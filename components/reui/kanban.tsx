@@ -93,6 +93,8 @@ const ColumnContext = createContext<{
 })
 
 const ItemContext = createContext<{
+  attributes?: DraggableAttributes
+  setActivatorNodeRef?: (node: HTMLElement | null) => void
   listeners: DraggableSyntheticListeners | undefined
   isDragging?: boolean
   disabled?: boolean
@@ -814,6 +816,7 @@ function KanbanItem({
 
   const {
     setNodeRef,
+    setActivatorNodeRef,
     transform,
     transition,
     attributes,
@@ -863,7 +866,7 @@ function KanbanItem({
       value={
         isOverlay
           ? { listeners: undefined, isDragging: true, disabled: false }
-          : { listeners, isDragging: isItemDragging, disabled }
+          : { attributes, setActivatorNodeRef, listeners, isDragging: isItemDragging, disabled }
       }
     >
       {useRender({
@@ -885,9 +888,11 @@ function KanbanItemHandle({
   cursor = true,
   ...props
 }: KanbanItemHandleProps) {
-  const { listeners, isDragging, disabled } = useContext(ItemContext)
+  const { attributes, setActivatorNodeRef, listeners, isDragging, disabled } = useContext(ItemContext)
 
   const defaultProps = {
+    ref: setActivatorNodeRef,
+    ...attributes,
     "data-slot": "kanban-item-handle",
     "data-dragging": isDragging,
     "data-disabled": disabled,

@@ -43,7 +43,7 @@ export function AppSidebar({ user, view, counts, recentIssues, selected, onNavig
   const personalItems = [
     { view: 'mine' as const, title: '我创建的', icon: UserRound },
     { view: 'shared' as const, title: '协作任务', icon: Users },
-    { view: 'review' as const, title: '待审阅', icon: Eye },
+    { view: 'review' as const, title: 'In Review', icon: Eye },
   ]
   return (
     <Sidebar variant="inset" {...props}>
@@ -74,7 +74,7 @@ export function AppSidebar({ user, view, counts, recentIssues, selected, onNavig
         }]} />
         {recentIssues.length > 0 && <SidebarGroup><SidebarGroupLabel>最近更新</SidebarGroupLabel><SidebarMenu>{recentIssues.slice(0, 5).map(issue => {
           const status = ISSUE_STATUSES.find(item => item.value === issue.status) ?? ISSUE_STATUSES[0]
-          return <SidebarMenuItem key={issue.id}><SidebarMenuButton tooltip={issue.title} isActive={selected === issue.id} onClick={() => { if (onOpen(issue.id)) setOpenMobile(false) }}><status.icon /><span>{issue.title}</span></SidebarMenuButton></SidebarMenuItem>
+          return <SidebarMenuItem key={issue.id}><SidebarMenuButton tooltip={issue.title} isActive={selected === issue.id} onClick={() => { if (onOpen(issue.id)) setOpenMobile(false) }}><status.icon className={status.indicatorClassName} /><span>{issue.title}</span></SidebarMenuButton></SidebarMenuItem>
         })}</SidebarMenu></SidebarGroup>}
       </SidebarContent>
       <SidebarFooter>

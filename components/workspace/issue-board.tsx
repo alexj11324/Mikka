@@ -1,14 +1,12 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { ChartNoAxesColumnIncreasing, GripVertical, Plus } from 'lucide-react'
+import { useId, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { moveIssue, type listIssues } from '@/app/actions/issues'
-import { Kanban, KanbanBoard, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay, type KanbanCommitMeta } from '@/components/reui/kanban'
-import { Badge } from '@/components/reui/badge'
+import { type KanbanCommitMeta } from '@/components/reui/kanban'
+import { KanbanBoard } from '@/components/blocks/kanban-board-1/components/kanban-board'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { IssuePropertyMenu } from './issue-property-menu'
-import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier, type IssueStatus } from './issue-properties'
+import { ISSUE_STATUSES, type IssueStatus } from './issue-properties'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Columns = Record<string, Issue[]>
@@ -26,8 +24,24 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
 }) {
   const [columns, setColumns] = useState<Columns>(() => groupIssues(issues))
   const [pending, setPending] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const issuesKey = JSON.stringify(issues)
+  const [sourceKey, setSourceKey] = useState(issuesKey)
+  if (issuesKey !== sourceKey && !dragging && !pending) {
+    setSourceKey(issuesKey)
+    setColumns(groupIssues(issues))
+  }
   const [message, setMessage] = useState('')
   const saving = useRef(false)
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const viewportId = useId()
+  const instructionsId = useId()
+
+  function scrollBoard(direction: -1 | 1) {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    viewport.scrollBy({ left: direction * Math.min(viewport.clientWidth * 0.8, 340), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+  }
 
   async function persist(issue: Issue, status: string, rollback: Columns) {
     if (saving.current) return
@@ -70,38 +84,23 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
   }
 
   return <section aria-label="任务看板" className="flex min-w-0 flex-1 flex-col gap-3 px-4 pb-6 sm:px-6">
-    <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || '拖动手柄跨列更新状态，列内按最近更新排序。'}</p>
-    <div className="min-w-0 overflow-x-auto pb-3">
-      <Kanban value={columns} onValueChange={setColumns} getItemValue={item => item.id} onValueCommit={commit} restoreOnCancel onDragStart={() => onBusyChange(true)} onDragCancel={() => onBusyChange(false)} onDragEnd={() => { if (!saving.current) onBusyChange(false) }} accessibility={{ screenReaderInstructions: { draggable: '按空格开始拖动，使用方向键移动到目标状态列，再按空格放下，按 Escape 取消。' } }}>
-        <KanbanBoard className="grid min-w-260 grid-cols-4 items-start gap-5">
-          {ISSUE_STATUSES.map(status => <KanbanColumn key={status.value} value={status.value}>
-            <header className="flex items-center justify-between gap-2 px-1 pb-3">
-              <div className="flex items-center gap-2"><status.icon className="size-4 text-muted-foreground" /><h2 className="text-sm font-medium">{status.label}</h2><Badge variant="outline">{columns[status.value]?.length ?? 0}</Badge></div>
-              <Button variant="ghost" size="icon-xs" aria-label={`新建${status.label}任务`} disabled={pending} onClick={() => onCreate(status.value)}><Plus /></Button>
-            </header>
-            <KanbanColumnContent value={status.value} aria-label={`${status.label}列`} className="min-h-96 gap-2 rounded-lg bg-muted/30 p-1.5">
-              {(columns[status.value] ?? []).map(issue => <KanbanItem key={issue.id} value={issue.id} disabled={pending} role="group" tabIndex={-1} aria-label={issue.title}>
-                <Card size="sm">
-                  <CardHeader>
-                    <div className="flex min-w-0 items-center justify-between gap-2">
-                      <span className="truncate font-mono text-xs text-muted-foreground">{issueIdentifier(issue.id)}</span>
-                      <KanbanItemHandle render={<Button variant="ghost" size="icon-xs" aria-label={`拖动任务：${issue.title}`} aria-roledescription="可拖动任务" disabled={pending} />}><GripVertical /></KanbanItemHandle>
-                    </div>
-                    <CardTitle><button type="button" disabled={pending} onClick={() => onOpen(issue.id)} className="w-full rounded-sm text-left leading-6 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">{issue.title}</button></CardTitle>
-                  </CardHeader>
-                  <CardContent><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><ChartNoAxesColumnIncreasing className="size-3.5" /><span>{ISSUE_PRIORITIES.find(item => item.value === issue.priority)?.label}</span></div></CardContent>
-                  <CardFooter className="justify-between gap-2">
-                    <IssuePropertyMenu label="移动到" value={status.value} options={ISSUE_STATUSES} icon={status.icon} disabled={pending} onChange={value => changeStatus(issue, value)} />
-                    <time className="shrink-0 text-xs tabular-nums text-muted-foreground" dateTime={new Date(issue.updatedAt).toISOString()}>{new Date(issue.updatedAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric', timeZone: 'UTC' })}</time>
-                  </CardFooter>
-                </Card>
-              </KanbanItem>)}
-              {!columns[status.value]?.length && <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground">拖动任务到这里</div>}
-            </KanbanColumnContent>
-          </KanbanColumn>)}
-        </KanbanBoard>
-        <KanbanOverlay className="rounded-lg border-2 border-dashed bg-muted/30" />
-      </Kanban>
+    <div className="flex items-center justify-between gap-3">
+      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || '左右滚动查看全部状态，拖动手柄跨列更新任务。'}</p>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="向左滚动看板" aria-controls={viewportId} onClick={() => scrollBoard(-1)}><ChevronLeft /></Button>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="向右滚动看板" aria-controls={viewportId} onClick={() => scrollBoard(1)}><ChevronRight /></Button>
+      </div>
     </div>
+    <p id={instructionsId} className="sr-only">使用触控板左右滑动、底部滚动条或左右按钮浏览。聚焦此区域后，可用左右方向键滚动，Home 返回开头，End 移至末尾。任务手柄上的方向键仍用于跨列拖动。</p>
+    <KanbanBoard value={columns} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onCreate={onCreate} onStatus={changeStatus} viewportRef={viewportRef} viewportId={viewportId} instructionsId={instructionsId} onViewportKeyDown={event => {
+      if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault()
+        scrollBoard(event.key === 'ArrowLeft' ? -1 : 1)
+      } else if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault()
+        event.currentTarget.scrollTo({ left: event.key === 'Home' ? 0 : event.currentTarget.scrollWidth })
+      }
+    }} onDragStart={() => { setDragging(true); onBusyChange(true) }} onDragCancel={() => { setDragging(false); onBusyChange(false) }} onDragEnd={() => { setDragging(false); if (!saving.current) onBusyChange(false) }} accessibility={{ screenReaderInstructions: { draggable: '按空格开始拖动，使用方向键移动到目标状态列，再按空格放下，按 Escape 取消。' } }} />
   </section>
 }

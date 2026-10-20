@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useRouter } from 'next/navigation'
-import { Columns3, List, Plus, Search } from 'lucide-react'
+import { Columns3, List, Search } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IssueBoard } from './issue-board'
 import { AppSidebar } from '@/components/app-sidebar'
@@ -29,6 +29,9 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
   const [selected, setSelected] = useState<string | null>(null)
   const [draftKey, setDraftKey] = useState(0)
   const [dirty, setDirty] = useState(false)
+  const flushDetail = useRef<(() => Promise<boolean>) | null>(null)
+  const leaving = useRef(false)
+  const registerFlush = useCallback((flush: (() => Promise<boolean>) | null) => { flushDetail.current = flush }, [])
   const [query, setQuery] = useState('')
   const [view, setView] = useState<IssueView>('all')
   const [creating, setCreating] = useState(false)
@@ -50,29 +53,41 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
   const [accountError, setAccountError] = useState('')
   const router = useRouter()
   const onDirty = useCallback((value: boolean) => setDirty(value), [])
+  async function leave(action: () => void | Promise<void>) {
+    leaving.current = true
+    try {
+      if (flushDetail.current) {
+        if (!await flushDetail.current()) return
+      } else if (dirty) return
+      setDirty(false)
+      await action()
+    } finally { leaving.current = false }
+  }
   function open(id: string | null) {
-    if (boardBusy || (dirty && !window.confirm('有未保存的修改，确定放弃这些修改？'))) return false
-    setDirty(false); setSelected(id); setDraftKey(value => value + 1)
+    if (boardBusy || leaving.current) return false
+    void leave(() => { setSelected(id); setDraftKey(value => value + 1) })
     return true
   }
-  function saved(id: string) { setSelected(id); void mutate() }
+  const saved = useCallback((id: string) => { setSelected(id); void mutate() }, [mutate])
   function create(status: IssueStatus = ISSUE_STATUSES.some(item => item.value === view) ? view as IssueStatus : 'todo') { if (boardBusy) return; setCreateStatus(status); setCreating(true) }
-  async function signOut() {
-    if (dirty && !window.confirm('有未保存的修改，确定退出？')) return
-    setSigningOut(true); setAccountError('')
-    try {
-      const result = await authClient.signOut()
-      if (result.error) throw new Error('sign out failed')
-      await mutate([], { revalidate: false }); router.replace('/sign-in'); router.refresh()
-    } catch { setAccountError('退出失败，请稍后重试。'); setSigningOut(false) }
+  function signOut() {
+    if (boardBusy || leaving.current) return
+    void leave(async () => {
+      setSigningOut(true); setAccountError('')
+      try {
+        const result = await authClient.signOut()
+        if (result.error) throw new Error('sign out failed')
+        await mutate([], { revalidate: false }); router.replace('/sign-in'); router.refresh()
+      } catch { setAccountError('退出失败，请稍后重试。'); setSigningOut(false) }
+    })
   }
   function navigate(next: IssueView) {
-    if (boardBusy || (dirty && !window.confirm('有未保存的修改，确定放弃这些修改？'))) return false
-    setDirty(false); setSelected(null); setView(next); setQuery(''); setDraftKey(value => value + 1)
+    if (boardBusy || leaving.current) return false
+    void leave(() => { setSelected(null); setView(next); setQuery(''); setDraftKey(value => value + 1) })
     return true
   }
   const filtered = tasks.filter(task => (view === 'all' || (view === 'mine' ? task.ownerId === user.id : view === 'shared' ? task.ownerId !== user.id : task.status === view)) && `${issueIdentifier(task.id)} ${task.title}`.toLowerCase().includes(query.trim().toLowerCase()))
-  const counts: Record<IssueView, number> = { all: tasks.length, mine: 0, shared: 0, todo: 0, doing: 0, review: 0, done: 0 }
+  const counts: Record<IssueView, number> = { all: tasks.length, mine: 0, shared: 0, backlog: 0, todo: 0, doing: 0, review: 0, done: 0, canceled: 0, duplicate: 0 }
   for (const task of tasks) {
     if (ISSUE_STATUSES.some(status => status.value === task.status)) counts[task.status as IssueStatus]++
     counts[task.ownerId === user.id ? 'mine' : 'shared']++
@@ -87,16 +102,16 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
           <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
           <Breadcrumb aria-label="当前位置"><BreadcrumbList><BreadcrumbItem className="hidden sm:inline-flex"><span>{WORKSPACE_NAME}</span></BreadcrumbItem><BreadcrumbSeparator className="hidden sm:block" /><BreadcrumbItem><BreadcrumbPage>{selected ? issueIdentifier(selected) : viewTitle}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
         </div>
-        <div className="flex shrink-0 items-center gap-2"><Button variant="ghost" size="icon-sm" aria-label="打开全局搜索" disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search /></Button><Button size="sm" disabled={boardBusy} onClick={() => create()}><Plus data-icon="inline-start" />新建任务</Button></div>
+        <div className="flex shrink-0 items-center gap-2"><Button variant="ghost" size="icon-sm" aria-label="打开全局搜索" disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search /></Button></div>
       </header>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {error && <p role="alert" className="px-6 py-2 text-xs text-destructive">列表更新失败，已保留上次结果。</p>}
-      {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onClose={() => open(null)} /> : <>
+      {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} /> : <>
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <div className="flex items-center gap-2"><h1 className="text-sm font-semibold">{viewTitle}</h1><Badge variant="secondary">{filtered.length}</Badge></div>
           <div className="flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto"><div className="flex min-w-0 items-center gap-2 sm:w-48"><Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" /><Input aria-label="搜索任务" placeholder="搜索任务…" value={query} onChange={event => setQuery(event.target.value)} disabled={boardBusy} /></div><ToggleGroup aria-label="任务视图" size="sm" variant="outline" spacing={0} disabled={boardBusy} value={[layout]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') setLayout(next) }}><ToggleGroupItem value="list" aria-label="列表视图"><List /></ToggleGroupItem><ToggleGroupItem value="board" aria-label="看板视图"><Columns3 /></ToggleGroupItem></ToggleGroup></div>
         </div>
-        {layout === 'board' ? <IssueBoard key={filtered.map(issue => `${issue.id}:${issue.revision}:${issue.status}`).join('|')} issues={filtered} onOpen={open} onCreate={create} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={open} onCreate={() => create()} />}
+        {layout === 'board' ? <IssueBoard issues={filtered} onOpen={open} onCreate={create} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={open} onCreate={() => create()} />}
       </>}
     </SidebarInset>
     {creating && <CreateIssueDialog initialStatus={createStatus} open={creating} onOpenChange={setCreating} onCreated={() => { void mutate() }} author={user.name || user.email} />}

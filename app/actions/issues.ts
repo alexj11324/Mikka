@@ -20,7 +20,7 @@ const documentSchema = z.custom<JSONContent>(value => {
 }, '文档格式不正确或超过大小限制。')
 const inputSchema = z.object({
   title: z.string().trim().min(1, '请填写任务标题。').max(200),
-  content: documentSchema, status: z.enum(['todo','doing','review','done']),
+  content: documentSchema, status: z.enum(['backlog','todo','doing','review','done','canceled','duplicate']),
   priority: z.enum(['urgent','high','normal','low']),
 })
 
