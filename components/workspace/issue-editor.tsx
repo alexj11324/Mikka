@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
+import { IssueActivity } from './issue-activity'
 import { useEditor, getSchema, type JSONContent } from "@tiptap/react"
 import { Collaboration } from "@tiptap/extension-collaboration"
 import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap"
@@ -32,9 +33,9 @@ import { CommentMark, CommentPaint, addThread, createThreadStore, replyToThread,
 const EMPTY_DOCUMENT: JSONContent = { type: "doc", content: [{ type: "paragraph" }] }
 const EMPTY_THREADS: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadIndex = {}
 
-function createEditorExtensions(isOpen: (id: string) => boolean, author: string, collaborative: boolean) {
+function createEditorExtensions(isOpen: (id: string) => boolean, author: string, collaborative: boolean, compact = false) {
   return [
-    ...createRichTextExtensions({ placeholder: "描述背景与验收标准，输入 / 插入内容…", collaborative }),
+    ...createRichTextExtensions({ placeholder: compact ? '添加描述…' : '描述背景与验收标准，输入 / 插入内容…', collaborative }),
     RichTextBlockActions, RichTextTable, RichTextOutlineBlock, createRichTextMention([]),
     RichTextSlashCommand.configure({ items: [...RICH_TEXT_BASIC_SLASH_ITEMS, RICH_TEXT_TABLE_SLASH_ITEM, RICH_TEXT_OUTLINE_SLASH_ITEM] }),
     RichTextChanges.configure({ author, tracking: false, now: () => new Date().toISOString() }),
@@ -48,7 +49,7 @@ export function createDocumentSeed(content: JSONContent) {
   doc.destroy()
   return update
 }
-export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作者', syncLabel = '未保存草稿', replacement, persisted = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; persisted?: boolean }) {
+export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作者', syncLabel = '未保存草稿', replacement, persisted = false, compact = false, layout = 'document', activity }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue'; activity?: ReactNode }) {
   const [localDoc] = useState(() => new Y.Doc())
   const threadDoc = sharedDoc ?? localDoc
   const threadStore = useMemo(() => createThreadStore(threadDoc), [threadDoc])
@@ -66,9 +67,9 @@ export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作�
   const changeRef = useRef(onChange)
   changeRef.current = onChange
   const extensions = useMemo(() => [
-    ...createEditorExtensions(threadStore.isOpen, author, !!sharedDoc),
+    ...createEditorExtensions(threadStore.isOpen, author, !!sharedDoc, compact),
     ...(sharedDoc ? [Collaboration.configure({ document: sharedDoc })] : []),
-  ], [threadStore, author, sharedDoc])
+  ], [threadStore, author, sharedDoc, compact])
   const editor = useEditor({
     extensions,
     content: sharedDoc ? undefined : content ?? EMPTY_DOCUMENT,
@@ -125,6 +126,42 @@ export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作�
   }
   const threadList = Object.values(threads)
   const openCount = threadList.filter(thread => !thread.resolved).length
+
+  if (compact) return <TooltipProvider delay={300}><section aria-label="任务描述编辑器">
+    <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn("min-h-28 text-sm/7", RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE)} />
+    {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
+    <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
+  </section></TooltipProvider>
+
+  if (layout === 'issue') return <TooltipProvider delay={300}>
+    <section aria-label="任务描述编辑器" className="flex min-w-0 flex-col gap-2">
+      <div ref={pageRef} className="relative min-w-0">
+        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-36 py-1 text-sm/7', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+        {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-7">
+        <span className="text-xs text-muted-foreground">输入 / 插入内容，选中文字设置格式</span>
+        <Button variant="ghost" size="xs" onClick={() => setPanel(panel === 'comments' ? '' : 'comments')} aria-expanded={panel === 'comments'}><MessageSquare data-icon="inline-start" />选区评论</Button>
+      </div>
+      {panel === 'comments' && <div className="flex flex-col gap-3 rounded-lg border p-4">
+        <p className="text-xs text-muted-foreground">选中描述中的一段文字，再添加评论。</p>
+        <FieldGroup><Field><FieldLabel htmlFor="selection-comment" className="sr-only">选区评论内容</FieldLabel><Input id="selection-comment" value={comment} onChange={event => setComment(event.target.value)} maxLength={2000} placeholder="写下选区评论…" /></Field></FieldGroup>
+        <div className="flex justify-end"><Button size="sm" variant="outline" disabled={!comment.trim()} onClick={addComment}>添加选区评论</Button></div>
+        {commentError && <p role="alert" className="text-xs text-destructive">{commentError}</p>}
+      </div>}
+    </section>
+    <IssueActivity author={author} threads={threadList} anchors={anchors} events={activity} onComment={body => {
+      const now = new Date().toISOString()
+      addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, createdAt: now, messages: [{ author, body, at: now }] }, 'issue-discussion')
+    }} onReply={(id, body) => { replyToThread(threadDoc, id, { author, body, at: new Date().toISOString() }) }} onResolve={(id, resolved) => { setThreadResolved(threadDoc, id, resolved) }} onSelect={id => {
+      if (!editor) return
+      let from: number | undefined
+      let to = 0
+      editor.state.doc.descendants((node, pos) => { if (node.isText && node.marks.some(mark => mark.type.name === 'comment' && mark.attrs.id === id)) { from ??= pos; to = pos + node.nodeSize } })
+      if (from !== undefined) editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run()
+    }} />
+    <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
+  </TooltipProvider>
 
   return <TooltipProvider delay={300}><section aria-label="任务描述编辑器" className="overflow-hidden rounded-lg border bg-background">
     <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-3 py-2">

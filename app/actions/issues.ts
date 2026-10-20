@@ -26,7 +26,7 @@ const inputSchema = z.object({
 
 export async function listIssues() {
   const userId = await getUserId()
-  return db.select({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt }).from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))).orderBy(desc(issues.updatedAt)).limit(100)
+  return db.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt }).from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))).orderBy(desc(issues.updatedAt)).limit(100)
 }
 export async function getIssue(id: string) {
   return (await requireIssueAccess(id)).issue
@@ -57,6 +57,15 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
     return { error: '保存未成功，请保留当前页面后重试。' }
   }
 }
+export async function moveIssue(input: { id: string; status: string; revision: number }) {
+  const parsed = z.object({ id: z.uuid(), status: inputSchema.shape.status, revision: z.number().int().positive() }).safeParse(input)
+  if (!parsed.success) return { error: '任务移动信息不正确。' }
+  const issue = await getIssue(parsed.data.id)
+  if (issue.revision !== parsed.data.revision) return { error: '任务已被其他成员更新，已恢复最新状态，请重试。' }
+  if (issue.status === parsed.data.status) return { issue }
+  return saveIssue({ ...issue, status: parsed.data.status })
+}
+
 export async function listIssueVersions(id: string) {
   const { issue } = await requireIssueAccess(id)
   const userId = issue.userId
