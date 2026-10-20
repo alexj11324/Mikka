@@ -12,5 +12,5 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   const query = await searchParams
   const session = await auth.api.getSession({ headers: await headers() })
   if (session?.user) redirect('/')
-  return <AuthForm mode="sign-in" githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean((query as Record<string, string>).error)} continueGitHub={query.continue === 'github'} callbackURL={authBaseURL ? `${authBaseURL.replace(/\/$/, '')}/api/auth/callback/github` : undefined} />
+  return <AuthForm mode="sign-in" testWorkspaceEnabled={process.env.NODE_ENV === 'development'} githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean((query as Record<string, string>).error)} continueGitHub={query.continue === 'github'} callbackURL={authBaseURL ? `${authBaseURL.replace(/\/$/, '')}/api/auth/callback/github` : undefined} />
 }
