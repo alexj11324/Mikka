@@ -8,7 +8,7 @@ const fontChinese = Noto_Sans_SC({ subsets: ['latin'], variable: '--font-noto-sc
 
 
 export const metadata: Metadata = {
-  title: "Orbit · 任务与文档工作台",
+  title: "Orvilo2 · 任务与文档工作台",
   description: "安全管理任务、编辑结构化文档，保存并查看每一次文档版本。",
   robots: { index: false, follow: false }, 
 };
