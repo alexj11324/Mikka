@@ -136,7 +136,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作�
   if (layout === 'issue') return <TooltipProvider delay={300}>
     <section aria-label="任务描述编辑器" className="flex min-w-0 flex-col gap-2">
       <div ref={pageRef} className="relative min-w-0">
-        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-36 py-1 text-sm/7', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-36 py-1 text-base/8', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
         {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 pb-7">
