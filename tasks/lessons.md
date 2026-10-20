@@ -40,3 +40,30 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 **顺带**：查「实际渲染字体的物理文件名」不要靠 `getComputedStyle().fontFamily`
 （那只是声明的字体栈），要用 CDP 的 **`CSS.getPlatformFontsForNode`**。
 调用前必须先 `DOM.getDocument` 填充节点表，否则报 "Could not find node with given id"。
+
+---
+
+## 2026-10-20 不要用一个窗口的查询结果去概括整体状态
+
+**发生了什么**：我说「CI 从来没跑起来过，GitHub Actions 因账单全停」，
+并把这个结论写进了 PR #3 的描述。用户反问「怎么可能，我已经公开仓库了呀」。
+
+**真相**：仓库是 public，CI 完全正常，账单问题只在 21:44–22:51 卡了一段。
+我跑的是 `gh run list --limit 8`，那 8 条**恰好全落在故障窗口内**，
+于是我把「这 8 条失败」当成了「从来都是失败」。
+
+**规则**：
+
+1. **说「一直」「从来」「总是」之前，必须拉全量历史再下结论**。
+   `gh run list --limit N` 的 N 是个陷阱 —— 先看时间跨度够不够，
+   或者直接按结论分组统计：`--json conclusion --jq 'group_by(.conclusion)[] | ...'`。
+   本次只要跑一句 `group_by` 就能看到「success: 9 次」，立刻发现结论错了。
+2. **临时性故障不要写成系统性故障**。看到 billing/quota/rate-limit 这类错误，
+   先看时间分布：如果前后都有成功的运行，那是临时抖动，不是坏掉。
+3. **错误结论一旦写进 PR 描述 / commit message，就进了仓库历史**，
+   发现后要主动去改（`gh pr edit <n> --body`），不能只在对话里更正。
+
+**为什么容易犯**：`gh run list` 默认按时间倒序，最新的一批最显眼。
+故障窗口通常就在最近，所以「最近的都失败」会强烈暗示「一直失败」。
+这是个采样偏差，不是数据问题。
+
