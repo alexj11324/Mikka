@@ -57,7 +57,7 @@
 --card-foreground: oklch(0.145 0 0);
 --popover: oklch(1 0 0);
 --popover-foreground: oklch(0.145 0 0);
---primary: oklch(0.205 0 0);
+--primary: oklch(0.53 0.185 278);
 --primary-foreground: oklch(0.985 0 0);
 --secondary: oklch(0.97 0 0);
 --secondary-foreground: oklch(0.205 0 0);
@@ -75,11 +75,11 @@
 --chart-4: oklch(0.371 0 0);
 --chart-5: oklch(0.269 0 0);
 --radius: 0.625rem;
---sidebar: oklch(0.985 0 0);
+--sidebar: oklch(0.974 0.003 270);
 --sidebar-foreground: oklch(0.145 0 0);
 --sidebar-primary: oklch(0.205 0 0);
 --sidebar-primary-foreground: oklch(0.985 0 0);
---sidebar-accent: oklch(0.97 0 0);
+--sidebar-accent: oklch(0.932 0.008 280);
 --sidebar-accent-foreground: oklch(0.205 0 0);
 --sidebar-border: oklch(0.922 0 0);
 --sidebar-ring: oklch(0.708 0 0);
@@ -92,8 +92,8 @@
 --card-foreground: oklch(0.985 0 0);
 --popover: oklch(0.205 0 0);
 --popover-foreground: oklch(0.985 0 0);
---primary: oklch(0.922 0 0);
---primary-foreground: oklch(0.205 0 0);
+--primary: oklch(0.72 0.15 280);
+--primary-foreground: oklch(0.15 0.02 280);
 --secondary: oklch(0.269 0 0);
 --secondary-foreground: oklch(0.985 0 0);
 --muted: oklch(0.269 0 0);
@@ -118,6 +118,59 @@
 --sidebar-border: oklch(1 0 0 / 10%);
 --sidebar-ring: oklch(0.556 0 0);
 }
+
+@theme inline {
+  --color-success: var(--success);
+}
+
+:root {
+  --success: oklch(0.47 0.105 160);
+  --role-blue: oklch(0.51 0.12 250);
+  --workflow-surface: oklch(0.979 0.005 280);
+}
+.dark {
+  --success: oklch(0.74 0.13 160);
+  --role-blue: oklch(0.72 0.12 250);
+  --workflow-surface: oklch(0.19 0.012 280);
+}
+.brand-mark {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: inset 0 1px 1px #ffffff30;
+}
+.workflow-canvas {
+  background-color: var(--workflow-surface);
+  background-image: radial-gradient(var(--border) 0.8px, transparent 0.8px);
+  background-size: 13px 13px;
+}
+.role-icon {
+  display: flex;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+.role-icon.violet { background: color-mix(in oklch, var(--primary) 9%, transparent); color: var(--primary); }
+.role-icon.blue { background: color-mix(in oklch, var(--role-blue) 9%, transparent); color: var(--role-blue); }
+.role-icon.green { background: color-mix(in oklch, var(--success) 9%, transparent); color: var(--success); }
+.theme-moon { display: none; }
+.dark .theme-moon { display: block; }
+.dark .theme-sun { display: none; }
+.issue-title-input {
+  border: 0;
+  border-radius: 0;
+  padding-left: 0;
+  font-size: 21px;
+  height: 42px;
+  font-weight: 600;
+  box-shadow: none;
+}
+.issue-title-input:focus-visible { box-shadow: none; }
+button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+main { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 
 @layer base {
 * {
