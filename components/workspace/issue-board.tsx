@@ -76,23 +76,16 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
     void persist(issue, meta.overContainer, meta.previousValue)
   }
 
-  function changeStatus(issue: Issue, status: string) {
-    if (saving.current) return
-    const previous = columns
-    setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, key === status ? [issue, ...items.filter(item => item.id !== issue.id)] : items.filter(item => item.id !== issue.id)])))
-    void persist(issue, status, previous)
-  }
-
   return <section aria-label="任务看板" className="flex min-w-0 flex-1 flex-col gap-3 px-4 pb-6 sm:px-6">
     <div className="flex items-center justify-between gap-3">
-      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || '左右滚动查看全部状态，拖动手柄跨列更新任务。'}</p>
+      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || '左右滚动查看全部状态，拖动卡片跨列更新任务，点击标题打开详情。'}</p>
       <div className="flex shrink-0 items-center gap-1">
         <Button type="button" variant="ghost" size="icon-sm" aria-label="向左滚动看板" aria-controls={viewportId} onClick={() => scrollBoard(-1)}><ChevronLeft /></Button>
         <Button type="button" variant="ghost" size="icon-sm" aria-label="向右滚动看板" aria-controls={viewportId} onClick={() => scrollBoard(1)}><ChevronRight /></Button>
       </div>
     </div>
-    <p id={instructionsId} className="sr-only">使用触控板左右滑动、底部滚动条或左右按钮浏览。聚焦此区域后，可用左右方向键滚动，Home 返回开头，End 移至末尾。任务手柄上的方向键仍用于跨列拖动。</p>
-    <KanbanBoard value={columns} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onCreate={onCreate} onStatus={changeStatus} viewportRef={viewportRef} viewportId={viewportId} instructionsId={instructionsId} onViewportKeyDown={event => {
+    <p id={instructionsId} className="sr-only">使用触控板左右滑动、底部滚动条或左右按钮浏览。聚焦此区域后，可用左右方向键滚动，Home 返回开头，End 移至末尾。聚焦可拖动卡片后，按空格开始拖动，使用方向键跨列移动，再按空格放下；Escape 取消。</p>
+    <KanbanBoard value={columns} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onCreate={onCreate} viewportRef={viewportRef} viewportId={viewportId} instructionsId={instructionsId} onViewportKeyDown={event => {
       if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         event.preventDefault()

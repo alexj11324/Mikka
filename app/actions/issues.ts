@@ -5,7 +5,7 @@ import { and, desc, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { issues, issueVersions, issueMembers } from '@/lib/db/schema'
+import { issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import type { JSONContent } from '@tiptap/react'
 
@@ -26,7 +26,7 @@ const inputSchema = z.object({
 
 export async function listIssues() {
   const userId = await getUserId()
-  return db.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt }).from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))).orderBy(desc(issues.updatedAt)).limit(100)
+  return db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))).orderBy(desc(issues.updatedAt)).limit(100)
 }
 export async function getIssue(id: string) {
   return (await requireIssueAccess(id)).issue
