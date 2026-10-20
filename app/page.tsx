@@ -1,5 +1,5 @@
-import { WorkspaceShell } from "@/components/workspace/workspace-shell"
+import { Demo } from "@/components/demo"
 
 export default function Page() {
-  return <WorkspaceShell setup={{ database: Boolean(process.env.DATABASE_URL), authSecret: Boolean(process.env.BETTER_AUTH_SECRET), reuiLicense: Boolean(process.env.REUI_LICENSE_KEY) }} />
+  return <Demo />
 }
