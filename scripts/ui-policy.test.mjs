@@ -1,22 +1,27 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { execFile, execFileSync } from 'node:child_process'
+import { promisify } from 'node:util'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { auditSource, auditCss, registryPreviewSources, sourceHash, splitUtilities, utilityBase } from './ui-policy.mjs'
+import { auditSource, auditCss, isComponentLibrarySource, splitUtilities, utilityBase } from './ui-policy.mjs'
 
 const policy = JSON.parse(readFileSync(new URL('../ui-policy.json', import.meta.url), 'utf8'))
 const prefix = `import { cn } from '@/lib/utils'; import { Button } from '@/components/ui/button';`
-const rules = (source, options) => auditSource('components/example.tsx', source, policy, options).map(d => d.rule)
-const has = (source, rule, options) => assert.ok(rules(source, options).includes(rule), `${rule}: ${source}`)
+const rules = source => auditSource('components/example.tsx', source, policy).map(d => d.rule)
+const has = (source, rule) => assert.ok(rules(source).includes(rule), `${rule}: ${source}`)
 
 for (const [label, source, rule] of [
-  ['raw HTML', '<button>Save</button>', 'registry/no-handwritten-ui'],
-  ['HTML alias', 'const Tag = "button"; const ui = <Tag />', 'registry/no-handwritten-ui'],
-  ['UI directory is not trusted', '<div className="flex" />', 'registry/no-handwritten-ui'],
-  ['primitive bypass', 'import { Button } from "@base-ui/react/button"; const ui = <Button />', 'registry/no-primitive-bypass'],
-  ['factory alias', 'import { createElement as make } from "react"; make("button")', 'registry/no-element-factory'],
-  ['DOM factory', 'document.createElement("button")', 'registry/no-custom-implementation'],
-  ['custom variants', 'import { cva } from "class-variance-authority"; cva("bg-muted")', 'registry/no-custom-implementation'],
-  ['spread props', '<Button {...props} />', 'registry/no-unchecked-spread'],
+  ['raw HTML', '<button>Save</button>', 'components/no-handwritten-ui'],
+  ['HTML alias', 'const Tag = "button"; const ui = <Tag />', 'components/no-handwritten-ui'],
+  ['handwritten business layout', '<div className="flex" />', 'components/no-handwritten-ui'],
+  ['primitive bypass', 'import { Button } from "@base-ui/react/button"; const ui = <Button />', 'components/no-primitive-bypass'],
+  ['factory alias', 'import { createElement as make } from "react"; make("button")', 'components/no-element-factory'],
+  ['DOM factory', 'document.createElement("button")', 'components/no-custom-implementation'],
+  ['custom variants', 'import { cva } from "class-variance-authority"; cva("bg-muted")', 'components/no-custom-implementation'],
+  ['spread props', '<Button {...props} />', 'components/no-unchecked-spread'],
   ['inline style', '<Button style={{ color: "red" }} />', 'style/no-inline-ui'],
   ['inline font', '<Button style={{ fontSize: 13 }} />', 'typography/no-inline-values'],
   ['arbitrary font size', '<Button className="text-[13px]" />', 'typography/preset-only'],
@@ -75,22 +80,21 @@ test('valid grouped items + title + avatar', () => {
   assert.deepEqual(rules(source), [])
 })
 
-test('verified registry source permits its implementation but NOT non-preset typography', () => {
-  assert.deepEqual(rules('<div className="text-sm font-medium" />', { verified: true }), [])
-  has('<div className="text-[13px]" />', 'typography/preset-only', { verified: true })
-  has('<div style={{ fontSize: 13 }} />', 'typography/no-inline-values', { verified: true })
-  has('<div className="[font-size:13px]" />', 'typography/preset-only', { verified: true })
-  has('<div className="hover:!text-[13px]" />', 'typography/preset-only', { verified: true })
+test('business code cannot bypass typography presets', () => {
+  has('<Button className="text-[13px]" />', 'typography/preset-only')
+  has('<Button style={{ fontSize: 13 }} />', 'typography/no-inline-values')
+  has('<Button className="[font-size:13px]" />', 'typography/preset-only')
+  has('<Button className="hover:!text-[13px]" />', 'typography/preset-only')
 })
 
 test('system colors are not mistaken for arbitrary font sizes', () => {
-  const diagnostics = rules('<div className="text-[CanvasText] text-[color:var(--color)]" />', { verified: true })
+  const diagnostics = rules('<div className="text-[CanvasText] text-[color:var(--color)]" />')
   assert.ok(!diagnostics.includes('typography/preset-only'))
   assert.ok(diagnostics.includes('style/semantic-colors'))
 })
 
 test('arbitrary lengths are typography, not colors', () => {
-  const diagnostics = rules('<div className="text-[13px]" />', { verified: true })
+  const diagnostics = rules('<div className="text-[13px]" />')
   assert.ok(diagnostics.includes('typography/preset-only'))
   assert.ok(!diagnostics.includes('style/semantic-colors'))
 })
@@ -102,26 +106,56 @@ test('CSS cannot bypass typography restrictions', () => {
 
 test('framework html/body shell is not mistaken for a handmade widget', () => {
   assert.deepEqual(auditSource('app/layout.tsx', '<html lang="zh-CN"><body>{children}</body></html>', policy), [])
-  assert.ok(auditSource('app/layout.tsx', '<html><body><div /></body></html>', policy).some(d => d.rule === 'registry/no-handwritten-ui'))
+  assert.ok(auditSource('app/layout.tsx', '<html><body><div /></body></html>', policy).some(d => d.rule === 'components/no-handwritten-ui'))
 })
 
-test('source receipts ignore formatting but detect implementation edits', () => {
-  assert.equal(sourceHash('const a = "hello";'), sourceHash("const a='hello'"))
-  assert.equal(sourceHash('<Card>\n  <Button />\n</Card>'), sourceHash('<Card><Button /></Card>'))
-  assert.equal(sourceHash('<Card className="cn-font-heading" />'), sourceHash('<Card className="font-heading" />'))
-  assert.equal(sourceHash('import { Button } from "@/registry/base-nova/ui/button"'), sourceHash('import { Button } from "@/components/ui/button"'))
-  assert.notEqual(sourceHash('<button />'), sourceHash('<div />'))
-  assert.notEqual(sourceHash('<Button className="flex" />'), sourceHash('<Button className="flex text-sm" />'))
-  assert.notEqual(sourceHash('const a = "hello";'), sourceHash('const a = "changed";'))
-  assert.notEqual(sourceHash('.x { color: red }', 'a.css'), sourceHash('.x { color: blue }', 'a.css'))
+test('only the configured component-library directories are outside the business UI audit', () => {
+  for (const file of ['components/ui/button.tsx', 'components/reui/frame.tsx', 'components/blocks/rich-text-editor-2/page.tsx']) assert.ok(isComponentLibrarySource(file, policy))
+  for (const file of ['components/auth-form.tsx', 'components/workspace/issue-editor.tsx', 'components/ui-custom.tsx', 'app/page.tsx']) assert.ok(!isComponentLibrarySource(file, policy))
 })
 
-test('registry preview extracts only CLI generated sources and fails closed', () => {
-  const preview = '┌ shadcn add (dry run)\n├ components/ui/button.tsx (skip) 2 lines\n│ │ import React from "react"\n│ │ const ui = <button />\n│ └──\n├ components/ui/card.tsx (overwrite) 1 lines\n│ │ const card = <div />\n└ Run without --dry-run to apply.'
-  const files = registryPreviewSources(preview)
-  assert.equal(files.get('components/ui/button.tsx'), 'import React from "react"\nconst ui = <button />')
-  assert.equal(files.get('components/ui/card.tsx'), 'const card = <div />')
-  assert.equal(registryPreviewSources('unexpected CLI output').size, 0)
+test('lint permits imported components but fails handwritten business UI without any source lock', async () => {
+  const cwd = mkdtempSync(path.join(tmpdir(), 'orvilo-ui-policy-'))
+  const filename = 'components/example.tsx'
+  const original = 'import { Button } from "@/components/ui/button"; export const Example = () => <Button variant="outline">Save</Button>'
+  const execute = async () => {
+    let result
+    try {
+      result = { ...await promisify(execFile)(process.execPath, [fileURLToPath(new URL('./lint-ui.mjs', import.meta.url)), '--json'], { cwd, encoding: 'utf8', timeout: 15000 }), status: 0 }
+    } catch (error) {
+      assert.equal(typeof error.code, 'number')
+      assert.ok(!error.killed, 'Lint subprocess must finish before its timeout')
+      result = { ...error, status: error.code }
+    }
+    return { status: result.status, report: JSON.parse(result.stdout) }
+  }
+  try {
+    execFileSync('git', ['init', '--quiet'], { cwd })
+    for (const library of policy.componentRoots) {
+      mkdirSync(path.join(cwd, library), { recursive: true })
+      writeFileSync(path.join(cwd, library, 'example.tsx'), 'export const LibraryComponent = () => <button className="text-[13px]">Save</button>')
+    }
+    writeFileSync(path.join(cwd, 'ui-policy.json'), JSON.stringify(policy))
+    writeFileSync(path.join(cwd, 'components.json'), JSON.stringify({ style: policy.style, iconLibrary: policy.iconLibrary.replace('-react', '') }))
+    writeFileSync(path.join(cwd, filename), original)
+    const composed = await execute()
+    assert.equal(composed.status, 0)
+    assert.equal(composed.report.errors, 0)
+    assert.equal(composed.report.libraryFiles, policy.componentRoots.length)
+    assert.equal(composed.report.files, 1)
+    writeFileSync(path.join(cwd, filename), 'export const Example = () => <button>Save</button>')
+    const handwritten = await execute()
+    assert.equal(handwritten.status, 1)
+    assert.ok(handwritten.report.diagnostics.some(d => d.rule === 'components/no-handwritten-ui'))
+    assert.ok(handwritten.report.diagnostics.every(d => d.file === filename))
+    writeFileSync(path.join(cwd, filename), original.replace('variant="outline"', 'style={{ fontSize: 13 }}'))
+    const styled = await execute()
+    assert.equal(styled.status, 1)
+    assert.ok(styled.report.diagnostics.some(d => d.rule === 'style/no-inline-ui'))
+    assert.ok(styled.report.diagnostics.some(d => d.rule === 'typography/no-inline-values'))
+  } finally {
+    rmSync(cwd, { recursive: true, force: true })
+  }
 })
 
 test('utility parser respects bracket expressions and variants', () => {

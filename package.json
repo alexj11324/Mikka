@@ -11,9 +11,6 @@
     "lint:code": "oxlint --deny-warnings",
     "lint:ui": "node scripts/lint-ui.mjs",
     "test:ui-policy": "node --test scripts/ui-policy.test.mjs",
-    "registry:record": "node scripts/registry-ui.mjs",
-    "registry:refresh": "node scripts/registry-ui.mjs --refresh",
-    "registry:verify": "node scripts/registry-ui.mjs --verify",
     "start": "next start",
     "typecheck": "tsgo --noEmit"
   },

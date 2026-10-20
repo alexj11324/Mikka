@@ -1,47 +1,8 @@
 import ts from 'typescript'
 import postcss from 'postcss'
-import { createHash } from 'node:crypto'
 
-export function sourceHash(text, file = 'component.tsx') {
-  if (file.endsWith('.css')) return createHash('sha256').update(text.replaceAll('\r\n', '\n').trim()).digest('hex')
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-  const tokens = []
-  function visit(node) {
-    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      const value = ts.isImportDeclaration(node.parent) || ts.isExportDeclaration(node.parent)
-        ? node.text.replace(/^@\/registry\/(?:base|radix)-(?:nova|vega|maia|lyra|mira|luma|sera|rhea)\/(ui|lib|hooks)\//, (_, directory) => directory === 'ui' ? '@/components/ui/' : `@/${directory}/`)
-        : node.text.replace(/\bcn-font-heading\b/g, 'font-heading')
-      tokens.push([node.kind, value])
-      return
-    }
-    if (ts.isIdentifier(node)) {
-      tokens.push([node.kind, node.text])
-      return
-    }
-    if (ts.isJsxText(node)) {
-      if (node.text.trim()) tokens.push([node.kind, node.text.trim()])
-      return
-    }
-    const children = []
-    ts.forEachChild(node, child => { children.push(child) })
-    tokens.push(children.length ? [node.kind] : [node.kind, node.getText(source)])
-    children.forEach(visit)
-  }
-  visit(source)
-  return createHash('sha256').update(JSON.stringify(tokens)).digest('hex')
-}
-
-export function registryPreviewSources(output) {
-  const files = new Map()
-  let current
-  for (const line of output.split('\n')) {
-    const heading = line.match(/^├ (.+?) \((?:create|overwrite|skip)\)/)
-    if (heading) {
-      current = []
-      files.set(heading[1], current)
-    } else if (current && line.startsWith('│ │ ')) current.push(line.slice(4))
-  }
-  return new Map([...files].filter(([, lines]) => lines.length).map(([file, lines]) => [file, lines.join('\n')]))
+export function isComponentLibrarySource(file, policy) {
+  return policy.componentRoots.some(root => file.startsWith(root))
 }
 
 export function splitUtilities(value) {
@@ -105,7 +66,7 @@ function checkUtility(token, policy, report) {
   if (/(?:^|:)dark:/.test(token) && /^(?:bg|text|border|ring|fill|stroke|outline)-/.test(base)) report('style/no-dark-color-override', `用语义 token 处理明暗主题，不单独覆盖 ${token}。`)
 }
 
-export function auditSource(file, text, policy, { verified = false } = {}) {
+export function auditSource(file, text, policy) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), variables = new Map(), seen = new Set()
   const add = (node, rule, message) => {
@@ -127,7 +88,7 @@ export function auditSource(file, text, policy, { verified = false } = {}) {
         if (!policy.typography.googleFonts.includes(name)) add(spec, 'typography/font-family', `字体 ${name} 不在批准的字体集合中。`)
       }
       if (from === 'next/font/local') add(node, 'typography/font-family', '本地字体也必须先进入统一字体策略，不允许临时引入。')
-      if (!verified && /^(?:@base-ui\/|@radix-ui\/|radix-ui$|react\/jsx-runtime|react\/jsx-dev-runtime)/.test(from)) add(node, 'registry/no-primitive-bypass', '业务代码只组合已下载组件，不直接使用底层 primitives 或 JSX runtime。')
+      if (/^(?:@base-ui\/|@radix-ui\/|radix-ui$|react\/jsx-runtime|react\/jsx-dev-runtime)/.test(from)) add(node, 'components/no-primitive-bypass', '业务代码只组合已下载组件，不直接使用底层 primitives 或 JSX runtime。')
       if (/^(?:@tabler\/icons|@heroicons\/|react-icons\/|@phosphor-icons\/)/.test(from) && from !== policy.iconLibrary) add(node, 'icons/library', `仅使用配置的 ${policy.iconLibrary}。`)
     }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
@@ -196,27 +157,27 @@ export function auditSource(file, text, policy, { verified = false } = {}) {
       for (const token of splitUtilities(node.text)) if (/^(?:text-|font-|leading-|tracking-|bg-|border-|ring-|outline-|fill-|stroke-|space-[xy]-|\[(?:font|line-height|letter-spacing))/.test(utilityBase(token))) checkUtility(token, policy, (rule, message) => add(node, rule, message))
     }
     if (ts.isPropertyAssignment(node) && /^(?:fontSize|fontFamily|fontWeight|lineHeight|letterSpacing|fontVariant|fontStyle)$/.test(node.name.getText(source).replaceAll(/['"]/g, ''))) add(node, 'typography/no-inline-values', '排版只能通过预设档位；不允许 style/配置对象手写字体值。')
-    if (!verified && ts.isCallExpression(node)) {
+    if (ts.isCallExpression(node)) {
       const name = node.expression.getText(source)
       const entry = imports.get(name)
-      if (name === 'React.createElement' || entry?.name === 'createElement' || /(?:^|\.)(?:jsx|jsxs|jsxDEV)$/.test(name)) add(node, 'registry/no-element-factory', '不允许通过 createElement/JSX runtime 绕过组件来源检查。')
-      if (name === 'document.createElement' || entry?.name === 'cva') add(node, 'registry/no-custom-implementation', '不允许在业务代码手写 UI 元素或 variants。')
+      if (name === 'React.createElement' || entry?.name === 'createElement' || /(?:^|\.)(?:jsx|jsxs|jsxDEV)$/.test(name)) add(node, 'components/no-element-factory', '不允许通过 createElement/JSX runtime 绕过组件来源检查。')
+      if (name === 'document.createElement' || entry?.name === 'cva') add(node, 'components/no-custom-implementation', '不允许在业务代码手写 UI 元素或 variants。')
     }
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const raw = node.tagName.getText(source), name = canonical(node), parents = ancestors(node)
       const frameworkShell = file === 'app/layout.tsx' && ['html', 'body'].includes(raw)
-      if (!verified && !frameworkShell && /^[a-z]/.test(raw) && !raw.includes('.')) add(node, 'registry/no-handwritten-ui', `手写 <${raw}>；必须使用有 registry 来源的组件组合。`)
-      if (!verified && ts.isIdentifier(node.tagName)) {
+      if (!frameworkShell && /^[a-z]/.test(raw) && !raw.includes('.')) add(node, 'components/no-handwritten-ui', `手写 <${raw}>；必须组合项目组件库中的组件。`)
+      if (ts.isIdentifier(node.tagName)) {
         const value = resolve(node.tagName)
-        if (value.strings.some(tag => /^[a-z][a-z0-9-]*$/.test(tag))) add(node, 'registry/no-handwritten-ui', '不允许用大写变量包装 HTML 标签绕过限制。')
+        if (value.strings.some(tag => /^[a-z][a-z0-9-]*$/.test(tag))) add(node, 'components/no-handwritten-ui', '不允许用大写变量包装 HTML 标签绕过限制。')
       }
-      if (!verified && node.attributes.properties.some(ts.isJsxSpreadAttribute)) add(node, 'registry/no-unchecked-spread', '调用处显式传递业务 props，避免 spread 注入未检查的样式或 render。')
-      if (!verified && (attr(node, 'style') || attr(node, 'css') || attr(node, 'sx') || attr(node, 'dangerouslySetInnerHTML'))) add(node, 'style/no-inline-ui', '不允许 style/css/sx/HTML 字符串自绘 UI；使用组件预设。')
+      if (node.attributes.properties.some(ts.isJsxSpreadAttribute)) add(node, 'components/no-unchecked-spread', '调用处显式传递业务 props，避免 spread 注入未检查的样式或 render。')
+      if ((attr(node, 'style') || attr(node, 'css') || attr(node, 'sx') || attr(node, 'dangerouslySetInnerHTML'))) add(node, 'style/no-inline-ui', '不允许 style/css/sx/HTML 字符串自绘 UI；使用组件预设。')
       const classAttr = attr(node, 'className')
       if (classAttr?.initializer) {
         const expression = ts.isJsxExpression(classAttr.initializer) ? classAttr.initializer.expression : classAttr.initializer
         const classes = resolve(expression)
-        if (!verified && !frameworkShell && !classes.known) add(classAttr, 'style/static-layout-only', 'className 必须可静态检查，动态组合请使用 cn() 和明确的布局常量。')
+        if (!frameworkShell && !classes.known) add(classAttr, 'style/static-layout-only', 'className 必须可静态检查，动态组合请使用 cn() 和明确的布局常量。')
         if (expression && (ts.isTemplateExpression(expression) || ts.isConditionalExpression(expression))) add(classAttr, 'style/use-cn', '条件 className 使用 cn()，不拼接模板或直接使用三元表达式。')
         for (const value of classes.strings) {
           const tokens = splitUtilities(value)
@@ -224,7 +185,7 @@ export function auditSource(file, text, policy, { verified = false } = {}) {
           const bases = tokens.map(utilityBase)
           for (const token of tokens) {
             const base = utilityBase(token)
-            if (!verified && !frameworkShell && !isLayoutUtility(base)) add(classAttr, typography.test(base) ? 'typography/no-callsite-override' : 'style/layout-only', `调用处 className 只能布局，不能手动覆盖 ${token}。`)
+            if (!frameworkShell && !isLayoutUtility(base)) add(classAttr, typography.test(base) ? 'typography/no-callsite-override' : 'style/layout-only', `调用处 className 只能布局，不能手动覆盖 ${token}。`)
             if (overlays.test(name) && /^-?z-/.test(base)) add(classAttr, 'style/overlay-stacking', '浮层组件自行管理层叠，不指定 z-index。')
             if (base.startsWith('w-') && bases.includes(`h-${base.slice(2)}`)) add(classAttr, 'style/size-shorthand', `相同宽高使用 size-${base.slice(2)}。`)
           }

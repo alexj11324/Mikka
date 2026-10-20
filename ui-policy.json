@@ -3,7 +3,7 @@
   "base": "base",
   "style": "base-nova",
   "iconLibrary": "lucide-react",
-  "registryLock": "ui-registry.lock.json",
+  "componentRoots": ["components/ui/", "components/reui/", "components/blocks/"],
   "typography": {
     "sizes": ["xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl"],
     "weights": ["normal", "medium", "semibold", "bold"],
