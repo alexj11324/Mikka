@@ -8,5 +8,5 @@ export default async function Page() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/sign-in')
   const initialIssues = await listIssues()
-  return <IssueWorkspace user={{ name: session.user.name, email: session.user.email }} initialIssues={initialIssues} />
+  return <IssueWorkspace user={{ id: session.user.id, name: session.user.name, email: session.user.email }} initialIssues={initialIssues} />
 }

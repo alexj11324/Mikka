@@ -1,11 +1,12 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { issues, issueVersions } from '@/lib/db/schema'
+import { issues, issueVersions, issueMembers } from '@/lib/db/schema'
+import { requireIssueAccess } from '@/lib/issue-access'
 import type { JSONContent } from '@tiptap/react'
 
 async function getUserId() {
@@ -25,31 +26,30 @@ const inputSchema = z.object({
 
 export async function listIssues() {
   const userId = await getUserId()
-  return db.select({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt }).from(issues).where(eq(issues.userId, userId)).orderBy(desc(issues.updatedAt)).limit(100)
+  return db.select({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt }).from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))).orderBy(desc(issues.updatedAt)).limit(100)
 }
 export async function getIssue(id: string) {
-  z.uuid().parse(id)
-  const userId = await getUserId()
-  const [issue] = await db.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, userId))).limit(1)
-  if (!issue) throw new Error('任务不存在或没有访问权限。')
-  return issue
+  return (await requireIssueAccess(id)).issue
 }
 export async function saveIssue(input: { id?: string; revision?: number; title: string; content: JSONContent; status: string; priority: string }) {
   const userId = await getUserId()
   const parsed = inputSchema.safeParse(input)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? '请检查任务内容。' }
   const id = input.id ? z.uuid().parse(input.id) : crypto.randomUUID()
+  const ownerId = input.id ? (await requireIssueAccess(id)).issue.userId : userId
   if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: '任务版本不正确，请重新打开。' }
   try {
     return await db.transaction(async tx => {
       let issue
       if (input.id) {
-        ;[issue] = await tx.update(issues).set({ ...parsed.data, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, userId), eq(issues.revision, input.revision!))).returning()
+        const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, ownerId))).for('update')
+        if (!latest) return { error: '任务不存在或没有访问权限。' }
+        ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
       } else {
         ;[issue] = await tx.insert(issues).values({ ...parsed.data, id, userId, revision: 1 }).returning()
       }
       if (!issue) return { error: '此任务已被更新或无访问权限。草稿已保留，请重新打开最新版本后再编辑。' }
-      await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
+      await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
       return { issue }
     })
   } catch (error) {
@@ -58,7 +58,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
   }
 }
 export async function listIssueVersions(id: string) {
-  z.uuid().parse(id)
-  const userId = await getUserId()
+  const { issue } = await requireIssueAccess(id)
+  const userId = issue.userId
   return db.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
 }

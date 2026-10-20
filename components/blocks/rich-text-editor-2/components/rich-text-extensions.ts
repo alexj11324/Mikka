@@ -16,6 +16,7 @@ import { RichTextTaskItem } from "./rich-text-task-item"
 interface RichTextExtensionOptions {
   /** Hint on the empty line under the caret. */
   placeholder: string
+  collaborative?: boolean
 }
 
 // Keeps the selection painted while focus sits in a popover field. A click back
@@ -98,10 +99,12 @@ const RichTextSelection = Selection.extend({
 /** The editor preset; call it at module scope (useEditor compares by identity). */
 export function createRichTextExtensions({
   placeholder,
+  collaborative = false,
 }: RichTextExtensionOptions) {
   return [
     // v3 StarterKit already carries Link, Underline, list keys and undo history.
     StarterKit.configure({
+      ...(collaborative ? { undoRedo: false as const } : {}),
       heading: { levels: [1, 2, 3] },
       link: { openOnClick: false, defaultProtocol: "https" },
     }),

@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Command, ArrowRight, Loader2 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
@@ -10,7 +9,6 @@ import { Input } from '@/components/ui/input'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 
 export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
-  const router = useRouter()
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const registering = mode === 'sign-up'
@@ -23,7 +21,9 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
       const credentials = { email: String(data.get('email')).trim(), password: String(data.get('password')) }
       const result = registering ? await authClient.signUp.email({ ...credentials, name: String(data.get('name')).trim() }) : await authClient.signIn.email(credentials)
       if (result.error) { setError('操作未成功，请检查填写的信息或稍后重试。'); return }
-      router.push('/'); router.refresh()
+      const session = await authClient.getSession({ query: { disableCookieCache: true } })
+      if (!session.data?.user) { setError('登录已响应，但浏览器未能保持会话。请允许此预览的第三方 Cookie，或在独立标签页打开后登录。'); return }
+      window.location.replace('/')
     } catch { setError('暂时无法连接，请稍后重试。') }
     finally { setPending(false) }
   }
@@ -36,6 +36,6 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
       <Field><FieldLabel htmlFor="password">密码</FieldLabel><Input id="password" name="password" type="password" autoComplete={registering ? 'new-password' : 'current-password'} placeholder="至少 8 位字符" minLength={8} maxLength={128} required disabled={pending} /></Field>
     </FieldGroup>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<Button type="submit" disabled={pending}>{pending ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <ArrowRight data-icon="inline-start" />}{registering ? '创建账号并进入' : '登录工作台'}</Button></form>
     <p className="text-center text-xs text-muted-foreground">{registering ? '已经有账号？' : '还没有账号？'} <Link href={registering ? '/sign-in' : '/sign-up'} className="font-medium text-foreground underline underline-offset-4">{registering ? '去登录' : '创建账号'}</Link></p>
-    <p className="text-center text-[11px] leading-5 text-muted-foreground">任务安全存储于 Neon · 仅本人可访问<br />多人协作与本机执行尚未启用</p>
+    <p className="text-center text-[11px] leading-5 text-muted-foreground">这是 Orbit 应用账号，与 v0 账号独立；首次使用请先创建账号。<br />数据存储于 Neon · 任务默认私有，可授权成员共同编辑</p>
   </section></main>
 }

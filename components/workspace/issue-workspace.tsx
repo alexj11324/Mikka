@@ -14,8 +14,8 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 const STATUS: Record<string, string> = { todo: '待处理', doing: '进行中', review: '待审阅', done: '已完成' }
-export function IssueWorkspace({ user, initialIssues }: { user: { name: string; email: string }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
-  const { data: tasks = [], mutate, error } = useSWR('issues', listIssues, { fallbackData: initialIssues })
+export function IssueWorkspace({ user, initialIssues }: { user: { id: string; name: string; email: string }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
+  const { data: tasks = [], mutate, error } = useSWR('issues', listIssues, { fallbackData: initialIssues, refreshInterval: 10000 })
   const [selected, setSelected] = useState<string | null>(null)
   const [draftKey, setDraftKey] = useState(0)
   const [dirty, setDirty] = useState(false)
@@ -45,8 +45,8 @@ export function IssueWorkspace({ user, initialIssues }: { user: { name: string; 
     {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
     <div className="mx-auto flex max-w-[1500px] flex-col md:min-h-[calc(100svh-57px)] md:flex-row">
       <aside aria-label="任务列表" className="flex w-full shrink-0 flex-col gap-4 border-b bg-muted/15 p-4 md:w-64 md:border-r md:border-b-0"><div className="flex items-center justify-between"><h2 className="text-xs font-medium text-muted-foreground">我的任务 <span className="ml-1">{tasks.length}</span></h2><Button variant="ghost" size="icon-sm" aria-label="新建任务" onClick={() => open(null)}><Plus /></Button></div><div className="flex items-center gap-2"><Search className="size-4 shrink-0 text-muted-foreground" /><Input aria-label="搜索任务" placeholder="搜索任务…" value={query} onChange={event => setQuery(event.target.value)} /></div>
-      <nav className="flex max-h-56 flex-col gap-1 overflow-y-auto md:max-h-[calc(100svh-260px)]">{error && <p role="alert" className="text-xs text-destructive">列表更新失败，已保留上次结果。</p>}{filtered.map(task => <button key={task.id} type="button" aria-current={selected === task.id ? 'page' : undefined} onClick={() => open(task.id)} className={cn('flex flex-col gap-2 rounded-md px-3 py-3 text-left transition-colors hover:bg-accent', selected === task.id && 'bg-accent')}><span className="truncate text-xs font-medium">{task.title}</span><span className="flex items-center gap-2 text-[10px] text-muted-foreground"><CircleDashed className="size-3" />{STATUS[task.status]}<span className="ml-auto">v{task.revision}</span></span></button>)}{!filtered.length && <p className="px-2 py-6 text-xs leading-6 text-muted-foreground">{query ? '没有找到匹配的任务。' : '还没有任务。创建第一个任务，开始记录工作。'}</p>}</nav><p className="mt-auto pt-4 text-[10px] leading-5 text-muted-foreground">Neon 持久化 · 账号数据隔离<br />实时协作与本机执行待接入</p></aside>
-      <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-8"><TaskDetail key={draftKey} id={selected} onSaved={saved} onDirty={onDirty} /></main>
+      <nav className="flex max-h-56 flex-col gap-1 overflow-y-auto md:max-h-[calc(100svh-260px)]">{error && <p role="alert" className="text-xs text-destructive">列表更新失败，已保留上次结果。</p>}{filtered.map(task => <button key={task.id} type="button" aria-current={selected === task.id ? 'page' : undefined} onClick={() => open(task.id)} className={cn('flex flex-col gap-2 rounded-md px-3 py-3 text-left transition-colors hover:bg-accent', selected === task.id && 'bg-accent')}><span className="truncate text-xs font-medium">{task.title}</span><span className="flex items-center gap-2 text-[10px] text-muted-foreground"><CircleDashed className="size-3" />{STATUS[task.status]}<span className="ml-auto">v{task.revision}</span></span></button>)}{!filtered.length && <p className="px-2 py-6 text-xs leading-6 text-muted-foreground">{query ? '没有找到匹配的任务。' : '还没有任务。创建第一个任务，开始记录工作。'}</p>}</nav><p className="mt-auto pt-4 text-[10px] leading-5 text-muted-foreground">Neon 持久化 · 仅授权成员可访问<br />Yjs 共同编辑 · 本机执行待接入</p></aside>
+      <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-8"><TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} /></main>
     </div>
   </div>
 }
