@@ -2,7 +2,7 @@ import { pgTable, text, uuid, varchar, jsonb, integer, timestamp, primaryKey } f
 import type { JSONContent } from '@tiptap/react'
 
 export const users = pgTable('user', {
-  id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(),
+  id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
 })
 export const issueMembers = pgTable('issue_members', {
   issueId: uuid('issueId').notNull(), userId: text('userId').notNull(), memberId: text('memberId').notNull(),

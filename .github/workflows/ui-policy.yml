@@ -1,0 +1,55 @@
+name: UI policy
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'v0/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-policy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-policy:
+    name: UI policy (strict)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:ui-policy
+      - name: Audit business UI composition
+        run: pnpm --silent lint:ui --json > ui-audit.json
+      - name: Show audit summary
+        if: always()
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            if (fs.existsSync("ui-audit.json")) {
+              const audit = JSON.parse(fs.readFileSync("ui-audit.json", "utf8"));
+              const summary = `## Strict UI policy\n\n${audit.files} business files scanned; ${audit.errors} errors. ${audit.libraryFiles} component-library implementation files excluded. No upstream source verification.\n\n` + Object.entries(audit.counts).map(([rule, count]) => `- ${rule}: ${count}`).join("\n") + "\n";
+              console.log(summary);
+              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+            }
+          '
+      - name: Upload detailed audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-policy-audit
+          path: ui-audit.json
+          if-no-files-found: ignore
+      - run: pnpm lint:code
+        if: always()
+      - run: pnpm typecheck
+        if: always()

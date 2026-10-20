@@ -5,7 +5,7 @@ import { and, desc, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { issues, issueVersions, issueMembers } from '@/lib/db/schema'
+import { issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import type { JSONContent } from '@tiptap/react'
 
@@ -20,13 +20,13 @@ const documentSchema = z.custom<JSONContent>(value => {
 }, '文档格式不正确或超过大小限制。')
 const inputSchema = z.object({
   title: z.string().trim().min(1, '请填写任务标题。').max(200),
-  content: documentSchema, status: z.enum(['todo','doing','review','done']),
+  content: documentSchema, status: z.enum(['backlog','todo','doing','review','done','canceled','duplicate']),
   priority: z.enum(['urgent','high','normal','low']),
 })
 
 export async function listIssues() {
   const userId = await getUserId()
-  return db.select({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt }).from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))).orderBy(desc(issues.updatedAt)).limit(100)
+  return db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))).orderBy(desc(issues.updatedAt)).limit(100)
 }
 export async function getIssue(id: string) {
   return (await requireIssueAccess(id)).issue
@@ -57,6 +57,15 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
     return { error: '保存未成功，请保留当前页面后重试。' }
   }
 }
+export async function moveIssue(input: { id: string; status: string; revision: number }) {
+  const parsed = z.object({ id: z.uuid(), status: inputSchema.shape.status, revision: z.number().int().positive() }).safeParse(input)
+  if (!parsed.success) return { error: '任务移动信息不正确。' }
+  const issue = await getIssue(parsed.data.id)
+  if (issue.revision !== parsed.data.revision) return { error: '任务已被其他成员更新，已恢复最新状态，请重试。' }
+  if (issue.status === parsed.data.status) return { issue }
+  return saveIssue({ ...issue, status: parsed.data.status })
+}
+
 export async function listIssueVersions(id: string) {
   const { issue } = await requireIssueAccess(id)
   const userId = issue.userId
