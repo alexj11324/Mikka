@@ -150,3 +150,55 @@ macOS 得到苹方，Windows 得到微软雅黑。
       显式苹方版与纯 fallback 版各测一次，结果相同
 - [x] 字体文件从 2 个 woff2 降到 1 个（Noto Sans SC 不再下载）
 
+---
+
+# 字体栈换成 Geist + 显式中文回退（2026-10-20）
+
+要求：字体栈改成
+`Geist Variable → PingFang SC → Hiragino Sans GB → Microsoft YaHei → ui-sans-serif → system-ui → sans-serif`，
+然后开 PR 并合并。
+
+## 背景：这一步的目标变了
+
+上一轮的目标是"照搬 Comma"（Comma 的 sans 是 Inter Variable，中文靠系统级联）。
+这一轮改成**对齐自家 Orvilo 主产品**——`Orvilo/packages/ui/src/styles/globals.css:15`
+用的就是这条 Geist 栈。
+
+之所以要绕这一圈：中途有另一个会话拿 `grep packages/ui/src/styles/globals.css`
+的结果回答了"app.comma.surf 上这个字是什么字体"，把**本地仓库**的字体栈
+当成了 **Comma 页面**的字体栈。两者不是一回事：
+
+| | 拉丁 | 中文那一层 |
+|---|---|---|
+| Comma（实测线上） | Inter Variable | 不写，靠系统级联 |
+| Orvilo 主产品 | Geist | 显式 PingFang SC / Hiragino / 雅黑 |
+| Orvilo3（本次改后） | Geist | 显式 PingFang SC / Hiragino / 雅黑 |
+
+## 改动
+
+| 文件 | 改动 |
+|---|---|
+| `app/layout.tsx` | `Inter` → `Geist`，变量 `--font-inter` → `--font-geist` |
+| `app/globals.css` | `--font-sans` 换成 Geist + 显式中文回退栈 |
+| `ui-policy.json` | `googleFonts` 由 `["Inter"]` 改为 `["Geist"]` |
+| `scripts/ui-policy.mjs` | 第 265 行硬编码的 `--font-sans` 批准值同步更新 |
+
+Geist 走 `next/font/google`（而非主产品用的 `@fontsource-variable/geist`）：
+next/font 在构建期把字体自托管到本地，运行时同样不联网；且不用新增依赖，
+也绕开了 UI 策略里"CSS `@import` 只允许 tailwindcss/tw-animate-css/shadcn"和
+"禁止 next/font/local"两条限制。
+
+`--font-inter` 已无引用，`Inter` 加载器整个移除。
+
+## 验证
+
+- [x] `node scripts/lint-ui.mjs` → 0 违规，退出码 0
+- [x] `node --test scripts/ui-policy.test.mjs` → 60/60
+- [x] `tsgo --noEmit` → 退出码 0
+- [x] `oxlint --deny-warnings` → 退出码 0
+- [x] 浏览器实测（CDP `CSS.getPlatformFontsForNode`，注入探针元素）：
+      拉丁+数字 → `Geist (webfont)`；中文 → `PingFang SC (系统字体)`；
+      等宽 → `Menlo (系统字体)`
+- [x] `document.fonts` 确认只加载 `Geist w100 900` 一个可变字体
+- [x] 截图确认版面未因字体度量差异发生位移或溢出
+
