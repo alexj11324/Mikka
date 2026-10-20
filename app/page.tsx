@@ -1,5 +1,5 @@
-import { Demo } from "@/components/demo"
+import { IssueWorkspace } from "@/components/workspace/issue-workspace"
 
 export default function Page() {
-  return <Demo />
+  return <IssueWorkspace />
 }
