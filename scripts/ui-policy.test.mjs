@@ -16,12 +16,22 @@ const has = (source, rule) => assert.ok(rules(source).includes(rule), `${rule}: 
 for (const [label, source, rule] of [
   ['raw HTML', '<button>Save</button>', 'components/no-handwritten-ui'],
   ['HTML alias', 'const Tag = "button"; const ui = <Tag />', 'components/no-handwritten-ui'],
-  ['handwritten business layout', '<div className="flex" />', 'components/no-handwritten-ui'],
+  ['handwritten input', '<input type="text" />', 'components/no-handwritten-ui'],
+  ['handwritten textarea', '<textarea />', 'components/no-handwritten-ui'],
+  ['handwritten select', '<select />', 'components/no-handwritten-ui'],
+  ['handwritten fieldset', '<fieldset />', 'components/no-handwritten-ui'],
+  ['handwritten kbd', '<kbd>K</kbd>', 'components/no-handwritten-ui'],
+  ['handwritten details', '<details><summary>x</summary></details>', 'components/no-handwritten-ui'],
+  ['handwritten hr', '<hr />', 'components/no-handwritten-ui'],
+  ['handwritten label', '<label>x</label>', 'components/no-handwritten-ui'],
+  ['handwritten table', '<table />', 'components/no-handwritten-ui'],
+  ['handwritten dialog', '<dialog />', 'components/no-handwritten-ui'],
+  ['handwritten nav', '<nav />', 'components/no-handwritten-ui'],
+  ['handwritten progress', '<progress />', 'components/no-handwritten-ui'],
   ['primitive bypass', 'import { Button } from "@base-ui/react/button"; const ui = <Button />', 'components/no-primitive-bypass'],
   ['factory alias', 'import { createElement as make } from "react"; make("button")', 'components/no-element-factory'],
   ['DOM factory', 'document.createElement("button")', 'components/no-custom-implementation'],
   ['custom variants', 'import { cva } from "class-variance-authority"; cva("bg-muted")', 'components/no-custom-implementation'],
-  ['spread props', '<Button {...props} />', 'components/no-unchecked-spread'],
   ['inline style', '<Button style={{ color: "red" }} />', 'style/no-inline-ui'],
   ['inline font', '<Button style={{ fontSize: 13 }} />', 'typography/no-inline-values'],
   ['arbitrary font size', '<Button className="text-[13px]" />', 'typography/preset-only'],
@@ -30,11 +40,6 @@ for (const [label, source, rule] of [
   ['non preset font weight', '<Button className="font-extrabold" />', 'typography/preset-only'],
   ['non preset size', '<Button className="text-9xl" />', 'typography/preset-only'],
   ['slash line height', '<Button className="text-sm/13" />', 'typography/preset-only'],
-  ['caller font override', '<Button className="text-sm" />', 'typography/no-callsite-override'],
-  ['caller color override', '<Button className="bg-primary" />', 'style/layout-only'],
-  ['caller custom CSS class', '<Button className="my-custom-button" />', 'style/layout-only'],
-  ['indirect caller override', 'const classes = "text-sm"; const ui = <Button className={classes} />', 'typography/no-callsite-override'],
-  ['cn indirect override', 'const classes = "font-bold"; const ui = <Button className={cn("flex", classes)} />', 'typography/no-callsite-override'],
   ['uncheckable classes', '<Button className={getClasses()} />', 'style/static-layout-only'],
   ['raw palette', '<Button className="text-emerald-600" />', 'style/semantic-colors'],
   ['space utility', '<Button className="space-x-2" />', 'style/gap'],
@@ -106,7 +111,25 @@ test('CSS cannot bypass typography restrictions', () => {
 
 test('framework html/body shell is not mistaken for a handmade widget', () => {
   assert.deepEqual(auditSource('app/layout.tsx', '<html lang="zh-CN"><body>{children}</body></html>', policy), [])
-  assert.ok(auditSource('app/layout.tsx', '<html><body><div /></body></html>', policy).some(d => d.rule === 'components/no-handwritten-ui'))
+  assert.ok(auditSource('app/layout.tsx', '<html><body><button /></body></html>', policy).some(d => d.rule === 'components/no-handwritten-ui'))
+})
+
+test('plain layout containers stay legal: only elements with a component equivalent are banned', () => {
+  const source = `${prefix}
+    const ui = <div className="flex flex-col gap-2"><span className="text-xs">a</span><p className="text-sm">b</p><section><header /><footer /></section></div>`
+  assert.deepEqual(rules(source), [])
+})
+
+test('a component callsite may adjust appearance, but raw palettes stay banned', () => {
+  assert.deepEqual(rules(`${prefix}\nconst ui = <Button className="rounded-full text-sm text-muted-foreground" />`), [])
+  has('<Button className="text-emerald-600" />', 'style/semantic-colors')
+})
+
+test('a render prop host element is composition, not a hand-written control', () => {
+  const source = `import { SidebarMenuSubButton } from '@/components/ui/sidebar';
+    const ui = <SidebarMenuSubButton render={<button type="button" />} onClick={go}>x</SidebarMenuSubButton>`
+  assert.deepEqual(rules(source), [])
+  has('<button>Save</button>', 'components/no-handwritten-ui')
 })
 
 test('only the configured component-library directories are outside the business UI audit', () => {

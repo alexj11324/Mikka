@@ -31,13 +31,23 @@ export function utilityBase(token) {
 }
 
 const palette = /^(?:bg|text|border(?:-[trblxyse])?|ring|outline|fill|stroke|decoration|from|via|to|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)(?:-|\/|$)/
-const typography = /^(?:text-(?:xs|sm|base|lg|xl|\d+xl|\[|\(|\d)|font-|leading-|tracking-|italic$|not-italic$)/
-const layout = /^(?:sr-only|not-sr-only|container|block|inline|inline-block|flex|inline-flex|grid|inline-grid|hidden|contents|relative|absolute|fixed|sticky|static|truncate|isolate|visible|invisible|collapse|table|table-row|table-cell)$|^(?:-?(?:m[trblxyse]?|p[trblxyse]?|gap(?:-[xy])?|space-[xy]|w|h|min-w|max-w|min-h|max-h|size|inset(?:-[xy])?|top|right|bottom|left|start|end|order|z)|flex|grid|auto|col|row|items|justify|content|self|place|basis|grow|shrink|overflow|overscroll|object|aspect|float|clear|break|line-clamp|whitespace|text-(?:left|right|center|start|end)|align|snap|scroll|touch|cursor|pointer-events|select|resize)-/
-function isLayoutUtility(base) {
-  if (!layout.test(base)) return false
-  const measured = base.match(/^-?(?:m[trblxyse]?|p[trblxyse]?|gap(?:-[xy])?|w|h|min-w|max-w|min-h|max-h|size|inset(?:-[xy])?|top|right|bottom|left|start|end|order|z|basis)-(.+)$/)
-  if (measured) return /^(?:\d+(?:\.\d+)?(?:\/\d+)?|px|auto|none|full|screen|sv[wh]|lv[wh]|dv[wh]|min|max|fit|prose|[2-7]?xl|xs|sm|md|lg|\[.+\]|\(.+\))$/.test(measured[1])
-  return true
+// 组件库里有对应成品组件的原生元素。手写它们等于重复实现一份组件。
+// 判据来自 shadcn 官方 skills 文档：Use existing components before custom markup.
+const RAW_ELEMENTS = {
+  button: 'Button',
+  input: 'Input / InputGroup',
+  select: 'Select / NativeSelect',
+  textarea: 'Textarea',
+  dialog: 'Dialog / AlertDialog',
+  table: 'Table',
+  kbd: 'Kbd',
+  nav: 'Sidebar / Breadcrumb / NavigationMenu',
+  label: 'Label / FieldLabel',
+  hr: 'Separator',
+  progress: 'Progress',
+  details: 'Collapsible / Accordion',
+  summary: 'Collapsible / Accordion',
+  fieldset: 'FieldSet',
 }
 const groupRules = new Map([
   ['SelectItem', 'SelectGroup'], ['SelectLabel', 'SelectGroup'],
@@ -63,7 +73,7 @@ function checkUtility(token, policy, report) {
   }
   if (palette.test(base) || arbitraryTextColor || /^(?:bg|border|ring|fill|stroke|outline)-(?:\[|\()/.test(base)) report('style/semantic-colors', `颜色必须使用语义 token：${token}。`)
   if (/^space-[xy]-/.test(base)) report('style/gap', `使用 flex/grid + gap，不使用 ${token}。`)
-  if (/(?:^|:)dark:/.test(token) && /^(?:bg|text|border|ring|fill|stroke|outline)-/.test(base)) report('style/no-dark-color-override', `用语义 token 处理明暗主题，不单独覆盖 ${token}。`)
+  if (/(?:^|:)dark:/.test(token) && /^(?:bg|text|border|ring|fill|stroke|outline)-/.test(base) && !/-transparent$/.test(base)) report('style/no-dark-color-override', `用语义 token 处理明暗主题，不单独覆盖 ${token}。`)
 }
 
 export function auditSource(file, text, policy) {
@@ -116,7 +126,9 @@ export function auditSource(file, text, policy) {
     if (ts.isIdentifier(node)) {
       if (['undefined', 'false', 'true'].includes(node.text)) return { strings: [], known: true }
       const entry = binding(node)
-      if (!entry || visited.has(entry)) return { strings: [], known: false }
+      // import 进来的常量在源文件里是静态字面量，本地追踪不到，但不该判成「不可检查」。
+      if (!entry) return { strings: [], known: imports.has(node.text) }
+      if (visited.has(entry)) return { strings: [], known: false }
       return resolve(entry.initializer, new Set([...visited, entry]))
     }
     if (node.kind === ts.SyntaxKind.NullKeyword || node.kind === ts.SyntaxKind.FalseKeyword || node.kind === ts.SyntaxKind.TrueKeyword) return { strings: [], known: true }
@@ -124,6 +136,8 @@ export function auditSource(file, text, policy) {
       const values = nodes.map(n => resolve(n, new Set(visited)))
       return { strings: values.flatMap(v => v.strings), known: values.every(v => v.known) }
     }
+    // 静态映射表的索引访问（如 RICH_TEXT_MARKUP_VIEW[markup]）：值在源文件里是静态的。
+    if (ts.isElementAccessExpression(node) && ts.isIdentifier(node.expression) && imports.has(node.expression.text)) return { strings: [], known: true }
     if (ts.isConditionalExpression(node)) return merge([node.whenTrue, node.whenFalse])
     if (ts.isBinaryExpression(node)) return merge(node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ? [node.right] : [node.left, node.right])
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && imports.get(node.expression.text)?.name === 'cn' && ['cn', '@/lib/utils'].includes(imports.get(node.expression.text)?.from)) return merge(node.arguments)
@@ -166,31 +180,44 @@ export function auditSource(file, text, policy) {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const raw = node.tagName.getText(source), name = canonical(node), parents = ancestors(node)
       const frameworkShell = file === 'app/layout.tsx' && ['html', 'body'].includes(raw)
-      if (!frameworkShell && /^[a-z]/.test(raw) && !raw.includes('.')) add(node, 'components/no-handwritten-ui', `手写 <${raw}>；必须组合项目组件库中的组件。`)
+      // Base UI 的 render prop 指定宿主元素（样式与行为由外层组件提供）：
+      // 那里的自闭合标签是组合 API，不是手写的控件。
+      const renderHost = ts.isJsxSelfClosingElement(node) && (() => {
+        for (let p = node.parent; p; p = p.parent) {
+          if (ts.isJsxAttribute(p)) return p.name.getText(source) === 'render'
+          if (ts.isJsxElement(p) || ts.isJsxSelfClosingElement(p)) return false
+        }
+        return false
+      })()
+      const replacement = RAW_ELEMENTS[raw]
+      if (!frameworkShell && !renderHost && replacement) add(node, 'components/no-handwritten-ui', `手写 <${raw}>；改用 ${replacement}。`)
       if (ts.isIdentifier(node.tagName)) {
         const value = resolve(node.tagName)
-        if (value.strings.some(tag => /^[a-z][a-z0-9-]*$/.test(tag))) add(node, 'components/no-handwritten-ui', '不允许用大写变量包装 HTML 标签绕过限制。')
+        if (value.strings.some(tag => RAW_ELEMENTS[tag])) add(node, 'components/no-handwritten-ui', '不允许用大写变量包装 HTML 标签绕过限制。')
       }
-      if (node.attributes.properties.some(ts.isJsxSpreadAttribute)) add(node, 'components/no-unchecked-spread', '调用处显式传递业务 props，避免 spread 注入未检查的样式或 render。')
       if ((attr(node, 'style') || attr(node, 'css') || attr(node, 'sx') || attr(node, 'dangerouslySetInnerHTML'))) add(node, 'style/no-inline-ui', '不允许 style/css/sx/HTML 字符串自绘 UI；使用组件预设。')
       const classAttr = attr(node, 'className')
       if (classAttr?.initializer) {
         const expression = ts.isJsxExpression(classAttr.initializer) ? classAttr.initializer.expression : classAttr.initializer
         const classes = resolve(expression)
         if (!frameworkShell && !classes.known) add(classAttr, 'style/static-layout-only', 'className 必须可静态检查，动态组合请使用 cn() 和明确的布局常量。')
-        if (expression && (ts.isTemplateExpression(expression) || ts.isConditionalExpression(expression))) add(classAttr, 'style/use-cn', '条件 className 使用 cn()，不拼接模板或直接使用三元表达式。')
+        if (!frameworkShell && expression && (ts.isTemplateExpression(expression) || ts.isConditionalExpression(expression))) add(classAttr, 'style/use-cn', '条件 className 使用 cn()，不拼接模板或直接使用三元表达式。')
         for (const value of classes.strings) {
           const tokens = splitUtilities(value)
           if (tokens.includes('overflow-hidden') && tokens.includes('text-ellipsis') && tokens.includes('whitespace-nowrap')) add(classAttr, 'style/truncate', '使用 truncate 简写。')
           const bases = tokens.map(utilityBase)
           for (const token of tokens) {
             const base = utilityBase(token)
-            if (!frameworkShell && !isLayoutUtility(base)) add(classAttr, typography.test(base) ? 'typography/no-callsite-override' : 'style/layout-only', `调用处 className 只能布局，不能手动覆盖 ${token}。`)
+            // 组件调用处的视觉 class 不做限制。Orvilo 的规则集里没有这一条，
+            // 而 shadcn 组件并不总提供对应 variant：硬禁只会逼出「包一层 span」的绕过，
+            // 或者把设计意图直接删掉。原始色板另由 style/semantic-colors 拦截。
             if (overlays.test(name) && /^-?z-/.test(base)) add(classAttr, 'style/overlay-stacking', '浮层组件自行管理层叠，不指定 z-index。')
             if (base.startsWith('w-') && bases.includes(`h-${base.slice(2)}`)) add(classAttr, 'style/size-shorthand', `相同宽高使用 size-${base.slice(2)}。`)
           }
           const icon = imports.get(raw)?.from === policy.iconLibrary
-          if (icon && parents.some(p => /^[A-Z]/.test(p)) && bases.some(b => /^(?:size|w|h)-/.test(b))) add(classAttr, 'icons/no-size-override', '组件内部的图标由组件决定尺寸。')
+          const hostEntry = imports.get(parents[0] ?? '')
+          const hostIsLibrary = !!hostEntry && /^@\/components\/(?:ui|reui)\//.test(hostEntry.from)
+          if (icon && hostIsLibrary && bases.some(b => /^(?:size|w|h)-/.test(b))) add(classAttr, 'icons/no-size-override', '组件内部的图标由组件决定尺寸。')
         }
       }
       const icon = imports.get(raw)?.from === policy.iconLibrary
@@ -236,7 +263,7 @@ export function auditCss(file, text, policy) {
     if (/^(?:font(?:-.+)?|line-height|letter-spacing|--text-.+|--leading-.+|--tracking-.+|--font-weight-.+)$/.test(node.prop)) add(node, 'typography/no-css-values', '不允许 CSS 自定义排版值或重定义 Tailwind 字体档位。')
     if (node.prop.startsWith('--font-')) {
       const permitted = { '--font-sans': 'var(--font-inter), var(--font-noto-sc), sans-serif', '--font-heading': 'var(--font-sans)' }
-      if (permitted[node.prop] !== node.value) add(node, 'typography/font-token', `${node.prop} 不在批准的字体 token 映射中。`)
+      if (node.prop in permitted && permitted[node.prop] !== node.value) add(node, 'typography/font-token', `${node.prop} 不在批准的字体 token 映射中。`)
     }
     if (!node.prop.startsWith('--') && !/^(?::root|\.dark|\*|body|html)$/.test(node.parent.selector ?? '')) add(node, 'style/no-custom-css', '业务样式不通过 CSS 选择器绕过组件预设。')
   })

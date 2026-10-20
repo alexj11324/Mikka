@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/sidebar"
 import { Command, Eye, ListTodo, Search, SquarePen, UserRound, Users } from "lucide-react"
 import { Button } from '@/components/ui/button'
+import { Kbd } from '@/components/ui/kbd'
+import { cn } from '@/lib/utils'
 import type { listIssues } from '@/app/actions/issues'
 import { useSidebar } from '@/components/ui/sidebar'
 
@@ -61,7 +63,7 @@ export function AppSidebar({ user, view, counts, recentIssues, selected, onNavig
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <div className="flex items-center gap-1 px-2 pb-1"><SidebarMenuButton onClick={() => { setOpenMobile(false); onSearch() }} tooltip="搜索任务（⌘ / Ctrl K）"><Search /><span>搜索任务</span><kbd className="ml-auto text-xs text-muted-foreground">⌘ K</kbd></SidebarMenuButton><Button variant="outline" size="icon-sm" aria-label="新建任务" title="新建任务（C）" onClick={create}><SquarePen /></Button></div>
+        <div className="flex items-center gap-1 px-2 pb-1"><SidebarMenuButton onClick={() => { setOpenMobile(false); onSearch() }} tooltip="搜索任务（⌘ / Ctrl K）"><Search data-icon="inline-start" /><span>搜索任务</span><Kbd className="ml-auto">⌘ K</Kbd></SidebarMenuButton><Button variant="outline" size="icon-sm" aria-label="新建任务" title="新建任务（C）" onClick={create}><SquarePen data-icon="inline-start" /></Button></div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -74,7 +76,7 @@ export function AppSidebar({ user, view, counts, recentIssues, selected, onNavig
         }]} />
         {recentIssues.length > 0 && <SidebarGroup><SidebarGroupLabel>最近更新</SidebarGroupLabel><SidebarMenu>{recentIssues.slice(0, 5).map(issue => {
           const status = ISSUE_STATUSES.find(item => item.value === issue.status) ?? ISSUE_STATUSES[0]
-          return <SidebarMenuItem key={issue.id}><SidebarMenuButton tooltip={issue.title} isActive={selected === issue.id} onClick={() => { if (onOpen(issue.id)) setOpenMobile(false) }}><status.icon className={status.indicatorClassName} /><span>{issue.title}</span></SidebarMenuButton></SidebarMenuItem>
+          return <SidebarMenuItem key={issue.id}><SidebarMenuButton tooltip={issue.title} isActive={selected === issue.id} onClick={() => { if (onOpen(issue.id)) setOpenMobile(false) }}><status.icon className={cn('text-muted-foreground', status.value === 'doing' && 'text-warning-foreground', status.value === 'review' && 'text-success-foreground', status.value === 'done' && 'text-info-foreground')} /><span>{issue.title}</span></SidebarMenuButton></SidebarMenuItem>
         })}</SidebarMenu></SidebarGroup>}
       </SidebarContent>
       <SidebarFooter>

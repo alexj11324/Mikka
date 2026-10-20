@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { JSONContent } from '@tiptap/react'
-import { ChartNoAxesColumnIncreasing, ChevronRight, CircleDashed, Loader2, LockKeyhole, Maximize2, Minimize2, SquareUserRound, X } from 'lucide-react'
+import { ChartNoAxesColumnIncreasing, ChevronRight, CircleDashed, LockKeyhole, Maximize2, Minimize2, SquareUserRound, X } from 'lucide-react'
 import { saveIssue } from '@/app/actions/issues'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel, FieldSet } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
@@ -92,17 +94,17 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
       }}>
         <header className="flex items-center justify-between gap-3 px-5 pt-4 sm:px-6">
           <div className="flex items-center gap-2 text-sm">
-            <Badge variant="outline" className="gap-1.5 rounded-full"><SquareUserRound className="size-3.5" />ORV</Badge><ChevronRight className="size-3 text-muted-foreground" />
+            <Badge variant="outline" className="gap-1.5 rounded-full"><SquareUserRound />ORV</Badge><ChevronRight className="size-3 text-muted-foreground" />
             <DialogTitle className="sr-only">新建任务</DialogTitle><span aria-hidden="true">新建任务</span>
           </div>
-          <div className="flex items-center gap-1"><Button type="button" variant="ghost" size="icon-sm" aria-label={expanded ? '收起创建卡片' : '展开创建卡片'} aria-pressed={expanded} disabled={pending} onClick={() => setExpanded(value => !value)}>{expanded ? <Minimize2 /> : <Maximize2 />}</Button><Button type="button" variant="ghost" size="icon-sm" aria-label="关闭新建任务" disabled={pending} onClick={close}><X /></Button></div>
+          <div className="flex items-center gap-1"><Button type="button" variant="ghost" size="icon-sm" aria-label={expanded ? '收起创建卡片' : '展开创建卡片'} aria-pressed={expanded} disabled={pending} onClick={() => setExpanded(value => !value)}>{expanded ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</Button><Button type="button" variant="ghost" size="icon-sm" aria-label="关闭新建任务" disabled={pending} onClick={close}><X data-icon="inline-start" /></Button></div>
         </header>
         <DialogDescription className="sr-only">填写标题和描述，选择状态与优先级后创建任务。</DialogDescription>
-        <fieldset disabled={pending} className={cn('flex min-w-0 flex-col gap-5 px-5 pt-5 pb-5 sm:px-6', expanded && 'min-h-96')}>
+        <FieldSet disabled={pending} className={cn('flex min-w-0 flex-col gap-5 px-5 pt-5 pb-5 sm:px-6', expanded && 'min-h-96')}>
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="new-issue-title" className="sr-only">任务标题</FieldLabel>
-              <input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder="任务标题" value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full bg-transparent py-1 text-lg font-semibold outline-none placeholder:text-muted-foreground/70" />
+              <Input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder="任务标题" value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
             </Field>
             <Field>
               <FieldLabel className="sr-only">任务描述</FieldLabel>
@@ -112,17 +114,17 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
           <div className="flex flex-wrap items-center gap-2">
             <IssuePropertyMenu pill label="任务状态" value={status} options={ISSUE_STATUSES} icon={CircleDashed} disabled={pending} onChange={setStatus} />
             <IssuePropertyMenu pill label="任务优先级" value={priority} options={ISSUE_PRIORITIES} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={setPriority} />
-            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><SquareUserRound className="size-3.5" />{WORKSPACE_NAME}</Badge>
-            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><LockKeyhole className="size-3.5" />私有</Badge>
+            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><SquareUserRound />{WORKSPACE_NAME}</Badge>
+            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><LockKeyhole />私有</Badge>
           </div>
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
           {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
-        </fieldset>
+        </FieldSet>
         <footer className="flex flex-wrap items-center justify-between gap-3 px-5 pt-1 pb-4 sm:px-6">
           <span className="text-xs text-muted-foreground">⌘ / Ctrl + Enter 创建</span>
           <div className="flex items-center gap-3">
-            <Field orientation="horizontal"><Switch id="create-more" size="sm" checked={createMore} onCheckedChange={setCreateMore} disabled={pending} /><FieldLabel htmlFor="create-more">连续创建</FieldLabel></Field>
-            <Button type="submit" size="sm" className="rounded-full" disabled={pending || !title.trim()}>{pending && <Loader2 data-icon="inline-start" className="animate-spin" />}{pending ? '正在创建…' : '创建任务'}</Button>
+            <FieldGroup className="w-auto"><Field orientation="horizontal"><Switch id="create-more" size="sm" checked={createMore} onCheckedChange={setCreateMore} disabled={pending} /><FieldLabel htmlFor="create-more">连续创建</FieldLabel></Field></FieldGroup>
+            <Button type="submit" size="sm" disabled={pending || !title.trim()}>{pending && <Spinner data-icon="inline-start" />}{pending ? '正在创建…' : '创建任务'}</Button>
           </div>
         </footer>
       </form>
