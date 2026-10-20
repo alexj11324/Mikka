@@ -62,7 +62,9 @@ export function IssueEditor({ content, onChange }: { content?: JSONContent; onCh
     content: content ?? EMPTY_DOCUMENT,
     immediatelyRender: false,
     editorProps: { attributes: { role: "textbox", "aria-label": "任务描述", "aria-multiline": "true" } },
-    onUpdate: ({ editor: current }) => changeRef.current(current.getJSON()),
+    onUpdate: ({ editor: current, transaction }) => {
+      if (transaction.docChanged) changeRef.current(current.getJSON())
+    },
   })
   const { changes } = useRichTextChanges(editor)
   const { anchors, activeId } = useCommentAnchors(editor)
@@ -124,7 +126,7 @@ export function IssueEditor({ content, onChange }: { content?: JSONContent; onCh
         {panel === "comments" && <><h3 className="text-xs font-medium">选区评论 · {openCount}</h3><p className="text-[10px] leading-5 text-muted-foreground">选中正文后添加评论。评论仅用于当前草稿，不会发送给其他成员。</p><FieldGroup><Field><FieldLabel htmlFor="draft-comment" className="sr-only">评论内容</FieldLabel><Input id="draft-comment" value={comment} onChange={e => setComment(e.target.value)} placeholder="写下评论…" maxLength={2000} disabled={!editable} /></Field></FieldGroup><Button size="sm" variant="outline" disabled={!editable || !comment.trim()} onClick={addComment}>添加选区评论</Button>{commentError && <p role="alert" className="text-xs text-destructive">{commentError}</p>}{threadList.map(thread => { const anchor = anchors.find(item => item.id === thread.id); return <article key={thread.id} className={cn("flex flex-col gap-2 rounded-md border bg-background p-3", activeId === thread.id && "border-primary")}><button className="truncate text-left text-[10px] text-muted-foreground" onClick={() => { if (!editor) return; let start: number | undefined; let end = 0; editor.state.doc.descendants((node, pos) => { if (node.isText && node.marks.some(mark => mark.type.name === "comment" && mark.attrs.id === thread.id)) { start ??= pos; end = pos + node.nodeSize } }); if (start !== undefined) editor.chain().focus().setTextSelection({ from: start, to: end }).run() }}>{anchor?.excerpt ?? "原文已删除"}</button>{thread.messages.map(message => <div key={message.id}><p className="text-[10px] text-muted-foreground">草稿作者</p><p className="break-words text-xs leading-6">{message.body}</p></div>)}<div className="flex gap-1"><Button size="sm" variant="ghost" disabled={!editable} onClick={() => { setReplyId(thread.id); setReply("") }}>回复</Button><Button size="sm" variant="ghost" disabled={!editable} onClick={() => setThreadResolved(threadDoc, thread.id, !thread.resolved)}>{thread.resolved ? "重新打开" : "标记解决"}</Button></div>{thread.resolved && <Badge variant="secondary">已解决</Badge>}{replyId === thread.id && <><Input aria-label="回复评论" placeholder="回复…" value={reply} onChange={e => setReply(e.target.value)} maxLength={2000} /><Button size="sm" disabled={!reply.trim() || !editable} onClick={() => submitReply(thread.id)}>提交回复</Button></>}</article> })}</>}
       </aside>}
     </div>
-    <footer className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-[10px] text-muted-foreground"><span>ReUI · Tiptap · 无 AI</span><span>未保存 · 未登录 · 刷新后丢失</span></footer>
+    <footer className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-[10px] text-muted-foreground"><span>ReUI · Tiptap · 无 AI</span><span>正文通过任务按钮保存 · 评论仅本次会话</span></footer>
     <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
   </section></TooltipProvider>
 }
