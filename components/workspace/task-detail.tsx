@@ -3,23 +3,23 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import useSWR from 'swr'
 import type { JSONContent } from '@tiptap/react'
-import { ArrowLeft, Check, FileText, History, MoreHorizontal, Users, X } from 'lucide-react'
+import { ArrowLeft, History } from 'lucide-react'
+import { IssueDetailHeader, type IssueDetailNavigation } from './issue-detail-header'
 import { getIssue, saveIssue, listIssueVersions } from '@/app/actions/issues'
 import { IssueEditor, createDocumentSeed } from './issue-editor'
 import { DocumentSync } from '@/lib/document-sync'
 import { IssueMembers } from './issue-members'
 import { IssueDetailProperties } from './issue-detail-properties'
-import { ISSUE_STATUSES, issueIdentifier } from './issue-properties'
+import { ISSUE_STATUSES } from './issue-properties'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/textarea'
 
 type Issue = Awaited<ReturnType<typeof getIssue>>
 type WorkspaceUser = { id: string; name: string; email: string }
-type DetailProps = { user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
+type DetailProps = { navigation: IssueDetailNavigation; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
 
 export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
   const { data, error, mutate } = useSWR(['issue', id], () => getIssue(id), { revalidateOnFocus: false })
@@ -28,7 +28,7 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
   return <TaskForm key={id} initial={data} {...props} />
 }
 
-function TaskForm({ initial, user, onSaved, onDirty, onClose, onRegisterFlush }: DetailProps & { initial: Issue }) {
+function TaskForm({ initial, user, onSaved, onDirty, onClose, onRegisterFlush, navigation }: DetailProps & { initial: Issue }) {
   const [saved, setSaved] = useState(initial)
   const [sync] = useState(() => new DocumentSync(initial.id, createDocumentSeed(initial.content)))
   const syncState = useSyncExternalStore(sync.subscribe, sync.getSnapshot, sync.getSnapshot)
@@ -126,19 +126,13 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onRegisterFlush }:
   </div>
 
   return <div className="flex min-w-0 flex-1 flex-col">
-    <div className="flex h-12 shrink-0 items-center justify-between gap-2 px-4 sm:px-6">
-      <div className="flex min-w-0 items-center gap-2"><Button variant="ghost" size="icon-sm" aria-label="返回任务视图" disabled={pending} onClick={onClose}><ArrowLeft data-icon="inline-start" /></Button><span className="truncate font-mono text-xs text-muted-foreground">{issueIdentifier(saved.id)}</span></div>
-      <div className="flex items-center gap-2"><span role="status" aria-live="polite" className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">{error ? '保存失败' : pending ? '正在保存…' : syncState.error ? '同步失败' : syncState.pending || syncState.syncing ? '正在同步…' : dirty ? '等待自动保存…' : <><Check className="size-3.5" />已自动保存</>}</span>
-        <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="更多任务操作" disabled={pending} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuGroup><DropdownMenuItem onClick={() => setDocumentTools(value => !value)}><FileText />{documentTools ? '返回任务描述' : '高级文档工具'}</DropdownMenuItem><DropdownMenuItem onClick={() => setHistory(true)}><History />版本历史</DropdownMenuItem><DropdownMenuItem onClick={() => setMembers(true)}><Users />管理协作成员</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
-        <Button variant="ghost" size="icon-sm" aria-label="关闭任务详情" disabled={pending} onClick={onClose}><X data-icon="inline-start" /></Button>
-      </div>
-    </div>
-    <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
-      <div className="min-w-0 flex-1 px-6 py-8 sm:px-10 sm:py-12 xl:px-16">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <IssueDetailHeader id={saved.id} title={title} saveLabel={error ? '保存失败' : pending ? '正在保存…' : syncState.error ? '同步失败' : !syncState.ready ? '正在连接…' : syncState.pending || syncState.syncing ? '正在同步…' : dirty ? '等待自动保存…' : '已自动保存'} saved={syncState.ready && !error && !pending && !syncState.error && !syncState.pending && !syncState.syncing && !dirty} pending={pending} documentTools={documentTools} navigation={navigation} onDocumentTools={() => setDocumentTools(value => !value)} onHistory={() => setHistory(true)} onMembers={() => setMembers(true)} onClose={onClose} />
+    <div className="mx-auto flex w-full min-w-0 max-w-screen-2xl flex-1 flex-col gap-8 lg:flex-row lg:gap-12 lg:px-10 lg:py-14 xl:gap-16 xl:px-16">
+      <div className="min-w-0 flex-1 px-5 pt-8 pb-6 sm:px-10 sm:pt-12 lg:px-0 lg:py-0">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
           {error && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="text-sm text-destructive">{error}</p><Button variant="outline" size="sm" disabled={pending} onClick={() => { void save() }}>重试自动保存</Button></div>}
-          <div className="flex min-w-0 flex-col gap-5">
-            <FieldGroup><Field><FieldLabel htmlFor="task-title" className="sr-only">任务标题</FieldLabel><Textarea id="task-title" rows={1} placeholder="任务标题" value={title} onChange={event => changed({ title: event.target.value })} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; setEditSequence(value => value + 1) }} onBlur={() => { if (title.trim() && title !== saved.title) void save() }} maxLength={200} className="field-sizing-content min-h-10 w-full resize-none rounded-sm border-none bg-transparent text-2xl leading-snug font-semibold tracking-tight shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring md:text-2xl dark:bg-transparent" onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }} /></Field></FieldGroup>
+          <div className="flex min-w-0 flex-col gap-7">
+            <FieldGroup><Field><FieldLabel htmlFor="task-title" className="sr-only">任务标题</FieldLabel><Textarea id="task-title" rows={1} placeholder="任务标题" value={title} onChange={event => changed({ title: event.target.value })} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; setEditSequence(value => value + 1) }} onBlur={() => { if (title.trim() && title !== saved.title) void save() }} maxLength={200} className="field-sizing-content min-h-10 w-full resize-none rounded-sm border-none bg-transparent px-0 py-0 text-2xl leading-snug font-semibold tracking-tight shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring md:text-3xl dark:bg-transparent" onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }} /></Field></FieldGroup>
             {documentTools && <div><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />返回简洁描述</Button></div>}
             {syncState.ready ? <IssueEditor persisted content={content} layout={documentTools ? 'document' : 'issue'} activity={activity} sharedDoc={sync.doc} author={user.name || user.email} replacement={replacement} syncLabel={syncState.error ? '同步失败' : syncState.pending || syncState.syncing ? '正在同步' : '已同步'} onChange={value => changed({ content: value })} /> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>重试文档同步</Button>}</div>}
           </div>
