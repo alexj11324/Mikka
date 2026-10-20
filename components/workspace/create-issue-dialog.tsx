@@ -123,7 +123,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
         <footer className="flex flex-wrap items-center justify-between gap-3 px-5 pt-1 pb-4 sm:px-6">
           <span className="text-xs text-muted-foreground">⌘ / Ctrl + Enter 创建</span>
           <div className="flex items-center gap-3">
-            <FieldGroup className="w-auto"><Field orientation="horizontal"><Switch id="create-more" size="sm" checked={createMore} onCheckedChange={setCreateMore} disabled={pending} /><FieldLabel htmlFor="create-more">连续创建</FieldLabel></Field></FieldGroup>
+            <FieldGroup className="contents"><Field orientation="horizontal"><Switch id="create-more" size="sm" checked={createMore} onCheckedChange={setCreateMore} disabled={pending} /><FieldLabel htmlFor="create-more">连续创建</FieldLabel></Field></FieldGroup>
             <Button type="submit" size="sm" disabled={pending || !title.trim()}>{pending && <Spinner data-icon="inline-start" />}{pending ? '正在创建…' : '创建任务'}</Button>
           </div>
         </footer>

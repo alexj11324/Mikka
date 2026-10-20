@@ -128,7 +128,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作�
   const openCount = threadList.filter(thread => !thread.resolved).length
 
   if (compact) return <TooltipProvider delay={300}><section aria-label="任务描述编辑器">
-    <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn("min-h-28", RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE)} />
+    <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn("min-h-28 text-sm/7", RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE)} />
     {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
     <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
   </section></TooltipProvider>
@@ -136,7 +136,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作�
   if (layout === 'issue') return <TooltipProvider delay={300}>
     <section aria-label="任务描述编辑器" className="flex min-w-0 flex-col gap-2">
       <div ref={pageRef} className="relative min-w-0">
-        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-36 py-1', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-36 py-1 text-sm/7', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
         {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 pb-7">
@@ -165,7 +165,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作�
 
   return <TooltipProvider delay={300}><section aria-label="任务描述编辑器" className="overflow-hidden rounded-lg border bg-background">
     <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-3 py-2">
-      <span className="flex items-center gap-2 text-xs font-medium"><span className="text-muted-foreground"><FileText className="size-3.5" /></span>任务文档<Badge variant="outline">{syncLabel}</Badge></span>
+      <span className="flex items-center gap-2 text-xs font-medium"><FileText className="size-3.5 text-muted-foreground" />任务文档<Badge variant="outline">{syncLabel}</Badge></span>
       <div className="flex items-center gap-2"><NativeSelect aria-label="编辑模式" size="sm" value={mode} onChange={e => setMode(e.target.value)}><NativeSelectOption value="editing">直接编辑</NativeSelectOption><NativeSelectOption value="suggesting">建议修订</NativeSelectOption><NativeSelectOption value="viewing">只读查看</NativeSelectOption></NativeSelect><NativeSelect aria-label="修订显示方式" size="sm" value={markup} onChange={e => setMarkup(e.target.value as RichTextMarkupView)}><NativeSelectOption value="all">全部标记</NativeSelectOption><NativeSelectOption value="final">最终文本</NativeSelectOption><NativeSelectOption value="original">原始文本</NativeSelectOption></NativeSelect></div>
     </div>
     {editable && <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
@@ -177,7 +177,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作�
     </div>
     <div className="flex min-h-72 flex-col lg:flex-row">
       <div ref={pageRef} className="relative min-w-0 flex-1">
-        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn("min-h-72 px-9 py-7 sm:px-12", RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE, RICH_TEXT_MARKUP_VIEW[markup])} />
+        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn("min-h-72 px-9 py-7 text-sm/7 sm:px-12", RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE, RICH_TEXT_MARKUP_VIEW[markup])} />
         {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
       </div>
       {panel && <aside aria-label={panel === "outline" ? "文档大纲" : panel === "changes" ? "修订审阅" : "文档评论"} className="flex w-full shrink-0 flex-col gap-3 border-t bg-muted/15 p-4 lg:w-60 lg:border-l lg:border-t-0">
