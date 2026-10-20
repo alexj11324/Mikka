@@ -38,19 +38,23 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>) {
 }
 export async function listMembers(id: string) {
   const { issue, user } = await requireIssueAccess(id)
-  const members = await db.select({ id: users.id, name: users.name, email: users.email }).from(issueMembers)
-    .innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId)))
-  return { members, isOwner: issue.userId === user.id }
+  const members = await db.select({ id: users.id, name: users.name, email: users.email, image: users.image, createdAt: issueMembers.createdAt }).from(issueMembers)
+    .innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId))).orderBy(issueMembers.createdAt, users.id)
+  const [owner] = await db.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(issues)
+    .innerJoin(users, eq(users.id, issues.userId)).where(and(eq(issues.id, id), eq(issues.userId, issue.userId))).limit(1)
+  if (!owner) throw new Error('任务所有者不存在。')
+  return { members, owner, currentUserId: user.id, isOwner: issue.userId === user.id }
 }
 export async function inviteMember(id: string, email: string) {
   const { issue, user } = await requireIssueAccess(id)
   if (issue.userId !== user.id) return { error: '只有任务所有者可以管理成员。' }
   const parsed = z.email().max(254).safeParse(email.trim().toLowerCase())
   if (!parsed.success) return { error: '请填写有效邮箱。' }
-  const [member] = await db.select({ id: users.id }).from(users).where(eq(users.email, parsed.data)).limit(1)
+  const [member] = await db.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(users).where(eq(users.email, parsed.data)).limit(1)
   if (!member || member.id === user.id) return { error: '无法添加该账号，请确认对方已注册且不是你自己。' }
-  await db.insert(issueMembers).values({ issueId: id, userId: user.id, memberId: member.id }).onConflictDoNothing()
-  return { success: true }
+  const [added] = await db.insert(issueMembers).values({ issueId: id, userId: user.id, memberId: member.id }).onConflictDoNothing().returning({ createdAt: issueMembers.createdAt })
+  if (!added) return { error: '该成员已拥有此任务的访问权限，无需重复添加。' }
+  return { success: true, member: { ...member, createdAt: added.createdAt } }
 }
 export async function removeMember(id: string, memberId: string) {
   const { issue, user } = await requireIssueAccess(id)
