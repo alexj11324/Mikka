@@ -77,3 +77,76 @@ footer, main, ul, li, dl, dt, dd, time, br, aside
 - [ ] `app-sidebar.tsx` 与 `issue-list.tsx` 内联了状态色映射（原为共享常量
       `status.indicatorClassName`），因为 `style/static-layout-only` 无法追踪属性访问。
       若 `issue-properties.ts` 的映射变化，这两处需同步
+
+---
+
+# 中文字体对齐 Comma（2026-10-20）
+
+要求：把中文字体改成 Comma 的样子。
+
+## 调研结论（实测 app.comma.surf，非猜测）
+
+用 CDP `CSS.getPlatformFontsForNode` 拿到**实际渲染字形的物理字体**：
+
+| | Comma | Orvilo3（改前） | Orvilo3（改后） |
+|---|---|---|---|
+| 拉丁 | Inter Variable（自托管 webfont） | Inter（webfont） | Inter（webfont） |
+| **中文** | **PingFang SC（系统字体）** | Noto Sans SC Thin（webfont） | **PingFang SC（系统）** |
+| 代码 | Menlo（Geist Mono 未内嵌，直接落到系统等宽） | — | — |
+
+**关键结论：Comma 全站 CSS 没有声明任何中文字体**（无 PingFang / Noto SC / 思源），
+中文完全靠 `-apple-system` / `system-ui` 的 CJK fallback，即 macOS 的 PingFang SC。
+字体栈原文：
+`"Inter Variable", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, …`
+
+## 顺带记录：Comma 的排版系统（本次未采用）
+
+- 字号档位语义化并**覆盖了 Tailwind 默认值**：`--text-sm: .8125rem`（13px，不是 14px）、
+  `--text-xs: .75rem`、`--text-regular/.md: .9375rem`（15px）、
+  `--text-micro: .6875rem`（11px）、`--text-mini: .75rem`（12px）
+- 字重把 normal/regular 重定义为 **450**（可变字体的中间值）
+- 实测密度：`text-sm`(13px) 182 处、`text-xs`(12px) 102 处；聊天正文 13px / w450 / lh 20px /
+  `tracking-[-0.14px]`；行内代码缩到 11.96px（13×0.92）
+- 根节点挂 `data-comma-font-size="small|default|large"` → `font-size: 90%|100%|110%`，
+  因为全站尺寸都是 rem，改一个根字号整体缩放
+- 色板基于 **Untitled UI**（blue-25 #f5faff … blue-950 #102a56），品牌蓝 `#205bff`
+- 中性色用 **OKLCH 相对颜色做运行时染色**：
+  `oklch(from <基准灰> calc(clamp(0, l + (clamp(.36, var(--comma-theme-l), .64) - .5) * 4 * l * (1 - l), 1)) calc(var(--comma-theme-c) * 4 * l * (1 - l)) var(--comma-theme-h))`
+  `4·l·(1-l)` 是钟形曲线 —— 中间调染色最深，纯黑纯白不动，所以两端对比度不受影响。
+  默认预设 `--comma-theme-c: 0` 即纯灰
+
+## 改动
+
+| 文件 | 改动 |
+|---|---|
+| `app/globals.css` | `--font-sans` 改为 `var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif` |
+| `app/layout.tsx` | 移除 `Noto_Sans_SC` 导入、`fontChinese` 变量与 `<html>` 上的 class |
+| `ui-policy.json` | `googleFonts` 从 `["Inter", "Noto_Sans_SC"]` 收敛为 `["Inter"]` |
+| `scripts/ui-policy.mjs` | 第 265 行硬编码的 `--font-sans` 批准值同步更新；第 76 行 `/-transparent$/` → `base.endsWith('-transparent')` 修掉既有 oxlint 警告 |
+
+后两处是必须的：策略脚本把 `--font-sans` 的取值写死在代码里，不改会报
+`typography/font-token`。
+
+**采用纯 fallback 策略，与 Comma 一致**：字体栈里不写任何中文字体名，
+让 `-apple-system` / `BlinkMacSystemFont` 的平台 CJK 级联去兜 ——
+macOS 得到苹方，Windows 得到微软雅黑。
+
+一开始写成显式 `"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC"`
+的版本，被要求改回 fallback 策略。两种写法在本机渲染结果相同（实测都是 PingFang SC），
+但纯 fallback 才是 Comma 的真实做法。
+
+与 Comma 原栈的唯一差异：去掉了 `"SF Pro Display"`（display 光学尺寸字面，
+对 UI 正文反而偏紧，且不覆盖中文）与 `Oxygen, Ubuntu, Cantarell, "Open Sans"`
+（Linux 发行版字体，对本项目是死条目）。
+
+## 验证
+
+- [x] `node scripts/lint-ui.mjs` → 0 违规，退出码 0
+- [x] `node --test scripts/ui-policy.test.mjs` → 60/60
+- [x] `tsgo --noEmit` → 退出码 0
+- [x] `oxlint --deny-warnings` → 退出码 0（顺手修掉既有的 `-transparent$` 警告后转绿）
+- [x] 浏览器实测（CDP `CSS.getPlatformFontsForNode`）：登录页 7 个中文节点
+      **全部 PingFang SC (system)**，拉丁 Inter (webfont)，零 Noto 残留。
+      显式苹方版与纯 fallback 版各测一次，结果相同
+- [x] 字体文件从 2 个 woff2 降到 1 个（Noto Sans SC 不再下载）
+

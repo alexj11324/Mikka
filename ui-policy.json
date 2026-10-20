@@ -8,7 +8,7 @@
     "sizes": ["xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl"],
     "weights": ["normal", "medium", "semibold", "bold"],
     "families": ["sans", "mono", "heading"],
-    "googleFonts": ["Inter", "Noto_Sans_SC"],
+    "googleFonts": ["Inter"],
     "leading": ["none", "tight", "snug", "normal", "relaxed", "loose", "3", "4", "5", "6", "7", "8", "9", "10"],
     "tracking": ["tighter", "tight", "normal", "wide", "wider", "widest"]
   }
