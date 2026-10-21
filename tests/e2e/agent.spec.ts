@@ -10,6 +10,25 @@ apiTest('开发预览验收入口不跳转到内部主机', async ({ request, ba
   expect(new URL(response.headers()['location'], baseURL).origin).toBe(new URL(baseURL!).origin)
 })
 
+apiTest('Agent 接口拒绝未登录请求与跨站请求', async ({ request }) => {
+  const unauthenticated = await request.post('/api/agent', { data: { prompt: '你好' } })
+  expect(unauthenticated.status()).toBe(401)
+  const crossSite = await request.post('/api/agent', { headers: { 'sec-fetch-site': 'cross-site' }, data: { prompt: '你好' } })
+  expect(crossSite.status()).toBe(403)
+})
+
+test('Agent 接口验证输入且不接受客户端密钥', async ({ page }) => {
+  await register(page)
+  for (const data of [{ prompt: '' }, { prompt: 'a'.repeat(8001) }, { prompt: '你好', apiKey: 'client-key' }]) {
+    const response = await page.request.post('/api/agent', { data })
+    expect(response.status()).toBe(400)
+  }
+  const malformed = await page.request.post('/api/agent', { headers: { 'Content-Type': 'application/json' }, data: '{' })
+  expect(malformed.status()).toBe(400)
+  const oversized = await page.request.post('/api/agent', { data: { prompt: 'a'.repeat(40001) } })
+  expect(oversized.status()).toBe(413)
+})
+
 test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区导航', async ({ page }) => {
   const externalRequests: string[] = []
   page.on('request', request => {
@@ -38,9 +57,25 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await input.dispatchEvent('keydown', { key: 'Enter', code: 'Enter', isComposing: true })
   await input.dispatchEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 229 })
   await expect(panel.getByRole('status')).toHaveCount(0)
+  let submittedPrompt = ''
+  await page.route('**/api/agent', async route => {
+    submittedPrompt = route.request().postDataJSON().prompt
+    await route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: 'data: {"type":"error","errorText":"测试：模型暂时不可用。"}\n\ndata: [DONE]\n\n' })
+  })
   await input.press('Enter')
-  await expect(panel.getByRole('status')).toHaveText('尚未连接模型服务，消息未发送。你的输入已保留。')
+  await expect(panel.getByRole('alert')).toContainText('测试：模型暂时不可用。')
   await expect(input).toHaveValue('原生组件交互测试\n')
+  expect(submittedPrompt).toBe('原生组件交互测试')
+  await page.route('**/api/agent', route => route.fulfill({
+    status: 200,
+    contentType: 'text/event-stream',
+    headers: { 'x-vercel-ai-ui-message-stream': 'v1' },
+    body: 'data: {"type":"start"}\n\ndata: {"type":"text-start","id":"text-1"}\n\ndata: {"type":"text-delta","id":"text-1","delta":"已收到你的问题。"}\n\ndata: {"type":"text-end","id":"text-1"}\n\ndata: {"type":"finish"}\n\ndata: [DONE]\n\n',
+  }))
+  await send.click()
+  await expect(panel.getByText('已收到你的问题。', { exact: true })).toBeVisible()
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  await expect(send).toBeEnabled()
   expect(externalRequests).toEqual([])
 
   await page.setViewportSize({ width: 390, height: 844 })

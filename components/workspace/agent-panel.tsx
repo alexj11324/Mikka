@@ -3,10 +3,12 @@
 import '@openuidev/react-ui/layered/styles/button.css'
 import '@openuidev/react-ui/layered/styles/card.css'
 import '@openuidev/react-ui/layered/styles/textArea.css'
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
+import { useCompletion } from '@ai-sdk/react'
 import { createTheme, ThemeProvider } from '@openuidev/react-ui/ThemeProvider'
 import { AgentComposer } from './agent-composer'
 import { AgentStarters } from './agent-starters'
+import { AgentResponse } from './agent-response'
 
 const agentTheme = createTheme({
   background: 'var(--background)',
@@ -31,23 +33,24 @@ const agentTheme = createTheme({
 })
 
 export function AgentPanel() {
-  const [draft, setDraft] = useState('')
-  const [notice, setNotice] = useState('')
+  const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ api: '/api/agent', credentials: 'same-origin' })
   const inputRef = useRef<HTMLTextAreaElement>(null)
-
-  function updateDraft(value: string) {
-    setDraft(value)
-    setNotice('')
-  }
+  const submittingRef = useRef(false)
 
   function selectStarter(prompt: string) {
+    if (isLoading) return
     updateDraft(prompt)
     inputRef.current?.focus()
   }
 
-  function submit() {
-    if (!draft.trim()) return
-    setNotice('尚未连接模型服务，消息未发送。你的输入已保留。')
+  async function submit() {
+    if (!draft.trim() || isLoading || submittingRef.current) return
+    submittingRef.current = true
+    try {
+      await complete(draft.trim())
+    } finally {
+      submittingRef.current = false
+    }
   }
 
   return <section id="orvilo-agent" aria-labelledby="agent-title" className="flex min-h-[calc(100svh-4rem)] w-full flex-col px-4 py-8 sm:px-8">
@@ -57,12 +60,10 @@ export function AgentPanel() {
           <h1 id="agent-title" className="text-2xl font-medium tracking-tight sm:text-3xl">有什么可以帮你？</h1>
           <p className="text-sm text-muted-foreground">从一个想法开始，和 Agent 一起理清下一步。</p>
         </header>
-        <AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={submit} />
-        <AgentStarters onSelect={selectStarter} />
-        <div className="flex flex-col gap-2 text-center text-xs text-muted-foreground">
-          {notice && <p role="status">{notice}</p>}
-          <p id="agent-service-note">当前仅接入 OpenUI 界面组件，尚未连接模型服务。</p>
-        </div>
+        <AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={submit} isLoading={isLoading} onStop={stop} />
+        <AgentResponse completion={completion} error={error} isLoading={isLoading} />
+        {!isLoading && <AgentStarters onSelect={selectStarter} />}
+        <p id="agent-service-note" className="text-center text-xs text-muted-foreground">OpenCode Zen · 单次问答，不保存历史，也不会读取或修改工作区数据。</p>
       </div>
     </ThemeProvider>
   </section>
