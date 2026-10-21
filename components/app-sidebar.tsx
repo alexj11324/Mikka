@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
 import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound, Users } from 'lucide-react'
 import { NavUser } from '@/components/nav-user'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
@@ -17,7 +16,7 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
   onNavigate: (section: WorkspaceSection) => boolean
   onSearch: () => void
   onCreate: () => void
-  onSettings: () => void
+  onSettings: (section?: 'preferences' | 'members', invite?: boolean) => void
   onSignOut: () => void
   signingOut: boolean
 }) {
@@ -58,8 +57,8 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
     </SidebarContent>
     <SidebarFooter>
       <SidebarMenu>
-        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members" />} tooltip="成员管理"><Users /><span>成员管理</span></SidebarMenuButton></SidebarMenuItem>
-        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members?invite=1" />} tooltip="邀请成员"><SquarePen /><span>邀请成员</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton onClick={() => { setOpenMobile(false); onSettings('members') }} tooltip="成员管理"><Users /><span>成员管理</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton onClick={() => { setOpenMobile(false); onSettings('members', true) }} tooltip="邀请成员"><SquarePen /><span>邀请成员</span></SidebarMenuButton></SidebarMenuItem>
       </SidebarMenu>
       <NavUser user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} />
     </SidebarFooter>

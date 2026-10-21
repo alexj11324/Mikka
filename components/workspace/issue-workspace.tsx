@@ -27,6 +27,7 @@ import { SECTION_TITLES, type WorkspaceSection } from './workspace-navigation'
 
 export function IssueWorkspace({ user, initialIssues }: { user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members'; invite: boolean }>({ section: 'preferences', invite: false })
   const [boardBusy, setBoardBusy] = useState(false)
   const { data: tasks = [], mutate, error } = useSWR('issues', listIssues, { fallbackData: initialIssues, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)
@@ -121,8 +122,8 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
   }
   const viewTitle = view === 'all' ? '全部任务' : view === 'mine' ? '我创建的' : view === 'shared' ? '协作任务' : ISSUE_STATUSES.find(status => status.value === view)?.label ?? '全部任务'
   return <AppShell>
-    {settingsOpen ? <SettingsView user={user} onBack={() => setSettingsOpen(false)} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
-    <AppSidebar onSettings={() => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsOpen(true) }) }} user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
+    {settingsOpen ? <SettingsView initialSection={settingsTarget.section} inviteInitially={settingsTarget.invite} user={user} onBack={() => setSettingsOpen(false)} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
+    <AppSidebar onSettings={(section = 'preferences', invite = false) => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsTarget({ section, invite }); setSettingsOpen(true) }) }} user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
     <AppShellContent parent={WORKSPACE_NAME} title={selected ? issueIdentifier(selected) : SECTION_TITLES[section]} actions={<Button variant="ghost" size="icon-sm" aria-label="打开全局搜索" disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {error && <p role="alert" className="px-6 py-2 text-xs text-destructive">列表更新失败，已保留上次结果。</p>}
