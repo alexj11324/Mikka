@@ -18,14 +18,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PROJECT_COLORS, PROJECT_ICON_COLORS, type Project, type ProjectControlField } from './project-properties'
 import { ProjectPicker, ProjectPropertyControl } from './project-property-controls'
 import { ProjectMilestones } from './project-milestones'
-import { WORKSPACE_NAME } from './issue-properties'
+import { WORKSPACE_NAME, WORKSPACE_TEAM_KEY } from './issue-properties'
 
 const FIELDS: ProjectControlField[] = ['status', 'priority', 'lead', 'members', 'startDate', 'targetDate', 'labels', 'dependencyIds']
 
 export function ProjectForm({ project, projects = [], userName, onClose, onSaved }: { project?: Project; projects?: Project[]; userName: string; onClose: () => void; onSaved: (project: Project) => void }) {
   const t = useTranslations('Projects')
   const translateError = useActionError()
-  const [initial] = useState<ProjectDraft>(() => ({ name: project?.name ?? '', summary: project?.summary ?? '', description: project?.description || project?.summary || '', status: (project?.status ?? 'backlog') as ProjectDraft['status'], priority: (project?.priority ?? 'none') as ProjectDraft['priority'], lead: (project?.lead ?? '') as '' | 'me', team: WORKSPACE_NAME, startDate: project?.startDate ?? '', targetDate: project?.targetDate ?? '', properties: project?.properties ?? DEFAULT_PROJECT_PROPERTIES }))
+  const [initial] = useState<ProjectDraft>(() => ({ name: project?.name ?? '', summary: project?.summary ?? '', description: project?.description || project?.summary || '', status: (project?.status ?? 'backlog') as ProjectDraft['status'], priority: (project?.priority ?? 'none') as ProjectDraft['priority'], lead: (project?.lead ?? '') as '' | 'me', team: WORKSPACE_TEAM_KEY, startDate: project?.startDate ?? '', targetDate: project?.targetDate ?? '', properties: project?.properties ?? DEFAULT_PROJECT_PROPERTIES }))
   const [draft, setDraft] = useState(initial)
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)

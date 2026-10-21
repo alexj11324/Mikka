@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
+import { WORKSPACE_TEAM_KEY } from '@/components/workspace/issue-properties'
 
 export const DEFAULT_PROJECT_PROPERTIES = { color: 'green' as const, members: [] as 'me'[], labels: [] as string[], dependencyIds: [] as string[], milestones: [] as { id: string; name: string; targetDate: string; completed: boolean }[] }
 const date = z.union([z.literal(''), z.iso.date()])
@@ -19,7 +19,7 @@ export const projectFields = z.object({
   summary: z.string().trim().max(500), description: z.string().max(50000),
   status: z.enum(['backlog', 'planned', 'started', 'paused', 'completed', 'canceled']),
   priority: z.enum(['none', 'urgent', 'high', 'normal', 'low']), lead: z.enum(['', 'me']),
-  team: z.literal(WORKSPACE_NAME), startDate: date, targetDate: date,
+  team: z.literal(WORKSPACE_TEAM_KEY), startDate: date, targetDate: date,
   properties: projectProperties.default(DEFAULT_PROJECT_PROPERTIES),
 })
 export const projectInput = projectFields.extend({ id: z.uuid().optional(), revision: z.number().int().positive().optional() }).refine(value => !value.startDate || !value.targetDate || value.startDate <= value.targetDate, 'validationProjectDateOrder')
