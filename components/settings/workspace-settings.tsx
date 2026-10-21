@@ -16,17 +16,19 @@ export function WorkspaceSettings() {
   const invalidSlug = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 48
   return <section className="flex flex-col gap-4" aria-label="工作区基本信息">
     <FieldGroup className="gap-0 rounded-xl border bg-muted/30 px-5">
-      <Field className="py-5 sm:flex-row sm:items-center sm:justify-between">
-        <FieldLabel htmlFor="workspace-name">名称</FieldLabel>
-        <Input id="workspace-name" className="w-full sm:w-72" value={name} maxLength={100} onChange={event => setName(event.target.value)} />
+      <Field orientation="responsive" className="justify-between gap-3 py-5">
+        <FieldLabel htmlFor="workspace-name" className="@md/field-group:flex-none">名称</FieldLabel>
+        <div className="min-w-0 @md/field-group:flex-[0_1_28rem]">
+          <Input id="workspace-name" value={name} maxLength={100} onChange={event => setName(event.target.value)} />
+        </div>
       </Field>
       <Separator />
-      <Field data-invalid={invalidSlug || undefined} className="py-5 sm:flex-row sm:items-center sm:justify-between">
-        <FieldLabel htmlFor="workspace-url">URL</FieldLabel>
-        <div className="flex w-full min-w-0 flex-col gap-2 sm:max-w-md sm:flex-1">
+      <Field orientation="responsive" data-invalid={invalidSlug || undefined} className="justify-between gap-3 py-5">
+        <FieldLabel htmlFor="workspace-url" className="@md/field-group:flex-none">URL</FieldLabel>
+        <div className="flex min-w-0 flex-col gap-2 @md/field-group:flex-[0_1_28rem]">
           <InputGroup>
-            <InputGroupAddon><InputGroupText>{host}/</InputGroupText></InputGroupAddon>
-            <InputGroupInput id="workspace-url" aria-describedby="workspace-url-help" aria-invalid={invalidSlug} value={slug} maxLength={48} autoCapitalize="none" spellCheck={false} onChange={event => setSlug(event.target.value)} />
+            <InputGroupInput id="workspace-url" className="min-w-24" aria-describedby="workspace-url-help" aria-invalid={invalidSlug} value={slug} maxLength={48} autoCapitalize="none" spellCheck={false} onChange={event => setSlug(event.target.value)} />
+            <InputGroupAddon className="min-w-0 max-w-[calc(100%-6rem)] shrink-0"><InputGroupText className="block truncate" title={`${host}/`}>{host}/</InputGroupText></InputGroupAddon>
           </InputGroup>
           {invalidSlug && <p role="alert" className="text-xs text-destructive">使用小写字母、数字和单个连字符，不能以连字符开头或结尾。</p>}
         </div>
