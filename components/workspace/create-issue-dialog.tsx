@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { JSONContent } from '@tiptap/react'
 import { ChartNoAxesColumnIncreasing, ChevronRight, CircleDashed, LockKeyhole, Maximize2, Minimize2, SquareUserRound, X } from 'lucide-react'
 import { saveIssue } from '@/app/actions/issues'
+import useSWR from 'swr'
+import { toast } from 'sonner'
+import { listTeams } from '@/app/actions/teams'
+import { setIssueTeam } from '@/app/actions/team-relations'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldGroup, FieldLabel, FieldSet } from '@/components/ui/field'
@@ -14,17 +19,20 @@ import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { IssueEditor } from './issue-editor'
 import { IssuePropertyMenu } from './issue-property-menu'
-import { ISSUE_PRIORITIES, ISSUE_STATUSES, WORKSPACE_NAME } from './issue-properties'
+import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 
 const EMPTY: JSONContent = { type: 'doc', content: [{ type: 'paragraph' }] }
 
-export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initialStatus = 'todo' }: {
+export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initialTeamId = '', initialStatus = 'todo' }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: (id: string) => void
   author: string
   initialStatus?: string
+  initialTeamId?: string
 }) {
+  const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
+  const [teamId, setTeamId] = useState(initialTeamId)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState<JSONContent>(EMPTY)
   const [status, setStatus] = useState(initialStatus)
@@ -37,7 +45,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   const titleRef = useRef<HTMLInputElement>(null)
   const submitting = useRef(false)
   const [defaults, setDefaults] = useState({ status: initialStatus, priority: 'normal' })
-  const dirty = !!title.trim() || JSON.stringify(content) !== JSON.stringify(EMPTY) || status !== defaults.status || priority !== defaults.priority
+  const dirty = !!title.trim() || JSON.stringify(content) !== JSON.stringify(EMPTY) || status !== defaults.status || priority !== defaults.priority || teamId !== initialTeamId
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => { if (notice && !pending) titleRef.current?.focus() }, [notice, pending])
@@ -65,6 +73,12 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
       if (!('issue' in result) || !result.issue) {
         setError(result.error ?? '创建失败，草稿已保留。')
         return
+      }
+      if (teamId) {
+        try {
+          const relation = await setIssueTeam({ issueId: result.issue.id, teamId, expectedTeamId: null })
+          if (!relation.ok) toast.warning(`任务已创建，团队归属未保存：${relation.error} 请在任务详情重试。`)
+        } catch { toast.warning('任务已创建，但团队归属未保存。请在任务详情重试，不要重复创建。') }
       }
       onCreated(result.issue.id)
       if (createMore) {
@@ -114,9 +128,9 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
           <div className="flex flex-wrap items-center gap-2">
             <IssuePropertyMenu pill label="任务状态" value={status} options={ISSUE_STATUSES} icon={CircleDashed} disabled={pending} onChange={setStatus} />
             <IssuePropertyMenu pill label="任务优先级" value={priority} options={ISSUE_PRIORITIES} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={setPriority} />
-            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><SquareUserRound />{WORKSPACE_NAME}</Badge>
-            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><LockKeyhole />私有</Badge>
+            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><LockKeyhole />{teamId ? '工作区公开' : '私有'}</Badge>
           </div>
+          <FieldGroup><Field><FieldLabel htmlFor="new-issue-team">归属团队</FieldLabel><NativeSelect id="new-issue-team" value={teamId} disabled={pending || !!teamsError} onChange={event => setTeamId(event.target.value)}><NativeSelectOption value="">无团队 · 私有任务</NativeSelectOption>{teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{team.identifier} · {team.name}</NativeSelectOption>)}</NativeSelect><p className="text-xs text-muted-foreground">{teamsError ? '团队读取失败，请稍后重试。' : teamId ? '此任务将对团队所在工作区所有启用成员公开并允许编辑。' : '仅你和后续授权的协作成员可以访问。'}</p></Field></FieldGroup>
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
           {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
         </FieldSet>

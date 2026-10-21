@@ -1,6 +1,8 @@
 'use client'
 
 import * as React from 'react'
+import useSWR from 'swr'
+import { listTeams } from '@/app/actions/teams'
 import Link from 'next/link'
 import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound, Users } from 'lucide-react'
 import { NavUser } from '@/components/nav-user'
@@ -11,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
 import type { WorkspaceSection } from '@/components/workspace/workspace-navigation'
 
-export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSettings, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
+export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, onSearch, onCreate, onSettings, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
   user: { name: string; email: string; image?: string | null }
   section: WorkspaceSection
   onNavigate: (section: WorkspaceSection) => boolean
@@ -20,7 +22,10 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
   onSettings: () => void
   onSignOut: () => void
   signingOut: boolean
+  teamId: string | null
+  onTeamNavigate: (teamId: string, section: WorkspaceSection) => boolean
 }) {
+  const { data: teams = [], error: teamsError, mutate: refreshTeams } = useSWR('teams', listTeams)
   const { setOpenMobile, open, openMobile, isMobile } = useSidebar()
   function navigate(next: WorkspaceSection) { if (onNavigate(next)) setOpenMobile(false) }
   const personal = [{ id: 'inbox', title: '收件箱', icon: Inbox }, { id: 'my-issues', title: '我的任务', icon: Scan }, { id: 'agent', title: 'Agent', icon: Send }] as const
@@ -43,17 +48,18 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
         <SidebarGroupLabel render={<CollapsibleTrigger />} className="mb-1 cursor-pointer">工作区<ChevronDown className="ml-1 transition-transform group-data-closed/workspace:-rotate-90" /></SidebarGroupLabel>
         <CollapsibleContent><SidebarMenu>
           <SidebarMenuItem><SidebarMenuButton isActive={section === 'projects'} onClick={() => navigate('projects')}><Box /><span>项目</span></SidebarMenuButton></SidebarMenuItem>
+          <SidebarMenuItem><SidebarMenuButton isActive={section === 'all-issues'} onClick={() => navigate('all-issues')}><Layers /><span>任务</span></SidebarMenuButton></SidebarMenuItem>
           <SidebarMenuItem><SidebarMenuButton isActive={section === 'views'} onClick={() => navigate('views')}><Layers /><span>视图</span></SidebarMenuButton></SidebarMenuItem>
           <SidebarMenuItem><DropdownMenu><DropdownMenuTrigger render={<SidebarMenuButton />}><Ellipsis /><span>更多</span></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup><DropdownMenuItem onClick={() => navigate('all-issues')}><Layers />全部任务</DropdownMenuItem><DropdownMenuItem render={<a href="https://linear.app/docs/projects" target="_blank" rel="noreferrer" />}><CircleHelp />项目使用指南</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu></SidebarMenuItem>
         </SidebarMenu></CollapsibleContent>
       </SidebarGroup></Collapsible>
       <Collapsible defaultOpen className="group/teams"><SidebarGroup>
         <SidebarGroupLabel render={<CollapsibleTrigger />} className="mb-1 cursor-pointer">你的团队<ChevronDown className="ml-1 transition-transform group-data-closed/teams:-rotate-90" /></SidebarGroupLabel>
-        <CollapsibleContent><SidebarMenu><SidebarMenuItem>
-          <Collapsible defaultOpen className="group/team"><CollapsibleTrigger render={<SidebarMenuButton aria-label={`展开或收起 ${WORKSPACE_NAME} 团队`} />}><SquareUserRound className="text-info-foreground" /><span>{WORKSPACE_NAME}</span><ChevronDown className="ml-auto transition-transform group-data-closed/team:-rotate-90" /></CollapsibleTrigger>
-            <CollapsibleContent><SidebarMenuSub className="mx-0 ml-4 border-0 px-0">{teamItems.map(item => <SidebarMenuSubItem key={item.id}><SidebarMenuSubButton render={<Button variant="ghost" />} isActive={section === item.id} onClick={() => navigate(item.id)}><item.icon /><span>{item.title}</span></SidebarMenuSubButton></SidebarMenuSubItem>)}</SidebarMenuSub></CollapsibleContent>
+        <CollapsibleContent><SidebarMenu>{teams.filter(team => team.role).map(team => <SidebarMenuItem key={team.id}>
+          <Collapsible defaultOpen className="group/team"><CollapsibleTrigger render={<SidebarMenuButton aria-label={`展开或收起 ${team.name} 团队`} />}><SquareUserRound className="text-info-foreground" /><span>{team.name}</span><ChevronDown className="ml-auto transition-transform group-data-closed/team:-rotate-90" /></CollapsibleTrigger>
+            <CollapsibleContent><SidebarMenuSub className="mx-0 ml-4 border-0 px-0">{teamItems.map(item => <SidebarMenuSubItem key={item.id}><SidebarMenuSubButton render={<Button variant="ghost" />} isActive={teamId === team.id && section === item.id} onClick={() => { if (onTeamNavigate(team.id, item.id)) setOpenMobile(false) }}><item.icon /><span>{item.title}</span></SidebarMenuSubButton></SidebarMenuSubItem>)}</SidebarMenuSub></CollapsibleContent>
           </Collapsible>
-        </SidebarMenuItem></SidebarMenu></CollapsibleContent>
+        </SidebarMenuItem>)}<SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/teams" />}><Users /><span>浏览与管理团队</span></SidebarMenuButton></SidebarMenuItem>{teamsError && <SidebarMenuItem><SidebarMenuButton onClick={() => void refreshTeams()}>团队读取失败，重试</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></CollapsibleContent>
       </SidebarGroup></Collapsible>
     </SidebarContent>
     <SidebarFooter>

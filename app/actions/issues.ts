@@ -1,7 +1,9 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { and, desc, eq, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, or } from 'drizzle-orm'
+import { accessibleTeams } from '@/lib/team-access'
+import { issueTeamScope } from '@/lib/issue-team-access'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -26,7 +28,12 @@ const inputSchema = z.object({
 
 export async function listIssues() {
   const userId = await getUserId()
-  return db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))).orderBy(desc(issues.updatedAt)).limit(100)
+  const teams = await accessibleTeams(userId)
+  const publicLinks = await issueTeamScope(userId)
+  const publicIds = publicLinks.map(link => link.issueId)
+  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId), publicIds.length ? inArray(issues.id, publicIds) : undefined)).orderBy(desc(issues.updatedAt)).limit(100)
+  const links = await issueTeamScope(userId, rows.map(row => row.id))
+  return rows.filter(row => { const link = links.find(item => item.issueId === row.id); return !link || teams.some(team => team.id === link.teamId) }).map(row => ({ ...row, teamId: links.find(link => link.issueId === row.id)?.teamId ?? null }))
 }
 export async function getIssue(id: string) {
   return (await requireIssueAccess(id)).issue
