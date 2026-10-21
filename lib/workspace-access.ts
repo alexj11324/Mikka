@@ -1,6 +1,8 @@
 import 'server-only'
 import { cookies } from 'next/headers'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
+import { db } from '@/lib/db'
+import { users } from '@/lib/db/schema'
 import { z } from 'zod'
 import { requireUser } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -38,9 +40,14 @@ export async function loadWorkspaceSettings(requestedId?: string) {
       .from(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId)).orderBy(asc(workspaceMembers.createdAt))
     const invitations = membership.role === 'admin' ? await tx.select({ id: workspaceInvitations.id, email: workspaceInvitations.email, role: workspaceInvitations.role, status: workspaceInvitations.status, createdAt: workspaceInvitations.createdAt, expiresAt: workspaceInvitations.expiresAt })
       .from(workspaceInvitations).where(and(eq(workspaceInvitations.workspaceId, workspaceId), eq(workspaceInvitations.status, 'pending'))).orderBy(asc(workspaceInvitations.createdAt)) : []
+    // Auth profiles live in a separate database; only read IDs from this authorized workspace.
+    const profiles = members.length ? await db.select({ id: users.id, image: users.image }).from(users)
+      .where(inArray(users.id, members.map(member => member.userId))) : []
+    const images = new Map(profiles.map(profile => [profile.id, profile.image]))
     return {
       workspace: { id: workspace.id, name: workspace.name }, choices, currentUserId: user.id, role: membership.role,
-      members: members.map(member => ({ ...member, createdAt: member.createdAt.toISOString() })),
+      currentUser: { email: user.email, image: user.image ?? null },
+      members: members.map(member => ({ ...member, image: images.get(member.userId) ?? null, createdAt: member.createdAt.toISOString() })),
       invitations: invitations.map(invite => ({ ...invite, createdAt: invite.createdAt.toISOString(), expiresAt: invite.expiresAt.toISOString() })),
     }
   })

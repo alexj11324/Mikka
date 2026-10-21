@@ -8,7 +8,7 @@ import { Badge } from '@/components/reui/badge'
 import { Frame, FrameHeader, FrameTitle, FrameDescription, FramePanel, FrameFooter } from '@/components/reui/frame'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/user-avatar'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -94,7 +94,7 @@ export function IssueMembers({ id }: { id: string }) {
         <FieldGroup><Field><FieldLabel htmlFor="member-search" className="sr-only">搜索成员</FieldLabel><InputGroup><InputGroupInput id="member-search" placeholder="搜索姓名或邮箱" value={query} onChange={event => setQuery(event.target.value)} /><InputGroupAddon><Search /></InputGroupAddon></InputGroup></Field></FieldGroup>
         <ItemGroup aria-label="任务成员">
           {visible.map(member => <Item key={member.id} role="listitem" size="sm" variant="outline">
-            <ItemMedia><Avatar>{member.image && <AvatarImage src={member.image} alt="" />}<AvatarFallback>{Array.from(member.name || member.email).slice(0, 2).join('').toUpperCase()}</AvatarFallback></Avatar></ItemMedia>
+            <ItemMedia><UserAvatar user={member} /></ItemMedia>
             <ItemContent className="min-w-0"><ItemTitle>{member.name || member.email}{member.id === data.currentUserId && <Badge variant="outline">你</Badge>}</ItemTitle><ItemDescription className="break-all">{member.email}</ItemDescription></ItemContent>
             <ItemActions>
               {member.id === data.owner.id ? <Badge variant="secondary"><ShieldCheck />所有者</Badge> : <Badge variant="outline">协作者</Badge>}

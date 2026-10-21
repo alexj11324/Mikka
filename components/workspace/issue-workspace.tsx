@@ -27,7 +27,7 @@ function WorkspaceSidebarTrigger() {
   return <SidebarTrigger className="-ml-1" aria-label="展开或收起侧栏" aria-expanded={isMobile ? openMobile : open} />
 }
 
-export function IssueWorkspace({ user, initialIssues }: { user: { id: string; name: string; email: string }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
+export function IssueWorkspace({ user, initialIssues }: { user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
   const [boardBusy, setBoardBusy] = useState(false)
   const { data: tasks = [], mutate, error } = useSWR('issues', listIssues, { fallbackData: initialIssues, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
   const [layout, setLayout] = useState<'board' | 'list'>('board')

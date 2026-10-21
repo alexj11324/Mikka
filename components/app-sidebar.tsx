@@ -28,7 +28,7 @@ import { useSidebar } from '@/components/ui/sidebar'
 import { ISSUE_STATUSES, WORKSPACE_NAME, type IssueView } from '@/components/workspace/issue-properties'
 
 export function AppSidebar({ user, view, counts, recentIssues, selected, onNavigate, onOpen, onSearch, onCreate, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
-  user: { name: string; email: string }
+  user: { name: string; email: string; image?: string | null }
   view: IssueView
   counts: Record<IssueView, number>
   recentIssues: Awaited<ReturnType<typeof listIssues>>

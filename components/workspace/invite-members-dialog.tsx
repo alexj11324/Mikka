@@ -20,7 +20,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   Field,
   FieldDescription,
@@ -42,12 +42,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 export function InviteMembersDialog({
   workspaceId,
   workspaceName,
+  currentUser,
   open,
   onOpenChange,
   onCreated,
 }: {
   workspaceId: string;
   workspaceName: string;
+  currentUser: { email: string; image?: string | null };
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => Promise<unknown>;
@@ -183,9 +185,7 @@ export function InviteMembersDialog({
       <DialogContent className="max-h-[85dvh] overflow-y-auto p-5 sm:max-w-xl sm:p-6">
         <DialogHeader className="mb-3 pr-7">
           <div className="flex items-center gap-2.5">
-            <Avatar className="size-6">
-              <AvatarFallback>{workspaceName.slice(0, 2)}</AvatarFallback>
-            </Avatar>
+            <UserAvatar user={currentUser} size="sm" />
             <DialogTitle>邀请成员</DialogTitle>
           </div>
           <DialogDescription className="sr-only">

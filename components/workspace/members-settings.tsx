@@ -26,7 +26,7 @@ import {
 import { InviteMembersDialog } from "@/components/workspace/invite-members-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/reui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   Table,
   TableBody,
@@ -442,13 +442,7 @@ export function MembersSettings({
                           <TableRow key={member.userId} className="border-0">
                             <TableCell className="py-4">
                               <div className="flex items-center gap-3">
-                                <Avatar className="size-7">
-                                  <AvatarFallback>
-                                    {(member.name || member.email)
-                                      .slice(0, 2)
-                                      .toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
+                                <UserAvatar user={member} size="md" />
                                 <div className="flex min-w-0 flex-col gap-0.5">
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium">
@@ -568,11 +562,7 @@ export function MembersSettings({
                       <TableRow key={invite.id} className="border-0">
                         <TableCell className="py-4">
                           <div className="flex items-center gap-3">
-                            <Avatar className="size-7">
-                              <AvatarFallback>
-                                {invite.email.slice(0, 2).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
+                            <UserAvatar user={invite} size="md" />
                             <div className="flex flex-col gap-0.5">
                               <span>{invite.email.split("@")[0]}</span>
                               <span className="text-xs text-muted-foreground">
@@ -641,6 +631,7 @@ export function MembersSettings({
         key={data.workspace.id}
         workspaceId={data.workspace.id}
         workspaceName={data.workspace.name}
+        currentUser={data.currentUser}
         open={inviteOpen && canManage}
         onOpenChange={setInviteOpen}
         onCreated={async () => {
