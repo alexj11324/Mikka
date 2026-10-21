@@ -123,7 +123,7 @@
     "signUpLabel": "Create account",
     "signInLabel": "Sign in",
     "tagline": "Tasks and documents, always in sync.",
-    "accountNote": "This is an Mikka account; it is separate from your v0 account.",
+    "accountNote": "This is a Mikka account; it is separate from your v0 account.",
     "dataNote": "Data is stored on Neon · tasks are private by default",
     "home": "Mikka home",
     "createTitle": "Create your work account",
@@ -1401,7 +1401,7 @@
       "csvInvalidRows": "These CSV lines have an empty or invalid email: {lines}. Nothing was imported; fix them and try again."
     },
     "joinTitle": "Join workspace",
-    "joinDescription": "You received an Mikka workspace invitation. Sign in with the invited email to join.",
+    "joinDescription": "You received a Mikka workspace invitation. Sign in with the invited email to join.",
     "invalidToken": "This invite link is malformed. Ask an admin for the complete link.",
     "signedInAs": "Signed in as: {email}",
     "validity": "Invite links are valid for 7 days and only work with the invited email address.",
