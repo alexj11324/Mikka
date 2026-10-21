@@ -13,5 +13,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
     redirect(query.acceptance === '1' ? '/acceptance' : '/api/acceptance')
   }
   const initialIssues = await listIssues()
-  return <IssueWorkspace user={{ id: session.user.id, name: session.user.name, email: session.user.email }} initialIssues={initialIssues} />
+  return <IssueWorkspace user={{ id: session.user.id, name: session.user.name, email: session.user.email, image: session.user.image }} initialIssues={initialIssues} />
 }

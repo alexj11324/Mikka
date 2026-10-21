@@ -1,7 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound } from 'lucide-react'
+import Link from 'next/link'
+import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound, Users } from 'lucide-react'
 import { NavUser } from '@/components/nav-user'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
@@ -11,7 +12,7 @@ import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
 import type { WorkspaceSection } from '@/components/workspace/workspace-navigation'
 
 export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
-  user: { name: string; email: string }
+  user: { name: string; email: string; image?: string | null }
   section: WorkspaceSection
   onNavigate: (section: WorkspaceSection) => boolean
   onSearch: () => void
@@ -19,7 +20,7 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSi
   onSignOut: () => void
   signingOut: boolean
 }) {
-  const { setOpenMobile } = useSidebar()
+  const { setOpenMobile, open, openMobile, isMobile } = useSidebar()
   function navigate(next: WorkspaceSection) { if (onNavigate(next)) setOpenMobile(false) }
   const personal = [{ id: 'inbox', title: '收件箱', icon: Inbox }, { id: 'my-issues', title: '我的任务', icon: Scan }, { id: 'agent', title: 'Agent', icon: Send }] as const
   const teamItems = [{ id: 'team-home', title: '主页', icon: House }, { id: 'team-issues', title: '任务', icon: Layers }, { id: 'team-projects', title: '项目', icon: Box }] as const
@@ -54,6 +55,13 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSi
         </SidebarMenuItem></SidebarMenu></CollapsibleContent>
       </SidebarGroup></Collapsible>
     </SidebarContent>
-    <SidebarFooter><NavUser user={user} onSignOut={onSignOut} signingOut={signingOut} /></SidebarFooter><SidebarRail />
+    <SidebarFooter>
+      <SidebarMenu>
+        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members" />} tooltip="成员管理"><Users /><span>成员管理</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members?invite=1" />} tooltip="邀请成员"><SquarePen /><span>邀请成员</span></SidebarMenuButton></SidebarMenuItem>
+      </SidebarMenu>
+      <NavUser user={user} onSignOut={onSignOut} signingOut={signingOut} />
+    </SidebarFooter>
+    <SidebarRail aria-label="展开或收起侧栏边轨" title="展开或收起侧栏" aria-expanded={isMobile ? openMobile : open} />
   </Sidebar>
 }

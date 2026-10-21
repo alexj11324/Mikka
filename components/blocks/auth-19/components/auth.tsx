@@ -3,14 +3,14 @@ import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { AuthLogo } from './auth-logo'
 
-export function Auth({ registering = false, children }: { registering?: boolean; children: ReactNode }) {
+export function Auth({ registering = false, children, next = '/' }: { registering?: boolean; children: ReactNode; next?: string }) {
   return (
     <main className="bg-background text-foreground flex min-h-svh w-full flex-col">
       <header className="flex items-center justify-between gap-4 px-5 py-5 sm:px-8 sm:py-6 lg:px-10">
         <AuthLogo />
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground hidden sm:inline">{registering ? '已经有账号？' : '还没有工作账号？'}</span>
-          <Link href={registering ? '/sign-in' : '/sign-up'} className={buttonVariants({ variant: 'link' })}>
+          <Link href={`${registering ? '/sign-in' : '/sign-up'}?next=${encodeURIComponent(next)}`} className={buttonVariants({ variant: 'link' })}>
             {registering ? '去登录' : '创建账号'}
           </Link>
         </div>

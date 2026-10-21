@@ -1,15 +1,7 @@
 import 'server-only'
 import { Pool } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { pgTable, uuid, text, varchar, jsonb, integer, timestamp } from 'drizzle-orm/pg-core'
-import { DEFAULT_PROJECT_PROPERTIES, type ProjectDraft } from '@/lib/project-input'
-
-export const projects = pgTable('workspace_projects', {
-  id: uuid('id').primaryKey(), userId: text('userId').notNull(), name: varchar('name', { length: 200 }).notNull(), summary: varchar('summary', { length: 500 }).notNull(), description: text('description').notNull(), status: text('status').notNull(), priority: text('priority').notNull(), lead: text('lead').notNull(), team: varchar('team', { length: 100 }).notNull(), startDate: varchar('startDate', { length: 10 }).notNull(), targetDate: varchar('targetDate', { length: 10 }).notNull(), properties: jsonb('properties').$type<ProjectDraft['properties']>().notNull().default(DEFAULT_PROJECT_PROPERTIES), issueIds: jsonb('issueIds').$type<string[]>().notNull(), revision: integer('revision').notNull(), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-})
-export const projectEvents = pgTable('workspace_project_events', {
-  id: uuid('id').primaryKey(), userId: text('userId').notNull(), projectId: uuid('projectId').notNull(), message: text('message').notNull(), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-})
+export { projects, projectEvents } from './project-schema'
 const globalDb = globalThis as unknown as { projectPool?: Pool }
 // Existing issues use ORVILO_DATABASE_URL; new project tables live in the connected Neon resource.
 const pool = globalDb.projectPool ?? new Pool({ connectionString: process.env.DATABASE_URL, max: 5, connectionTimeoutMillis: 10000, idleTimeoutMillis: 20000 })
