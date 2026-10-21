@@ -39,14 +39,16 @@ function TaskCard({ task, status, disabled, isOverlay = false, onOpen, onStatusC
   const card = <Card size="sm" className={cn('select-none gap-2 shadow-xs transition-shadow hover:ring-foreground/20 hover:shadow-sm', isOverlay && 'pointer-events-none shadow-lg')}>
     <CardHeader className="flex min-w-0 items-center justify-between gap-2">
       <CardDescription className="truncate tabular-nums">{issueIdentifier(task.metadata.number)}</CardDescription>
-      <CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary>
+      <div className="flex shrink-0 items-center gap-1">
+        <CardControlBoundary><IssuePropertyMenu label="优先级" value={task.priority} options={ISSUE_PRIORITIES} icon={Flag} iconOnly compact pill disabled={controlsDisabled} onChange={value => onPriorityChange(task, value)} /></CardControlBoundary>
+        <CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary>
+      </div>
     </CardHeader>
     <CardContent className="flex min-w-0 items-start gap-1">
       <CardControlBoundary><IssuePropertyMenu label="任务状态" value={status} options={ISSUE_STATUSES} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></CardControlBoundary>
       <CardTitle className="min-w-0 flex-1 pt-0.5"><h3 data-slot="kanban-task-title" className="line-clamp-3 break-words">{task.title}</h3></CardTitle>
     </CardContent>
     <CardContent className="flex flex-wrap items-center gap-1.5 pt-1">
-      <CardControlBoundary><IssuePropertyMenu label="优先级" value={task.priority} options={ISSUE_PRIORITIES} icon={Flag} iconOnly compact pill disabled={controlsDisabled} onChange={value => onPriorityChange(task, value)} /></CardControlBoundary>
       <CardControlBoundary><IssueMetadataControls task={task} section="properties" compact disabled={controlsDisabled} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary>
     </CardContent>
     <CardFooter className="border-0 bg-transparent pt-0"><CardCreatedAt createdAt={task.createdAt} /></CardFooter>
@@ -98,7 +100,7 @@ export function KanbanBoard({ pending = false, viewportRef, viewportId, instruct
               <Badge variant="outline">{props.value[column.value]?.length ?? 0}</Badge>
               <Button type="button" variant="ghost" size="icon-xs" className="ml-auto" aria-label={`新建${column.label}任务`} disabled={pending} onClick={() => onCreate(column.value)}><Plus /></Button>
             </div>
-            <KanbanColumnContent value={column.value} className="min-h-0 flex-1 gap-2 overflow-y-auto overscroll-y-contain" aria-label={`${column.label}列`}>
+            <KanbanColumnContent value={column.value} className="min-h-0 flex-1 gap-2 overflow-y-auto overscroll-y-contain p-1" aria-label={`${column.label}列`}>
               {(props.value[column.value] ?? []).map(task => <TaskCard key={task.id} task={task} status={column.value} disabled={pending} onOpen={onOpen} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} onMetadataSaved={onMetadataSaved} onMetadataBusy={onMetadataBusy} />)}
               {!props.value[column.value]?.length && <p className="rounded-lg border border-dashed border-border/70 bg-background/55 px-3 py-6 text-center text-xs text-muted-foreground">拖动任务到这里</p>}
             </KanbanColumnContent>
