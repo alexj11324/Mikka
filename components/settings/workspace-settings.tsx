@@ -15,7 +15,7 @@ export function WorkspaceSettings() {
   useEffect(() => { setHost(window.location.host) }, [])
   const invalidSlug = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 48
   return <section className="flex flex-col gap-4" aria-label={t('label')}>
-    <FieldGroup className="gap-0 overflow-hidden rounded-2xl border bg-card">
+    <FieldGroup data-settings-card className="gap-0 divide-y divide-border overflow-hidden rounded-2xl border bg-card">
       <Field orientation="responsive" className="justify-between gap-3 px-5 py-5">
         <FieldLabel htmlFor="workspace-name" className="@md/field-group:flex-none">{t('name')}</FieldLabel>
         <div className="min-w-0 @md/field-group:flex-[0_1_28rem]">
