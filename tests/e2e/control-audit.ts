@@ -24,17 +24,20 @@ export async function clickWithEffect(page: Page, control: Locator) {
   const url = page.url()
   let nativeDialog = false
   let download = false
+  let fileChooser = false
   let popup: Page | undefined
   const onDialog = async (dialog: import('@playwright/test').Dialog) => { nativeDialog = true; await dialog.dismiss() }
   const onDownload = () => { download = true }
+  const onFileChooser = () => { fileChooser = true }
   const onPopup = (opened: Page) => { popup = opened }
   page.on('dialog', onDialog)
   page.on('download', onDownload)
+  page.on('filechooser', onFileChooser)
   page.on('popup', onPopup)
   try {
     await control.click()
     await expect.poll(async () => {
-      if (nativeDialog || download || (popup && popup.url() !== 'about:blank')) return true
+      if (nativeDialog || download || fileChooser || (popup && popup.url() !== 'about:blank')) return true
       if (page.url() !== url) return true
       return await visibleState(page) !== before
     }, { timeout: 4000, message: '点击后必须有 URL、可访问界面、弹窗、下载或系统对话框变化；仅网络请求或 console.log 不算成功。' }).toBe(true)
@@ -42,6 +45,7 @@ export async function clickWithEffect(page: Page, control: Locator) {
   } finally {
     page.off('dialog', onDialog)
     page.off('download', onDownload)
+    page.off('filechooser', onFileChooser)
     page.off('popup', onPopup)
     await popup?.close()
   }

@@ -1,4 +1,4 @@
-import { test, expect, register, watchRuntime } from './fixtures'
+import { test, expect, register, watchRuntime, browserClientHeaders } from './fixtures'
 import { controlsSelector, clickWithEffect, inspectControl } from './control-audit'
 import type { Page } from '@playwright/test'
 
@@ -52,7 +52,7 @@ for (const surface of surfaces) {
       if (skip) { coverage.push({ label, status: skip }); continue }
       await test.step(`点击 ${label}`, async () => {
         // 每个候选控件使用独立页面与同一服务端会话，避免上一次的菜单/导航污染下一次。
-        const context = await browser.newContext({ baseURL, storageState })
+        const context = await browser.newContext({ baseURL, storageState, extraHTTPHeaders: browserClientHeaders() })
         const runtimeErrors = watchRuntime(context)
         try {
           const isolated = await context.newPage()

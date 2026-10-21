@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomInt, randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { test as base, expect, type BrowserContext, type Page } from '@playwright/test'
 
@@ -18,7 +18,15 @@ export function watchRuntime(context: BrowserContext) {
   return failures
 }
 
+export function browserClientHeaders() {
+  // 独立测试客户端使用基准测试保留网段，避免共享 CI 来源耗尽生产限流；不修改应用限流规则。
+  return { 'x-forwarded-for': `198.18.${randomInt(256)}.${randomInt(1, 255)}` }
+}
+
 export const test = base.extend<{ runtimeGuard: void }>({
+  extraHTTPHeaders: async ({ extraHTTPHeaders }, use) => {
+    await use({ ...extraHTTPHeaders, ...browserClientHeaders() })
+  },
   runtimeGuard: [async ({ context }, use, testInfo) => {
     const failures = watchRuntime(context)
     await use()

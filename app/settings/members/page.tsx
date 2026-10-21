@@ -7,7 +7,7 @@ import { loadWorkspaceSettings } from '@/lib/workspace-access'
 import { MembersSettings } from '@/components/workspace/members-settings'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
-export const metadata: Metadata = { title: '成员管理 · Orvilo3', description: '管理工作区成员、角色、待接受邀请和停用成员。' }
+export const metadata: Metadata = { title: '成员管理 · Orvilo3', description: '管理工作区成员、角色与邀请，支持 CSV 拖拽批量邀请和成员导出。' }
 
 export default async function MembersPage({ searchParams }: { searchParams: Promise<{ workspace?: string; invite?: string }> }) {
   const query = await searchParams

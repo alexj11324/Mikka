@@ -14,7 +14,8 @@
     "test:ui-policy": "node --test scripts/ui-policy.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
-    "check": "pnpm test:ui-policy && pnpm lint && pnpm typecheck",
+    "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
+    "check": "pnpm test:ui-policy && pnpm test:csv && pnpm lint && pnpm typecheck",
     "check:ci": "pnpm check && pnpm build && pnpm test:e2e",
     "start": "next start",
     "typecheck": "tsgo --noEmit"
