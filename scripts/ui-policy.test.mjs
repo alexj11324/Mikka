@@ -208,7 +208,7 @@ test('lint permits imported components but fails handwritten business UI without
     execFileSync('git', ['init', '--quiet'], { cwd })
     for (const library of policy.componentRoots) {
       mkdirSync(path.join(cwd, library), { recursive: true })
-      writeFileSync(path.join(cwd, library, 'example.tsx'), 'export const LibraryComponent = ({ onSave }) => <button className="text-[13px]" onClick={onSave}>Save</button>')
+      writeFileSync(path.join(cwd, library, 'example.tsx'), library === 'components/blocks/' ? 'import { Button } from "@/components/ui/button"; export const LibraryComponent = ({ onSave }) => <Button onClick={onSave}>Save</Button>' : 'export const LibraryComponent = ({ onSave }) => <button className="text-[13px]" onClick={onSave}>Save</button>')
     }
     writeFileSync(path.join(cwd, 'ui-policy.json'), JSON.stringify(policy))
     writeFileSync(path.join(cwd, 'components.json'), JSON.stringify({ style: policy.style, iconLibrary: policy.iconLibrary.replace('-react', '') }))
@@ -234,6 +234,10 @@ test('lint permits imported components but fails handwritten business UI without
     assert.equal(deadBlock.status, 1)
     assert.ok(deadBlock.report.diagnostics.some(d => d.file === 'components/blocks/example.tsx' && d.rule === 'interaction/no-placeholder-action'))
     assert.ok(deadBlock.report.interactionFiles > 0)
+    writeFileSync(path.join(cwd, 'components/blocks/example.tsx'), 'export const Example = ({ onSave }) => <button onClick={onSave}>Save</button>')
+    const rawBlock = await execute()
+    assert.equal(rawBlock.status, 1)
+    assert.ok(rawBlock.report.diagnostics.some(d => d.file === 'components/blocks/example.tsx' && d.rule === 'interaction/use-button-component'))
   } finally {
     rmSync(cwd, { recursive: true, force: true })
   }

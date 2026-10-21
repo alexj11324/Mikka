@@ -1,6 +1,7 @@
 import { cn } from "cn"
 
 import { AvatarGroup } from "@/components/ui/avatar"
+import { Button } from '@/components/ui/button'
 import {
   Tooltip,
   TooltipContent,
@@ -78,8 +79,10 @@ export function PresenceStack({
             <Tooltip key={teammate.id}>
               <TooltipTrigger
                 render={
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     aria-label={
                       teammate.followable
                         ? `${action} ${name}, ${status}`

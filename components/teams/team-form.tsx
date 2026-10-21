@@ -10,11 +10,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Spinner } from '@/components/ui/spinner'
+import { suggestTeamIdentifier } from '@/lib/team-identifier'
 
 type Team = { id: string; name: string; identifier: string; description: string }
-export function TeamForm({ workspaceId, team, editable = true, onClose, onSaved }: { workspaceId: string; team?: Team; editable?: boolean; onClose: () => void; onSaved: (teamId: string) => void }) {
+export function TeamForm({ workspaceId, team, existingIdentifiers = [], editable = true, onClose, onSaved }: { workspaceId: string; team?: Team; existingIdentifiers?: readonly string[]; editable?: boolean; onClose: () => void; onSaved: (teamId: string) => void }) {
   const [name, setName] = useState(team?.name ?? '')
   const [identifier, setIdentifier] = useState(team?.identifier ?? '')
+  const [identifierEdited, setIdentifierEdited] = useState(!!team)
   const [description, setDescription] = useState(team?.description ?? '')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
@@ -51,10 +53,10 @@ export function TeamForm({ workspaceId, team, editable = true, onClose, onSaved 
       <form aria-label={team ? '团队常规设置' : '创建新团队'} className="flex flex-col gap-8" onSubmit={event => { event.preventDefault(); void submit() }} onKeyDown={event => { if (event.nativeEvent.isComposing || event.keyCode === 229) return; if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); event.currentTarget.requestSubmit() } }}>
         <SettingsGroup>
           <SettingsRow title="Icon & Name" htmlFor="team-name" data-disabled={pending} lang="en">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground" aria-hidden="true"><SquareUserRound className="size-4" /></span><Input id="team-name" required maxLength={100} value={name} onChange={event => setName(event.target.value)} disabled={pending} readOnly={!editable} aria-label="团队名称" placeholder="e.g. Engineering" className="min-w-0 flex-1 @md/field-group:w-48" />
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground" aria-hidden="true"><SquareUserRound className="size-4" /></span><Input id="team-name" required maxLength={100} value={name} onChange={event => { const value = event.target.value; setName(value); if (!team && !identifierEdited) setIdentifier(suggestTeamIdentifier(value, existingIdentifiers)) }} disabled={pending} readOnly={!editable} aria-label="团队名称" placeholder="e.g. Engineering" className="min-w-0 flex-1 @md/field-group:w-48" />
           </SettingsRow>
           <SettingsRow title="Identifier" htmlFor="team-identifier" description="Used to identify issues from this team (e.g. ENG-123)" descriptionId="team-identifier-description" data-disabled={pending} lang="en">
-            <Input id="team-identifier" required maxLength={12} pattern="[A-Z][A-Z0-9]{1,11}" value={identifier} onChange={event => setIdentifier(event.target.value.toUpperCase())} disabled={pending} readOnly={!editable} aria-label="团队标识" aria-describedby="team-identifier-description" title="2–12 位大写字母或数字，以字母开头" placeholder="e.g. ENG" className="min-w-0 @md/field-group:w-36" />
+            <Input id="team-identifier" required maxLength={12} pattern="[A-Z][A-Z0-9]{1,11}" value={identifier} onChange={event => { const value = event.target.value.toUpperCase(); setIdentifierEdited(!!value); setIdentifier(value || (!team ? suggestTeamIdentifier(name, existingIdentifiers) : '')) }} disabled={pending} readOnly={!editable} aria-label="团队标识" aria-describedby="team-identifier-description" title="2–12 位大写字母或数字，以字母开头" placeholder="e.g. ENG" className="min-w-0 @md/field-group:w-36" />
           </SettingsRow>
           {team && <SettingsRow title="团队简介" htmlFor="team-description" description="介绍团队的职责与工作范围。" data-disabled={pending}><Textarea id="team-description" maxLength={500} rows={3} value={description} onChange={event => setDescription(event.target.value)} disabled={pending} readOnly={!editable} placeholder="这个团队负责什么？" className="min-w-0 @md/field-group:w-64" /></SettingsRow>}
         </SettingsGroup>

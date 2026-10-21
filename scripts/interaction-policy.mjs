@@ -143,6 +143,10 @@ export function auditInteractions(file, text) {
     if (tag) {
       const name = nameOf(tag), parents = surrounding(tag)
       const role = literal(expression(attr(tag, 'role')))
+      const intrinsic = /^[a-z]/.test(name)
+      if (name === 'button' || intrinsic && role === 'button' || intrinsic && /^(?:div|span|p|li|td|tr|svg)$/.test(name) && hasAction(tag)) {
+        add(tag, 'interaction/use-button-component', '操作按钮必须使用共享 Button 或对应交互组件；禁止裸 button、role="button" 或可点击普通元素。导航使用真实链接，菜单使用菜单组件。')
+      }
       const isAction = actionControls.test(name) || ['button', 'menuitem', 'link'].includes(role) || ['a', 'Link'].includes(name)
       if (isAction) {
         const handlers = ['onClick', 'onSelect'].map(key => attr(tag, key)).filter(Boolean)
@@ -155,7 +159,8 @@ export function auditInteractions(file, text) {
         const renderParent = tag.parent && ts.isJsxExpression(tag.parent) && ts.isJsxAttribute(tag.parent.parent) && tag.parent.parent.name.getText(source) === 'render' ? tag.parent.parent.parent.parent : null
         const composed = !!renderParent && hasAction(renderParent) || parents.some(parent => behaviorControls.test(nameOf(parent)) || nameOf(parent) === 'Slot' && hasAction(parent))
         const navigation = realHref(tag) || renderedNavigation(tag)
-        if (!hasAction(tag) && !behaviorControls.test(name) && !composed && !formAction && !(type === 'reset' && form) && !navigation) {
+        const unavailable = !!attr(tag, 'disabled') && /^orvilo-upcoming-/.test(literal(expression(attr(tag, 'data-feature-flag'))) ?? '') && expression(attr(tag, 'data-feature-implemented'))?.kind === ts.SyntaxKind.FalseKeyword && !!attr(tag, 'aria-describedby') && !!attr(tag, 'title')
+        if (!hasAction(tag) && !behaviorControls.test(name) && !composed && !formAction && !(type === 'reset' && form) && !navigation && !unavailable) {
           add(tag, 'interaction/no-dead-control', '可点击控件没有实际事件、有效导航、表单动作或组件触发行为；不能用 disabled、Tooltip 或空回调代替功能。')
         }
         const href = expression(attr(tag, 'href'))

@@ -3,10 +3,21 @@ import test from 'node:test'
 import { auditInteractions } from './interaction-policy.mjs'
 
 const rules = source => auditInteractions('components/example.tsx', source).map(d => d.rule)
+
+for (const [name, source] of [
+  ['native working button', '<button onClick={save}>保存</button>'],
+  ['native disabled button', '<button disabled onClick={save}>保存</button>'],
+  ['button role on div', '<div role="button" onClick={save}>保存</div>'],
+  ['clickable span', '<span onClick={save}>编辑</span>'],
+  ['clickable div', '<div onClick={() => navigate(id)}>成员</div>'],
+  ['composed native host', '<SidebarMenuSubButton render={<button type="button" />} onClick={navigate}>任务</SidebarMenuSubButton>'],
+]) test(`requires Button component: ${name}`, () => assert.ok(rules(source).includes('interaction/use-button-component'), source))
 for (const [name, source] of [
   ['missing action', '<Button>保存</Button>'],
   ['native missing action', '<button type="button">保存</button>'],
   ['disabled is not implementation', '<Button disabled>保存</Button>'],
+  ['feature flag alone is not implementation', '<Button disabled data-feature-flag="orvilo-upcoming-example">保存</Button>'],
+  ['feature marked implemented still needs action', '<Button disabled data-feature-flag="orvilo-upcoming-example" data-feature-implemented={true} aria-describedby="reason" title="尚未开放">保存</Button>'],
   ['empty callback', '<Button onClick={() => {}}>保存</Button>'],
   ['undefined callback', '<Button onClick={undefined}>保存</Button>'],
   ['returned undefined', '<Button onClick={() => undefined}>保存</Button>'],
@@ -39,6 +50,7 @@ for (const [name, source] of [
 ]) test(`rejects ${name}`, () => assert.ok(rules(source).length > 0, source))
 
 for (const [name, source] of [
+  ['explicit unimplemented feature presentation', '<Button disabled data-feature-flag="orvilo-upcoming-example" data-feature-implemented={false} aria-describedby="reason" title="尚未开放">保存</Button>'],
   ['real callback', '<Button onClick={() => setOpen(true)}>打开</Button>'],
   ['forwarded callback', 'function Save({ onSave }) { return <Button onClick={onSave}>保存</Button> }'],
   ['async mutation', '<Button onClick={async () => { await saveIssue(data); await mutate() }}>保存</Button>'],
@@ -55,7 +67,7 @@ for (const [name, source] of [
   ['dynamic href', '<Link href={task.url}>任务</Link>'],
   ['guarded normalized href', 'const safeHref = href ? normalizeHref(href) : null; const ui = safeHref ? <Button render={<a href={safeHref} />}>链接</Button> : null'],
   ['conditional routes', '<Link href={registering ? "/sign-in" : "/sign-up"}>登录</Link>'],
-  ['render host event delegation', '<SidebarMenuSubButton render={<button type="button" />} onClick={navigate}>任务</SidebarMenuSubButton>'],
+  ['render host event delegation', '<SidebarMenuSubButton render={<Button type="button" variant="ghost" />} onClick={navigate}>任务</SidebarMenuSubButton>'],
   ['fragment target', '<a href="#description">描述</a>'],
   ['template URL', '<Link href={`/issues/${id}`}>详情</Link>'],
   ['aliased template URL', 'const href = `/issues/${id}`; const ui = <Button render={<Link href={href} />}>详情</Button>'],

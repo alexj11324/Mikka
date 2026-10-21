@@ -17,7 +17,7 @@
     "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
     "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
     "test:analytics": "node --experimental-strip-types --test tests/analytics-policy.test.mjs",
-    "test:settings": "node --experimental-strip-types --test tests/settings-navigation.test.mjs",
+    "test:settings": "node --experimental-strip-types --test tests/settings-navigation.test.mjs tests/team-identifier.test.mjs",
     "check": "pnpm test:ui-policy && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm test:issues && pnpm lint && pnpm typecheck",
     "check:ci": "pnpm check && pnpm build && pnpm test:e2e",
     "test:issues": "node --test scripts/issue-checklist.test.mjs scripts/issue-metadata.test.mjs scripts/issue-relations.test.mjs",

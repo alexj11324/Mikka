@@ -1,10 +1,8 @@
 "use client";
 
 import { Fragment, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import useSWR, { type KeyedMutator } from "swr";
 import { fetchSettingsData, isSettingsAccessError, memberSettingsKey, settingsReadOptions } from '@/lib/settings-data';
-import { pushSettingsHistory } from '@/lib/settings-navigation';
 import { SettingsDataState } from '@/components/settings/settings-data-state';
 import {
   ArrowDown,
@@ -99,7 +97,6 @@ export function MembersSettings({ workspaceId, inviteInitially }: { workspaceId?
 }
 
 function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: { data: WorkspaceSettings; fetchError: boolean; mutate: KeyedMutator<WorkspaceSettings>; inviteInitially: boolean }) {
-  const router = useRouter();
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [ascending, setAscending] = useState(true);
@@ -218,7 +215,7 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
   return (
     <>
           <section aria-label="工作区成员管理" data-settings-state={fetchError ? 'error' : 'ready'} className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-8 sm:px-10 sm:py-12">
-            <header className="flex flex-wrap items-center justify-between gap-4"><div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">成员</h1><p className="text-sm text-muted-foreground">管理工作区成员、角色与邀请。</p></div><Select value={data.workspace.id} items={data.choices.map(item => ({ value: item.id, label: item.name }))} onValueChange={value => { if (value) { const href = `/settings/members?workspace=${encodeURIComponent(value)}`; if (!pushSettingsHistory(href)) router.push(href); } }}><SelectTrigger aria-label="当前工作区"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{data.choices.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectGroup></SelectContent></Select></header>
+            <header className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">成员</h1><p className="text-sm text-muted-foreground">管理当前工作区的成员、角色与邀请。</p></header>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex w-full items-center gap-2 sm:w-auto">
                 <div className="min-w-0 flex-1 sm:w-72">
