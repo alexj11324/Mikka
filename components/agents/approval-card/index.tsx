@@ -230,7 +230,7 @@ export function ApprovalCard({
     ? (currentAnswers[question.id] ?? EMPTY_ANSWER)
     : EMPTY_ANSWER;
   const displayTitle = question?.title ?? title;
-  const titleKey = question?.id ?? String(status);
+  const titleKey = question?.id ?? "approval";
   const statusLabel = getStatusLabel(status);
 
   const clearAutoAdvance = useCallback(() => {

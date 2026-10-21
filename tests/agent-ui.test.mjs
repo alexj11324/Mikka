@@ -73,6 +73,52 @@ test('问题、任务与图标严格限制输入，不能伪造审批结果', ()
   assert.equal('ToolApproval' in agentComponentCatalog, false)
 })
 
+test('49 项 AI Elements 对照不遗漏且 beUI 对应源码可导入', async () => {
+  const coverage = JSON.parse(await readFile(new URL('../lib/agent-ui-coverage.json', import.meta.url), 'utf8'))
+  const expected = ['Attachments', 'Chain of Thought', 'Checkpoint', 'Confirmation', 'Context', 'Conversation', 'Inline Citation', 'Message', 'Model Selector', 'Plan', 'Prompt Input', 'Question', 'Queue', 'Reasoning', 'Shimmer', 'Sources', 'Suggestion', 'Task', 'Tool', 'Agent', 'Artifact', 'Code Block', 'Commit', 'Environment Variables', 'File Tree', 'JSX Preview', 'Package Info', 'Sandbox', 'Schema Display', 'Snippet', 'Stack Trace', 'Terminal', 'Test Results', 'Web Preview', 'Image', 'Open In Chat', 'Audio Player', 'Mic Selector', 'Persona', 'Speech Input', 'Transcription', 'Voice Selector', 'Canvas', 'Connection', 'Controls', 'Edge', 'Node', 'Panel', 'Toolbar']
+  assert.deepEqual(coverage.components.map(item => item.element).sort(), expected.sort())
+  for (const entry of coverage.components) {
+    assert.ok(entry.note)
+    assert.ok(['functional', 'partial', 'none'].includes(entry.match))
+    assert.equal(entry.match === 'none', entry.beui.length === 0)
+    assert.equal(entry.match === 'none', entry.usage === 'unavailable')
+    for (const slug of entry.beui) assert.ok(coverage.beui[slug], `${entry.element}: ${slug}`)
+  }
+  for (const [slug, entry] of Object.entries(coverage.beui)) {
+    assert.equal(entry.source, `https://beui.dev/r/${slug}`)
+    for (const path of [entry.path, ...entry.relatedPaths ?? []]) {
+      assert.match(path, /^components\/(agents|motion)\//)
+      const source = await readFile(new URL(`../${path}`, import.meta.url), 'utf8')
+      assert.match(source, /export /, path)
+      assert.doesNotMatch(source, /from ['"][^'"]*(?:ai-elements|@ai-sdk\/elements)/)
+    }
+  }
+})
+
+test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 会话组件', async () => {
+  for (const [file, expectedImport] of [
+    ['agent-composer.tsx', 'prompt-input'],
+    ['agent-conversation.tsx', 'message-scroller'],
+    ['agent-conversation.tsx', 'message-bubble'],
+    ['agent-conversation.tsx', 'message'],
+    ['agent-response.tsx', 'streaming-response'],
+    ['agent-response.tsx', 'loading-states/agent-progress'],
+    ['agent-decision.tsx', 'approval-card'],
+    ['agent-content.tsx', 'todo-list'],
+  ]) {
+    const source = await readFile(new URL(`../components/workspace/${file}`, import.meta.url), 'utf8')
+    assert.ok(source.includes(`from '@/components/agents/${expectedImport}'`), file)
+    assert.doesNotMatch(source, /from ['"][^'"]*(?:ai-elements|@ai-sdk\/elements|\/ui\/(?:message|message-scroller|bubble|input-group))/)
+  }
+  const starters = await readFile(new URL('../components/workspace/agent-starters.tsx', import.meta.url), 'utf8')
+  assert.ok(starters.includes("from '@/components/motion/button/base'"))
+})
+
+test('停止按钮先取消表单默认行为，避免同步恢复后误发草稿', async () => {
+  const source = await readFile(new URL('../components/agents/prompt-input.tsx', import.meta.url), 'utf8')
+  assert.match(source, /onClick=\{loading \? event => \{[\s\S]*?event\.preventDefault\(\);\s*onStop\?\.\(\);/)
+})
+
 test('beUI 限制按钮语义、状态、数字和小数位', () => {
   const { BeButton, BeBadge, BeStat } = agentComponentCatalog
   assert.equal(BeButton.props.safeParse({ label: '继续细化', action: '请根据用户数据给出建议' }).success, true)

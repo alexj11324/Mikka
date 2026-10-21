@@ -309,7 +309,11 @@ export function PromptInput({
           size="icon"
           disabled={loading ? !onStop : !canSubmit}
           aria-label={loading ? "停止生成" : "发送消息"}
-          onClick={loading ? onStop : undefined}
+          onClick={loading ? event => {
+            // Stopping can synchronously turn this button into a submit button before the click default runs.
+            event.preventDefault();
+            onStop?.();
+          } : undefined}
           className="ml-auto size-8 rounded-full"
         >
           <AnimatePresence initial={false} mode="popLayout">

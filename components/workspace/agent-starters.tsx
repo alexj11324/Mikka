@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/motion/button/base'
 import { ClipboardList, FileText, GitCompareArrows, Layers } from 'lucide-react'
 
 const starters = [

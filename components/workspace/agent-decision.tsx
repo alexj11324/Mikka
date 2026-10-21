@@ -35,7 +35,7 @@ function useDecision() {
     }
   }
 
-  return { send, sent, error, status: (pending || busy || streaming ? 'submitting' : sent ? 'answered' : 'pending') as ApprovalCardStatus }
+  return { send, sent, error, status: (sent ? 'answered' : pending || busy || streaming ? 'submitting' : 'pending') as ApprovalCardStatus }
 }
 
 export const AgentApproval: AgentComponentRenderers['BeApproval'] = ({ props }) => {
