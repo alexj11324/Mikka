@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type FormEvent, type RefObject } from "react"
 import { useEditorState, type Editor } from "@tiptap/react"
 import { BubbleMenu } from "@tiptap/react/menus"
+import { useTranslations } from "next-intl"
 
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
@@ -49,6 +50,7 @@ interface LinkFormProps {
 }
 
 function LinkForm({ editor, href, inputRef, onDone }: LinkFormProps) {
+  const t = useTranslations('Editor.richText')
   const [draft, setDraft] = useState(href ?? "")
   const [invalid, setInvalid] = useState(false)
   const errorId = useId()
@@ -101,8 +103,8 @@ function LinkForm({ editor, href, inputRef, onDone }: LinkFormProps) {
           <InputGroupInput
             ref={inputRef}
             value={draft}
-            placeholder="Paste or type a link"
-            aria-label="Link address"
+            placeholder={t('linkPlaceholder')}
+            aria-label={t('linkAddress')}
             aria-invalid={invalid || undefined}
             aria-describedby={invalid ? errorId : undefined}
             onChange={(event) => {
@@ -116,7 +118,7 @@ function LinkForm({ editor, href, inputRef, onDone }: LinkFormProps) {
             <InputGroupButton
               type="submit"
               size="icon-xs"
-              aria-label="Apply link"
+              aria-label={t('applyLink')}
               disabled={!draft.trim()}
               focusableWhenDisabled
               className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
@@ -126,7 +128,7 @@ function LinkForm({ editor, href, inputRef, onDone }: LinkFormProps) {
             {href ? (
               <InputGroupButton
                 size="icon-xs"
-                aria-label="Remove link"
+                aria-label={t('removeLink')}
                 onClick={() => {
                   removeLink(editor)
                   onDone()
@@ -139,7 +141,7 @@ function LinkForm({ editor, href, inputRef, onDone }: LinkFormProps) {
         </InputGroup>
         {invalid ? (
           <FieldError id={errorId}>
-            Enter a web address, like example.com
+            {t('invalidLink')}
           </FieldError>
         ) : null}
       </Field>
@@ -160,6 +162,7 @@ export function RichTextLinkPopover({
   open,
   onOpenChange,
 }: RichTextLinkPopoverProps) {
+  const t = useTranslations('Editor.richText')
   const inputRef = useRef<HTMLInputElement>(null)
 
   return (
@@ -171,7 +174,7 @@ export function RichTextLinkPopover({
             render={
               <Toggle
                 size="sm"
-                aria-label="Link"
+                aria-label={t('link')}
                 pressed={state.link !== null}
                 disabled={!state.canFormat}
                 onMouseDown={keepEditorFocus}
@@ -184,13 +187,13 @@ export function RichTextLinkPopover({
           </PopoverTrigger>
         </TooltipTrigger>
         <TooltipContent>
-          Link
+          {t('link')}
           <ShortcutKeys keys={["mod", "K"]} />
         </TooltipContent>
       </Tooltip>
       <PopoverContent
         align="start"
-        aria-label="Link"
+        aria-label={t('link')}
         className="w-80"
         initialFocus={inputRef}
         finalFocus={() => editor?.view.dom ?? true}
@@ -233,6 +236,7 @@ export function RichTextLinkBubble({
   editor,
   onEdit,
 }: RichTextLinkBubbleProps) {
+  const t = useTranslations('Editor.richText')
   const href = useEditorState({
     editor,
     selector: ({ editor: current }) =>
@@ -252,7 +256,7 @@ export function RichTextLinkBubble({
       className="z-50"
     >
       {/* One outline group: the address, then its two actions. */}
-      <ButtonGroup aria-label="Link">
+      <ButtonGroup aria-label={t('link')}>
         {safeHref ? (
           <Button
             nativeButton={false}
@@ -267,7 +271,7 @@ export function RichTextLinkBubble({
             <span className="truncate">
               {safeHref.replace(/^https?:\/\//, "")}
             </span>
-            <span className="sr-only">(opens in a new tab)</span>
+            <span className="sr-only">{t('opensInNewTab')}</span>
           </Button>
         ) : null}
         <Tooltip>
@@ -276,14 +280,14 @@ export function RichTextLinkBubble({
               <Button
                 variant="outline"
                 size="icon-sm"
-                aria-label="Edit link"
+                aria-label={t('editLink')}
                 onClick={onEdit}
               />
             }
           >
             <PencilIcon aria-hidden="true" />
           </TooltipTrigger>
-          <TooltipContent>Edit link</TooltipContent>
+          <TooltipContent>{t('editLink')}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger
@@ -291,14 +295,14 @@ export function RichTextLinkBubble({
               <Button
                 variant="outline"
                 size="icon-sm"
-                aria-label="Remove link"
+                aria-label={t('removeLink')}
                 onClick={() => removeLink(editor)}
               />
             }
           >
             <Link2OffIcon aria-hidden="true" />
           </TooltipTrigger>
-          <TooltipContent>Remove link</TooltipContent>
+          <TooltipContent>{t('removeLink')}</TooltipContent>
         </Tooltip>
       </ButtonGroup>
     </BubbleMenu>

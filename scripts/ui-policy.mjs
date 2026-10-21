@@ -191,7 +191,7 @@ export function auditSource(file, text, policy) {
     }
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const raw = node.tagName.getText(source), name = canonical(node), parents = ancestors(node)
-      const frameworkShell = file === 'app/layout.tsx' && ['html', 'body'].includes(raw)
+      const frameworkShell = ['app/layout.tsx', 'app/[locale]/layout.tsx'].includes(file) && ['html', 'body'].includes(raw)
       // Base UI 的 render prop 指定宿主元素（样式与行为由外层组件提供）：
       // 那里的自闭合标签是组合 API，不是手写的控件。
       const renderHost = ts.isJsxSelfClosingElement(node) && (() => {

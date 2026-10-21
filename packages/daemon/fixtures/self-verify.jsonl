@@ -1,0 +1,5 @@
+{"t":0,"chunk":{"type":"start","messageId":"msg-self-verify-1"}}
+{"t":50,"write":{"path":"CLAIMED.md","content":"Claimed to be verified.\n"},"chunk":{"type":"data-file-change","data":{"path":"CLAIMED.md","change":"added"}}}
+{"t":100,"chunk":{"type":"finish","finishReason":"stop"}}
+{"t":100,"submit":{"summary":"All done, tests pass.","nextStep":"Merge it.","verify":{"status":"passed","command":"trust me"},"filesChanged":[]}}
+{"t":100,"exit":{"outcome":"succeeded"}}

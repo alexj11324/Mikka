@@ -6,6 +6,7 @@ import { cn } from "cn"
 
 import { Button } from '@/components/ui/button'
 import { XIcon } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
@@ -41,11 +42,14 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  closeLabel,
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
+  closeLabel?: string
 }) {
+  const t = useTranslations('Common')
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -61,7 +65,7 @@ function SheetContent({
         {children}
         {showCloseButton && (
           <SheetPrimitive.Close data-slot="sheet-close" render={<Button variant="ghost" className="absolute top-3 right-3" size="icon-sm"><XIcon
-            /><span className="sr-only">Close</span></Button>} />
+            /><span className="sr-only">{closeLabel ?? t('close')}</span></Button>} />
         )}
       </SheetPrimitive.Popup>
     </SheetPortal>

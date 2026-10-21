@@ -1,4 +1,5 @@
 import type { Editor } from "@tiptap/react"
+import { useTranslations } from "next-intl"
 
 import {
   RichTextAlignMenu,
@@ -7,15 +8,15 @@ import {
   RichTextHistory,
   RichTextListToggles,
   RichTextMarkToggles,
-} from "./rich-text-controls"
-import { RichTextHighlightPopover } from "./rich-text-highlight"
-import { RichTextLinkPopover } from "./rich-text-link"
-import { useRichTextState } from "./rich-text-state"
+} from "@/components/blocks/rich-text-editor-2/components/rich-text-controls"
+import { RichTextHighlightPopover } from "@/components/blocks/rich-text-editor-2/components/rich-text-highlight"
+import { RichTextLinkPopover } from "@/components/blocks/rich-text-editor-2/components/rich-text-link"
+import { useRichTextState } from "@/components/blocks/rich-text-editor-2/components/rich-text-state"
 import {
   RichTextToolbar,
   RichTextToolbarGroup,
   RichTextToolbarSeparator,
-} from "./rich-text-toolbar"
+} from "@/components/blocks/rich-text-editor-2/components/rich-text-toolbar"
 
 interface FormattingToolbarProps {
   editor: Editor | null
@@ -30,10 +31,11 @@ export function FormattingToolbar({
   onLinkOpenChange,
 }: FormattingToolbarProps) {
   const state = useRichTextState(editor)
+  const t = useTranslations('Editor.richText')
 
   return (
     <RichTextToolbar
-      aria-label="Formatting"
+      aria-label={t('formatting')}
       className="shrink-0 border-b px-(--frame-panel-header-px) py-(--frame-panel-header-py)"
     >
       <RichTextHistory editor={editor} state={state} />
@@ -41,7 +43,7 @@ export function FormattingToolbar({
       <RichTextBlockTypeMenu editor={editor} state={state} />
       <RichTextToolbarSeparator />
       <RichTextMarkToggles editor={editor} state={state} />
-      <RichTextToolbarGroup label="Annotate">
+      <RichTextToolbarGroup label={t('annotate')}>
         <RichTextHighlightPopover editor={editor} state={state} />
         <RichTextLinkPopover
           editor={editor}

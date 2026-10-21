@@ -7,11 +7,45 @@ const emailHeaders = new Set([
   "email",
   "e-mail",
   "email address",
-  "邮箱",
-  "邮箱地址",
-  "电子邮箱",
-  "电子邮件",
+  "邮箱", // i18n-ignore CSV header value
+  "邮箱地址", // i18n-ignore CSV header value
+  "电子邮箱", // i18n-ignore CSV header value
+  "电子邮件", // i18n-ignore CSV header value
 ]);
+
+export type InvitationCsvErrorCode =
+  | "emailRequired"
+  | "tooManyEmails"
+  | "invalidEmails"
+  | "csvQuote"
+  | "csvUnclosedQuote"
+  | "csvEmpty"
+  | "csvMissingHeader"
+  | "csvHeaderOnly"
+  | "csvInvalidRows";
+
+export interface InvitationCsvErrorParams {
+  max?: number;
+  count?: number;
+  line?: number;
+  lines?: number[];
+  emails?: string[];
+}
+
+export class InvitationCsvError extends Error {
+  readonly code: InvitationCsvErrorCode;
+  readonly params: InvitationCsvErrorParams;
+
+  constructor(
+    code: InvitationCsvErrorCode,
+    params: InvitationCsvErrorParams = {},
+  ) {
+    super(code);
+    this.name = "InvitationCsvError";
+    this.code = code;
+    this.params = params;
+  }
+}
 
 export function invitationEmails(value: string) {
   return [
@@ -25,18 +59,19 @@ export function invitationEmails(value: string) {
 }
 
 export function validateInvitationEmails(emails: string[]) {
-  if (!emails.length) throw new Error("请至少填写一个邮箱地址。");
+  if (!emails.length) throw new InvitationCsvError("emailRequired");
   if (emails.length > MAX_INVITATION_EMAILS)
-    throw new Error(
-      `一次最多邀请 ${MAX_INVITATION_EMAILS} 人；当前有 ${emails.length} 个邮箱，请分批导入。`,
-    );
+    throw new InvitationCsvError("tooManyEmails", {
+      max: MAX_INVITATION_EMAILS,
+      count: emails.length,
+    });
   const invalid = emails.filter(
     (email) => !emailSchema.safeParse(email).success,
   );
   if (invalid.length)
-    throw new Error(
-      `邮箱格式不正确：${invalid.slice(0, 3).join("、")}${invalid.length > 3 ? "等" : ""}。请修正后再邀请。`,
-    );
+    throw new InvitationCsvError("invalidEmails", {
+      emails: invalid.slice(0, 3),
+    });
 }
 
 export function parseInvitationCsv(source: string): {
@@ -93,20 +128,20 @@ export function parseInvitationCsv(source: string): {
       quoted = true;
     } else {
       if (char === '"' || (closed && char.trim()))
-        throw new Error(`CSV 第 ${line} 行的引号格式不正确。`);
+        throw new InvitationCsvError("csvQuote", { line });
       if (!closed) cell += char;
     }
   }
-  if (quoted) throw new Error("CSV 中有未闭合的引号，请检查文件格式。");
+  if (quoted) throw new InvitationCsvError("csvUnclosedQuote");
   finishRow();
-  if (!rows.length) throw new Error("CSV 文件为空，请添加邮箱后重试。");
+  if (!rows.length) throw new InvitationCsvError("csvEmpty");
   const headerIndex = rows[0].cells.findIndex((value) =>
     emailHeaders.has(value.toLowerCase()),
   );
   if (headerIndex < 0 && rows.some((row) => row.cells.length !== 1))
-    throw new Error("多列 CSV 需要包含 email 或「邮箱」表头。");
+    throw new InvitationCsvError("csvMissingHeader");
   const records = headerIndex < 0 ? rows : rows.slice(1);
-  if (!records.length) throw new Error("CSV 只有表头，没有可邀请的邮箱。");
+  if (!records.length) throw new InvitationCsvError("csvHeaderOnly");
   const emails: string[] = [],
     invalidLines: number[] = [];
   for (const row of records) {
@@ -117,9 +152,9 @@ export function parseInvitationCsv(source: string): {
     else emails.push(email);
   }
   if (invalidLines.length)
-    throw new Error(
-      `CSV 第 ${invalidLines.slice(0, 5).join("、")} 行邮箱为空或格式不正确${invalidLines.length > 5 ? "等" : ""}。未导入任何邮箱，请修正后重试。`,
-    );
+    throw new InvitationCsvError("csvInvalidRows", {
+      lines: invalidLines.slice(0, 5),
+    });
   const unique = [...new Set(emails)];
   validateInvitationEmails(unique);
   return { emails: unique, duplicates: emails.length - unique.length };

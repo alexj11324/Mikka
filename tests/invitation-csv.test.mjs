@@ -42,7 +42,7 @@ test("拒绝空文件、只有表头以及缺少邮箱列的多列文件", () =>
 test("指出无效邮箱行且不部分导入", () => {
   assert.throws(
     () => parseInvitationCsv("name,email\nA,a@example.com\nB,wrong\nC,"),
-    /第 3、4 行/,
+    error => error.code === "csvInvalidRows" && JSON.stringify(error.params.lines) === "[3,4]",
   );
 });
 test("拒绝未闭合和不合法引号", () => {
@@ -51,7 +51,10 @@ test("拒绝未闭合和不合法引号", () => {
     'email\n"a@example.com"bad',
     'email\na"@example.com',
   ])
-    assert.throws(() => parseInvitationCsv(text), /引号/);
+    assert.throws(
+      () => parseInvitationCsv(text),
+      error => error.code === "csvQuote" || error.code === "csvUnclosedQuote",
+    );
 });
 test("按去重后的数量校验批量上限，手动输入同样校验", () => {
   const list = Array.from(
@@ -60,15 +63,15 @@ test("按去重后的数量校验批量上限，手动输入同样校验", () =>
   );
   assert.throws(
     () => parseInvitationCsv(list.join("\n")),
-    /一次最多邀请 20 人/,
+    error => error.code === "tooManyEmails" && error.params.max === 20,
   );
   assert.equal(
     parseInvitationCsv([...list.slice(0, 20), list[0]].join("\n")).emails
       .length,
     20,
   );
-  assert.throws(() => validateInvitationEmails(["invalid"]), /邮箱格式/);
-  assert.throws(() => validateInvitationEmails([]), /至少/);
+  assert.throws(() => validateInvitationEmails(["invalid"]), error => error.code === "invalidEmails");
+  assert.throws(() => validateInvitationEmails([]), error => error.code === "emailRequired");
   assert.deepEqual(
     invitationEmails("A@example.com，a@example.com; b@example.com\n"),
     ["a@example.com", "b@example.com"],

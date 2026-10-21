@@ -3,6 +3,7 @@ import { IconTile } from "@/components/reui/icon-tile"
 import { PluginKey } from "@tiptap/pm/state"
 import { Extension, type Editor, type Range } from "@tiptap/react"
 import { Suggestion, type SuggestionProps } from "@tiptap/suggestion"
+import { useTranslations } from "next-intl"
 
 import { CommandShortcut } from "@/components/ui/command"
 import {
@@ -175,8 +176,19 @@ export const RICH_TEXT_BASIC_SLASH_ITEMS: RichTextSlashItem[] = [
   },
 ]
 
-function matches(item: RichTextSlashItem, query: string) {
-  if (!query) return true
+type SlashTranslator = (key: string) => string
+
+/** Replaces the English defaults with the active locale, keeping search keywords. */
+export function localizeSlashItems(t: SlashTranslator, items: readonly RichTextSlashItem[]): RichTextSlashItem[] {
+  return items.map(item => ({
+    ...item,
+    group: t(`slash.group.${item.group === 'Advanced' ? 'advanced' : 'basic'}`),
+    title: t(`slash.${item.id}.title`),
+    hint: t(`slash.${item.id}.hint`),
+  }))
+}
+
+function matches(item: RichTextSlashItem, query: string) {  if (!query) return true
 
   return (
     item.title.toLowerCase().includes(query) ||
@@ -202,6 +214,7 @@ type SlashMenuProps = SuggestionProps<RichTextSlashItem, RichTextSlashItem> & {
 }
 
 function SlashMenu({ ref, editor, items, loading, command }: SlashMenuProps) {
+  const t = useTranslations('Editor.richText')
   // The first lookup is still running: nothing to show yet.
   if (loading && items.length === 0) return null
 
@@ -209,8 +222,8 @@ function SlashMenu({ ref, editor, items, loading, command }: SlashMenuProps) {
     <RichTextSuggestionMenu
       ref={ref}
       editor={editor}
-      label="Insert block"
-      empty="No matching blocks"
+      label={t('insertBlock')}
+      empty={t('noMatchingBlocks')}
       groups={groupItems(items)}
       getKey={(item) => item.id}
       onSelect={command}

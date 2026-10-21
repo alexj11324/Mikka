@@ -4,7 +4,7 @@ import type { JSONContent } from '@tiptap/core'
 export const LABEL_COLORS = ['violet', 'blue', 'green', 'yellow', 'red', 'gray'] as const
 export const labelSchema = z.object({ name: z.string().trim().min(1).max(40), color: z.enum(LABEL_COLORS) })
 export const pullRequestSchema = z.object({
-  url: z.url().max(500).refine(value => /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*\/?$/.test(value), '请输入有效的 GitHub PR 链接。'),
+  url: z.url().max(500).refine(value => /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*\/?$/.test(value), 'issueMetadataInvalid'),
   state: z.enum(['open', 'merged', 'closed']),
 })
 export const assigneeSchema = z.object({ kind: z.enum(['member', 'agent']), id: z.string().min(1).max(128), name: z.string().max(200), image: z.string().nullable() })

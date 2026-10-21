@@ -1,0 +1,6 @@
+{"t":0,"chunk":{"type":"start","messageId":"msg-crash-1"}}
+{"t":100,"chunk":{"type":"text-start","id":"txt-1"}}
+{"t":160,"chunk":{"type":"text-delta","id":"txt-1","delta":"Reading the source tree."}}
+{"t":200,"chunk":{"type":"text-end","id":"txt-1"}}
+{"t":300,"chunk":{"type":"tool-input-available","toolCallId":"call-read-1","toolName":"read","input":{"path":"README.md"}}}
+{"t":350,"exit":{"outcome":"failed","error":"agent CLI exited with signal SIGSEGV"}}

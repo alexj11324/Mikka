@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import type { JSONContent } from '@tiptap/react'
 import { ChartNoAxesColumnIncreasing, ChevronRight, CircleDashed, LockKeyhole, Maximize2, Minimize2, SquareUserRound, X } from 'lucide-react'
 import { saveIssue } from '@/app/actions/issues'
+import { useActionError } from '@/lib/use-action-error'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldGroup, FieldLabel, FieldSet } from '@/components/ui/field'
@@ -25,6 +27,13 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   author: string
   initialStatus?: string
 }) {
+  const t = useTranslations('Issue.create')
+  const tIssue = useTranslations('Issue')
+  const actionError = useActionError()
+  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
+  const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
+  const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
+  const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
   const [title, setTitle] = useState('')
   const [content, setContent] = useState<JSONContent>(EMPTY)
   const [status, setStatus] = useState(initialStatus)
@@ -50,7 +59,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
 
   function close() {
     if (submitting.current) return
-    if (dirty && !window.confirm('放弃这份尚未创建的任务草稿？')) return
+    if (dirty && !window.confirm(t('discardDraft'))) return
     onOpenChange(false)
   }
 
@@ -63,7 +72,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
     try {
       const result = await saveIssue({ title, content, status, priority })
       if (!('issue' in result) || !result.issue) {
-        setError(result.error ?? '创建失败，草稿已保留。')
+        setError(actionError(result.error ?? 'issueCreateFailed'))
         return
       }
       onCreated(result.issue.id)
@@ -72,13 +81,13 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
         setTitle('')
         setContent(EMPTY)
         setEditorKey(value => value + 1)
-        setNotice('任务已创建，可以继续添加下一项。')
+        setNotice(t('createdNotice'))
         titleRef.current?.focus()
       } else {
         onOpenChange(false)
       }
     } catch {
-      setError('暂时无法创建，草稿已保留，请稍后重试。')
+      setError(t('createError'))
     } finally {
       submitting.current = false
       setPending(false)
@@ -95,38 +104,38 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
         <header className="flex items-center justify-between gap-3 px-5 pt-4 sm:px-6">
           <div className="flex items-center gap-2 text-sm">
             <Badge variant="outline" className="gap-1.5 rounded-full"><SquareUserRound />ORV</Badge><ChevronRight className="size-3 text-muted-foreground" />
-            <DialogTitle className="sr-only">新建任务</DialogTitle><span aria-hidden="true">新建任务</span>
+            <DialogTitle className="sr-only">{t('title')}</DialogTitle><span aria-hidden="true">{t('title')}</span>
           </div>
-          <div className="flex items-center gap-1"><Button type="button" variant="ghost" size="icon-sm" aria-label={expanded ? '收起创建卡片' : '展开创建卡片'} aria-pressed={expanded} disabled={pending} onClick={() => setExpanded(value => !value)}>{expanded ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</Button><Button type="button" variant="ghost" size="icon-sm" aria-label="关闭新建任务" disabled={pending} onClick={close}><X data-icon="inline-start" /></Button></div>
+          <div className="flex items-center gap-1"><Button type="button" variant="ghost" size="icon-sm" aria-label={expanded ? t('collapse') : t('expand')} aria-pressed={expanded} disabled={pending} onClick={() => setExpanded(value => !value)}>{expanded ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</Button><Button type="button" variant="ghost" size="icon-sm" aria-label={t('close')} disabled={pending} onClick={close}><X data-icon="inline-start" /></Button></div>
         </header>
-        <DialogDescription className="sr-only">填写标题和描述，选择状态与优先级后创建任务。</DialogDescription>
+        <DialogDescription className="sr-only">{t('description')}</DialogDescription>
         <FieldSet disabled={pending} className={cn('flex min-w-0 flex-col gap-5 px-5 pt-5 pb-5 sm:px-6', expanded && 'min-h-96')}>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="new-issue-title" className="sr-only">任务标题</FieldLabel>
-              <Input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder="任务标题" value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent px-0 py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
+              <FieldLabel htmlFor="new-issue-title" className="sr-only">{t('titleLabel')}</FieldLabel>
+              <Input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder={t('titleLabel')} value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent px-0 py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
             </Field>
             <Field>
-              <FieldLabel className="sr-only">任务描述</FieldLabel>
+              <FieldLabel className="sr-only">{t('descriptionLabel')}</FieldLabel>
               <div inert={pending}><IssueEditor key={editorKey} compact content={content} author={author} onChange={setContent} /></div>
             </Field>
           </FieldGroup>
           <div className="flex flex-wrap items-center gap-2">
-            <IssuePropertyMenu pill label="任务状态" value={status} options={ISSUE_STATUSES} icon={CircleDashed} disabled={pending} onChange={setStatus} />
-            <IssuePropertyMenu pill label="任务优先级" value={priority} options={ISSUE_PRIORITIES} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={setPriority} />
+            <IssuePropertyMenu pill label={tIssue('statusLabel')} value={status} options={statusOptions} icon={CircleDashed} disabled={pending} onChange={setStatus} />
+            <IssuePropertyMenu pill label={tIssue('priorityLabel')} value={priority} options={priorityOptions} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={setPriority} />
           </div>
           <p className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5"><SquareUserRound aria-hidden="true" className="size-3.5" />工作区：{WORKSPACE_NAME}</span>
-            <span className="inline-flex items-center gap-1.5"><LockKeyhole aria-hidden="true" className="size-3.5" />初始仅自己可见，创建后可邀请成员协作</span>
+            <span className="inline-flex items-center gap-1.5"><SquareUserRound aria-hidden="true" className="size-3.5" />{t('workspace', { name: WORKSPACE_NAME })}</span>
+            <span className="inline-flex items-center gap-1.5"><LockKeyhole aria-hidden="true" className="size-3.5" />{t('privateHint')}</span>
           </p>
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
           {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
         </FieldSet>
         <footer className="flex flex-wrap items-center justify-between gap-3 px-5 pt-1 pb-4 sm:px-6">
-          <span className="text-xs text-muted-foreground">⌘ / Ctrl + Enter 创建</span>
+          <span className="text-xs text-muted-foreground">{t('shortcutCreate')}</span>
           <div className="flex items-center gap-3">
-            <FieldGroup className="contents"><Field orientation="horizontal"><Switch id="create-more" size="sm" checked={createMore} onCheckedChange={setCreateMore} disabled={pending} /><FieldLabel htmlFor="create-more">连续创建</FieldLabel></Field></FieldGroup>
-            <Button type="submit" size="sm" disabled={pending || !title.trim()}>{pending && <Spinner data-icon="inline-start" />}{pending ? '正在创建…' : '创建任务'}</Button>
+            <FieldGroup className="contents"><Field orientation="horizontal"><Switch id="create-more" size="sm" checked={createMore} onCheckedChange={setCreateMore} disabled={pending} /><FieldLabel htmlFor="create-more">{t('createMore')}</FieldLabel></Field></FieldGroup>
+            <Button type="submit" size="sm" disabled={pending || !title.trim()}>{pending && <Spinner data-icon="inline-start" />}{pending ? t('creating') : t('submit')}</Button>
           </div>
         </footer>
       </form>

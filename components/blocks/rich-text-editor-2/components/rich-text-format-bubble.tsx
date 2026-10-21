@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef } from "react"
 import type { EditorState } from "@tiptap/pm/state"
 import { isTextSelection, type Editor } from "@tiptap/react"
 import { BubbleMenu } from "@tiptap/react/menus"
+import { useTranslations } from "next-intl"
 
 import { RichTextBubbleBar, setRichTextBubble } from "./rich-text-bubble-bar"
 import {
@@ -74,6 +75,7 @@ export function RichTextFormatBubble({
     []
   )
 
+  const t = useTranslations('Editor.richText')
   return (
     <BubbleMenu
       editor={editor}
@@ -85,7 +87,7 @@ export function RichTextFormatBubble({
       <RichTextBubbleBar
         editor={editor}
         pluginKey={FORMAT_BUBBLE_KEY}
-        label="Format"
+        label={t('format')}
         holdOpen={linkOpen}
       >
         <RichTextBlockTypeMenu editor={editor} state={state} />
@@ -94,7 +96,7 @@ export function RichTextFormatBubble({
         <RichTextToolbarSeparator />
         <RichTextAlignMenu editor={editor} state={state} />
         <RichTextToolbarSeparator />
-        <RichTextToolbarGroup label="Annotate">
+        <RichTextToolbarGroup label={t('annotate')}>
           <RichTextHighlightPopover editor={editor} state={state} />
           <RichTextLinkPopover
             editor={editor}

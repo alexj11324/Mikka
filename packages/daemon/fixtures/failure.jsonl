@@ -1,0 +1,8 @@
+{"t":0,"chunk":{"type":"start","messageId":"msg-failure-1"}}
+{"t":100,"chunk":{"type":"text-start","id":"txt-1"}}
+{"t":160,"chunk":{"type":"text-delta","id":"txt-1","delta":"Running the build first."}}
+{"t":200,"chunk":{"type":"text-end","id":"txt-1"}}
+{"t":300,"chunk":{"type":"tool-input-available","toolCallId":"call-build-1","toolName":"bash","input":{"command":"bun run build"}}}
+{"t":900,"chunk":{"type":"tool-output-error","toolCallId":"call-build-1","errorText":"build failed: exit code 1"}}
+{"t":950,"chunk":{"type":"error","errorText":"Agent stopped: the build failed and it could not recover."}}
+{"t":960,"exit":{"outcome":"failed","error":"build failed"}}

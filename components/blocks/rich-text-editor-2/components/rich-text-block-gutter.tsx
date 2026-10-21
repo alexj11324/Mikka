@@ -10,6 +10,7 @@ import {
 import { NodeSelection, Selection, type Transaction } from "@tiptap/pm/state"
 import type { EditorView } from "@tiptap/pm/view"
 import type { Editor } from "@tiptap/react"
+import { useTranslations } from "next-intl"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -197,6 +198,7 @@ export function RichTextBlockGutter({
   gap = GUTTER_GAP,
   onDeleteTable,
 }: RichTextBlockGutterProps) {
+  const t = useTranslations('Editor.richText')
   const [shown, setShown] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -452,7 +454,7 @@ export function RichTextBlockGutter({
               variant="ghost"
               size="icon-xs"
               tabIndex={-1}
-              aria-label="Add block"
+              aria-label={t('addBlock')}
               onMouseDown={keepEditorFocus}
               onClick={insertRow}
               className="text-muted-foreground"
@@ -463,9 +465,9 @@ export function RichTextBlockGutter({
         </TooltipTrigger>
         <TooltipContent>
           <span className="flex flex-col items-start gap-0.5">
-            <span>Add block below</span>
+            <span>{t('addBlockBelow')}</span>
             <span className="flex items-center gap-1.5">
-              Add above
+              {t('addAbove')}
               <ShortcutKeys keys={["alt", "Click"]} />
             </span>
           </span>
@@ -492,7 +494,7 @@ export function RichTextBlockGutter({
                   size="icon-xs"
                   tabIndex={-1}
                   draggable
-                  aria-label="Block actions"
+                  aria-label={t('blockActions')}
                   onClick={() =>
                     menuOpen
                       ? handleMenuOpenChange(false)
@@ -509,9 +511,9 @@ export function RichTextBlockGutter({
           </TooltipTrigger>
           <TooltipContent>
             <span className="flex flex-col items-start gap-0.5">
-              <span>Drag to reorder</span>
+              <span>{t('dragToReorder')}</span>
               <span className="flex items-center gap-1.5">
-                Block actions
+                {t('blockActions')}
                 <ShortcutKeys keys={["mod", "/"]} />
               </span>
             </span>

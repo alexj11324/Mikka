@@ -3,29 +3,45 @@
 import { headers } from 'next/headers'
 import { and, desc, eq, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { ActionFailureError, runAction } from '@/lib/action-error'
+import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
+import { issueMembers, issueVersions, issues, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { issueChecklist } from '@/lib/issue-checklist'
+import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
 import { issueWithMetadata, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers, ensureIssueNumbers } from '@/lib/issue-numbering'
 
+type IssueRow = typeof issues.$inferSelect
+type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata> }
+
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new Error('请先登录。')
+  if (!session?.user) throw new ActionFailureError('authRequired')
   return session.user.id
 }
+
 const documentSchema = z.custom<JSONContent>(value => {
   if (!value || typeof value !== 'object' || (value as JSONContent).type !== 'doc') return false
   return JSON.stringify(value).length <= 250000
-}, '文档格式不正确或超过大小限制。')
-const inputSchema = z.object({
-  title: z.string().trim().min(1, '请填写任务标题。').max(200),
-  content: documentSchema, status: z.enum(['backlog','todo','doing','review','done','canceled','duplicate']),
-  priority: z.enum(['urgent','high','normal','low']),
 })
+
+const inputSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  content: documentSchema,
+  status: z.enum(ISSUE_STATUS_CODES),
+  priority: z.enum(ISSUE_PRIORITY_CODES),
+})
+
+function validationCode(error: z.ZodError): ActionErrorCode {
+  const field = error.issues[0]?.path[0]
+  if (field === 'title') return 'validationTitleRequired'
+  if (field === 'content') return 'validationDocument'
+  return 'validationGeneric'
+}
 
 export async function listIssues() {
   const userId = await getUserId()
@@ -37,6 +53,7 @@ export async function listIssues() {
   }
   return rows.filter(row => !readIssueMetadata(row.content).deletedAt).map(({ content, ...issue }) => ({ ...issue, metadata: readIssueMetadata(content), checklist: issueChecklist(content) }))
 }
+
 export async function getIssue(id: string) {
   let { issue } = await requireIssueAccess(id)
   if (!readIssueMetadata(issue.content).number) {
@@ -45,50 +62,65 @@ export async function getIssue(id: string) {
   }
   return issueWithMetadata(issue)
 }
-export async function saveIssue(input: { id?: string; revision?: number; title: string; content: JSONContent; status: string; priority: string }) {
-  const userId = await getUserId()
-  const parsed = inputSchema.safeParse(input)
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? '请检查任务内容。' }
-  const id = input.id ? z.uuid().parse(input.id) : crypto.randomUUID()
-  const ownerId = input.id ? (await requireIssueAccess(id)).issue.userId : userId
-  if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: '任务版本不正确，请重新打开。' }
-  try {
-    return await db.transaction(async tx => {
-      let issue
-      if (input.id) {
-        const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, ownerId))).for('update')
-        if (!latest) return { error: '任务不存在或没有访问权限。' }
-        ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
-      } else {
-        const number = await allocateIssueNumbers(tx, userId)
-        const metadata = { ...readIssueMetadata({ type: 'doc' }), number }
-        ;[issue] = await tx.insert(issues).values({ ...parsed.data, content: withIssueMetadata(parsed.data.content, metadata), id, userId, revision: 1 }).returning()
-      }
-      if (!issue) return { error: '此任务已被更新或无访问权限。草稿已保留，请重新打开最新版本后再编辑。' }
-      await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
-      return { issue: issueWithMetadata(issue) }
-    })
-  } catch (error) {
-    console.error('保存任务失败', error instanceof Error ? error.message : 'database error')
-    return { error: '保存未成功，请保留当前页面后重试。' }
-  }
-}
-export async function moveIssue(input: { id: string; status: string; revision: number }) {
-  const parsed = z.object({ id: z.uuid(), status: inputSchema.shape.status, revision: z.number().int().positive() }).safeParse(input)
-  if (!parsed.success) return { error: '任务移动信息不正确。' }
-  const issue = await getIssue(parsed.data.id)
-  if (issue.revision !== parsed.data.revision) return { error: '任务已被其他成员更新，已恢复最新状态，请重试。' }
-  if (issue.status === parsed.data.status) return { issue }
-  return saveIssue({ ...issue, status: parsed.data.status })
+export async function saveIssue(input: { id?: string; revision?: number; title: string; content: JSONContent; status: string; priority: string }): Promise<ActionResult<{ issue: IssueView }>> {
+  return runAction(async () => {
+    const userId = await getUserId()
+    const parsed = inputSchema.safeParse(input)
+    if (!parsed.success) return { error: validationCode(parsed.error) }
+    let id: string
+    if (input.id) {
+      const parsedId = z.uuid().safeParse(input.id)
+      if (!parsedId.success) return { error: 'issueNotFound' }
+      id = parsedId.data
+    } else {
+      id = crypto.randomUUID()
+    }
+    const ownerId = input.id ? (await requireIssueAccess(id)).issue.userId : userId
+    if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: 'issueRevisionInvalid' }
+    try {
+      return await db.transaction(async tx => {
+        let issue
+        if (input.id) {
+          const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, ownerId))).for('update')
+          if (!latest) return { error: 'issueNotFound' }
+          ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
+        } else {
+          const number = await allocateIssueNumbers(tx, userId)
+          const metadata = { ...readIssueMetadata({ type: 'doc' }), number }
+          ;[issue] = await tx.insert(issues).values({ ...parsed.data, content: withIssueMetadata(parsed.data.content, metadata), id, userId, revision: 1 }).returning()
+        }
+        if (!issue) return { error: 'issueStale' }
+        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
+        return { issue: issueWithMetadata(issue) }
+      })
+    } catch (error) {
+      if (error instanceof ActionFailureError) throw error
+      console.error('Failed to save issue', error instanceof Error ? error.message : 'database error')
+      return { error: 'issueSaveFailed' }
+    }
+  })
 }
 
-export async function changeIssuePriority(input: { id: string; priority: string; revision: number }) {
-  const parsed = z.object({ id: z.uuid(), priority: inputSchema.shape.priority, revision: z.number().int().positive() }).safeParse(input)
-  if (!parsed.success) return { error: '任务优先级信息不正确。' }
-  const issue = await getIssue(parsed.data.id)
-  if (issue.revision !== parsed.data.revision) return { error: '任务已被其他成员更新，请刷新后重试。' }
-  if (issue.priority === parsed.data.priority) return { issue }
-  return saveIssue({ ...issue, priority: parsed.data.priority })
+export async function moveIssue(input: { id: string; status: string; revision: number }): Promise<ActionResult<{ issue: IssueView }>> {
+  return runAction(async () => {
+    const parsed = z.object({ id: z.uuid(), status: inputSchema.shape.status, revision: z.number().int().positive() }).safeParse(input)
+    if (!parsed.success) return { error: 'issueMoveInvalid' }
+    const issue = await getIssue(parsed.data.id)
+    if (issue.revision !== parsed.data.revision) return { error: 'issueStale' }
+    if (issue.status === parsed.data.status) return { issue }
+    return saveIssue({ ...issue, status: parsed.data.status })
+  })
+}
+
+export async function changeIssuePriority(input: { id: string; priority: string; revision: number }): Promise<ActionResult<{ issue: IssueView }>> {
+  return runAction(async () => {
+    const parsed = z.object({ id: z.uuid(), priority: inputSchema.shape.priority, revision: z.number().int().positive() }).safeParse(input)
+    if (!parsed.success) return { error: 'issuePriorityInvalid' }
+    const issue = await getIssue(parsed.data.id)
+    if (issue.revision !== parsed.data.revision) return { error: 'issueStale' }
+    if (issue.priority === parsed.data.priority) return { issue }
+    return saveIssue({ ...issue, priority: parsed.data.priority })
+  })
 }
 
 export async function listIssueVersions(id: string) {

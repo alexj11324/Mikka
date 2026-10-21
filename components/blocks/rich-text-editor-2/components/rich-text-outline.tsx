@@ -8,6 +8,7 @@ import {
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model"
 import type { Transaction } from "@tiptap/pm/state"
 import type { Editor } from "@tiptap/react"
+import { useTranslations } from "next-intl"
 import { cn } from "cn"
 
 import { Button } from "@/components/ui/button"
@@ -312,13 +313,15 @@ export function RichTextOutlineRail({
   outline,
   activeIndex,
   onSelect,
-  label = "Outline",
+  label,
   className,
 }: RichTextOutlineRailProps) {
+  const t = useTranslations('Editor.richText')
   if (outline.length === 0) return null
+  const resolvedLabel = label ?? t('contents')
 
   return (
-    <nav aria-label={label} className={cn("group/outline", className)}>
+    <nav aria-label={resolvedLabel} className={cn("group/outline", className)}>
       <div
         aria-hidden="true"
         className="flex w-10 flex-col items-end gap-2.5 py-3 pe-1 transition-opacity duration-150 group-focus-within/outline:opacity-0 group-hover/outline:opacity-0 motion-reduce:transition-none"

@@ -1,0 +1,67 @@
+{"t":0,"chunk":{"type":"start","messageId":"msg-long-1"}}
+{"t":0,"chunk":{"type":"text-start","id":"txt-1"}}
+{"t":500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 1. "}}
+{"t":1000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 2. "}}
+{"t":1500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 3. "}}
+{"t":2000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 4. "}}
+{"t":2500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 5. "}}
+{"t":3000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 6. "}}
+{"t":3500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 7. "}}
+{"t":4000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 8. "}}
+{"t":4500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 9. "}}
+{"t":5000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 10. "}}
+{"t":5500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 11. "}}
+{"t":6000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 12. "}}
+{"t":6500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 13. "}}
+{"t":7000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 14. "}}
+{"t":7500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 15. "}}
+{"t":8000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 16. "}}
+{"t":8500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 17. "}}
+{"t":9000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 18. "}}
+{"t":9500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 19. "}}
+{"t":10000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 20. "}}
+{"t":10500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 21. "}}
+{"t":11000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 22. "}}
+{"t":11500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 23. "}}
+{"t":12000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 24. "}}
+{"t":12500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 25. "}}
+{"t":13000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 26. "}}
+{"t":13500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 27. "}}
+{"t":14000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 28. "}}
+{"t":14500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 29. "}}
+{"t":15000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 30. "}}
+{"t":15500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 31. "}}
+{"t":16000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 32. "}}
+{"t":16500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 33. "}}
+{"t":17000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 34. "}}
+{"t":17500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 35. "}}
+{"t":18000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 36. "}}
+{"t":18500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 37. "}}
+{"t":19000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 38. "}}
+{"t":19500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 39. "}}
+{"t":20000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 40. "}}
+{"t":20500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 41. "}}
+{"t":21000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 42. "}}
+{"t":21500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 43. "}}
+{"t":22000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 44. "}}
+{"t":22500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 45. "}}
+{"t":23000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 46. "}}
+{"t":23500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 47. "}}
+{"t":24000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 48. "}}
+{"t":24500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 49. "}}
+{"t":25000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 50. "}}
+{"t":25500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 51. "}}
+{"t":26000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 52. "}}
+{"t":26500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 53. "}}
+{"t":27000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 54. "}}
+{"t":27500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 55. "}}
+{"t":28000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 56. "}}
+{"t":28500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 57. "}}
+{"t":29000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 58. "}}
+{"t":29500,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 59. "}}
+{"t":30000,"chunk":{"type":"text-delta","id":"txt-1","delta":"step 60. "}}
+{"t":30500,"chunk":{"type":"text-end","id":"txt-1"}}
+{"t":30500,"write":{"path":"notes/long-run.md","content":"Long mock run finished.\n"},"chunk":{"type":"data-file-change","data":{"path":"notes/long-run.md","change":"added"}}}
+{"t":30500,"chunk":{"type":"finish","finishReason":"stop"}}
+{"t":30500,"submit":{"summary":"Done."}}
+{"t":30500,"exit":{"outcome":"succeeded"}}

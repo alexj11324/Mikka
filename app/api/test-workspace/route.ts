@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   try {
     let response = await auth.api.signInEmail({ body: credentials, headers: request.headers, asResponse: true })
     if (!response.ok) {
-      response = await auth.api.signUpEmail({ body: { ...credentials, name: 'Orvilo 测试账号' }, headers: request.headers, asResponse: true })
+      response = await auth.api.signUpEmail({ body: { ...credentials, name: 'Orvilo Test Account' }, headers: request.headers, asResponse: true })
       if (!response.ok) response = await auth.api.signInEmail({ body: credentials, headers: request.headers, asResponse: true })
     }
     if (!response.ok) return new Response(null, { status: 503 })

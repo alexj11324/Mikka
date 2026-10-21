@@ -1,4 +1,4 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": [".next/**", "out/**", "build/**", "next-env.d.ts", "user_read_only_context/**", "v0_memories/**"]
+  "ignorePatterns": [".next/**", "out/**", "build/**", "packages/**", "components/reui/code-block/**", "next-env.d.ts", "user_read_only_context/**", "v0_memories/**"]
 }

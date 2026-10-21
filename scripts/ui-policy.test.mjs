@@ -133,6 +133,7 @@ test('CSS cannot bypass typography restrictions', () => {
 
 test('framework html/body shell is not mistaken for a handmade widget', () => {
   assert.deepEqual(auditSource('app/layout.tsx', '<html lang="zh-CN"><body>{children}</body></html>', policy), [])
+  assert.deepEqual(auditSource('app/[locale]/layout.tsx', '<html lang={locale}><body>{children}</body></html>', policy), [])
   assert.ok(auditSource('app/layout.tsx', '<html><body><button /></body></html>', policy).some(d => d.rule === 'components/no-handwritten-ui'))
 })
 
