@@ -1,6 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { test, expect, register, watchRuntime, browserClientHeaders } from "./fixtures";
 
+test("旧设置预览地址跳转到真实成员设置并保留参数", async ({ page, request }) => {
+  const workspace = randomUUID();
+  const response = await request.get(`/preview/settings?workspace=${workspace}&invite=1`, { maxRedirects: 0 });
+  expect(response.status()).toBe(307);
+  const destination = new URL(response.headers().location, response.url());
+  expect(destination.pathname).toBe('/settings/members');
+  expect(destination.searchParams.get('workspace')).toBe(workspace);
+  expect(destination.searchParams.get('invite')).toBe('1');
+
+  await register(page, '/settings/members');
+  await page.goto('/preview/settings?invite=1');
+  await expect(page).toHaveURL(url => url.pathname === '/settings/members' && url.searchParams.get('invite') === '1');
+  await expect(page.getByRole('dialog', { name: '邀请成员', exact: true })).toBeVisible();
+});
+
 test("成员导航、邀请取消、角色选择、创建和撤销邀请、管理员保护", async ({
   page,
 }) => {
