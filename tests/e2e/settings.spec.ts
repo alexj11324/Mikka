@@ -19,7 +19,7 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
       navigations.push(url.href)
       return route.abort()
     }
-    return route.continue()
+    return route.fallback()
   })
   await page.getByRole('button', { name: '账户菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()
