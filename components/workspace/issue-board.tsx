@@ -1,11 +1,10 @@
 'use client'
 
 import { useId, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { toast } from 'sonner'
 import { changeIssuePriority, moveIssue, type listIssues } from '@/app/actions/issues'
 import { type KanbanCommitMeta } from '@/components/reui/kanban'
 import { KanbanBoard } from '@/components/blocks/kanban-board-1/components/kanban-board'
-import { Button } from '@/components/ui/button'
 import { ISSUE_STATUSES, type IssueStatus } from './issue-properties'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
@@ -57,7 +56,9 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
       setMessage(patch.status ? `已移至${ISSUE_STATUSES.find(item => item.value === patch.status)?.label}` : '优先级已保存。')
     } catch (error) {
       setColumns(rollback)
-      setMessage(error instanceof Error ? error.message : '状态保存失败，已恢复原位置。')
+      const errorMessage = error instanceof Error ? error.message : '状态保存失败，已恢复原位置。'
+      setMessage(errorMessage)
+      toast.error(errorMessage)
     } finally {
       saving.current = false
       setPending(false)
@@ -91,16 +92,14 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
     void persist(issue, { priority }, columns)
   }
 
-  return <section aria-label="任务看板" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 px-4 pb-2 sm:px-6">
-    <div className="flex shrink-0 items-center justify-between gap-3">
-      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || '点击卡片打开详情，拖动卡片或使用状态菜单更新状态。'}</p>
-      <div className="flex shrink-0 items-center gap-1">
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="向左滚动看板" aria-controls={viewportId} onClick={() => scrollBoard(-1)}><ChevronLeft data-icon="inline-start" /></Button>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="向右滚动看板" aria-controls={viewportId} onClick={() => scrollBoard(1)}><ChevronRight data-icon="inline-start" /></Button>
-      </div>
-    </div>
-    <p id={instructionsId} className="sr-only">使用触控板左右滑动、底部滚动条或左右按钮浏览。聚焦此区域后，可用左右方向键滚动，Home 返回开头，End 移至末尾。聚焦卡片后，按 Enter 打开详情，按空格开始拖动，使用方向键跨列移动，再按空格放下；Escape 取消。</p>
-    <KanbanBoard value={columns} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onCreate={onCreate} onStatusChange={changeStatus} onPriorityChange={changePriority} viewportRef={viewportRef} viewportId={viewportId} instructionsId={instructionsId} onViewportKeyDown={event => {
+  return <section aria-label="任务看板" className="flex min-h-0 min-w-0 flex-1 select-none flex-col px-4 pb-2 sm:px-6">
+    <p role="status" aria-live="polite" className="sr-only">{message}</p>
+    <p id={instructionsId} className="sr-only">使用触控板左右滑动或底部滚动条浏览。聚焦此区域后，可用左右方向键滚动，Home 返回开头，End 移至末尾。聚焦卡片后，按 Enter 打开详情，按空格开始拖动，使用方向键跨列移动，再按空格放下；Escape 取消。</p>
+    <KanbanBoard value={columns} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onCreate={onCreate} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
+      setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
+      setMessage('任务属性已保存。')
+      void onUpdated().catch(() => {})
+    }} viewportRef={viewportRef} viewportId={viewportId} instructionsId={instructionsId} onViewportKeyDown={event => {
       if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         event.preventDefault()

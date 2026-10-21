@@ -4,8 +4,11 @@ import { ChartNoAxesColumnIncreasing, CircleDashed, History, LockKeyhole, Users 
 import { Button } from '@/components/ui/button'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
+import { IssueMetadataControls, type MetadataSavedIssue } from './issue-metadata-controls'
+import type { IssueMetadata } from '@/lib/issue-metadata'
 
-export function IssueDetailProperties({ status, priority, revision, createdAt, updatedAt, pending, onStatus, onPriority, onMembers, onHistory }: {
+export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled, onMetadataBusy, status, priority, revision, createdAt, updatedAt, pending, onStatus, onPriority, onMembers, onHistory }: {
+  task: { id: string; revision: number; metadata: IssueMetadata }; onMetadataSaved: (issue: MetadataSavedIssue) => void; metadataDisabled: boolean; onMetadataBusy: (busy: boolean) => void
   status: string; priority: string; revision: number; createdAt: Date | string; updatedAt: Date | string; pending: boolean
   onStatus: (value: string) => void; onPriority: (value: string) => void; onMembers: () => void; onHistory: () => void
 }) {
@@ -13,6 +16,7 @@ export function IssueDetailProperties({ status, priority, revision, createdAt, u
     <div className="flex flex-col items-start gap-2"><h2 className="mb-1 px-2 text-sm font-medium text-muted-foreground">属性</h2>
       <IssuePropertyMenu label="任务状态" value={status} options={ISSUE_STATUSES} icon={CircleDashed} disabled={pending} onChange={onStatus} />
       <IssuePropertyMenu label="任务优先级" value={priority} options={ISSUE_PRIORITIES} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} />
+      <div className="flex w-full flex-wrap items-center gap-2"><IssueMetadataControls task={task} disabled={metadataDisabled} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>
       <Button variant="ghost" size="sm" onClick={onMembers}><Users data-icon="inline-start" />协作成员</Button>
     </div>
     <div className="flex flex-col gap-4 px-2"><h2 className="text-xs font-medium text-muted-foreground">访问权限</h2><p className="flex items-center gap-2 text-xs"><LockKeyhole className="size-3.5 text-muted-foreground" />仅授权成员可访问</p></div>

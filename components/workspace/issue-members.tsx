@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 
-export function IssueMembers({ id, defaultOpen = false }: { id: string; defaultOpen?: boolean }) {
+export function IssueMembers({ id, defaultOpen = false, onChanged }: { id: string; defaultOpen?: boolean; onChanged?: () => Promise<void> }) {
   const { data, error, mutate } = useSWR(['members', id], () => listMembers(id), { refreshInterval: 10000 })
   const [email, setEmail] = useState('')
   const [pending, setPending] = useState(false)
@@ -20,14 +20,14 @@ export function IssueMembers({ id, defaultOpen = false }: { id: string; defaultO
     try {
       const result = await inviteMember(id, email)
       if (result.error) { setMessage(result.error); return }
-      setEmail(''); setMessage('成员已添加，对方登录后可在任务列表中打开此任务。'); await mutate()
+      setEmail(''); setMessage('成员已添加，对方登录后可在任务列表中打开此任务。'); await mutate(); await onChanged?.()
     } catch { setMessage('添加失败，请稍后重试。') }
     finally { setPending(false) }
   }
   async function remove(memberId: string) {
     if (pending || !window.confirm('移除此成员的任务访问权限？已保存的贡献将保留。')) return
     setPending(true); setMessage('')
-    try { await removeMember(id, memberId); await mutate() }
+    try { await removeMember(id, memberId); await mutate(); await onChanged?.() }
     catch { setMessage('移除失败，请稍后重试。') }
     finally { setPending(false) }
   }

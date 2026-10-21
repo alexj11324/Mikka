@@ -11,7 +11,7 @@
     "lint:code": "oxlint --deny-warnings",
     "lint:ui": "node scripts/lint-ui.mjs",
     "test:ui-policy": "node --test scripts/ui-policy.test.mjs scripts/interaction-policy.test.mjs",
-    "test:issues": "node --test scripts/issue-checklist.test.mjs",
+    "test:issues": "node --test scripts/issue-checklist.test.mjs scripts/issue-metadata.test.mjs",
     "start": "next start",
     "typecheck": "tsgo --noEmit"
   },

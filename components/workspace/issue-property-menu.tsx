@@ -21,7 +21,7 @@ export function IssuePropertyMenu({ label, value, options, icon: Icon, disabled,
   const option = options.find(item => item.value === value)
   const ValueIcon = option?.icon ?? Icon
   return <DropdownMenu>
-    <DropdownMenuTrigger render={<Button type="button" variant={pill ? 'outline' : 'ghost'} size={iconOnly ? 'icon-sm' : compact ? 'xs' : 'sm'} className={cn(pill && 'rounded-full', iconOnly && !pill && '-ml-1')} disabled={disabled} title={`${label}：${option?.label ?? value}`} aria-label={`${label}：${option?.label ?? value}`} />}>
+    <DropdownMenuTrigger render={<Button type="button" variant={pill ? 'outline' : 'ghost'} size={iconOnly ? compact ? 'icon-compact' : 'icon-sm' : compact ? 'xs' : 'sm'} className={cn(pill && 'rounded-full', iconOnly && !pill && '-ml-1')} disabled={disabled} title={`${label}：${option?.label ?? value}`} aria-label={`${label}：${option?.label ?? value}`} />}>
       <ValueIcon data-icon="inline-start" className={cn({
         'text-muted-foreground': option?.indicatorClassName === 'text-muted-foreground',
         'text-warning-foreground': option?.indicatorClassName === 'text-warning-foreground',

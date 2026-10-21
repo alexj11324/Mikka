@@ -87,7 +87,7 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
     void leave(() => { setSelected(null); setView(next); setQuery(''); setDraftKey(value => value + 1) })
     return true
   }
-  const filtered = tasks.filter(task => (view === 'all' || (view === 'mine' ? task.ownerId === user.id : view === 'shared' ? task.ownerId !== user.id : task.status === view)) && `${issueIdentifier(task.id)} ${task.title}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const filtered = tasks.filter(task => (view === 'all' || (view === 'mine' ? task.ownerId === user.id : view === 'shared' ? task.ownerId !== user.id : task.status === view)) && `${issueIdentifier(task.metadata.number)} ${task.title}`.toLowerCase().includes(query.trim().toLowerCase()))
   const counts: Record<IssueView, number> = { all: tasks.length, mine: 0, shared: 0, backlog: 0, todo: 0, doing: 0, review: 0, done: 0, canceled: 0, duplicate: 0 }
   for (const task of tasks) {
     if (ISSUE_STATUSES.some(status => status.value === task.status)) counts[task.status as IssueStatus]++
@@ -101,7 +101,7 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
         <div className="flex min-w-0 items-center gap-2">
           <SidebarTrigger className="-ml-1" aria-label="展开或收起侧栏" />
           <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
-          <Breadcrumb aria-label="当前位置"><BreadcrumbList><BreadcrumbItem className="hidden sm:inline-flex"><span>{WORKSPACE_NAME}</span></BreadcrumbItem><BreadcrumbSeparator className="hidden sm:block" /><BreadcrumbItem><BreadcrumbPage>{selected ? issueIdentifier(selected) : viewTitle}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
+          <Breadcrumb aria-label="当前位置"><BreadcrumbList><BreadcrumbItem className="hidden sm:inline-flex"><span>{WORKSPACE_NAME}</span></BreadcrumbItem><BreadcrumbSeparator className="hidden sm:block" /><BreadcrumbItem><BreadcrumbPage>{viewTitle}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
         </div>
         <div className="flex shrink-0 items-center gap-2"><Button variant="ghost" size="icon-sm" aria-label="打开全局搜索" disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button></div>
       </header>}

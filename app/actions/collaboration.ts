@@ -6,8 +6,9 @@ import * as Y from 'yjs'
 import { yXmlFragmentToProsemirrorJSON } from '@tiptap/y-tiptap'
 import type { JSONContent } from '@tiptap/core'
 import { db } from '@/lib/db'
-import { issues, issueDocuments, issueMembers, users } from '@/lib/db/schema'
+import { issues, issueDocuments, issueMembers, issueVersions, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
+import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 
 const encodedState = z.string().max(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/)
 const syncSchema = z.object({ id: z.uuid(), vector: encodedState.optional(), update: encodedState.optional(), seed: encodedState.optional() })
@@ -15,7 +16,7 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>) {
   const parsed = syncSchema.parse(input)
   const { issue } = await requireIssueAccess(parsed.id)
   return db.transaction(async tx => {
-    const [locked] = await tx.select({ id: issues.id }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
+    const [locked] = await tx.select({ id: issues.id, content: issues.content }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
     if (!locked) throw new Error('任务不存在。')
     const [stored] = await tx.select().from(issueDocuments).where(and(eq(issueDocuments.issueId, issue.id), eq(issueDocuments.userId, issue.userId))).limit(1)
     const doc = new Y.Doc()
@@ -26,7 +27,7 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>) {
       if (parsed.update) Y.applyUpdate(doc, Buffer.from(parsed.update, 'base64'))
       const state = Buffer.from(Y.encodeStateAsUpdate(doc)).toString('base64')
       if (state.length > 1_400_000) throw new Error('协作文档超过 1 MB 上限，请拆分任务。')
-      const content = yXmlFragmentToProsemirrorJSON(doc.getXmlFragment('default')) as JSONContent
+      const content = withIssueMetadata(yXmlFragmentToProsemirrorJSON(doc.getXmlFragment('default')) as JSONContent, readIssueMetadata(locked.content))
       if (JSON.stringify(content).length > 250000) throw new Error('正文超过大小限制。')
       if (!stored || state !== stored.state) {
         await tx.insert(issueDocuments).values({ issueId: issue.id, userId: issue.userId, state }).onConflictDoUpdate({ target: issueDocuments.issueId, set: { state, updatedAt: new Date() } })
@@ -56,5 +57,14 @@ export async function removeMember(id: string, memberId: string) {
   const { issue, user } = await requireIssueAccess(id)
   if (issue.userId !== user.id) throw new Error('只有任务所有者可以管理成员。')
   z.string().min(1).max(128).parse(memberId)
-  await db.delete(issueMembers).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, user.id), eq(issueMembers.memberId, memberId)))
+  await db.transaction(async tx => {
+    const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, user.id))).for('update')
+    if (!latest) throw new Error('任务不存在。')
+    await tx.delete(issueMembers).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, user.id), eq(issueMembers.memberId, memberId)))
+    const metadata = readIssueMetadata(latest.content)
+    if (metadata.assignee?.kind === 'member' && metadata.assignee.id === memberId) {
+      const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, assignee: null }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, user.id))).returning()
+      await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: user.id, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
+    }
+  })
 }
