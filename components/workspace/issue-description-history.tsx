@@ -63,7 +63,7 @@ export function IssueDescriptionHistory({ open, onOpenChange, number, title, cur
   }
   return <>
     <Dialog open={open} onOpenChange={value => { if (!pending) onOpenChange(value) }}>
-      <DialogContent className="flex h-[85svh] max-h-[900px] flex-col gap-0 p-0 sm:max-w-[min(90vw,1140px)]">
+      <DialogContent className="flex h-[92svh] max-h-[900px] min-w-0 flex-col gap-0 overflow-hidden p-0 sm:h-[85svh] sm:max-w-[min(90vw,1140px)]">
         <DialogHeader className="shrink-0 px-5 py-4 pr-12"><DialogTitle className="truncate">{issueIdentifier(number)} {title} 的描述历史</DialogTitle><DialogDescription className="sr-only">左侧预览描述与变更，右侧选择历史版本。恢复仅替换描述，不修改当前标题、属性与评论。</DialogDescription></DialogHeader>
         {loadingError ? <div role="alert" className="flex flex-col items-start gap-4 p-6"><p>描述历史读取失败。</p><Button variant="outline" onClick={onRetry}>重新加载</Button></div> : !versions ? <div role="status" aria-label="正在读取描述历史" className="p-6"><Skeleton className="h-72 w-full" /></div> : <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 md:flex-row">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border">
@@ -71,17 +71,17 @@ export function IssueDescriptionHistory({ open, onOpenChange, number, title, cur
               <div className="mb-5 flex items-center gap-2 text-xs text-muted-foreground"><History className="size-3.5" /><time>{selected ? new Date(selected.createdAt).toLocaleString('zh-CN') : '当前描述'}</time></div>
               <DescriptionPreview key={`${selected?.id ?? 'current'}-${highlight}`} content={highlight ? compared.content : selected?.content ?? currentContent} />
             </div>
-            <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 bg-muted/40 px-3 py-3">
-              <FieldLabel className="flex cursor-pointer items-center gap-2"><Switch size="sm" checked={highlight} onCheckedChange={value => { setHighlight(value); setChangeIndex(1) }} />高亮变更</FieldLabel>
+            <div className="mx-auto mb-3 flex max-w-full shrink-0 flex-wrap items-center justify-center gap-1 rounded-2xl border bg-popover px-2 py-1 shadow-lg sm:rounded-full [&_button]:min-h-11 [&_button[aria-label]]:min-w-11">
+              <FieldLabel className="flex min-h-11 cursor-pointer items-center gap-2 px-1"><Switch size="sm" checked={highlight} onCheckedChange={value => { setHighlight(value); setChangeIndex(1) }} />高亮变更</FieldLabel>
               <span className="px-2 text-xs tabular-nums text-muted-foreground">{compared.changes ? `${Math.min(changeIndex, compared.changes)} / ${compared.changes}` : '无描述变更'}</span>
               <Button size="icon-xs" variant="ghost" aria-label="上一处变更" disabled={!highlight || !compared.changes} onClick={() => jump(-1)}><ArrowUp data-icon="inline-start" /></Button><Button size="icon-xs" variant="ghost" aria-label="下一处变更" disabled={!highlight || !compared.changes} onClick={() => jump(1)}><ArrowDown data-icon="inline-start" /></Button>
               <Button size="sm" disabled={!selected || isCurrent || pending} onClick={() => setConfirm(true)}>{pending ? '正在恢复…' : '恢复此描述'}</Button>
             </div>
             {error && <p role="alert" className="px-4 pb-3 text-xs text-destructive">{error}</p>}
           </div>
-          <aside aria-label="描述版本时间线" className="flex max-h-40 w-full shrink-0 flex-col gap-2 overflow-y-auto p-3 md:max-h-none md:w-56 md:pl-4 md:pr-0">
+          <aside aria-label="描述版本时间线" className="order-first flex w-full shrink-0 gap-2 overflow-x-auto p-1 pb-3 md:order-last md:w-56 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:pl-4 md:pr-0">
             {descriptions.length === 0 && <p className="text-sm text-muted-foreground">暂无描述历史。</p>}
-            {descriptions.map((version, index) => <Button key={version.id} variant={selected?.id === version.id ? 'secondary' : 'ghost'} className={cn('h-auto w-full justify-start whitespace-normal py-3', selected?.id === version.id && 'ring-1 ring-ring')} onClick={() => { setSelectedId(version.id); setChangeIndex(1); setError('') }}><span className="flex w-full flex-col items-start gap-2"><span className="flex w-full items-center justify-between gap-2"><time className="text-xs">{new Date(version.createdAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>{index === 0 && <Badge variant="outline"><Check data-icon="inline-start" />当前</Badge>}</span><span className="text-xs text-muted-foreground">描述版本 · v{version.revision}</span></span></Button>)}
+            {descriptions.map((version, index) => <Button key={version.id} variant={selected?.id === version.id ? 'secondary' : 'ghost'} aria-pressed={selected?.id === version.id} className={cn('h-auto min-h-11 w-40 shrink-0 justify-start whitespace-normal py-3 md:w-full', selected?.id === version.id && 'ring-1 ring-ring')} onClick={() => { setSelectedId(version.id); setChangeIndex(1); setError('') }}><span className="flex w-full flex-col items-start gap-2"><span className="flex w-full items-center justify-between gap-2"><time className="text-xs">{new Date(version.createdAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>{index === 0 && <Badge variant="outline"><Check data-icon="inline-start" />当前</Badge>}</span><span className="text-xs text-muted-foreground">描述版本 · v{version.revision}</span></span></Button>)}
           </aside>
         </div>}
       </DialogContent>
