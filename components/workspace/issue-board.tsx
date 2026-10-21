@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { moveIssue, type listIssues } from '@/app/actions/issues'
 import { type KanbanCommitMeta } from '@/components/reui/kanban'
@@ -36,6 +36,23 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
   const viewportRef = useRef<HTMLDivElement>(null)
   const viewportId = useId()
   const instructionsId = useId()
+  const [canScroll, setCanScroll] = useState({ left: false, right: false })
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    function update() {
+      if (!viewport) return
+      const left = viewport.scrollLeft > 1
+      const right = viewport.scrollLeft + viewport.clientWidth < viewport.scrollWidth - 1
+      setCanScroll(current => current.left === left && current.right === right ? current : { left, right })
+    }
+    const observer = new ResizeObserver(update)
+    observer.observe(viewport)
+    if (viewport.firstElementChild) observer.observe(viewport.firstElementChild)
+    viewport.addEventListener('scroll', update, { passive: true })
+    update()
+    return () => { observer.disconnect(); viewport.removeEventListener('scroll', update) }
+  }, [])
 
   function scrollBoard(direction: -1 | 1) {
     const viewport = viewportRef.current
@@ -80,8 +97,8 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
     <div className="flex items-center justify-between gap-3">
       <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || '左右滚动查看全部状态，拖动卡片跨列更新任务，点击标题打开详情。'}</p>
       <div className="flex shrink-0 items-center gap-1">
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="向左滚动看板" aria-controls={viewportId} onClick={() => scrollBoard(-1)}><ChevronLeft data-icon="inline-start" /></Button>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="向右滚动看板" aria-controls={viewportId} onClick={() => scrollBoard(1)}><ChevronRight data-icon="inline-start" /></Button>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="向左滚动看板" aria-controls={viewportId} disabled={!canScroll.left} onClick={() => scrollBoard(-1)}><ChevronLeft data-icon="inline-start" /></Button>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="向右滚动看板" aria-controls={viewportId} disabled={!canScroll.right} onClick={() => scrollBoard(1)}><ChevronRight data-icon="inline-start" /></Button>
       </div>
     </div>
     <p id={instructionsId} className="sr-only">使用触控板左右滑动、底部滚动条或左右按钮浏览。聚焦此区域后，可用左右方向键滚动，Home 返回开头，End 移至末尾。聚焦可拖动卡片后，按空格开始拖动，使用方向键跨列移动，再按空格放下；Escape 取消。</p>

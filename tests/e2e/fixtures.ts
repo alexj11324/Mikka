@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { setTimeout as delay } from 'node:timers/promises'
 import { test as base, expect, type BrowserContext, type Page } from '@playwright/test'
 
 export function watchRuntime(context: BrowserContext) {
@@ -33,6 +34,8 @@ export async function register(page: Page, next = '/', email = `e2e-${randomUUID
   await page.getByLabel('称呼', { exact: true }).fill('回归测试成员')
   await page.getByLabel('邮箱', { exact: true }).fill(email)
   await page.getByLabel('密码', { exact: true }).fill(password)
+  // Better Auth 的生产规则为同一来源每 10 秒最多注册 3 次；CI 所有浏览器共享来源。
+  await delay(4000)
   await page.getByRole('button', { name: '创建账号并进入', exact: true }).click()
   await expect(page).toHaveURL(url => `${url.pathname}${url.search}` === next)
   return { email, password }
