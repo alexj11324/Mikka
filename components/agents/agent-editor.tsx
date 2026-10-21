@@ -1,18 +1,19 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Cpu, RotateCcw, Sparkles, Trash2 } from 'lucide-react'
+import { RotateCcw, Sparkles, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/reui/badge'
-import { Frame, FrameDescription, FrameFooter, FrameHeader, FramePanel, FrameTitle } from '@/components/reui/frame'
 import { IconTile } from '@/components/reui/icon-tile'
+import { cn } from '@/lib/utils'
 import { createAgent, deleteAgent, resetAgentInstructions, updateAgent, type AgentView, type DeviceView } from '@/app/actions/agents'
 import { resolveAgentPlacement, SUGGESTED_MODELS } from '@/lib/agent-placement'
 import { BUILT_IN_AGENT_PRESETS, MAX_AGENT_INSTRUCTIONS_LENGTH, isBuiltInAgentRole, type AgentRole } from '@/lib/agent-roles'
@@ -63,6 +64,18 @@ function sameDraft(a: Draft, b: Draft): boolean {
 
 function installedOn(device: DeviceView | undefined, harness: SupportedHarness): boolean {
   return Boolean(device?.harnesses.some(info => info.harness === harness && info.installed))
+}
+
+function EditorSectionHeading({ id, index, title, description }: { id: string; index: string; title: string; description: string }) {
+  return (
+    <div className="mb-4 flex items-start gap-3">
+      <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold tabular-nums text-muted-foreground">{index}</span>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <h3 id={id} className="text-sm font-semibold">{title}</h3>
+        <p className="text-xs leading-5 text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -191,150 +204,157 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
   ]
 
   return (
-    <Frame spacing="lg" className="min-w-0" role="region" aria-label={agent ? t('editTitle', { name: agent.name }) : t('createTitle')}>
-      <FrameHeader className="flex-row items-center gap-3">
-        <IconTile size="sm" variant="elevated" aria-hidden="true"><Icon /></IconTile>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <FrameTitle className="flex items-center gap-2">
-            <span className="truncate">{agent ? agent.name : t('createTitle')}</span>
+    <Card className="min-w-0" role="region" aria-label={agent ? t('editTitle', { name: agent.name }) : t('createTitle')}>
+      <CardHeader className="flex-row items-start gap-4 rounded-xl bg-muted/30">
+        <IconTile size="default" variant="soft" className="text-project-action" aria-hidden="true"><Icon /></IconTile>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant={builtIn ? 'info-light' : 'outline'} size="sm">{t(`roles.${role}`)}</Badge>
-          </FrameTitle>
-          <FrameDescription className="text-xs">{builtIn ? t('builtInHint') : t('customHint')}</FrameDescription>
+            {!agent && <Badge variant="secondary" size="sm">{t('notSaved')}</Badge>}
+          </div>
+          <CardTitle className="truncate text-xl tracking-tight">{agent ? agent.name : t('createTitle')}</CardTitle>
+          <CardDescription className="text-xs">{builtIn ? t('builtInHint') : t('customHint')}</CardDescription>
         </div>
-      </FrameHeader>
+      </CardHeader>
 
-      <FramePanel>
-        <FieldGroup>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="agent-name">{t('name')}</FieldLabel>
-              <Input id="agent-name" value={draft.name} maxLength={60} placeholder={t('namePlaceholder')} onChange={event => patch({ name: event.target.value })} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="agent-description">{t('summary')}</FieldLabel>
-              <Input id="agent-description" value={draft.description} maxLength={200} placeholder={builtIn ? t(`roleSummary.${role}`) : t('summaryPlaceholder')} onChange={event => patch({ description: event.target.value })} />
-            </Field>
-          </div>
-        </FieldGroup>
-      </FramePanel>
+      <CardContent className="flex flex-col gap-6 pt-5">
+        <section aria-labelledby="agent-identity-heading">
+          <EditorSectionHeading id="agent-identity-heading" index="01" title={t('identitySection')} description={t('identityDescription')} />
+          <FieldGroup>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="agent-name">{t('name')}</FieldLabel>
+                <Input id="agent-name" value={draft.name} maxLength={60} placeholder={t('namePlaceholder')} onChange={event => patch({ name: event.target.value })} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="agent-description">{t('summary')}</FieldLabel>
+                <Input id="agent-description" value={draft.description} maxLength={200} placeholder={builtIn ? t(`roleSummary.${role}`) : t('summaryPlaceholder')} onChange={event => patch({ description: event.target.value })} />
+              </Field>
+            </div>
+          </FieldGroup>
+        </section>
 
-      <FramePanel>
-        <FieldGroup>
-          <div className="flex flex-col gap-1">
-            <span className="flex items-center gap-2 text-sm font-medium"><Cpu className="size-4 text-muted-foreground" aria-hidden="true" />{t('runtime')}</span>
-            <span className="text-xs text-muted-foreground">{t('autoHint')}</span>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field>
-              <FieldLabel htmlFor="agent-device">{t('device')}</FieldLabel>
-              <Select value={draft.deviceId} items={deviceItems} onValueChange={value => chooseDevice(value ?? AUTO)}>
-                <SelectTrigger id="agent-device" className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value={AUTO}>{t('auto')}</SelectItem>
-                  </SelectGroup>
-                  {devices.length > 0 && (
+        <section aria-labelledby="agent-runtime-heading" className="rounded-2xl bg-muted/30 p-4 sm:p-5">
+          <EditorSectionHeading id="agent-runtime-heading" index="02" title={t('runtime')} description={t('runtimeDescription')} />
+          <FieldGroup>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <Field>
+                <FieldLabel htmlFor="agent-device">{t('device')}</FieldLabel>
+                <Select value={draft.deviceId} items={deviceItems} onValueChange={value => chooseDevice(value ?? AUTO)}>
+                  <SelectTrigger id="agent-device" className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
                     <SelectGroup>
-                      <SelectLabel>{t('devicesGroup')}</SelectLabel>
-                      {devices.map(item => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.online ? item.name : t('deviceOffline', { name: item.name })}
+                      <SelectItem value={AUTO}>{t('auto')}</SelectItem>
+                    </SelectGroup>
+                    {devices.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>{t('devicesGroup')}</SelectLabel>
+                        {devices.map(item => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.online ? item.name : t('deviceOffline', { name: item.name })}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="agent-harness">{t('harness')}</FieldLabel>
+                <Select value={draft.harness} items={harnessItems} onValueChange={value => chooseHarness(value ?? AUTO)}>
+                  <SelectTrigger id="agent-harness" className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value={AUTO}>{t('auto')}</SelectItem>
+                      {SUPPORTED_HARNESSES.map(item => (
+                        <SelectItem key={item} value={item} disabled={Boolean(device) && !installedOn(device, item)}>
+                          {HARNESS_LABELS[item]}
                         </SelectItem>
                       ))}
                     </SelectGroup>
-                  )}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="agent-harness">{t('harness')}</FieldLabel>
-              <Select value={draft.harness} items={harnessItems} onValueChange={value => chooseHarness(value ?? AUTO)}>
-                <SelectTrigger id="agent-harness" className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value={AUTO}>{t('auto')}</SelectItem>
-                    {SUPPORTED_HARNESSES.map(item => (
-                      <SelectItem key={item} value={item} disabled={Boolean(device) && !installedOn(device, item)}>
-                        {HARNESS_LABELS[item]}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="agent-model">{t('model')}</FieldLabel>
-              <Select value={draft.modelChoice} items={modelItems} onValueChange={value => patch({ modelChoice: value ?? AUTO })}>
-                <SelectTrigger id="agent-model" className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {modelItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          {draft.modelChoice === CUSTOM && (
-            <Field>
-              <FieldLabel htmlFor="agent-custom-model">{t('customModel')}</FieldLabel>
-              <Input id="agent-custom-model" value={draft.customModel} maxLength={120} placeholder={t('customModelPlaceholder')} onChange={event => patch({ customModel: event.target.value })} />
-            </Field>
-          )}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg bg-muted/60 px-3 py-2 text-xs" role="status">
-            <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="shrink-0 text-muted-foreground">{t('previewLabel')}</span>
-            <span className="min-w-0 font-medium">{previewText}</span>
-          </div>
-        </FieldGroup>
-      </FramePanel>
-
-      <FramePanel>
-        <FieldGroup>
-          <Field>
-            <div className="flex items-center justify-between gap-2">
-              <FieldLabel htmlFor="agent-instructions">{t('instructions')}</FieldLabel>
-              {builtIn && (
-                <Button size="xs" variant="ghost" disabled={pending} onClick={resetPrompt}>
-                  <RotateCcw data-icon="inline-start" />
-                  {t('resetPrompt')}
-                </Button>
-              )}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="agent-model">{t('model')}</FieldLabel>
+                <Select value={draft.modelChoice} items={modelItems} onValueChange={value => patch({ modelChoice: value ?? AUTO })}>
+                  <SelectTrigger id="agent-model" className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {modelItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
             </div>
-            <Textarea
-              id="agent-instructions"
-              value={draft.instructions}
-              maxLength={MAX_AGENT_INSTRUCTIONS_LENGTH}
-              placeholder={t('instructionsPlaceholder')}
-              className="h-96 max-h-96 min-h-60 overflow-y-auto font-mono text-xs leading-5 field-sizing-fixed"
-              onChange={event => patch({ instructions: event.target.value })}
-            />
-            <FieldDescription className="text-right tabular-nums">
-              {t('instructionsCount', { count: draft.instructions.length, max: MAX_AGENT_INSTRUCTIONS_LENGTH })}
-            </FieldDescription>
-          </Field>
-        </FieldGroup>
-      </FramePanel>
+            {draft.modelChoice === CUSTOM && (
+              <Field>
+                <FieldLabel htmlFor="agent-custom-model">{t('customModel')}</FieldLabel>
+                <Input id="agent-custom-model" value={draft.customModel} maxLength={120} placeholder={t('customModelPlaceholder')} onChange={event => patch({ customModel: event.target.value })} />
+              </Field>
+            )}
+            <div className={cn('flex items-start gap-3 rounded-xl border px-3.5 py-3', preview.ok ? 'border-success/20 bg-success/5' : 'border-warning/20 bg-warning/5')} role="status">
+              <IconTile size="xs" variant="soft" className={cn(preview.ok ? 'text-success' : 'text-warning')} aria-hidden="true"><Sparkles /></IconTile>
+              <div className="min-w-0 pt-0.5">
+                <p className="text-xs font-semibold">{t('previewLabel')}</p>
+                <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{previewText}</p>
+              </div>
+            </div>
+          </FieldGroup>
+        </section>
 
-      <FrameFooter className="flex-row flex-wrap items-center gap-2">
-        {agent && !builtIn && (
-          <Button variant="ghost" size="sm" disabled={pending} onClick={() => setConfirmDelete(true)}>
-            <Trash2 data-icon="inline-start" />
-            {t('deleteConfirm')}
-          </Button>
-        )}
+        <section aria-labelledby="agent-instructions-heading" className="rounded-2xl bg-muted/30 p-4 sm:p-5">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <EditorSectionHeading id="agent-instructions-heading" index="03" title={t('instructionsSection')} description={t('instructionsDescription')} />
+            {builtIn && (
+              <Button size="xs" variant="outline" disabled={pending} onClick={resetPrompt}>
+                <RotateCcw data-icon="inline-start" />
+                {t('resetPrompt')}
+              </Button>
+            )}
+          </div>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="agent-instructions" className="sr-only">{t('instructions')}</FieldLabel>
+              <Textarea
+                id="agent-instructions"
+                value={draft.instructions}
+                maxLength={MAX_AGENT_INSTRUCTIONS_LENGTH}
+                placeholder={t('instructionsPlaceholder')}
+                className="h-64 min-h-48 max-h-80 resize-y overflow-y-auto font-mono text-xs leading-5"
+                onChange={event => patch({ instructions: event.target.value })}
+              />
+              <FieldDescription className="flex items-center justify-between gap-3">
+                <span>{t('instructions')}</span>
+                <span className="text-right tabular-nums">{t('instructionsCount', { count: draft.instructions.length, max: MAX_AGENT_INSTRUCTIONS_LENGTH })}</span>
+              </FieldDescription>
+            </Field>
+          </FieldGroup>
+        </section>
+      </CardContent>
+
+      <CardFooter className="flex-col items-stretch gap-3 sm:flex-row sm:items-center">
         {error && <span role="alert" className="text-xs text-destructive">{error}</span>}
-        <span className="ml-auto flex items-center gap-2">
-          {!agent ? (
-            <Button variant="outline" size="sm" className="rounded-full" disabled={pending} onClick={onCancelNew}>{commonT('cancel')}</Button>
-          ) : dirty && (
-            <Button variant="outline" size="sm" className="rounded-full" disabled={pending} onClick={() => setDraft(initial)}>{t('discard')}</Button>
-          )}
-          <Button size="sm" className="rounded-full bg-workspace-accent text-workspace-accent-foreground hover:bg-workspace-accent/90" disabled={pending || !dirty || !draft.name.trim()} onClick={save}>
-            {pending && <Spinner data-icon="inline-start" />}
-            {agent ? t('save') : t('create')}
-          </Button>
-        </span>
-      </FrameFooter>
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
+          {agent && !builtIn ? (
+            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" disabled={pending} onClick={() => setConfirmDelete(true)}>
+              <Trash2 data-icon="inline-start" />
+              {t('deleteConfirm')}
+            </Button>
+          ) : <span />}
+          <span className="ml-auto flex items-center gap-2">
+            {!agent ? (
+              <Button variant="outline" size="sm" className="rounded-full" disabled={pending} onClick={onCancelNew}>{commonT('cancel')}</Button>
+            ) : dirty && (
+              <Button variant="outline" size="sm" className="rounded-full" disabled={pending} onClick={() => setDraft(initial)}>{t('discard')}</Button>
+            )}
+            <Button size="sm" className="rounded-full bg-workspace-accent text-workspace-accent-foreground hover:bg-workspace-accent/90" disabled={pending || !dirty || !draft.name.trim()} onClick={save}>
+              {pending && <Spinner data-icon="inline-start" />}
+              {agent ? t('save') : t('create')}
+            </Button>
+          </span>
+        </div>
+      </CardFooter>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
@@ -348,6 +368,6 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Frame>
+    </Card>
   )
 }

@@ -1351,7 +1351,7 @@
     }
   },
   "Invite": {
-    "title": "邀请成员",
+    "title": "邀请���员",
     "description": "邀请同事加入{workspace}，可输入邮箱或拖入 CSV 批量导入。",
     "done": "完成",
     "emailLabel": "邮箱地址",
@@ -1385,7 +1385,7 @@
     "imported": "已导入 {count} 个有效邮箱；共 {total} 位待邀请。",
     "importedDuplicates": "已导入 {count} 个有效邮箱，已去重 {duplicates} 个；共 {total} 位待邀请。",
     "errors": {
-      "notCsv": "请选择一个 .csv 文件。",
+      "notCsv": "请选择一个 .csv 文件��",
       "fileTooLarge": "CSV 文件不能超过 1 MB。",
       "readFailed": "文件读取失败，请使用 UTF-8 编码的 CSV 文件。",
       "checkEmails": "请检查邮箱地址。",
@@ -1425,6 +1425,18 @@
   "Agents": {
     "title": "Agent 角色",
     "description": "Coordinator、Worker、Reviewer 是默认角色，也可以添加自己的角色。每个角色可以指定在哪台机器上、用哪个 Harness 和模型运行，不指定就自动选择。",
+    "eyebrow": "智能体工作区",
+    "rolesMetric": "已配置角色",
+    "rolesMetricHint": "包含默认与自定义角色",
+    "builtInMetricHint": "协调、执行与审查",
+    "machinesMetric": "在线机器",
+    "machinesMetricHint": "{online} 台在线 · 共 {total} 台",
+    "customEmptyHint": "按你的工作流创建专属角色",
+    "identitySection": "角色资料",
+    "identityDescription": "设置名称和简介，让团队一眼看懂这个 Agent 的职责。",
+    "runtimeDescription": "选择固定运行环境，或保留自动分配以便系统灵活调度。",
+    "instructionsSection": "行为与指令",
+    "instructionsDescription": "写清楚目标、工作方式和最终交付要求。",
     "createTrigger": "新建角色",
     "builtInGroup": "默认角色",
     "customGroup": "自定义角色",
