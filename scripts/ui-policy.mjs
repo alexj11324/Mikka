@@ -141,6 +141,12 @@ export function auditSource(file, text, policy) {
     if (ts.isConditionalExpression(node)) return merge([node.whenTrue, node.whenFalse])
     if (ts.isBinaryExpression(node)) return merge(node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ? [node.right] : [node.left, node.right])
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && imports.get(node.expression.text)?.name === 'cn' && ['cn', '@/lib/utils'].includes(imports.get(node.expression.text)?.from)) return merge(node.arguments)
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && imports.get(node.expression.text)?.name === 'buttonVariants' && imports.get(node.expression.text)?.from === '@/components/ui/button') {
+      const options = node.arguments[0]
+      if (!options) return { strings: [], known: true }
+      if (!ts.isObjectLiteralExpression(options) || !options.properties.every(ts.isPropertyAssignment)) return { strings: [], known: false }
+      return merge(options.properties.filter(prop => ['className', 'class'].includes(prop.name.getText(source).replaceAll(/['"]/g, ''))).map(prop => prop.initializer))
+    }
     if (ts.isObjectLiteralExpression(node)) {
       return { strings: node.properties.filter(ts.isPropertyAssignment).flatMap(prop => ts.isStringLiteralLike(prop.name) ? [prop.name.text] : []), known: node.properties.every(prop => ts.isPropertyAssignment(prop) && !ts.isComputedPropertyName(prop.name)) }
     }
