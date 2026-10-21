@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       asResponse: true,
       body: {
         name: 'Acceptance Guest',
-        email: `acceptance-${randomUUID()}@preview.orvilo.invalid`,
+        email: `acceptance-${randomUUID()}@preview.mikka.invalid`,
         password: randomBytes(32).toString('base64url'),
       },
     })

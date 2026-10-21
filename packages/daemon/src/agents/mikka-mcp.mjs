@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Orvilo's MCP server for agent CLIs: the explicit hand-in tools a real
+// Mikka's MCP server for agent CLIs: the explicit hand-in tools a real
 // harness calls instead of just ending its turn (`submit`, `ask_human`,
 // `report_blocked`). It runs inside the agent's sandbox as a stdio child of
 // the CLI, with no dependencies, and records the call in the handoff file
@@ -7,7 +7,7 @@
 // that file when the turn ends; the file, not the CLI's event stream, is the
 // one source of truth for every harness.
 //
-//   node orvilo-mcp.mjs --handoff <file>
+//   node mikka-mcp.mjs --handoff <file>
 //
 // Protocol: MCP over stdio, newline-delimited JSON-RPC 2.0.
 import { randomUUID } from "node:crypto"
@@ -17,7 +17,7 @@ import { createInterface } from "node:readline"
 const handoffIndex = process.argv.indexOf("--handoff")
 const handoffFile = handoffIndex > 0 ? process.argv[handoffIndex + 1] : null
 if (!handoffFile) {
-  process.stderr.write("orvilo-mcp: --handoff <file> is required\n")
+  process.stderr.write("mikka-mcp: --handoff <file> is required\n")
   process.exit(2)
 }
 
@@ -109,7 +109,7 @@ const TOOLS = [
   {
     name: "submit",
     description:
-      "Hand in your finished work. Call this once, as your last action, when the task is done and you checked it. Orvilo then runs the verify command, commits your changes and pushes the branch. Do not commit or push yourself. On a planning run, hand in the spec and the split you propose instead of code.",
+      "Hand in your finished work. Call this once, as your last action, when the task is done and you checked it. Mikka then runs the verify command, commits your changes and pushes the branch. Do not commit or push yourself. On a planning run, hand in the spec and the split you propose instead of code.",
     inputSchema: {
       type: "object",
       properties: {
@@ -238,7 +238,7 @@ function handle(message) {
       return reply(id, {
         protocolVersion: params?.protocolVersion ?? "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "orvilo", version: "0.0.1" },
+        serverInfo: { name: "mikka", version: "0.0.1" },
       })
     case "ping":
       return reply(id, {})
@@ -261,7 +261,7 @@ function handle(message) {
           ? "Recorded. End your turn now."
           : planned
             ? "Handed in. End your turn now; a person approves the spec, then the split."
-            : "Handed in. End your turn now; Orvilo verifies, commits and pushes."
+            : "Handed in. End your turn now; Mikka verifies, commits and pushes."
       return reply(id, { content: [{ type: "text", text }] })
     }
     default:

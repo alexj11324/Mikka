@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { COMMANDS_MAX_SKIP, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_PARAM } from '@orvilo/protocol/device'
+import { COMMANDS_MAX_SKIP, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_PARAM } from '@mikka/protocol/device'
 import { authenticateDevice, ownedDevice, pendingCommands, sleep, waitSeconds } from '@/lib/device-link'
 
 export const dynamic = 'force-dynamic'

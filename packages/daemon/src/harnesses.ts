@@ -1,6 +1,6 @@
 // Detects which harness CLIs are installed on this device and their
 // versions; reported on device registration and heartbeats.
-import type { Harness, HarnessInfo } from "@orvilo/protocol"
+import type { Harness, HarnessInfo } from "@mikka/protocol"
 import { execa } from "execa"
 
 import { buildChildEnv } from "./env"

@@ -23,7 +23,7 @@ import {
 } from "node:fs"
 import { join } from "node:path"
 
-import type { RunCompletion } from "@orvilo/protocol"
+import type { RunCompletion } from "@mikka/protocol"
 
 import type { RunChunk } from "./chunks"
 import { isNonRetryable, ServerUnreachableError } from "./errors"

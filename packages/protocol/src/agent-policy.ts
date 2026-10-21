@@ -197,7 +197,7 @@ export function isModelHarness(harness: string): harness is ModelHarness {
  * One model name as the harness's own CLI takes it (`sonnet`,
  * `claude-sonnet-4-5`, `gpt-5-codex`). It reaches the CLI as a single argv
  * entry, never through a shell, so the only rule is that it is short and not
- * blank; Orvilo keeps no list of what each vendor ships.
+ * blank; Mikka keeps no list of what each vendor ships.
  */
 export const modelNameSchema = z
   .string()

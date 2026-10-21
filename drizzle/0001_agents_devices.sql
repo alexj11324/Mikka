@@ -1,6 +1,6 @@
 -- Devices, agents and runs (Orvilo3). The daemon owns detection and
 -- execution; these tables store what it registers and reports.
--- Applied with: node --env-file=.env.local scripts/apply-sql.mjs drizzle/0001_agents_devices.sql
+-- Applied by scripts/migrate.mjs on production builds.
 
 create table if not exists devices (
   id uuid primary key,

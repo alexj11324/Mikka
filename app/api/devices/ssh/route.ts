@@ -33,12 +33,12 @@ interface StepEvent {
 /**
  * The server's SSH keys must only reach machines an administrator configured,
  * not any host an authenticated user types into the form. `~/.ssh/config`
- * hosts are the normal path; `ORVILO_SSH_HOSTS` is the explicit override for
+ * hosts are the normal path; `MIKKA_SSH_HOSTS` is the explicit override for
  * deployments that keep config elsewhere. The manual token flow stays
  * available for arbitrary machines.
  */
 async function isAllowedSshHost(hostname: string): Promise<boolean> {
-  const allowlist = (process.env.ORVILO_SSH_HOSTS ?? '')
+  const allowlist = (process.env.MIKKA_SSH_HOSTS ?? process.env.ORVILO_SSH_HOSTS ?? '')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean)
@@ -109,19 +109,19 @@ export async function POST(request: Request) {
         send({ step: 'check', state: 'done', detail: firstLine(out) })
 
         send({ step: 'install', state: 'active', detail: t('copyDaemon') })
-        await sshRun(target, 'mkdir -p ~/.orvilo/data')
-        const copy = await rsync(`${repoRoot}/packages`, target, '~/.orvilo/packages', ['--exclude', 'node_modules', '--exclude', '.turbo'])
+        await sshRun(target, 'mkdir -p ~/.mikka/data')
+        const copy = await rsync(`${repoRoot}/packages`, target, '~/.mikka/packages', ['--exclude', 'node_modules', '--exclude', '.turbo'])
         if (copy.code !== 0) {
           send({ step: 'install', state: 'failed', detail: firstLine(copy.stderr) || t('rsyncExitCode', { code: copy.code }) })
           return
         }
-        await rsync(`${repoRoot}/pnpm-workspace.yaml`, target, '~/.orvilo/pnpm-workspace.yaml')
+        await rsync(`${repoRoot}/pnpm-workspace.yaml`, target, '~/.mikka/pnpm-workspace.yaml')
         await sshRun(target, [
-          "cat > ~/.orvilo/package.json <<'ORVILO_EOF'",
-          JSON.stringify({ name: 'orvilo-daemon-host', private: true, type: 'module' }, null, 2),
-          'ORVILO_EOF',
+          "cat > ~/.mikka/package.json <<'MIKKA_EOF'",
+          JSON.stringify({ name: 'mikka-daemon-host', private: true, type: 'module' }, null, 2),
+          'MIKKA_EOF',
         ].join('\n'))
-        const install = await sshRun(target, 'cd ~/.orvilo && pnpm install --silent', 900_000)
+        const install = await sshRun(target, 'cd ~/.mikka && pnpm install --silent', 900_000)
         if (install.code !== 0) {
           send({ step: 'install', state: 'failed', detail: firstLine(install.stderr) || t('installExitCode', { code: install.code }) })
           return
@@ -134,13 +134,13 @@ export async function POST(request: Request) {
           id: crypto.randomUUID(), userId, name: name || `ssh:${host}`, tokenHash: hashDeviceToken(token),
         })
         await sshRun(target, [
-          "cat > ~/.orvilo/data/device.json <<'ORVILO_EOF'",
+          "cat > ~/.mikka/data/device.json <<'MIKKA_EOF'",
           JSON.stringify({ credential: token }),
-          'ORVILO_EOF',
-          'chmod 600 ~/.orvilo/data/device.json',
+          'MIKKA_EOF',
+          'chmod 600 ~/.mikka/data/device.json',
         ].join('\n'))
         const startedAt = new Date()
-        const start = await sshRun(target, `cd ~/.orvilo && nohup ./node_modules/.bin/tsx packages/daemon/bin/orvilo.ts daemon --server '${origin}' --data-dir ~/.orvilo/data > ~/.orvilo/daemon.log 2>&1 < /dev/null & echo started`)
+        const start = await sshRun(target, `cd ~/.mikka && nohup ./node_modules/.bin/tsx packages/daemon/bin/mikka.ts daemon --server '${origin}' --data-dir ~/.mikka/data > ~/.mikka/daemon.log 2>&1 < /dev/null & echo started`)
         if (start.code !== 0) {
           send({ step: 'start', state: 'failed', detail: firstLine(start.stderr) || t('startExitCode', { code: start.code }) })
           return
@@ -158,7 +158,7 @@ export async function POST(request: Request) {
             return
           }
           if (Date.now() > deadline) {
-            const log = await sshRun(target, 'tail -n 5 ~/.orvilo/daemon.log')
+            const log = await sshRun(target, 'tail -n 5 ~/.mikka/daemon.log')
             send({ step: 'connect', state: 'failed', detail: firstLine(log.stdout) || t('heartbeatTimeout') })
             return
           }

@@ -8,7 +8,7 @@ import {
   quotaSnapshotSchema,
   type QuotaSnapshot,
   type QuotaVendor,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 
 import type { Logger } from "../log"
 import { readClaudeQuota } from "./claude"

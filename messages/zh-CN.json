@@ -123,13 +123,13 @@
     "signUpLabel": "注册账号",
     "signInLabel": "登录账号",
     "tagline": "任务与文档，保持同步。",
-    "accountNote": "这是 Orvilo 应用账号，与 v0 账号独立。",
+    "accountNote": "这是 Mikka 应用账号，与 v0 账号独立。",
     "dataNote": "数据存储于 Neon · 任务默认私有",
-    "home": "Orvilo 首页",
+    "home": "Mikka 首页",
     "createTitle": "创建你的工作账号",
     "welcome": "欢迎回来",
     "createDescription": "从第一个任务开始，把想法变成可追踪的进展。",
-    "welcomeDescription": "登录 Orvilo，继续你的任务与文档。",
+    "welcomeDescription": "登录 Mikka，继续你的任务与文档。",
     "continueGithub": "使用 GitHub 继续",
     "githubScope": "仅获取登录所需的身份与邮箱，不请求仓库读写权限。",
     "githubNotConfigured": "GitHub 登录暂未配置，请使用邮箱继续。",
@@ -160,11 +160,11 @@
     "testIssueSwitchDescription": "用于验证上一条／下一条任务切换。再次进入测试工作台时会复用账号和已有任务。"
   },
   "Metadata": {
-    "title": "Orvilo · 任务与文档工作台",
+    "title": "Mikka · 任务与文档工作台",
     "description": "使用列表与拖拽看板管理任务，协作编辑描述、讨论进展并追溯版本。",
-    "signInTitle": "登录 · Orvilo",
-    "signInDescription": "登录 Orvilo 工作台，继续管理任务与文档。",
-    "signUpTitle": "注册 · Orvilo",
+    "signInTitle": "登录 · Mikka",
+    "signInDescription": "登录 Mikka 工作台，继续管理任务与文档。",
+    "signUpTitle": "注册 · Mikka",
     "signUpDescription": "创建工作账号，开始管理任务与文档。",
     "property": {
       "setProject": "设置所属项目",
@@ -276,13 +276,13 @@
       "reload": "重新读取成员",
       "agents": "Agent"
     },
-    "membersTitle": "成员管理 · Orvilo",
+    "membersTitle": "成员管理 · Mikka",
     "membersDescription": "管理工作区成员、角色与邀请，支持 CSV 拖拽批量邀请和成员导出。",
-    "inviteTitle": "接受工作区邀请 · Orvilo",
-    "inviteDescription": "使用受邀邮箱登录并安全加入 Orvilo 工作区。",
-    "acceptanceTitle": "进入验收 · Orvilo",
+    "inviteTitle": "接受工作区邀请 · Mikka",
+    "inviteDescription": "使用受邀邮箱登录并安全加入 Mikka 工作区。",
+    "acceptanceTitle": "进入验收 · Mikka",
     "acceptanceDescription": "开发预览专用的独立验收工作台入口。",
-    "settingsPreviewTitle": "设置预览 · Orvilo",
+    "settingsPreviewTitle": "设置预览 · Mikka",
     "settingsPreviewDescription": "无需登录的设置界面预览，使用演示资料。"
   },
   "NotFound": {
@@ -606,7 +606,7 @@
     "connect": {
       "trigger": "连接设备",
       "title": "连接远程主机",
-      "description": "一台你能 ssh 进去的机器。Orvilo 会在上面安装并启动 daemon，然后把它检测到的 harness 带回来。",
+      "description": "一台你能 ssh 进去的机器。Mikka 会在上面安装并启动 daemon，然后把它检测到的 harness 带回来。",
       "host": "主机",
       "hostPlaceholder": "ssh 主机、主机名或 IP[:端口]",
       "actAs": "以谁的身份",
@@ -643,13 +643,13 @@
       "sshExitCode": "ssh 退出码 {code}",
       "noNode": "这台机器上没有 node",
       "noPnpm": "这台机器上没有 pnpm",
-      "copyDaemon": "复制 daemon 到 ~/.orvilo",
+      "copyDaemon": "复制 daemon 到 ~/.mikka",
       "rsyncExitCode": "rsync 退出码 {code}",
       "installExitCode": "pnpm install 退出码 {code}",
       "depsInstalled": "依赖已安装",
       "startExitCode": "启动失败，退出码 {code}",
       "daemonRunning": "daemon 已在后台运行",
-      "heartbeatTimeout": "等待心跳超时，请查看 ~/.orvilo/daemon.log",
+      "heartbeatTimeout": "等待心跳超时，请查看 ~/.mikka/daemon.log",
       "connectionError": "连接过程出错"
     }
   },
@@ -1029,7 +1029,7 @@
     "manage": "管理",
     "adminAccess": "管理员访问权限",
     "memberAccess": "成员访问权限",
-    "brandFooter": "Orvilo · 工作区设置",
+    "brandFooter": "Mikka · 工作区设置",
     "searchLabel": "搜索成员或邀请",
     "filterLabel": "成员状态筛选",
     "filters": {
@@ -1305,7 +1305,7 @@
     "sections": {
       "preferences": {
         "title": "偏好设置",
-        "description": "让 Orvilo 更符合你的工作习惯。"
+        "description": "让 Mikka 更符合你的工作习惯。"
       },
       "profile": {
         "title": "个人资料",
@@ -1401,7 +1401,7 @@
       "csvInvalidRows": "CSV 第 {lines} 行邮箱为空或格式不正确。未导入任何邮箱，请修正后重试。"
     },
     "joinTitle": "加入工作区",
-    "joinDescription": "你收到了一份 Orvilo 工作区邀请。请使用受邀邮箱登录，确认后加入。",
+    "joinDescription": "你收到了一份 Mikka 工作区邀请。请使用受邀邮箱登录，确认后加入。",
     "invalidToken": "邀请链接格式无效，请向管理员索取完整链接。",
     "signedInAs": "当前登录：{email}",
     "validity": "邀请链接有效期为 7 天，仅限对应的受邀邮箱使用。",

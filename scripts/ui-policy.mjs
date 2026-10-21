@@ -222,7 +222,7 @@ export function auditSource(file, text, policy) {
           if (drawnRule) add(classAttr, 'style/no-horizontal-rule', '禁止用 h-px/0.5 + bg-* 手画水平细线；用间距或背景分组。')
           for (const token of tokens) {
             const base = utilityBase(token)
-            // 组件调用处的视觉 class 不做限制。Orvilo 的规则集里没有这一条，
+            // 组件调用处的视觉 class 不做限制。Mikka 的规则集里没有这一条，
             // 而 shadcn 组件并不总提供对应 variant：硬禁只会逼出「包一层 span」的绕过，
             // 或者把设计意图直接删掉。原始色板另由 style/semantic-colors 拦截。
             if (overlays.test(name) && /^-?z-/.test(base)) add(classAttr, 'style/overlay-stacking', '浮层组件自行管理层叠，不指定 z-index。')

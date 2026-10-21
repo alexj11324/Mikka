@@ -19,8 +19,8 @@ export const ISSUE_PRIORITIES = [
 
 export type IssueStatus = typeof ISSUE_STATUSES[number]['value']
 export type IssueView = 'all' | 'mine' | 'shared' | 'favorites' | 'following' | IssueStatus
-export const WORKSPACE_NAME = 'Orvilo'
-export const WORKSPACE_SLUG = 'orvilo'
+export const WORKSPACE_NAME = 'Mikka'
+export const WORKSPACE_SLUG = 'mikka'
 
 export function issueIdentifier(number: number | undefined, pendingLabel = 'Unassigned') {
   return number ? `ORV-${number}` : pendingLabel

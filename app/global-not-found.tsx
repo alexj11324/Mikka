@@ -5,7 +5,7 @@ import Link from 'next/link'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: '404 · Orvilo',
+  title: '404 · Mikka',
 }
 
 /**

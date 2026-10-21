@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { runCommandsAck } from '@orvilo/protocol/device'
+import { runCommandsAck } from '@mikka/protocol/device'
 import { ackCommands, authenticateDevice, ownedDevice } from '@/lib/device-link'
 
 export const dynamic = 'force-dynamic'

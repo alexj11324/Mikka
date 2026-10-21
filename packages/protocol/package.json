@@ -1,5 +1,5 @@
 {
-  "name": "@orvilo/protocol",
+  "name": "@mikka/protocol",
   "version": "0.0.1",
   "type": "module",
   "private": true,
@@ -51,7 +51,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@orvilo/config": "workspace:*",
+    "@mikka/config": "workspace:*",
     "@types/semver": "7.8.0",
     "vitest": "5.0.5"
   }
