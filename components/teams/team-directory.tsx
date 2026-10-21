@@ -41,7 +41,7 @@ export function TeamDirectory({ initial, initialTeamId, createInitially = false,
   }
   const filtered = data.teams.filter(team => (view === 'all' || !!team.role) && `${team.name} ${team.identifier} ${team.description}`.toLowerCase().includes(query.trim().toLowerCase()))
   const selectedTeam = data.teams.find(team => team.id === initialTeamId)
-  if (createInitially) return <div className="w-full px-4 py-4 sm:px-6"><TeamForm workspaceId={data.workspace.id} onClose={() => router.push(directoryHref)} onSaved={saved} /></div>
+  if (createInitially) return <div className="w-full px-4 py-5 sm:px-6"><TeamForm workspaceId={data.workspace.id} onClose={() => router.push(directoryHref)} onSaved={saved} /></div>
   if (initialTeamId && selectedTeam) return <div className="w-full px-4 py-4 sm:px-6">
     {initialView === 'general' ? <TeamForm workspaceId={data.workspace.id} team={selectedTeam} editable={selectedTeam.role === 'owner' || data.role === 'admin'} onClose={() => router.push(teamHref(selectedTeam.id))} onSaved={saved} /> : initialView === 'members' ? <section className="flex flex-col gap-8"><Button variant="ghost" size="sm" className="self-start" nativeButton={false} role="link" render={<Link href={teamHref(selectedTeam.id)} />}><ChevronLeft data-icon="inline-start" />团队设置</Button><div className="mx-auto flex w-full max-w-3xl flex-col gap-8 pb-12 sm:pt-4"><header className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">团队成员</h1><p className="text-sm text-muted-foreground">{selectedTeam.name} · {selectedTeam.memberCount} 位成员</p></header><TeamMembersSettings team={selectedTeam} workspaceMembers={data.members} onUpdated={updated} /></div></section> : <TeamSettingsDetails team={selectedTeam} />}
   </div>

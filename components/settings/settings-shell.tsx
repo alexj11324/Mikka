@@ -26,5 +26,5 @@ export function SettingsShell({ user, children }: { user: { id: string; name: st
       router.replace('/sign-in?login=1'); router.refresh()
     } catch { setError('退出失败，请稍后重试。'); setSigningOut(false) }
   }
-  return <AppShell><SettingsView user={user} activeSection={section} workspaceId={params.get('workspace') ?? undefined} selectedTeamId={params.get('team') ?? undefined} onBack={() => router.push(params.get('team') ? `/?team=${encodeURIComponent(params.get('team')!)}` : '/')} onSignOut={() => void signOut()} signingOut={signingOut} accountError={error}>{children}</SettingsView></AppShell>
+  return <AppShell variant="settings"><SettingsView user={user} activeSection={section} workspaceId={params.get('workspace') ?? undefined} selectedTeamId={params.get('team') ?? undefined} onBack={() => router.push(params.get('team') ? `/?team=${encodeURIComponent(params.get('team')!)}` : '/')} onSignOut={() => void signOut()} signingOut={signingOut} accountError={error}>{children}</SettingsView></AppShell>
 }

@@ -7,7 +7,7 @@ import { AppShell } from '@/components/app-shell'
 export function SettingsPreview() {
   const router = useRouter()
   return (
-    <AppShell>
+    <AppShell variant="settings">
         <SettingsView
           user={{ name: '预览用户', email: 'preview@example.com' }}
           onBack={() => router.push('/sign-in')}

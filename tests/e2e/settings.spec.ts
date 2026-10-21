@@ -26,7 +26,7 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(sidebar.getByRole('link', { name: '设置回归团队', exact: true })).toHaveAttribute('aria-current', 'page')
   const settings = page.getByRole('region', { name: '团队设置选项', exact: true })
-  await expect(settings.getByRole('link', { name: /成员/ })).toContainText('1 位成员')
+  await expect(settings.getByLabel('1 位成员', { exact: true })).toBeVisible()
   await testInfo.attach('团队设置总览', { body: await page.screenshot({ path: '/tmp/agent-browser/team-settings-overview.png', fullPage: true }), contentType: 'image/png' })
   await settings.getByRole('link', { name: /常规设置/ }).click()
   const general = page.getByRole('form', { name: '团队常规设置', exact: true })
