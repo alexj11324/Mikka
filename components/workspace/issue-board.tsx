@@ -93,8 +93,8 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
     void persist(issue, meta.overContainer, meta.previousValue)
   }
 
-  return <section aria-label="任务看板" className="flex min-w-0 flex-1 flex-col gap-3 px-4 pb-6 sm:px-6">
-    <div className="flex items-center justify-between gap-3">
+  return <section aria-label="任务看板" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 px-4 pb-2 sm:px-6">
+    <div className="flex shrink-0 items-center justify-between gap-3">
       <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || '左右滚动查看全部状态，拖动卡片跨列更新任务，点击标题打开详情。'}</p>
       <div className="flex shrink-0 items-center gap-1">
         <Button type="button" variant="ghost" size="icon-sm" aria-label="向左滚动看板" aria-controls={viewportId} disabled={!canScroll.left} onClick={() => scrollBoard(-1)}><ChevronLeft data-icon="inline-start" /></Button>
