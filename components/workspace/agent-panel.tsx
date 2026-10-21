@@ -1,9 +1,9 @@
 'use client'
 
-import '@openuidev/react-ui/layered/styles/button.css'
-import '@openuidev/react-ui/layered/styles/card.css'
-import '@openuidev/react-ui/layered/styles/textArea.css'
-import { useRef } from 'react'
+import '@openuidev/react-ui/layered/styles/index.css'
+import { useRef, useState } from 'react'
+import type { ActionEvent } from '@openuidev/react-lang'
+import { toast } from 'sonner'
 import { useCompletion } from '@ai-sdk/react'
 import { createTheme, ThemeProvider } from '@openuidev/react-ui/ThemeProvider'
 import { AgentComposer } from './agent-composer'
@@ -36,6 +36,22 @@ export function AgentPanel() {
   const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ api: '/api/agent', credentials: 'same-origin' })
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const submittingRef = useRef(false)
+  const sessionIdRef = useRef<string | null>(null)
+  const [generation, setGeneration] = useState(0)
+
+  function handleUIAction(event: ActionEvent) {
+    if (isLoading) return
+    if (event.type !== 'continue_conversation') {
+      toast.info('当前界面只支持填入提问，不会打开外部链接或修改工作区。')
+      return
+    }
+    const context = typeof event.params.context === 'string' ? event.params.context : ''
+    const form = event.formState && Object.keys(event.formState).length > 0 ? `\n表单内容：${JSON.stringify(event.formState)}` : ''
+    const prompt = [event.humanFriendlyMessage, context, form].filter(Boolean).join('\n')
+    updateDraft(prompt.slice(0, 8000))
+    inputRef.current?.focus()
+    toast.info('已填入提问，请确认内容后发送。')
+  }
 
   function selectStarter(prompt: string) {
     if (isLoading) return
@@ -47,7 +63,9 @@ export function AgentPanel() {
     if (!draft.trim() || isLoading || submittingRef.current) return
     submittingRef.current = true
     try {
-      await complete(draft.trim())
+      sessionIdRef.current ??= crypto.randomUUID()
+      setGeneration(value => value + 1)
+      await complete(draft.trim(), { body: { sessionId: sessionIdRef.current } })
     } finally {
       submittingRef.current = false
     }
@@ -61,9 +79,9 @@ export function AgentPanel() {
           <p className="text-sm text-muted-foreground">从一个想法开始，和 Agent 一起理清下一步。</p>
         </header>
         <AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={submit} isLoading={isLoading} onStop={stop} />
-        <AgentResponse completion={completion} error={error} isLoading={isLoading} />
+        <AgentResponse key={generation} completion={completion} error={error} isLoading={isLoading} onAction={handleUIAction} />
         {!isLoading && <AgentStarters onSelect={selectStarter} />}
-        <p id="agent-service-note" className="text-center text-xs text-muted-foreground">OpenCode Zen · 单次问答，不保存历史，也不会读取或修改工作区数据。</p>
+        <p id="agent-service-note" className="text-center text-xs text-muted-foreground">OpenCode Go · GLM-5.3-Flash · OpenUI 生成界面。单次问答，不保存历史，不读取或修改工作区；界面按钮仅填入提问。</p>
       </div>
     </ThemeProvider>
   </section>

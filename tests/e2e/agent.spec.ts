@@ -19,7 +19,7 @@ apiTest('Agent 接口拒绝未登录请求与跨站请求', async ({ request }) 
 
 test('Agent 接口验证输入且不接受客户端密钥', async ({ page }) => {
   await register(page)
-  for (const data of [{ prompt: '' }, { prompt: 'a'.repeat(8001) }, { prompt: '你好', apiKey: 'client-key' }]) {
+  for (const data of [{ prompt: '' }, { prompt: 'a'.repeat(8001) }, { prompt: '你好', apiKey: 'client-key' }, { prompt: '你好', sessionId: 'invalid-session' }]) {
     const response = await page.request.post('/api/agent', { data })
     expect(response.status()).toBe(400)
   }
@@ -86,4 +86,66 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await page.getByRole('button', { name: '我的任务', exact: true }).click()
   await expect(page.getByRole('heading', { name: '我创建的任务', exact: true })).toBeVisible()
   await expect(panel).toHaveCount(0)
+})
+
+function openUIStream(response: string) {
+  return [
+    { type: 'start' },
+    { type: 'text-start', id: 'ui-1' },
+    { type: 'text-delta', id: 'ui-1', delta: response },
+    { type: 'text-end', id: 'ui-1' },
+    { type: 'finish' },
+  ].map(event => `data: ${JSON.stringify(event)}\n\n`).join('') + 'data: [DONE]\n\n'
+}
+
+const generatedUI = `root = Stack([heading, tabs, form, note])
+heading = TextContent("项目规划建议", "large-heavy")
+tabs = Tabs([TabItem("plan", "阶段计划", [table]), TabItem("summary", "交付说明", [description])])
+table = Table([Col("阶段", ["需求梳理", "方案验证"]), Col("交付物", ["需求清单", "交互原型"])])
+description = TextContent("以上为建议计划，尚未保存到工作区。")
+form = Form("refine", buttons, [field])
+field = FormControl("项目名称", Input("projectName", "输入项目名称", "text", { required: true }))
+buttons = Buttons([Button("填入提问", @ToAssistant("请根据填写的项目名称细化项目计划"), "primary")])
+note = TextContent("表单仅填入提问，不会创建项目。")`
+
+test('OpenUI 将模型输出渲染为表格、Tabs 和表单，动作仅填入提问且会话稳定', async ({ page }) => {
+  await register(page)
+  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  const panel = page.getByRole('region', { name: '有什么可以帮你？' })
+  const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
+  const sessionIds: string[] = []
+  let requests = 0
+  await page.route('**/api/agent', route => {
+    requests++
+    const body = route.request().postDataJSON()
+    sessionIds.push(body.sessionId)
+    return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream(generatedUI) })
+  })
+  await input.fill('请用表格和表单给出项目计划建议')
+  await panel.getByRole('button', { name: '发送消息' }).click()
+  await expect(panel.getByRole('columnheader', { name: '阶段', exact: true })).toBeVisible()
+  await expect(panel.getByRole('cell', { name: '需求梳理', exact: true })).toBeVisible()
+  await panel.getByRole('tab', { name: '交付说明' }).click()
+  await expect(panel.getByText('以上为建议计划，尚未保存到工作区。', { exact: true })).toBeVisible()
+  await panel.getByRole('tab', { name: '阶段计划' }).click()
+  await panel.getByRole('textbox', { name: /^项目名称/ }).fill('Orvilo 发布')
+  await panel.getByRole('button', { name: '填入提问', exact: true }).click()
+  await expect(input).toHaveValue(/Orvilo 发布/)
+  await expect(input).toBeFocused()
+  expect(requests).toBe(1)
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  await expect(panel.getByText(/root = Stack/)).toHaveCount(0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await panel.getByRole('button', { name: '发送消息' }).click()
+  await expect(panel.getByRole('columnheader', { name: '阶段', exact: true })).toBeVisible()
+  expect(sessionIds).toHaveLength(2)
+  expect(sessionIds[0]).toMatch(/^[0-9a-f-]{36}$/)
+  expect(sessionIds[1]).toBe(sessionIds[0])
+
+  await page.route('**/api/agent', route => route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream('root = Stack([missing])') }))
+  await input.fill('测试不完整的模型输出')
+  await panel.getByRole('button', { name: '发送消息' }).click()
+  await expect(panel.getByRole('alert')).toContainText('界面未能完整生成')
+  await expect(input).toHaveValue('测试不完整的模型输出')
 })

@@ -2,10 +2,11 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createUIMessageStreamResponse, streamText, toUIMessageStream } from 'ai'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
+import { systemPrompt } from '@/lib/agent-ui-prompt.json'
 
 export const maxDuration = 60
 
-const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000) }).strict()
+const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional() }).strict()
 const errorHeaders = { 'Cache-Control': 'private, no-store', 'Content-Type': 'text/plain; charset=utf-8' }
 
 export async function POST(request: Request) {
@@ -50,16 +51,19 @@ export async function POST(request: Request) {
   const apiKey = process.env.OPENCODE_API_KEY
   if (!apiKey) return new Response('服务端尚未配置 OPENCODE_API_KEY，请添加环境变量后重试。', { status: 503, headers: errorHeaders })
 
-  const opencode = createOpenAI({ apiKey, baseURL: 'https://opencode.ai/zen/v1' })
+  const opencode = createOpenAI({
+    apiKey,
+    baseURL: 'https://opencode.ai/zen/go/v1',
+    headers: { 'User-Agent': 'Orvilo-UI-Agent/1.0', 'x-opencode-session': parsed.data.sessionId ?? crypto.randomUUID() },
+  })
   const result = streamText({
-    model: opencode.responses('gpt-5.4-mini'),
-    system: '你是 Orvilo 工作台中的助手，帮助用户梳理项目、任务和文档。默认使用简体中文，提供清晰、简洁、可执行的建议。你无法读取或修改用户工作区的数据，不要声称已经创建、查询或更新任务、项目或文档。每次请求是独立问答，只能根据本次用户输入作答。',
+    model: opencode.chat('glm-5.3-flash'),
+    system: systemPrompt,
     prompt: parsed.data.prompt,
-    maxOutputTokens: 2048,
+    maxOutputTokens: 4096,
     maxRetries: 0,
     timeout: 50000,
     abortSignal: request.signal,
-    providerOptions: { openai: { store: false, reasoningEffort: 'low', reasoningSummary: null } },
     onError: () => undefined,
   })
   return createUIMessageStreamResponse({
@@ -67,7 +71,7 @@ export async function POST(request: Request) {
     stream: toUIMessageStream({
       stream: result.stream,
       sendReasoning: false,
-      onError: () => 'OpenCode 请求失败，请检查密钥、余额及模型权限后重试。',
+      onError: () => 'OpenCode Go 请求失败，请检查密钥、Go 订阅额度及模型权限后重试。',
     }),
   })
 }
