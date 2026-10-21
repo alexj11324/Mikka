@@ -2,28 +2,31 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { saveProject } from '@/app/actions/projects'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Box, ChevronRight, ContactRound, X, LoaderCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { DEFAULT_PROJECT_PROPERTIES, type ProjectDraft } from '@/lib/project-input'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Button } from '@/components/ui/button'
-import { PROJECT_STATUSES, type Project } from './project-properties'
-import { ISSUE_PRIORITIES, WORKSPACE_NAME } from './issue-properties'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PROJECT_COLORS, PROJECT_ICON_COLORS, type Project, type ProjectControlField } from './project-properties'
+import { ProjectPicker, ProjectPropertyControl } from './project-property-controls'
+import { ProjectMilestones } from './project-milestones'
+import { WORKSPACE_NAME } from './issue-properties'
 
-export function ProjectForm({ project, onClose, onSaved }: { project?: Project; onClose: () => void; onSaved: (project: Project) => void }) {
-  const [name, setName] = useState(project?.name ?? '')
-  const [summary, setSummary] = useState(project?.summary ?? '')
-  const [description, setDescription] = useState(project?.description ?? '')
-  const [status, setStatus] = useState(project?.status ?? 'backlog')
-  const [priority, setPriority] = useState(project?.priority ?? 'normal')
-  const [lead, setLead] = useState(project?.lead ?? '')
-  const [startDate, setStartDate] = useState(project?.startDate ?? '')
-  const [targetDate, setTargetDate] = useState(project?.targetDate ?? '')
+const FIELDS: ProjectControlField[] = ['status', 'priority', 'lead', 'members', 'startDate', 'targetDate', 'labels', 'dependencyIds']
+
+export function ProjectForm({ project, projects = [], userName = '我', onClose, onSaved }: { project?: Project; projects?: Project[]; userName?: string; onClose: () => void; onSaved: (project: Project) => void }) {
+  const [initial] = useState<ProjectDraft>(() => ({ name: project?.name ?? '', summary: project?.summary ?? '', description: project?.description ?? '', status: (project?.status ?? 'backlog') as ProjectDraft['status'], priority: (project?.priority ?? 'none') as ProjectDraft['priority'], lead: (project?.lead ?? '') as '' | 'me', team: WORKSPACE_NAME, startDate: project?.startDate ?? '', targetDate: project?.targetDate ?? '', properties: project?.properties ?? DEFAULT_PROJECT_PROPERTIES }))
+  const [draft, setDraft] = useState(initial)
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const submitting = useRef(false)
-  const dirty = name !== (project?.name ?? '') || summary !== (project?.summary ?? '') || description !== (project?.description ?? '') || status !== (project?.status ?? 'backlog') || priority !== (project?.priority ?? 'normal') || lead !== (project?.lead ?? '') || startDate !== (project?.startDate ?? '') || targetDate !== (project?.targetDate ?? '')
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial)
   useEffect(() => {
     if (!dirty) return
     const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault() }
@@ -35,29 +38,25 @@ export function ProjectForm({ project, onClose, onSaved }: { project?: Project; 
     if (submitting.current) return
     submitting.current = true; setPending(true); setError('')
     try {
-      const result = await saveProject({ id: project?.id, revision: project?.revision, name, summary, description, status: status as 'backlog', priority: priority as 'normal', lead: lead as '' | 'me', team: WORKSPACE_NAME, startDate, targetDate })
-      if (!('project' in result) || !result.project) { setError(result.error ?? '保存失败。'); return }
+      const result = await saveProject({ ...draft, id: project?.id, revision: project?.revision })
+      if (!result.project) { setError(result.error ?? '保存失败。'); return }
       onSaved(result.project)
     } catch { setError('保存失败，输入已保留，请重试。') }
     finally { submitting.current = false; setPending(false) }
   }
-  return <Dialog open onOpenChange={value => { if (!value) close() }}><DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{project ? '编辑项目' : '新建项目'}</DialogTitle><DialogDescription>围绕一个明确的交付目标组织任务。</DialogDescription></DialogHeader>
-    <form className="flex flex-col gap-6" onSubmit={event => { event.preventDefault(); void submit() }}>
-      <FieldGroup>
-        <Field><FieldLabel htmlFor="project-name">项目名称</FieldLabel><Input id="project-name" value={name} onChange={event => setName(event.target.value)} maxLength={200} required disabled={pending} placeholder="例如：发布新版本" /></Field>
-        <Field><FieldLabel htmlFor="project-summary">简短摘要</FieldLabel><Input id="project-summary" value={summary} onChange={event => setSummary(event.target.value)} maxLength={500} disabled={pending} placeholder="项目要达成什么目标？" /></Field>
-        <div className="grid grid-cols-2 gap-4">
-          <Field><FieldLabel htmlFor="project-status">状态</FieldLabel><NativeSelect id="project-status" value={status} onChange={event => setStatus(event.target.value)} disabled={pending}>{PROJECT_STATUSES.map(item => <NativeSelectOption key={item.value} value={item.value}>{item.label}</NativeSelectOption>)}</NativeSelect></Field>
-          <Field><FieldLabel htmlFor="project-priority">优先级</FieldLabel><NativeSelect id="project-priority" value={priority} onChange={event => setPriority(event.target.value)} disabled={pending}>{ISSUE_PRIORITIES.map(item => <NativeSelectOption key={item.value} value={item.value}>{item.label}</NativeSelectOption>)}</NativeSelect></Field>
-          <Field><FieldLabel htmlFor="project-lead">负责人</FieldLabel><NativeSelect id="project-lead" value={lead} onChange={event => setLead(event.target.value)} disabled={pending}><NativeSelectOption value="">未指定</NativeSelectOption><NativeSelectOption value="me">我</NativeSelectOption></NativeSelect></Field>
-          <Field><FieldLabel htmlFor="project-team">团队</FieldLabel><Input id="project-team" value={WORKSPACE_NAME} readOnly /></Field>
-          <Field><FieldLabel htmlFor="project-start">开始日期</FieldLabel><Input id="project-start" type="date" value={startDate} onChange={event => setStartDate(event.target.value)} disabled={pending} /></Field>
-          <Field><FieldLabel htmlFor="project-target">目标日期</FieldLabel><Input id="project-target" type="date" min={startDate || undefined} value={targetDate} onChange={event => setTargetDate(event.target.value)} disabled={pending} /></Field>
-        </div>
-        <Field><FieldLabel htmlFor="project-description">详细描述</FieldLabel><Textarea id="project-description" value={description} onChange={event => setDescription(event.target.value)} maxLength={50000} disabled={pending} rows={5} placeholder="说明背景、范围和交付标准…" /></Field>
-      </FieldGroup>
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <DialogFooter><Button type="button" variant="outline" onClick={close} disabled={pending}>取消</Button><Button type="submit" disabled={pending || !name.trim()}>{pending ? '正在保存…' : project ? '保存修改' : '创建项目'}</Button></DialogFooter>
+  return <Dialog open onOpenChange={value => { if (!value) close() }}><DialogContent showCloseButton={false} className="flex h-[min(88svh,58rem)] max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0 shadow-2xl sm:max-w-4xl">
+    <DialogHeader className="flex-row items-center justify-between gap-3 px-5 pt-5 sm:px-7"><div className="flex items-center gap-2"><Badge variant="outline" className="gap-1.5 rounded-full px-2 py-1 font-normal"><ContactRound className="text-info-foreground" />{WORKSPACE_NAME}</Badge><ChevronRight className="size-3 text-muted-foreground" /><DialogTitle className="text-sm font-normal">{project ? '编辑项目' : '新建项目'}</DialogTitle></div><Button type="button" variant="ghost" size="icon-sm" aria-label="关闭项目编辑器" disabled={pending} onClick={close}><X data-icon="inline-start" /></Button><DialogDescription className="sr-only">设置项目名称、摘要、属性、描述和里程碑，保存到工作区。</DialogDescription></DialogHeader>
+    <form className="flex min-h-0 flex-1 flex-col" onSubmit={event => { event.preventDefault(); void submit() }} onKeyDown={event => { if (event.nativeEvent.isComposing || event.keyCode === 229) return; if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); if (draft.name.trim()) void submit() } }}>
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 pt-4 pb-5 sm:px-7">
+        <div className="self-start"><ProjectPicker label="项目图标颜色" choices={PROJECT_COLORS.map(item => ({ value: item.value, label: item.label, icon: Box }))} selected={[draft.properties.color]} onChange={value => setDraft(current => ({ ...current, properties: { ...current.properties, color: value as ProjectDraft['properties']['color'] } }))} disabled={pending} plain><span className={cn('flex size-8 items-center justify-center rounded-md', PROJECT_ICON_COLORS[draft.properties.color])}><Box data-icon="inline-start" /></span></ProjectPicker></div>
+        <FieldGroup className="gap-1"><Field className="gap-0"><FieldLabel className="sr-only" htmlFor="project-name">项目名称</FieldLabel><Input id="project-name" className="h-10 rounded-none border-0 bg-transparent! px-0 text-2xl font-semibold shadow-none md:text-2xl focus-visible:ring-0" value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} maxLength={200} required disabled={pending} placeholder="项目名称" /></Field><Field className="gap-0"><FieldLabel className="sr-only" htmlFor="project-summary">简短摘要</FieldLabel><Input id="project-summary" className="rounded-none border-0 bg-transparent! px-0 text-base shadow-none md:text-base focus-visible:ring-0" value={draft.summary} onChange={event => setDraft(current => ({ ...current, summary: event.target.value }))} maxLength={500} disabled={pending} placeholder="添加简短摘要…" /></Field></FieldGroup>
+        <div className="flex flex-wrap items-center gap-2">{FIELDS.map(field => <ProjectPropertyControl key={field} field={field} value={draft} userName={userName} projects={projects} projectId={project?.id} disabled={pending} onChange={changes => setDraft(current => ({ ...current, ...changes }))} />)}</div>
+        <Separator className="my-1" />
+        <FieldGroup className="min-h-32 flex-1"><Field className="flex-1"><FieldLabel className="sr-only" htmlFor="project-description">项目描述</FieldLabel><Textarea id="project-description" className="min-h-32 flex-1 resize-none rounded-none border-0 bg-transparent! px-0 text-base shadow-none md:text-base focus-visible:ring-0" value={draft.description} onChange={event => setDraft(current => ({ ...current, description: event.target.value }))} maxLength={50000} disabled={pending} placeholder="撰写描述、项目简报，或收集想法…" /></Field></FieldGroup>
+        <ProjectMilestones value={draft.properties.milestones} disabled={pending} onChange={milestones => setDraft(current => ({ ...current, properties: { ...current.properties, milestones } }))} />
+        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+      </div>
+      <footer className="flex shrink-0 items-center justify-end gap-3 border-t px-5 py-4 sm:px-7"><span className="mr-auto hidden text-xs text-muted-foreground sm:inline">⌘ / Ctrl + Enter {project ? '保存' : '创建'}</span><Button type="submit" className="rounded-full bg-project-action px-4 text-project-action-foreground hover:bg-project-action/90" disabled={pending || !draft.name.trim()}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}{pending ? '正在保存…' : project ? '保存修改' : '创建项目'}</Button></footer>
     </form>
   </DialogContent></Dialog>
 }

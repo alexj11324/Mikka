@@ -6,35 +6,47 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { projectDb, projects, projectEvents } from '@/lib/db/projects'
 import { requireIssueAccess } from '@/lib/issue-access'
-import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
+import { projectInput, projectPatch, hasDependencyCycle, type ProjectChanges } from '@/lib/project-input'
 
 async function userId() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new Error('请先登录。')
   return session.user.id
 }
-const date = z.union([z.literal(''), z.iso.date()])
-const projectInput = z.object({
-  id: z.uuid().optional(), revision: z.number().int().positive().optional(), name: z.string().trim().min(1, '请填写项目名称。').max(200), summary: z.string().trim().max(500), description: z.string().max(50000), status: z.enum(['backlog', 'planned', 'started', 'paused', 'completed', 'canceled']), priority: z.enum(['urgent', 'high', 'normal', 'low']), lead: z.enum(['', 'me']), team: z.literal(WORKSPACE_NAME), startDate: date, targetDate: date,
-}).refine(value => !value.startDate || !value.targetDate || value.startDate <= value.targetDate, '目标日期不能早于开始日期。')
 export async function listProjects() {
   const owner = await userId()
   return projectDb.select().from(projects).where(eq(projects.userId, owner)).orderBy(desc(projects.updatedAt))
 }
-export async function saveProject(input: z.input<typeof projectInput>) {
-  const owner = await userId()
-  const parsed = projectInput.safeParse(input)
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? '请检查项目属性。' }
-  const { id, revision, ...values } = parsed.data
-  if (id && !revision) return { error: '请重新加载项目后重试。' }
+async function persistProject(owner: string, input: unknown, partial: boolean) {
   try {
     return await projectDb.transaction(async tx => {
-      const [project] = id ? await tx.update(projects).set({ ...values, revision: revision! + 1, updatedAt: new Date() }).where(and(eq(projects.id, id), eq(projects.userId, owner), eq(projects.revision, revision!))).returning() : await tx.insert(projects).values({ ...values, id: crypto.randomUUID(), userId: owner, issueIds: [], revision: 1 }).returning()
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${owner}, 0))`)
+      const owned = await tx.select().from(projects).where(eq(projects.userId, owner))
+      const patch = partial ? projectPatch.safeParse(input) : null
+      if (patch && !patch.success) return { error: patch.error.issues[0]?.message ?? '属性格式不正确。' }
+      const current = patch?.success ? owned.find(item => item.id === patch.data.id) : undefined
+      if (patch?.success && !current) return { error: '项目不存在或无访问权限。' }
+      const parsed = projectInput.safeParse(patch?.success ? { ...current, ...patch.data.changes, id: patch.data.id, revision: patch.data.revision } : input)
+      if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? '请检查项目属性。' }
+      const { id, revision, ...values } = parsed.data
+      if (id && (!revision || !owned.some(item => item.id === id && item.revision === revision))) return { error: '项目已更新，请刷新后重试，避免覆盖他人的修改。' }
+      if (values.properties.dependencyIds.some(value => !owned.some(item => item.id === value))) return { error: '依赖项目不存在或无访问权限。' }
+      const nextId = id ?? crypto.randomUUID()
+      if (hasDependencyCycle(nextId, values.properties.dependencyIds, owned)) return { error: '项目不能依赖自身，也不能形成循环依赖。' }
+      const [project] = id ? await tx.update(projects).set({ ...values, revision: revision! + 1, updatedAt: new Date() }).where(and(eq(projects.id, id), eq(projects.userId, owner), eq(projects.revision, revision!))).returning() : await tx.insert(projects).values({ ...values, id: nextId, userId: owner, issueIds: [], revision: 1 }).returning()
       if (!project) return { error: '项目已更新或无访问权限，请刷新后重试。' }
-      await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: owner, projectId: project.id, message: id ? '更新了项目属性与概览' : '创建了项目' })
+      const names: Record<string, string> = { status: '状态', priority: '优先级', lead: '负责人', startDate: '开始日期', targetDate: '目标日期', properties: '项目属性', name: '名称', summary: '摘要', description: '描述', team: '团队' }
+      const message = patch?.success ? `更新了${Object.keys(patch.data.changes).map(key => names[key]).join('、')}` : id ? '更新了项目属性与概览' : '创建了项目'
+      await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: owner, projectId: project.id, message })
       return { project }
     })
   } catch { return { error: '项目保存失败，输入已保留，请稍后重试。' } }
+}
+export async function saveProject(input: z.input<typeof projectInput>) {
+  return persistProject(await userId(), input, false)
+}
+export async function updateProjectProperties(input: { id: string; revision: number; changes: ProjectChanges }) {
+  return persistProject(await userId(), input, true)
 }
 export async function listProjectEvents(id: string) {
   const owner = await userId()
