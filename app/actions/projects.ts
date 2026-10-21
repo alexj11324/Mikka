@@ -62,7 +62,7 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
       if (input.projectId && !destination) return { error: '项目不存在或无访问权限。' }
       if (destination && !destination.issueIds.includes(input.issueId) && destination.issueIds.length >= 100) return { error: '目标项目已达到 100 项任务上限。' }
       const result = await updateIssueMetadata({ id: input.issueId, revision: input.revision, patch: { project: destination?.name ?? null } })
-      if (!result.issue) return result
+      if (!('issue' in result) || !result.issue) return result
       for (const project of owned.filter(project => project.issueIds.includes(input.issueId) || project.id === input.projectId)) {
         const issueIds = project.id === input.projectId ? [...new Set([...project.issueIds, input.issueId])] : project.issueIds.filter(id => id !== input.issueId)
         await tx.update(projects).set({ issueIds, revision: project.revision + 1, updatedAt: new Date() }).where(and(eq(projects.id, project.id), eq(projects.userId, owner)))

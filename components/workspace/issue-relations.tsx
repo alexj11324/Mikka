@@ -38,7 +38,7 @@ export function IssueRelations({ task, mode, onOpen, onCreate, onPick, getCurren
       const latest = await getCurrent()
       if (!latest) return
       const result = await updateIssueRelation({ id: task.id, revision: latest.revision, kind, targetId, remove: true })
-      if (!result.issue) throw new Error(result.error)
+      if (!('issue' in result) || !result.issue) throw new Error(result.error)
       onSaved(result.issue); await mutate(); toast.success('任务关系已移除')
     } catch (error) { toast.error(error instanceof Error ? error.message : '移除失败，请重试。') }
     finally { busy.current = false; setPending(false) }
@@ -46,7 +46,7 @@ export function IssueRelations({ task, mode, onOpen, onCreate, onPick, getCurren
   async function status(id: string, revision: number, status: string) {
     if (busy.current || disabled) return
     busy.current = true; setPending(true)
-    try { const result = await moveIssue({ id, revision, status }); if (!result.issue) throw new Error(result.error); await mutate(); toast.success('子任务状态已更新') }
+    try { const result = await moveIssue({ id, revision, status }); if (!('issue' in result) || !result.issue) throw new Error(result.error); await mutate(); toast.success('子任务状态已更新') }
     catch (error) { toast.error(error instanceof Error ? error.message : '状态保存失败。') }
     finally { busy.current = false; setPending(false) }
   }

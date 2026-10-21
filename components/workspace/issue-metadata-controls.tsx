@@ -17,7 +17,7 @@ import { IssueAssigneeMenu } from './issue-assignee-menu'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { cn } from '@/lib/utils'
 
-export type MetadataSavedIssue = NonNullable<Awaited<ReturnType<typeof updateIssueMetadata>>['issue']>
+export type MetadataSavedIssue = Extract<Awaited<ReturnType<typeof updateIssueMetadata>>, { issue: unknown }>['issue']
 type Target = 'project' | 'labels' | 'pullRequests' | 'invite'
 export type MetadataRequest = { target: Target | 'assignee'; sequence: number }
 const TITLES = { project: '设置所属项目', labels: '编辑任务标签', pullRequests: '管理关联 PR', invite: '邀请并分配成员' }
@@ -66,7 +66,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
     saving.current = true; setPending(true); setError(''); onBusyChange?.(true)
     try {
       const result = await updateIssueMetadata({ id: task.id, revision: task.revision, patch, inviteEmail })
-      if (!result.issue) { setError(result.error ?? '保存失败，请重试。'); return false }
+      if (!('issue' in result) || !result.issue) { setError(result.error ?? '保存失败，请重试。'); return false }
       onSaved(result.issue)
       return true
     } catch { setError('保存失败，请稍后重试。'); return false }
@@ -90,7 +90,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
     saving.current = true; setPending(true); setError(''); onBusyChange?.(true)
     try {
       const result = await moveIssueToProject({ issueId: task.id, revision: task.revision, projectId: selected?.id ?? null })
-      if (!result.issue) { setError(result.error ?? '项目关联失败。'); return }
+      if (!('issue' in result) || !result.issue) { setError(result.error ?? '项目关联失败。'); return }
       onSaved(result.issue); setTarget(null)
     } catch { setError('项目关联失败，请重试。') }
     finally { saving.current = false; setPending(false); onBusyChange?.(false) }
