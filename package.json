@@ -5,8 +5,8 @@
   "type": "module",
   "packageManager": "pnpm@10.34.3",
   "scripts": {
-    "generate:agent-ui": "node scripts/generate-agent-ui-prompt.mjs",
-    "check:agent-ui": "node scripts/generate-agent-ui-prompt.mjs --check",
+    "generate:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs",
+    "check:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
     "build": "pnpm generate:agent-ui && next build",
     "dev": "next dev --webpack",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
@@ -17,7 +17,8 @@
     "test:e2e": "playwright test",
     "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
     "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
-    "check": "pnpm check:agent-ui && pnpm test:ui-policy && pnpm test:csv && pnpm lint && pnpm typecheck",
+    "test:agent": "node --experimental-strip-types --test tests/agent-fetch.test.mjs",
+    "check": "pnpm check:agent-ui && pnpm test:agent && pnpm test:ui-policy && pnpm test:csv && pnpm lint && pnpm typecheck",
     "check:ci": "pnpm check && pnpm build && pnpm test:e2e",
     "start": "next start",
     "typecheck": "tsgo --noEmit"
@@ -67,6 +68,7 @@
     "react-resizable-panels": "^4.14.7",
     "recharts": "3.10.1",
     "shadcn": "latest",
+    "shiki": "^4.5.0",
     "sonner": "^1.7.4",
     "swr": "^2.5.1",
     "tailwind-merge": "^3.7.0",

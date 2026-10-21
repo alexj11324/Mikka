@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@openuidev/react-ui/Button'
+import { Button } from '@/components/ui/button'
 import { ClipboardList, FileText, GitCompareArrows, Layers } from 'lucide-react'
 
 const starters = [
@@ -11,7 +11,7 @@ const starters = [
 ]
 
 export function AgentStarters({ onSelect }: { onSelect: (prompt: string) => void }) {
-  return <div role="group" aria-label="快速开始" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-    {starters.map(starter => <Button key={starter.title} type="button" variant="secondary" size="large" className="min-h-16 w-full justify-start" iconLeft={<starter.icon aria-hidden="true" />} onClick={() => onSelect(starter.prompt)}>{starter.title}</Button>)}
+  return <div role="group" aria-label="快速开始" className="flex flex-wrap justify-center gap-2">
+    {starters.map(starter => <Button key={starter.title} type="button" variant="outline" size="sm" onClick={() => onSelect(starter.prompt)}><starter.icon data-icon="inline-start" aria-hidden="true" />{starter.title}</Button>)}
   </div>
 }

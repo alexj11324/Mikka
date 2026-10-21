@@ -9,6 +9,8 @@ import { createTheme, ThemeProvider } from '@openuidev/react-ui/ThemeProvider'
 import { AgentComposer } from './agent-composer'
 import { AgentStarters } from './agent-starters'
 import { AgentResponse } from './agent-response'
+import { AiChat } from '@/components/blocks/ai-chat-1/components/ai-chat'
+import { fetchAgentResponse } from '@/lib/agent-fetch'
 
 const agentTheme = createTheme({
   background: 'var(--background)',
@@ -33,11 +35,17 @@ const agentTheme = createTheme({
 })
 
 export function AgentPanel() {
-  const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ api: '/api/agent', credentials: 'same-origin' })
+  const [sessionVersion, setSessionVersion] = useState(0)
+  return <AgentSession key={sessionVersion} onReset={() => setSessionVersion(value => value + 1)} />
+}
+
+function AgentSession({ onReset }: { onReset: () => void }) {
+  const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ api: '/api/agent', credentials: 'same-origin', fetch: fetchAgentResponse })
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const submittingRef = useRef(false)
   const sessionIdRef = useRef<string | null>(null)
   const [generation, setGeneration] = useState(0)
+  const [question, setQuestion] = useState('')
 
   function handleUIAction(event: ActionEvent) {
     if (isLoading) return
@@ -65,24 +73,21 @@ export function AgentPanel() {
     try {
       sessionIdRef.current ??= crypto.randomUUID()
       setGeneration(value => value + 1)
+      setQuestion(draft.trim())
       await complete(draft.trim(), { body: { sessionId: sessionIdRef.current } })
     } finally {
       submittingRef.current = false
     }
   }
 
-  return <section id="orvilo-agent" aria-labelledby="agent-title" className="flex min-h-[calc(100svh-4rem)] w-full flex-col px-4 py-8 sm:px-8">
-    <ThemeProvider cssSelector="#orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
-      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-8 py-12 sm:py-20">
-        <header className="flex flex-col gap-3 text-center">
-          <h1 id="agent-title" className="text-2xl font-medium tracking-tight sm:text-3xl">有什么可以帮你？</h1>
-          <p className="text-sm text-muted-foreground">从一个想法开始，和 Agent 一起理清下一步。</p>
-        </header>
-        <AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={submit} isLoading={isLoading} onStop={stop} />
-        <AgentResponse key={generation} completion={completion} error={error} isLoading={isLoading} onAction={handleUIAction} />
-        {!isLoading && <AgentStarters onSelect={selectStarter} />}
-        <p id="agent-service-note" className="text-center text-xs text-muted-foreground">OpenCode Go · GLM-5.3-Flash · OpenUI 生成界面。单次问答，不保存历史，不读取或修改工作区；界面按钮仅填入提问。</p>
-      </div>
-    </ThemeProvider>
-  </section>
+  return <ThemeProvider cssSelector="#orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
+    <AiChat
+      question={question}
+      streaming={isLoading}
+      onReset={onReset}
+      composer={<AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={submit} isLoading={isLoading} onStop={() => { console.log('[v0] stop requested'); stop() }} />}
+      response={<AgentResponse key={generation} completion={completion} error={error} isLoading={isLoading} onAction={handleUIAction} />}
+      starters={<AgentStarters onSelect={selectStarter} />}
+    />
+  </ThemeProvider>
 }
