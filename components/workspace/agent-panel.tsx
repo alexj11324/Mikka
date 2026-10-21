@@ -48,21 +48,23 @@ function AgentSession({ onReset }: { onReset: () => void }) {
   const [question, setQuestion] = useState('')
   const [previousTurns, setPreviousTurns] = useState<{ id: number; question: string; completion: string; error?: Error }[]>([])
 
-  function handleUIAction(event: ActionEvent) {
-    if (isLoading) return
+  async function handleUIAction(event: ActionEvent) {
+    if (isLoading || submittingRef.current) return
     if (event.type !== 'continue_conversation') {
-      toast.info('当前界面只支持填入提问，不会打开外部链接或修改工作区。')
+      toast.info('当前界面只支持直接继续对话，不会打开外部链接或修改工作区。')
       return
     }
     const context = typeof event.params.context === 'string' ? event.params.context : ''
-    const form = event.formState && Object.keys(event.formState).length > 0 ? `\n表单内容：${JSON.stringify(event.formState)}` : ''
+    const form = event.formState && Object.keys(event.formState).length > 0 ? `表单内容：${JSON.stringify(event.formState)}` : ''
     const prompt = [event.humanFriendlyMessage, context, form].filter(Boolean).join('\n')
-    updateDraft(prompt.slice(0, 8000))
-    inputRef.current?.focus()
-    toast.info('已填入提问，请确认内容后发送。')
+    if (!prompt.trim() || prompt.length > 8000) {
+      toast.error('提问内容为空或过长，请在原组件中调整后重试。')
+      return
+    }
+    if (!await request(prompt, 'inline')) toast.error('本次提问未完成，请在原组件中重试。')
   }
 
-  async function request(prompt: string) {
+  async function request(prompt: string, source: 'composer' | 'inline' = 'composer') {
     if (!prompt.trim() || prompt.length > 8000 || isLoading || submittingRef.current) return false
     submittingRef.current = true
     try {
@@ -72,7 +74,7 @@ function AgentSession({ onReset }: { onReset: () => void }) {
       setGeneration(value => value + 1)
       setQuestion(prompt.trim())
       const result = await complete(prompt.trim(), { body: { sessionId: sessionIdRef.current } })
-      if (result) updateDraft('')
+      if (result && source === 'composer') updateDraft(current => current === prompt ? '' : current)
       return Boolean(result)
     } finally {
       submittingRef.current = false
@@ -80,7 +82,7 @@ function AgentSession({ onReset }: { onReset: () => void }) {
   }
 
   return <ThemeProvider cssSelector="#orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
-    <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt) }}>
+    <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt, 'inline') }}>
       <AgentChat
         turns={[
           ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse completion={turn.completion} error={turn.error} isLoading={false} onAction={handleUIAction} /> })),

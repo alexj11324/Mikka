@@ -134,7 +134,9 @@ test('Chat App 整页使用官网外壳、导航与输入配置，不保留旧�
   const panel = await readFile(new URL('../components/workspace/agent-panel.tsx', import.meta.url), 'utf8')
   assert.doesNotMatch(panel, /starters=|AgentStarters/)
   assert.match(panel, /if \(question\) setPreviousTurns/)
-  assert.match(panel, /if \(result\) updateDraft\(''\)/)
+  assert.match(panel, /result && source === 'composer'/)
+  assert.match(panel, /current === prompt \? '' : current/)
+  assert.match(panel, /continueFromAnswer: prompt => request\(prompt, 'inline'\)/)
 })
 
 test('服务端和 beUI 界面均使用 DS 4.1 Flash', async () => {
@@ -151,6 +153,25 @@ test('服务端和 beUI 界面均使用 DS 4.1 Flash', async () => {
 test('停止按钮先取消表单默认行为，避免同步恢复后误发草稿', async () => {
   const source = await readFile(new URL('../components/agents/prompt-input.tsx', import.meta.url), 'utf8')
   assert.match(source, /onClick=\{loading \? event => \{[\s\S]*?event\.preventDefault\(\);\s*onStop\?\.\(\);/)
+})
+
+test('回复动作统一直接请求，澄清使用内联问题卡片', async () => {
+  const panel = await readFile(new URL('../components/workspace/agent-panel.tsx', import.meta.url), 'utf8')
+  const handler = panel.slice(panel.indexOf('async function handleUIAction'), panel.indexOf('async function request'))
+  assert.match(handler, /request\(prompt, 'inline'\)/)
+  assert.doesNotMatch(handler, /updateDraft|\.focus\(|\.slice\(/)
+  const renderers = await readFile(new URL('../components/workspace/agent-ui-library.tsx', import.meta.url), 'utf8')
+  assert.match(renderers, /send\(props.action\)/)
+  assert.match(renderers, /send\(props.prompt\)/)
+  assert.doesNotMatch(renderers, /useTriggerAction/)
+  const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
+  assert.ok(spec.promptOptions.additionalRules.some(rule => rule.includes('所有回复内的按钮') && rule.includes('不填入、不聚焦、不清空')))
+  assert.ok(spec.promptOptions.additionalRules.some(rule => rule.includes('需求模糊') && rule.includes('BeQuestions') && rule.includes('allowCustom=true')))
+  for (const name of ['BeButton', 'ShadcnButton']) {
+    const props = name === 'BeButton' ? { action: '请提供建议' } : { prompt: '请提供建议' }
+    assert.equal(agentComponentCatalog[name].props.safeParse({ ...props, label: '直接提问' }).success, true)
+    assert.equal(agentComponentCatalog[name].props.safeParse({ ...props, label: '填入提问' }).success, true)
+  }
 })
 
 test('beUI 限制按钮语义、状态、数字和小数位', () => {

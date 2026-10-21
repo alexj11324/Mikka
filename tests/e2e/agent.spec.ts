@@ -36,7 +36,7 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   })
   await register(page)
   await page.getByRole('button', { name: 'Agent', exact: true }).click()
-  const panel = page.getByRole('region', { name: '有什么可以帮你？' })
+  const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   await expect(panel).toBeVisible()
   await expect(panel.locator('iframe')).toHaveCount(0)
   await expect(page.getByRole('link', { name: /独立打开/ })).toHaveCount(0)
@@ -81,10 +81,10 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(send).toBeEnabled()
   expect(externalRequests).toEqual([])
   await expect(panel.getByRole('group', { name: '你的问题', exact: true })).toContainText('原生组件交互测试')
-  await panel.getByRole('button', { name: '新问题', exact: true }).click()
+  await panel.getByRole('button', { name: '新任务', exact: true }).click()
   await expect(input).toHaveValue('')
   await expect(send).toBeDisabled()
-  await expect(panel.getByRole('group', { name: 'Agent 回复', exact: true })).toHaveCount(0)
+  await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
   await expect(panel.getByRole('button', { name: '拆解项目计划', exact: true })).toBeVisible()
 
   await page.setViewportSize({ width: 390, height: 844 })
@@ -101,7 +101,7 @@ for (const stage of ['headers', 'body'] as const) {
   test(`停止生成在 ${stage} 阶段取消请求且不重新提交`, async ({ page }) => {
     await register(page)
     await page.getByRole('button', { name: 'Agent', exact: true }).click()
-    const panel = page.getByRole('region', { name: '有什么可以帮你？' })
+    const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
     const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
     await page.evaluate(stage => {
       const state = { requests: 0, aborted: false }
@@ -133,7 +133,7 @@ for (const stage of ['headers', 'body'] as const) {
     await panel.getByRole('button', { name: '停止生成' }).click()
     await expect(panel.getByRole('button', { name: '发送消息' })).toBeEnabled()
     expect(await page.evaluate(() => Reflect.get(window, 'agentCancellationTest').requests)).toBe(2)
-    await panel.getByRole('button', { name: '新问题', exact: true }).click()
+    await panel.getByRole('button', { name: '新任务', exact: true }).click()
     await expect(input).toHaveValue('')
   })
 }
@@ -148,11 +148,11 @@ function openUIStream(response: string) {
   ].map(event => `data: ${JSON.stringify(event)}\n\n`).join('') + 'data: [DONE]\n\n'
 }
 
-test('beUI 注册组件展示用户数字且动效按钮只填入提问', async ({ page }) => {
+test('beUI 注册组件展示用户数字且动效按钮直接提问并保留草稿', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await register(page)
   await page.getByRole('button', { name: 'Agent', exact: true }).click()
-  const panel = page.getByRole('region', { name: '有什么可以帮你？' })
+  const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   let requests = 0
   await page.route('**/api/agent', route => {
@@ -161,7 +161,7 @@ test('beUI 注册组件展示用户数字且动效按钮只填入提问', async 
       status: 200,
       contentType: 'text/event-stream',
       headers: { 'x-vercel-ai-ui-message-stream': 'v1' },
-      body: openUIStream(`root = Stack([badge, statistic, button])
+      body: openUIStream(requests > 1 ? 'root = TextContent("已直接细化任务建议。")' : `root = Stack([badge, statistic, button])
 badge = BeBadge("用户提供的状态", "info")
 statistic = BeStat("本周完成任务", 12.5, "项", 1)
 button = BeButton("继续细化", "请根据本周完成12.5项任务的数据给出改进建议", "outline")`),
@@ -172,10 +172,13 @@ button = BeButton("继续细化", "请根据本周完成12.5项任务的数据�
   await expect(panel.locator('[data-badge-label]')).toHaveText('用户提供的状态')
   await expect(panel.getByText('12.5项', { exact: true }).first()).toBeVisible()
   await expect(panel.getByRole('alert')).toHaveCount(0)
+  await input.fill('保留独立草稿')
   await panel.getByRole('button', { name: '继续细化', exact: true }).click()
-  await expect(input).toHaveValue('请根据本周完成12.5项任务的数据给出改进建议')
-  await expect(input).toBeFocused()
-  expect(requests).toBe(1)
+  await expect(panel.getByText('已直接细化任务建议。', { exact: true })).toBeVisible()
+  await expect(input).toHaveValue('保留独立草稿')
+  await expect(input).not.toBeFocused()
+  await expect(panel.getByRole('button', { name: '已提问', exact: true })).toBeDisabled()
+  expect(requests).toBe(2)
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
@@ -184,7 +187,7 @@ test('beUI 功能组展示回复与计划，审批和多步回答直接继续且
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await register(page)
   await page.getByRole('button', { name: 'Agent', exact: true }).click()
-  const panel = page.getByRole('region', { name: '有什么可以帮你？' })
+  const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   const submissions: { prompt: string; sessionId: string }[] = []
   await page.route('**/api/agent', route => {
@@ -204,7 +207,7 @@ icon = AgentIcon("question", "等待你的意见")`) })
   await expect(tasks).toContainText('待开始')
   await expect(tasks).toContainText('已完成 0 项')
   await expect(panel.getByText('等待你的意见', { exact: true })).toBeVisible()
-  await expect(panel.getByRole('button', { name: '发送消息' })).toBeEnabled()
+  await expect(panel.getByRole('button', { name: '发送消息' })).toBeDisabled()
   await input.fill('未发送的独立草稿')
   await panel.getByRole('button', { name: '同意并继续', exact: true }).click()
   await expect(panel.getByText('已根据第 2 次提交继续提供建议。', { exact: true })).toBeVisible()
@@ -227,13 +230,13 @@ icon = AgentIcon("question", "等待你的意见")`) })
   expect(submissions[2].prompt).toContain('类型检查；键盘交互；还需要移动端验收')
   expect(submissions.every(body => body.sessionId === submissions[0].sessionId)).toBe(true)
   await expect(input).toHaveValue('未发送的独立草稿')
-  await expect(panel.getByRole('group', { name: 'Agent 回复', exact: true })).toHaveCount(3)
+  await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(3)
   await expect(panel.getByRole('button', { name: '提交回答并继续', exact: true })).toHaveCount(0)
   await expect(panel.getByRole('alert')).toHaveCount(0)
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  await panel.getByRole('button', { name: '新问题', exact: true }).click()
-  await expect(panel.getByRole('group', { name: 'Agent 回复', exact: true })).toHaveCount(0)
+  await panel.getByRole('button', { name: '新任务', exact: true }).click()
+  await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
   await expect(input).toHaveValue('')
 })
 
@@ -241,7 +244,7 @@ test('beUI 内联回答失败与停止后保留选择，可在原卡片重试且
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await register(page)
   await page.getByRole('button', { name: 'Agent', exact: true }).click()
-  const panel = page.getByRole('region', { name: '有什么可以帮你？' })
+  const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   const submissions: { prompt: string; sessionId: string }[] = []
   await page.route('**/api/agent', route => {
@@ -295,6 +298,55 @@ test('beUI 内联回答失败与停止后保留选择，可在原卡片重试且
   expect(submissions[2]).toEqual(submissions[1])
 })
 
+test('旧按钮直接提问，纯文本在原卡片回答且失败可重试', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await register(page)
+  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
+  const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
+  const submissions: { prompt: string; sessionId: string }[] = []
+  await page.route('**/api/agent', async route => {
+    submissions.push(route.request().postDataJSON())
+    if (submissions.length === 2) await new Promise(resolve => setTimeout(resolve, 300))
+    const body = submissions.length === 1
+      ? openUIStream(`root = Stack([note, question, button])
+note = ShadcnAlert("需要更多信息", "在下方补充你的需求，直接提交即可。")
+question = BeQuestions("为 Orvilo 工作台提供任务建议，用户尚未说明具体需求。", [{ id: "goal", title: "你想完成什么任务？", allowCustom: true }])
+button = BeButton("填入提问", "为 Orvilo 本周任务建议一个计划结构，仅建议不执行。", "outline")`)
+      : submissions.length === 2
+        ? 'data: {"type":"error","errorText":"测试：提问失败，请在原卡片重试。"}\n\ndata: [DONE]\n\n'
+        : openUIStream(`root = TextContent("第 ${submissions.length} 次请求直接继续成功。")`)
+    return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body })
+  })
+  await input.fill('1')
+  await panel.getByRole('button', { name: '发送消息' }).click()
+  await expect(panel.getByRole('heading', { name: '你想完成什么任务？' })).toBeVisible()
+  await expect(panel.getByRole('button', { name: '填入提问', exact: true })).toHaveCount(0)
+  await input.fill('主输入框中的独立草稿')
+  const quick = panel.getByRole('button', { name: '直接提问', exact: true })
+  await quick.dblclick()
+  await expect(panel.getByText('本次继续未完成，选择和回答已保留，可以在此重试。', { exact: true })).toBeVisible()
+  expect(submissions).toHaveLength(2)
+  await expect(input).toHaveValue('主输入框中的独立草稿')
+  await quick.click()
+  await expect(panel.getByText('第 3 次请求直接继续成功。', { exact: true })).toBeVisible()
+  await expect(panel.getByRole('button', { name: '已提问', exact: true })).toBeDisabled()
+  expect(submissions[2]).toEqual(submissions[1])
+  const answer = panel.getByRole('textbox', { name: '你想完成什么任务？：补充回答' })
+  await answer.fill('请帮我整理一份本周任务清单')
+  await panel.getByRole('button', { name: '提交回答并继续', exact: true }).click()
+  await expect(panel.getByText('第 4 次请求直接继续成功。', { exact: true })).toBeVisible()
+  expect(submissions[3].prompt).toContain('你想完成什么任务？：请帮我整理一份本周任务清单')
+  expect(submissions.every(body => body.sessionId === submissions[0].sessionId)).toBe(true)
+  await expect(input).toHaveValue('主输入框中的独立草稿')
+  await expect(panel.getByRole('button', { name: '提交回答并继续', exact: true })).toHaveCount(0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await panel.getByRole('button', { name: '新任务', exact: true }).click()
+  await expect(input).toHaveValue('')
+  await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
+})
+
 const generatedUI = `root = Stack([heading, tabs, form, note])
 heading = TextContent("项目规划建议", "large-heavy")
 tabs = Tabs([TabItem("plan", "阶段计划", [table]), TabItem("summary", "交付说明", [description])])
@@ -302,13 +354,13 @@ table = Table([Col("阶段", ["需求梳理", "方案验证"]), Col("交付物",
 description = TextContent("以上为建议计划，尚未保存到工作区。")
 form = Form("refine", buttons, [field])
 field = FormControl("项目名称", Input("projectName", "输入项目名称", "text", { required: true }))
-buttons = Buttons([Button("填入提问", @ToAssistant("请根据填写的项目名称细化项目计划"), "primary")])
-note = TextContent("表单仅填入提问，不会创建项目。")`
+buttons = Buttons([Button("提交回答并继续", @ToAssistant("请根据填写的项目名称细化项目计划"), "primary")])
+note = TextContent("表单提交后直接继续提供建议，不会创建项目。")`
 
-test('OpenUI 将模型输出渲染为表格、Tabs 和表单，动作仅填入提问且会话稳定', async ({ page }) => {
+test('OpenUI 表格、Tabs 和表单直接提交，兼容按钮续问且会话稳定', async ({ page }) => {
   await register(page)
   await page.getByRole('button', { name: 'Agent', exact: true }).click()
-  const panel = page.getByRole('region', { name: '有什么可以帮你？' })
+  const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   const sessionIds: string[] = []
   let requests = 0
@@ -316,7 +368,7 @@ test('OpenUI 将模型输出渲染为表格、Tabs 和表单，动作仅填入�
     requests++
     const body = route.request().postDataJSON()
     sessionIds.push(body.sessionId)
-    return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream(generatedUI) })
+    return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream(requests === 1 ? generatedUI : 'root = TextContent("已根据项目名称继续提供建议。")') })
   })
   await input.fill('请用表格和表单给出项目计划建议')
   await panel.getByRole('button', { name: '发送消息' }).click()
@@ -325,16 +377,17 @@ test('OpenUI 将模型输出渲染为表格、Tabs 和表单，动作仅填入�
   await panel.getByRole('tab', { name: '交付说明' }).click()
   await expect(panel.getByText('以上为建议计划，尚未保存到工作区。', { exact: true })).toBeVisible()
   await panel.getByRole('tab', { name: '阶段计划' }).click()
+  await input.fill('未发送的表单外草稿')
   await panel.getByRole('textbox', { name: /^项目名称/ }).fill('Orvilo 发布')
-  await panel.getByRole('button', { name: '填入提问', exact: true }).click()
-  await expect(input).toHaveValue(/Orvilo 发布/)
-  await expect(input).toBeFocused()
-  expect(requests).toBe(1)
+  await panel.getByRole('button', { name: '提交回答并继续', exact: true }).click()
+  await expect(panel.getByText('已根据项目名称继续提供建议。', { exact: true })).toBeVisible()
+  await expect(input).toHaveValue('未发送的表单外草稿')
+  await expect(input).not.toBeFocused()
+  expect(requests).toBe(2)
   await expect(panel.getByRole('alert')).toHaveCount(0)
   await expect(panel.getByText(/root = Stack/)).toHaveCount(0)
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  await panel.getByRole('button', { name: '发送消息' }).click()
   await expect(panel.getByRole('columnheader', { name: '阶段', exact: true })).toBeVisible()
   expect(sessionIds).toHaveLength(2)
   expect(sessionIds[0]).toMatch(/^[0-9a-f-]{36}$/)
@@ -362,8 +415,11 @@ button = ShadcnButton("继续细化", "请细化本地组件注册方案", "outl
   await expect(panel.getByText('没有自动安装任何未注册组件。', { exact: true })).toBeVisible()
   await panel.getByRole('tab', { name: '方案乙', exact: true }).click()
   await expect(panel.getByText('本地方案乙内容', { exact: true })).toBeVisible()
+  await input.fill('本地组件外的草稿')
+  await page.route('**/api/agent', route => route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream('root = TextContent("本地组件建议已直接细化。")') }))
   await panel.getByRole('button', { name: '继续细化', exact: true }).click()
-  await expect(input).toHaveValue(/请细化本地组件注册方案/)
+  await expect(panel.getByText('本地组件建议已直接细化。', { exact: true })).toBeVisible()
+  await expect(input).toHaveValue('本地组件外的草稿')
   await expect(panel.getByRole('alert')).toHaveCount(0)
   expect(requests).toBe(2)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)

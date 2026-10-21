@@ -7,8 +7,8 @@ const children = z.array(z.any()).max(30)
 
 export const agentComponentCatalog = {
   BeButton: {
-    description: 'beUI 弹簧动效按钮。label 为“填入提问”或“继续细化”；action 必须是包含上下文的完整独立问题。只填入提问，不自动发送或保存。',
-    props: z.object({ label: z.enum(['填入提问', '继续细化']), action: text, variant: z.enum(['primary', 'secondary', 'ghost', 'outline']).optional() }),
+    description: 'beUI 弹簧动效快捷提问按钮。label 使用“直接提问”或“继续细化”；action 必须是包含完整上下文、可立即发送的独立问题。点击后直接请求 Agent，不填入或清空底部输入框，不执行工作区操作。需要用户补充信息时使用 BeQuestions，不要展示重复的泛化按钮。“填入提问”仅兼容旧输出，实际显示并执行直接提问。',
+    props: z.object({ label: z.enum(['直接提问', '继续细化', '填入提问']), action: text, variant: z.enum(['primary', 'secondary', 'ghost', 'outline']).optional() }),
   },
   BeBadge: {
     description: 'beUI 动效状态徽标。只展示用户提供的状态或明确标注的建议，不表示执行了工作区操作。',
@@ -83,8 +83,8 @@ export const agentComponentCatalog = {
     props: z.object({ columns: z.array(text).min(1).max(6), rows: z.array(z.array(text).max(6)).max(30) }),
   },
   ShadcnButton: {
-    description: '本地 shadcn 按钮。label 必须为“填入提问”或“继续细化”；prompt 为完整独立的问题。只填入输入框，不自动请求或保存。',
-    props: z.object({ label: z.enum(['填入提问', '继续细化']), prompt: text, variant: z.enum(['default', 'secondary', 'outline', 'ghost']).optional() }),
+    description: '本地 shadcn 快捷提问按钮。label 使用“直接提问”或“继续细化”；prompt 为包含完整上下文的独立问题。点击后直接请求 Agent，不触碰底部提问草稿，不执行或保存工作区操作。“填入提问”仅兼容旧输出，实际执行直接提问。',
+    props: z.object({ label: z.enum(['直接提问', '继续细化', '填入提问']), prompt: text, variant: z.enum(['default', 'secondary', 'outline', 'ghost']).optional() }),
   },
   ReuiBadge: {
     description: '本地 REUI 语义状态徽标，可用不同状态颜色。',

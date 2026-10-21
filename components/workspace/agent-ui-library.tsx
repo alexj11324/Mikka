@@ -1,8 +1,7 @@
 'use client'
 
-import { useIsStreaming, useTriggerAction } from '@openuidev/react-lang'
 import { Info } from 'lucide-react'
-import { AgentApproval, AgentQuestions } from './agent-decision'
+import { AgentApproval, AgentQuestions, useAgentDecision } from './agent-decision'
 import { AgentContent, AgentStatusIcon, AgentTasks } from './agent-content'
 import { Button as BeButton } from '@/components/motion/button/base'
 import { AnimatedBadge } from '@/components/motion/animated-badge'
@@ -22,9 +21,11 @@ import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '@/
 
 const renderers = {
   BeButton: function BePromptButton({ props }) {
-    const trigger = useTriggerAction()
-    const streaming = useIsStreaming()
-    return <BeButton type="button" variant={props.variant} size="sm" disabled={streaming} onClick={() => trigger(props.action)}>{props.label}</BeButton>
+    const { send, sent, error, status } = useAgentDecision()
+    return <div className="flex min-w-0 flex-col gap-2">
+      <BeButton type="button" variant={props.variant} size="sm" disabled={status !== 'pending'} onClick={() => { void send(props.action) }}>{sent ? '已提问' : props.label === '填入提问' ? '直接提问' : props.label}</BeButton>
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+    </div>
   },
   BeBadge: ({ props }) => <AnimatedBadge status={props.status} size="sm" pulse={false}>{props.text}</AnimatedBadge>,
   BeStat: ({ props }) => {
@@ -61,9 +62,11 @@ const renderers = {
     <TableBody>{(props.rows ?? []).map((row, index) => <TableRow key={index}>{(row ?? []).map((cell, cellIndex) => <TableCell key={cellIndex}>{cell}</TableCell>)}</TableRow>)}</TableBody>
   </Table>,
   ShadcnButton: function PromptButton({ props }) {
-    const trigger = useTriggerAction()
-    const streaming = useIsStreaming()
-    return <Button type="button" variant={props.variant} disabled={streaming} onClick={() => trigger(props.label, undefined, { type: 'continue_conversation', params: { context: props.prompt } })}>{props.label}</Button>
+    const { send, sent, error, status } = useAgentDecision()
+    return <div className="flex min-w-0 flex-col gap-2">
+      <Button type="button" variant={props.variant} disabled={status !== 'pending'} onClick={() => { void send(props.prompt) }}>{sent ? '已提问' : props.label === '填入提问' ? '直接提问' : props.label}</Button>
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+    </div>
   },
   ReuiBadge: ({ props }) => <ReuiBadge variant={props.variant ?? 'outline'}>{props.text}</ReuiBadge>,
   ReuiAlert: ({ props }) => <ReuiAlert variant={props.variant} role="note"><Info aria-hidden="true" /><ReuiAlertTitle>{props.title}</ReuiAlertTitle><ReuiAlertDescription>{props.description}</ReuiAlertDescription></ReuiAlert>,

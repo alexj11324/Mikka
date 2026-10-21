@@ -67,7 +67,7 @@ function AgentChatSidebar({ turns, streaming, onReset }: { turns: AgentTurn[]; s
           {view === 'search' && <Input label="搜索本轮问题" type="search" value={query} onChange={setQuery} placeholder="输入关键词…" />}
           {view === 'runs' && <p role="status" className="px-2 text-xs text-muted-foreground">{streaming ? '正在生成当前回复，可在输入栏停止。' : turns.length ? `本轮已发起 ${turns.length} 次请求。` : '尚未发起请求。'}</p>}
           {items.length ? <AISidebar items={items} activeId={activeId} onActiveChange={navigate} ariaLabel="本轮问题" renderMenu={() => null} /> : <p className="px-2 text-xs text-muted-foreground">{query && view === 'search' ? '没有匹配的问题。' : '发送消息后，在这里查看本轮问题。'}</p>}
-          <p id="agent-service-note" className="px-2 text-xs leading-relaxed text-muted-foreground">OpenCode Go · 不持久保存对话，不读取或修改工作区；确认和回答直接继续，其他建议按钮仅填入提问。</p>
+          <p id="agent-service-note" className="px-2 text-xs leading-relaxed text-muted-foreground">OpenCode Go · 不持久保存对话，不读取或修改工作区；在回复卡片内提问、回答或确认后直接继续，底部输入框保留独立草稿。</p>
         </AnimatedSidebarGroupContent>
       </AnimatedSidebarGroup>
     </AnimatedSidebarContent>

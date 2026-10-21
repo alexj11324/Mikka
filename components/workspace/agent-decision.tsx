@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAgentInteraction } from './agent-interaction'
 import { type AgentComponentRenderers } from '@/lib/agent-ui-catalog'
 
-function useDecision() {
+export function useAgentDecision() {
   const { busy, continueFromAnswer } = useAgentInteraction()
   const streaming = useIsStreaming()
   const locked = useRef(false)
@@ -17,8 +17,8 @@ function useDecision() {
 
   async function send(prompt: string) {
     if (busy || streaming || locked.current || sent) return
-    if (prompt.length > 8000) {
-      setError('回答内容过长，请缩短补充内容后重新提交。')
+    if (!prompt.trim() || prompt.length > 8000) {
+      setError('提问内容为空或过长，请调整后在此重新提交。')
       return
     }
     locked.current = true
@@ -39,7 +39,7 @@ function useDecision() {
 }
 
 export const AgentApproval: AgentComponentRenderers['BeApproval'] = ({ props }) => {
-  const { send, sent, error, status } = useDecision()
+  const { send, sent, error, status } = useAgentDecision()
   const [decision, setDecision] = useState('')
 
   function choose(value: string) {
@@ -63,7 +63,7 @@ export const AgentApproval: AgentComponentRenderers['BeApproval'] = ({ props }) 
 }
 
 export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }) => {
-  const { send, sent, error, status } = useDecision()
+  const { send, sent, error, status } = useAgentDecision()
   const [summary, setSummary] = useState('')
   const questions = (props.questions ?? []).map(question => ({ ...question, autoAdvance: false, customPlaceholder: '补充其他回答…' }))
 
