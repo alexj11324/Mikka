@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from 'next/link'
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
@@ -80,6 +81,10 @@ export function AppSidebar({ user, view, counts, recentIssues, selected, onNavig
         })}</SidebarMenu></SidebarGroup>}
       </SidebarContent>
       <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members" />} tooltip="成员管理"><Users /><span>成员管理</span></SidebarMenuButton></SidebarMenuItem>
+          <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members?invite=1" />} tooltip="邀请成员"><SquarePen /><span>邀请成员</span></SidebarMenuButton></SidebarMenuItem>
+        </SidebarMenu>
         <NavUser user={user} onSignOut={onSignOut} signingOut={signingOut} />
       </SidebarFooter>
       <SidebarRail />
