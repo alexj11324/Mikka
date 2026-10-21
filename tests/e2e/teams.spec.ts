@@ -128,7 +128,7 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
     await member.keyboard.press('Escape')
     await member.goto('/')
     await showAllTasks(member)
-    await expect(member.locator('[aria-label="任务���表"]').getByText(publicTitle, { exact: true })).toBeVisible()
+    await expect(member.locator('[aria-label="任务列表"]').getByText(publicTitle, { exact: true })).toBeVisible()
     await expect(member.getByText(privateTitle, { exact: true })).toHaveCount(0)
     await page.goto(`/settings/members?workspace=${workspaceId}`)
     const membership = page.getByRole('row').filter({ hasText: email })

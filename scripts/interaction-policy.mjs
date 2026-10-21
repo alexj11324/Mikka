@@ -159,7 +159,7 @@ export function auditInteractions(file, text) {
         const renderParent = tag.parent && ts.isJsxExpression(tag.parent) && ts.isJsxAttribute(tag.parent.parent) && tag.parent.parent.name.getText(source) === 'render' ? tag.parent.parent.parent.parent : null
         const composed = !!renderParent && hasAction(renderParent) || parents.some(parent => behaviorControls.test(nameOf(parent)) || nameOf(parent) === 'Slot' && hasAction(parent))
         const navigation = realHref(tag) || renderedNavigation(tag)
-        const unavailable = !!attr(tag, 'disabled') && /^orvilo-upcoming-/.test(literal(expression(attr(tag, 'data-feature-flag'))) ?? '') && expression(attr(tag, 'data-feature-implemented'))?.kind === ts.SyntaxKind.FalseKeyword && !!attr(tag, 'aria-describedby') && !!attr(tag, 'title')
+        const unavailable = !!attr(tag, 'disabled') && (literal(expression(attr(tag, 'data-feature-flag'))) ?? '').startsWith('orvilo-upcoming-') && expression(attr(tag, 'data-feature-implemented'))?.kind === ts.SyntaxKind.FalseKeyword && !!attr(tag, 'aria-describedby') && !!attr(tag, 'title')
         if (!hasAction(tag) && !behaviorControls.test(name) && !composed && !formAction && !(type === 'reset' && form) && !navigation && !unavailable) {
           add(tag, 'interaction/no-dead-control', '可点击控件没有实际事件、有效导航、表单动作或组件触发行为；不能用 disabled、Tooltip 或空回调代替功能。')
         }
