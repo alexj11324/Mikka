@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
-import { FileText, LoaderCircle, MessageSquarePlus, PanelLeft, Search } from 'lucide-react'
+import { useRef, useState, type ReactNode } from 'react'
+import { ChevronDown, FileText, LoaderCircle, MessageSquarePlus, Search } from 'lucide-react'
 import { ChatApp, ChatAppFooter, ChatAppHeader } from '@/components/agents/chat-app'
-import { AISidebar } from '@/components/agents/ai-sidebar'
-import { AnimatedSidebar, AnimatedSidebarContent, AnimatedSidebarGroup, AnimatedSidebarGroupContent, AnimatedSidebarGroupLabel, AnimatedSidebarInset, AnimatedSidebarMenu, AnimatedSidebarMenuButton, AnimatedSidebarMenuItem, AnimatedSidebarRail, AnimatedSidebarTrigger, useAnimatedSidebar } from '@/components/motion/animated-sidebar'
-import { Input } from '@/components/motion/input'
+import { AnimatedSidebarInset } from '@/components/motion/animated-sidebar'
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { AgentConversation, type AgentTurn } from './agent-conversation'
 import type { SavedAgentSession } from '@/lib/agent-history'
 
@@ -23,20 +24,12 @@ export function AgentChat({ turns, composer, streaming, sessions, sessionId, onS
   composer: ReactNode
   streaming: boolean
 }) {
+  const title = sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || '新任务'
+
   return <section aria-label="Agent 对话工作区" className="orvilo-agent h-[calc(100svh-4rem)] min-h-0 w-full p-2 sm:p-4">
-    <ChatApp sidebarWidth="17rem" className="h-full">
-      <AgentChatSidebar sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} />
+    <ChatApp open={false} className="h-full">
       <AnimatedSidebarInset className="min-h-0 bg-background">
-        <ChatAppHeader>
-          <div className="flex min-w-0 items-center gap-2.5">
-            <AnimatedSidebarTrigger aria-label="切换对话侧栏" className="text-muted-foreground hover:bg-muted hover:text-foreground"><PanelLeft className="size-4" /></AnimatedSidebarTrigger>
-            <div className="min-w-0">
-              <h1 className="truncate text-sm font-medium">{turns.at(-1)?.question || '新任务'}</h1>
-              <p className="truncate text-xs text-muted-foreground">Agent 工作区 · DS 4.1 Flash</p>
-            </div>
-          </div>
-          {streaming && <span role="status" className="shrink-0 text-xs text-muted-foreground">正在回复</span>}
-        </ChatAppHeader>
+        <AgentChatHeader title={title} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} />
         <AgentConversation turns={turns} streaming={streaming} />
         <ChatAppFooter>
           <div className="mx-auto max-w-3xl">{composer}</div>
@@ -46,37 +39,59 @@ export function AgentChat({ turns, composer, streaming, sessions, sessionId, onS
   </section>
 }
 
-function AgentChatSidebar({ sessions, sessionId, onSelect, onReset }: AgentChatNavigation) {
+function AgentChatHeader({ title, streaming, sessions, sessionId, onSelect, onReset }: AgentChatNavigation & { title: string; streaming: boolean }) {
+  const [open, setOpen] = useState(false)
   const [searching, setSearching] = useState(false)
-  const [query, setQuery] = useState('')
-  const { isMobile, setOpenMobile } = useAnimatedSidebar()
-  const items = sessions.filter(session => !searching || session.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
-    .map(session => ({ id: session.id, label: session.title, kind: 'file' as const }))
+  const searchRef = useRef<HTMLInputElement>(null)
+  const today = new Date().setHours(0, 0, 0, 0)
+  const groups = [
+    { label: '今天', sessions: sessions.filter(session => Date.parse(session.updatedAt) >= today) },
+    { label: '最近 7 天', sessions: sessions.filter(session => Date.parse(session.updatedAt) < today && Date.parse(session.updatedAt) >= today - 6 * 86400000) },
+    { label: '更早', sessions: sessions.filter(session => Date.parse(session.updatedAt) < today - 6 * 86400000) },
+  ]
 
   function navigate(id: string) {
+    setOpen(false)
+    setSearching(false)
     onSelect(id)
-    if (isMobile) setOpenMobile(false)
   }
 
-  return <AnimatedSidebar ariaLabel="对话导航" collapsible="offcanvas" className="min-h-0" panelClassName="h-full bg-background">
-    <AnimatedSidebarContent className="gap-4 overflow-hidden px-2 py-4">
-      <AnimatedSidebarGroup className="shrink-0 px-1 py-0">
-        <AnimatedSidebarGroupContent>
-          <AnimatedSidebarMenu className="gap-1">
-            <AnimatedSidebarMenuItem><AnimatedSidebarMenuButton icon={<MessageSquarePlus className="size-4" />} onSelect={onReset} className="font-normal">新任务</AnimatedSidebarMenuButton></AnimatedSidebarMenuItem>
-            <AnimatedSidebarMenuItem><AnimatedSidebarMenuButton icon={<Search className="size-4" />} onSelect={() => setSearching(value => !value)} isActive={searching} closeOnSelect={false} className="font-normal">搜索</AnimatedSidebarMenuButton></AnimatedSidebarMenuItem>
-          </AnimatedSidebarMenu>
-        </AnimatedSidebarGroupContent>
-      </AnimatedSidebarGroup>
-      <AnimatedSidebarGroup className="min-h-0 flex-1 px-1 py-0">
-        <AnimatedSidebarGroupLabel className="mb-1 h-8 px-2 text-xs font-medium normal-case tracking-normal">历史会话</AnimatedSidebarGroupLabel>
-        <AnimatedSidebarGroupContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-          {searching && <Input label="搜索历史会话" type="search" value={query} onChange={setQuery} placeholder="输入关键词…" />}
-          {items.length ? <AISidebar items={items} activeId={sessionId} onActiveChange={navigate} ariaLabel="历史会话" renderIcon={item => sessions.find(session => session.id === item.id)?.running
-            ? <LoaderCircle aria-label="正在回复" className="size-4 animate-spin" /> : <FileText aria-hidden="true" className="size-4" />} renderMenu={() => null} /> : <p className="px-2 text-xs text-muted-foreground">{query && searching ? '未找到相关会话' : '暂无历史会话'}</p>}
-        </AnimatedSidebarGroupContent>
-      </AnimatedSidebarGroup>
-    </AnimatedSidebarContent>
-    <AnimatedSidebarRail />
-  </AnimatedSidebar>
+  return <ChatAppHeader className="gap-2 px-3">
+    <Popover open={open} onOpenChange={value => { setOpen(value); if (!value) setSearching(false) }}>
+      <h1 className="min-w-0">
+        <PopoverTrigger render={<Button variant="ghost" className="max-w-full justify-start" aria-label={`切换会话：${title}`} />}>
+          <span className="truncate">{title}</span>
+          <ChevronDown aria-hidden="true" data-icon="inline-end" />
+        </PopoverTrigger>
+      </h1>
+      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-0" aria-label={searching ? '搜索历史会话' : '切换历史会话'} initialFocus={searching ? searchRef : undefined}>
+        <Command label={searching ? '搜索历史会话' : '历史会话'} shouldFilter={searching} tabIndex={0}>
+          {searching && <CommandInput ref={searchRef} aria-label="搜索历史会话" placeholder="搜索历史会话…" />}
+          <CommandList label="历史会话" className="max-h-80">
+            <CommandEmpty>{sessions.length ? '未找到相关会话' : '暂无历史会话'}</CommandEmpty>
+            {groups.filter(group => group.sessions.length > 0).map(group => <CommandGroup key={group.label} heading={group.label}>
+              {group.sessions.map(session => <CommandItem key={session.id} value={session.id} keywords={[session.title]} data-checked={session.id === sessionId} onSelect={() => navigate(session.id)} className="gap-2 py-2">
+                {session.running ? <LoaderCircle aria-label="正在回复" className="animate-spin" /> : <FileText aria-hidden="true" />}
+                <span className="min-w-0 flex-1 truncate">{session.title}</span>
+                <time dateTime={session.updatedAt} title={new Date(session.updatedAt).toLocaleString('zh-CN')} className="shrink-0 text-xs text-muted-foreground">{relativeDate(session.updatedAt)}</time>
+              </CommandItem>)}
+            </CommandGroup>)}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+    <div className="ml-auto flex shrink-0 items-center gap-1">
+      {streaming && <span role="status" className="sr-only">正在回复</span>}
+      <Button variant="ghost" size="icon" aria-label="新任务" title="新任务" onClick={onReset}><MessageSquarePlus aria-hidden="true" data-icon="inline-start" /></Button>
+      <Button variant="ghost" size="icon" aria-label="搜索" title="搜索历史会话" onClick={() => { setSearching(true); setOpen(true) }}><Search aria-hidden="true" data-icon="inline-start" /></Button>
+    </div>
+  </ChatAppHeader>
+}
+
+function relativeDate(date: string) {
+  const days = Math.max(0, Math.floor((Date.now() - Date.parse(date)) / 86400000))
+  if (days === 0) return '今天'
+  if (days < 7) return `${days}天前`
+  if (days < 30) return `${Math.floor(days / 7)}周前`
+  return new Date(date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
 }

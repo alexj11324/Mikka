@@ -206,11 +206,14 @@ test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 
   assert.doesNotMatch(starters, /<Button|function AgentStarters/)
 })
 
-test('Chat App 整页使用官网外壳、导航与输入配置，不保留旧欢迎布局', async () => {
+test('Chat App 保留官网外壳与输入配置，会话导航收进标题菜单', async () => {
   const source = await readFile(new URL('../components/workspace/agent-chat.tsx', import.meta.url), 'utf8')
-  for (const name of ['ChatApp', 'AnimatedSidebar', 'AnimatedSidebarInset', 'AnimatedSidebarTrigger', 'AISidebar']) {
+  for (const name of ['ChatApp', 'AnimatedSidebarInset', 'Popover', 'PopoverTrigger', 'Command', 'CommandItem']) {
     assert.match(source, new RegExp(`<${name}[\\s>]`))
   }
+  assert.doesNotMatch(source, /<AnimatedSidebar[\s>]|<AnimatedSidebarTrigger|<AISidebar/)
+  assert.match(source, /aria-label=\{`切换会话：\$\{title\}`\}/)
+  for (const label of ['新任务', '搜索']) assert.ok(source.includes(`size="icon" aria-label="${label}"`))
   assert.ok(source.includes("from '@/components/agents/chat-app'"))
   const conversation = await readFile(new URL('../components/workspace/agent-conversation.tsx', import.meta.url), 'utf8')
   assert.match(conversation, /<MessageGroup spacing="default">/)
@@ -240,7 +243,7 @@ test('服务端和 beUI 界面均使用 DS 4.1 Flash', async () => {
   assert.match(route, /validateAgentStream\(\)/)
   assert.ok(composer.includes('model="deepseek-v4.1-flash"'))
   assert.match(composer, /DS 4\.1 Flash/)
-  assert.match(chat, /DS 4\.1 Flash/)
+  assert.doesNotMatch(chat, /Agent 工作区|DS 4\.1 Flash/)
   for (const source of [route, composer, chat]) assert.doesNotMatch(source, /glm-5\.3|GLM-5\.3/)
 })
 

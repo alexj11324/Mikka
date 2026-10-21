@@ -206,7 +206,9 @@ test('生成期间可新建和切换任务，独立保留草稿、回复与停�
   await expect(panel.getByRole('button', { name: '新任务', exact: true })).toBeEnabled()
   await panel.getByRole('button', { name: '新任务', exact: true }).click()
   await expect(input).toHaveValue('')
-  await expect(panel.getByRole('treeitem', { name: /^第一并发任务/ })).toBeVisible()
+  await panel.getByRole('button', { name: /^切换会话：/ }).click()
+  await expect(page.getByRole('option', { name: /第一并发任务/ })).toBeVisible()
+  await page.keyboard.press('Escape')
   await input.fill('第二并发任务')
   await panel.getByRole('button', { name: '发送消息', exact: true }).click()
   await expect(panel.getByText('第二并发任务的独立回复', { exact: true })).toBeVisible()
@@ -215,7 +217,8 @@ test('生成期间可新建和切换任务，独立保留草稿、回复与停�
   ])
   expect(await page.evaluate(() => new Set(Reflect.get(window, 'concurrentAgentTest').requests.map((request: { sessionId: string }) => request.sessionId)).size)).toBe(2)
 
-  await panel.getByRole('treeitem', { name: /^第一并发任务/ }).click()
+  await panel.getByRole('button', { name: /^切换会话：/ }).click()
+  await page.getByRole('option', { name: /第一并发任务/ }).click()
   await expect(input).toHaveValue('第一并发任务')
   await expect(panel.getByText('第一并发任务的独立回复', { exact: true })).toBeVisible()
   await expect(panel.getByText('第二并发任务的独立回复', { exact: true })).toHaveCount(0)
@@ -225,15 +228,78 @@ test('生成期间可新建和切换任务，独立保留草稿、回复与停�
   expect(await page.evaluate(() => Reflect.get(window, 'concurrentAgentTest').requests.map((request: { aborted: boolean }) => request.aborted))).toEqual([true, false])
 
   await page.evaluate(() => Reflect.get(window, 'concurrentAgentTest').finish(1))
-  await panel.getByRole('treeitem', { name: /^第二并发任务/ }).click()
+  await panel.getByRole('button', { name: /^切换会话：/ }).click()
+  await page.getByRole('option', { name: /第二并发任务/ }).click()
   await expect(panel.getByText('第二并发任务的独立回复', { exact: true })).toBeVisible()
   await expect(input).toHaveValue('')
   await expect(panel.getByRole('button', { name: '停止生成', exact: true })).toHaveCount(0)
-  await panel.getByRole('treeitem', { name: /^第一并发任务/ }).click()
+  await panel.getByRole('button', { name: /^切换会话：/ }).click()
+  await page.getByRole('option', { name: /第一并发任务/ }).click()
   await expect(input).toHaveValue('第一任务保留的草稿')
   expect(await page.evaluate(() => Reflect.get(window, 'concurrentAgentTest').requests.length)).toBe(2)
   await expect(panel).toHaveCount(1)
   await expect(panel.getByRole('alert')).toHaveCount(0)
+})
+
+test('标题下拉切换历史，右侧图标搜索和新建，桌面与手机均不占侧栏空间', async ({ page }) => {
+  await register(page)
+  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  const panel = page.getByRole('region', { name: 'Agent 对话工作区', exact: true })
+  const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
+  const switcher = panel.getByRole('button', { name: /^切换会话：/ })
+  await expect(panel.getByText('Agent 工作区 · DS 4.1 Flash', { exact: true })).toHaveCount(0)
+  await expect(panel.getByRole('button', { name: '切换对话侧栏' })).toHaveCount(0)
+  await expect(panel.getByRole('complementary', { name: '对话导航' })).toHaveCount(0)
+  await switcher.click()
+  await expect(page.getByText('暂无历史会话', { exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(switcher).toBeFocused()
+
+  await page.route('**/api/agent', route => route.fulfill({
+    status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' },
+    body: openUIStream(`root = TextContent(${JSON.stringify(`${route.request().postDataJSON().prompt}的回复`)})`),
+  }))
+  for (const title of ['香港景点', '项目计划']) {
+    await input.fill(title)
+    await panel.getByRole('button', { name: '发送消息' }).click()
+    await expect(panel.getByText(`${title}的回复`, { exact: true })).toBeVisible()
+    await expect(switcher).toHaveText(title)
+    await panel.getByRole('button', { name: '新任务', exact: true }).click()
+  }
+  await input.fill('新任务的独立草稿')
+
+  for (const width of [1159, 390]) {
+    await page.setViewportSize({ width, height: 851 })
+    for (const name of ['新任务', '搜索']) {
+      const button = panel.locator('header').getByRole('button', { name, exact: true })
+      await expect(button).toBeVisible()
+      await expect(button).toHaveText('')
+    }
+    await panel.getByRole('button', { name: '搜索', exact: true }).click()
+    const search = page.getByRole('combobox', { name: '搜索历史会话', exact: true })
+    await expect(search).toBeFocused()
+    await search.fill('不存在的历史')
+    await expect(page.getByText('未找到相关会话', { exact: true })).toBeVisible()
+    await search.fill('香港')
+    await expect(page.getByRole('option', { name: /^香港景点/ })).toBeVisible()
+    await expect(page.getByRole('option', { name: /^项目计划/ })).toHaveCount(0)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await search.press('Enter')
+    await expect(switcher).toHaveText('香港景点')
+    await expect(search).toHaveCount(0)
+    await expect(panel.getByText('香港景点的回复', { exact: true })).toBeVisible()
+    const followUp = `${width} 像素下的下一轮问题`
+    await input.fill(followUp)
+    await panel.getByRole('button', { name: '发送消息' }).click()
+    await expect(panel.getByText(`${followUp}的回复`, { exact: true })).toBeVisible()
+    await expect(switcher).toHaveText('香港景点')
+    await panel.getByRole('button', { name: '新任务', exact: true }).click()
+    await expect(input).toHaveValue('')
+  }
+  await switcher.click()
+  await expect(page.getByRole('group', { name: '今天', exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: /^项目计划/ })).toContainText('今天')
+  await page.keyboard.press('Escape')
 })
 
 function openUIStream(response: string) {
@@ -246,7 +312,7 @@ function openUIStream(response: string) {
   ].map(event => `data: ${JSON.stringify(event)}\n\n`).join('') + 'data: [DONE]\n\n'
 }
 
-test('beUI 注册组件展示用户数字且动效按钮直接提问并保留草稿', async ({ page }) => {
+test('beUI 注册组件展示用户数字且动效按钮直���提问并保留草稿', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await register(page)
   await page.getByRole('button', { name: 'Agent', exact: true }).click()
@@ -333,8 +399,7 @@ icon = AgentIcon("question", "等待你的意见")`) })
   await expect(panel.getByRole('alert')).toHaveCount(0)
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  await panel.getByRole('button', { name: '切换对话侧栏', exact: true }).click()
-  await page.getByRole('button', { name: '新任务', exact: true }).click()
+  await panel.getByRole('button', { name: '新任务', exact: true }).click()
   await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
   await expect(input).toHaveValue('')
 })
@@ -442,8 +507,7 @@ button = BeButton("填入提问", "为 Orvilo 本周任务建议一个计划结�
   await expect(panel.getByRole('button', { name: '提交回答并继续', exact: true })).toHaveCount(0)
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  await panel.getByRole('button', { name: '切换对话侧栏', exact: true }).click()
-  await page.getByRole('button', { name: '新任务', exact: true }).click()
+  await panel.getByRole('button', { name: '新任务', exact: true }).click()
   await expect(input).toHaveValue('')
   await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
 })
