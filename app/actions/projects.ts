@@ -98,8 +98,8 @@ export async function setProjectIssues(input: { id: string; revision: number; is
     const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), issueIds: z.array(z.uuid()).max(100) }).safeParse(input)
     if (!parsed.success) return failure('projectIssuesInvalid')
     const ids = [...new Set(parsed.data.issueIds)]
+    for (const id of ids) await requireIssueAccess(id)
     try {
-      for (const id of ids) await requireIssueAccess(id)
       return await projectDb.transaction(async tx => {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${owner}, 0))`)
         const owned = await tx.select().from(projects).where(eq(projects.userId, owner))

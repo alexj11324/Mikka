@@ -16,7 +16,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
   if (!user) {
     if (initialSelected) localeRedirect({ href: `/sign-in?next=${encodeURIComponent(`/?issue=${initialSelected}`)}`, locale: await getLocale() })
     if (!isAcceptanceEnabled()) localeRedirect({ href: '/sign-in', locale: await getLocale() })
-    redirect(query.acceptance === '1' ? '/acceptance' : '/api/acceptance')
+    if (query.acceptance === '1') localeRedirect({ href: '/acceptance', locale: await getLocale() })
+    redirect('/api/acceptance')
   }
   const initialIssues = await listIssues()
   return <IssueWorkspace initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialIssues={initialIssues} />

@@ -88,6 +88,7 @@ export const ACTION_ERROR_CODES = [
   'inviteExpired',
   'workspaceMembershipSuspended',
   'inviteInvalidEmails',
+  'workspaceReadFailed',
 ] as const
 
 export type ActionErrorCode = (typeof ACTION_ERROR_CODES)[number]

@@ -52,7 +52,7 @@ export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, o
             {data?.members.map((member, index) => <CommandItem key={member.id} value={`${member.name} ${member.id}`} disabled={disabled} onSelect={() => { void select({ kind: 'member', id: member.id }) }}><AssigneeAvatar assignee={{ ...member, kind: 'member' }} /><span className="flex-1 truncate">{member.name}</span>{assignee?.kind === 'member' && assignee.id === member.id && <Check />}{index < 9 && <CommandShortcut>{index + 1}</CommandShortcut>}</CommandItem>)}
           </CommandGroup>
           <CommandSeparator />
-          <CommandGroup heading="Agents">
+          <CommandGroup heading={t('agents')}>
             {data?.agents.map(agent => <CommandItem key={agent.id} value={`${agent.name} ${agent.harness}`} disabled={disabled} onSelect={() => { void select({ kind: 'agent', id: agent.id }) }}><Bot /><span className="flex-1 truncate">{agent.name}</span>{assignee?.kind === 'agent' && assignee.id === agent.id && <Check />}</CommandItem>)}
             {data && !data.agents.length && <p className="px-2 py-3 text-xs text-muted-foreground">{t('noAgents')}</p>}
           </CommandGroup>

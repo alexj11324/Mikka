@@ -273,7 +273,8 @@
       "noAgents": "尚未配置 Agent",
       "newMember": "新成员",
       "invite": "邀请并分配…",
-      "reload": "重新读取成员"
+      "reload": "重新读取成员",
+      "agents": "Agent"
     },
     "membersTitle": "成员管理 · Orvilo",
     "membersDescription": "管理工作区成员、角色与邀请，支持 CSV 拖拽批量邀请和成员导出。",
@@ -842,7 +843,8 @@
     "inviteInvalid": "邀请无效、已过期，或当前登录邮箱不匹配。",
     "inviteExpired": "邀请已失效，请向管理员索取新的链接。",
     "workspaceMembershipSuspended": "成员资格已停用，请联系管理员恢复。",
-    "inviteInvalidEmails": "邮箱地址无效、为空或数量过多，请检查后重试。"
+    "inviteInvalidEmails": "邮箱地址无效、为空或数量过多，请检查后重试。",
+    "workspaceReadFailed": "无法读取工作区设置，请稍后重试。"
   },
   "Overview": {
     "sections": {

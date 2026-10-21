@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { getLocale, getTranslations } from 'next-intl/server'
 
 import { AuthForm } from '@/components/auth-form'
-import { redirect as localeRedirect } from '@/i18n/navigation'
+import { getPathname, redirect as localeRedirect } from '@/i18n/navigation'
 import { isAcceptanceEnabled } from '@/lib/acceptance'
 import { auth, authBaseURL, githubEnabled } from '@/lib/auth'
 import { safeAuthReturn } from '@/lib/auth-return'
@@ -19,7 +19,11 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   const query = await searchParams
   const next = safeAuthReturn(query.next)
   const session = await auth.api.getSession({ headers: await headers() })
-  if (session?.user) localeRedirect({ href: next, locale: await getLocale() })
+  if (session?.user) {
+    const locale = await getLocale()
+    if (next.startsWith('/?')) redirect(`${getPathname({ locale, href: '/' })}${next.slice(1)}`)
+    localeRedirect({ href: next, locale })
+  }
   if (isAcceptanceEnabled() && query.login !== '1' && !query.oauth && !query.continue && !query.error && !query.next) redirect('/api/acceptance')
   return <AuthForm next={next} mode="sign-in" githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean(query.error)} continueGitHub={query.continue === 'github'} callbackURL={authBaseURL ? `${authBaseURL.replace(/\/$/, '')}/api/auth/callback/github` : undefined} />
 }

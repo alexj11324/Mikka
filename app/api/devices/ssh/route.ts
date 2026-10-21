@@ -13,6 +13,9 @@ export const dynamic = 'force-dynamic'
 /** ssh, rsync and a remote install; 300s is the Hobby plan's ceiling. */
 export const maxDuration = 300
 
+/** One long install per account at a time; the next request gets a 429. */
+const activeConnects = new Map<string, number>()
+
 const bodySchema = z.object({
   host: z.string().trim().min(1).max(255),
   user: z.string().trim().max(64).default(''),
@@ -67,14 +70,18 @@ export async function POST(request: Request) {
   if (!(await isAllowedSshHost(requestedHost))) {
     return NextResponse.json({ error: 'Host is not in the server SSH allowlist.' }, { status: 403 })
   }
-  // The origin goes into a remote shell command, so it must be a plain URL.
-  // Take it from configured auth settings, never the request Host header.
-  const origin = authBaseURL ?? new URL(request.url).origin
+  // The origin goes into a remote shell command, so it must be a configured,
+  // plain URL. Never fall back to the request Host header.
+  const origin = authBaseURL
+  if (!origin) return NextResponse.json({ error: 'Server URL is not configured.' }, { status: 500 })
   if (!/^https?:\/\/[A-Za-z0-9.-]+(?::\d{1,5})?$/.test(origin)) {
     return NextResponse.json({ error: 'Invalid server origin.' }, { status: 400 })
   }
   const repoRoot = process.cwd()
   const userId = session.user.id
+  const active = activeConnects.get(userId) ?? 0
+  if (active >= 1) return NextResponse.json({ error: 'Another connection is already running.' }, { status: 429 })
+  activeConnects.set(userId, active + 1)
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
@@ -160,6 +167,9 @@ export async function POST(request: Request) {
       } catch (error) {
         send({ step: 'connect', state: 'failed', detail: error instanceof Error ? error.message : t('connectionError') })
       } finally {
+        const running = activeConnects.get(userId) ?? 1
+        if (running <= 1) activeConnects.delete(userId)
+        else activeConnects.set(userId, running - 1)
         controller.close()
       }
     },

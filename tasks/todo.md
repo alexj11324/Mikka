@@ -623,3 +623,27 @@ MCP servers, and hooks run outside it*）。无人值守下 `permissionMode` 也
 
 保留为后续项：SSH 连接端点的目标 allowlist / 限流；`app/actions/agents.ts` 未接入 UI 的 action 仍直接 throw；next-intl `timeZone` 未固定；`minimumReleaseAge: 0` 属于既有基础设施改动。
 
+
+---
+
+## 2026-10-21 合并 main 并补全新功能 i18n
+
+- [x] 解决 27 个冲突文件，保留 main 的项目/成员/设置/关系/元数据功能
+- [x] 新路由迁入 `app/[locale]`：acceptance、invite/[token]、preview/settings、settings/members
+- [x] 新增命名空间：Projects、Members、Settings、Invite、Acceptance、IssueDetail、Metadata、Overview
+- [x] 新增 55 个 Server Action 错误码，消费方统一 `useActionError`
+- [x] 品牌名统一为 Orvilo（含 workspace name/slug）
+- [x] E2E 固定 zh-CN，21/21 通过；CSV 测试改为断言错误码
+- [x] 修复 setup-e2e-db 的 schema 过滤与 Dialog/Sheet 默认关闭文案
+
+验证：`pnpm check`、`pnpm i18n:check`、`pnpm build`、`pnpm test:e2e`（21/21）通过。
+
+### 合并审查修复
+
+- [x] 恢复工作台侧栏的「设备」入口（i18n Link）
+- [x] 新增 `drizzle/0003_agents_columns.sql`，为既有 agents 表补列与索引
+- [x] `setProjectIssues` 不再吞 `ActionFailureError`
+- [x] `safeAuthReturn` 支持 `/?issue=<uuid>` 与 `/devices`，登录后保留深链
+- [x] SSH 路由拒绝缺失 `authBaseURL` 的请求，并限制每账号一个并发连接
+- [x] 指派菜单 Agents 分组、设置页 Sheet/rail、workspaceReadFailed 文案
+- [x] 验收页改用 locale redirect

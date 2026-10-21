@@ -12,7 +12,7 @@ export default async function DevicesPage() {
   const session = await auth.api.getSession({ headers: await headers() })
   const user = session?.user
   if (!user) {
-    redirect({ href: '/sign-in', locale: await getLocale() })
+    redirect({ href: '/sign-in?next=%2Fdevices', locale: await getLocale() })
     return null
   }
   const devices = await listDevices()

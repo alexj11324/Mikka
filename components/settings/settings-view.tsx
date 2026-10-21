@@ -28,6 +28,8 @@ function SettingRow({ title, description, children }: { title: string; descripti
 
 export function SettingsView({ user, onBack, onSignOut, signingOut, accountError }: { user: { name: string; email: string }; onBack: () => void; onSignOut: () => void; signingOut: boolean; accountError: string }) {
   const t = useTranslations('Settings')
+  const navT = useTranslations('Nav')
+  const commonT = useTranslations('Common')
   const [section, setSection] = useState<SectionId>('preferences')
   const [query, setQuery] = useState('')
   const { theme, setTheme } = useTheme()
@@ -47,7 +49,7 @@ export function SettingsView({ user, onBack, onSignOut, signingOut, accountError
   const current = sections.find(item => item.id === section)!
   const filtered = sections.filter(item => `${item.title} ${groupLabels[item.group]}`.includes(query.trim()))
   return <>
-    <Sidebar variant="inset">
+    <Sidebar variant="inset" mobileTitle={navT('sidebarTitle')} mobileDescription={navT('sidebarDescription')} mobileCloseLabel={commonT('close')}>
       <SidebarHeader>
         <SidebarMenu><SidebarMenuItem><SidebarMenuButton onClick={() => { setOpenMobile(false); onBack() }}><ArrowLeft /><span>{t('backToApp')}</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>
         <div className="relative my-2"><Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" aria-hidden="true" /><SidebarInput className="pl-8" aria-label={t('searchLabel')} placeholder={t('searchPlaceholder')} value={query} onChange={event => setQuery(event.target.value)} /></div>
@@ -60,7 +62,7 @@ export function SettingsView({ user, onBack, onSignOut, signingOut, accountError
         {filtered.length === 0 && <p className="px-4 py-2 text-sm text-muted-foreground" role="status">{t('noResults')}</p>}
       </SidebarContent>
       <SidebarFooter><NavUser user={user} onSignOut={onSignOut} signingOut={signingOut} /></SidebarFooter>
-      <SidebarRail />
+      <SidebarRail label={navT('toggleSidebar')} />
     </Sidebar>
     <AppShellContent parent={t('title')} title={current.title}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-6 py-10 sm:px-10 sm:py-16">

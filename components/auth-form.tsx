@@ -14,7 +14,9 @@ export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, con
   const t = useTranslations('Auth')
   const locale = useLocale()
   const returnPath = safeAuthReturn(next)
-  const home = getPathname({ locale, href: returnPath })
+  const home = returnPath.startsWith('/?')
+    ? `${getPathname({ locale, href: '/' })}${returnPath.slice(1)}`
+    : getPathname({ locale, href: returnPath })
   const signIn = getPathname({ locale, href: '/sign-in' })
   const [error, setError] = useState(oauthFailed ? t('oauthFailed') : '')
   const [notice, setNotice] = useState(continueGitHub ? t('continueNotice') : '')

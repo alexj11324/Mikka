@@ -273,7 +273,8 @@
       "noAgents": "No agents configured yet",
       "newMember": "New member",
       "invite": "Invite and assign…",
-      "reload": "Reload members"
+      "reload": "Reload members",
+      "agents": "Agents"
     },
     "membersTitle": "Members · Orvilo",
     "membersDescription": "Manage workspace members, roles, and invitations, with CSV bulk invites and member export.",
@@ -842,7 +843,8 @@
     "inviteInvalid": "This invitation is invalid, expired, or the signed-in email does not match.",
     "inviteExpired": "This invitation is no longer valid. Ask an admin for a new link.",
     "workspaceMembershipSuspended": "Your membership is suspended. Contact an admin to restore it.",
-    "inviteInvalidEmails": "The email addresses are invalid, empty, or too many. Check them and try again."
+    "inviteInvalidEmails": "The email addresses are invalid, empty, or too many. Check them and try again.",
+    "workspaceReadFailed": "Could not read the workspace settings. Please try again."
   },
   "Overview": {
     "sections": {
