@@ -1,7 +1,7 @@
 "use client";
 // beui.dev/components/agents/chat-app
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ComponentProps } from "react";
 import {
   AnimatedSidebarProvider,
   type AnimatedSidebarProviderProps,
@@ -68,6 +68,16 @@ function ShellFit({ minWidth }: { minWidth: number }) {
   }, [minWidth, setOpen]);
 
   return <div ref={markerRef} className="hidden" />;
+}
+
+// Extracted from beUI's chat-app-usage composition so host layout rules do not
+// strip the template's header and composer separators.
+export function ChatAppHeader({ className, ...props }: ComponentProps<'header'>) {
+  return <header className={cn('flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4', className)} {...props} />;
+}
+
+export function ChatAppFooter({ className, ...props }: ComponentProps<'footer'>) {
+  return <footer className={cn('shrink-0 border-t border-border bg-background p-3', className)} {...props} />;
 }
 
 export function ChatApp({

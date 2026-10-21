@@ -7,7 +7,6 @@ import { toast } from 'sonner'
 import { useCompletion } from '@ai-sdk/react'
 import { createTheme, ThemeProvider } from '@openuidev/react-ui/ThemeProvider'
 import { AgentComposer } from './agent-composer'
-import { AgentStarters } from './agent-starters'
 import { AgentResponse } from './agent-response'
 import { AgentChat } from './agent-chat'
 import { AgentInteractionContext } from './agent-interaction'
@@ -63,22 +62,17 @@ function AgentSession({ onReset }: { onReset: () => void }) {
     toast.info('已填入提问，请确认内容后发送。')
   }
 
-  function selectStarter(prompt: string) {
-    if (isLoading) return
-    updateDraft(prompt)
-    inputRef.current?.focus()
-  }
-
-  async function request(prompt: string, inline = false) {
+  async function request(prompt: string) {
     if (!prompt.trim() || prompt.length > 8000 || isLoading || submittingRef.current) return false
     submittingRef.current = true
     try {
       sessionIdRef.current ??= crypto.randomUUID()
-      if (inline) setPreviousTurns(turns => [...turns, { id: generation, question, completion, error }])
+      if (question) setPreviousTurns(turns => [...turns, { id: generation, question, completion, error }])
       else setPreviousTurns([])
       setGeneration(value => value + 1)
       setQuestion(prompt.trim())
       const result = await complete(prompt.trim(), { body: { sessionId: sessionIdRef.current } })
+      if (result) updateDraft('')
       return Boolean(result)
     } finally {
       submittingRef.current = false
@@ -86,7 +80,7 @@ function AgentSession({ onReset }: { onReset: () => void }) {
   }
 
   return <ThemeProvider cssSelector="#orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
-    <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt, true) }}>
+    <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt) }}>
       <AgentChat
         turns={[
           ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse completion={turn.completion} error={turn.error} isLoading={false} onAction={handleUIAction} /> })),
@@ -95,7 +89,6 @@ function AgentSession({ onReset }: { onReset: () => void }) {
         streaming={isLoading}
         onReset={onReset}
         composer={<AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={stop} />}
-        starters={<AgentStarters onSelect={selectStarter} />}
       />
     </AgentInteractionContext>
   </ThemeProvider>

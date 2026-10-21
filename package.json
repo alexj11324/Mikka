@@ -18,7 +18,8 @@
     "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
     "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
     "test:agent": "node --experimental-strip-types --test tests/agent-fetch.test.mjs tests/agent-ui.test.mjs",
-    "check": "pnpm check:agent-ui && pnpm test:agent && pnpm test:ui-policy && pnpm test:csv && pnpm lint && pnpm typecheck",
+    "test:acceptance": "node --test tests/acceptance.test.mjs",
+    "check": "pnpm check:agent-ui && pnpm test:agent && pnpm test:acceptance && pnpm test:ui-policy && pnpm test:csv && pnpm lint && pnpm typecheck",
     "check:ci": "pnpm check && pnpm build && pnpm test:e2e",
     "start": "next start",
     "typecheck": "tsgo --noEmit"

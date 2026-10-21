@@ -111,7 +111,30 @@ test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 
     assert.doesNotMatch(source, /from ['"][^'"]*(?:ai-elements|@ai-sdk\/elements|\/ui\/(?:message|message-scroller|bubble|input-group))/)
   }
   const starters = await readFile(new URL('../components/workspace/agent-starters.tsx', import.meta.url), 'utf8')
-  assert.ok(starters.includes("from '@/components/motion/button/base'"))
+  assert.match(starters, /export const agentStarters/)
+  assert.doesNotMatch(starters, /<Button|function AgentStarters/)
+})
+
+test('Chat App 整页使用官网外壳、导航与输入配置，不保留旧欢迎布局', async () => {
+  const source = await readFile(new URL('../components/workspace/agent-chat.tsx', import.meta.url), 'utf8')
+  for (const name of ['ChatApp', 'AnimatedSidebar', 'AnimatedSidebarInset', 'AnimatedSidebarTrigger', 'AISidebar']) {
+    assert.match(source, new RegExp(`<${name}[\\s>]`))
+  }
+  assert.ok(source.includes("from '@/components/agents/chat-app'"))
+  const conversation = await readFile(new URL('../components/workspace/agent-conversation.tsx', import.meta.url), 'utf8')
+  assert.match(conversation, /<MessageGroup spacing="default">/)
+  assert.match(conversation, /<MessageAvatar>/)
+  assert.match(conversation, /variant="solid"/)
+  assert.doesNotMatch(conversation, /<Empty|AgentStarters|有什么可以帮你/)
+  const composer = await readFile(new URL('../components/workspace/agent-composer.tsx', import.meta.url), 'utf8')
+  assert.match(composer, /minRows=\{1\}/)
+  assert.match(composer, /models=\{/)
+  assert.match(composer, /actions=\{/)
+  assert.doesNotMatch(composer, /leadingAction|<Kbd/)
+  const panel = await readFile(new URL('../components/workspace/agent-panel.tsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(panel, /starters=|AgentStarters/)
+  assert.match(panel, /if \(question\) setPreviousTurns/)
+  assert.match(panel, /if \(result\) updateDraft\(''\)/)
 })
 
 test('停止按钮先取消表单默认行为，避免同步恢复后误发草稿', async () => {
