@@ -63,12 +63,12 @@
 }
 
 :root {
---settings-background: oklch(0.975 0 0);
+--settings-background: oklch(0.98 0.002 286);
 --settings-foreground: oklch(0.25 0 0);
---settings-card: oklch(0.99 0 0);
---settings-sidebar: oklch(0.985 0 0);
---settings-sidebar-foreground: oklch(0.38 0 0);
---settings-sidebar-accent: oklch(0.945 0 0);
+--settings-card: oklch(1 0 0);
+--settings-sidebar: oklch(0.95 0.002 286);
+--settings-sidebar-foreground: oklch(0.44 0 0);
+--settings-sidebar-accent: oklch(0.905 0.002 286);
 --settings-border: oklch(0.905 0 0);
 --settings-input: oklch(0.89 0 0);
 --settings-muted-foreground: oklch(0.51 0 0);
