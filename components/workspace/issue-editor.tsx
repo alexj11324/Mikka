@@ -50,7 +50,7 @@ export function createDocumentSeed(content: JSONContent) {
   doc.destroy()
   return update
 }
-export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, syncLabel: syncLabelProp, replacement, onReplacementApplied, persisted = false, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
+export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, persisted = false, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
   const t = useTranslations('Editor')
   const author = authorProp ?? t('draftAuthor')
   const syncLabel = syncLabelProp ?? t('unsavedDraft')
@@ -130,13 +130,13 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
     if (!editor.chain().setMark("comment", { id }).run()) return
-    addThread(threadDoc, { id, author, createdAt: now, messages: [{ author, body: comment.trim(), at: now }] }, "draft-comment")
+    addThread(threadDoc, { id, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body: comment.trim(), at: now }] }, "draft-comment")
     setComment("")
     setCommentError("")
   }
   function submitReply(id: string) {
     if (!reply.trim()) return
-    replyToThread(threadDoc, id, { author, body: reply.trim(), at: new Date().toISOString() })
+    replyToThread(threadDoc, id, { author, authorUserId, body: reply.trim(), at: new Date().toISOString() })
     setReply("")
     setReplyId(null)
   }
@@ -166,8 +166,8 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
     {layout === 'issue' && !compact && afterDescription}
     {layout === 'issue' && !compact && <IssueActivity author={author} threads={threadList} anchors={anchors} events={activity} onComment={body => {
       const now = new Date().toISOString()
-      addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, createdAt: now, messages: [{ author, body, at: now }] }, 'issue-discussion')
-    }} onReply={(id, body) => { replyToThread(threadDoc, id, { author, body, at: new Date().toISOString() }) }} onResolve={(id, resolved) => { setThreadResolved(threadDoc, id, resolved) }} onSelect={id => {
+      addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body, at: now }] }, 'issue-discussion')
+    }} onReply={(id, body) => { replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString() }) }} onResolve={(id, resolved) => { setThreadResolved(threadDoc, id, resolved) }} onSelect={id => {
       if (!editor) return
       let from: number | undefined
       let to = 0

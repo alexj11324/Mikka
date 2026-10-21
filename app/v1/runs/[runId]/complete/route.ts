@@ -3,6 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { runStateForStop } from '@orvilo/protocol/daemon'
 import { runCompleteRequest, reachesReview } from '@orvilo/protocol/run'
 import { db } from '@/lib/db'
+import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { agentRuns, devices, issues, type RunStatus } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
 
@@ -45,6 +46,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATUSES])))
   if (run.issueId && reachesReview(stopReason, report)) {
     await db.update(issues).set({ status: 'review', updatedAt: new Date() }).where(eq(issues.id, run.issueId))
+    dispatchLinearIssueSync(run.issueId)
   }
   return new NextResponse(null, { status: 204 })
 }

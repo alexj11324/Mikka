@@ -1314,6 +1314,10 @@
       "workspace": {
         "title": "工作区",
         "description": "当前工作区的基本信息。"
+      },
+      "integrations": {
+        "title": "集成",
+        "description": "连接团队使用的外部工具。"
       }
     },
     "appearance": {
@@ -1345,6 +1349,30 @@
       "urlHelp": "URL 中的标识用于访问工作区。修改地址会影响现有链接。",
       "previewNote": "表单预览：尚未连接工作区存储，修改不会保存。",
       "previewLabel": "工作区表单预览"
+    },
+    "linear": {
+      "title": "Linear",
+      "description": "连接 Linear 账号，在 Linear 和 Orvilo 之间同步任务与评论。",
+      "connected": "已连接",
+      "connectedTo": "已连接到 {organization}",
+      "connect": "连接 Linear",
+      "disconnect": "断开连接",
+      "notConfigured": "请管理员配置 Linear OAuth、Webhook、令牌加密和定时任务。",
+      "oauthSuccess": "Linear 已连接。选择一个团队以开始同步。",
+      "oauthError": "无法连接 Linear，请重试。",
+      "teamLabel": "Linear 团队",
+      "teamPlaceholder": "选择团队",
+      "teamDescription": "每个 Orvilo 账号目前可同步一个 Linear 团队。新任务会自动同步，已有任务在下次变更后加入同步。",
+      "enable": "开启双向同步",
+      "pause": "暂停同步",
+      "syncActive": "正在同步 {team}",
+      "failedIssues": "需要处理的任务",
+      "inboundFailures": "需要处理的 Linear 更新",
+      "deliveryType": "{type} 更新",
+      "retry": "重试同步",
+      "loadError": "无法加载 Linear 设置。",
+      "operationError": "Linear 同步操作失败，请重试。",
+      "teamAlreadyLinked": "此 Linear 团队已连接到另一个 Orvilo 账号。"
     },
     "preview": {
       "userName": "预览用户"

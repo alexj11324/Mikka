@@ -3,15 +3,16 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useTheme } from 'next-themes'
 import { useTranslations } from 'next-intl'
-import { ArrowLeft, Building2, Monitor, Moon, Search, SlidersHorizontal, Sun, UserRound } from 'lucide-react'
+import { ArrowLeft, Building2, Cable, Monitor, Moon, Search, SlidersHorizontal, Sun, UserRound } from 'lucide-react'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { AppShellContent } from '@/components/app-shell'
 import { NavUser } from '@/components/nav-user'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { WorkspaceSettings } from '@/components/settings/workspace-settings'
+import { LinearSettings } from '@/components/settings/linear-settings'
 
-type SectionId = 'preferences' | 'profile' | 'workspace'
+type SectionId = 'preferences' | 'profile' | 'workspace' | 'integrations'
 type SectionGroup = 'personal' | 'workspace'
 
 const SECTION_GROUPS: SectionGroup[] = ['personal', 'workspace']
@@ -20,17 +21,18 @@ const SECTIONS = [
   { id: 'preferences', group: 'personal', icon: SlidersHorizontal },
   { id: 'profile', group: 'personal', icon: UserRound },
   { id: 'workspace', group: 'workspace', icon: Building2 },
+  { id: 'integrations', group: 'workspace', icon: Cable },
 ] as const
 
 function SettingRow({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return <div className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-col gap-1"><div className="text-sm font-medium">{title}</div>{description && <p className="text-sm text-muted-foreground">{description}</p>}</div><div className="shrink-0 text-sm">{children}</div></div>
 }
 
-export function SettingsView({ user, onBack, onSignOut, signingOut, accountError }: { user: { name: string; email: string }; onBack: () => void; onSignOut: () => void; signingOut: boolean; accountError: string }) {
+export function SettingsView({ user, onBack, onSignOut, signingOut, accountError, initialSection = 'preferences', linearNotice = null }: { user: { name: string; email: string }; onBack: () => void; onSignOut: () => void; signingOut: boolean; accountError: string; initialSection?: SectionId; linearNotice?: 'connected' | 'error' | null }) {
   const t = useTranslations('Settings')
   const navT = useTranslations('Nav')
   const commonT = useTranslations('Common')
-  const [section, setSection] = useState<SectionId>('preferences')
+  const [section, setSection] = useState<SectionId>(initialSection)
   const [query, setQuery] = useState('')
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -40,6 +42,7 @@ export function SettingsView({ user, onBack, onSignOut, signingOut, accountError
     preferences: { title: t('sections.preferences.title'), description: t('sections.preferences.description') },
     profile: { title: t('sections.profile.title'), description: t('sections.profile.description') },
     workspace: { title: t('sections.workspace.title'), description: t('sections.workspace.description') },
+    integrations: { title: t('sections.integrations.title'), description: t('sections.integrations.description') },
   }
   const groupLabels: Record<SectionGroup, string> = {
     personal: t('groups.personal'),
@@ -71,6 +74,7 @@ export function SettingsView({ user, onBack, onSignOut, signingOut, accountError
         {section === 'preferences' && <section className="flex flex-col gap-3" aria-labelledby="appearance-heading"><h2 id="appearance-heading" className="text-sm font-medium">{t('appearance.title')}</h2><div className="rounded-xl border bg-muted/30 px-5"><SettingRow title={t('appearance.theme')} description={t('appearance.themeDescription')}><ToggleGroup aria-label={t('appearance.themeLabel')} variant="outline" spacing={0} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}><ToggleGroupItem value="light" aria-label={t('appearance.light')}><Sun />{t('appearance.light')}</ToggleGroupItem><ToggleGroupItem value="dark" aria-label={t('appearance.dark')}><Moon />{t('appearance.dark')}</ToggleGroupItem><ToggleGroupItem value="system" aria-label={t('appearance.systemLabel')}><Monitor />{t('appearance.system')}</ToggleGroupItem></ToggleGroup></SettingRow><SettingRow title={t('appearance.language')} description={t('appearance.languageDescription')}><span className="text-muted-foreground">{t('appearance.languageName')}</span></SettingRow></div></section>}
         {section === 'profile' && <section className="flex flex-col gap-3" aria-labelledby="profile-heading"><h2 id="profile-heading" className="text-sm font-medium">{t('profile.heading')}</h2><div className="rounded-xl border bg-muted/30 px-5"><SettingRow title={t('profile.avatar')} description={t('profile.avatarDescription')}><Avatar className="size-10"><AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></SettingRow><SettingRow title={t('profile.name')}><span>{user.name || t('profile.notSet')}</span></SettingRow><SettingRow title={t('profile.email')}><span className="break-all">{user.email}</span></SettingRow></div><p className="text-xs text-muted-foreground">{t('profile.readOnly')}</p></section>}
         {section === 'workspace' && <WorkspaceSettings />}
+        {section === 'integrations' && <LinearSettings notice={linearNotice} />}
       </div>
     </AppShellContent>
   </>

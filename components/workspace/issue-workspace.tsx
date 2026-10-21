@@ -44,6 +44,18 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null }: 
   }
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsSection, setSettingsSection] = useState<'preferences' | 'profile' | 'workspace' | 'integrations'>('preferences')
+  const [linearNotice, setLinearNotice] = useState<'connected' | 'error' | null>(null)
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const result = url.searchParams.get('linear')
+    if (result !== 'connected' && result !== 'error') return
+    setSettingsOpen(true)
+    setSettingsSection('integrations')
+    setLinearNotice(result)
+    url.searchParams.delete('linear')
+    window.history.replaceState(null, '', url)
+  }, [])
   const [boardBusy, setBoardBusy] = useState(false)
   const { data: tasks = [], mutate, error } = useSWR('issues', listIssues, { fallbackData: initialIssues, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)
@@ -152,7 +164,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null }: 
   }
   const viewTitle = view === 'all' ? t('allIssues') : view === 'mine' ? t('mine') : view === 'shared' ? t('shared') : view === 'favorites' ? t('favorites') : view === 'following' ? t('following') : statusLabel(view)
   return <AppShell fixed={!settingsOpen && !selected && !isProjects && !isOverview && layout === 'board'}>
-    {settingsOpen ? <SettingsView user={user} onBack={() => setSettingsOpen(false)} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
+    {settingsOpen ? <SettingsView user={user} onBack={() => setSettingsOpen(false)} onSignOut={signOut} signingOut={signingOut} accountError={accountError} initialSection={settingsSection} linearNotice={linearNotice} /> : <>
     <AppSidebar onSettings={() => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsOpen(true) }) }} user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
     <AppShellContent hideHeader={!!selected} parent={WORKSPACE_NAME} title={sectionTitles[section]} actions={<Button variant="ghost" size="icon-sm" aria-label={t('openSearch')} disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}

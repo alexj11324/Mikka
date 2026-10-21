@@ -1314,6 +1314,10 @@
       "workspace": {
         "title": "Workspace",
         "description": "Basic information about the current workspace."
+      },
+      "integrations": {
+        "title": "Integrations",
+        "description": "Connect Orvilo with the tools your team uses."
       }
     },
     "appearance": {
@@ -1345,6 +1349,30 @@
       "urlHelp": "The URL slug identifies the workspace. Changing it affects existing links.",
       "previewNote": "Form preview: workspace storage is not connected, so changes are not saved.",
       "previewLabel": "Workspace form preview"
+    },
+    "linear": {
+      "title": "Linear",
+      "description": "Connect a Linear account to sync issues and comments with Orvilo.",
+      "connected": "Connected",
+      "connectedTo": "Connected to {organization}",
+      "connect": "Connect Linear",
+      "disconnect": "Disconnect",
+      "notConfigured": "Linear OAuth, webhook, token encryption, and cron settings must be configured by an administrator.",
+      "oauthSuccess": "Linear is connected. Choose a team to start syncing.",
+      "oauthError": "Linear could not be connected. Try again.",
+      "teamLabel": "Linear team",
+      "teamPlaceholder": "Choose a team",
+      "teamDescription": "One team can sync with this Orvilo account at a time. New issues sync automatically; existing issues join after their next change.",
+      "enable": "Enable two-way sync",
+      "pause": "Pause sync",
+      "syncActive": "Syncing {team}",
+      "failedIssues": "Issues that need attention",
+      "inboundFailures": "Linear updates that need attention",
+      "deliveryType": "{type} update",
+      "retry": "Retry sync",
+      "loadError": "Could not load Linear settings.",
+      "operationError": "The Linear sync action failed. Try again.",
+      "teamAlreadyLinked": "This Linear team is already connected to another Orvilo account."
     },
     "preview": {
       "userName": "Preview user"

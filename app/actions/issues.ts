@@ -14,6 +14,7 @@ import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
 import { issueWithMetadata, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers, ensureIssueNumbers } from '@/lib/issue-numbering'
+import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 
 type IssueRow = typeof issues.$inferSelect
 type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata> }
@@ -78,7 +79,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
     const ownerId = input.id ? (await requireIssueAccess(id)).issue.userId : userId
     if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: 'issueRevisionInvalid' }
     try {
-      return await db.transaction(async tx => {
+      const result = await db.transaction(async tx => {
         let issue
         if (input.id) {
           const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, ownerId))).for('update')
@@ -93,6 +94,8 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
         return { issue: issueWithMetadata(issue) }
       })
+      if ('issue' in result) dispatchLinearIssueSync(result.issue.id)
+      return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
       console.error('Failed to save issue', error instanceof Error ? error.message : 'database error')

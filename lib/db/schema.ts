@@ -31,6 +31,56 @@ export const issueVersions = pgTable('issue_versions', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
+/** OAuth grants and sync state live beside issues so webhook inbox/outbox writes are atomic. */
+export const linearOAuthStates = pgTable('linear_oauth_states', {
+  stateHash: text('stateHash').primaryKey(), userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  verifier: text('verifier').notNull(), expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
+export const linearConnections = pgTable('linear_connections', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  linearUserId: text('linearUserId').notNull(), organizationId: text('organizationId').notNull(), organizationName: text('organizationName').notNull(),
+  accessToken: text('accessToken').notNull(), refreshToken: text('refreshToken').notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(), revokedAt: timestamp('revokedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+export const linearTeamSyncs = pgTable('linear_team_syncs', {
+  id: uuid('id').primaryKey(), ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  linearTeamId: text('linearTeamId').notNull().unique(), linearTeamKey: text('linearTeamKey').notNull(), linearTeamName: text('linearTeamName').notNull(),
+  active: boolean('active').notNull().default(true), lastError: text('lastError'), lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('linear_team_syncs_owner_idx').on(table.ownerId, table.active), uniqueIndex('linear_team_syncs_one_active_per_owner_key').on(table.ownerId).where(sql`${table.active}`)])
+export const linearIssueLinks = pgTable('linear_issue_links', {
+  id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().unique().references(() => issues.id, { onDelete: 'cascade' }),
+  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  teamSyncId: uuid('teamSyncId').notNull().references(() => linearTeamSyncs.id, { onDelete: 'cascade' }),
+  linearIssueId: text('linearIssueId').notNull().unique(), linearIdentifier: text('linearIdentifier').notNull(), linearDescriptionHash: text('linearDescriptionHash'),
+  syncStatus: text('syncStatus').notNull().default('synced'), lastError: text('lastError'),
+  appSyncedAt: timestamp('appSyncedAt', { withTimezone: true }), linearUpdatedAt: timestamp('linearUpdatedAt', { withTimezone: true }),
+  remoteRemovedAt: timestamp('remoteRemovedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('linear_issue_links_team_idx').on(table.teamSyncId)])
+export const linearCommentLinks = pgTable('linear_comment_links', {
+  id: uuid('id').primaryKey(), issueLinkId: uuid('issueLinkId').notNull().references(() => linearIssueLinks.id, { onDelete: 'cascade' }),
+  threadId: text('threadId').notNull(), messageId: text('messageId').notNull(), authorUserId: text('authorUserId'), linearCommentId: text('linearCommentId').notNull().unique(),
+  parentLinearCommentId: text('parentLinearCommentId'), bodyHash: text('bodyHash').notNull(), syncStatus: text('syncStatus').notNull().default('pending'), lastError: text('lastError'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('linear_comment_links_local_key').on(table.issueLinkId, table.threadId, table.messageId)])
+export const linearSyncOutbox = pgTable('linear_sync_outbox', {
+  id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('queued'), attempts: integer('attempts').notNull().default(0),
+  availableAt: timestamp('availableAt', { withTimezone: true }).notNull().defaultNow(), lastError: text('lastError'),
+  lastAttemptAt: timestamp('lastAttemptAt', { withTimezone: true }), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('linear_sync_outbox_ready_idx').on(table.status, table.availableAt)])
+export const linearSyncInbox = pgTable('linear_sync_inbox', {
+  deliveryId: text('deliveryId').primaryKey(), organizationId: text('organizationId').notNull(), eventType: text('eventType').notNull(),
+  payload: jsonb('payload').$type<Record<string, unknown>>().notNull(), status: text('status').notNull().default('queued'),
+  attempts: integer('attempts').notNull().default(0), availableAt: timestamp('availableAt', { withTimezone: true }).notNull().defaultNow(),
+  lastError: text('lastError'), lastAttemptAt: timestamp('lastAttemptAt', { withTimezone: true }),
+  receivedAt: timestamp('receivedAt', { withTimezone: true }).notNull().defaultNow(), processedAt: timestamp('processedAt', { withTimezone: true }),
+}, table => [index('linear_sync_inbox_ready_idx').on(table.status, table.availableAt)])
+
 // --- Devices, agents and runs ---------------------------------------------
 //
 // The daemon owns detection and execution; the server stores what it reports.
