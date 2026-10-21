@@ -5,13 +5,17 @@ import { isAcceptanceEnabled } from '@/lib/acceptance'
 
 export const dynamic = 'force-dynamic'
 
+function redirectWithinPreview(path: '/' | '/?acceptance=1' | '/acceptance') {
+  // NextRequest.url can contain the internal 0.0.0.0 origin behind the preview proxy.
+  return new NextResponse(null, { status: 307, headers: { Location: path, 'Cache-Control': 'no-store' } })
+}
+
 export async function GET(request: NextRequest) {
   if (!isAcceptanceEnabled()) return new NextResponse(null, { status: 404 })
 
-  const destination = new URL('/?acceptance=1', request.url)
   try {
     const session = await auth.api.getSession({ headers: request.headers })
-    if (session?.user) return NextResponse.redirect(new URL('/', request.url))
+    if (session?.user) return redirectWithinPreview('/')
 
     const result = await auth.api.signUpEmail({
       headers: request.headers,
@@ -25,12 +29,11 @@ export async function GET(request: NextRequest) {
     const cookies = result.headers.getSetCookie()
     if (!result.ok || cookies.length === 0) throw new Error('Acceptance session unavailable')
 
-    const response = NextResponse.redirect(destination)
-    response.headers.set('Cache-Control', 'no-store')
+    const response = redirectWithinPreview('/?acceptance=1')
     for (const cookie of cookies) response.headers.append('Set-Cookie', cookie)
     return response
   } catch {
     console.error('Unable to start the development acceptance session')
-    return NextResponse.redirect(new URL('/acceptance', request.url))
+    return redirectWithinPreview('/acceptance')
   }
 }
