@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, register, test } from './fixtures'
 
 const sections = ['偏好设置', '个人资料', '工作区']
 
@@ -10,7 +10,10 @@ const sections = ['偏好设置', '个人资料', '工作区']
  * to static lint. Measuring the rendered boxes is the only reliable signal.
  */
 test('settings row dividers span the grouped card edges', async ({ page }) => {
-  await page.goto('/preview/settings')
+  // /preview/settings redirects outside development, so open the real view.
+  await register(page)
+  await page.getByRole('button', { name: '账户菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '设置', exact: true }).click()
 
   for (const section of sections) {
     await page.getByRole('button', { name: section }).click()
