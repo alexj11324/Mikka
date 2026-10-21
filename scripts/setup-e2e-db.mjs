@@ -4,6 +4,7 @@ import { SQL, sql } from 'drizzle-orm'
 import { getTableConfig, PgDialect } from 'drizzle-orm/pg-core'
 import * as issueSchema from '../lib/db/schema.ts'
 import * as workspaceSchema from '../lib/db/workspace-schema.ts'
+import * as projectSchema from '../lib/db/project-schema.ts'
 
 const connectionString = process.env.E2E_DATABASE_URL
 if (!connectionString) throw new Error('必须设置独立的 E2E_DATABASE_URL，禁止回退到业务数据库。')
@@ -23,7 +24,7 @@ try {
 const pool = new Pool({ connectionString, max: 1 })
 const dialect = new PgDialect()
 const identifier = name => dialect.sqlToQuery(sql`${sql.identifier(name)}`).sql
-function defaultValue(value) {
+function defaultValue(value, dataType) {
   if (value instanceof SQL) {
     const query = dialect.sqlToQuery(value)
     if (query.params.length) throw new Error('测试 DDL 不支持带参数的默认值。')
@@ -31,11 +32,12 @@ function defaultValue(value) {
   }
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   if (typeof value === 'string') return `'${value.replaceAll("'", "''")}'`
+  if (dataType === 'json') return `'${JSON.stringify(value).replaceAll("'", "''")}'::jsonb`
   throw new Error('测试 DDL 遇到未支持的默认值。')
 }
 
 try {
-  for (const table of [...Object.values(issueSchema), ...Object.values(workspaceSchema)]) {
+  for (const table of [...Object.values(issueSchema), ...Object.values(workspaceSchema), ...Object.values(projectSchema)]) {
     const config = getTableConfig(table)
     if (config.name === 'user') continue
     const columns = config.columns.map(column => [
@@ -43,7 +45,7 @@ try {
       column.notNull ? 'NOT NULL' : '',
       column.primary ? 'PRIMARY KEY' : '',
       column.isUnique ? 'UNIQUE' : '',
-      column.default === undefined ? '' : `DEFAULT ${defaultValue(column.default)}`,
+      column.default === undefined ? '' : `DEFAULT ${defaultValue(column.default, column.dataType)}`,
     ].filter(Boolean).join(' '))
     const constraints = [
       ...config.primaryKeys.map(key => `PRIMARY KEY (${key.columns.map(column => identifier(column.name)).join(', ')})`),

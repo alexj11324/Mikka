@@ -110,7 +110,8 @@ function gutterPoint(
   view: EditorView,
   target: BlockTarget,
   scroller: HTMLElement,
-  gutter: HTMLElement
+  gutter: HTMLElement,
+  gap: number
 ) {
   const block = view.nodeDOM(target.pos)
   if (!(block instanceof HTMLElement)) return null
@@ -118,7 +119,7 @@ function gutterPoint(
   const edge = isListItem(target.node) ? block.parentElement : view.dom
   const left = (edge ?? block).getBoundingClientRect().left
   const box = scroller.getBoundingClientRect()
-  const x = left - box.left + scroller.scrollLeft - GUTTER_GAP
+  const x = left - box.left + scroller.scrollLeft - gap
   const y = firstLineCenter(view, target, block) - box.top + scroller.scrollTop
 
   return {
@@ -181,6 +182,7 @@ function holdPress(event: SyntheticEvent) {
 interface RichTextBlockGutterProps {
   editor: Editor
   editable: boolean
+  gap?: number
   /** The relative box the gutter is positioned in; it may scroll itself or move
    *  with a page that its host scrolls. */
   scrollerRef: RefObject<HTMLDivElement | null>
@@ -192,6 +194,7 @@ export function RichTextBlockGutter({
   editor,
   editable,
   scrollerRef,
+  gap = GUTTER_GAP,
   onDeleteTable,
 }: RichTextBlockGutterProps) {
   const [shown, setShown] = useState(false)
@@ -271,7 +274,7 @@ export function RichTextBlockGutter({
       if (!force && shownRef.current && targetRef.current === target.pos) {
         return
       }
-      const point = gutterPoint(view, target, scroller, gutter)
+      const point = gutterPoint(view, target, scroller, gutter, gap)
       if (!point) return show(false)
       targetRef.current = target.pos
       gutter.style.transform = `translate(${point.x}px, ${point.y}px)`
@@ -393,7 +396,7 @@ export function RichTextBlockGutter({
       editor.off("focus", refresh)
       editor.off("blur", handleBlur)
     }
-  }, [editor, scrollerRef])
+  }, [editor, scrollerRef, gap])
 
   function insertRow(event: ReactMouseEvent) {
     const pos = targetRef.current

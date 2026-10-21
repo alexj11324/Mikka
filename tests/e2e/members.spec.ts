@@ -58,7 +58,7 @@ test("成员导航、邀请取消、角色选择、创建和撤销邀请、管�
   await expect(confirmation).not.toBeVisible();
   await page.getByRole("link", { name: "返回工作台", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "全部任务", exact: true }),
+    page.getByRole("heading", { name: "项目", exact: true }),
   ).toBeVisible();
 });
 
