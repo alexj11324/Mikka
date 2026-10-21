@@ -132,8 +132,8 @@ export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作�
       <div className={cn('min-w-0 [--frame-panel-header-px:--spacing(2)] [--frame-panel-header-py:--spacing(2)]', layout === 'description' ? '[&>[role=toolbar]]:rounded-lg [&>[role=toolbar]]:border' : 'rounded-lg border')}>
         <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />
         <div ref={pageRef} className="relative min-w-0">
-          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-36 px-4 py-4 text-sm/7 sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
-          {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
+          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-36 px-4 py-4 text-sm/7', layout === 'description' ? 'sm:pl-16' : 'sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+          {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
         </div>
       </div>
       {layout === 'issue' && !compact && <><div className="flex flex-wrap items-center justify-between gap-2 pb-7">

@@ -16,8 +16,8 @@ import { ProjectPropertyControl } from './project-property-controls'
 import { useProjectUpdate } from './use-project-update'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-export function ProjectWorkspace({ projects, loading, error, projectId, team, issues, userName, onSelect, onOpenIssue, onCreateIssue, onUpdated }: {
-  projects: Project[]; loading: boolean; error: boolean; projectId: string | null; team?: string; issues: Awaited<ReturnType<typeof listIssues>>; userName: string; onSelect: (id: string | null) => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void
+export function ProjectWorkspace({ projects, loading, error, projectId, team, issues, userName, onSelect, onOpenTeam, onOpenIssue, onCreateIssue, onUpdated }: {
+  projects: Project[]; loading: boolean; error: boolean; projectId: string | null; team?: string; issues: Awaited<ReturnType<typeof listIssues>>; userName: string; onSelect: (id: string | null) => void; onOpenTeam: () => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void
 }) {
   const [creating, setCreating] = useState(false)
   const { update, pending, error: saveError } = useProjectUpdate(onUpdated)
@@ -28,7 +28,7 @@ export function ProjectWorkspace({ projects, loading, error, projectId, team, is
   const filtered = projects.filter(item => (!team || item.team === team) && (status === 'all' || item.status === status) && item.name.toLowerCase().includes(query.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN') * (ascending ? 1 : -1))
   if (error) return <Empty><EmptyHeader><EmptyTitle>项目读取失败</EmptyTitle><EmptyDescription>未使用示例数据替代，请重试连接。</EmptyDescription></EmptyHeader><Button variant="outline" onClick={onUpdated}>重新读取</Button></Empty>
   if (loading) return <div role="status" aria-label="正在加载项目" className="flex flex-col gap-4 p-6"><Skeleton className="h-8 w-48" /><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
-  if (project) return <ProjectDetail key={project.id} project={project} projects={projects} issues={issues} userName={userName} onBack={() => onSelect(null)} onOpenIssue={onOpenIssue} onCreateIssue={onCreateIssue} onUpdated={onUpdated} />
+  if (project) return <ProjectDetail key={project.id} project={project} projects={projects} issues={issues} userName={userName} onBack={() => onSelect(null)} onOpenTeam={() => { setQuery(''); setStatus('all'); onOpenTeam() }} onOpenIssue={onOpenIssue} onCreateIssue={onCreateIssue} onUpdated={onUpdated} />
   return <div className="flex min-w-0 flex-1 flex-col">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4"><h1 className="text-sm font-medium">{team ? `${team} · 项目` : '项目'}</h1><Button size="sm" variant="ghost" onClick={() => setCreating(true)}><Plus data-icon="inline-start" />新建项目</Button></div>
     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><span className="text-sm text-muted-foreground">全部项目 · {filtered.length}</span><div className="flex items-center gap-2"><Input aria-label="搜索项目" placeholder="搜索项目…" className="w-40 sm:w-48" value={query} onChange={event => setQuery(event.target.value)} /><NativeSelect aria-label="筛选项目状态" value={status} onChange={event => setStatus(event.target.value)}><NativeSelectOption value="all">全部状态</NativeSelectOption>{PROJECT_STATUSES.map(item => <NativeSelectOption key={item.value} value={item.value}>{item.label}</NativeSelectOption>)}</NativeSelect></div></div>
