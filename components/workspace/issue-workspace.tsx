@@ -7,6 +7,7 @@ import { Columns3, List, Search } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IssueBoard } from './issue-board'
 import { AppSidebar } from '@/components/app-sidebar'
+import { SettingsView } from '@/components/settings/settings-view'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
@@ -22,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 export function IssueWorkspace({ user, initialIssues }: { user: { id: string; name: string; email: string }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [boardBusy, setBoardBusy] = useState(false)
   const { data: tasks = [], mutate, error } = useSWR('issues', listIssues, { fallbackData: initialIssues, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
   const [layout, setLayout] = useState<'board' | 'list'>('board')
@@ -38,7 +40,7 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
   const [searchOpen, setSearchOpen] = useState(false)
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
-      if (event.isComposing || event.keyCode === 229 || boardBusy) return
+      if (event.isComposing || event.keyCode === 229 || boardBusy || settingsOpen) return
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         if (document.querySelector('[role="dialog"][data-open]') && !searchOpen) return
         event.preventDefault(); setSearchOpen(value => !value)
@@ -48,7 +50,7 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
     }
     window.addEventListener('keydown', shortcut)
     return () => window.removeEventListener('keydown', shortcut)
-  }, [creating, searchOpen, view, boardBusy])
+  }, [creating, searchOpen, view, boardBusy, settingsOpen])
   const [signingOut, setSigningOut] = useState(false)
   const [accountError, setAccountError] = useState('')
   const router = useRouter()
@@ -94,7 +96,8 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
   }
   const viewTitle = view === 'all' ? '全部任务' : view === 'mine' ? '我创建的' : view === 'shared' ? '协作任务' : ISSUE_STATUSES.find(status => status.value === view)?.label ?? '全部任务'
   return <TooltipProvider><SidebarProvider>
-    <AppSidebar user={user} view={view} counts={counts} recentIssues={tasks} selected={selected} onNavigate={navigate} onOpen={open} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
+    {settingsOpen ? <SettingsView user={user} onBack={() => setSettingsOpen(false)} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
+    <AppSidebar onSettings={() => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsOpen(true) }) }} user={user} view={view} counts={counts} recentIssues={tasks} selected={selected} onNavigate={navigate} onOpen={open} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
     <SidebarInset className="min-w-0">
       <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b px-4">
         <div className="flex min-w-0 items-center gap-2">
@@ -114,6 +117,7 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
         {layout === 'board' ? <IssueBoard issues={filtered} onOpen={open} onCreate={create} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={open} onCreate={() => create()} />}
       </>}
     </SidebarInset>
+    </>}
     {creating && <CreateIssueDialog initialStatus={createStatus} open={creating} onOpenChange={setCreating} onCreated={() => { void mutate() }} author={user.name || user.email} />}
     {searchOpen && <IssueSearch open={searchOpen} onOpenChange={setSearchOpen} issues={tasks} onOpen={open} onCreate={() => create()} />}
   </SidebarProvider></TooltipProvider>

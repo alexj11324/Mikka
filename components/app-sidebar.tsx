@@ -26,7 +26,7 @@ import { useSidebar } from '@/components/ui/sidebar'
 
 import { ISSUE_STATUSES, WORKSPACE_NAME, type IssueView } from '@/components/workspace/issue-properties'
 
-export function AppSidebar({ user, view, counts, recentIssues, selected, onNavigate, onOpen, onSearch, onCreate, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
+export function AppSidebar({ user, view, counts, recentIssues, selected, onNavigate, onOpen, onSearch, onCreate, onSettings, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
   user: { name: string; email: string }
   view: IssueView
   counts: Record<IssueView, number>
@@ -36,6 +36,7 @@ export function AppSidebar({ user, view, counts, recentIssues, selected, onNavig
   onOpen: (id: string) => boolean
   onSearch: () => void
   onCreate: () => void
+  onSettings: () => void
   onSignOut: () => void
   signingOut: boolean
 }) {
@@ -80,7 +81,7 @@ export function AppSidebar({ user, view, counts, recentIssues, selected, onNavig
         })}</SidebarMenu></SidebarGroup>}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} onSignOut={onSignOut} signingOut={signingOut} />
+        <NavUser user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
