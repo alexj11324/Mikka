@@ -23,7 +23,7 @@ export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: st
 
 export async function loadWorkspaceSettings(requestedId?: string, authenticatedUser?: Awaited<ReturnType<typeof requireUser>>) {
   const user = authenticatedUser ?? await requireUser()
-  return workspaceDb.transaction(async tx => {
+  const snapshot = await workspaceDb.transaction(async tx => {
     const own = await tx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.userId, user.id)).limit(1)
     if (!own.length) {
       const [created] = await tx.insert(workspaces).values({ id: crypto.randomUUID(), userId: user.id, name: `${user.name || '我的'}的工作区`.slice(0, 120) }).onConflictDoNothing().returning({ id: workspaces.id })
@@ -42,16 +42,23 @@ export async function loadWorkspaceSettings(requestedId?: string, authenticatedU
       .from(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId)).orderBy(asc(workspaceMembers.createdAt))
     const invitations = membership.role === 'admin' ? await tx.select({ id: workspaceInvitations.id, email: workspaceInvitations.email, role: workspaceInvitations.role, status: workspaceInvitations.status, createdAt: workspaceInvitations.createdAt, expiresAt: workspaceInvitations.expiresAt })
       .from(workspaceInvitations).where(and(eq(workspaceInvitations.workspaceId, workspaceId), eq(workspaceInvitations.status, 'pending'))).orderBy(asc(workspaceInvitations.createdAt)) : []
-    // Auth profiles live in a separate database; only read IDs from this authorized workspace.
-    const profiles = members.length ? await db.select({ id: users.id, image: users.image }).from(users)
-      .where(inArray(users.id, members.map(member => member.userId))) : []
-    const images = new Map(profiles.map(profile => [profile.id, profile.image]))
     return {
       workspace: { id: workspace.id, name: workspace.name }, choices, currentUserId: user.id, role: membership.role,
       currentUser: { email: user.email, image: user.image ?? null },
-      members: members.map(member => ({ ...member, image: images.get(member.userId) ?? null, createdAt: member.createdAt.toISOString() })),
+      members,
       invitations: invitations.map(invite => ({ ...invite, createdAt: invite.createdAt.toISOString(), expiresAt: invite.expiresAt.toISOString() })),
     }
   }, { isolationLevel: 'repeatable read' })
+  // Release the workspace connection before waiting on the separate auth database.
+  // Only read profile IDs from the authorized workspace snapshot.
+  const otherMemberIds = snapshot.members.filter(member => member.userId !== user.id).map(member => member.userId)
+  const profiles = otherMemberIds.length ? await db.select({ id: users.id, image: users.image }).from(users)
+    .where(inArray(users.id, otherMemberIds)) : []
+  const images = new Map(profiles.map(profile => [profile.id, profile.image]))
+  images.set(user.id, user.image ?? null)
+  return {
+    ...snapshot,
+    members: snapshot.members.map(member => ({ ...member, image: images.get(member.userId) ?? null, createdAt: member.createdAt.toISOString() })),
+  }
 }
 export type WorkspaceSettings = Awaited<ReturnType<typeof loadWorkspaceSettings>>
