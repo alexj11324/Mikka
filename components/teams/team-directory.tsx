@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { SettingsLink as Link } from '@/components/settings/settings-link'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -22,7 +22,7 @@ import { TeamMembersSettings } from './team-members-settings'
 import { TeamSettingsDetails } from './team-settings-details'
 
 type Directory = Awaited<ReturnType<typeof loadTeamDirectory>>
-export function TeamDirectory({ workspaceId, onWorkspaceResolved }: { workspaceId?: string; onWorkspaceResolved: (id: string) => void }) {
+export function TeamDirectory({ workspaceId }: { workspaceId?: string }) {
   const router = useRouter()
   const params = useSearchParams()
   const initialTeamId = params.get('team') ?? undefined
@@ -30,12 +30,6 @@ export function TeamDirectory({ workspaceId, onWorkspaceResolved }: { workspaceI
   const initialView = params.get('view')
   const { mutate: refresh } = useSWRConfig()
   const { data, error: readError, mutate } = useSWR<Directory>(teamDirectoryKey(workspaceId), fetchTeamDirectory, settingsReadOptions)
-  useEffect(() => {
-    if (data && !workspaceId) {
-      void refresh(['team-directory', data.workspace.id], data, { revalidate: false })
-      onWorkspaceResolved(data.workspace.id)
-    }
-  }, [data, workspaceId, onWorkspaceResolved, refresh])
   function navigate(href: string) { if (!pushSettingsHistory(href, workspaceId)) router.push(href) }
   const [query, setQuery] = useState('')
   const [view, setView] = useState('all')

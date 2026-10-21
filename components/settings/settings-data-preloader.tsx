@@ -17,8 +17,7 @@ export function SettingsDataPreloader({ workspaceId, onWorkspaceResolved }: { wo
     if (workspaceId) return
     if (members) void mutate(memberSettingsKey(members.workspace.id), members, { revalidate: false })
     if (directory) void mutate(teamDirectoryKey(directory.workspace.id), directory, { revalidate: false })
-    const id = members?.workspace.id ?? directory?.workspace.id
-    if (id) onWorkspaceResolved(id)
+    if (members && directory && members.workspace.id === directory.workspace.id) onWorkspaceResolved(members.workspace.id)
   }, [workspaceId, members, directory, mutate, onWorkspaceResolved])
 
   return null

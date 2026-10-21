@@ -33,7 +33,7 @@ export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers
   return <SWRConfig value={cacheConfig}>
     <SettingsDataPreloader workspaceId={params.get('workspace') ?? initialWorkspaceId} onWorkspaceResolved={setWorkspaceId} />
     {pathname.startsWith('/settings')
-      ? <SettingsShell user={user} defaultWorkspaceId={workspaceId} onWorkspaceResolved={setWorkspaceId} />
+      ? <SettingsShell user={user} defaultWorkspaceId={workspaceId} />
       : <IssueWorkspace user={user} initialIssues={initialIssues} />}
   </SWRConfig>
 }

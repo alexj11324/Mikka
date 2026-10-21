@@ -1,8 +1,8 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import useSWR, { useSWRConfig, type KeyedMutator } from "swr";
+import useSWR, { type KeyedMutator } from "swr";
 import { fetchSettingsData, isSettingsAccessError, memberSettingsKey, settingsReadOptions } from '@/lib/settings-data';
 import { pushSettingsHistory } from '@/lib/settings-navigation';
 import { SettingsDataState } from '@/components/settings/settings-data-state';
@@ -92,15 +92,8 @@ type Change = {
   status: "active" | "suspended";
 };
 
-export function MembersSettings({ workspaceId, inviteInitially, onWorkspaceResolved }: { workspaceId?: string; inviteInitially: boolean; onWorkspaceResolved: (id: string) => void }) {
-  const { mutate: updateCache } = useSWRConfig();
+export function MembersSettings({ workspaceId, inviteInitially }: { workspaceId?: string; inviteInitially: boolean }) {
   const { data, error, mutate } = useSWR<WorkspaceSettings>(memberSettingsKey(workspaceId), fetchSettingsData<WorkspaceSettings>, settingsReadOptions);
-  useEffect(() => {
-    if (data && !workspaceId) {
-      void updateCache(`/api/workspace?workspace=${encodeURIComponent(data.workspace.id)}`, data, { revalidate: false });
-      onWorkspaceResolved(data.workspace.id);
-    }
-  }, [data, workspaceId, onWorkspaceResolved, updateCache]);
   if (!data || isSettingsAccessError(error)) return <SettingsDataState title="成员" error={error} onRetry={() => void mutate()} />;
   return <MembersSettingsContent key={`${data.workspace.id}-${inviteInitially}`} data={data} fetchError={Boolean(error)} mutate={mutate} inviteInitially={inviteInitially} />;
 }
