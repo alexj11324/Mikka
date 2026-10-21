@@ -1,7 +1,7 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
@@ -15,7 +15,13 @@ import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/
 import { listSshHosts } from '@/lib/ssh'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
+import { modelNameSchema } from '@orvilo/protocol/agent-policy'
 import type { HarnessInfo } from '@orvilo/protocol/harness'
+import { resolveAgentPlacement, type PlacementResult } from '@/lib/agent-placement'
+import {
+  AGENT_ROLES, BUILT_IN_AGENT_PRESETS, BUILT_IN_AGENT_ROLES, MAX_AGENT_INSTRUCTIONS_LENGTH,
+  isBuiltInAgentRole, type AgentRole,
+} from '@/lib/agent-roles'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -46,10 +52,15 @@ export interface DeviceView {
 
 export interface AgentView {
   id: string
+  role: AgentRole
   name: string
   description: string
   instructions: string
-  harness: SupportedHarness
+  /** null: auto, chosen when a run is queued. */
+  harness: SupportedHarness | null
+  /** null: auto, the harness CLI's own default. */
+  model: string | null
+  /** null: auto, any of this person's enabled devices. */
   deviceId: string | null
   deviceName: string | null
 }
@@ -59,7 +70,8 @@ export interface RunView {
   issueId: string | null
   agentId: string
   agentName: string
-  harness: SupportedHarness
+  harness: SupportedHarness | null
+  model: string | null
   status: string
   kind: string
   stopReason: string | null
@@ -155,85 +167,157 @@ export async function removeDeviceRepo(id: string): Promise<void> {
   await db.delete(deviceRepos).where(and(eq(deviceRepos.id, parsed.data), eq(deviceRepos.userId, userId)))
 }
 
-export async function listAgents(): Promise<AgentView[]> {
-  const userId = await getUserId()
-  const rows = await db.select({
-    id: agents.id, name: agents.name, description: agents.description, instructions: agents.instructions,
-    harness: agents.harness, deviceId: agents.deviceId, deviceName: devices.name,
-  }).from(agents).leftJoin(devices, eq(devices.id, agents.deviceId))
-    .where(eq(agents.userId, userId)).orderBy(asc(agents.name))
-  return rows
+/**
+ * Coordinator, Worker and Reviewer exist for everyone. They are inserted the
+ * first time they are missing; the partial unique index on (userId, role)
+ * makes a concurrent second insert a no-op, and a custom agent that already
+ * took one of the names simply keeps it.
+ */
+async function ensureBuiltInAgents(userId: string): Promise<void> {
+  const existing = await db.select({ role: agents.role }).from(agents).where(eq(agents.userId, userId))
+  const missing = BUILT_IN_AGENT_ROLES.filter(role => !existing.some(row => row.role === role))
+  if (!missing.length) return
+  await db.insert(agents).values(missing.map(role => {
+    const preset = BUILT_IN_AGENT_PRESETS[role]
+    return {
+      id: crypto.randomUUID(), userId, role, name: preset.name,
+      description: preset.description, instructions: preset.instructions,
+      harness: null, model: null, deviceId: null,
+    }
+  })).onConflictDoNothing()
 }
 
-const agentInput = z.object({
-  deviceId: z.uuid(),
-  harness: z.enum(SUPPORTED_HARNESSES),
+/** Built-in roles first, in their fixed order, then custom roles by name. */
+function roleRank(role: string): number {
+  const index = (AGENT_ROLES as readonly string[]).indexOf(role)
+  return index === -1 ? AGENT_ROLES.length : index
+}
+
+export async function listAgents(): Promise<AgentView[]> {
+  const userId = await getUserId()
+  await ensureBuiltInAgents(userId)
+  const rows = await db.select({
+    id: agents.id, role: agents.role, name: agents.name, description: agents.description,
+    instructions: agents.instructions, harness: agents.harness, model: agents.model,
+    deviceId: agents.deviceId, deviceName: devices.name,
+  }).from(agents).leftJoin(devices, eq(devices.id, agents.deviceId))
+    .where(eq(agents.userId, userId)).orderBy(asc(agents.name))
+  return rows.sort((a, b) => roleRank(a.role) - roleRank(b.role))
+}
+
+const agentFields = {
   name: z.string().trim().min(1).max(60),
   description: z.string().trim().max(200),
-  instructions: z.string().trim().max(4000),
-})
+  instructions: z.string().trim().max(MAX_AGENT_INSTRUCTIONS_LENGTH),
+  deviceId: z.uuid().nullable(),
+  harness: z.enum(SUPPORTED_HARNESSES).nullable(),
+  model: modelNameSchema.nullable(),
+}
+const agentInput = z.object(agentFields)
+const agentUpdateInput = z.object({ id: z.uuid(), ...agentFields })
+
+export type AgentInput = z.input<typeof agentInput>
 
 function agentValidationCode(error: z.ZodError): 'validationNameRequired' | 'validationGeneric' {
   return error.issues[0]?.path[0] === 'name' ? 'validationNameRequired' : 'validationGeneric'
 }
 
 /**
- * An agent is a named role run by one harness on one device. The harness must
- * be one the device actually reports as installed — the daemon's own
- * detection decides what can be added.
+ * A pinned device must be this person's; a pinned device and harness together
+ * must be a harness that device reports as installed — the daemon's own
+ * detection decides. Anything left on auto is checked when a run is queued.
  */
-export async function createAgent(input: z.infer<typeof agentInput>): Promise<{ id: string }> {
-  const userId = await getUserId()
-  const parsed = agentInput.safeParse(input)
-  if (!parsed.success) throw new ActionFailureError(agentValidationCode(parsed.error))
-  const device = await ownedDeviceWithHarness(parsed.data.deviceId, parsed.data.harness, userId)
-  if (!device) throw new ActionFailureError('agentHarnessMissing')
-  const id = crypto.randomUUID()
-  try {
-    await db.insert(agents).values({ id, userId, ...parsed.data })
-  } catch (error) {
-    // 23505 is the name unique index; anything else is a real failure.
-    if ((error as { code?: string }).code === '23505') throw new ActionFailureError('agentDuplicateName')
-    throw new ActionFailureError('agentAddFailed')
-  }
-  return { id }
-}
-
-export async function updateAgent(input: { id: string; name: string; description: string; instructions: string }): Promise<void> {
-  const userId = await getUserId()
-  const parsed = z.object({
-    id: z.uuid(), name: z.string().trim().min(1).max(60),
-    description: z.string().trim().max(200), instructions: z.string().trim().max(4000),
-  }).safeParse(input)
-  if (!parsed.success) throw new ActionFailureError(agentValidationCode(parsed.error))
-  try {
-    await db.update(agents).set({
-      name: parsed.data.name, description: parsed.data.description,
-      instructions: parsed.data.instructions, updatedAt: new Date(),
-    }).where(and(eq(agents.id, parsed.data.id), eq(agents.userId, userId)))
-  } catch (error) {
-    if ((error as { code?: string }).code === '23505') throw new ActionFailureError('agentDuplicateName')
-    throw new ActionFailureError('agentSaveFailed')
-  }
-}
-
-export async function deleteAgent(id: string): Promise<void> {
-  const userId = await getUserId()
-  const parsed = z.uuid().safeParse(id)
-  if (!parsed.success) throw new ActionFailureError('agentNotFound')
-  await db.delete(agents).where(and(eq(agents.id, parsed.data), eq(agents.userId, userId)))
-}
-
-async function ownedDeviceWithHarness(deviceId: string, harness: SupportedHarness, userId: string) {
+async function checkPlacement(input: { deviceId: string | null; harness: SupportedHarness | null }, userId: string): Promise<void> {
+  if (!input.deviceId) return
   const [device] = await db.select().from(devices)
-    .where(and(eq(devices.id, deviceId), eq(devices.ownerId, userId))).limit(1)
-  if (!device) return null
-  return device.harnesses.some(info => info.harness === harness && info.installed) ? device : null
+    .where(and(eq(devices.id, input.deviceId), eq(devices.ownerId, userId))).limit(1)
+  if (!device) throw new ActionFailureError('deviceNotFound')
+  if (input.harness && !device.harnesses.some(info => info.harness === input.harness && info.installed)) {
+    throw new ActionFailureError('agentHarnessMissing')
+  }
+}
+
+/** A custom role. Built-in roles are seeded, never created here. */
+export async function createAgent(input: AgentInput): Promise<ActionResult<{ id: string }>> {
+  return runAction(async () => {
+    const userId = await getUserId()
+    const parsed = agentInput.safeParse(input)
+    if (!parsed.success) throw new ActionFailureError(agentValidationCode(parsed.error))
+    await checkPlacement(parsed.data, userId)
+    const id = crypto.randomUUID()
+    try {
+      await db.insert(agents).values({ id, userId, role: 'custom', ...parsed.data })
+    } catch (error) {
+      // 23505 is the name unique index; anything else is a real failure.
+      if ((error as { code?: string }).code === '23505') throw new ActionFailureError('agentDuplicateName')
+      throw new ActionFailureError('agentAddFailed')
+    }
+    return { id }
+  })
+}
+
+export async function updateAgent(input: AgentInput & { id: string }): Promise<ActionResult<{ success: true }>> {
+  return runAction(async () => {
+    const userId = await getUserId()
+    const parsed = agentUpdateInput.safeParse(input)
+    if (!parsed.success) throw new ActionFailureError(agentValidationCode(parsed.error))
+    await checkPlacement(parsed.data, userId)
+    const { id, ...fields } = parsed.data
+    let updated: { id: string }[]
+    try {
+      updated = await db.update(agents).set({ ...fields, updatedAt: new Date() })
+        .where(and(eq(agents.id, id), eq(agents.userId, userId))).returning({ id: agents.id })
+    } catch (error) {
+      if ((error as { code?: string }).code === '23505') throw new ActionFailureError('agentDuplicateName')
+      throw new ActionFailureError('agentSaveFailed')
+    }
+    if (!updated.length) throw new ActionFailureError('agentNotFound')
+    return { success: true as const }
+  })
+}
+
+/** Puts a built-in role's description and prompt back to the shipped ones. */
+export async function resetAgentInstructions(id: string): Promise<ActionResult<{ success: true }>> {
+  return runAction(async () => {
+    const userId = await getUserId()
+    const parsed = z.uuid().safeParse(id)
+    if (!parsed.success) throw new ActionFailureError('agentNotFound')
+    const [agent] = await db.select({ role: agents.role }).from(agents)
+      .where(and(eq(agents.id, parsed.data), eq(agents.userId, userId))).limit(1)
+    if (!agent) throw new ActionFailureError('agentNotFound')
+    if (!isBuiltInAgentRole(agent.role)) throw new ActionFailureError('agentNotBuiltIn')
+    const preset = BUILT_IN_AGENT_PRESETS[agent.role]
+    await db.update(agents)
+      .set({ description: preset.description, instructions: preset.instructions, updatedAt: new Date() })
+      .where(and(eq(agents.id, parsed.data), eq(agents.userId, userId)))
+    return { success: true as const }
+  })
+}
+
+/** Deletes a custom role. Built-in roles can be edited or reset, not removed. */
+export async function deleteAgent(id: string): Promise<ActionResult<{ success: true }>> {
+  return runAction(async () => {
+    const userId = await getUserId()
+    const parsed = z.uuid().safeParse(id)
+    if (!parsed.success) throw new ActionFailureError('agentNotFound')
+    const [agent] = await db.select({ role: agents.role }).from(agents)
+      .where(and(eq(agents.id, parsed.data), eq(agents.userId, userId))).limit(1)
+    if (!agent) throw new ActionFailureError('agentNotFound')
+    if (isBuiltInAgentRole(agent.role)) throw new ActionFailureError('agentBuiltInDelete')
+    await db.delete(agents).where(and(eq(agents.id, parsed.data), eq(agents.userId, userId)))
+    return { success: true as const }
+  })
+}
+
+function placementError(result: Extract<PlacementResult, { ok: false }>): ActionFailureError {
+  return new ActionFailureError(result.reason === 'harnessMissing' ? 'agentHarnessMissing' : 'agentNoDevice')
 }
 
 /**
- * Queues one run of one agent against one issue. The daemon picks it up on its
- * next poll, claims it, and reports back through `/v1/runs/:runId/complete`.
+ * Queues one run of one agent against one issue. The repository decides the
+ * device; anything the agent left on auto is resolved here and stored on the
+ * run. The daemon picks it up on its next poll, claims it, and reports back
+ * through `/v1/runs/:runId/complete`.
  */
 export async function startRun(input: { issueId: string; agentId: string; deviceRepoId: string }): Promise<{ runId: string }> {
   const userId = await getUserId()
@@ -242,14 +326,25 @@ export async function startRun(input: { issueId: string; agentId: string; device
   const { issue } = await requireIssueAccess(parsed.data.issueId)
   const [agent] = await db.select().from(agents)
     .where(and(eq(agents.id, parsed.data.agentId), eq(agents.userId, userId))).limit(1)
-  if (!agent?.deviceId) throw new ActionFailureError('agentNoDevice')
+  if (!agent) throw new ActionFailureError('agentNotFound')
   const [repo] = await db.select().from(deviceRepos)
-    .where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.deviceId, agent.deviceId), eq(deviceRepos.userId, userId))).limit(1)
+    .where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.userId, userId))).limit(1)
   if (!repo) throw new ActionFailureError('agentRepoMissing')
+  const owned = await db.select().from(devices).where(eq(devices.ownerId, userId))
+  const placement = resolveAgentPlacement(
+    { deviceId: agent.deviceId, harness: agent.harness, model: agent.model },
+    owned.map(device => ({
+      id: device.id, enabled: device.enabled, lastSeenAt: device.lastSeenAt, harnesses: device.harnesses,
+      online: device.lastSeenAt ? Date.now() - device.lastSeenAt.getTime() < DEVICE_ONLINE_WINDOW_MS : false,
+    })),
+    repo.deviceId,
+  )
+  if (!placement.ok) throw placementError(placement)
   const runId = crypto.randomUUID()
   await db.insert(agentRuns).values({
-    id: runId, userId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
+    id: runId, userId, issueId: issue.id, agentId: agent.id, deviceId: placement.deviceId,
+    deviceRepoId: repo.id, harness: placement.harness, model: placement.model,
+    status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
     prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions),
   })
   return { runId }
@@ -264,13 +359,16 @@ function runPrompt(title: string, body: string, instructions: string): string {
   return parts.join('\n\n').slice(0, 100_000)
 }
 
+/** The harness a run used: stored on the run, or its agent's on older rows. */
+const runHarness = sql<SupportedHarness | null>`coalesce(${agentRuns.harness}, ${agents.harness})`
+
 export async function listRuns(issueId: string): Promise<RunView[]> {
   const userId = await getUserId()
   const parsed = z.uuid().safeParse(issueId)
   if (!parsed.success) return []
   const rows = await db.select({
     id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: agents.name,
-    harness: agents.harness, status: agentRuns.status, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
+    harness: runHarness, model: agentRuns.model, status: agentRuns.status, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
     error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,
     startedAt: agentRuns.startedAt, finishedAt: agentRuns.finishedAt,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
@@ -291,7 +389,7 @@ export async function getRun(runId: string): Promise<RunDetail | null> {
   if (!parsed.success) return null
   const [run] = await db.select({
     id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: agents.name,
-    harness: agents.harness, status: agentRuns.status, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
+    harness: runHarness, model: agentRuns.model, status: agentRuns.status, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
     error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,
     startedAt: agentRuns.startedAt, finishedAt: agentRuns.finishedAt,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))

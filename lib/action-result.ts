@@ -25,6 +25,8 @@ export const ACTION_ERROR_CODES = [
   'agentNotFound',
   'agentNoDevice',
   'agentRepoMissing',
+  'agentBuiltInDelete',
+  'agentNotBuiltIn',
   'repoPathInvalid',
   'repoNotFound',
   'runInvalid',

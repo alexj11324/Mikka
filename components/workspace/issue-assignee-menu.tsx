@@ -53,7 +53,7 @@ export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, o
           </CommandGroup>
           <CommandSeparator />
           <CommandGroup heading={t('agents')}>
-            {data?.agents.map(agent => <CommandItem key={agent.id} value={`${agent.name} ${agent.harness}`} disabled={disabled} onSelect={() => { void select({ kind: 'agent', id: agent.id }) }}><Bot /><span className="flex-1 truncate">{agent.name}</span>{assignee?.kind === 'agent' && assignee.id === agent.id && <Check />}</CommandItem>)}
+            {data?.agents.map(agent => <CommandItem key={agent.id} value={`${agent.name} ${agent.harness ?? ''}`} disabled={disabled} onSelect={() => { void select({ kind: 'agent', id: agent.id }) }}><Bot /><span className="flex-1 truncate">{agent.name}</span>{assignee?.kind === 'agent' && assignee.id === agent.id && <Check />}</CommandItem>)}
             {data && !data.agents.length && <p className="px-2 py-3 text-xs text-muted-foreground">{t('noAgents')}</p>}
           </CommandGroup>
           {data?.isOwner && <><CommandSeparator /><CommandGroup heading={t('newMember')}><CommandItem value={t('invite')} onSelect={() => { setOpen(false); onInvite() }}><Send />{t('invite')}</CommandItem></CommandGroup></>}
