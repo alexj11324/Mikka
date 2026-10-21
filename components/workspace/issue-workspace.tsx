@@ -25,6 +25,7 @@ import { listProjects, setProjectIssues } from '@/app/actions/projects'
 import { ProjectWorkspace } from './project-workspace'
 import { WorkspaceOverview } from './workspace-overview'
 import { SECTION_TITLES, type WorkspaceSection } from './workspace-navigation'
+import type { AgentHistory } from '@/lib/agent-history'
 
 const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), {
   loading: () => <div role="status" aria-label="正在加载任务编辑器" className="flex flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>,
@@ -33,14 +34,21 @@ const CreateIssueDialog = dynamic(() => import('./create-issue-dialog').then(mod
   loading: () => <p role="status" className="p-6 text-sm text-muted-foreground">正在加载新建任务…</p>,
 })
 
-export function IssueWorkspace({ user, initialIssues }: { user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
+export function IssueWorkspace({ user, initialIssues, initialAgentHistory, initialSection = 'projects' }: { user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection }) {
   const { data: workspaceData } = useWorkspace(user.email)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members'; invite: boolean }>({ section: 'preferences', invite: false })
   const [boardBusy, setBoardBusy] = useState(false)
   const { data: tasks = [], mutate, error } = useSWR(['issues', user.id], listIssues, { fallbackData: initialIssues, revalidateOnMount: false, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)
-  const [section, setSection] = useState<WorkspaceSection>('projects')
+  const [section, setSection] = useState<WorkspaceSection>(initialSection)
+  function changeSection(next: WorkspaceSection) {
+    setSection(next)
+    const url = new URL(window.location.href)
+    if (next === 'agent') url.searchParams.set('section', 'agent')
+    else url.searchParams.delete('section')
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+  }
   const [projectId, setProjectId] = useState<string | null>(null)
   const [creationProject, setCreationProject] = useState<string | null>(null)
   const [layout, setLayout] = useState<'board' | 'list'>('board')
@@ -113,12 +121,12 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
   }
   function navigate(next: IssueView) {
     if (boardBusy || leaving.current) return false
-    void leave(() => { setSelected(null); if (['inbox', 'agent', 'views', 'team-home'].includes(section)) setSection('team-issues'); setView(next); setQuery(''); setDraftKey(value => value + 1) })
+    void leave(() => { setSelected(null); if (['inbox', 'agent', 'views', 'team-home'].includes(section)) changeSection('team-issues'); setView(next); setQuery(''); setDraftKey(value => value + 1) })
     return true
   }
   function navigateSection(next: WorkspaceSection) {
     if (boardBusy || leaving.current) return false
-    void leave(() => { setSelected(null); setSection(next); setProjectId(null); setView(next === 'my-issues' ? 'mine' : 'all'); setQuery(''); setDraftKey(value => value + 1) })
+    void leave(() => { setSelected(null); changeSection(next); setProjectId(null); setView(next === 'my-issues' ? 'mine' : 'all'); setQuery(''); setDraftKey(value => value + 1) })
     return true
   }
   const isProjects = section === 'projects' || section === 'team-projects'
@@ -136,7 +144,7 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
     <AppShellContent parent={workspaceData?.workspace.name ?? '工作区'} title={selected ? issueIdentifier(selected) : SECTION_TITLES[section]} actions={<Button variant="ghost" size="icon-sm" aria-label="打开全局搜索" disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {error && <p role="alert" className="px-6 py-2 text-xs text-destructive">列表更新失败，已保留上次结果。</p>}
-      {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} /> : isProjects ? <ProjectWorkspace projects={projects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? WORKSPACE_NAME : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create('todo')} onUpdated={() => { void refreshProjects() }} /> : isOverview ? <WorkspaceOverview section={section} counts={counts} projectCount={projects.length} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : <>
+      {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} /> : isProjects ? <ProjectWorkspace projects={projects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? WORKSPACE_NAME : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create('todo')} onUpdated={() => { void refreshProjects() }} /> : isOverview ? <WorkspaceOverview userId={user.id} initialAgentHistory={initialAgentHistory} section={section} counts={counts} projectCount={projects.length} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : <>
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <div className="flex flex-wrap items-center gap-2"><h1 className="text-sm font-semibold">{section === 'my-issues' ? '我创建的任务' : viewTitle}</h1><Badge variant="secondary">{filtered.length}</Badge>{section !== 'my-issues' && <NativeSelect aria-label="筛选任务状态" value={view} disabled={boardBusy} onChange={event => navigate(event.target.value as IssueView)}><NativeSelectOption value="all">全部状态</NativeSelectOption>{ISSUE_STATUSES.map(status => <NativeSelectOption key={status.value} value={status.value}>{status.label}</NativeSelectOption>)}</NativeSelect>}</div>
           <div className="flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto"><div className="flex min-w-0 items-center gap-2 sm:w-48"><span className="inline-flex shrink-0 text-muted-foreground"><Search className="size-3.5" aria-hidden="true" /></span><Input aria-label="搜索任务" placeholder="搜索任务…" value={query} onChange={event => setQuery(event.target.value)} disabled={boardBusy} /></div><ToggleGroup aria-label="任务视图" size="sm" variant="outline" spacing={0} disabled={boardBusy} value={[layout]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') setLayout(next) }}><ToggleGroupItem value="list" aria-label="列表视图"><List /></ToggleGroupItem><ToggleGroupItem value="board" aria-label="看板视图"><Columns3 /></ToggleGroupItem></ToggleGroup></div>

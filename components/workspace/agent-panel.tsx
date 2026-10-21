@@ -3,16 +3,16 @@
 import '@openuidev/react-ui/layered/styles/index.css'
 import { useRef, useState } from 'react'
 import useSWR from 'swr'
-import { authClient } from '@/lib/auth-client'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'
+import type { AgentHistory } from '@/lib/agent-history'
 import type { ActionEvent } from '@openuidev/react-lang'
 import { toast } from 'sonner'
 import { useCompletion } from '@ai-sdk/react'
 import { createTheme, ThemeProvider } from '@openuidev/react-ui/ThemeProvider'
 import { AgentComposer } from './agent-composer'
 import { AgentResponse } from './agent-response'
-import { AgentChat } from './agent-chat'
+import { AgentChat, type AgentChatSession } from './agent-chat'
 import { AgentInteractionContext } from './agent-interaction'
 import { fetchAgentResponse } from '@/lib/agent-fetch'
 
@@ -45,33 +45,74 @@ async function fetchHistory(url: string): Promise<AgentHistory> {
   return body
 }
 
-export function AgentPanel() {
-  const [selection, setSelection] = useState<{ key: string; sessionId?: string; fresh?: boolean }>({ key: 'latest' })
-  const query = selection.fresh ? '?new=1' : selection.sessionId ? `?sessionId=${selection.sessionId}` : ''
-  const { data: account } = authClient.useSession()
-  const userId = account?.user.id
-  const { data, error, mutate } = useSWR<AgentHistory>(userId ? [`/api/agent/sessions${query}`, userId] : null, ([url]: [string, string]) => fetchHistory(url), { revalidateOnFocus: false, revalidateOnMount: true })
-  if (!data) return <section aria-label="Agent 历史加载" className="flex min-h-64 flex-col items-center justify-center gap-3">
-    <p role={error ? 'alert' : 'status'}>{error ? error.message : '正在恢复聊天历史…'}</p>
-    {error && <Button variant="outline" onClick={() => { void mutate() }}>重试加载</Button>}
+export function AgentPanel({ userId, initialHistory }: { userId: string; initialHistory?: AgentHistory }) {
+  const latest = useSWR<AgentHistory>(['/api/agent/sessions', userId], ([url]: [string, string]) => fetchHistory(url), {
+    fallbackData: initialHistory, revalidateOnFocus: false, revalidateOnMount: !initialHistory,
+  })
+  if (!latest.data) return <AgentHistoryLoading error={latest.error} onRetry={() => { void latest.mutate() }} />
+  return <ThemeProvider cssSelector=".orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
+    <AgentSessions userId={userId} initial={latest.data} onSaved={async () => { await latest.mutate() }} />
+  </ThemeProvider>
+}
+
+function AgentHistoryLoading({ error, onRetry }: { error?: Error; onRetry: () => void }) {
+  return <section aria-label="Agent 对话工作区" aria-busy={!error} className="flex h-[calc(100svh-4rem)] flex-col gap-4 p-4">
+    {error ? <><p role="alert">聊天记录加载失败。</p><Button variant="outline" onClick={onRetry}>重试</Button></> : <><Skeleton className="h-14 w-full" /><Skeleton className="h-20 w-2/3" /><Skeleton className="mt-auto h-24 w-full" /></>}
   </section>
-  return <AgentSession key={`${userId}:${selection.key}`} initial={data} sessions={data.sessions}
-    onSaved={async () => { await mutate() }}
-    onSelect={sessionId => setSelection({ key: sessionId, sessionId })}
-    onReset={() => setSelection({ key: crypto.randomUUID(), fresh: true })} />
+}
+
+type OpenSession = { key: string; initial?: AgentHistory; sessionId?: string }
+type LiveSession = AgentChatSession & { key: string }
+
+function AgentSessions({ userId, initial, onSaved }: { userId: string; initial: AgentHistory; onSaved: () => Promise<void> }) {
+  const [opened, setOpened] = useState<OpenSession[]>([{ key: initial.sessionId ?? 'new', initial }])
+  const [activeKey, setActiveKey] = useState(initial.sessionId ?? 'new')
+  const [live, setLive] = useState<Record<string, LiveSession>>({})
+  const sessions = new Map<string, AgentChatSession>(initial.sessions.map(session => [session.id, session]))
+  for (const session of Object.values(live)) sessions.set(session.id, session)
+  const history = [...sessions.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+
+  function select(sessionId: string) {
+    const existing = opened.find(entry => (live[entry.key]?.id ?? entry.sessionId ?? entry.initial?.sessionId) === sessionId)
+    if (existing) { setActiveKey(existing.key); return }
+    setOpened(entries => [...entries, { key: sessionId, sessionId }])
+    setActiveKey(sessionId)
+  }
+
+  function reset() {
+    const key = crypto.randomUUID()
+    setOpened(entries => [...entries, { key, initial: { sessions: [], sessionId: null, turns: [] } }])
+    setActiveKey(key)
+  }
+
+  return opened.map(entry => <div key={entry.key} hidden={entry.key !== activeKey}>
+    <AgentSessionLoader entry={entry} userId={userId} sessions={history} onSelect={select} onReset={reset} onSaved={onSaved}
+      onState={session => setLive(current => ({ ...current, [entry.key]: { ...session, key: entry.key } }))} />
+  </div>)
+}
+
+function AgentSessionLoader({ entry, userId, ...props }: Omit<AgentSessionProps, 'initial' | 'completionId'> & { entry: OpenSession; userId: string }) {
+  const selected = useSWR<AgentHistory>(!entry.initial && entry.sessionId ? [`/api/agent/sessions?sessionId=${entry.sessionId}`, userId] : null,
+    ([url]: [string, string]) => fetchHistory(url), { revalidateOnFocus: false, revalidateIfStale: false })
+  const data = entry.initial ?? selected.data
+  if (!data) return <AgentHistoryLoading error={selected.error} onRetry={() => { void selected.mutate() }} />
+  return <AgentSession {...props} initial={data} completionId={`${userId}:${entry.key}`} />
 }
 
 type DisplayTurn = { id: string; question: string; completion: string; error?: Error; stopped: boolean }
+type AgentSessionProps = {
+  onReset: () => void; onSelect: (id: string) => void; onSaved: () => Promise<void>; initial: AgentHistory; sessions: AgentChatSession[]
+  completionId: string; onState: (session: AgentChatSession) => void
+}
 
-function AgentSession({ onReset, onSelect, onSaved, initial, sessions }: {
-  onReset: () => void; onSelect: (id: string) => void; onSaved: () => Promise<void>; initial: AgentHistory; sessions: SavedAgentSession[]
-}) {
+function AgentSession({ onReset, onSelect, onSaved, onState, initial, sessions, completionId }: AgentSessionProps) {
   const restored = initial.turns.at(-1)
-  const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ api: '/api/agent', credentials: 'same-origin', fetch: fetchAgentResponse, initialCompletion: restored?.completion ?? '' })
+  const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ id: completionId, api: '/api/agent', credentials: 'same-origin', fetch: fetchAgentResponse, initialCompletion: restored?.completion ?? '' })
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const submittingRef = useRef(false)
   const lastRequestRef = useRef<{ prompt: string; failed: boolean } | null>(restored ? { prompt: restored.prompt, failed: restored.status !== 'complete' } : null)
   const sessionIdRef = useRef<string | null>(initial.sessionId)
+  const titleRef = useRef(initial.sessions.find(session => session.id === initial.sessionId)?.title ?? initial.turns[0]?.prompt)
   const [generation, setGeneration] = useState(restored?.id ?? '')
   const [question, setQuestion] = useState(restored?.prompt ?? '')
   const [stopped, setStopped] = useState(restored?.status === 'stopped' || restored?.status === 'pending')
@@ -103,6 +144,8 @@ function AgentSession({ onReset, onSelect, onSaved, initial, sessions }: {
     submittingRef.current = true
     try {
       sessionIdRef.current ??= crypto.randomUUID()
+      titleRef.current ??= prompt.trim().slice(0, 200)
+      onState({ id: sessionIdRef.current, title: titleRef.current, updatedAt: new Date().toISOString(), running: true })
       const retrying = lastRequestRef.current?.failed && lastRequestRef.current.prompt === prompt.trim()
       const turnId = retrying && generation ? generation : crypto.randomUUID()
       if (!retrying) {
@@ -120,12 +163,12 @@ function AgentSession({ onReset, onSelect, onSaved, initial, sessions }: {
       return Boolean(result?.trim())
     } finally {
       submittingRef.current = false
+      if (sessionIdRef.current && titleRef.current) onState({ id: sessionIdRef.current, title: titleRef.current, updatedAt: new Date().toISOString(), running: false })
       void onSaved().catch(() => toast.error('暂时无法刷新会话列表，请刷新页面重试。'))
     }
   }
 
-  return <ThemeProvider cssSelector="#orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
-    <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt, 'inline') }}>
+  return <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt, 'inline') }}>
       <AgentChat
         turns={[
           ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse completion={turn.completion} error={turn.error} stopped={turn.stopped} isLoading={false} onAction={handleUIAction} /> })),
@@ -139,5 +182,4 @@ function AgentSession({ onReset, onSelect, onSaved, initial, sessions }: {
         composer={<AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} />}
       />
     </AgentInteractionContext>
-  </ThemeProvider>
 }

@@ -15,8 +15,7 @@ export function AgentComposer({ ref, draft, onChange, onSubmit, isLoading, onSto
   return <PromptInput
     ref={ref}
     aria-label="向 Agent 提问"
-    aria-describedby="agent-service-note"
-    placeholder="让 Agent 继续…"
+    placeholder="输入消息…"
     minRows={1}
     maxRows={4}
     models={[{ value: 'deepseek-v4.1-flash', label: 'DS 4.1 Flash' }]}

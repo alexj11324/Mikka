@@ -55,15 +55,20 @@ export async function saveAgentTurn(userId: string, sessionId: string, turnId: s
 }
 
 export async function getAgentHistory(userId: string, requestedId?: string, fresh = false) {
-  const sessions = await db.select({ id: agentSessions.id, title: agentSessions.title, updatedAt: agentSessions.updatedAt })
-    .from(agentSessions).where(eq(agentSessions.userId, userId)).orderBy(desc(agentSessions.updatedAt)).limit(100)
-  const sessionId = fresh ? null : requestedId ?? sessions[0]?.id ?? null
-  if (!sessionId) return { sessions, sessionId: null, turns: [] }
-  const [session] = await db.select({ id: agentSessions.id }).from(agentSessions)
-    .where(and(eq(agentSessions.id, sessionId), eq(agentSessions.userId, userId))).limit(1)
-  if (!session) throw new AgentStoreError('找不到此会话。', 404)
-  const turns = await db.select({ id: agentTurns.id, prompt: agentTurns.prompt, completion: agentTurns.completion, status: agentTurns.status, error: agentTurns.error })
-    .from(agentTurns).where(and(eq(agentTurns.sessionId, sessionId), eq(agentTurns.userId, userId)))
-    .orderBy(asc(agentTurns.createdAt), asc(agentTurns.id))
-  return { sessions, sessionId, turns }
+  const selected = db.select({ id: agentSessions.id }).from(agentSessions)
+    .where(and(eq(agentSessions.userId, userId), requestedId ? eq(agentSessions.id, requestedId) : undefined))
+    .orderBy(desc(agentSessions.updatedAt), desc(agentSessions.id)).limit(1).as('selected')
+  const [sessions, rows] = await Promise.all([
+    db.select({ id: agentSessions.id, title: agentSessions.title, updatedAt: agentSessions.updatedAt })
+      .from(agentSessions).where(eq(agentSessions.userId, userId))
+      .orderBy(desc(agentSessions.updatedAt), desc(agentSessions.id)).limit(100),
+    fresh ? Promise.resolve([]) : db.select({
+      sessionId: selected.id,
+      turn: { id: agentTurns.id, prompt: agentTurns.prompt, completion: agentTurns.completion, status: agentTurns.status, error: agentTurns.error },
+    }).from(selected).leftJoin(agentTurns, and(eq(agentTurns.sessionId, selected.id), eq(agentTurns.userId, userId)))
+      .orderBy(asc(agentTurns.createdAt), asc(agentTurns.id)),
+  ])
+  const sessionId = rows[0]?.sessionId ?? null
+  if (requestedId && !fresh && !sessionId) throw new AgentStoreError('找不到此会话。', 404)
+  return { sessions: sessions.map(session => ({ ...session, updatedAt: session.updatedAt.toISOString() })), sessionId, turns: rows.flatMap(row => row.turn ? [row.turn] : []) }
 }

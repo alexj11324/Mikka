@@ -1,6 +1,5 @@
 'use client'
 
-import dynamic from 'next/dynamic'
 import type { ActionEvent } from '@openuidev/react-lang'
 import { Bot } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -10,15 +9,12 @@ import { Message, MessageAvatar, MessageContent, MessageHeader } from '@/compone
 import { AgentProgress } from '@/components/agents/loading-states/agent-progress'
 import { StreamingResponse } from '@/components/agents/streaming-response'
 
-const AgentGenerativeUI = dynamic(() => import('./agent-generative-ui').then(module => module.AgentGenerativeUI), {
-  ssr: false,
-  loading: () => null,
-})
+import { AgentGenerativeUI } from './agent-generative-ui'
 
 export function AgentResponse({ completion, error, isLoading, stopped = false, onAction, onRetry }: { completion: string; error?: Error; isLoading: boolean; stopped?: boolean; onAction: (event: ActionEvent) => void; onRetry?: () => void }) {
   if (!completion && !error && !isLoading) return null
 
-  return <Message from="assistant" aria-label="Agent 回复" animateIn>
+  return <Message from="assistant" aria-label="Agent 回复" animateIn={isLoading}>
     <MessageAvatar><Bot aria-hidden="true" /></MessageAvatar>
     <MessageContent className="gap-3">
       <MessageHeader>Agent</MessageHeader>
