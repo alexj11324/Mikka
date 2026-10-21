@@ -46,6 +46,13 @@ for (const [label, source, rule] of [
   ['dark color override', '<Button className="dark:bg-muted" />', 'style/no-dark-color-override'],
   ['conditional classes', '<Button className={active ? "flex" : "grid"} />', 'style/use-cn'],
   ['equal dimensions', '<Button className="h-4 w-4" />', 'style/size-shorthand'],
+  ['horizontal bottom rule', '<div className="border-b" />', 'style/no-horizontal-rule'],
+  ['horizontal top rule', '<div className="lg:border-t-2" />', 'style/no-horizontal-rule'],
+  ['horizontal both rule', '<div className="border-y" />', 'style/no-horizontal-rule'],
+  ['row divider rule', '<div className="divide-y" />', 'style/no-horizontal-rule'],
+  ['hand-drawn rule', '<div className="h-px w-full bg-border" />', 'style/no-horizontal-rule'],
+  ['horizontal separator', 'import { Separator } from "@/components/ui/separator"; const ui = <Separator />', 'style/no-horizontal-rule'],
+  ['dynamic separator orientation', 'import { Separator } from "@/components/ui/separator"; const ui = <Separator orientation={vertical ? "vertical" : "horizontal"} />', 'style/no-horizontal-rule'],
   ['truncate shorthand', '<Button className="overflow-hidden text-ellipsis whitespace-nowrap" />', 'style/truncate'],
   ['overlay stacking', 'import { DialogContent } from "@/components/ui/dialog"; const ui = <DialogContent className="z-50" />', 'style/overlay-stacking'],
   ['aliased menu grouping', 'import { SelectItem as Option } from "@/components/ui/select"; const ui = <Option />', 'composition/group'],
@@ -82,6 +89,21 @@ test('valid grouped items + title + avatar', () => {
     import { DialogContent, DialogTitle } from '@/components/ui/dialog';
     import { Avatar, AvatarFallback } from '@/components/ui/avatar';
     const ui = <DialogContent><DialogTitle>Title</DialogTitle><SelectGroup><SelectItem value="a">A</SelectItem></SelectGroup><Avatar><AvatarFallback>A</AvatarFallback></Avatar></DialogContent>`
+  assert.deepEqual(rules(source), [])
+})
+
+test('vertical separators, box borders and spacing-based grouping stay legal', () => {
+  const source = `${prefix}
+    import { Separator } from '@/components/ui/separator';
+    const orientation = 'vertical';
+    const ui = <div className="flex flex-col gap-6 rounded-lg border p-4">
+      <Separator orientation="vertical" />
+      <Separator orientation={'vertical'} />
+      <Separator orientation={\`vertical\`} />
+      <Separator orientation={orientation} />
+      <div className="border-l border-t-0 border-t-transparent divide-y-0 divide-x" />
+      <div className="h-px w-8 bg-transparent" />
+    </div>`
   assert.deepEqual(rules(source), [])
 })
 
@@ -130,6 +152,15 @@ test('a render prop host element is composition, not a hand-written control', ()
     const ui = <SidebarMenuSubButton render={<button type="button" />} onClick={go}>x</SidebarMenuSubButton>`
   assert.deepEqual(rules(source), [])
   has('<button>Save</button>', 'components/no-handwritten-ui')
+})
+
+test('official buttonVariants links are permitted without bypassing class checks', () => {
+  const source = `import { buttonVariants as linkStyle } from '@/components/ui/button';`
+  assert.deepEqual(rules(`${source} const ui = <a href="/" className={linkStyle({ variant: 'ghost', className: 'justify-start' })}>返回</a>`), [])
+  has(`${source} const ui = <a className={linkStyle({ className: getClasses() })} />`, 'style/static-layout-only')
+  has(`${source} const ui = <a className={linkStyle({ className: 'text-[13px]' })} />`, 'typography/preset-only')
+  has(`${source} const ui = <a className={linkStyle({ ...untrusted })} />`, 'style/static-layout-only')
+  has(`import { buttonVariants } from './custom'; const ui = <a className={buttonVariants()} />`, 'style/static-layout-only')
 })
 
 test('only the configured component-library directories are outside the business UI audit', () => {

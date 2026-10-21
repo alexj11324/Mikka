@@ -28,13 +28,13 @@ export function IssueList({ issues, searching, onOpen, onCreate }: {
       if (!group.length) return null
       const indicatorClassName = status.value === 'doing' ? 'text-warning-foreground' : status.value === 'review' ? 'text-success-foreground' : status.value === 'done' ? 'text-info-foreground' : 'text-muted-foreground'
       return <section key={status.value} aria-label={status.label}>
-        <header className="flex h-10 items-center gap-2 border-y bg-muted/40 px-4 text-xs sm:px-6">
+        <header className="flex h-10 items-center gap-2 bg-muted/40 px-4 text-xs sm:px-6">
           <status.icon className={cn('size-3.5', indicatorClassName)} />
           <h2 className="font-medium">{status.label}</h2>
           <span className="text-muted-foreground">{group.length}</span>
         </header>
         <ul>
-          {group.map(issue => <li key={issue.id} className="border-b last:border-b-0">
+          {group.map(issue => <li key={issue.id}>
             <Button type="button" variant="ghost" onClick={() => onOpen(issue.id)} className="h-auto min-h-13 w-full justify-start p-0">
               <span className="flex w-full items-center gap-3 px-4 py-3 text-left sm:px-6">
                 <status.icon className={cn('size-3.5 shrink-0', indicatorClassName)} />

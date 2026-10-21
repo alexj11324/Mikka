@@ -202,3 +202,34 @@ next/font 在构建期把字体自托管到本地，运行时同样不联网；�
 - [x] `document.fonts` 确认只加载 `Geist w100 900` 一个可变字体
 - [x] 截图确认版面未因字体度量差异发生位移或溢出
 
+---
+
+# 禁止全宽水平长线（2026-10-20）
+
+要求：截图里表格头下面那种贯穿整行的长线不要；lint 加规则禁止。
+
+## 规则
+
+`scripts/ui-policy.mjs` 新增 `style/no-horizontal-rule`：
+
+- `border-t` / `border-b` / `border-y`（含 `-2`、颜色后缀、任意值；`-0`、`-[0px]`、`-transparent` 豁免）
+- `divide-y`（`-0`、`-reverse` 豁免）
+- `h-px` / `h-0.5` 同时带绘制背景的 `bg-*`（手画细线）
+- 默认水平方向的 `<Separator />`；`orientation` 支持字面量、表达式、模板字符串与本地常量，动态条件保守判违规
+
+竖线（`border-l/r`、`divide-x`、`orientation="vertical"`）与盒状 `border` 不受影响。
+
+## 代码侧
+
+- `components/ui/table.tsx`：`TableHeader` / `TableRow` / `TableFooter` 去掉默认 `border-b` / `border-t`（截图那条线的来源）
+- `components/ui/dialog.tsx` / `alert-dialog.tsx` / `card.tsx` 的 Footer 去掉 `border-t`；
+  `accordion.tsx` 的 Item 去掉 `not-last:border-b`（否则对话框与折叠面板仍会出现长线）
+- 业务代码 8 个文件清掉 16 处水平线，保留 `bg-muted/*` 分组与 `lg:border-l` 竖线
+
+## 验证
+
+- [x] `node scripts/lint-ui.mjs` → 0 违规
+- [x] `node --test scripts/ui-policy.test.mjs` → 68/68
+- [x] `pnpm lint:code`（oxlint）→ 退出码 0
+- [x] `pnpm typecheck`（tsgo --noEmit）→ 退出码 0
+

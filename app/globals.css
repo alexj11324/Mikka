@@ -15,7 +15,11 @@
 --color-card-foreground: var(--card-foreground);
 --color-popover: var(--popover);
 --color-popover-foreground: var(--popover-foreground);
---color-primary: var(--primary);
+  --color-workspace-accent: oklch(0.56 0.18 279);
+  --color-workspace-accent-foreground: oklch(1 0 0);
+  --color-project-action: var(--project-action);
+  --color-project-action-foreground: var(--project-action-foreground);
+  --color-primary: var(--primary);
 --color-primary-foreground: var(--primary-foreground);
 --color-secondary: var(--secondary);
 --color-secondary-foreground: var(--secondary-foreground);
@@ -59,6 +63,8 @@
 }
 
 :root {
+--project-action: oklch(0.56 0.17 277);
+--project-action-foreground: oklch(0.985 0 0);
   --background: oklch(1 0 0);
 --foreground: oklch(0.145 0 0);
 --card: oklch(1 0 0);
@@ -126,8 +132,8 @@
 --chart-3: oklch(0.439 0 0);
 --chart-4: oklch(0.371 0 0);
 --chart-5: oklch(0.269 0 0);
---sidebar: oklch(0.205 0 0);
---sidebar-foreground: oklch(0.985 0 0);
+--sidebar: oklch(0.115 0 0);
+--sidebar-foreground: oklch(0.78 0 0);
 --sidebar-primary: oklch(0.488 0.243 264.376);
 --sidebar-primary-foreground: oklch(0.985 0 0);
 --sidebar-accent: oklch(0.269 0 0);

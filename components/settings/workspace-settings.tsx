@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group'
 import { Field, FieldLabel, FieldGroup } from '@/components/ui/field'
-import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { WORKSPACE_NAME, WORKSPACE_SLUG } from '@/components/workspace/issue-properties'
 
@@ -22,7 +21,6 @@ export function WorkspaceSettings() {
           <Input id="workspace-name" value={name} maxLength={100} onChange={event => setName(event.target.value)} />
         </div>
       </Field>
-      <Separator />
       <Field orientation="responsive" data-invalid={invalidSlug || undefined} className="justify-between gap-3 py-5">
         <FieldLabel htmlFor="workspace-url" className="@md/field-group:flex-none">URL</FieldLabel>
         <div className="flex min-w-0 flex-col gap-2 @md/field-group:flex-[0_1_28rem]">
