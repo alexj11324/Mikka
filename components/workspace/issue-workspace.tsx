@@ -7,10 +7,8 @@ import { Columns3, List, Search } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IssueBoard } from './issue-board'
 import { AppSidebar } from '@/components/app-sidebar'
-import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import { Separator } from '@/components/ui/separator'
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
+import { SettingsView } from '@/components/settings/settings-view'
+import { AppShell, AppShellContent } from '@/components/app-shell'
 import { CreateIssueDialog } from './create-issue-dialog'
 import { IssueList } from './issue-list'
 import { IssueSearch } from './issue-search'
@@ -27,12 +25,8 @@ import { ProjectWorkspace } from './project-workspace'
 import { WorkspaceOverview } from './workspace-overview'
 import { SECTION_TITLES, type WorkspaceSection } from './workspace-navigation'
 
-function WorkspaceSidebarTrigger() {
-  const { isMobile, openMobile, open } = useSidebar()
-  return <SidebarTrigger className="-ml-1" aria-label="展开或收起侧栏" aria-expanded={isMobile ? openMobile : open} />
-}
-
 export function IssueWorkspace({ user, initialIssues }: { user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [boardBusy, setBoardBusy] = useState(false)
   const { data: tasks = [], mutate, error } = useSWR('issues', listIssues, { fallbackData: initialIssues, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)
@@ -53,7 +47,7 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
   const [searchOpen, setSearchOpen] = useState(false)
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
-      if (event.isComposing || event.keyCode === 229 || boardBusy) return
+      if (event.isComposing || event.keyCode === 229 || boardBusy || settingsOpen) return
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         if (document.querySelector('[role="dialog"][data-open]') && !searchOpen) return
         event.preventDefault(); setSearchOpen(value => !value)
@@ -63,7 +57,7 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
     }
     window.addEventListener('keydown', shortcut)
     return () => window.removeEventListener('keydown', shortcut)
-  }, [creating, searchOpen, view, boardBusy, section, projectId])
+  }, [creating, searchOpen, view, boardBusy, settingsOpen, section, projectId])
   const [signingOut, setSigningOut] = useState(false)
   const [accountError, setAccountError] = useState('')
   const router = useRouter()
@@ -126,17 +120,10 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
     counts[task.ownerId === user.id ? 'mine' : 'shared']++
   }
   const viewTitle = view === 'all' ? '全部任务' : view === 'mine' ? '我创建的' : view === 'shared' ? '协作任务' : ISSUE_STATUSES.find(status => status.value === view)?.label ?? '全部任务'
-  return <TooltipProvider><SidebarProvider>
-    <AppSidebar user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
-    <SidebarInset className="min-w-0">
-      <header className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
-        <div className="flex min-w-0 items-center gap-2">
-          <WorkspaceSidebarTrigger />
-          <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
-          <Breadcrumb aria-label="当前位置"><BreadcrumbList><BreadcrumbItem className="hidden sm:inline-flex"><span>{WORKSPACE_NAME}</span></BreadcrumbItem><BreadcrumbSeparator className="hidden sm:block" /><BreadcrumbItem><BreadcrumbPage>{selected ? issueIdentifier(selected) : SECTION_TITLES[section]}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
-        </div>
-        <div className="flex shrink-0 items-center gap-2"><Button variant="ghost" size="icon-sm" aria-label="打开全局搜索" disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button></div>
-      </header>
+  return <AppShell>
+    {settingsOpen ? <SettingsView user={user} onBack={() => setSettingsOpen(false)} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
+    <AppSidebar onSettings={() => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsOpen(true) }) }} user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
+    <AppShellContent parent={WORKSPACE_NAME} title={selected ? issueIdentifier(selected) : SECTION_TITLES[section]} actions={<Button variant="ghost" size="icon-sm" aria-label="打开全局搜索" disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {error && <p role="alert" className="px-6 py-2 text-xs text-destructive">列表更新失败，已保留上次结果。</p>}
       {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} /> : isProjects ? <ProjectWorkspace projects={projects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? WORKSPACE_NAME : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create('todo')} onUpdated={() => { void refreshProjects() }} /> : isOverview ? <WorkspaceOverview section={section} counts={counts} projectCount={projects.length} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : <>
@@ -146,8 +133,9 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
         </div>
         {layout === 'board' ? <IssueBoard issues={filtered} onOpen={open} onCreate={create} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={open} onCreate={() => create()} />}
       </>}
-    </SidebarInset>
+    </AppShellContent>
+    </>}
     {creating && <CreateIssueDialog initialStatus={createStatus} open={creating} onOpenChange={setCreating} onCreated={id => { void issueCreated(id) }} author={user.name || user.email} />}
     {searchOpen && <IssueSearch open={searchOpen} onOpenChange={setSearchOpen} issues={tasks} onOpen={open} onCreate={() => create()} />}
-  </SidebarProvider></TooltipProvider>
+  </AppShell>
 }

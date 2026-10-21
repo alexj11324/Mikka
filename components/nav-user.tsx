@@ -16,12 +16,13 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, LogOutIcon, Moon, Sun } from "lucide-react"
+import { ChevronsUpDownIcon, LogOutIcon, Moon, Sun, Settings } from "lucide-react"
 import { useTheme } from 'next-themes'
 
 export function NavUser({
-  user, onSignOut, signingOut,
+  user, onSignOut, signingOut, onSettings,
 }: {
+  onSettings?: () => void
   user: { name: string; email: string; image?: string | null }
   onSignOut: () => void
   signingOut: boolean
@@ -63,6 +64,7 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
+              {onSettings && <DropdownMenuItem onClick={onSettings}><Settings />设置</DropdownMenuItem>}
               <DropdownMenuItem onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
                 {resolvedTheme === 'dark' ? <Sun /> : <Moon />}切换明暗主题
               </DropdownMenuItem>

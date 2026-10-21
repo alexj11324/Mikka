@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.34.3",
   "scripts": {
     "build": "next build",
-    "dev": "next dev --turbopack",
+    "dev": "next dev --webpack",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "lint": "pnpm lint:code && pnpm lint:ui",
     "lint:code": "oxlint --deny-warnings",

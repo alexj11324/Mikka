@@ -11,12 +11,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
 import type { WorkspaceSection } from '@/components/workspace/workspace-navigation'
 
-export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
+export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSettings, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
   user: { name: string; email: string; image?: string | null }
   section: WorkspaceSection
   onNavigate: (section: WorkspaceSection) => boolean
   onSearch: () => void
   onCreate: () => void
+  onSettings: () => void
   onSignOut: () => void
   signingOut: boolean
 }) {
@@ -60,7 +61,7 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSi
         <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members" />} tooltip="成员管理"><Users /><span>成员管理</span></SidebarMenuButton></SidebarMenuItem>
         <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members?invite=1" />} tooltip="邀请成员"><SquarePen /><span>邀请成员</span></SidebarMenuButton></SidebarMenuItem>
       </SidebarMenu>
-      <NavUser user={user} onSignOut={onSignOut} signingOut={signingOut} />
+      <NavUser user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} />
     </SidebarFooter>
     <SidebarRail aria-label="展开或收起侧栏边轨" title="展开或收起侧栏" aria-expanded={isMobile ? openMobile : open} />
   </Sidebar>
