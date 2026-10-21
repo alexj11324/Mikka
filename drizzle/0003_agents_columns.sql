@@ -1,7 +1,7 @@
 -- Existing deployments created `agents` with the original four columns.
 -- `create table if not exists` in 0001 does not add the newer columns, so
 -- bring old tables up to the current schema before the app selects them.
--- Applied with: node --env-file=.env.local scripts/apply-sql.mjs drizzle/0003_agents_columns.sql
+-- Applied by scripts/migrate.mjs on production builds.
 
 alter table agents add column if not exists description text not null default '';
 alter table agents add column if not exists instructions text not null default '';
