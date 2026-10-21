@@ -5,8 +5,8 @@ import type { Page } from '@playwright/test'
 const surfaces: { name: string; scope?: 'dialog' | 'menu'; prepare: (page: Page) => Promise<void> }[] = [
   { name: '工作台', prepare: async page => {
     await page.goto('/')
-    await page.getByRole('button', { name: '我创建的', exact: true }).click()
-    await expect(page.getByRole('heading', { name: '我创建的', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '我的任务', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '我创建的任务', exact: true })).toBeVisible()
   } },
   { name: '成员管理', prepare: async page => {
     await page.goto('/settings/members')

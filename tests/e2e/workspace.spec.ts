@@ -13,6 +13,8 @@ test('未登录访问受保护页面、注册和登录链接', async ({ page }) 
 
 test('注册、创建任务、菜单、搜索、视图切换和退出登录', async ({ page }) => {
   const account = await register(page)
+  await expect(page.getByRole('heading', { name: '项目', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '任务', exact: true }).click()
   await expect(page.getByRole('heading', { name: '全部任务', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '新建任务', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
@@ -25,6 +27,7 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await expect(dialog).not.toBeVisible()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true })).toBeVisible()
   await page.reload()
+  await page.getByRole('button', { name: '任务', exact: true }).click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '列表视图', exact: true }).click()
   await expect(page.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: title })).toBeVisible()
@@ -43,5 +46,6 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await page.getByLabel('密码', { exact: true }).fill(account.password)
   await page.getByRole('button', { name: '登录工作台', exact: true }).click()
   await expect(page).toHaveURL(url => url.pathname === '/')
+  await page.getByRole('button', { name: '任务', exact: true }).click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true })).toBeVisible()
 })

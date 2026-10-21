@@ -37,7 +37,7 @@ export const test = base.extend<{ runtimeGuard: void }>({
 export { expect }
 
 export async function register(page: Page, next = '/', email = `e2e-${randomUUID()}@example.com`) {
-  const password = randomBytes(32).toString("base64url")
+  const password = randomBytes(32).toString('base64url')
   await page.goto(`/sign-up?next=${encodeURIComponent(next)}`)
   await page.getByLabel('称呼', { exact: true }).fill('回归测试成员')
   await page.getByLabel('邮箱', { exact: true }).fill(email)
