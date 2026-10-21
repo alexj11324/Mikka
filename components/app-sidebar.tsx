@@ -4,7 +4,7 @@ import * as React from 'react'
 import useSWR from 'swr'
 import { listTeams } from '@/app/actions/teams'
 import Link from 'next/link'
-import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound, Users } from 'lucide-react'
+import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound, Settings, Users } from 'lucide-react'
 import { NavUser } from '@/components/nav-user'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
@@ -36,7 +36,7 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
         <SidebarMenu className="min-w-0 flex-1"><SidebarMenuItem>
           <DropdownMenu><DropdownMenuTrigger render={<SidebarMenuButton aria-label="工作区菜单" className="h-10" />}>
             <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">O</span><span className="flex-1 font-semibold">{WORKSPACE_NAME}</span><ChevronDown />
-          </DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup><DropdownMenuItem onClick={() => navigate('projects')}><Box />工作区项目</DropdownMenuItem><DropdownMenuItem onClick={() => navigate('team-home')}><SquareUserRound />团队主页</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
+          </DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup><DropdownMenuItem onClick={() => navigate('projects')}><Box />工作区项目</DropdownMenuItem><DropdownMenuItem render={<Link href="/settings/teams" />}><SquareUserRound />团队管理</DropdownMenuItem><DropdownMenuItem onClick={onSettings}><Settings />设置</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
         </SidebarMenuItem></SidebarMenu>
         <Button variant="ghost" size="icon-sm" aria-label="搜索任务" title="搜索任务（⌘ / Ctrl K）" onClick={() => { setOpenMobile(false); onSearch() }}><Search data-icon="inline-start" /></Button>
         <Button variant="secondary" size="icon-sm" aria-label="新建任务" title="新建任务（C）" onClick={() => { setOpenMobile(false); onCreate() }}><SquarePen data-icon="inline-start" /></Button>

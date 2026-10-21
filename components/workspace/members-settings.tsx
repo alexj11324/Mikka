@@ -1,20 +1,15 @@
 "use client";
 
 import { Fragment, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import {
   ArrowDown,
-  ArrowLeft,
   ArrowUp,
-  Building2,
-  ChevronRight,
   Download,
   Info,
   MoreHorizontal,
   Search,
-  Shield,
   Users,
 } from "lucide-react";
 import type { WorkspaceSettings } from "@/lib/workspace-access";
@@ -24,7 +19,7 @@ import {
   updateWorkspaceMember,
 } from "@/app/actions/workspace";
 import { InviteMembersDialog } from "@/components/workspace/invite-members-dialog";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/reui/badge";
 import { UserAvatar } from "@/components/user-avatar";
 import {
@@ -230,85 +225,9 @@ export function MembersSettings({
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground md:flex-row">
-      <aside
-        className="flex shrink-0 flex-col gap-7 p-3 md:w-60 md:py-5"
-        aria-label="工作区设置导航"
-      >
-        <Link
-          href="/"
-          className={buttonVariants({
-            variant: "ghost",
-            className: "justify-start text-muted-foreground",
-          })}
-        >
-          <ArrowLeft data-icon="inline-start" />
-          返回工作台
-        </Link>
-        <div className="flex flex-col gap-3 px-1">
-          <div className="flex items-center gap-2 px-2 text-sm text-muted-foreground">
-            <Building2 className="size-4" />
-            <span>工作区</span>
-          </div>
-          <Select
-            value={data.workspace.id}
-            items={data.choices.map((item) => ({
-              value: item.id,
-              label: item.name,
-            }))}
-            onValueChange={(value) => {
-              if (value) router.push(`/settings/members?workspace=${value}`);
-            }}
-          >
-            <SelectTrigger aria-label="当前工作区" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {data.choices.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-2">
-          <p className="px-3 text-xs text-muted-foreground">管理</p>
-          <Link
-            href={`/settings/members?workspace=${data.workspace.id}`}
-            className={buttonVariants({
-              variant: "secondary",
-              className: "justify-start rounded-lg",
-            })}
-            aria-current="page"
-          >
-            <Users data-icon="inline-start" />
-            成员
-          </Link>
-        </div>
-        <div className="mt-auto hidden flex-col gap-3 px-3 pb-2 md:flex">
-
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Shield className="size-3.5" />
-            {data.role === "admin" ? "管理员访问权限" : "成员访问权限"}
-          </div>
-          <span className="text-xs text-muted-foreground">
-            Orvilo3 · 工作区设置
-          </span>
-        </div>
-      </aside>
-      <main className="flex min-w-0 flex-1 flex-col md:py-2 md:pr-2">
-        <div className="flex min-h-[calc(100dvh-1rem)] flex-col rounded-xl border bg-sidebar/40">
-          <header className="flex h-12 items-center gap-2 px-5 text-xs text-muted-foreground md:px-8">
-            <Users className="size-3.5" />
-            <span>设置</span>
-            <ChevronRight className="size-3" />
-            <span>成员</span>
-          </header>
-          <div className="flex w-full flex-col gap-6 px-5 py-5 md:px-10 lg:px-14 lg:py-8">
-            <h1 className="text-2xl font-medium tracking-tight">成员</h1>
+    <>
+          <section aria-label="工作区成员管理" className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-8 sm:px-10 sm:py-12">
+            <header className="flex flex-wrap items-center justify-between gap-4"><div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">成员</h1><p className="text-sm text-muted-foreground">管理工作区成员、角色与邀请。</p></div><Select value={data.workspace.id} items={data.choices.map(item => ({ value: item.id, label: item.name }))} onValueChange={value => { if (value) router.push(`/settings/members?workspace=${encodeURIComponent(value)}`) }}><SelectTrigger aria-label="当前工作区"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{data.choices.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectGroup></SelectContent></Select></header>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex w-full items-center gap-2 sm:w-auto">
                 <div className="min-w-0 flex-1 sm:w-72">
@@ -623,9 +542,7 @@ export function MembersSettings({
                   : "仅管理员可邀请成员和更改权限。如需操作，请联系工作区管理员。"}
               </p>
             </div>
-          </div>
-        </div>
-      </main>
+          </section>
       <InviteMembersDialog
         key={data.workspace.id}
         workspaceId={data.workspace.id}
@@ -673,6 +590,6 @@ export function MembersSettings({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }
