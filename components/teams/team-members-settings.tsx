@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { changeTeamMember, listTeamMembers, type loadTeamDirectory } from '@/app/actions/teams'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Button } from '@/components/ui/button'
@@ -13,7 +12,7 @@ import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 
 type Directory = Awaited<ReturnType<typeof loadTeamDirectory>>
-export function TeamMembersDialog({ team, workspaceMembers, onClose, onUpdated }: { team: Directory['teams'][number]; workspaceMembers: Directory['members']; onClose: () => void; onUpdated: () => void }) {
+export function TeamMembersSettings({ team, workspaceMembers, onUpdated }: { team: Directory['teams'][number]; workspaceMembers: Directory['members']; onUpdated: () => void }) {
   const { data, error: readError, mutate } = useSWR(['team-members', team.id], () => listTeamMembers(team.id))
   const [adding, setAdding] = useState('')
   const [pending, setPending] = useState(false)
@@ -29,10 +28,10 @@ export function TeamMembersDialog({ team, workspaceMembers, onClose, onUpdated }
     finally { setPending(false) }
   }
   const available = workspaceMembers.filter(member => member.status === 'active' && !data?.members.some(item => item.userId === member.userId))
-  return <Dialog open onOpenChange={value => { if (!value && !pending) onClose() }}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{team.name} · 团队成员</DialogTitle><DialogDescription>负责人管理团队。加入或退出不改变工作区内的公开访问权限；停用工作区成员会撤销访问。</DialogDescription></DialogHeader>
+  return <section className="flex min-w-0 flex-col gap-6" aria-label={`${team.name} · 团队成员`}><p className="text-sm leading-relaxed text-muted-foreground">负责人管理团队。加入或退出不改变工作区内的公开访问权限；停用工作区成员会撤销访问。</p>
     {readError ? <Alert variant="destructive"><AlertDescription>成员读取失败。<Button variant="ghost" size="sm" onClick={() => void mutate()}>重试</Button></AlertDescription></Alert> : !data ? <Skeleton className="h-28 w-full" /> : <>
       {data.canManage && <FieldGroup><Field><FieldLabel htmlFor="add-team-member">添加工作区成员</FieldLabel><div className="flex flex-wrap gap-2"><NativeSelect id="add-team-member" value={adding} onChange={event => setAdding(event.target.value)} disabled={pending}><NativeSelectOption value="">选择启用中的成员</NativeSelectOption>{available.map(member => <NativeSelectOption key={member.userId} value={member.userId}>{member.name} · {member.email}</NativeSelectOption>)}</NativeSelect><Button size="sm" disabled={!adding || pending} onClick={() => void change(adding, 'add')}>添加成员</Button></div></Field></FieldGroup>}
       <Table><TableHeader><TableRow><TableHead>成员</TableHead><TableHead>角色</TableHead>{data.canManage && <TableHead className="text-right">操作</TableHead>}</TableRow></TableHeader><TableBody>{data.members.map(member => <TableRow key={member.userId}><TableCell><p className="text-sm">{member.name}</p><p className="text-xs text-muted-foreground">{member.email}</p>{member.status === 'suspended' && <Badge variant="outline">工作区已停用</Badge>}</TableCell><TableCell>{member.role === 'owner' ? '负责人' : '成员'}</TableCell>{data.canManage && <TableCell><div className="flex flex-wrap justify-end gap-1"><Button size="sm" variant="ghost" disabled={pending || member.status !== 'active'} aria-label={`${member.role === 'owner' ? '设为成员' : '设为负责人'}：${member.email}`} onClick={() => void change(member.userId, member.role === 'owner' ? 'member' : 'owner')}>{member.role === 'owner' ? '设为成员' : '设为负责人'}</Button><Button size="sm" variant="ghost" disabled={pending} aria-label={`移出团队：${member.email}`} onClick={() => void change(member.userId, 'remove')}>移出</Button></div></TableCell>}</TableRow>)}</TableBody></Table>
     </>}{error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-  </DialogContent></Dialog>
+  </section>
 }

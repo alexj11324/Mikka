@@ -1,22 +1,22 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft, Globe2, Pencil, Users } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import { ChevronLeft, ChevronRight, Settings, Users } from 'lucide-react'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 type Team = { id: string; workspaceId: string; name: string; identifier: string; description: string; memberCount: number }
 
-export function TeamSettingsDetails({ team, canManage, onEdit, onMembers }: { team: Team; canManage: boolean; onEdit: () => void; onMembers: () => void }) {
-  return <section className="flex max-w-3xl flex-col gap-8" aria-label={`${team.name} 团队设置`}>
-    <Button variant="ghost" size="sm" className="self-start" nativeButton={false} role="link" render={<Link href={`/settings/teams?workspace=${team.workspaceId}`} />}><ArrowLeft data-icon="inline-start" />全部团队</Button>
-    <header className="flex flex-wrap items-start justify-between gap-4"><div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">{team.name}</h1><p className="text-sm text-muted-foreground">团队基本信息与成员管理</p></div>{canManage && <Button variant="outline" size="sm" onClick={onEdit}><Pencil data-icon="inline-start" />编辑团队</Button>}</header>
-    <FieldGroup className="rounded-xl border bg-muted/30 p-5"><Field orientation="responsive"><FieldLabel htmlFor="team-settings-name">名称</FieldLabel><Input id="team-settings-name" value={team.name} readOnly /></Field><Field orientation="responsive"><FieldLabel htmlFor="team-settings-identifier">团队标识</FieldLabel><Input id="team-settings-identifier" value={team.identifier} readOnly /></Field><Field orientation="responsive"><FieldLabel htmlFor="team-settings-description">简介</FieldLabel><Textarea id="team-settings-description" value={team.description} placeholder="暂无简介" rows={3} readOnly /></Field></FieldGroup>
-    <div className="flex flex-wrap items-center justify-between gap-4"><div className="flex flex-col gap-2"><span className="text-sm font-medium">团队可见性</span><p className="text-sm text-muted-foreground">仅当前工作区的启用成员可访问，不公开到互联网。</p></div><Badge variant="outline"><Globe2 />公开团队</Badge></div>
-    <div className="flex flex-wrap items-center justify-between gap-4"><div className="flex flex-col gap-2"><h2 className="text-sm font-medium">成员</h2><p className="text-sm text-muted-foreground">{team.memberCount} 位团队成员</p></div><Button variant="outline" size="sm" onClick={onMembers}><Users data-icon="inline-start" />{canManage ? '管理团队成员' : '查看团队成员'}</Button></div>
-    <Button variant="ghost" className="self-start" nativeButton={false} role="link" render={<Link href={`/?team=${team.id}`} />}>返回团队主页</Button>
+export function TeamSettingsDetails({ team }: { team: Team }) {
+  const href = `/settings/teams?workspace=${encodeURIComponent(team.workspaceId)}&team=${encodeURIComponent(team.id)}`
+  return <section className="flex flex-col gap-8" aria-label={`${team.name} 团队设置`}>
+    <Link className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'self-start')} href={`/settings/teams?workspace=${encodeURIComponent(team.workspaceId)}`}><ChevronLeft data-icon="inline-start" />全部团队</Link>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 pb-12 sm:pt-4">
+      <header className="flex flex-wrap items-end justify-between gap-4 px-1 sm:px-4"><div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">{team.name}</h1><p className="text-sm text-muted-foreground">所有工作区成员均可访问</p></div><Link className={buttonVariants({ variant: 'ghost', size: 'sm' })} href={`/?team=${encodeURIComponent(team.id)}`}>团队概览<ChevronRight data-icon="inline-end" /></Link></header>
+      <section className="flex flex-col rounded-xl border bg-card px-4 sm:px-5" aria-label="团队设置选项">
+        <Link href={`${href}&view=general`} className="flex min-w-0 items-center gap-3 rounded-lg py-5 outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Settings className="size-5" aria-hidden="true" /></span><span className="flex min-w-0 flex-1 flex-col gap-1"><span className="text-sm font-medium">常规设置</span><span className="text-sm text-muted-foreground">名称、团队标识与简介</span></span><ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /></Link>
+        <Link href={`${href}&view=members`} className="flex min-w-0 items-center gap-3 rounded-lg py-5 outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Users className="size-5" aria-hidden="true" /></span><span className="flex min-w-0 flex-1 flex-col gap-1"><span className="text-sm font-medium">成员</span><span className="text-sm text-muted-foreground">管理团队成员</span></span><span className="shrink-0 text-sm text-muted-foreground">{team.memberCount} 位成员</span><ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /></Link>
+      </section>
+    </div>
   </section>
 }
