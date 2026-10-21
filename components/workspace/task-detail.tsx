@@ -16,7 +16,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/textarea'
-import { Separator } from '@/components/ui/separator'
 
 type Issue = Awaited<ReturnType<typeof getIssue>>
 type WorkspaceUser = { id: string; name: string; email: string }
@@ -127,7 +126,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onRegisterFlush }:
   </div>
 
   return <div className="flex min-w-0 flex-1 flex-col">
-    <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4 sm:px-6">
+    <div className="flex h-12 shrink-0 items-center justify-between gap-2 px-4 sm:px-6">
       <div className="flex min-w-0 items-center gap-2"><Button variant="ghost" size="icon-sm" aria-label="返回任务视图" disabled={pending} onClick={onClose}><ArrowLeft data-icon="inline-start" /></Button><span className="truncate font-mono text-xs text-muted-foreground">{issueIdentifier(saved.id)}</span></div>
       <div className="flex items-center gap-2"><span role="status" aria-live="polite" className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">{error ? '保存失败' : pending ? '正在保存…' : syncState.error ? '同步失败' : syncState.pending || syncState.syncing ? '正在同步…' : dirty ? '等待自动保存…' : <><Check className="size-3.5" />已自动保存</>}</span>
         <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="更多任务操作" disabled={pending} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuGroup><DropdownMenuItem onClick={() => setDocumentTools(value => !value)}><FileText />{documentTools ? '返回任务描述' : '高级文档工具'}</DropdownMenuItem><DropdownMenuItem onClick={() => setHistory(true)}><History />版本历史</DropdownMenuItem><DropdownMenuItem onClick={() => setMembers(true)}><Users />管理协作成员</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
@@ -149,7 +148,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onRegisterFlush }:
       <IssueDetailProperties status={status} priority={priority} revision={saved.revision} createdAt={saved.createdAt} updatedAt={saved.updatedAt} pending={pending || !syncState.ready} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} onMembers={() => setMembers(true)} onHistory={() => setHistory(true)} />
     </div>
     <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle>协作成员</DialogTitle><DialogDescription>管理此任务的访问与编辑权限。</DialogDescription></DialogHeader><IssueMembers id={saved.id} /></DialogContent></Dialog>
-    <Dialog open={history} onOpenChange={setHistory}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>版本历史</DialogTitle><DialogDescription>载入旧版本会同步替换共享正文，评论保留，并自动保存为新版本。</DialogDescription></DialogHeader><div className="flex flex-col gap-4">{historyError ? <p role="alert" className="text-xs text-destructive">版本读取失败，请重试。</p> : !versions ? <Skeleton className="h-20 w-full" /> : versions.map(version => <article key={version.id} className="flex flex-col gap-3"><Separator /><div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">v{version.revision} · {version.title}</p><time className="text-xs text-muted-foreground">{new Date(version.createdAt).toLocaleString('zh-CN')}</time></div><Button size="sm" variant="outline" disabled={pending} onClick={() => restore(version)}>载入此版本</Button></div><p className="line-clamp-3 text-xs leading-6 text-muted-foreground">{plainText(version.content) || '空白文档'}</p></article>)}</div></DialogContent></Dialog>
+    <Dialog open={history} onOpenChange={setHistory}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>版本历史</DialogTitle><DialogDescription>载入旧版本会同步替换共享正文，评论保留，并自动保存为新版本。</DialogDescription></DialogHeader><div className="flex flex-col gap-4">{historyError ? <p role="alert" className="text-xs text-destructive">版本读取失败，请重试。</p> : !versions ? <Skeleton className="h-20 w-full" /> : versions.map(version => <article key={version.id} className="flex flex-col gap-3"><div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">v{version.revision} · {version.title}</p><time className="text-xs text-muted-foreground">{new Date(version.createdAt).toLocaleString('zh-CN')}</time></div><Button size="sm" variant="outline" disabled={pending} onClick={() => restore(version)}>载入此版本</Button></div><p className="line-clamp-3 text-xs leading-6 text-muted-foreground">{plainText(version.content) || '空白文档'}</p></article>)}</div></DialogContent></Dialog>
   </div>
 }
 
