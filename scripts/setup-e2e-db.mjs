@@ -22,7 +22,7 @@ try {
 
 const pool = new Pool({ connectionString, max: 1 })
 const dialect = new PgDialect()
-const identifier = name => dialect.sqlToQuery(sql.identifier(name)).sql
+const identifier = name => dialect.sqlToQuery(sql`${sql.identifier(name)}`).sql
 function defaultValue(value) {
   if (value instanceof SQL) {
     const query = dialect.sqlToQuery(value)
