@@ -3,6 +3,55 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { createParser, generateSystemPrompt } from '@openuidev/lang-core'
 import { agentComponentCatalog, agentComponentGroups, createAgentLibrary } from '../lib/agent-ui-catalog.ts'
+import { agentImageQuery, findAgentImage, parseAgentImage } from '../lib/agent-images.ts'
+
+function commonsImage(overrides = {}) {
+  return { title: 'File:Victoria Harbour.jpg', index: 1, imageinfo: [{ thumburl: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/photo.jpg', thumbwidth: 960, thumbheight: 540, descriptionurl: 'https://commons.wikimedia.org/wiki/File:Victoria_Harbour.jpg', mime: 'image/jpeg', extmetadata: { Artist: { value: '<a>摄影师</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' } }, ...overrides }] }
+}
+
+test('图片解析保留真实来源和许可，拒绝不安全资源', () => {
+  const image = parseAgentImage({ query: { pages: { 1: commonsImage() } } })
+  assert.equal(image.author, '摄影师')
+  assert.equal(image.license, 'CC BY-SA 4.0')
+  assert.equal(image.width, 960)
+  for (const unsafe of [
+    { thumburl: 'javascript:alert(1)' },
+    { thumburl: 'https://127.0.0.1/private' },
+    { thumburl: 'https://upload.wikimedia.org.evil.test/image.jpg' },
+    { descriptionurl: 'https://evil.test/phishing' },
+    { mime: 'image/svg+xml' },
+    { thumbwidth: -1 },
+    { extmetadata: {} },
+  ]) assert.equal(parseAgentImage({ query: { pages: { 1: commonsImage(unsafe) } } }), null)
+  assert.equal(parseAgentImage({ error: 'unavailable' }), null)
+  for (const query of ['https://evil.test', '<script>', 'a\nb']) {
+    assert.equal(agentImageQuery.safeParse(query).success, false)
+    assert.equal(agentComponentCatalog.BeImage.props.safeParse({ query, alt: '资料配图' }).success, false)
+  }
+})
+
+test('配图检索通过固定来源查询，并正确处理无结果及上游错误', async t => {
+  t.mock.method(globalThis, 'fetch', async url => {
+    assert.equal(url.origin, 'https://commons.wikimedia.org')
+    assert.equal(url.searchParams.get('gsrnamespace'), '6')
+    assert.match(url.searchParams.get('gsrsearch'), /Victoria Harbour/)
+    return Response.json({ query: { pages: { 1: commonsImage() } } })
+  })
+  assert.equal((await findAgentImage('Victoria Harbour')).license, 'CC BY-SA 4.0')
+  globalThis.fetch.mock.mockImplementation(async () => Response.json({ query: { pages: {} } }))
+  assert.equal(await findAgentImage('Victoria Harbour'), null)
+  globalThis.fetch.mock.mockImplementation(async () => new Response(null, { status: 503 }))
+  await assert.rejects(findAgentImage('Victoria Harbour'), /暂时不可用/)
+})
+
+test('资料配图和详细回答规则进入模型规范', async () => {
+  const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
+  assert.ok(spec.promptOptions.additionalRules.some(rule => rule.includes('不设简短回答偏好') && rule.includes('不能用一张摘要表')))
+  assert.ok(spec.promptOptions.additionalRules.some(rule => rule.includes('BeImage') && rule.includes('真实配图')))
+  const result = createParser(library.toJSONSchema(), library.root).parse('root = Stack([TextContent("介绍"), BeImage("Hong Kong Victoria Harbour", "维多利亚港资料配图", "现代风光资料图片")])')
+  assert.ok(result.root)
+  assert.deepEqual(result.meta.errors, [])
+})
 
 const library = createAgentLibrary()
 const beuiResponse = `root = Stack([badge, statistic, button])
@@ -143,7 +192,10 @@ test('服务端和 beUI 界面均使用 DS 4.1 Flash', async () => {
   const route = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
   const composer = await readFile(new URL('../components/workspace/agent-composer.tsx', import.meta.url), 'utf8')
   const chat = await readFile(new URL('../components/workspace/agent-chat.tsx', import.meta.url), 'utf8')
-  assert.ok(route.includes("opencode.chat('deepseek-v4.1-flash')"))
+  assert.ok(route.includes("opencode('deepseek-v4.1-flash')"))
+  assert.doesNotMatch(route, /maxOutputTokens\s*:|providerOptions\s*:|reasoning\s*:/)
+  assert.match(route, /createOpenAICompatible/)
+  assert.match(route, /validateAgentStream\(\)/)
   assert.ok(composer.includes('model="deepseek-v4.1-flash"'))
   assert.match(composer, /DS 4\.1 Flash/)
   assert.match(chat, /DS 4\.1 Flash/)

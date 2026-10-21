@@ -1,16 +1,25 @@
-import { createOpenAI } from '@ai-sdk/openai'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createUIMessageStreamResponse, streamText, toUIMessageStream } from 'ai'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { generateSystemPrompt } from '@openuidev/lang-core'
 import agentUISpec from '@/lib/agent-ui.spec.json'
+import { validateAgentStream } from '@/lib/agent-fetch'
 
 const systemPrompt = generateSystemPrompt(agentUISpec)
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional() }).strict()
 const errorHeaders = { 'Cache-Control': 'private, no-store', 'Content-Type': 'text/plain; charset=utf-8' }
+
+function agentErrorMessage(error: unknown) {
+  const status = typeof error === 'object' && error !== null && 'statusCode' in error ? error.statusCode : undefined
+  if (status === 401 || status === 403) return 'OpenCode Go 身份验证或模型权限检查失败，请检查服务端配置。'
+  if (status === 429 || status === 402) return 'OpenCode Go 当前限流或额度不足，请稍后重试并检查订阅额度。'
+  if (error instanceof Error && /timeout|abort/i.test(error.name)) return '模型响应超时，已收到的内容已保留，请在此重试。'
+  return 'OpenCode Go 连接失败，已有内容已保留，请在此重试。'
+}
 
 export async function POST(request: Request) {
   if (request.headers.get('sec-fetch-site') === 'cross-site') {
@@ -54,27 +63,29 @@ export async function POST(request: Request) {
   const apiKey = process.env.OPENCODE_API_KEY
   if (!apiKey) return new Response('服务端尚未配置 OPENCODE_API_KEY，请添加环境变量后重试。', { status: 503, headers: errorHeaders })
 
-  const opencode = createOpenAI({
+  const opencode = createOpenAICompatible({
+    name: 'opencode',
     apiKey,
     baseURL: 'https://opencode.ai/zen/go/v1',
     headers: { 'User-Agent': 'Orvilo-UI-Agent/1.0', 'x-opencode-session': parsed.data.sessionId ?? crypto.randomUUID() },
   })
   const result = streamText({
-    model: opencode.chat('deepseek-v4.1-flash'),
+    model: opencode('deepseek-v4.1-flash'),
     system: systemPrompt,
     prompt: parsed.data.prompt,
-    maxOutputTokens: 4096,
-    maxRetries: 0,
-    timeout: 50000,
+    maxRetries: 1,
+    timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
     abortSignal: request.signal,
-    onError: () => undefined,
+    onError: ({ error }) => {
+      if (!request.signal.aborted) console.error('Agent generation failed:', agentErrorMessage(error))
+    },
   })
   return createUIMessageStreamResponse({
     headers: { 'Cache-Control': 'private, no-store', 'X-Accel-Buffering': 'no' },
     stream: toUIMessageStream({
       stream: result.stream,
       sendReasoning: false,
-      onError: () => 'OpenCode Go 请求失败，请检查密钥、Go 订阅额度及模型权限后重试。',
-    }),
+      onError: agentErrorMessage,
+    }).pipeThrough(validateAgentStream()),
   })
 }

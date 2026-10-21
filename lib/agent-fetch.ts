@@ -1,3 +1,31 @@
+import type { UIMessageChunk } from 'ai'
+
+export function validateAgentStream() {
+  let hasText = false
+  let failed = false
+  let finished = false
+  return new TransformStream<UIMessageChunk, UIMessageChunk>({
+    transform(part, controller) {
+      if (part.type === 'text-delta' && part.delta.trim()) hasText = true
+      if (part.type === 'error') failed = true
+      if (part.type === 'abort') finished = true
+      if (part.type === 'finish') {
+        finished = true
+        if (!failed && (part.finishReason === 'length' || !hasText)) {
+          controller.enqueue({ type: 'error', errorText: part.finishReason === 'length'
+            ? '本次生成达到输出上限，回复未完整生成。已有内容已保留，可以在此重试。'
+            : '模型未返回正文，请在此重试。' })
+          failed = true
+        }
+      }
+      controller.enqueue(part)
+    },
+    flush(controller) {
+      if (!finished && !failed) controller.enqueue({ type: 'error', errorText: '回复连接提前结束，已有内容已保留，请在此重试。' })
+    },
+  })
+}
+
 export const fetchAgentResponse: typeof fetch = async (input, options) => {
   const signal = options?.signal
   if (!signal) return fetch(input, options)

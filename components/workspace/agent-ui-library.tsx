@@ -3,6 +3,7 @@
 import { Info } from 'lucide-react'
 import { AgentApproval, AgentQuestions, useAgentDecision } from './agent-decision'
 import { AgentContent, AgentStatusIcon, AgentTasks } from './agent-content'
+import { AgentImage } from './agent-image'
 import { Button as BeButton } from '@/components/motion/button/base'
 import { AnimatedBadge } from '@/components/motion/animated-badge'
 import { AnimatedNumber } from '@/components/motion/animated-number'
@@ -20,6 +21,7 @@ import { Badge as ReuiBadge } from '@/components/reui/badge'
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '@/components/reui/frame'
 
 const renderers = {
+  BeImage: ({ props }) => <AgentImage {...props} />,
   BeButton: function BePromptButton({ props }) {
     const { send, sent, error, status } = useAgentDecision()
     return <div className="flex min-w-0 flex-col gap-2">

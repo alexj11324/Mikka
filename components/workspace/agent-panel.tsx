@@ -43,6 +43,7 @@ function AgentSession({ onReset }: { onReset: () => void }) {
   const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ api: '/api/agent', credentials: 'same-origin', fetch: fetchAgentResponse })
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const submittingRef = useRef(false)
+  const lastRequestRef = useRef<{ prompt: string; failed: boolean } | null>(null)
   const sessionIdRef = useRef<string | null>(null)
   const [generation, setGeneration] = useState(0)
   const [question, setQuestion] = useState('')
@@ -69,13 +70,18 @@ function AgentSession({ onReset }: { onReset: () => void }) {
     submittingRef.current = true
     try {
       sessionIdRef.current ??= crypto.randomUUID()
-      if (question) setPreviousTurns(turns => [...turns, { id: generation, question, completion, error }])
-      else setPreviousTurns([])
-      setGeneration(value => value + 1)
+      const retrying = lastRequestRef.current?.failed && lastRequestRef.current.prompt === prompt.trim()
+      if (!retrying) {
+        if (question) setPreviousTurns(turns => [...turns, { id: generation, question, completion, error }])
+        else setPreviousTurns([])
+        setGeneration(value => value + 1)
+      }
       setQuestion(prompt.trim())
+      lastRequestRef.current = { prompt: prompt.trim(), failed: true }
       const result = await complete(prompt.trim(), { body: { sessionId: sessionIdRef.current } })
+      lastRequestRef.current.failed = !result?.trim()
       if (result && source === 'composer') updateDraft(current => current === prompt ? '' : current)
-      return Boolean(result)
+      return Boolean(result?.trim())
     } finally {
       submittingRef.current = false
     }
@@ -86,7 +92,7 @@ function AgentSession({ onReset }: { onReset: () => void }) {
       <AgentChat
         turns={[
           ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse completion={turn.completion} error={turn.error} isLoading={false} onAction={handleUIAction} /> })),
-          ...(question ? [{ id: generation, question, response: <AgentResponse completion={completion} error={error} isLoading={isLoading} onAction={handleUIAction} /> }] : []),
+          ...(question ? [{ id: generation, question, response: <AgentResponse completion={completion} error={error} isLoading={isLoading} onAction={handleUIAction} onRetry={() => { void request(question, 'inline') }} /> }] : []),
         ]}
         streaming={isLoading}
         onReset={onReset}

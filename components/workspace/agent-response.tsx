@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import type { ActionEvent } from '@openuidev/react-lang'
 import { Bot } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import { MessageBubble as Bubble, MessageBubbleContent as BubbleContent } from '@/components/agents/message-bubble'
 import { Message, MessageAvatar, MessageContent, MessageHeader } from '@/components/agents/message'
 import { AgentProgress } from '@/components/agents/loading-states/agent-progress'
@@ -14,7 +15,7 @@ const AgentGenerativeUI = dynamic(() => import('./agent-generative-ui').then(mod
   loading: () => <p role="status" className="text-xs text-muted-foreground">正在加载生成界面…</p>,
 })
 
-export function AgentResponse({ completion, error, isLoading, onAction }: { completion: string; error?: Error; isLoading: boolean; onAction: (event: ActionEvent) => void }) {
+export function AgentResponse({ completion, error, isLoading, onAction, onRetry }: { completion: string; error?: Error; isLoading: boolean; onAction: (event: ActionEvent) => void; onRetry?: () => void }) {
   if (!completion && !error && !isLoading) return null
 
   return <Message from="assistant" aria-label="Agent 回复" animateIn>
@@ -23,11 +24,11 @@ export function AgentResponse({ completion, error, isLoading, onAction }: { comp
       <MessageHeader>Agent</MessageHeader>
       <Bubble variant="ghost" className="w-full min-w-0">
         <BubbleContent className="flex w-full min-w-0 flex-col gap-4">
-          {isLoading && <AgentProgress label="正在生成回复" />}
+          {isLoading && <AgentProgress label={completion ? '正在继续生成回复' : '正在思考并准备正文，可随时停止'} />}
           {completion && <StreamingResponse status={error ? 'error' : isLoading ? 'streaming' : 'complete'} announce={false} showActions={false}>
             <div className="w-full min-w-0 overflow-x-auto break-words"><AgentGenerativeUI response={completion} isStreaming={isLoading} onAction={onAction} /></div>
           </StreamingResponse>}
-          {error && <Alert variant="destructive"><AlertDescription>{error.message || '请求失败，请稍后重试。'} 你的输入已保留，可重新发送。</AlertDescription></Alert>}
+          {error && <Alert variant="destructive"><AlertDescription>{error.message || '请求失败，请稍后重试。'} 你的输入已保留。{onRetry && <Button type="button" variant="outline" size="sm" disabled={isLoading} onClick={onRetry}>重试此回复</Button>}</AlertDescription></Alert>}
         </BubbleContent>
       </Bubble>
     </MessageContent>
