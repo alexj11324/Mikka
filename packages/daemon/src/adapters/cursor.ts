@@ -57,7 +57,7 @@ type PermissionRequest = Parameters<acp.Client["requestPermission"]>[0]
 type PermissionResponse = Awaited<ReturnType<acp.Client["requestPermission"]>>
 
 /**
- * Answers Cursor's permission request for a tool call (ADR 0028). Orvilo's
+ * Answers Cursor's permission request for a tool call (ADR 0028). Mikka's
  * sandbox is the boundary, so tool calls are allowed, except a shell command
  * the workspace's policy does not allow: installing dependencies under
  * `ask` or `deny` (nobody can be asked mid-run, so `ask` is refused and the
@@ -265,7 +265,7 @@ export class CursorAdapter implements AgentAdapter {
     ctx.clearHandoff()
     const argv = [
       this.options.binary ?? "agent",
-      // Cursor's own sandbox cannot nest inside Orvilo's.
+      // Cursor's own sandbox cannot nest inside Mikka's.
       "--sandbox",
       "disabled",
       ...(options.model ? ["--model", options.model] : []),
@@ -293,7 +293,7 @@ export class CursorAdapter implements AgentAdapter {
 
     const conn = new acp.ClientSideConnection(
       () => ({
-        // Orvilo's sandbox decides, plus the workspace's command rules.
+        // Mikka's sandbox decides, plus the workspace's command rules.
         async requestPermission(params) {
           const { response, refused } = acpPermissionResponse(
             params,
@@ -403,7 +403,7 @@ export class CursorAdapter implements AgentAdapter {
       await ready(
         conn.initialize({
           protocolVersion: acp.PROTOCOL_VERSION,
-          clientInfo: { name: "orvilo", version: DAEMON_VERSION },
+          clientInfo: { name: "mikka", version: DAEMON_VERSION },
           clientCapabilities: {
             fs: { readTextFile: false, writeTextFile: false },
             terminal: false,

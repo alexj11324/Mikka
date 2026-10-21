@@ -19,12 +19,12 @@ import {
   type RelayErrorCode,
   type RelayServerMessage,
   type RunEvent,
-} from "@orvilo/protocol/relay"
+} from "@mikka/protocol/relay"
 import {
   CLIENT_KIND_PARAM,
   CLIENT_VERSION_PARAM,
   type ClientKind,
-} from "@orvilo/protocol/version"
+} from "@mikka/protocol/version"
 
 export type RelayStatus =
   | "idle"
@@ -239,7 +239,7 @@ export class RelayClient {
   private request(frame: Pending["frame"]): Promise<void> {
     if (this.status === "update_required")
       return Promise.reject(
-        new RelayRequestError("update_required", "Update Orvilo to continue.")
+        new RelayRequestError("update_required", "Update Mikka to continue.")
       )
     return new Promise<void>((resolve, reject) => {
       this.pending.push({ frame, resolve, reject })
@@ -324,7 +324,7 @@ export class RelayClient {
           p.reject(
             new RelayRequestError(
               "update_required",
-              "Update Orvilo to continue."
+              "Update Mikka to continue."
             )
           )
         return

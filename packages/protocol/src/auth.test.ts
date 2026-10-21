@@ -9,10 +9,10 @@ import {
 describe("mobileTrustedOrigins", () => {
   it("trusts the app's scheme always and Expo Go's only in development", () => {
     expect(mobileTrustedOrigins({ isDev: true })).toEqual([
-      "orvilo://",
+      "mikka://",
       "exp://",
     ])
-    expect(mobileTrustedOrigins({ isDev: false })).toEqual(["orvilo://"])
+    expect(mobileTrustedOrigins({ isDev: false })).toEqual(["mikka://"])
   })
 })
 

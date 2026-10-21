@@ -7,7 +7,7 @@ import type {
   QuotaSnapshot,
   QuotaWindow,
   QuotaWindowKind,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 
 import { sanitizeError } from "./files"
 import {
@@ -143,7 +143,7 @@ function headersFor(auth: CodexAuth): Record<string, string> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${auth.accessToken}`,
     Accept: "application/json",
-    "User-Agent": "orvilo-daemon",
+    "User-Agent": "mikka-daemon",
   }
   const accountId = safeAccountId(auth.accountId)
   if (accountId) headers["ChatGPT-Account-Id"] = accountId

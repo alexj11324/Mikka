@@ -15,7 +15,7 @@ import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/
 import { listSshHosts } from '@/lib/ssh'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
-import type { HarnessInfo } from '@orvilo/protocol/harness'
+import type { HarnessInfo } from '@mikka/protocol/harness'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })

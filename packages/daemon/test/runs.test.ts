@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { DAEMON_RPC_ERRORS } from "@orvilo/protocol"
+import { DAEMON_RPC_ERRORS } from "@mikka/protocol"
 import { afterEach, describe, expect, it } from "vitest"
 
 import type { RunChunk } from "../src/chunks"
@@ -108,10 +108,10 @@ describe("mock runs", () => {
     expect(run.state).toBe("succeeded")
     expect(run.worktree).toBe(join(dataDir, "worktrees", runId))
     expect(
-      readFileSync(join(run.worktree as string, "ORVILO_MOCK.md"), "utf8")
+      readFileSync(join(run.worktree as string, "MIKKA_MOCK.md"), "utf8")
     ).toContain("mock")
     // The main checkout is untouched.
-    expect(existsSync(join(repo, "ORVILO_MOCK.md"))).toBe(false)
+    expect(existsSync(join(repo, "MIKKA_MOCK.md"))).toBe(false)
 
     const chunks = server.chunksFor(runId)
     expect(states(chunks)).toEqual([
@@ -127,8 +127,8 @@ describe("mock runs", () => {
     expect(server.runs.get(runId)?.completion).toMatchObject({
       stopReason: "submitted",
       report: {
-        summary: "Added ORVILO_MOCK.md with a short usage note.",
-        filesChanged: ["ORVILO_MOCK.md"],
+        summary: "Added MIKKA_MOCK.md with a short usage note.",
+        filesChanged: ["MIKKA_MOCK.md"],
         verify: { status: "passed", command: VERIFY },
       },
     })
@@ -285,7 +285,7 @@ describe("mock runs", () => {
     await daemon.supervisor.cancel(runId)
     await waitFor(
       () =>
-        git(repo, "branch", "--list", `orvilo/run-${runId}`) === "" &&
+        git(repo, "branch", "--list", `mikka/run-${runId}`) === "" &&
         git(repo, "worktree", "list").split("\n").length === 1
     )
   })
@@ -293,7 +293,7 @@ describe("mock runs", () => {
 
 // A planning run writes no code: it hands in a spec and the split it
 // proposes, and the daemon turns both into the conversation's two cards
-// (ADR ORV-205). Real CLIs get there through the `orvilo` submit tool
+// (ADR ORV-205). Real CLIs get there through the `mikka` submit tool
 // (test/real-agents.test.ts, opt-in); the fixture keeps the emission itself
 // — the step that puts the cards in front of a person — covered every run.
 //
@@ -412,15 +412,15 @@ describe("clean-up of earlier leftovers", () => {
   it("sweeps empty run branches at start and keeps one with a commit", async () => {
     const { repo, server, dataDir } = await setup()
     // Left by runs this daemon has no record of: one empty, one with work.
-    git(repo, "branch", "orvilo/run-empty1", "main")
-    git(repo, "branch", "orvilo/run-work1", "main")
+    git(repo, "branch", "mikka/run-empty1", "main")
+    git(repo, "branch", "mikka/run-work1", "main")
     git(
       repo,
       "worktree",
       "add",
       "-q",
       join(tempDir(), "wt"),
-      "orvilo/run-work1"
+      "mikka/run-work1"
     )
     const wt = git(repo, "worktree", "list", "--porcelain")
       .split("\n")
@@ -432,7 +432,7 @@ describe("clean-up of earlier leftovers", () => {
       "-c",
       "user.name=a",
       "-c",
-      "user.email=a@orvilo.invalid",
+      "user.email=a@mikka.invalid",
       "commit",
       "-q",
       "--allow-empty",
@@ -440,8 +440,8 @@ describe("clean-up of earlier leftovers", () => {
       "work"
     )
     await boot(server, dataDir)
-    expect(git(repo, "branch", "--list", "orvilo/run-empty1")).toBe("")
-    expect(git(repo, "branch", "--list", "orvilo/run-work1")).not.toBe("")
+    expect(git(repo, "branch", "--list", "mikka/run-empty1")).toBe("")
+    expect(git(repo, "branch", "--list", "mikka/run-work1")).not.toBe("")
   })
 })
 

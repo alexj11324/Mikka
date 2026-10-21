@@ -1,7 +1,7 @@
 // Built-in preset skills (ADR ORV-277). A preset is not stored anywhere: the
 // Skills settings page copies one into the workspace's `skill` table, and from
 // then on it is an ordinary skill the workspace owns and can edit. Presets are
-// written for Orvilo; the role split was inspired by Ruflo's core agents
+// written for Mikka; the role split was inspired by Ruflo's core agents
 // (MIT, see THIRD_PARTY_NOTICES.md).
 import { plannerInstructions } from "./planner"
 import { researcherInstructions } from "./researcher"

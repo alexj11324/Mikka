@@ -5,7 +5,7 @@ export const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env
 export const authBaseURL = process.env.BETTER_AUTH_URL ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.V0_RUNTIME_URL)
 
 export const auth = betterAuth({
-  appName: 'Orvilo',
+  appName: 'Mikka',
   onAPIError: { errorURL: '/sign-in?oauth=failed' },
   database: pool,
   socialProviders: githubEnabled ? {

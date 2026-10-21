@@ -1,8 +1,8 @@
-// `orvilo daemon | daemon login | daemon status` (ADR 0004). The desktop app
+// `mikka daemon | daemon login | daemon status` (ADR 0004). The desktop app
 // runs the same entry with `daemon --data-dir <userData>`.
 import { parseArgs } from "node:util"
 
-import type { Flavor } from "@orvilo/protocol"
+import type { Flavor } from "@mikka/protocol"
 
 import { readJson, writeJsonAtomic } from "./fs-util"
 import { DaemonAlreadyRunningError } from "./lock"
@@ -15,16 +15,16 @@ import { MemoryServer, type DeviceRepo, type ServerLink } from "./server-link"
 import { HttpServerLink } from "./server-link-http"
 
 const USAGE = `Usage:
-  orvilo daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>]
-  orvilo daemon login [--server <url>] [--workspace <id>] [--token <session>] [--dev] [--data-dir <dir>]
-  orvilo daemon status [--dev] [--data-dir <dir>]`
+  mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>]
+  mikka daemon login [--server <url>] [--workspace <id>] [--token <session>] [--dev] [--data-dir <dir>]
+  mikka daemon status [--dev] [--data-dir <dir>]`
 
 const SERVER_URLS: Record<Flavor, string> = {
   prod: "https://orvilo.aspectlylabs.com",
   dev: "http://localhost:4000",
 }
 
-const CLIENT = { name: "orvilo-cli", version: DAEMON_VERSION }
+const CLIENT = { name: "mikka-cli", version: DAEMON_VERSION }
 
 export interface CliIO {
   out: (line: string) => void
@@ -85,14 +85,14 @@ export async function runCli(
     let credential = values.token
     if (!credential) {
       const serverUrl =
-        values.server ?? process.env.ORVILO_PUBLIC_URL ?? SERVER_URLS[flavor]
+        values.server ?? process.env.MIKKA_PUBLIC_URL ?? SERVER_URLS[flavor]
       try {
         credential = await deviceLogin({
           serverUrl,
           prompt: (code) => {
             io.out(`Your code: ${code.user_code}`)
             io.out(
-              `Approve it in the Orvilo app: ${code.verification_uri_complete ?? code.verification_uri}`
+              `Approve it in the Mikka app: ${code.verification_uri_complete ?? code.verification_uri}`
             )
             io.out("Waiting for approval...")
           },
@@ -131,7 +131,7 @@ export async function runCli(
   }
 
   const serverArg =
-    values.server ?? process.env.ORVILO_PUBLIC_URL ?? SERVER_URLS[flavor]
+    values.server ?? process.env.MIKKA_PUBLIC_URL ?? SERVER_URLS[flavor]
   let link: ServerLink
   let memoryServer: MemoryServer | undefined
   let credential: string | undefined
@@ -188,7 +188,7 @@ export async function runCli(
   }
 }
 
-/** Process entry for `bin/orvilo.ts` and the app-started daemon. */
+/** Process entry for `bin/mikka.ts` and the app-started daemon. */
 export function main(argv = process.argv.slice(2)) {
   runCli(argv).then(
     (code) => {

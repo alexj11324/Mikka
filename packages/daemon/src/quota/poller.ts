@@ -5,7 +5,7 @@ import {
   unknownQuotaReport,
   type QuotaSnapshot,
   type QuotaSnapshotReport,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 
 import type { Logger } from "../log"
 import { sanitizeError } from "./files"

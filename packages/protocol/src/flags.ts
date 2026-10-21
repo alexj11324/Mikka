@@ -1,6 +1,6 @@
 // Feature flags (ADR 0033, docs/analytics.md). A flag hides UI that is not
 // finished or not yet for everyone. Without a PostHog key every flag is off,
-// except the ones a build forces on (`ORVILO_FLAGS`), so local development can
+// except the ones a build forces on (`MIKKA_FLAGS`), so local development can
 // still see the screens.
 
 /**
@@ -13,7 +13,7 @@ export const FEATURE_FLAGS = [
   // is created in PostHog (ADR 0033).
   "feat-system-notifications",
   // The read-only check before In Review (ADR 0046). The server reads it from
-  // its own ORVILO_FLAGS; the key is here so the same one can be created in
+  // its own MIKKA_FLAGS; the key is here so the same one can be created in
   // PostHog (ADR 0033).
   "feat-readonly-check",
   // Hides the acceptance criteria editor until it has shipped to everyone
@@ -119,7 +119,7 @@ export function isFeatureFlag(name: unknown): name is FeatureFlag {
 }
 
 /**
- * Parses the build-time `ORVILO_FLAGS` list (comma separated flag names, or
+ * Parses the build-time `MIKKA_FLAGS` list (comma separated flag names, or
  * `all`) into the flags forced on. Unknown names are ignored.
  */
 export function parseForcedFlags(value: string | undefined): FeatureFlag[] {

@@ -45,7 +45,7 @@ function validationCode(error: z.ZodError): ActionErrorCode {
 
 export async function listIssues() {
   const userId = await getUserId()
-  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)), sql`${issues.content}->'attrs'->'orvilo'->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
+  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)), sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
   const ownersWithoutNumbers = [...new Set(rows.filter(row => !readIssueMetadata(row.content).number).map(row => row.ownerId))]
   if (ownersWithoutNumbers.length) {
     for (const ownerId of ownersWithoutNumbers) await ensureIssueNumbers(ownerId)
