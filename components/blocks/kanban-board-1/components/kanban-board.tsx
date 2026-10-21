@@ -2,14 +2,15 @@
 
 import { type ComponentProps, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
-import { ArrowRight, CalendarDays, Plus } from 'lucide-react'
+import { Circle, Flag, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { ISSUE_PRIORITIES, issueIdentifier, type IssueStatus } from '@/components/workspace/issue-properties'
+import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
+import { CardControlBoundary, CardMembers, CardHistory, CardCompletion } from '@/components/workspace/issue-card-controls'
+import { IssuePropertyMenu } from '@/components/workspace/issue-property-menu'
+import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier, type IssueStatus } from '@/components/workspace/issue-properties'
 import { BOARD_COLUMNS, type BoardColumns, type BoardTask } from './data'
 
 function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typeof ScrollAreaPrimitive.Viewport> & { viewportRef: Ref<HTMLDivElement> }) {
@@ -22,86 +23,49 @@ function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typ
   </ScrollAreaPrimitive.Root>
 }
 
-function TaskTitleAffordance({ title, isDone, onOpen, disabled }: { title: string; isDone: boolean; onOpen: () => void; disabled: boolean }) {
-  return <button type="button" disabled={disabled} onClick={onOpen} onPointerDown={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} className="group/task-title inline-flex max-w-full min-w-0 items-start gap-1 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
-    <span data-slot="kanban-task-title" className={cn('line-clamp-2 cursor-pointer py-0.25 transition-colors hover:text-primary', isDone && 'text-muted-foreground line-through')}>{title}</span>
-    <ArrowRight aria-hidden="true" className="mt-1 size-3 shrink-0 -translate-x-1 opacity-0 transition-all group-hover/task-title:translate-x-0 group-hover/task-title:opacity-100 motion-reduce:transition-none" />
-  </button>
-}
-
-const signalDotClass: Record<IssueStatus, string> = {
-  backlog: 'bg-muted-foreground',
-  todo: 'bg-muted-foreground',
-  doing: 'bg-warning',
-  review: 'bg-success',
-  done: 'bg-info',
-  canceled: 'bg-muted-foreground',
-  duplicate: 'bg-muted-foreground',
-}
-
 const priorityCodes: Record<string, string> = { urgent: 'P0', high: 'P1', normal: 'P2', low: 'P3' }
 
-function SignalBadge({ status }: { status: IssueStatus }) {
-  return <Badge variant="outline" className="gap-1.5">
-    <span className={cn('size-1.5 shrink-0 rounded-full', signalDotClass[status])} aria-hidden="true" />
-    {BOARD_COLUMNS.find(column => column.value === status)?.label}
-  </Badge>
-}
-
-function DueBadge({ updatedAt }: { updatedAt: BoardTask['updatedAt'] }) {
-  return <Badge variant="outline" className="bg-background gap-1.5 font-normal" title="最后更新日期（非截止日期）">
-    <CalendarDays className="size-3.5 text-muted-foreground" aria-hidden="true" />
-    <time className="tabular-nums" dateTime={new Date(updatedAt).toISOString()}>{new Date(updatedAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric', timeZone: 'UTC' })}</time>
-  </Badge>
-}
-
-function CompletionRing() {
-  return <span className="flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" aria-label="尚未设置完成百分比" title="尚未设置完成百分比">
-    <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border">-</span>
-  </span>
-}
-
-function TaskCard({ task, status, disabled, isOverlay = false, onOpen }: {
+function TaskCard({ task, status, disabled, isOverlay = false, onOpen, onStatusChange, onPriorityChange }: {
   task: BoardTask
   status: IssueStatus
   disabled: boolean
   isOverlay?: boolean
   onOpen: (id: string) => void
+  onStatusChange: (task: BoardTask, status: IssueStatus) => void
+  onPriorityChange: (task: BoardTask, priority: string) => void
 }) {
   const isDone = status === 'done' || status === 'canceled' || status === 'duplicate'
-  const owner = task.ownerName || '未知成员'
-  const initials = Array.from(owner).slice(0, 2).join('').toUpperCase()
-  const card = <Card size="sm" className={cn('bg-card p-0 shadow-xs transition-[border-color,box-shadow] hover:border-foreground/20 hover:shadow-sm', isOverlay && 'pointer-events-none shadow-lg', isDone && 'bg-muted/40')}>
-    <CardContent className="flex min-h-[8.75rem] flex-col p-3">
-      <div className="flex min-w-0 items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <Badge variant="secondary">任务</Badge>
-          <span className="truncate text-xs tabular-nums text-muted-foreground">{issueIdentifier(task.id)}</span>
-          <span className="text-xs tabular-nums text-muted-foreground" title={ISSUE_PRIORITIES.find(item => item.value === task.priority)?.label}>{priorityCodes[task.priority]}</span>
-        </div>
-        <SignalBadge status={status} />
+  const controlsDisabled = disabled || isOverlay
+  const card = <Card size="sm" className={cn('min-h-36 gap-0 bg-card p-0 shadow-xs transition-shadow hover:ring-foreground/20 hover:shadow-sm', isOverlay && 'pointer-events-none shadow-lg', isDone && 'bg-muted/40')}>
+    <CardHeader className="flex min-w-0 items-start justify-between gap-1 p-3 pb-0">
+      <div className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-muted-foreground">
+        <CardControlBoundary><Button type="button" variant="secondary" size="xs" disabled={controlsDisabled} onClick={() => onOpen(task.id)}>任务</Button></CardControlBoundary>
+        <span className="truncate tabular-nums">{issueIdentifier(task.id)}</span>
+        <CardControlBoundary><IssuePropertyMenu label="优先级" value={task.priority} options={ISSUE_PRIORITIES} icon={Flag} compact displayValue={priorityCodes[task.priority]} disabled={controlsDisabled} onChange={value => onPriorityChange(task, value)} /></CardControlBoundary>
       </div>
-      <h3 className="mt-3 min-h-10 text-sm leading-5 font-medium">
-        <TaskTitleAffordance title={task.title} isDone={isDone} onOpen={() => onOpen(task.id)} disabled={disabled || isOverlay} />
-      </h3>
-      <div className="mt-auto flex items-center justify-between gap-2 pt-4">
-        <div className="flex min-w-0 items-center gap-2" title={`创建者：${owner}`}>
-          <Avatar size="sm">
-            {task.ownerImage && <AvatarImage src={task.ownerImage} alt={owner} />}
-            <AvatarFallback>{initials}</AvatarFallback>
-          </Avatar>
-          <span className="truncate text-xs font-medium text-muted-foreground">{owner}</span>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <DueBadge updatedAt={task.updatedAt} />
-          <CompletionRing />
-        </div>
-      </div>
+      <CardControlBoundary><IssuePropertyMenu label="任务状态" value={status} options={ISSUE_STATUSES} icon={Circle} compact pill disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></CardControlBoundary>
+    </CardHeader>
+    <CardContent className="px-3 pt-3 pb-4">
+      <h3 data-slot="kanban-task-title" className={cn('line-clamp-2 min-h-10 text-sm leading-5 font-medium', isDone && 'text-muted-foreground line-through')}>{task.title}</h3>
     </CardContent>
+    <CardFooter className="mt-auto justify-between gap-2 border-0 bg-transparent p-3 pt-0">
+      <CardMembers task={task} disabled={controlsDisabled} />
+      <div className="flex shrink-0 items-center gap-1"><CardHistory task={task} disabled={controlsDisabled} onOpen={onOpen} /><CardCompletion task={task} status={status} disabled={controlsDisabled} onOpen={onOpen} onStatusChange={onStatusChange} /></div>
+    </CardFooter>
   </Card>
 
   return <KanbanItem value={task.id} disabled={disabled} className="shrink-0" role="group" tabIndex={-1} aria-label={task.title}>
-    {isOverlay ? card : <KanbanItemHandle className="block touch-pan-y rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`拖动任务：${task.title}`} aria-roledescription="可拖动任务">{card}</KanbanItemHandle>}
+    {isOverlay ? card : <KanbanItemHandle cursor={false} role="group" tabIndex={disabled ? -1 : 0} className="block cursor-pointer touch-pan-y rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging=true]:cursor-grabbing" aria-label={`打开任务：${task.title}`} aria-roledescription="可打开、可拖动任务" aria-keyshortcuts="Enter Space" onClick={event => {
+      if (disabled || event.defaultPrevented || (event.target as HTMLElement).closest('[data-card-control]') || window.getSelection()?.toString()) return
+      onOpen(task.id)
+    }} onKeyDownCapture={event => {
+      if (event.target !== event.currentTarget || event.nativeEvent.isComposing || event.keyCode === 229 || event.currentTarget.dataset.dragging === 'true') return
+      if (event.key === 'Enter' && !disabled) {
+        event.preventDefault()
+        event.stopPropagation()
+        onOpen(task.id)
+      }
+    }}>{card}</KanbanItemHandle>}
   </KanbanItem>
 }
 
@@ -114,9 +78,11 @@ type KanbanBoardProps = Omit<ComponentProps<typeof Kanban<BoardTask>>, 'children
   onViewportKeyDown: ComponentProps<'div'>['onKeyDown']
   onOpen: (id: string) => void
   onCreate: (status: IssueStatus) => void
+  onStatusChange: (task: BoardTask, status: IssueStatus) => void
+  onPriorityChange: (task: BoardTask, priority: string) => void
 }
 
-export function KanbanBoard({ pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onOpen, onCreate, ...props }: KanbanBoardProps) {
+export function KanbanBoard({ pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onOpen, onCreate, onStatusChange, onPriorityChange, ...props }: KanbanBoardProps) {
   return <Kanban {...props} getItemValue={item => item.id} className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
     <BoardScrollArea viewportRef={viewportRef} id={viewportId} role="region" aria-label="横向滚动任务看板" aria-describedby={instructionsId} tabIndex={0} onKeyDown={onViewportKeyDown}>
       <KanbanBoardPrimitive className="grid h-full min-h-0 w-max min-w-full auto-cols-[17.5rem] grid-flow-col grid-cols-none items-stretch gap-3 px-1 pb-2">
@@ -129,7 +95,7 @@ export function KanbanBoard({ pending = false, viewportRef, viewportId, instruct
               <Button type="button" variant="ghost" size="icon-xs" className="ml-auto" aria-label={`新建${column.label}任务`} disabled={pending} onClick={() => onCreate(column.value)}><Plus /></Button>
             </div>
             <KanbanColumnContent value={column.value} className="min-h-0 flex-1 gap-2 overflow-y-auto overscroll-y-contain" aria-label={`${column.label}列`}>
-              {(props.value[column.value] ?? []).map(task => <TaskCard key={task.id} task={task} status={column.value} disabled={pending} onOpen={onOpen} />)}
+              {(props.value[column.value] ?? []).map(task => <TaskCard key={task.id} task={task} status={column.value} disabled={pending} onOpen={onOpen} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} />)}
               {!props.value[column.value]?.length && <p className="rounded-lg border border-dashed border-border/70 bg-background/55 px-3 py-6 text-center text-xs text-muted-foreground">拖动任务到这里</p>}
             </KanbanColumnContent>
           </section>
@@ -139,7 +105,7 @@ export function KanbanBoard({ pending = false, viewportRef, viewportId, instruct
     <KanbanOverlay>{({ value }) => {
       const entry = Object.entries(props.value).find(([, tasks]) => tasks.some(task => task.id === value))
       const task = entry?.[1].find(item => item.id === value)
-      return task ? <TaskCard task={task} status={entry![0] as IssueStatus} disabled isOverlay onOpen={onOpen} /> : null
+      return task ? <TaskCard task={task} status={entry![0] as IssueStatus} disabled isOverlay onOpen={onOpen} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} /> : null
     }}</KanbanOverlay>
   </Kanban>
 }

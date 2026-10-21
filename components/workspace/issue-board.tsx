@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { moveIssue, type listIssues } from '@/app/actions/issues'
+import { changeIssuePriority, moveIssue, type listIssues } from '@/app/actions/issues'
 import { type KanbanCommitMeta } from '@/components/reui/kanban'
 import { KanbanBoard } from '@/components/blocks/kanban-board-1/components/kanban-board'
 import { Button } from '@/components/ui/button'
@@ -43,17 +43,18 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
     viewport.scrollBy({ left: direction * Math.min(viewport.clientWidth * 0.8, 340), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
   }
 
-  async function persist(issue: Issue, status: string, rollback: Columns) {
+  async function persist(issue: Issue, patch: { status?: string; priority?: string }, rollback: Columns) {
     if (saving.current) return
     saving.current = true
     setPending(true)
     onBusyChange(true)
-    setMessage('正在保存任务状态…')
+    setMessage('正在保存任务属性…')
     try {
-      const result = await moveIssue({ id: issue.id, status, revision: issue.revision })
-      if (!('issue' in result) || !result.issue) throw new Error(result.error ?? '移动失败，请重试。')
-      setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === issue.id ? { ...item, status, revision: result.issue!.revision, updatedAt: result.issue!.updatedAt } : item)])))
-      setMessage(`已移至${ISSUE_STATUSES.find(item => item.value === status)?.label}`)
+      const result = patch.status ? await moveIssue({ id: issue.id, status: patch.status, revision: issue.revision }) : await changeIssuePriority({ id: issue.id, priority: patch.priority!, revision: issue.revision })
+      if (!('issue' in result) || !result.issue) throw new Error(result.error ?? '保存失败，请重试。')
+      const savedIssue = result.issue
+      setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === issue.id ? { ...item, status: savedIssue.status, priority: savedIssue.priority, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
+      setMessage(patch.status ? `已移至${ISSUE_STATUSES.find(item => item.value === patch.status)?.label}` : '优先级已保存。')
     } catch (error) {
       setColumns(rollback)
       setMessage(error instanceof Error ? error.message : '状态保存失败，已恢复原位置。')
@@ -73,19 +74,33 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
     const issue = meta.previousValue[meta.activeContainer]?.find(item => item.id === String(meta.event.active.id))
     if (!issue) { setColumns(meta.previousValue); return }
     setColumns(next)
-    void persist(issue, meta.overContainer, meta.previousValue)
+    void persist(issue, { status: meta.overContainer }, meta.previousValue)
+  }
+
+  function changeStatus(issue: Issue, status: IssueStatus) {
+    if (saving.current || dragging || issue.status === status) return
+    const next = Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, key === status ? [{ ...issue, status }, ...items.filter(item => item.id !== issue.id)] : items.filter(item => item.id !== issue.id)]))
+    setColumns(next)
+    void persist(issue, { status }, columns)
+  }
+
+  function changePriority(issue: Issue, priority: string) {
+    if (saving.current || dragging || issue.priority === priority) return
+    const next = Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, items.map(item => item.id === issue.id ? { ...item, priority } : item)]))
+    setColumns(next)
+    void persist(issue, { priority }, columns)
   }
 
   return <section aria-label="任务看板" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 px-4 pb-2 sm:px-6">
     <div className="flex shrink-0 items-center justify-between gap-3">
-      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || '左右滚动查看全部状态，拖动卡片跨列更新任务，点击标题打开详情。'}</p>
+      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || '点击卡片打开详情，拖动卡片或使用状态菜单更新状态。'}</p>
       <div className="flex shrink-0 items-center gap-1">
         <Button type="button" variant="ghost" size="icon-sm" aria-label="向左滚动看板" aria-controls={viewportId} onClick={() => scrollBoard(-1)}><ChevronLeft data-icon="inline-start" /></Button>
         <Button type="button" variant="ghost" size="icon-sm" aria-label="向右滚动看板" aria-controls={viewportId} onClick={() => scrollBoard(1)}><ChevronRight data-icon="inline-start" /></Button>
       </div>
     </div>
-    <p id={instructionsId} className="sr-only">使用触控板左右滑动、底部滚动条或左右按钮浏览。聚焦此区域后，可用左右方向键滚动，Home 返回开头，End 移至末尾。聚焦可拖动卡片后，按空格开始拖动，使用方向键跨列移动，再按空格放下；Escape 取消。</p>
-    <KanbanBoard value={columns} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onCreate={onCreate} viewportRef={viewportRef} viewportId={viewportId} instructionsId={instructionsId} onViewportKeyDown={event => {
+    <p id={instructionsId} className="sr-only">使用触控板左右滑动、底部滚动条或左右按钮浏览。聚焦此区域后，可用左右方向键滚动，Home 返回开头，End 移至末尾。聚焦卡片后，按 Enter 打开详情，按空格开始拖动，使用方向键跨列移动，再按空格放下；Escape 取消。</p>
+    <KanbanBoard value={columns} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onCreate={onCreate} onStatusChange={changeStatus} onPriorityChange={changePriority} viewportRef={viewportRef} viewportId={viewportId} instructionsId={instructionsId} onViewportKeyDown={event => {
       if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         event.preventDefault()

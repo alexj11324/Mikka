@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 
-export function IssueMembers({ id }: { id: string }) {
+export function IssueMembers({ id, defaultOpen = false }: { id: string; defaultOpen?: boolean }) {
   const { data, error, mutate } = useSWR(['members', id], () => listMembers(id), { refreshInterval: 10000 })
   const [email, setEmail] = useState('')
   const [pending, setPending] = useState(false)
@@ -31,7 +31,7 @@ export function IssueMembers({ id }: { id: string }) {
     catch { setMessage('移除失败，请稍后重试。') }
     finally { setPending(false) }
   }
-  return <Collapsible render={<div className="rounded-lg border p-4" />}><CollapsibleTrigger className="cursor-pointer"><span className="text-xs font-medium">协作成员 {data ? `· ${data.members.length + 1}` : ''}</span></CollapsibleTrigger><CollapsibleContent><div className="mt-4 flex flex-col gap-4">
+  return <Collapsible defaultOpen={defaultOpen} render={<div className="rounded-lg border p-4" />}><CollapsibleTrigger className="cursor-pointer"><span className="text-xs font-medium">协作成员 {data ? `· ${data.members.length + 1}` : ''}</span></CollapsibleTrigger><CollapsibleContent><div className="mt-4 flex flex-col gap-4">
     <p className="text-xs leading-6 text-muted-foreground">仅所有者和获授权成员可以访问、编辑正文与评论。成员均可保存版本；只有所有者可以管理成员。</p>
     {error && <p role="alert" className="text-xs text-destructive">成员读取失败，请重试。</p>}
     {data?.members.map(member => <div key={member.id} className="flex items-center justify-between gap-3 text-xs"><div className="min-w-0"><p className="truncate font-medium">{member.name}</p><p className="truncate text-muted-foreground">{member.email}</p></div>{data.isOwner && <Button size="sm" variant="ghost" disabled={pending} onClick={() => remove(member.id)}>移除<span className="sr-only">{member.name}</span></Button>}</div>)}

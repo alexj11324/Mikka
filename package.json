@@ -4,13 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "next build",
+    "build": "pnpm lint && next build",
     "dev": "next dev --webpack",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "lint": "pnpm lint:code && pnpm lint:ui",
     "lint:code": "oxlint --deny-warnings",
     "lint:ui": "node scripts/lint-ui.mjs",
-    "test:ui-policy": "node --test scripts/ui-policy.test.mjs",
+    "test:ui-policy": "node --test scripts/ui-policy.test.mjs scripts/interaction-policy.test.mjs",
+    "test:issues": "node --test scripts/issue-checklist.test.mjs",
     "start": "next start",
     "typecheck": "tsgo --noEmit"
   },
