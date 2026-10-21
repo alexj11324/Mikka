@@ -16,7 +16,7 @@ for (const { platform, modifier } of [
     await expect(settings.locator('[data-slot="kbd"]')).toHaveText([modifier, ','])
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: '搜索任务', exact: true }).hover()
-    await expect(page.getByRole('tooltip').locator('[data-slot="kbd"]')).toHaveText([modifier, 'K'])
+    await expect(page.locator('[data-slot="tooltip-content"] [data-slot="kbd"]')).toHaveText([modifier, 'K'])
     await page.getByRole('button', { name: '新建任务', exact: true }).click()
     const create = page.getByRole('dialog', { name: '新建任务', exact: true })
     await expect(create.locator('footer [data-slot="kbd"]')).toHaveText([modifier, 'Enter'])
