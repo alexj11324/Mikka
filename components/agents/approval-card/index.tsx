@@ -40,12 +40,12 @@ export type {
 const EMPTY_ANSWER: ApprovalCardAnswer = { selected: [], custom: "" };
 
 function getStatusLabel(status: ApprovalCardStatus) {
-  if (status === "submitting") return "Submitting";
-  if (status === "approved") return "Approved";
-  if (status === "rejected") return "Rejected";
-  if (status === "changes-requested") return "Changes requested";
-  if (status === "answered") return "Response submitted";
-  return "Input required";
+  if (status === "submitting") return "正在继续";
+  if (status === "approved") return "已同意";
+  if (status === "rejected") return "已拒绝";
+  if (status === "changes-requested") return "需要修改";
+  if (status === "answered") return "已填写意见";
+  return "等待你的选择";
 }
 
 function getStatusClass(status: ApprovalCardStatus) {
@@ -140,9 +140,10 @@ function QuestionOptions({
 
       {question.allowCustom ? (
         <Input
+          aria-label={`${question.title}：补充回答`}
           value={custom}
           disabled={disabled}
-          placeholder={question.customPlaceholder ?? "Add another response…"}
+          placeholder={question.customPlaceholder ?? "补充其他回答…"}
           onChange={(value) =>
             onChange({
               selected: question.multiple ? answer.selected : [],
@@ -165,7 +166,7 @@ function ProgressDots({ current, ids }: { current: number; ids: string[] }) {
   return (
     <span className="flex gap-1.5">
       <span className="sr-only">
-        Question {current + 1} of {ids.length}
+        第 {current + 1} 题，共 {ids.length} 题
       </span>
       {ids.map((id, index) => (
         <motion.span
@@ -188,7 +189,7 @@ function ProgressDots({ current, ids }: { current: number; ids: string[] }) {
 }
 
 export function ApprovalCard({
-  title = "Approval required",
+  title = "请确认建议方案",
   description,
   children,
   questions = [],
@@ -204,8 +205,8 @@ export function ApprovalCard({
   onReject,
   onRequestChanges,
   onDismiss,
-  approveLabel = "Approve",
-  submitLabel = "Submit response",
+  approveLabel = "同意",
+  submitLabel = "填写回答",
   result,
   className,
 }: ApprovalCardProps) {
@@ -342,7 +343,7 @@ export function ApprovalCard({
             {onDismiss ? (
               <button
                 type="button"
-                aria-label="Dismiss"
+                aria-label="关闭"
                 onClick={onDismiss}
                 className="grid size-5 shrink-0 place-items-center rounded-full text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
@@ -378,9 +379,9 @@ export function ApprovalCard({
             ) : (
               <div>
                 {description ? (
-                  <p className="mt-1 leading-5 text-muted-foreground">
+                  <div className="mt-1 leading-5 text-muted-foreground">
                     {description}
-                  </p>
+                  </div>
                 ) : null}
                 {children ? <div className="mt-3">{children}</div> : null}
               </div>
@@ -393,7 +394,7 @@ export function ApprovalCard({
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label="Previous question"
+                      aria-label="上一题"
                       disabled={busy || currentStep === 0}
                       onClick={() => setStep(currentStep - 1)}
                       className="rounded-full"
@@ -410,10 +411,10 @@ export function ApprovalCard({
                   size={currentStep === questions.length - 1 ? "sm" : "icon"}
                   aria-label={
                     currentStep === questions.length - 1
-                      ? "Submit response"
-                      : "Next question"
+                      ? typeof submitLabel === "string" ? submitLabel : "填写回答"
+                      : "下一题"
                   }
-                  disabled={busy || !isAnswered(currentAnswer)}
+                  disabled={busy || !isAnswered(currentAnswer) || (currentStep === questions.length - 1 && questions.some(item => !isAnswered(currentAnswers[item.id] ?? EMPTY_ANSWER)))}
                   onClick={continueQuestion}
                   className="ml-auto rounded-full"
                 >
@@ -447,7 +448,7 @@ export function ApprovalCard({
                     onClick={onRequestChanges}
                     className="rounded-full"
                   >
-                    Request changes
+                    修改方案
                   </Button>
                 ) : null}
                 {onReject ? (
@@ -458,7 +459,7 @@ export function ApprovalCard({
                     onClick={onReject}
                     className="rounded-full text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400"
                   >
-                    Reject
+                    不同意
                   </Button>
                 ) : null}
               </div>

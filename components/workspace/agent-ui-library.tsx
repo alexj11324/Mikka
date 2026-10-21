@@ -2,6 +2,8 @@
 
 import { useIsStreaming, useTriggerAction } from '@openuidev/react-lang'
 import { Info } from 'lucide-react'
+import { AgentApproval, AgentQuestions } from './agent-decision'
+import { AgentContent, AgentStatusIcon, AgentTasks } from './agent-content'
 import { Button as BeButton } from '@/components/motion/button/base'
 import { AnimatedBadge } from '@/components/motion/animated-badge'
 import { AnimatedNumber } from '@/components/motion/animated-number'
@@ -35,6 +37,11 @@ const renderers = {
       </p></CardContent>
     </Card>
   },
+  BeResponse: AgentContent,
+  BeApproval: AgentApproval,
+  BeQuestions: AgentQuestions,
+  BeTodoList: AgentTasks,
+  AgentIcon: AgentStatusIcon,
   ShadcnCard: ({ props, renderNode }) => <Card size="sm" className="min-w-0">
     <CardHeader><CardTitle>{props.title}</CardTitle>{props.description && <CardDescription>{props.description}</CardDescription>}</CardHeader>
     <CardContent className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</CardContent>

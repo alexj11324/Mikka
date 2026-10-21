@@ -342,6 +342,26 @@
         "signature": "BeStat(label: string, value: number, unit?: string, precision?: number)",
         "description": "beUI 动态数字指标。label 为指标名，value 必须来自用户提供的数据，unit 为单位，precision 为小数位数。不编造数据、不读取工作区。"
       },
+      "BeResponse": {
+        "signature": "BeResponse(children: any[])",
+        "description": "对应 AI Elements MessageResponse 的 beUI 回复内容分组。children 为已注册内容组件，流式状态由宿主控制，不自行模拟生成进度。"
+      },
+      "BeApproval": {
+        "signature": "BeApproval(title: string, description: string, context: string)",
+        "description": "对应 AI Elements Confirmation 的 beUI ApprovalCard，用于确认建议方案，不是工具授权。title 和 description 必须完整描述待确认建议；context 包含完整上下文。用户确认、拒绝或要求修改后，只将意见填入提问，不会发送、授权或执行操作。"
+      },
+      "BeQuestions": {
+        "signature": "BeQuestions(context: string, questions: {id: string, title: string, options?: {value: string, label: string, description?: string}[], multiple?: boolean, allowCustom?: boolean}[])",
+        "description": "beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。提交仅填入提问，等待用户确认发送；不得索取密码或密钥。"
+      },
+      "BeTodoList": {
+        "signature": "BeTodoList(title: string, items: {id: string, title: string, status?: \"pending\" | \"in-progress\" | \"completed\" | \"cancelled\", progress?: number, detail?: string}[], source?: \"suggestion\" | \"user\")",
+        "description": "对应 AI Elements Plan/Task 的 beUI TodoList。source=suggestion 为建议计划，所有项目强制显示待开始，不代表执行；source=user 仅展示用户本次明确提供的真实状态和进度。不能编造工具执行进度。"
+      },
+      "AgentIcon": {
+        "signature": "AgentIcon(name: \"assistant\" | \"reply\" | \"approve\" | \"question\" | \"progress\" | \"task\" | \"code\" | \"source\", label: string)",
+        "description": "现有 Lucide 图标白名单，不是 beUI 独立图标包。用于带中文含义的状态说明，不能传入 SVG、组件代码、路径或任意图标名。"
+      },
       "ShadcnCard": {
         "signature": "ShadcnCard(title: string, children: any[], description?: string)",
         "description": "本地 shadcn 卡片。用于有标题的建议、说明或内容分组，可嵌套已注册组件。"
@@ -389,23 +409,52 @@
     },
     "componentGroups": [
       {
-        "name": "beUI",
+        "name": "消息回复",
         "components": [
-          "BeButton",
-          "BeBadge",
-          "BeStat"
+          "BeResponse"
         ],
         "notes": [
-          "优先使用 beUI 按钮、状态徽标和数字指标；数字只能来自用户输入。"
+          "AI Elements MessageResponse → beUI StreamingResponse；回复正文可嵌套已注册组件。会话和输入框由宿主控制，不由模型创建。"
         ]
       },
       {
-        "name": "本地内容组件",
+        "name": "审批与问题",
+        "components": [
+          "BeApproval",
+          "BeQuestions"
+        ],
+        "notes": [
+          "Confirmation → ApprovalCard；选择问题复用 ApprovalCard 提问模式。仅填入提问，不执行工具、不保存审批。ToolApproval 已安装但仅供未来真实工具授权流程使用，不开放给模型伪造授权。"
+        ]
+      },
+      {
+        "name": "任务与进度",
+        "components": [
+          "BeTodoList",
+          "BeStat",
+          "ShadcnProgress"
+        ],
+        "notes": [
+          "Plan/Task → TodoList；Loader/Shimmer → AgentProgress、ReasoningText、ThinkingShimmer，由宿主根据请求状态控制。建议计划保持待开始；数字只能来自用户输入。"
+        ]
+      },
+      {
+        "name": "图标状态与操作",
+        "components": [
+          "AgentIcon",
+          "BeBadge",
+          "BeButton"
+        ],
+        "notes": [
+          "Lucide 提供图标；beUI AnimatedBadge 提供动态状态图标；Button 提供操作反馈。不得用动态图标伪造执行结果。"
+        ]
+      },
+      {
+        "name": "本地内容与兼容组件",
         "components": [
           "ShadcnCard",
           "ShadcnBadge",
           "ShadcnAlert",
-          "ShadcnProgress",
           "ShadcnAccordion",
           "ShadcnTabs",
           "ShadcnTable",
@@ -415,7 +464,7 @@
           "ReuiFrame"
         ],
         "notes": [
-          "使用本地 shadcn 与 REUI 组件组织内容。"
+          "复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock、FileDiff、ToolResult、AgentActivity、Citations、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不自动生成虚构工具记录。"
         ]
       }
     ],
@@ -678,6 +727,21 @@
         "BeStat": {
           "$ref": "#/$defs/BeStat"
         },
+        "BeResponse": {
+          "$ref": "#/$defs/BeResponse"
+        },
+        "BeApproval": {
+          "$ref": "#/$defs/BeApproval"
+        },
+        "BeQuestions": {
+          "$ref": "#/$defs/BeQuestions"
+        },
+        "BeTodoList": {
+          "$ref": "#/$defs/BeTodoList"
+        },
+        "AgentIcon": {
+          "$ref": "#/$defs/AgentIcon"
+        },
         "ShadcnCard": {
           "$ref": "#/$defs/ShadcnCard"
         },
@@ -798,6 +862,11 @@
         "BeButton",
         "BeBadge",
         "BeStat",
+        "BeResponse",
+        "BeApproval",
+        "BeQuestions",
+        "BeTodoList",
+        "AgentIcon",
         "ShadcnCard",
         "ShadcnBadge",
         "ShadcnAlert",
@@ -4386,6 +4455,218 @@
           "additionalProperties": false,
           "description": "beUI 动态数字指标。label 为指标名，value 必须来自用户提供的数据，unit 为单位，precision 为小数位数。不编造数据、不读取工作区。"
         },
+        "BeResponse": {
+          "type": "object",
+          "properties": {
+            "children": {
+              "maxItems": 30,
+              "type": "array",
+              "items": {}
+            }
+          },
+          "required": [
+            "children"
+          ],
+          "additionalProperties": false,
+          "description": "对应 AI Elements MessageResponse 的 beUI 回复内容分组。children 为已注册内容组件，流式状态由宿主控制，不自行模拟生成进度。"
+        },
+        "BeApproval": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "context": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            }
+          },
+          "required": [
+            "title",
+            "description",
+            "context"
+          ],
+          "additionalProperties": false,
+          "description": "对应 AI Elements Confirmation 的 beUI ApprovalCard，用于确认建议方案，不是工具授权。title 和 description 必须完整描述待确认建议；context 包含完整上下文。用户确认、拒绝或要求修改后，只将意见填入提问，不会发送、授权或执行操作。"
+        },
+        "BeQuestions": {
+          "type": "object",
+          "properties": {
+            "context": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "questions": {
+              "minItems": 1,
+              "maxItems": 10,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "options": {
+                    "minItems": 1,
+                    "maxItems": 6,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 300
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "multiple": {
+                    "type": "boolean"
+                  },
+                  "allowCustom": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "context",
+            "questions"
+          ],
+          "additionalProperties": false,
+          "description": "beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。提交仅填入提问，等待用户确认发送；不得索取密码或密钥。"
+        },
+        "BeTodoList": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "items": {
+              "minItems": 1,
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "in-progress",
+                      "completed",
+                      "cancelled"
+                    ]
+                  },
+                  "progress": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "detail": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "suggestion",
+                "user"
+              ]
+            }
+          },
+          "required": [
+            "title",
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "对应 AI Elements Plan/Task 的 beUI TodoList。source=suggestion 为建议计划，所有项目强制显示待开始，不代表执行；source=user 仅展示用户本次明确提供的真实状态和进度。不能编造工具执行进度。"
+        },
+        "AgentIcon": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "enum": [
+                "assistant",
+                "reply",
+                "approve",
+                "question",
+                "progress",
+                "task",
+                "code",
+                "source"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "required": [
+            "name",
+            "label"
+          ],
+          "additionalProperties": false,
+          "description": "现有 Lucide 图标白名单，不是 beUI 独立图标包。用于带中文含义的状态说明，不能传入 SVG、组件代码、路径或任意图标名。"
+        },
         "ShadcnCard": {
           "type": "object",
           "properties": {
@@ -4717,8 +4998,8 @@
       "Always pass a category to Icon — it enables a topical fallback when the exact icon name is unavailable.",
       "EditableTable requires the consuming app to persist edits — use it only when the user or app explicitly asks for an editable table; default to Table for read-only data.",
       "你是 Orvilo 工作台中的 UI 生成助手。默认使用简体中文。严格输出 OpenUI Lang，不要输出代码围栏、HTML 或 React 代码。",
-      "优先使用已注册的 beUI 组件：BeButton（动效按钮）、BeBadge（状态徽标）、BeStat（用户提供的数字指标）。内容布局复用 ShadcnCard、ShadcnAlert、ShadcnProgress、ShadcnAccordion、ShadcnTabs、ShadcnTable、ReuiAlert、ReuiFrame。ShadcnButton、ShadcnBadge、ReuiBadge 仅用于兼容。所有组件均为已安装的本地源码，不得使用目录外组件或声称会自动安装组件。",
-      "根据问题选择合适的组件：项目计划使用 Steps 或 ShadcnTable；对比使用 ShadcnTabs 或 ShadcnTable；用户提供数字时可使用图表；简单问答使用 TextContent。不要为了展示组件而堆砌界面。",
+      "按功能组优先使用已注册的 beUI 组件：消息回复 BeResponse；方案确认 BeApproval；单选、多选、自定义提问 BeQuestions；建议计划或用户任务状态 BeTodoList；动态按钮 BeButton；状态徽标 BeBadge；用户数字指标 BeStat。图标用现有 Lucide 的 AgentIcon 白名单。内容布局复用 ShadcnCard、ShadcnAlert、ShadcnProgress、ShadcnAccordion、ShadcnTabs、ShadcnTable、ReuiAlert、ReuiFrame。ShadcnButton、ShadcnBadge、ReuiBadge 仅用于兼容。所有组件均为已安装的本地源码，不得使用目录外组件或声称会自动安装组件。",
+      "根据问题选择合适的组件：项目计划使用 BeTodoList 并设 source=suggestion；只有用户提供真实状态才用 source=user；对比使用 ShadcnTabs 或 ShadcnTable；用户提供数字时可使用图表；简单问答使用 TextContent。BeApproval 只能确认建议，不是授权；BeQuestions 提交只填入提问。加载状态 AgentProgress、ReasoningText、ThinkingShimmer 和真实工具授权 ToolApproval 由宿主控制，不由模型虚构。不要为了展示组件而堆砌界面。",
       "只能使用用户本次提供的数据。没有实时工作区数据和工具，不得声称查询、创建、保存或更新了项目、任务、文档。建议和计划必须标明为建议；缺少数据时先说明需要什么，禁止编造统计数据。仅在用户明确要求示例时才提供标明为示例的数据。",
       "这是单次问答，不保存历史。下一次请求不会自动包含本轮内容。@ToAssistant 的文字必须独立完整、包含必要上下文。",
       "按钮和表单提交仅将内容填入提问输入框，用户确认发送后才会再次请求模型。按钮文案应为“填入提问”或“继续细化”，禁止“已保存”等虚假结果。",
@@ -4730,6 +5011,11 @@
     "BeButton",
     "BeBadge",
     "BeStat",
+    "BeResponse",
+    "BeApproval",
+    "BeQuestions",
+    "BeTodoList",
+    "AgentIcon",
     "ShadcnCard",
     "ShadcnBadge",
     "ShadcnAlert",

@@ -5,11 +5,10 @@ import { Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { AgentConversation } from './agent-conversation'
+import { AgentConversation, type AgentTurn } from './agent-conversation'
 
-export function AgentChat({ question, response, composer, starters, streaming, onReset }: {
-  question: string
-  response: ReactNode
+export function AgentChat({ turns, composer, starters, streaming, onReset }: {
+  turns: AgentTurn[]
   composer: ReactNode
   starters: ReactNode
   streaming: boolean
@@ -24,11 +23,11 @@ export function AgentChat({ question, response, composer, starters, streaming, o
         <TooltipContent>清空本轮，开始新问题</TooltipContent>
       </Tooltip>
     </header>
-    <AgentConversation question={question} response={response} starters={starters} />
+    <AgentConversation turns={turns} starters={starters} streaming={streaming} />
     <footer className="shrink-0 px-4 pt-3 pb-4 sm:px-6 sm:pb-5">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {composer}
-        <p id="agent-service-note" className="text-center text-xs text-muted-foreground">OpenCode Go · 单次问答，不保存历史，不读取或修改工作区；界面按钮仅填入提问。</p>
+        <p id="agent-service-note" className="text-center text-xs text-muted-foreground">OpenCode Go · 不持久保存对话，不读取或修改工作区；确认和回答直接继续，其他建议按钮仅填入提问。</p>
       </div>
     </footer>
   </section>

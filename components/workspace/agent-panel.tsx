@@ -10,6 +10,7 @@ import { AgentComposer } from './agent-composer'
 import { AgentStarters } from './agent-starters'
 import { AgentResponse } from './agent-response'
 import { AgentChat } from './agent-chat'
+import { AgentInteractionContext } from './agent-interaction'
 import { fetchAgentResponse } from '@/lib/agent-fetch'
 
 const agentTheme = createTheme({
@@ -46,6 +47,7 @@ function AgentSession({ onReset }: { onReset: () => void }) {
   const sessionIdRef = useRef<string | null>(null)
   const [generation, setGeneration] = useState(0)
   const [question, setQuestion] = useState('')
+  const [previousTurns, setPreviousTurns] = useState<{ id: number; question: string; completion: string; error?: Error }[]>([])
 
   function handleUIAction(event: ActionEvent) {
     if (isLoading) return
@@ -67,27 +69,34 @@ function AgentSession({ onReset }: { onReset: () => void }) {
     inputRef.current?.focus()
   }
 
-  async function submit() {
-    if (!draft.trim() || isLoading || submittingRef.current) return
+  async function request(prompt: string, inline = false) {
+    if (!prompt.trim() || prompt.length > 8000 || isLoading || submittingRef.current) return false
     submittingRef.current = true
     try {
       sessionIdRef.current ??= crypto.randomUUID()
+      if (inline) setPreviousTurns(turns => [...turns, { id: generation, question, completion, error }])
+      else setPreviousTurns([])
       setGeneration(value => value + 1)
-      setQuestion(draft.trim())
-      await complete(draft.trim(), { body: { sessionId: sessionIdRef.current } })
+      setQuestion(prompt.trim())
+      const result = await complete(prompt.trim(), { body: { sessionId: sessionIdRef.current } })
+      return Boolean(result)
     } finally {
       submittingRef.current = false
     }
   }
 
   return <ThemeProvider cssSelector="#orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
-    <AgentChat
-      question={question}
-      streaming={isLoading}
-      onReset={onReset}
-      composer={<AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={submit} isLoading={isLoading} onStop={stop} />}
-      response={<AgentResponse key={generation} completion={completion} error={error} isLoading={isLoading} onAction={handleUIAction} />}
-      starters={<AgentStarters onSelect={selectStarter} />}
-    />
+    <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt, true) }}>
+      <AgentChat
+        turns={[
+          ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse completion={turn.completion} error={turn.error} isLoading={false} onAction={handleUIAction} /> })),
+          ...(question ? [{ id: generation, question, response: <AgentResponse completion={completion} error={error} isLoading={isLoading} onAction={handleUIAction} /> }] : []),
+        ]}
+        streaming={isLoading}
+        onReset={onReset}
+        composer={<AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={stop} />}
+        starters={<AgentStarters onSelect={selectStarter} />}
+      />
+    </AgentInteractionContext>
   </ThemeProvider>
 }

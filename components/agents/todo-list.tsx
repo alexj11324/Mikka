@@ -47,10 +47,10 @@ export interface TodoListProps {
 }
 
 function statusLabel(status: TodoItemStatus) {
-  if (status === "in-progress") return "In progress";
-  if (status === "completed") return "Completed";
-  if (status === "cancelled") return "Cancelled";
-  return "Pending";
+  if (status === "in-progress") return "进行中";
+  if (status === "completed") return "已完成";
+  if (status === "cancelled") return "已取消";
+  return "待开始";
 }
 
 function TodoHeaderIcon({ complete }: { complete: boolean }) {
@@ -200,7 +200,7 @@ function TodoStatusIcon({
 
 export function TodoList({
   items,
-  title = "To-dos",
+  title = "任务计划",
   open,
   defaultOpen = true,
   onOpenChange,
@@ -258,7 +258,7 @@ export function TodoList({
 
   return (
     <section
-      aria-label="Agent task list"
+      aria-label="Agent 任务列表"
       className={cn(
         "w-full overflow-hidden rounded-2xl border border-border/70",
         className,
@@ -283,7 +283,7 @@ export function TodoList({
           )}
         >
           <span className="sr-only">
-            {completed} of {items.length} tasks completed
+            已完成 {completed} 项，共 {items.length} 项任务
           </span>
           <span aria-hidden="true" className="inline-flex">
             <ActionSwapRollText value={String(completed)}>
@@ -378,7 +378,7 @@ export function TodoList({
             </ol>
           ) : (
             <p className="px-1.5 py-2 text-sm text-muted-foreground">
-              No tasks yet
+              暂无任务
             </p>
           )}
         </div>

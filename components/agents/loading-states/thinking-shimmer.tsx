@@ -11,7 +11,7 @@ export interface ThinkingShimmerProps {
 }
 
 export function ThinkingShimmer({
-  children = "Thinking…",
+  children = "正在生成回复…",
   duration = 1.8,
   className,
 }: ThinkingShimmerProps) {

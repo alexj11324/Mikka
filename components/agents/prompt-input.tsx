@@ -7,6 +7,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
+  type Ref,
   type TextareaHTMLAttributes,
   useCallback,
   useEffect,
@@ -48,6 +49,7 @@ export interface PromptInputProps extends Omit<
   TextareaHTMLAttributes<HTMLTextAreaElement>,
   "value" | "defaultValue" | "onChange" | "onSubmit" | "children"
 > {
+  ref?: Ref<HTMLTextAreaElement>;
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
@@ -67,6 +69,7 @@ export interface PromptInputProps extends Omit<
 }
 
 export function PromptInput({
+  ref: externalRef,
   value,
   defaultValue = "",
   onValueChange,
@@ -84,8 +87,8 @@ export function PromptInput({
   leadingAction,
   className,
   disabled,
-  placeholder = "Ask the agent to do something…",
-  "aria-label": ariaLabel = "Prompt",
+  placeholder = "描述你想完成的事…",
+  "aria-label": ariaLabel = "向 Agent 提问",
   onKeyDown,
   ...textareaProps
 }: PromptInputProps) {
@@ -156,7 +159,7 @@ export function PromptInput({
       event.defaultPrevented ||
       event.key !== "Enter" ||
       event.shiftKey ||
-      event.nativeEvent.isComposing
+      event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229
     ) {
       return;
     }
@@ -181,7 +184,11 @@ export function PromptInput({
         {`${currentValue}\u200b`}
       </div>
       <textarea
-        ref={textareaRef}
+        ref={node => {
+          textareaRef.current = node;
+          if (typeof externalRef === 'function') externalRef(node);
+          else if (externalRef) externalRef.current = node;
+        }}
         value={currentValue}
         disabled={disabled}
         placeholder={placeholder}
@@ -202,7 +209,7 @@ export function PromptInput({
                 variant="ghost"
                 size="icon"
                 disabled={disabled || loading}
-                aria-label="Add to prompt"
+                aria-label="添加到提问"
                 className="size-8 rounded-full"
               >
                 <motion.span
@@ -269,7 +276,7 @@ export function PromptInput({
                   </span>
                 ) : null}
                 <span className="truncate text-muted-foreground">
-                  {currentModel?.label ?? "Choose model"}
+                  {currentModel?.label ?? "选择模型"}
                 </span>
               </span>
             </SelectTrigger>
@@ -301,7 +308,7 @@ export function PromptInput({
           type={loading ? "button" : "submit"}
           size="icon"
           disabled={loading ? !onStop : !canSubmit}
-          aria-label={loading ? "Stop generating" : "Send prompt"}
+          aria-label={loading ? "停止生成" : "发送消息"}
           onClick={loading ? onStop : undefined}
           className="ml-auto size-8 rounded-full"
         >
