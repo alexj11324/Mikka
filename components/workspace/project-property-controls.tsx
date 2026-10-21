@@ -1,7 +1,7 @@
 'use client'
 
 import { useId, useState, type ReactNode } from 'react'
-import { Box, Users, UserRound, CalendarDays, CalendarCheck, Tag, GitBranch, type LucideIcon } from 'lucide-react'
+import { Box, Users, UserRound, CalendarDays, CalendarCheck, Tag, GitBranch, Plus, type LucideIcon } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -11,21 +11,32 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Calendar } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { PROJECT_HEALTH, PROJECT_PRIORITIES, PROJECT_STATUSES, type Project, type ProjectControlField } from './project-properties'
 
 type Choice = { value: string; label: string; icon?: LucideIcon; description?: string }
-export function ProjectPicker({ label, children, choices, selected, onChange, multiple = false, onCreate, disabled, plain = false }: { label: string; children: ReactNode; choices: Choice[]; selected: string[]; onChange: (value: string) => void; multiple?: boolean; onCreate?: (value: string) => void; disabled?: boolean; plain?: boolean }) {
+export function ProjectPicker({ label, children, choices, selected, onChange, multiple = false, onCreate, createDisabled = false, disabled, plain = false }: { label: string; children: ReactNode; choices: Choice[]; selected: string[]; onChange: (value: string) => void; multiple?: boolean; onCreate?: (value: string) => void; createDisabled?: boolean; disabled?: boolean; plain?: boolean }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  return <Popover open={open} onOpenChange={value => { setOpen(value); if (!value) setQuery('') }}>
+  const [createDraft, setCreateDraft] = useState<string | null>(null)
+  const id = useId()
+  const duplicate = createDraft !== null && choices.some(item => item.value === createDraft.trim())
+  function create() {
+    const name = createDraft?.trim()
+    if (!name || name.length > 50 || duplicate || disabled || createDisabled || !onCreate) return
+    onCreate(name)
+    setQuery('')
+    setCreateDraft(null)
+  }
+  return <Popover open={open} onOpenChange={value => { setOpen(value); if (!value) { setQuery(''); setCreateDraft(null) } }}>
     <PopoverTrigger render={<Button type="button" variant={plain ? 'ghost' : 'outline'} size="sm" disabled={disabled} aria-label={label} className={cn('h-7 max-w-full justify-start gap-1.5', !plain && 'rounded-full bg-muted/40 px-2 text-muted-foreground', plain && 'px-2 font-normal')} />}>{children}</PopoverTrigger>
     <PopoverContent align="start" className="w-64 p-0">
       <Command><CommandInput aria-label={`搜索${label}`} placeholder={`搜索${label.split('：')[0]}…`} value={query} onValueChange={setQuery} />
-        <CommandList><CommandEmpty>{onCreate ? '按下方按钮创建新标签' : '没有可选项'}</CommandEmpty><CommandGroup heading={label.split('：')[0]}>{choices.map(choice => <CommandItem key={choice.value} disabled={disabled} value={`${choice.label} ${choice.value}`} data-checked={selected.includes(choice.value)} aria-selected={selected.includes(choice.value)} onSelect={() => { onChange(choice.value); if (!multiple) setOpen(false) }}>{choice.icon && <choice.icon />}<span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="truncate">{choice.label}</span>{choice.description && <span className="text-xs text-muted-foreground">{choice.description}</span>}</span></CommandItem>)}
-          {onCreate && query.trim() && !choices.some(item => item.value === query.trim()) && <CommandItem disabled={disabled} value={query} onSelect={() => { onCreate(query.trim()); setQuery('') }}>创建标签「{query.trim()}」</CommandItem>}
+        <CommandList><CommandEmpty>{onCreate ? '暂无匹配标签，可在下方新建。' : '没有可选项'}</CommandEmpty><CommandGroup heading={label.split('：')[0]}>{choices.map(choice => <CommandItem key={choice.value} disabled={disabled} value={`${choice.label} ${choice.value}`} data-checked={selected.includes(choice.value)} aria-selected={selected.includes(choice.value)} onSelect={() => { onChange(choice.value); if (!multiple) setOpen(false) }}>{choice.icon && <choice.icon />}<span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="truncate">{choice.label}</span>{choice.description && <span className="text-xs text-muted-foreground">{choice.description}</span>}</span></CommandItem>)}
+          {onCreate && query.trim() && !choices.some(item => item.value === query.trim()) && <CommandItem disabled={disabled || createDisabled || query.trim().length > 50} value={query} onSelect={() => { onCreate(query.trim()); setQuery('') }}>创建标签「{query.trim()}」</CommandItem>}
         </CommandGroup></CommandList>
       </Command>
+      {onCreate && <div className="border-t p-3">{createDraft === null ? <Button type="button" variant="ghost" size="sm" className="w-full justify-start" disabled={disabled || createDisabled} onClick={() => setCreateDraft(query.trim().slice(0, 50))}><Plus data-icon="inline-start" />新建标签</Button> : <FieldGroup className="gap-3"><Field data-invalid={duplicate}><FieldLabel htmlFor={id}>标签名称</FieldLabel><Input id={id} autoFocus value={createDraft} maxLength={50} placeholder="输入新标签名称…" aria-invalid={duplicate} aria-describedby={duplicate ? `${id}-error` : undefined} disabled={disabled} onChange={event => setCreateDraft(event.target.value)} onKeyDown={event => { event.stopPropagation(); if (event.nativeEvent.isComposing || event.keyCode === 229) return; if (event.key === 'Enter') { event.preventDefault(); create() } }} />{duplicate && <FieldError id={`${id}-error`}>标签已存在，请在上方选择。</FieldError>}</Field><div className="flex gap-2"><Button type="button" size="sm" disabled={disabled || createDisabled || !createDraft.trim() || duplicate} onClick={create}><Plus data-icon="inline-start" />添加标签</Button><Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => setCreateDraft(null)}>取消</Button></div></FieldGroup>}</div>}
     </PopoverContent>
   </Popover>
 }
@@ -66,7 +77,7 @@ export function ProjectPropertyControl({ field, value, onChange, userName, proje
   if (field === 'labels') {
     const labels = [...new Set([...projects.flatMap(item => item.properties.labels), ...properties.labels])]
     const toggle = (label: string) => updateProperties({ labels: properties.labels.includes(label) ? properties.labels.filter(item => item !== label) : [...properties.labels, label] })
-    return <ProjectPicker {...shared} multiple label="标签" choices={labels.map(label => ({ value: label, label, icon: Tag }))} selected={properties.labels} onChange={toggle} onCreate={label => { if (label.length <= 50 && properties.labels.length < 20) toggle(label) }}><Tag data-icon="inline-start" /><span className="truncate">{properties.labels.length ? properties.labels.join('、') : '标签'}</span></ProjectPicker>
+    return <ProjectPicker {...shared} multiple label="标签" createDisabled={properties.labels.length >= 20} choices={labels.map(label => ({ value: label, label, icon: Tag }))} selected={properties.labels} onChange={toggle} onCreate={label => { if (label.length <= 50 && properties.labels.length < 20) toggle(label) }}><Tag data-icon="inline-start" /><span className="truncate">{properties.labels.length ? properties.labels.join('、') : '标签'}</span></ProjectPicker>
   }
   const dependencies = projects.filter(item => item.id !== projectId && (!projectId || !hasDependencyCycle(projectId, [item.id], projects)))
   return <ProjectPicker {...shared} multiple label="依赖项目" choices={dependencies.map(item => ({ value: item.id, label: item.name, icon: Box }))} selected={properties.dependencyIds} onChange={id => updateProperties({ dependencyIds: properties.dependencyIds.includes(id) ? properties.dependencyIds.filter(item => item !== id) : [...properties.dependencyIds, id] })}><GitBranch data-icon="inline-start" />{properties.dependencyIds.length ? `${properties.dependencyIds.length} 个依赖` : '依赖'}</ProjectPicker>
