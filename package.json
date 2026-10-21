@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.34.3",
   "scripts": {
     "build": "next build",
     "dev": "next dev --turbopack",
@@ -11,6 +12,10 @@
     "lint:code": "oxlint --deny-warnings",
     "lint:ui": "node scripts/lint-ui.mjs",
     "test:ui-policy": "node --test scripts/ui-policy.test.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
+    "check": "pnpm test:ui-policy && pnpm lint && pnpm typecheck",
+    "check:ci": "pnpm check && pnpm build && pnpm test:e2e",
     "start": "next start",
     "typecheck": "tsgo --noEmit"
   },
@@ -64,6 +69,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^25.1.0",
     "@types/pg": "^8.23.1",

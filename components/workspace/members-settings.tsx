@@ -8,7 +8,7 @@ import { ArrowLeft, ChevronRight, Command, ExternalLink, Info, MoreHorizontal, S
 import type { WorkspaceSettings } from '@/lib/workspace-access'
 import { revokeWorkspaceInvitation, updateWorkspaceMember } from '@/app/actions/workspace'
 import { InviteMembersDialog } from '@/components/workspace/invite-members-dialog'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/reui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -67,9 +67,9 @@ export function MembersSettings({ initial, inviteInitially }: { initial: Workspa
   }
   return <div className="flex min-h-dvh flex-col bg-background text-foreground md:flex-row">
     <aside className="flex shrink-0 flex-col gap-6 border-b bg-sidebar p-4 md:w-56 md:border-r md:border-b-0" aria-label="工作区设置导航">
-      <Button variant="ghost" className="justify-start" nativeButton={false} render={<Link href="/" />}><ArrowLeft data-icon="inline-start" />返回工作台</Button>
+      <Link href="/" className={buttonVariants({ variant: 'ghost', className: 'justify-start' })}><ArrowLeft data-icon="inline-start" />返回工作台</Link>
       <div className="flex items-center gap-3 px-2"><div className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"><Command className="size-4" /></div><div className="flex min-w-0 flex-col"><span className="truncate text-sm font-medium">Orvilo3</span><span className="text-xs text-muted-foreground">工作区设置</span></div></div>
-      <div className="flex flex-col gap-2"><p className="px-2 text-xs text-muted-foreground">管理</p><Button variant="secondary" className="justify-start" nativeButton={false} render={<Link href={`/settings/members?workspace=${data.workspace.id}`} />} aria-current="page"><Users data-icon="inline-start" />成员</Button></div>
+      <div className="flex flex-col gap-2"><p className="px-2 text-xs text-muted-foreground">管理</p><Link href={`/settings/members?workspace=${data.workspace.id}`} className={buttonVariants({ variant: 'secondary', className: 'justify-start' })} aria-current="page"><Users data-icon="inline-start" />成员</Link></div>
       <div className="mt-auto hidden flex-col gap-3 px-2 pb-2 md:flex"><Separator /><p className="text-xs leading-relaxed text-muted-foreground">在一个工作区中连接团队，让协作有序发生。</p><Link href="https://linear.app/docs/members-roles" target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-muted-foreground">Linear 成员管理参考<ExternalLink className="size-3" /></Link></div>
     </aside>
     <main className="flex min-w-0 flex-1 flex-col">
