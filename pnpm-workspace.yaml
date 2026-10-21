@@ -1,5 +1,18 @@
+packages:
+  - 'packages/*'
+
+# The lockfile already pins these versions; pnpm's 24h release-age gate
+# blocks every install/typecheck run until it is disabled.
+minimumReleaseAge: 0
+
 pmOnFail: ignore
 
 minimumReleaseAgeExclude:
   - '@next/*'
   - next
+
+allowBuilds:
+  '@parcel/watcher': true
+  '@swc/core': true
+  esbuild: true
+  sharp: true

@@ -1,6 +1,7 @@
 import { useCallback } from "react"
 import { TableKit } from "@tiptap/extension-table"
 import { findParentNodeClosestToPos, type Editor } from "@tiptap/react"
+import { useTranslations } from "next-intl"
 import { BubbleMenu } from "@tiptap/react/menus"
 import { cn } from "cn"
 
@@ -135,6 +136,7 @@ export function RichTextTableBubble({
   editor,
   onDeleteTable,
 }: RichTextTableBubbleProps) {
+  const t = useTranslations('Editor.richText')
   const table = useRichTextSelector(editor, readTable)
 
   // Anchors to the whole table, so the bar holds still while the caret moves.
@@ -163,17 +165,17 @@ export function RichTextTableBubble({
       <RichTextBubbleBar
         editor={editor}
         pluginKey={TABLE_BUBBLE_KEY}
-        label="Table"
+        label={t('table')}
       >
-        <RichTextToolbarGroup label="Insert">
+        <RichTextToolbarGroup label={t('insert')}>
           <RichTextButton
-            label="Add row below"
+            label={t('addRowBelow')}
             onClick={() => editor.chain().focus().addRowAfter().run()}
           >
             <BetweenHorizontalEndIcon aria-hidden="true" />
           </RichTextButton>
           <RichTextButton
-            label="Add column right"
+            label={t('addColumnRight')}
             onClick={() => editor.chain().focus().addColumnAfter().run()}
           >
             <BetweenVerticalEndIcon aria-hidden="true" />
@@ -181,7 +183,7 @@ export function RichTextTableBubble({
         </RichTextToolbarGroup>
         <RichTextToolbarSeparator />
         <RichTextToggle
-          label="Header row"
+          label={t('headerRow')}
           pressed={table.headerRow}
           onToggle={() => editor.chain().focus().toggleHeaderRow().run()}
         >
@@ -197,7 +199,7 @@ export function RichTextTableBubble({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label="Delete"
+                    aria-label={t('delete')}
                     data-toolbar-item=""
                   />
                 }
@@ -205,7 +207,7 @@ export function RichTextTableBubble({
                 <Trash2Icon aria-hidden="true" />
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent>Delete</TooltipContent>
+            <TooltipContent>{t('delete')}</TooltipContent>
           </Tooltip>
           <DropdownMenuContent
             align="start"
@@ -213,26 +215,26 @@ export function RichTextTableBubble({
             finalFocus={() => editor.view.dom}
           >
             <DropdownMenuGroup>
-              <DropdownMenuLabel>Delete</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('delete')}</DropdownMenuLabel>
               <DropdownMenuItem
                 disabled={!table.canDeleteRow}
                 onClick={() => editor.chain().focus().deleteRow().run()}
               >
                 <Rows3Icon aria-hidden="true" />
-                Delete Row
+                {t('deleteRow')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!table.canDeleteColumn}
                 onClick={() => editor.chain().focus().deleteColumn().run()}
               >
                 <Columns3Icon aria-hidden="true" />
-                Delete Column
+                {t('deleteColumn')}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={onDeleteTable}>
               <Trash2Icon aria-hidden="true" />
-              Delete Table
+              {t('deleteTableAction')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

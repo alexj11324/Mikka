@@ -2,7 +2,9 @@
 
 import { useId, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { moveIssue, type listIssues } from '@/app/actions/issues'
+import { useActionError } from '@/lib/use-action-error'
 import { type KanbanCommitMeta } from '@/components/reui/kanban'
 import { KanbanBoard } from '@/components/blocks/kanban-board-1/components/kanban-board'
 import { Button } from '@/components/ui/button'
@@ -22,6 +24,10 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
   onUpdated: () => Promise<unknown>
   onBusyChange: (busy: boolean) => void
 }) {
+  const t = useTranslations('Board')
+  const statusT = useTranslations('Issue.status')
+  const statusLabel = (value: string) => statusT.has(value as never) ? statusT(value as never) : value
+  const translateError = useActionError()
   const [columns, setColumns] = useState<Columns>(() => groupIssues(issues))
   const [pending, setPending] = useState(false)
   const [dragging, setDragging] = useState(false)
@@ -48,15 +54,19 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
     saving.current = true
     setPending(true)
     onBusyChange(true)
-    setMessage('正在保存任务状态…')
+    setMessage(t('saving'))
     try {
       const result = await moveIssue({ id: issue.id, status, revision: issue.revision })
-      if (!('issue' in result) || !result.issue) throw new Error(result.error ?? '移动失败，请重试。')
-      setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === issue.id ? { ...item, status, revision: result.issue!.revision, updatedAt: result.issue!.updatedAt } : item)])))
-      setMessage(`已移至${ISSUE_STATUSES.find(item => item.value === status)?.label}`)
-    } catch (error) {
+      if ('error' in result) {
+        setColumns(rollback)
+        setMessage(translateError(result.error))
+        return
+      }
+      setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === issue.id ? { ...item, status, revision: result.issue.revision, updatedAt: result.issue.updatedAt } : item)])))
+      setMessage(t('moved', { status: statusLabel(status) }))
+    } catch {
       setColumns(rollback)
-      setMessage(error instanceof Error ? error.message : '状态保存失败，已恢复原位置。')
+      setMessage(t('moveRollback'))
     } finally {
       saving.current = false
       setPending(false)
@@ -76,15 +86,15 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
     void persist(issue, meta.overContainer, meta.previousValue)
   }
 
-  return <section aria-label="任务看板" className="flex min-w-0 flex-1 flex-col gap-3 px-4 pb-6 sm:px-6">
+  return <section aria-label={t('label')} className="flex min-w-0 flex-1 flex-col gap-3 px-4 pb-6 sm:px-6">
     <div className="flex items-center justify-between gap-3">
-      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || '左右滚动查看全部状态，拖动卡片跨列更新任务，点击标题打开详情。'}</p>
+      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || t('instructions')}</p>
       <div className="flex shrink-0 items-center gap-1">
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="向左滚动看板" aria-controls={viewportId} onClick={() => scrollBoard(-1)}><ChevronLeft data-icon="inline-start" /></Button>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="向右滚动看板" aria-controls={viewportId} onClick={() => scrollBoard(1)}><ChevronRight data-icon="inline-start" /></Button>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={t('scrollLeft')} aria-controls={viewportId} onClick={() => scrollBoard(-1)}><ChevronLeft data-icon="inline-start" /></Button>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={t('scrollRight')} aria-controls={viewportId} onClick={() => scrollBoard(1)}><ChevronRight data-icon="inline-start" /></Button>
       </div>
     </div>
-    <p id={instructionsId} className="sr-only">使用触控板左右滑动、底部滚动条或左右按钮浏览。聚焦此区域后，可用左右方向键滚动，Home 返回开头，End 移至末尾。聚焦可拖动卡片后，按空格开始拖动，使用方向键跨列移动，再按空格放下；Escape 取消。</p>
+    <p id={instructionsId} className="sr-only">{t('keyboardHint')}</p>
     <KanbanBoard value={columns} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onCreate={onCreate} viewportRef={viewportRef} viewportId={viewportId} instructionsId={instructionsId} onViewportKeyDown={event => {
       if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
@@ -94,6 +104,6 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
         event.preventDefault()
         event.currentTarget.scrollTo({ left: event.key === 'Home' ? 0 : event.currentTarget.scrollWidth })
       }
-    }} onDragStart={() => { setDragging(true); onBusyChange(true) }} onDragCancel={() => { setDragging(false); onBusyChange(false) }} onDragEnd={() => { setDragging(false); if (!saving.current) onBusyChange(false) }} accessibility={{ screenReaderInstructions: { draggable: '按空格开始拖动，使用方向键移动到目标状态列，再按空格放下，按 Escape 取消。' } }} />
+    }} onDragStart={() => { setDragging(true); onBusyChange(true) }} onDragCancel={() => { setDragging(false); onBusyChange(false) }} onDragEnd={() => { setDragging(false); if (!saving.current) onBusyChange(false) }} accessibility={{ screenReaderInstructions: { draggable: t('dragHint') } }} />
   </section>
 }

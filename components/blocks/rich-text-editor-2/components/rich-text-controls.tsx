@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import type { Editor } from "@tiptap/react"
+import { useTranslations } from "next-intl"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -42,10 +43,11 @@ function focusEditor(editor: Editor | null) {
 }
 
 export function RichTextHistory({ editor, state }: ControlProps) {
+  const t = useTranslations('Editor.richText')
   return (
-    <RichTextToolbarGroup label="History">
+    <RichTextToolbarGroup label={t('history')}>
       <RichTextButton
-        label="Undo"
+        label={t('undo')}
         shortcut={["mod", "Z"]}
         disabled={!state.canUndo}
         onClick={() => editor?.chain().focus().undo().run()}
@@ -53,7 +55,7 @@ export function RichTextHistory({ editor, state }: ControlProps) {
         <Undo2Icon aria-hidden="true" />
       </RichTextButton>
       <RichTextButton
-        label="Redo"
+        label={t('redo')}
         shortcut={["mod", "shift", "Z"]}
         disabled={!state.canRedo}
         onClick={() => editor?.chain().focus().redo().run()}
@@ -66,7 +68,7 @@ export function RichTextHistory({ editor, state }: ControlProps) {
 
 interface BlockTypeOption {
   value: RichTextBlockType
-  label: string
+  labelKey: 'paragraph' | 'heading1' | 'heading2' | 'heading3'
   icon: ReactNode
   keys: readonly string[]
 }
@@ -75,7 +77,7 @@ interface BlockTypeOption {
 const BLOCK_TYPES: BlockTypeOption[] = [
   {
     value: "paragraph",
-    label: "Text",
+    labelKey: "paragraph",
     keys: ["mod", "alt", "0"],
     icon: (
       <TypeIcon aria-hidden="true" />
@@ -83,7 +85,7 @@ const BLOCK_TYPES: BlockTypeOption[] = [
   },
   {
     value: "heading-1",
-    label: "Heading 1",
+    labelKey: "heading1",
     keys: ["mod", "alt", "1"],
     icon: (
       <Heading1Icon aria-hidden="true" />
@@ -91,7 +93,7 @@ const BLOCK_TYPES: BlockTypeOption[] = [
   },
   {
     value: "heading-2",
-    label: "Heading 2",
+    labelKey: "heading2",
     keys: ["mod", "alt", "2"],
     icon: (
       <Heading2Icon aria-hidden="true" />
@@ -99,7 +101,7 @@ const BLOCK_TYPES: BlockTypeOption[] = [
   },
   {
     value: "heading-3",
-    label: "Heading 3",
+    labelKey: "heading3",
     keys: ["mod", "alt", "3"],
     icon: (
       <Heading3Icon aria-hidden="true" />
@@ -124,9 +126,11 @@ function MenuShortcut({ keys }: { keys: readonly string[] }) {
 }
 
 export function RichTextBlockTypeMenu({ editor, state }: ControlProps) {
+  const t = useTranslations('Editor.richText')
   const current =
     BLOCK_TYPES.find((option) => option.value === state.blockType) ??
     BLOCK_TYPES[0]
+  const currentLabel = t(`blockType.${current.labelKey}`)
 
   // Fixed width on desktop, so the bar never shifts as the label changes;
   // the current block's glyph alone below sm, so the marks stay in view.
@@ -137,7 +141,7 @@ export function RichTextBlockTypeMenu({ editor, state }: ControlProps) {
           <Button
             variant="ghost"
             size="sm"
-            aria-label={`Block type, ${current.label}`}
+            aria-label={t('blockTypeAria', { type: currentLabel })}
             disabled={!state.editable || state.codeBlock}
             className="shrink-0 justify-between sm:w-28"
             data-toolbar-item=""
@@ -145,7 +149,7 @@ export function RichTextBlockTypeMenu({ editor, state }: ControlProps) {
         }
       >
         <span className="flex sm:hidden">{current.icon}</span>
-        <span className="truncate max-sm:hidden">{current.label}</span>
+        <span className="truncate max-sm:hidden">{currentLabel}</span>
         <ChevronDownIcon aria-hidden="true" className="opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -154,7 +158,7 @@ export function RichTextBlockTypeMenu({ editor, state }: ControlProps) {
         finalFocus={focusEditor(editor)}
       >
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Turn Into</DropdownMenuLabel>
+          <DropdownMenuLabel>{t('turnInto')}</DropdownMenuLabel>
           <DropdownMenuRadioGroup
             value={state.blockType}
             onValueChange={(value) => {
@@ -169,7 +173,7 @@ export function RichTextBlockTypeMenu({ editor, state }: ControlProps) {
                 closeOnClick
               >
                 {option.icon}
-                {option.label}
+                {t(`blockType.${option.labelKey}`)}
                 <MenuShortcut keys={option.keys} />
               </DropdownMenuRadioItem>
             ))}
@@ -181,10 +185,11 @@ export function RichTextBlockTypeMenu({ editor, state }: ControlProps) {
 }
 
 export function RichTextListToggles({ editor, state }: ControlProps) {
+  const t = useTranslations('Editor.richText')
   return (
-    <RichTextToolbarGroup label="Lists">
+    <RichTextToolbarGroup label={t('lists')}>
       <RichTextToggle
-        label="Bullet list"
+        label={t('bulletList')}
         shortcut={["mod", "shift", "8"]}
         pressed={state.bulletList}
         disabled={!state.editable}
@@ -193,7 +198,7 @@ export function RichTextListToggles({ editor, state }: ControlProps) {
         <ListIcon aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
-        label="Numbered list"
+        label={t('numberedList')}
         shortcut={["mod", "shift", "7"]}
         pressed={state.orderedList}
         disabled={!state.editable}
@@ -202,7 +207,7 @@ export function RichTextListToggles({ editor, state }: ControlProps) {
         <ListOrderedIcon aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
-        label="Task list"
+        label={t('taskList')}
         shortcut={["mod", "shift", "9"]}
         pressed={state.taskList}
         disabled={!state.editable}
@@ -215,10 +220,11 @@ export function RichTextListToggles({ editor, state }: ControlProps) {
 }
 
 export function RichTextBlockToggles({ editor, state }: ControlProps) {
+  const t = useTranslations('Editor.richText')
   return (
-    <RichTextToolbarGroup label="Blocks">
+    <RichTextToolbarGroup label={t('blocks')}>
       <RichTextToggle
-        label="Quote"
+        label={t('quote')}
         shortcut={["mod", "shift", "B"]}
         pressed={state.blockquote}
         disabled={!state.editable}
@@ -227,7 +233,7 @@ export function RichTextBlockToggles({ editor, state }: ControlProps) {
         <TextQuoteIcon aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
-        label="Code block"
+        label={t('codeBlock')}
         shortcut={["mod", "alt", "C"]}
         pressed={state.codeBlock}
         disabled={!state.editable}
@@ -236,7 +242,7 @@ export function RichTextBlockToggles({ editor, state }: ControlProps) {
         <SquareCodeIcon aria-hidden="true" />
       </RichTextToggle>
       <RichTextButton
-        label="Divider"
+        label={t('divider')}
         disabled={!state.editable}
         onClick={() => editor?.chain().focus().setHorizontalRule().run()}
       >
@@ -247,12 +253,13 @@ export function RichTextBlockToggles({ editor, state }: ControlProps) {
 }
 
 export function RichTextMarkToggles({ editor, state }: ControlProps) {
+  const t = useTranslations('Editor.richText')
   const disabled = !state.canFormat
 
   return (
-    <RichTextToolbarGroup label="Text style">
+    <RichTextToolbarGroup label={t('textStyle')}>
       <RichTextToggle
-        label="Bold"
+        label={t('bold')}
         shortcut={["mod", "B"]}
         pressed={state.bold}
         disabled={disabled}
@@ -261,7 +268,7 @@ export function RichTextMarkToggles({ editor, state }: ControlProps) {
         <BoldIcon aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
-        label="Italic"
+        label={t('italic')}
         shortcut={["mod", "I"]}
         pressed={state.italic}
         disabled={disabled}
@@ -270,7 +277,7 @@ export function RichTextMarkToggles({ editor, state }: ControlProps) {
         <ItalicIcon aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
-        label="Underline"
+        label={t('underline')}
         shortcut={["mod", "U"]}
         pressed={state.underline}
         disabled={disabled}
@@ -279,7 +286,7 @@ export function RichTextMarkToggles({ editor, state }: ControlProps) {
         <UnderlineIcon aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
-        label="Strikethrough"
+        label={t('strikethrough')}
         shortcut={["mod", "shift", "S"]}
         pressed={state.strike}
         disabled={disabled}
@@ -288,7 +295,7 @@ export function RichTextMarkToggles({ editor, state }: ControlProps) {
         <StrikethroughIcon aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
-        label="Inline code"
+        label={t('inlineCode')}
         shortcut={["mod", "E"]}
         pressed={state.code}
         disabled={!state.canCode}
@@ -298,13 +305,6 @@ export function RichTextMarkToggles({ editor, state }: ControlProps) {
       </RichTextToggle>
     </RichTextToolbarGroup>
   )
-}
-
-const ALIGN_LABELS: Record<RichTextAlign, string> = {
-  left: "Align left",
-  center: "Align center",
-  right: "Align right",
-  justify: "Justify",
 }
 
 const ALIGN_KEYS: Record<RichTextAlign, string> = {
@@ -331,9 +331,11 @@ const ALIGN_ICONS: Record<RichTextAlign, ReactNode> = {
 }
 
 const isAlign = (value: unknown): value is RichTextAlign =>
-  typeof value === "string" && value in ALIGN_LABELS
+  typeof value === "string" && (RICH_TEXT_ALIGNS as readonly string[]).includes(value)
 
 export function RichTextAlignMenu({ editor, state }: ControlProps) {
+  const t = useTranslations('Editor.richText')
+  const alignLabel = (align: RichTextAlign) => t(`align.${align}`)
   // Two glyphs and no label read as an icon button, so the text inset is trimmed.
   return (
     <DropdownMenu>
@@ -345,7 +347,7 @@ export function RichTextAlignMenu({ editor, state }: ControlProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={`Alignment, ${ALIGN_LABELS[state.align]}`}
+                aria-label={t('alignmentAria', { align: alignLabel(state.align) })}
                 disabled={!state.editable}
                 className="gap-0.5 px-1.5"
                 data-toolbar-item=""
@@ -356,7 +358,7 @@ export function RichTextAlignMenu({ editor, state }: ControlProps) {
             <ChevronDownIcon aria-hidden="true" className="opacity-60" />
           </DropdownMenuTrigger>
         </TooltipTrigger>
-        <TooltipContent>Alignment</TooltipContent>
+        <TooltipContent>{t('alignment')}</TooltipContent>
       </Tooltip>
       <DropdownMenuContent
         align="start"
@@ -364,7 +366,7 @@ export function RichTextAlignMenu({ editor, state }: ControlProps) {
         finalFocus={focusEditor(editor)}
       >
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Alignment</DropdownMenuLabel>
+          <DropdownMenuLabel>{t('alignment')}</DropdownMenuLabel>
           <DropdownMenuRadioGroup
             value={state.align}
             onValueChange={(value) => {
@@ -376,7 +378,7 @@ export function RichTextAlignMenu({ editor, state }: ControlProps) {
             {RICH_TEXT_ALIGNS.map((align) => (
               <DropdownMenuRadioItem key={align} value={align} closeOnClick>
                 {ALIGN_ICONS[align]}
-                {ALIGN_LABELS[align]}
+                {alignLabel(align)}
                 <MenuShortcut keys={["mod", "shift", ALIGN_KEYS[align]]} />
               </DropdownMenuRadioItem>
             ))}

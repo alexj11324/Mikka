@@ -1,0 +1,7 @@
+{"t":0,"chunk":{"type":"start","messageId":"msg-stall-1"}}
+{"t":100,"chunk":{"type":"text-start","id":"txt-1"}}
+{"t":160,"chunk":{"type":"text-delta","id":"txt-1","delta":"Starting the dev server to check the page."}}
+{"t":200,"chunk":{"type":"text-end","id":"txt-1"}}
+{"t":300,"chunk":{"type":"tool-input-available","toolCallId":"call-dev-1","toolName":"bash","input":{"command":"bun run dev"}}}
+{"t":400,"hang":true}
+{"t":500,"exit":{"outcome":"succeeded"}}

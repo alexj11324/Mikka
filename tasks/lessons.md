@@ -67,3 +67,109 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 故障窗口通常就在最近，所以「最近的都失败」会强烈暗示「一直失败」。
 这是个采样偏差，不是数据问题。
 
+## 2026-10-20 配 `*_URL` 类环境变量前，先证明域名属于这个部署
+
+**发生了什么**：给 Vercel 三个环境配 `BETTER_AUTH_URL` 时，我把 Production 设成了
+`https://orvilo.aspectlylabs.com` —— 依据只是「Cloudflare 有 `aspectlylabs.com` 这个 zone，
+且它是 Orvilo 线上域名」。实际上：
+
+- 这个 Vercel 项目 (`new-base-nova-project`) 的域名列表**只有** `new-base-nova-project-ten.vercel.app`；
+- `orvilo.aspectlylabs.com` 返回 **10 字节**的 `Orvilo API`，是 Cloudflare 上的另一个东西，
+  响应里没有 `x-vercel-id`。
+
+**两个坑，第二个更隐蔽**：
+
+1. **别从"域名归属"推断"这个项目部署在哪个域名"**。
+   核实方法二选一：`GET /v9/projects/{id}/domains?teamId=...`，或
+   `curl -sI <域名>` 看有没有 `x-vercel-id` 头（有才是 Vercel 在服务）。
+   Cloudflare 开了代理时 `server: cloudflare` 不代表后端不是 Vercel，但**缺 `x-vercel-id`
+   基本可以断定不是**。
+
+2. **代码里已经有 fallback 时，别再加冗余的 env 变量**。
+   `lib/auth.ts:5` 本来就是
+   `BETTER_AUTH_URL ?? VERCEL_PROJECT_PRODUCTION_URL ?? VERCEL_URL ?? V0_RUNTIME_URL`。
+   官方文档写明 `VERCEL_PROJECT_PRODUCTION_URL`
+   **"is always set, even in preview deployments"** —— 所以 Preview 上的 fallback
+   本来就指向 production 域名，这正是「GitHub OAuth App 只能注册一个 callback URL」
+   约束下的设计。我把它改成 `https://$VERCEL_URL`，反而**覆盖掉**了这条设计。
+
+**规则**：
+
+1. 设 `*_URL` / `*_ORIGIN` 类变量前，先证明这个域名**真的在服务当前部署**。
+2. 加 env 变量前先读一遍消费它的代码。有 fallback 链的地方，
+   env 变量只在该环境**拿不到 system var** 时才需要（本地 dev 就是这种：
+   没有 `VERCEL_*`，所以 Development 保留 `http://localhost:3000` 是对的）。
+3. **`vercel env add` 在 Production/Preview 默认存成 Secret（write-only），存完读不回来**，
+   没法校验有没有混进换行。非敏感的 URL 用 `--type config` 存，
+   以后能核对；`vercel env pull` 对 Secret 只会写 `[SENSITIVE]` 占位符。
+4. 改坏了不一定要立刻重新部署：官方文档说 env 变更**只对新的部署生效**，
+   所以旧部署仍用旧值。发现配错时，在下次部署前改回来就来得及 —— 但也别指望
+   「已生效的坏值」会自己回滚。
+5. **`vercel env add` 的用法**：环境是 `-e/--environment` 标志，**不是位置参数**
+   （`vercel env add NAME --environment production --type config --value "..."`）。
+   写 `vercel env add NAME production` 会静默失败。用 `--value` 而不是
+   `echo ... | vercel env add` —— 前者从 argv 取完整字符串，
+   不存在「stdin 尾随换行是否被 trim」的疑问，配合 `--type config` 还能回读校验。
+
+## 2026-10-20 交付报告：第一屏是清单逐项结果，不是我的自查过程
+
+**发生了什么**：用户指着清单说「后面两个，直接都做了，做完了告诉我」。两件我都做完了，
+但交付报告用大半篇幅讲我自己之前的配置错误、域名归属调查、Vercel 文档考据，
+最后还抛了一个「需要你决定的一件事」。用户读完的直接反应是：要的两件事没看到，
+满屏都是预览环境和提问。
+
+**规则**：
+
+1. 「做完了」的报告**第一屏就是清单逐项 ✅/❌**，证据、背景、自查放后面。
+2. **交付报告不以提问结尾**。真要用户拍板的事单独一句放最后，
+   别包在正文里让它看起来像任务没完成。
+3. 自查出来的错误要讲，但压成一句（「顺带修了我之前配错的两处」），不占正文。
+4. 用户说「后面两个」时，**回去读自己上一条消息里那份清单的原文**，
+   按序号对上，别靠记忆。
+
+---
+
+## 2026-10-20 用户偏好：不要全宽水平长线
+
+**发生了什么**：截图指出表格头下方那条贯穿整行的分割线，明确说「agent 很喜欢用这种长线，
+我喜欢不带线的」。
+
+**规则**：
+
+1. 业务 UI 不做全宽水平分割线：不用 `border-t/b/y`、`divide-y`、水平 `<Separator />`、
+   `h-px bg-*`。分组用间距（`gap-*`）或背景（`bg-muted/*`）。
+2. 竖线（`border-l/r`、`orientation="vertical"`）和盒状边框（`border`）可以保留。
+3. 这条已经落在 `style/no-horizontal-rule`；先跑 `node scripts/lint-ui.mjs`，不要靠肉眼。
+
+
+---
+
+## 2026-10-21 i18n：key 对齐不等于 key 存在
+
+**发生了什么**：`messages/zh-CN.json` 与 `en.json` 的 key 完全对齐、CJK 扫描全绿，
+但浏览器里出现了 `Nav.toggleSidebar`、`Editor.slash.text.title` 这类原始 key。
+原因是代码引用了一个两边都没有的 key——next-intl 会原样渲染 key，而 CJK 扫描只看中文、比较器只看两份字典。
+
+**规则**：
+
+1. 字典完整性检查必须包含「代码用到的 key 是否存在于字典」，不能只比较两个 locale。
+2. 从 `useTranslations('Ns')` / `getTranslations(...)` 推断命名空间，校验字面量 `t('key')`；
+   模板字符串 key 与同名变量多命名空间的情况跳过，避免误报。
+3. 浏览器验收时顺手扫 `\b(Namespace)\.[a-z0-9_.-]+`，这是发现缺 key 最快的手段。
+4. 动态拼接的 key（slash items、枚举）要么列白名单，要么在浏览器里逐项点开确认。
+
+## 2026-10-21 Turbopack 缓存被强杀后会永远卡在 Starting
+
+**发生了什么**：反复 `TaskStop` 开发服务器后，`next dev` 进程 CPU 很高但端口不响应，
+日志出现 `inner_of_upper_lost_followers` 的 tokio panic。
+
+**规则**：遇到这种状态先 `rm -rf .next` 再启动，不要在「等它编译完」上浪费时间；
+`pkill -f "next dev"` 后确认端口释放，避免新实例换端口导致 better-auth origin 校验失败。
+
+## 2026-10-21 `[locale]/not-found.tsx` 需要 catch-all 才可达
+
+**发生了什么**：`app/[locale]/not-found.tsx` 写了却永远不渲染；`/en/nonexistent` 直接落到静态的 `app/global-not-found.tsx`（双语但 `<html lang="zh-CN">`）。
+
+**规则**：顶层动态段下的 404 要加 `app/[locale]/[...rest]/page.tsx` 调 `notFound()`；
+验证时看 HTTP 状态（404）、浏览器 `document.documentElement.lang` 与页面文案三者是否一致。
+另外 `JSON.parse` 会静默丢掉重复 key，检查器应能发现重复键，或至少用 `jq`/脚本单独查一次。

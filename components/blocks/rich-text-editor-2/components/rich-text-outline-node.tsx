@@ -14,18 +14,20 @@ import {
 } from "./rich-text-outline"
 import type { RichTextSlashItem } from "./rich-text-slash-menu"
 import { TableOfContentsIcon } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 const LINK_INDENT = ["", "ps-4", "ps-8"] as const
 
 function OutlineBlockView({ editor }: ReactNodeViewProps) {
+  const t = useTranslations('Editor.richText')
   // Heading edits elsewhere never reach this node, so it reads the editor.
   const outline = useRichTextOutline(editor)
 
   return (
     <NodeViewWrapper className="flex flex-col gap-1.5">
-      <p className="text-muted-foreground text-xs font-medium">Contents</p>
+      <p className="text-muted-foreground text-xs font-medium">{t('contents')}</p>
       {outline.length ? (
-        <nav aria-label="Contents" className="flex flex-col items-start">
+        <nav aria-label={t('contents')} className="flex flex-col items-start">
           {outline.map((entry, index) => (
             <Button
               key={entry.id}
@@ -43,7 +45,7 @@ function OutlineBlockView({ editor }: ReactNodeViewProps) {
         </nav>
       ) : (
         <p className="text-muted-foreground text-sm">
-          No headings yet. Add one and it shows up here.
+          {t('outlineEmpty')}
         </p>
       )}
     </NodeViewWrapper>

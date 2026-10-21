@@ -3,13 +3,14 @@
 import { type ComponentProps, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { ArrowRight, CalendarDays, Plus } from 'lucide-react'
+import { useFormatter, useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { ISSUE_PRIORITIES, issueIdentifier, type IssueStatus } from '@/components/workspace/issue-properties'
+import { issueIdentifier, type IssueStatus } from '@/components/workspace/issue-properties'
 import { BOARD_COLUMNS, type BoardColumns, type BoardTask } from './data'
 
 function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typeof ScrollAreaPrimitive.Viewport> & { viewportRef: Ref<HTMLDivElement> }) {
@@ -42,21 +43,25 @@ const signalDotClass: Record<IssueStatus, string> = {
 const priorityCodes: Record<string, string> = { urgent: 'P0', high: 'P1', normal: 'P2', low: 'P3' }
 
 function SignalBadge({ status }: { status: IssueStatus }) {
+  const statusT = useTranslations('Issue.status')
   return <Badge variant="outline" className="gap-1.5">
     <span className={cn('size-1.5 shrink-0 rounded-full', signalDotClass[status])} aria-hidden="true" />
-    {BOARD_COLUMNS.find(column => column.value === status)?.label}
+    {statusT.has(status as never) ? statusT(status as never) : status}
   </Badge>
 }
 
 function DueBadge({ updatedAt }: { updatedAt: BoardTask['updatedAt'] }) {
-  return <Badge variant="outline" className="bg-background gap-1.5 font-normal" title="最后更新日期（非截止日期）">
+  const t = useTranslations('Board')
+  const format = useFormatter()
+  return <Badge variant="outline" className="bg-background gap-1.5 font-normal" title={t('lastUpdated')}>
     <CalendarDays className="size-3.5 text-muted-foreground" aria-hidden="true" />
-    <time className="tabular-nums" dateTime={new Date(updatedAt).toISOString()}>{new Date(updatedAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric', timeZone: 'UTC' })}</time>
+    <time className="tabular-nums" dateTime={new Date(updatedAt).toISOString()}>{format.dateTime(new Date(updatedAt), { month: 'numeric', day: 'numeric', timeZone: 'UTC' })}</time>
   </Badge>
 }
 
 function CompletionRing() {
-  return <span className="flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" aria-label="尚未设置完成百分比" title="尚未设置完成百分比">
+  const t = useTranslations('Board')
+  return <span className="flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" aria-label={t('noCompletion')} title={t('noCompletion')}>
     <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border">-</span>
   </span>
 }
@@ -68,16 +73,18 @@ function TaskCard({ task, status, disabled, isOverlay = false, onOpen }: {
   isOverlay?: boolean
   onOpen: (id: string) => void
 }) {
+  const t = useTranslations('Board')
+  const priorityT = useTranslations('Issue.priority')
   const isDone = status === 'done' || status === 'canceled' || status === 'duplicate'
-  const owner = task.ownerName || '未知成员'
+  const owner = task.ownerName || t('unknownMember')
   const initials = Array.from(owner).slice(0, 2).join('').toUpperCase()
   const card = <Card size="sm" className={cn('bg-card p-0 shadow-xs transition-[border-color,box-shadow] hover:border-foreground/20 hover:shadow-sm', isOverlay && 'pointer-events-none shadow-lg', isDone && 'bg-muted/40')}>
     <CardContent className="flex min-h-[8.75rem] flex-col p-3">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <Badge variant="secondary">任务</Badge>
+          <Badge variant="secondary">{t('task')}</Badge>
           <span className="truncate text-xs tabular-nums text-muted-foreground">{issueIdentifier(task.id)}</span>
-          <span className="text-xs tabular-nums text-muted-foreground" title={ISSUE_PRIORITIES.find(item => item.value === task.priority)?.label}>{priorityCodes[task.priority]}</span>
+          <span className="text-xs tabular-nums text-muted-foreground" title={priorityT.has(task.priority as never) ? priorityT(task.priority as never) : task.priority}>{priorityCodes[task.priority]}</span>
         </div>
         <SignalBadge status={status} />
       </div>
@@ -85,7 +92,7 @@ function TaskCard({ task, status, disabled, isOverlay = false, onOpen }: {
         <TaskTitleAffordance title={task.title} isDone={isDone} onOpen={() => onOpen(task.id)} disabled={disabled || isOverlay} />
       </h3>
       <div className="mt-auto flex items-center justify-between gap-2 pt-4">
-        <div className="flex min-w-0 items-center gap-2" title={`创建者：${owner}`}>
+        <div className="flex min-w-0 items-center gap-2" title={t('creator', { name: owner })}>
           <Avatar size="sm">
             {task.ownerImage && <AvatarImage src={task.ownerImage} alt={owner} />}
             <AvatarFallback>{initials}</AvatarFallback>
@@ -101,7 +108,7 @@ function TaskCard({ task, status, disabled, isOverlay = false, onOpen }: {
   </Card>
 
   return <KanbanItem value={task.id} disabled={disabled} role="group" tabIndex={-1} aria-label={task.title}>
-    {isOverlay ? card : <KanbanItemHandle className="block touch-pan-y rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`拖动任务：${task.title}`} aria-roledescription="可拖动任务">{card}</KanbanItemHandle>}
+    {isOverlay ? card : <KanbanItemHandle className="block touch-pan-y rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={t('dragTask', { title: task.title })} aria-roledescription={t('draggableTask')}>{card}</KanbanItemHandle>}
   </KanbanItem>
 }
 
@@ -117,20 +124,23 @@ type KanbanBoardProps = Omit<ComponentProps<typeof Kanban<BoardTask>>, 'children
 }
 
 export function KanbanBoard({ pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onOpen, onCreate, ...props }: KanbanBoardProps) {
+  const t = useTranslations('Board')
+  const statusT = useTranslations('Issue.status')
+  const statusLabel = (value: string) => statusT.has(value as never) ? statusT(value as never) : value
   return <Kanban {...props} getItemValue={item => item.id} className="w-full min-w-0">
-    <BoardScrollArea viewportRef={viewportRef} id={viewportId} role="region" aria-label="横向滚动任务看板" aria-describedby={instructionsId} tabIndex={0} onKeyDown={onViewportKeyDown}>
+    <BoardScrollArea viewportRef={viewportRef} id={viewportId} role="region" aria-label={t('horizontalScroll')} aria-describedby={instructionsId} tabIndex={0} onKeyDown={onViewportKeyDown}>
       <KanbanBoardPrimitive className="grid w-max min-w-full auto-cols-[17.5rem] grid-flow-col grid-cols-none items-start gap-3 px-1 pb-2">
         {BOARD_COLUMNS.map(column => <KanbanColumn key={column.value} value={column.value} className="w-70 min-w-70">
-          <section className={cn('flex min-h-64 flex-col gap-2 rounded-lg border p-2.5 transition-colors', column.surfaceClassName, column.borderClassName)} aria-label={`${column.label}任务列`}>
+          <section className={cn('flex min-h-64 flex-col gap-2 rounded-lg border p-2.5 transition-colors', column.surfaceClassName, column.borderClassName)} aria-label={t('columnLabel', { status: statusLabel(column.value) })}>
             <div className="flex h-8 items-center gap-2 px-0.5">
               <column.icon className={cn('size-4 shrink-0', column.indicatorClassName)} aria-hidden="true" />
-              <h2 className="truncate text-sm font-semibold">{column.label}</h2>
+              <h2 className="truncate text-sm font-semibold">{statusLabel(column.value)}</h2>
               <Badge variant="outline">{props.value[column.value]?.length ?? 0}</Badge>
-              <Button type="button" variant="ghost" size="icon-xs" className="ml-auto" aria-label={`新建${column.label}任务`} disabled={pending} onClick={() => onCreate(column.value)}><Plus /></Button>
+              <Button type="button" variant="ghost" size="icon-xs" className="ml-auto" aria-label={t('newTaskIn', { status: statusLabel(column.value) })} disabled={pending} onClick={() => onCreate(column.value)}><Plus /></Button>
             </div>
-            <KanbanColumnContent value={column.value} className="min-h-28 gap-2" aria-label={`${column.label}列`}>
+            <KanbanColumnContent value={column.value} className="min-h-28 gap-2" aria-label={t('columnContent', { status: statusLabel(column.value) })}>
               {(props.value[column.value] ?? []).map(task => <TaskCard key={task.id} task={task} status={column.value} disabled={pending} onOpen={onOpen} />)}
-              {!props.value[column.value]?.length && <p className="rounded-lg border border-dashed border-border/70 bg-background/55 px-3 py-6 text-center text-xs text-muted-foreground">拖动任务到这里</p>}
+              {!props.value[column.value]?.length && <p className="rounded-lg border border-dashed border-border/70 bg-background/55 px-3 py-6 text-center text-xs text-muted-foreground">{t('dropHere')}</p>}
             </KanbanColumnContent>
           </section>
         </KanbanColumn>)}

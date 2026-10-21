@@ -1,0 +1,48 @@
+import { NextResponse } from 'next/server'
+import { and, eq } from 'drizzle-orm'
+import { RUN_LEASE_MS } from '@orvilo/protocol/device'
+import { db } from '@/lib/db'
+import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
+import { authenticateDevice, ownedDevice } from '@/lib/device-link'
+
+export const dynamic = 'force-dynamic'
+
+/**
+ * `POST /v1/devices/:deviceId/runs/:runId/claim`: hands the daemon everything
+ * it needs to run. 409 means the run is not queued for this device — the
+ * daemon's `RunNotPinnedHereError`, and it stops asking.
+ */
+export async function POST(request: Request, { params }: { params: Promise<{ deviceId: string; runId: string }> }) {
+  const caller = await authenticateDevice(request)
+  if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { deviceId, runId } = await params
+  const device = await ownedDevice(deviceId, caller.userId)
+  if (!device) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
+  if (!device.enabled) return NextResponse.json({ error: 'Scheduling is off for this device.' }, { status: 409 })
+  const [run] = await db
+    .select()
+    .from(agentRuns)
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
+    .limit(1)
+  if (!run) return NextResponse.json({ error: 'Run is not queued for this device.' }, { status: 409 })
+  const [agent] = await db.select().from(agents).where(eq(agents.id, run.agentId)).limit(1)
+  const [repo] = run.deviceRepoId
+    ? await db.select().from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
+    : []
+  if (!agent || !repo || !run.issueId) {
+    await db.update(agentRuns)
+      .set({ status: 'failed', stopReason: 'error', error: 'Run is missing its agent, repository or issue.', finishedAt: new Date(), updatedAt: new Date() })
+      .where(eq(agentRuns.id, runId))
+    return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
+  }
+  const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
+  await db.update(agentRuns)
+    .set({ status: 'preparing', startedAt: new Date(), leaseExpiresAt: new Date(leaseExpiresAt), updatedAt: new Date() })
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
+  return NextResponse.json({
+    runId, issueId: run.issueId, deviceId, repoId: repo.id,
+    baseBranch: repo.baseBranch, harness: agent.harness, prompt: run.prompt,
+    kind: run.kind, leaseExpiresAt,
+    ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
+  })
+}

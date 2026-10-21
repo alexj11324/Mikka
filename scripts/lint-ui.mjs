@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { auditSource, auditCss, isComponentLibrarySource } from './ui-policy.mjs'
 
 const policy = JSON.parse(readFileSync('ui-policy.json', 'utf8'))
-const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { encoding: 'utf8' }).split('\0').filter(file => /\.(?:[cm]?[jt]sx?|css)$/.test(file) && !/^(?:scripts|node_modules|\.next|out|build|user_read_only_context|v0_memories)\//.test(file) && !file.endsWith('.d.ts') && existsSync(file))
+const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { encoding: 'utf8' }).split('\0').filter(file => /\.(?:[cm]?[jt]sx?|css)$/.test(file) && !/^(?:packages|scripts|node_modules|\.next|out|build|user_read_only_context|v0_memories)\//.test(file) && !file.endsWith('.d.ts') && existsSync(file))
 const diagnostics = []
 const config = JSON.parse(readFileSync('components.json', 'utf8'))
 if (config.style !== policy.style || config.iconLibrary !== policy.iconLibrary.replace('-react', '')) diagnostics.push({ file: 'components.json', line: 1, column: 1, rule: 'policy/config-drift', message: '组件 base/style/iconLibrary 与 ui-policy.json 不一致；变更预设需同步审核策略。' })

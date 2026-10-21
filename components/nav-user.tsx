@@ -19,8 +19,11 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, LogOutIcon, Moon, Sun } from "lucide-react"
+import { ChevronsUpDownIcon, Languages, LogOutIcon, Moon, Sun } from "lucide-react"
 import { useTheme } from 'next-themes'
+import { useLocale, useTranslations } from 'next-intl'
+
+import { usePathname, useRouter } from '@/i18n/navigation'
 
 export function NavUser({
   user, onSignOut, signingOut,
@@ -31,13 +34,21 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
   const { resolvedTheme, setTheme } = useTheme()
+  const locale = useLocale()
+  const pathname = usePathname()
+  const router = useRouter()
+  const t = useTranslations('Nav')
+  function switchLocale() {
+    const target = locale === 'en' ? 'zh-CN' : 'en'
+    router.replace(`${pathname}${window.location.search}${window.location.hash}`, { locale: target })
+  }
   return (
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <SidebarMenuButton size="lg" aria-label="账户菜单" className="aria-expanded:bg-muted" />
+              <SidebarMenuButton size="lg" aria-label={t('accountMenu')} className="aria-expanded:bg-muted" />
             }
           >
             <Avatar>
@@ -71,13 +82,16 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
-                {resolvedTheme === 'dark' ? <Sun /> : <Moon />}切换明暗主题
+                {resolvedTheme === 'dark' ? <Sun /> : <Moon />}{t('toggleTheme')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={switchLocale} aria-label={t('switchLanguage')}>
+                <Languages />{locale === 'en' ? '中文' : 'English'}{/* i18n-ignore: language names stay native */}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={onSignOut} disabled={signingOut}>
-                <LogOutIcon />{signingOut ? '正在退出…' : '退出登录'}
+                <LogOutIcon />{signingOut ? t('signingOut') : t('signOut')}
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>

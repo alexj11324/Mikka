@@ -71,7 +71,7 @@ export class DocumentSync {
     await this.exchange(id)
     // Edits made during a request must be acknowledged before taking a version snapshot.
     if (this.version !== this.acknowledged) await this.exchange(id)
-    if (this.version !== this.acknowledged) throw new Error('文档仍有更新，请稍后重试。')
+    if (this.version !== this.acknowledged) throw new Error('documentPending')
   }
   destroy() {
     this.listeners.clear()

@@ -2,13 +2,17 @@
 
 import { useState, type FormEvent } from 'react'
 import useSWR from 'swr'
+import { useTranslations } from 'next-intl'
 import { inviteMember, listMembers, removeMember } from '@/app/actions/collaboration'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { useActionError } from '@/lib/use-action-error'
 
 export function IssueMembers({ id }: { id: string }) {
+  const t = useTranslations('Workspace.members')
+  const translateError = useActionError()
   const { data, error, mutate } = useSWR(['members', id], () => listMembers(id), { refreshInterval: 10000 })
   const [email, setEmail] = useState('')
   const [pending, setPending] = useState(false)
@@ -19,23 +23,27 @@ export function IssueMembers({ id }: { id: string }) {
     setPending(true); setMessage('')
     try {
       const result = await inviteMember(id, email)
-      if (result.error) { setMessage(result.error); return }
-      setEmail(''); setMessage('成员已添加，对方登录后可在任务列表中打开此任务。'); await mutate()
-    } catch { setMessage('添加失败，请稍后重试。') }
+      if ('error' in result) { setMessage(translateError(result.error)); return }
+      setEmail(''); setMessage(t('added')); await mutate()
+    } catch { setMessage(t('addFailed')) }
     finally { setPending(false) }
   }
   async function remove(memberId: string) {
-    if (pending || !window.confirm('移除此成员的任务访问权限？已保存的贡献将保留。')) return
+    if (pending || !window.confirm(t('removeConfirm'))) return
     setPending(true); setMessage('')
-    try { await removeMember(id, memberId); await mutate() }
-    catch { setMessage('移除失败，请稍后重试。') }
+    try {
+      const result = await removeMember(id, memberId)
+      if ('error' in result) { setMessage(translateError(result.error)); return }
+      await mutate()
+    }
+    catch { setMessage(t('removeFailed')) }
     finally { setPending(false) }
   }
-  return <Collapsible render={<div className="rounded-lg border p-4" />}><CollapsibleTrigger className="cursor-pointer"><span className="text-xs font-medium">协作成员 {data ? `· ${data.members.length + 1}` : ''}</span></CollapsibleTrigger><CollapsibleContent><div className="mt-4 flex flex-col gap-4">
-    <p className="text-xs leading-6 text-muted-foreground">仅所有者和获授权成员可以访问、编辑正文与评论。成员均可保存版本；只有所有者可以管理成员。</p>
-    {error && <p role="alert" className="text-xs text-destructive">成员读取失败，请重试。</p>}
-    {data?.members.map(member => <div key={member.id} className="flex items-center justify-between gap-3 text-xs"><div className="min-w-0"><p className="truncate font-medium">{member.name}</p><p className="truncate text-muted-foreground">{member.email}</p></div>{data.isOwner && <Button size="sm" variant="ghost" disabled={pending} onClick={() => remove(member.id)}>移除<span className="sr-only">{member.name}</span></Button>}</div>)}
-    {data?.isOwner && <form onSubmit={invite} className="flex flex-col gap-3 sm:flex-row sm:items-end"><FieldGroup><Field><FieldLabel htmlFor="member-email">添加已注册成员</FieldLabel><Input id="member-email" type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="输入对方的登录邮箱" required maxLength={254} disabled={pending} /></Field></FieldGroup><Button size="sm" variant="outline" type="submit" disabled={pending}>添加成员</Button></form>}
+  return <Collapsible render={<div className="rounded-lg border p-4" />}><CollapsibleTrigger className="cursor-pointer"><span className="text-xs font-medium">{t('title')} {data ? `· ${data.members.length + 1}` : ''}</span></CollapsibleTrigger><CollapsibleContent><div className="mt-4 flex flex-col gap-4">
+    <p className="text-xs leading-6 text-muted-foreground">{t('description')}</p>
+    {error && <p role="alert" className="text-xs text-destructive">{t('readFailed')}</p>}
+    {data?.members.map(member => <div key={member.id} className="flex items-center justify-between gap-3 text-xs"><div className="min-w-0"><p className="truncate font-medium">{member.name}</p><p className="truncate text-muted-foreground">{member.email}</p></div>{data.isOwner && <Button size="sm" variant="ghost" disabled={pending} onClick={() => remove(member.id)}>{t('remove')}<span className="sr-only">{member.name}</span></Button>}</div>)}
+    {data?.isOwner && <form onSubmit={invite} className="flex flex-col gap-3 sm:flex-row sm:items-end"><FieldGroup><Field><FieldLabel htmlFor="member-email">{t('addLabel')}</FieldLabel><Input id="member-email" type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder={t('emailPlaceholder')} required maxLength={254} disabled={pending} /></Field></FieldGroup><Button size="sm" variant="outline" type="submit" disabled={pending}>{t('add')}</Button></form>}
     {message && <p role="status" className="text-xs leading-6">{message}</p>}
   </div></CollapsibleContent></Collapsible>
 }
