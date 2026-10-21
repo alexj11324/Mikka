@@ -104,7 +104,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="new-issue-title" className="sr-only">任务标题</FieldLabel>
-              <Input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder="任务标题" value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
+              <Input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder="任务标题" value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent px-0 py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
             </Field>
             <Field>
               <FieldLabel className="sr-only">任务描述</FieldLabel>
@@ -114,9 +114,11 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
           <div className="flex flex-wrap items-center gap-2">
             <IssuePropertyMenu pill label="任务状态" value={status} options={ISSUE_STATUSES} icon={CircleDashed} disabled={pending} onChange={setStatus} />
             <IssuePropertyMenu pill label="任务优先级" value={priority} options={ISSUE_PRIORITIES} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={setPriority} />
-            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><SquareUserRound />{WORKSPACE_NAME}</Badge>
-            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><LockKeyhole />私有</Badge>
           </div>
+          <p className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5"><SquareUserRound aria-hidden="true" className="size-3.5" />工作区：{WORKSPACE_NAME}</span>
+            <span className="inline-flex items-center gap-1.5"><LockKeyhole aria-hidden="true" className="size-3.5" />初始仅自己可见，创建后可邀请成员协作</span>
+          </p>
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
           {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
         </FieldSet>
