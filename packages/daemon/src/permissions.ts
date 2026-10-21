@@ -118,22 +118,59 @@ const INSTALL_COMMANDS: readonly (readonly [string, readonly string[]])[] = [
 /**
  * The policy action a shell command line falls under, for CLIs that ask
  * before running a command (Cursor). Each `&&`, `;` or `|` segment counts.
+ * Wrappers (`sudo`, `env`, `command`, `xargs`, `sh -c …`) are unwrapped so
+ * `env git push` and `/usr/bin/git push` cannot slip past the git rule.
  */
 export function classifyCommand(command: string): PermissionAction | null {
   for (const segment of command.split(/&&|\|\||;|\||\n/)) {
-    const words = segment.trim().split(/\s+/).filter(Boolean)
-    // Skip env assignments and wrappers (`FOO=1 npx …`, `sudo …`).
-    while (
-      words.length &&
-      (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0]) || words[0] === "sudo")
-    )
-      words.shift()
-    const [tool, verb] = words
-    if (!tool) continue
-    if (tool === "git" && words.includes("push")) return "git_push"
-    const entry = INSTALL_COMMANDS.find(([name]) => name === basename(tool))
-    if (entry && verb && entry[1].includes(verb)) return "install_dependency"
+    const action = classifySegment(segment, 0)
+    if (action) return action
   }
+  return null
+}
+
+const WRAPPERS = new Set(["sudo", "command", "exec", "env", "nohup", "time", "nice", "xargs"])
+const SHELLS = new Set(["sh", "bash", "zsh", "dash", "fish"])
+/** Wrapper options that take the next word as their value (`sudo -u deploy`). */
+const OPTION_VALUES = new Set(["-u", "-g", "-p", "-C", "-h", "-r", "-t", "-U", "-n", "-P", "-d", "-L", "-s", "-E", "-a", "-I", "-S"])
+
+function classifySegment(segment: string, depth: number): PermissionAction | null {
+  const words = segment
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.replace(/^['"]+|['"]+$/g, ""))
+  // Skip env assignments and wrappers (`FOO=1 npx …`, `sudo -u x …`).
+  while (words.length) {
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0])) {
+      words.shift()
+      continue
+    }
+    if (WRAPPERS.has(basename(words[0]))) {
+      words.shift()
+      while (words.length && words[0].startsWith("-")) {
+        const option = words.shift() as string
+        if (!option.includes("=") && OPTION_VALUES.has(option)) words.shift()
+      }
+      continue
+    }
+    break
+  }
+  const [tool, verb] = words
+  if (!tool) return null
+  const name = basename(tool)
+  // `sh -c "git push"` keeps the real command in the argument string.
+  if (SHELLS.has(name) && depth < 3) {
+    const index = words.findIndex((word) => word === "--command" || /^-[A-Za-z]*c[A-Za-z]*$/.test(word))
+    if (index !== -1) {
+      const nested = words.slice(index + 1).join(" ").replace(/^['"]|['"]$/g, "")
+      const action = classifyCommand(nested)
+      if (action) return action
+    }
+  }
+  if (name === "git" && words.slice(1).some((word) => word === "push")) return "git_push"
+  const entry = INSTALL_COMMANDS.find(([command]) => command === name)
+  if (entry && verb && entry[1].includes(verb)) return "install_dependency"
   return null
 }
 

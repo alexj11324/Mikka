@@ -172,6 +172,16 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(classifyCommand("bun run build")).toBeNull()
   })
 
+  it("unwraps shells and wrappers before matching git push", () => {
+    expect(classifyCommand("env git push")).toBe("git_push")
+    expect(classifyCommand("command git push origin HEAD")).toBe("git_push")
+    expect(classifyCommand("/usr/bin/git push origin HEAD")).toBe("git_push")
+    expect(classifyCommand("sudo -u deploy git push")).toBe("git_push")
+    expect(classifyCommand("sh -c 'git push origin HEAD'")).toBe("git_push")
+    expect(classifyCommand("bash -lc 'cd app && git push'")).toBe("git_push")
+    expect(classifyCommand("xargs git push")).toBe("git_push")
+  })
+
   it("gives Claude Code ask or deny rules for installs and always denies git push", () => {
     expect(claudePermissionRules(policy({}))).toMatchObject({
       ask: expect.arrayContaining(["Bash(npm install:*)"]),

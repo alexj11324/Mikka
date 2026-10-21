@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server'
 import { and, desc, eq, gt } from 'drizzle-orm'
 import { z } from 'zod'
 import { getTranslations } from 'next-intl/server'
-import { auth } from '@/lib/auth'
+import { auth, authBaseURL } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { deviceTokens, devices } from '@/lib/db/schema'
 import { hashDeviceToken, newDeviceToken } from '@/lib/device-link'
-import { firstLine, parseSshTarget, rsync, sshRun } from '@/lib/ssh'
+import { firstLine, listSshHosts, parseSshTarget, rsync, sshRun } from '@/lib/ssh'
 import { routing } from '@/i18n/routing'
 
 export const dynamic = 'force-dynamic'
@@ -28,6 +28,23 @@ interface StepEvent {
 }
 
 /**
+ * The server's SSH keys must only reach machines an administrator configured,
+ * not any host an authenticated user types into the form. `~/.ssh/config`
+ * hosts are the normal path; `ORVILO_SSH_HOSTS` is the explicit override for
+ * deployments that keep config elsewhere. The manual token flow stays
+ * available for arbitrary machines.
+ */
+async function isAllowedSshHost(hostname: string): Promise<boolean> {
+  const allowlist = (process.env.ORVILO_SSH_HOSTS ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+  if (allowlist.includes(hostname)) return true
+  const hosts = await listSshHosts()
+  return hosts.some((host) => host.alias === hostname || host.hostName === hostname)
+}
+
+/**
  * Connects a remote machine over SSH: log in, check what it has, copy the
  * daemon there, install it, start it, and wait for the device to appear.
  * Every step is streamed as one JSON line so the dialog can show progress the
@@ -46,8 +63,13 @@ export async function POST(request: Request) {
   const t = await getTranslations({ locale, namespace: 'Devices.connect' })
   const target = parseSshTarget(host, user)
   if (!target) return NextResponse.json({ error: 'Invalid host.' }, { status: 400 })
+  const requestedHost = host.split(':')[0]
+  if (!(await isAllowedSshHost(requestedHost))) {
+    return NextResponse.json({ error: 'Host is not in the server SSH allowlist.' }, { status: 403 })
+  }
   // The origin goes into a remote shell command, so it must be a plain URL.
-  const origin = new URL(request.url).origin
+  // Take it from configured auth settings, never the request Host header.
+  const origin = authBaseURL ?? new URL(request.url).origin
   if (!/^https?:\/\/[A-Za-z0-9.-]+(?::\d{1,5})?$/.test(origin)) {
     return NextResponse.json({ error: 'Invalid server origin.' }, { status: 400 })
   }

@@ -36,6 +36,10 @@ const META = `<meta http-equiv="Content-Security-Policy" content="${DIRECTIVES.j
  * headers are not applied (the browser shim's blob: URL). Policies only add
  * up: nothing later in the page can loosen it. Goes after a leading doctype
  * so the page keeps standards mode.
+ *
+ * A meta CSP is defense-in-depth, not isolation: it cannot sandbox the page.
+ * Callers must still load previews through `orvilo-preview:` or an iframe with
+ * `sandbox="allow-scripts"` and no `allow-same-origin`.
  */
 export function withPreviewCsp(html: string): string {
   const doctype = /^\s*<!doctype[^>]*>/i.exec(html)?.[0] ?? ""
