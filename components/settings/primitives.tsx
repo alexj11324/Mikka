@@ -32,7 +32,7 @@ export function SettingsSection({
         </div>
         {action}
       </header>
-      <div className="overflow-hidden rounded-xl border bg-card px-5">
+      <div className="overflow-hidden rounded-2xl border bg-card">
         <div className="divide-y divide-border">{children}</div>
       </div>
     </section>
@@ -56,7 +56,7 @@ export function SettingRow({
   children?: ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="text-sm font-medium">{title}</span>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
