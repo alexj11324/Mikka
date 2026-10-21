@@ -29,6 +29,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:ui-policy
       - run: pnpm test:csv
+      - run: pnpm test:settings
       - name: Audit business UI composition
         run: pnpm --silent lint:ui --json > ui-audit.json
       - name: Show audit summary

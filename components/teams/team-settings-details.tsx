@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import { SettingsLink as Link } from '@/components/settings/settings-link'
+import { pushSettingsHistory } from '@/lib/settings-navigation'
 import { useRouter } from 'next/navigation'
 import { useSWRConfig } from 'swr'
 import { ArrowUpRight, Bot, Box, ChartNoAxesCombined, CheckCircle2, ChevronLeft, ChevronRight, CircleDot, CircleHelp, CirclePlay, Globe2, Layers, MessageSquareMore, Repeat2, Settings, Tags, Users, type LucideIcon } from 'lucide-react'
@@ -43,7 +44,7 @@ const sections = [
 function SettingsRows({ rows }: { rows: SettingsRow[] }) {
   const release = useFeatureAvailability('teamSettings')
   return <ItemGroup className="gap-0 rounded-xl border bg-card px-4 sm:px-5">{rows.map(row => <div key={row.title} role="listitem">
-    <Item render={row.href && (!row.unavailable || release.enabled) ? <Link href={row.href} aria-label={row.label} /> : undefined} data-feature-flag={row.unavailable ? release.key : undefined} aria-disabled={row.unavailable && !release.enabled || undefined} title={row.unavailable ? release.reason : undefined} className="min-h-18 flex-nowrap gap-3 rounded-none px-0 py-4">
+    <Item render={row.href && (!row.unavailable || release.enabled) ? <Link href={row.href} aria-label={row.label} workspaceId={new URL(row.href, 'https://settings.invalid').searchParams.get('workspace') ?? undefined} /> : undefined} data-feature-flag={row.unavailable ? release.key : undefined} aria-disabled={row.unavailable && !release.enabled || undefined} title={row.unavailable ? release.reason : undefined} className="min-h-18 flex-nowrap gap-3 rounded-none px-0 py-4">
       {row.icon && <ItemMedia variant="icon" className="size-9 rounded-lg bg-muted text-muted-foreground"><row.icon aria-hidden="true" /></ItemMedia>}
       <ItemContent className="min-w-0"><ItemTitle lang="en">{row.title}</ItemTitle>{row.description && <ItemDescription lang="en">{row.description}</ItemDescription>}</ItemContent>
       <ItemActions className="max-w-24 shrink-0 sm:max-w-none">{row.action ?? <>{(row.status || row.unavailable) && <span className="text-right text-xs text-muted-foreground sm:text-sm">{row.status ?? '暂未开放'}</span>}{row.href && <ChevronRight className="shrink-0 text-muted-foreground" aria-hidden="true" />}</>}</ItemActions>
@@ -68,12 +69,12 @@ export function TeamSettingsDetails({ team }: { team: Team }) {
       if (!result.ok) { setLeaveError(result.error); return }
       setConfirmLeave(false)
       await Promise.allSettled([mutate('teams'), mutate(['team-directory', team.workspaceId])])
-      router.push(directoryHref)
+      if (!pushSettingsHistory(directoryHref, team.workspaceId)) router.push(directoryHref)
     } catch { setLeaveError('退出失败，请重试。') }
     finally { setLeaving(false) }
   }
   return <section className="flex flex-col gap-8" aria-label={`${team.name} 团队设置`}>
-    <Link aria-label="全部团队" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'self-start')} href={directoryHref}><ChevronLeft data-icon="inline-start" /><span lang="en">Teams</span></Link>
+    <Link workspaceId={team.workspaceId} aria-label="全部团队" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'self-start')} href={directoryHref}><ChevronLeft data-icon="inline-start" /><span lang="en">Teams</span></Link>
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-12 pb-12 sm:pt-1">
       <header className="flex flex-wrap items-end justify-between gap-4 px-1 sm:px-4"><div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">{team.name}</h1><p className="text-sm text-muted-foreground" lang="en">Accessible to all workspace members</p></div><Link aria-label="团队概览" className={buttonVariants({ variant: 'ghost', size: 'sm' })} href={`/?team=${encodeURIComponent(team.id)}`}><span lang="en">Team overview</span><ChevronRight data-icon="inline-end" /></Link></header>
       <section aria-label="团队设置选项"><SettingsRows rows={[

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import {
@@ -109,8 +109,9 @@ export function MembersSettings({
   } = useSWR(
     `/api/workspace?workspace=${initial.workspace.id}`,
     fetchSettings,
-    { fallbackData: initial, revalidateOnMount: true },
+    { fallbackData: initial, revalidateOnMount: false },
   );
+  useEffect(() => { void mutate(initial, { revalidate: false }); }, [initial, mutate]);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [ascending, setAscending] = useState(true);

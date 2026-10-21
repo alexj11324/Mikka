@@ -12,7 +12,7 @@ import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 
 type Directory = Awaited<ReturnType<typeof loadTeamDirectory>>
-export function TeamMembersSettings({ team, workspaceMembers, onUpdated }: { team: Directory['teams'][number]; workspaceMembers: Directory['members']; onUpdated: () => void }) {
+export function TeamMembersSettings({ team, onUpdated }: { team: Directory['teams'][number]; onUpdated: () => void }) {
   const { data, error: readError, mutate } = useSWR(['team-members', team.id], () => listTeamMembers(team.id))
   const [adding, setAdding] = useState('')
   const [pending, setPending] = useState(false)
@@ -27,7 +27,8 @@ export function TeamMembersSettings({ team, workspaceMembers, onUpdated }: { tea
     } catch { setError('操作失败，请重试。') }
     finally { setPending(false) }
   }
-  const available = workspaceMembers.filter(member => member.status === 'active' && !data?.members.some(item => item.userId === member.userId))
+  const memberIds = new Set(data?.members.map(member => member.userId))
+  const available = data?.workspaceMembers.filter(member => !memberIds.has(member.userId)) ?? []
   return <section className="flex min-w-0 flex-col gap-6" aria-label={`${team.name} · 团队成员`}><p className="text-sm leading-relaxed text-muted-foreground">负责人管理团队。加入或退出不改变工作区内的公开访问权限；停用工作区成员会撤销访问。</p>
     {readError ? <Alert variant="destructive"><AlertDescription>成员读取失败。<Button variant="ghost" size="sm" onClick={() => void mutate()}>重试</Button></AlertDescription></Alert> : !data ? <Skeleton className="h-28 w-full" /> : <>
       {data.canManage && <FieldGroup><Field><FieldLabel htmlFor="add-team-member">添加工作区成员</FieldLabel><div className="flex flex-wrap gap-2"><NativeSelect id="add-team-member" value={adding} onChange={event => setAdding(event.target.value)} disabled={pending}><NativeSelectOption value="">选择启用中的成员</NativeSelectOption>{available.map(member => <NativeSelectOption key={member.userId} value={member.userId}>{member.name} · {member.email}</NativeSelectOption>)}</NativeSelect><Button size="sm" disabled={!adding || pending} onClick={() => void change(adding, 'add')}>添加成员</Button></div></Field></FieldGroup>}

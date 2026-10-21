@@ -1,14 +1,13 @@
 import 'server-only'
-import { headers } from 'next/headers'
+import { getSession } from '@/lib/session'
 import { and, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { issues, issueMembers } from '@/lib/db/schema'
 import { issueTeamAccess } from '@/lib/issue-team-access'
 
 export async function requireUser() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSession()
   if (!session?.user) throw new Error('请先登录。')
   return session.user
 }

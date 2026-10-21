@@ -1,12 +1,12 @@
 'use server'
 
-import { and, asc, eq, inArray, ne } from 'drizzle-orm'
+import { and, asc, count, eq, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireUser } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teams, teamMembers } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
-import { loadWorkspaceSettings, requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
+import { loadWorkspaceContext, requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { accessibleTeams, requireTeam } from '@/lib/team-access'
 
 const fields = z.object({ name: z.string().trim().min(1, '请填写团队名称。').max(100), identifier: z.string().trim().toUpperCase().regex(/^[A-Z][A-Z0-9]{1,11}$/, '标识须为 2–12 位大写字母或数字，并以字母开头。'), description: z.string().trim().max(500) })
@@ -21,12 +21,16 @@ async function result<T>(operation: () => Promise<T>) {
 }
 export async function listTeams() { return accessibleTeams((await requireUser()).id) }
 export async function loadTeamDirectory(workspaceId?: string) {
-  const settings = await loadWorkspaceSettings(workspaceId)
-  const all = (await accessibleTeams(settings.currentUserId)).filter(team => team.workspaceId === settings.workspace.id)
-  const memberships = all.length ? await workspaceDb.select({ teamId: teamMembers.teamId, userId: teamMembers.userId, role: teamMembers.role }).from(teamMembers)
-    .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, settings.workspace.id), eq(workspaceMembers.userId, teamMembers.userId), eq(workspaceMembers.status, 'active')))
-    .where(inArray(teamMembers.teamId, all.map(team => team.id))) : []
-  return { ...settings, teams: all.map(team => ({ ...team, memberCount: memberships.filter(member => member.teamId === team.id).length })) }
+  const context = await loadWorkspaceContext(workspaceId)
+  const [all, counts] = await Promise.all([
+    accessibleTeams(context.currentUserId, context.workspace.id),
+    workspaceDb.select({ teamId: teamMembers.teamId, total: count() }).from(teamMembers)
+      .innerJoin(teams, and(eq(teams.id, teamMembers.teamId), eq(teams.workspaceId, context.workspace.id)))
+      .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, context.workspace.id), eq(workspaceMembers.userId, teamMembers.userId), eq(workspaceMembers.status, 'active')))
+      .groupBy(teamMembers.teamId),
+  ])
+  const memberCounts = new Map(counts.map(row => [row.teamId, row.total]))
+  return { ...context, teams: all.map(team => ({ ...team, memberCount: memberCounts.get(team.id) ?? 0 })) }
 }
 export async function saveTeam(input: { id?: string; workspaceId: string; name: string; identifier: string; description: string }) {
   return result(async () => {
@@ -53,7 +57,10 @@ export async function listTeamMembers(id: string) {
     const members = await tx.select({ userId: workspaceMembers.userId, name: workspaceMembers.name, email: workspaceMembers.email, status: workspaceMembers.status, role: teamMembers.role }).from(teamMembers)
       .innerJoin(workspaceMembers, and(eq(workspaceMembers.userId, teamMembers.userId), eq(workspaceMembers.workspaceId, team.workspaceId)))
       .where(eq(teamMembers.teamId, id)).orderBy(asc(teamMembers.createdAt))
-    return { members, canManage: team.admin === 'admin' || team.role === 'owner' }
+    const canManage = team.admin === 'admin' || team.role === 'owner'
+    const availableMembers = canManage ? await tx.select({ userId: workspaceMembers.userId, name: workspaceMembers.name, email: workspaceMembers.email, status: workspaceMembers.status }).from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, team.workspaceId), eq(workspaceMembers.status, 'active'))).orderBy(asc(workspaceMembers.createdAt)) : []
+    return { members, canManage, workspaceMembers: availableMembers }
   })
 }
 export async function changeTeamMember(input: { teamId: string; userId?: string; action: 'join' | 'leave' | 'add' | 'remove' | 'owner' | 'member' }) {

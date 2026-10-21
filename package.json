@@ -16,7 +16,8 @@
     "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
     "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
     "test:analytics": "node --experimental-strip-types --test tests/analytics-policy.test.mjs",
-    "check": "pnpm test:ui-policy && pnpm test:csv && pnpm test:analytics && pnpm lint && pnpm typecheck",
+    "test:settings": "node --experimental-strip-types --test tests/settings-navigation.test.mjs",
+    "check": "pnpm test:ui-policy && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm lint && pnpm typecheck",
     "check:ci": "pnpm check && pnpm build && pnpm test:e2e",
     "start": "next start",
     "typecheck": "tsgo --noEmit"

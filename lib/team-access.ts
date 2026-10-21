@@ -6,10 +6,11 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { teams, teamMembers } from '@/lib/db/team-schema'
 import { WorkspaceError, type WorkspaceTransaction } from '@/lib/workspace-access'
 
-export async function accessibleTeams(userId: string) {
+export async function accessibleTeams(userId: string, workspaceId?: string) {
   return workspaceDb.select({ id: teams.id, workspaceId: teams.workspaceId, name: teams.name, identifier: teams.identifier, description: teams.description, workspaceRole: workspaceMembers.role, role: teamMembers.role })
     .from(teams).innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, teams.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
-    .leftJoin(teamMembers, and(eq(teamMembers.teamId, teams.id), eq(teamMembers.userId, userId))).orderBy(teams.createdAt)
+    .leftJoin(teamMembers, and(eq(teamMembers.teamId, teams.id), eq(teamMembers.userId, userId)))
+    .where(workspaceId ? eq(teams.workspaceId, workspaceId) : undefined).orderBy(teams.createdAt)
 }
 export async function requireTeam(tx: WorkspaceTransaction, id: string, userId: string, manage = false) {
   z.uuid().parse(id)
