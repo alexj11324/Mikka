@@ -109,6 +109,7 @@ export interface BuiltInAgentPreset {
   role: BuiltInAgentRole
   /** The row's name when seeded; the person may rename it. */
   name: string
+  /** Empty: the UI shows the role's translated summary instead. */
   description: string
   instructions: string
 }
@@ -117,19 +118,19 @@ export const BUILT_IN_AGENT_PRESETS: Record<BuiltInAgentRole, BuiltInAgentPreset
   coordinator: {
     role: 'coordinator',
     name: 'Coordinator',
-    description: 'Plans an issue, splits it into sub-issues for Workers and drives it to done.',
+    description: '',
     instructions: coordinatorInstructions,
   },
   worker: {
     role: 'worker',
     name: 'Worker',
-    description: 'Implements one issue in the repository and hands in a verified change.',
+    description: '',
     instructions: workerInstructions,
   },
   reviewer: {
     role: 'reviewer',
     name: 'Reviewer',
-    description: 'Reviews a change against its acceptance criteria and blocks only on real defects.',
+    description: '',
     instructions: reviewerInstructions,
   },
 }

@@ -1424,14 +1424,13 @@
   },
   "Agents": {
     "title": "Agent roles",
-    "description": "Coordinator, Worker and Reviewer come built in, and you can add your own roles. Pick the machine, harness and model for each one, or leave them on auto.",
+    "description": "Coordinator, Worker and Reviewer are built in, and you can add your own roles. Each role can pin the machine, harness and model it runs on, or leave them on auto.",
     "createTrigger": "New role",
     "builtInGroup": "Built-in roles",
     "customGroup": "Custom roles",
-    "customEmpty": "No custom roles yet. Choose New role and write a prompt to add one, such as a tester, a docs writer or a security reviewer.",
+    "customEmpty": "Add a custom role",
     "listError": "Could not load agents. Try again shortly.",
     "noDevicesHint": "No machine is connected yet. Connect one that runs the daemon on the Devices page before agents can run tasks.",
-    "noDescription": "No description",
     "roles": {
       "coordinator": "Coordinator",
       "worker": "Worker",
@@ -1449,7 +1448,7 @@
     "modelCustom": "Custom model…",
     "customModel": "Model name",
     "customModelPlaceholder": "e.g. claude-sonnet-4-5",
-    "autoHint": "Auto: when a run is queued, the enabled machine that is online, seen most recently and has the harness is picked; Claude Code is preferred over Codex; the model is the CLI's default. What was actually used is stored on each run.",
+    "autoHint": "Auto decides the machine and harness when a run is queued.",
     "name": "Name",
     "namePlaceholder": "e.g. Tester",
     "summary": "Summary",
@@ -1459,16 +1458,34 @@
     "instructionsCount": "{count} / {max} characters",
     "resetPrompt": "Reset to default prompt",
     "createTitle": "New custom role",
-    "createDescription": "Name the role, write its prompt, then choose the machine and model it runs on.",
     "editTitle": "Edit {name}",
-    "editDescription": "Change the role's prompt and the machine, harness and model it runs on.",
-    "edit": "Edit",
-    "editAgent": "Edit {name}",
-    "deleteAgent": "Delete {name}",
     "save": "Save",
     "create": "Create",
     "deleteTitle": "Delete {name}?",
     "deleteDescription": "Its run history is deleted with it, and this cannot be undone.",
-    "deleteConfirm": "Delete"
+    "deleteConfirm": "Delete",
+    "listLabel": "Roles",
+    "notSaved": "Not saved yet",
+    "allAuto": "Assigned automatically",
+    "autoDevice": "Any machine",
+    "autoHarness": "Any harness",
+    "autoModel": "Default model",
+    "builtInHint": "Built-in role. You can edit it but not delete it.",
+    "customHint": "Custom role. Write its prompt, then save.",
+    "runtime": "Runs on",
+    "previewLabel": "With your machines now:",
+    "previewOk": "{harness} on {device}, model {model}",
+    "cliDefault": "CLI default",
+    "preview": {
+      "noDevice": "No machine is available yet. Connect one on the Devices page",
+      "deviceUnavailable": "This machine is disabled or gone",
+      "harnessMissing": "No machine has this harness installed"
+    },
+    "roleSummary": {
+      "coordinator": "Plans an issue, hands parts to Workers and drives it to done.",
+      "worker": "Implements one issue in the repository and hands in a verified change.",
+      "reviewer": "Reviews a change against its acceptance criteria and blocks only on real defects."
+    },
+    "discard": "Discard changes"
   }
 }

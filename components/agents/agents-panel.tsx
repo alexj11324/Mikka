@@ -1,168 +1,149 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import useSWR from 'swr'
-import { Bot, Hammer, Network, Pencil, Plus, ShieldCheck, Trash2, type LucideIcon } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/reui/badge'
+import { Frame, FrameHeader, FramePanel, FrameTitle } from '@/components/reui/frame'
 import { IconTile } from '@/components/reui/icon-tile'
-import { deleteAgent, listAgents, listDevices, type AgentView, type DeviceView } from '@/app/actions/agents'
-import { isBuiltInAgentRole, type AgentRole } from '@/lib/agent-roles'
-import { useActionError } from '@/lib/use-action-error'
-import { AgentDialog, HARNESS_LABELS } from './agent-dialog'
+import { listAgents, listDevices, type AgentView, type DeviceView } from '@/app/actions/agents'
+import { isBuiltInAgentRole } from '@/lib/agent-roles'
+import { cn } from '@/lib/utils'
+import { AgentEditor, HARNESS_LABELS } from './agent-editor'
+import { ROLE_ICONS } from './role-icons'
 
-const ROLE_ICONS: Record<AgentRole, LucideIcon> = { coordinator: Network, worker: Hammer, reviewer: ShieldCheck, custom: Bot }
-
-function AgentCard({ agent, onEdit, onDelete }: { agent: AgentView; onEdit: () => void; onDelete: () => void }) {
+/** "MacBook Pro · Claude Code · opus", or one word when everything is auto. */
+function usePlacementSummary() {
   const t = useTranslations('Agents')
-  const Icon = ROLE_ICONS[agent.role] ?? Bot
-  const builtIn = isBuiltInAgentRole(agent.role)
-  const placement = [
-    { label: t('device'), value: agent.deviceId ? agent.deviceName ?? t('deviceMissing') : t('auto') },
-    { label: t('harness'), value: agent.harness ? HARNESS_LABELS[agent.harness] : t('auto') },
-    { label: t('model'), value: agent.model ?? t('auto') },
-  ]
+  return (agent: AgentView) => {
+    if (!agent.deviceId && !agent.harness && !agent.model) return t('allAuto')
+    return [
+      agent.deviceId ? agent.deviceName ?? t('deviceMissing') : t('autoDevice'),
+      agent.harness ? HARNESS_LABELS[agent.harness] : t('autoHarness'),
+      agent.model ?? t('autoModel'),
+    ].join(' · ')
+  }
+}
+
+function RoleItem({ agent, selected, onSelect }: { agent: AgentView; selected: boolean; onSelect: () => void }) {
+  const t = useTranslations('Agents')
+  const summary = usePlacementSummary()
+  const Icon = ROLE_ICONS[agent.role]
   return (
-    <div className="flex flex-col gap-3 rounded-xl border p-5">
-      <div className="flex items-start gap-3">
-        <IconTile variant="elevated" aria-hidden="true"><Icon /></IconTile>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold">{agent.name}</span>
-            <Badge variant={builtIn ? 'secondary' : 'outline'} size="sm">{t(`roles.${agent.role}`)}</Badge>
-          </span>
-          <span className="text-xs text-muted-foreground">{agent.description || t('noDescription')}</span>
-        </div>
-        <span className="flex shrink-0 items-center gap-1">
-          <Button size="xs" variant="ghost" onClick={onEdit} aria-label={t('editAgent', { name: agent.name })}>
-            <Pencil data-icon="inline-start" />
-            {t('edit')}
-          </Button>
-          {!builtIn && (
-            <Button size="icon-xs" variant="ghost" onClick={onDelete} aria-label={t('deleteAgent', { name: agent.name })}>
-              <Trash2 data-icon="inline-start" />
-            </Button>
-          )}
-        </span>
-      </div>
-      <dl className="grid gap-2 sm:grid-cols-3">
-        {placement.map(item => (
-          <div key={item.label} className="flex flex-col gap-0.5 rounded-lg bg-muted/50 px-3 py-2">
-            <dt className="text-xs text-muted-foreground">{item.label}</dt>
-            <dd className="truncate text-xs font-medium">{item.value}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
+    <Item
+      size="sm"
+      variant={selected ? 'muted' : 'default'}
+      className={cn('cursor-pointer text-left', !selected && 'hover:bg-muted/40')}
+      aria-current={selected ? 'true' : undefined}
+      render={<button type="button" onClick={onSelect} />}
+    >
+      <ItemMedia>
+        <IconTile size="sm" variant={selected ? 'elevated' : 'outline'} aria-hidden="true"><Icon /></IconTile>
+      </ItemMedia>
+      <ItemContent className="min-w-0">
+        <ItemTitle className="w-full">
+          <span className="truncate">{agent.name}</span>
+          {isBuiltInAgentRole(agent.role) && <Badge variant="secondary" size="xs">{t(`roles.${agent.role}`)}</Badge>}
+        </ItemTitle>
+        <ItemDescription className="truncate text-xs">{summary(agent)}</ItemDescription>
+      </ItemContent>
+    </Item>
   )
 }
 
 /**
- * The Agent section: the three built-in roles plus any custom ones, each with
- * the machine, harness and model it runs on. Built-in roles are created for
- * every person on first load (see `listAgents`).
+ * The Agent section: roles on the left, the selected one edited in place on
+ * the right. Coordinator, Worker and Reviewer are created for every person on
+ * first load (see `listAgents`); custom roles are added with New role.
  */
 export function AgentsPanel() {
   const t = useTranslations('Agents')
-  const commonT = useTranslations('Common')
-  const translateError = useActionError()
   const { data: agents, mutate, error } = useSWR('agents', listAgents)
   const { data: devices = [] } = useSWR<DeviceView[]>('devices', listDevices)
-  const [editing, setEditing] = useState<{ agent: AgentView | null; key: number } | null>(null)
-  const [deleting, setDeleting] = useState<AgentView | null>(null)
-  const [deleteError, setDeleteError] = useState('')
-  const [pending, startTransition] = useTransition()
-
-  function confirmDelete() {
-    if (!deleting) return
-    const target = deleting
-    setDeleteError('')
-    startTransition(async () => {
-      try {
-        const result = await deleteAgent(target.id)
-        if ('error' in result) { setDeleteError(translateError(result.error)); return }
-        setDeleting(null)
-        void mutate()
-      } catch {
-        setDeleteError(translateError('agentSaveFailed'))
-      }
-    })
-  }
+  /** An agent id, 'new' for an unsaved custom role, or null for the first role. */
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const builtIn = agents?.filter(agent => isBuiltInAgentRole(agent.role)) ?? []
   const custom = agents?.filter(agent => !isBuiltInAgentRole(agent.role)) ?? []
+  const selected = selectedId === 'new' ? null : agents?.find(agent => agent.id === selectedId) ?? agents?.[0] ?? null
+  const creating = selectedId === 'new'
 
   return (
-    <section aria-label={t('title')} className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-5 py-8">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">{t('title')}</h1>
+    <section aria-label={t('title')} className="flex w-full flex-col gap-6 px-5 py-6 md:px-10 lg:px-14 lg:py-8">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex max-w-2xl flex-col gap-1.5">
+          <h1 className="text-2xl font-medium tracking-tight">{t('title')}</h1>
           <p className="text-sm text-muted-foreground">{t('description')}</p>
         </div>
-        <Button size="sm" onClick={() => setEditing({ agent: null, key: Date.now() })}>
+        <Button
+          className="rounded-full bg-workspace-accent text-workspace-accent-foreground hover:bg-workspace-accent/90"
+          disabled={!agents}
+          onClick={() => setSelectedId('new')}
+        >
           <Plus data-icon="inline-start" />
           {t('createTrigger')}
         </Button>
       </header>
 
       {error && <p role="alert" className="text-xs text-destructive">{t('listError')}</p>}
-      {!agents && !error && (
-        <div className="flex flex-col gap-3">
-          {[0, 1, 2].map(index => <Skeleton key={index} className="h-32 rounded-xl" />)}
-        </div>
-      )}
 
-      {agents && (
-        <div className="flex flex-col gap-3">
-          <h2 className="text-xs font-medium text-muted-foreground">{t('builtInGroup')}</h2>
-          {builtIn.map(agent => (
-            <AgentCard key={agent.id} agent={agent} onEdit={() => setEditing({ agent, key: Date.now() })} onDelete={() => setDeleting(agent)} />
-          ))}
-        </div>
-      )}
+      <div className="grid items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <Frame spacing="sm" aria-label={t('listLabel')}>
+          <FrameHeader><FrameTitle className="text-xs text-muted-foreground">{t('builtInGroup')}</FrameTitle></FrameHeader>
+          <FramePanel fit className="p-1">
+            {!agents ? (
+              <div className="flex flex-col gap-1 p-1">{[0, 1, 2].map(index => <Skeleton key={index} className="h-12 rounded-lg" />)}</div>
+            ) : (
+              <ItemGroup className="gap-0.5">
+                {builtIn.map(agent => (
+                  <RoleItem key={agent.id} agent={agent} selected={!creating && selected?.id === agent.id} onSelect={() => setSelectedId(agent.id)} />
+                ))}
+              </ItemGroup>
+            )}
+          </FramePanel>
+          <FrameHeader><FrameTitle className="text-xs text-muted-foreground">{t('customGroup')}</FrameTitle></FrameHeader>
+          <FramePanel fit className="p-1">
+            {custom.length === 0 && !creating ? (
+              <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground" disabled={!agents} onClick={() => setSelectedId('new')}>
+                <Plus data-icon="inline-start" />
+                {t('customEmpty')}
+              </Button>
+            ) : (
+              <ItemGroup className="gap-0.5">
+                {custom.map(agent => (
+                  <RoleItem key={agent.id} agent={agent} selected={!creating && selected?.id === agent.id} onSelect={() => setSelectedId(agent.id)} />
+                ))}
+                {creating && (
+                  <Item size="sm" variant="muted">
+                    <ItemMedia><IconTile size="sm" variant="elevated" aria-hidden="true"><Plus /></IconTile></ItemMedia>
+                    <ItemContent><ItemTitle>{t('createTitle')}</ItemTitle><ItemDescription className="text-xs">{t('notSaved')}</ItemDescription></ItemContent>
+                  </Item>
+                )}
+              </ItemGroup>
+            )}
+          </FramePanel>
+          {devices.length === 0 && agents && (
+            <p className="px-2 pb-1 text-xs text-muted-foreground">{t('noDevicesHint')}</p>
+          )}
+        </Frame>
 
-      {agents && (
-        <div className="flex flex-col gap-3">
-          <h2 className="text-xs font-medium text-muted-foreground">{t('customGroup')}</h2>
-          {custom.length === 0 ? (
-            <p className="rounded-xl border border-dashed px-5 py-6 text-center text-xs text-muted-foreground">{t('customEmpty')}</p>
-          ) : custom.map(agent => (
-            <AgentCard key={agent.id} agent={agent} onEdit={() => setEditing({ agent, key: Date.now() })} onDelete={() => setDeleting(agent)} />
-          ))}
-        </div>
-      )}
-
-      {devices.length === 0 && agents && (
-        <p className="text-xs text-muted-foreground">{t('noDevicesHint')}</p>
-      )}
-
-      {editing && (
-        <AgentDialog
-          key={editing.key}
-          open
-          agent={editing.agent}
-          devices={devices}
-          onOpenChange={open => { if (!open) setEditing(null) }}
-          onSaved={() => { void mutate() }}
-        />
-      )}
-
-      <AlertDialog open={deleting !== null} onOpenChange={open => { if (!open) { setDeleting(null); setDeleteError('') } }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('deleteTitle', { name: deleting?.name ?? '' })}</AlertDialogTitle>
-            <AlertDialogDescription>{t('deleteDescription')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          {deleteError && <p role="alert" className="text-xs text-destructive">{deleteError}</p>}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending}>{commonT('cancel')}</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" disabled={pending} onClick={confirmDelete}>{t('deleteConfirm')}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {agents && (creating || selected) ? (
+          <AgentEditor
+            key={creating ? 'new' : selected?.id}
+            agent={creating ? null : selected}
+            devices={devices}
+            onSaved={id => { setSelectedId(id || null); void mutate() }}
+            onDeleted={() => { setSelectedId(null); void mutate() }}
+            onCancelNew={() => setSelectedId(null)}
+          />
+        ) : (
+          <Skeleton className="h-[32rem] rounded-xl" />
+        )}
+      </div>
     </section>
   )
 }
