@@ -19,7 +19,6 @@ test("旧设置预览地址跳转到真实成员设置并保留参数", async ({
 test("成员导航、邀请取消、角色选择、创建和撤销邀请、管理员保护", async ({
   page,
 }) => {
-  await register(page);
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve });
   let initialRequests = 0;
@@ -28,6 +27,7 @@ test("成员导航、邀请取消、角色选择、创建和撤销邀请、管�
     await gate;
     await route.continue();
   });
+  await register(page);
   await page.getByRole("button", { name: "邀请成员", exact: true }).click();
   try {
     await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeVisible();

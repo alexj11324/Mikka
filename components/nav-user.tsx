@@ -64,7 +64,7 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              {onSettings && <DropdownMenuItem onClick={onSettings}><Settings />设置</DropdownMenuItem>}
+              {onSettings && <DropdownMenuItem onClick={() => onSettings()}><Settings />设置</DropdownMenuItem>}
               <DropdownMenuItem onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
                 {resolvedTheme === 'dark' ? <Sun /> : <Moon />}切换明暗主题
               </DropdownMenuItem>

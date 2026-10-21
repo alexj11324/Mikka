@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound, Users } from 'lucide-react'
 import { NavUser } from '@/components/nav-user'
+import { WorkspaceSwitcher } from '@/components/workspace/workspace-switcher'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -10,7 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
 import type { WorkspaceSection } from '@/components/workspace/workspace-navigation'
 
-export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSettings, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
+export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSettings, onSignOut, signingOut, onWorkspaceChange, ...props }: React.ComponentProps<typeof Sidebar> & {
   user: { name: string; email: string; image?: string | null }
   section: WorkspaceSection
   onNavigate: (section: WorkspaceSection) => boolean
@@ -19,6 +20,7 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
   onSettings: (section?: 'preferences' | 'members', invite?: boolean) => void
   onSignOut: () => void
   signingOut: boolean
+  onWorkspaceChange: () => Promise<boolean>
 }) {
   const { setOpenMobile, open, openMobile, isMobile } = useSidebar()
   function navigate(next: WorkspaceSection) { if (onNavigate(next)) setOpenMobile(false) }
@@ -28,9 +30,7 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
     <SidebarHeader className="pb-4">
       <div className="flex items-center gap-1">
         <SidebarMenu className="min-w-0 flex-1"><SidebarMenuItem>
-          <DropdownMenu><DropdownMenuTrigger render={<SidebarMenuButton aria-label="工作区菜单" className="h-10" />}>
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">O</span><span className="flex-1 font-semibold">{WORKSPACE_NAME}</span><ChevronDown />
-          </DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup><DropdownMenuItem onClick={() => navigate('projects')}><Box />工作区项目</DropdownMenuItem><DropdownMenuItem onClick={() => navigate('team-home')}><SquareUserRound />团队主页</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
+          <WorkspaceSwitcher userKey={user.email} canLeave={onWorkspaceChange} />
         </SidebarMenuItem></SidebarMenu>
         <Button variant="ghost" size="icon-sm" aria-label="搜索任务" title="搜索任务（⌘ / Ctrl K）" onClick={() => { setOpenMobile(false); onSearch() }}><Search data-icon="inline-start" /></Button>
         <Button variant="secondary" size="icon-sm" aria-label="新建任务" title="新建任务（C）" onClick={() => { setOpenMobile(false); onCreate() }}><SquarePen data-icon="inline-start" /></Button>
@@ -60,7 +60,7 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
         <SidebarMenuItem><SidebarMenuButton onClick={() => { setOpenMobile(false); onSettings('members') }} tooltip="成员管理"><Users /><span>成员管理</span></SidebarMenuButton></SidebarMenuItem>
         <SidebarMenuItem><SidebarMenuButton onClick={() => { setOpenMobile(false); onSettings('members', true) }} tooltip="邀请成员"><SquarePen /><span>邀请成员</span></SidebarMenuButton></SidebarMenuItem>
       </SidebarMenu>
-      <NavUser user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} />
+      <NavUser user={user} onSettings={() => { setOpenMobile(false); onSettings('preferences') }} onSignOut={onSignOut} signingOut={signingOut} />
     </SidebarFooter>
     <SidebarRail aria-label="展开或收起侧栏边轨" title="展开或收起侧栏" aria-expanded={isMobile ? openMobile : open} />
   </Sidebar>

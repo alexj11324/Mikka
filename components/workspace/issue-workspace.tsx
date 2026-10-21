@@ -2,20 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
+import { useWorkspace } from '@/hooks/use-workspace'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Columns3, List, Search } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IssueBoard } from './issue-board'
 import { AppSidebar } from '@/components/app-sidebar'
 import { SettingsView } from '@/components/settings/settings-view'
 import { AppShell, AppShellContent } from '@/components/app-shell'
-import { CreateIssueDialog } from './create-issue-dialog'
 import { IssueList } from './issue-list'
 import { IssueSearch } from './issue-search'
 import { ISSUE_STATUSES, WORKSPACE_NAME, issueIdentifier, type IssueStatus, type IssueView } from './issue-properties'
 import { listIssues } from '@/app/actions/issues'
 import { authClient } from '@/lib/auth-client'
-import { TaskDetail } from './task-detail'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -25,11 +26,19 @@ import { ProjectWorkspace } from './project-workspace'
 import { WorkspaceOverview } from './workspace-overview'
 import { SECTION_TITLES, type WorkspaceSection } from './workspace-navigation'
 
+const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), {
+  loading: () => <div role="status" aria-label="正在加载任务编辑器" className="flex flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>,
+})
+const CreateIssueDialog = dynamic(() => import('./create-issue-dialog').then(module => module.CreateIssueDialog), {
+  loading: () => <p role="status" className="p-6 text-sm text-muted-foreground">正在加载新建任务…</p>,
+})
+
 export function IssueWorkspace({ user, initialIssues }: { user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
+  const { data: workspaceData } = useWorkspace(user.email)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members'; invite: boolean }>({ section: 'preferences', invite: false })
   const [boardBusy, setBoardBusy] = useState(false)
-  const { data: tasks = [], mutate, error } = useSWR('issues', listIssues, { fallbackData: initialIssues, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
+  const { data: tasks = [], mutate, error } = useSWR(['issues', user.id], listIssues, { fallbackData: initialIssues, revalidateOnMount: false, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)
   const [section, setSection] = useState<WorkspaceSection>('projects')
   const [projectId, setProjectId] = useState<string | null>(null)
@@ -123,8 +132,8 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
   const viewTitle = view === 'all' ? '全部任务' : view === 'mine' ? '我创建的' : view === 'shared' ? '协作任务' : ISSUE_STATUSES.find(status => status.value === view)?.label ?? '全部任务'
   return <AppShell>
     {settingsOpen ? <SettingsView initialSection={settingsTarget.section} inviteInitially={settingsTarget.invite} user={user} onBack={() => setSettingsOpen(false)} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
-    <AppSidebar onSettings={(section = 'preferences', invite = false) => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsTarget({ section, invite }); setSettingsOpen(true) }) }} user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
-    <AppShellContent parent={WORKSPACE_NAME} title={selected ? issueIdentifier(selected) : SECTION_TITLES[section]} actions={<Button variant="ghost" size="icon-sm" aria-label="打开全局搜索" disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
+    <AppSidebar onWorkspaceChange={async () => { if (boardBusy || leaving.current) return false; let allowed = false; await leave(() => { setSelected(null); setProjectId(null); setQuery(''); allowed = true }); return allowed }} onSettings={(section = 'preferences', invite = false) => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsTarget({ section, invite }); setSettingsOpen(true) }) }} user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
+    <AppShellContent parent={workspaceData?.workspace.name ?? '工作区'} title={selected ? issueIdentifier(selected) : SECTION_TITLES[section]} actions={<Button variant="ghost" size="icon-sm" aria-label="打开全局搜索" disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {error && <p role="alert" className="px-6 py-2 text-xs text-destructive">列表更新失败，已保留上次结果。</p>}
       {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} /> : isProjects ? <ProjectWorkspace projects={projects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? WORKSPACE_NAME : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create('todo')} onUpdated={() => { void refreshProjects() }} /> : isOverview ? <WorkspaceOverview section={section} counts={counts} projectCount={projects.length} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : <>

@@ -10,6 +10,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { WorkspaceSettings } from '@/components/settings/workspace-settings'
 import { MembersPanel } from '@/components/settings/members-panel'
+import { useWorkspace } from '@/hooks/use-workspace'
 
 const sections = [
   { id: 'preferences', title: '偏好设置', group: '个人', icon: SlidersHorizontal, description: '让 Orvilo 更符合你的工作习惯。' },
@@ -23,13 +24,14 @@ function SettingRow({ title, description, children }: { title: string; descripti
 }
 
 export function SettingsView({ user, onBack, onSignOut, signingOut, accountError, initialSection = 'preferences', inviteInitially = false, workspaceId }: { user: { name: string; email: string }; onBack: () => void; onSignOut: () => void; signingOut: boolean; accountError: string; initialSection?: 'preferences' | 'members'; inviteInitially?: boolean; workspaceId?: string }) {
+  const { data: workspaceData } = useWorkspace(user.email, workspaceId)
   const [section, setSection] = useState<(typeof sections)[number]['id']>(initialSection)
   const [query, setQuery] = useState('')
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
   const { setOpenMobile } = useSidebar()
-  const current = sections.find(item => item.id === section)!
+  const current = sections.find(item => item.id === section) ?? sections[0]
   const filtered = sections.filter(item => `${item.title} ${item.group}`.includes(query.trim()))
   return <>
     <Sidebar variant="inset">
@@ -47,13 +49,13 @@ export function SettingsView({ user, onBack, onSignOut, signingOut, accountError
       <SidebarFooter><NavUser user={user} onSignOut={onSignOut} signingOut={signingOut} /></SidebarFooter>
       <SidebarRail />
     </Sidebar>
-    <AppShellContent parent="设置" title={current.title}>
+    <AppShellContent parent={workspaceData?.workspace.name ?? '设置'} title={current.title}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-6 py-10 sm:px-10 sm:py-16">
         <div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">{current.title}</h1><p className="text-sm text-muted-foreground">{current.description}</p></div>
         {accountError && <p role="alert" className="text-sm text-destructive">{accountError}</p>}
         {section === 'preferences' && <section className="flex flex-col gap-3" aria-labelledby="appearance-heading"><h2 id="appearance-heading" className="text-sm font-medium">外观</h2><div className="rounded-xl border bg-muted/30 px-5"><SettingRow title="界面主题" description="选择浅色、深色或跟随系统。"><ToggleGroup aria-label="界面主题" variant="outline" spacing={0} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}><ToggleGroupItem value="light" aria-label="浅色"><Sun />浅色</ToggleGroupItem><ToggleGroupItem value="dark" aria-label="深色"><Moon />深色</ToggleGroupItem><ToggleGroupItem value="system" aria-label="跟随系统"><Monitor />系统</ToggleGroupItem></ToggleGroup></SettingRow><SettingRow title="界面语言" description="当前版本的显示语言。"><span className="text-muted-foreground">简体中文</span></SettingRow></div></section>}
         {section === 'profile' && <section className="flex flex-col gap-3" aria-labelledby="profile-heading"><h2 id="profile-heading" className="text-sm font-medium">账户信息</h2><div className="rounded-xl border bg-muted/30 px-5"><SettingRow title="头像" description="根据账户名称自动生成。"><Avatar className="size-10"><AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></SettingRow><SettingRow title="名称"><span>{user.name || '未设置'}</span></SettingRow><SettingRow title="电子邮箱"><span className="break-all">{user.email}</span></SettingRow></div><p className="text-xs text-muted-foreground">账户信息为只读，当前版本暂不支持在此修改。</p></section>}
-        {section === 'workspace' && <WorkspaceSettings />}
+        {section === 'workspace' && <WorkspaceSettings userKey={user.email} workspaceId={workspaceId} />}
         {section === 'members' && <MembersPanel userKey={user.email} workspaceId={workspaceId} inviteInitially={inviteInitially} />}
       </div>
     </AppShellContent>

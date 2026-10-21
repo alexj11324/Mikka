@@ -23,6 +23,36 @@ async function result<T>(operation: () => Promise<T>) {
   }
 }
 
+async function saveWorkspaceSelection(workspaceId: string) {
+  ;(await cookies()).set('orvilo-workspace', workspaceId, { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' : 'lax', secure: true, path: '/', maxAge: 31536000 })
+}
+
+export async function switchWorkspace(workspaceId: string) {
+  return result(async () => {
+    const user = await requireUser()
+    z.uuid().parse(workspaceId)
+    const [membership] = await workspaceDb.select({ id: workspaceMembers.workspaceId }).from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'))).limit(1)
+    if (!membership) throw new WorkspaceError('没有访问此工作区的权限。')
+    await saveWorkspaceSelection(workspaceId)
+    return { workspaceId }
+  })
+}
+
+export async function createWorkspace(name: string) {
+  return result(async () => {
+    const user = await requireUser()
+    const parsedName = z.string().trim().min(1).max(120).parse(name)
+    const workspaceId = crypto.randomUUID()
+    await workspaceDb.transaction(async tx => {
+      await tx.insert(workspaces).values({ id: workspaceId, userId: user.id, name: parsedName })
+      await tx.insert(workspaceMembers).values({ workspaceId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: 'admin' })
+    })
+    await saveWorkspaceSelection(workspaceId)
+    return { workspaceId }
+  })
+}
+
 export async function createWorkspaceInvitation(input: { workspaceId: string; emails: string[]; role: string }) {
   return result(async () => {
     const user = await requireUser()
