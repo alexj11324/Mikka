@@ -22,6 +22,6 @@ export type IssueView = 'all' | 'mine' | 'shared' | IssueStatus
 export const WORKSPACE_NAME = 'Orvilo3'
 export const WORKSPACE_SLUG = 'orvilo3'
 
-export function issueIdentifier(id: string) {
-  return `ORV-${id.slice(0, 6).toUpperCase()}`
+export function issueIdentifier(number: number | undefined) {
+  return number ? `ORV-${number}` : '正在分配编号'
 }

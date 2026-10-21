@@ -11,8 +11,8 @@ import { WORKSPACE_NAME, issueIdentifier } from './issue-properties'
 
 export type IssueDetailNavigation = { index: number; total: number; onOpen: (offset: -1 | 1) => void }
 
-export function IssueDetailHeader({ id, title, saveLabel, saved, pending, documentTools, navigation, onDocumentTools, onHistory, onMembers, onClose }: {
-  id: string; title: string; saveLabel: string; saved: boolean; pending: boolean; documentTools: boolean
+export function IssueDetailHeader({ number, title, saveLabel, saved, pending, documentTools, navigation, onDocumentTools, onHistory, onMembers, onClose }: {
+  number: number | undefined; title: string; saveLabel: string; saved: boolean; pending: boolean; documentTools: boolean
   navigation: IssueDetailNavigation
   onDocumentTools: () => void; onHistory: () => void; onMembers: () => void; onClose: () => void
 }) {
@@ -25,7 +25,7 @@ export function IssueDetailHeader({ id, title, saveLabel, saved, pending, docume
         <BreadcrumbSeparator className="hidden md:block" />
         <BreadcrumbItem className="hidden shrink-0 sm:inline-flex"><Button variant="ghost" size="xs" disabled={pending} onClick={onClose}>任务</Button></BreadcrumbItem>
         <BreadcrumbSeparator className="hidden sm:block" />
-        <BreadcrumbItem className="min-w-0"><BreadcrumbPage className="flex min-w-0 items-center gap-2"><span className="shrink-0">{issueIdentifier(id)}</span><span className="hidden truncate text-muted-foreground lg:inline" title={title}>{title}</span></BreadcrumbPage></BreadcrumbItem>
+        <BreadcrumbItem className="min-w-0"><BreadcrumbPage className="flex min-w-0 items-center gap-2"><span className="shrink-0">{issueIdentifier(number)}</span><span className="hidden truncate text-muted-foreground lg:inline" title={title}>{title}</span></BreadcrumbPage></BreadcrumbItem>
       </BreadcrumbList></Breadcrumb>
     </div>
     <div className="flex shrink-0 items-center gap-1">

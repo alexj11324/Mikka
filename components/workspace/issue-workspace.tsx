@@ -113,7 +113,7 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
   }
   const isProjects = section === 'projects' || section === 'team-projects'
   const isOverview = ['inbox', 'agent', 'views', 'team-home'].includes(section)
-  const filtered = tasks.filter(task => (view === 'all' || (view === 'mine' ? task.ownerId === user.id : view === 'shared' ? task.ownerId !== user.id : task.status === view)) && `${issueIdentifier(task.id)} ${task.title}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const filtered = tasks.filter(task => (view === 'all' || (view === 'mine' ? task.ownerId === user.id : view === 'shared' ? task.ownerId !== user.id : task.status === view)) && `${issueIdentifier(task.metadata.number)} ${task.title}`.toLowerCase().includes(query.trim().toLowerCase()))
   const counts: Record<IssueView, number> = { all: tasks.length, mine: 0, shared: 0, backlog: 0, todo: 0, doing: 0, review: 0, done: 0, canceled: 0, duplicate: 0 }
   for (const task of tasks) {
     if (ISSUE_STATUSES.some(status => status.value === task.status)) counts[task.status as IssueStatus]++

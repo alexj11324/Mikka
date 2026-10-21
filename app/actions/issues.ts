@@ -9,6 +9,8 @@ import { issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { issueChecklist } from '@/lib/issue-checklist'
 import type { JSONContent } from '@tiptap/react'
+import { issueWithMetadata, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { allocateIssueNumbers, ensureIssueNumbers } from '@/lib/issue-numbering'
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -28,10 +30,20 @@ const inputSchema = z.object({
 export async function listIssues() {
   const userId = await getUserId()
   const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))).orderBy(desc(issues.updatedAt)).limit(100)
-  return rows.map(({ content, ...issue }) => ({ ...issue, checklist: issueChecklist(content) }))
+  const ownersWithoutNumbers = [...new Set(rows.filter(row => !readIssueMetadata(row.content).number).map(row => row.ownerId))]
+  if (ownersWithoutNumbers.length) {
+    for (const ownerId of ownersWithoutNumbers) await ensureIssueNumbers(ownerId)
+    return listIssues()
+  }
+  return rows.map(({ content, ...issue }) => ({ ...issue, metadata: readIssueMetadata(content), checklist: issueChecklist(content) }))
 }
 export async function getIssue(id: string) {
-  return (await requireIssueAccess(id)).issue
+  let { issue } = await requireIssueAccess(id)
+  if (!readIssueMetadata(issue.content).number) {
+    await ensureIssueNumbers(issue.userId)
+    issue = (await requireIssueAccess(id)).issue
+  }
+  return issueWithMetadata(issue)
 }
 export async function saveIssue(input: { id?: string; revision?: number; title: string; content: JSONContent; status: string; priority: string }) {
   const userId = await getUserId()
@@ -48,11 +60,13 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         if (!latest) return { error: '任务不存在或没有访问权限。' }
         ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
       } else {
-        ;[issue] = await tx.insert(issues).values({ ...parsed.data, id, userId, revision: 1 }).returning()
+        const number = await allocateIssueNumbers(tx, userId)
+        const metadata = { ...readIssueMetadata({ type: 'doc' }), number }
+        ;[issue] = await tx.insert(issues).values({ ...parsed.data, content: withIssueMetadata(parsed.data.content, metadata), id, userId, revision: 1 }).returning()
       }
       if (!issue) return { error: '此任务已被更新或无访问权限。草稿已保留，请重新打开最新版本后再编辑。' }
       await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
-      return { issue }
+      return { issue: issueWithMetadata(issue) }
     })
   } catch (error) {
     console.error('保存任务失败', error instanceof Error ? error.message : 'database error')

@@ -17,7 +17,7 @@
     "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
     "check": "pnpm test:ui-policy && pnpm test:csv && pnpm lint && pnpm typecheck",
     "check:ci": "pnpm check && pnpm build && pnpm test:e2e",
-    "test:issues": "node --test scripts/issue-checklist.test.mjs",
+    "test:issues": "node --test scripts/issue-checklist.test.mjs scripts/issue-metadata.test.mjs",
     "start": "next start",
     "typecheck": "tsgo --noEmit"
   },

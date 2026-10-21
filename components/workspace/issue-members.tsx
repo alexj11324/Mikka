@@ -19,7 +19,7 @@ import { Spinner } from '@/components/ui/spinner'
 
 type Member = Awaited<ReturnType<typeof listMembers>>['owner']
 
-export function IssueMembers({ id }: { id: string }) {
+export function IssueMembers({ id, onChanged }: { id: string; onChanged?: () => Promise<void> }) {
   const { data, error, isValidating, mutate } = useSWR(['members', id], () => listMembers(id), { refreshInterval: 10000 })
   const [email, setEmail] = useState('')
   const [query, setQuery] = useState('')
@@ -44,6 +44,7 @@ export function IssueMembers({ id }: { id: string }) {
       await mutate(current => current ? { ...current, members: [...current.members.filter(item => item.id !== member.id), member] } : current, { revalidate: false })
       setEmail(''); setQuery(''); setMessage('成员已添加，对方登录后可在「协作任务」中访问此任务。')
       void mutate().catch(() => {})
+      await onChanged?.()
     } catch { setInviteError('添加失败，请稍后重试。') }
     finally { busy.current = false; setPending(false) }
   }
@@ -58,6 +59,7 @@ export function IssueMembers({ id }: { id: string }) {
       setMessage(`已移除 ${removing.name || removing.email} 的访问权限。`)
       setRemoving(null)
       void mutate().catch(() => {})
+      await onChanged?.()
     } catch { setRemoveError('移除失败，请稍后重试。') }
     finally { busy.current = false; setPending(false) }
   }
