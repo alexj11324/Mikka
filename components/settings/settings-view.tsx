@@ -9,7 +9,7 @@ import { NavUser } from '@/components/nav-user'
 import { Separator } from '@/components/ui/separator'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
+import { WORKSPACE_NAME, WORKSPACE_SLUG } from '@/components/workspace/issue-properties'
 
 const sections = [
   { id: 'preferences', title: '偏好设置', group: '个人', icon: SlidersHorizontal, description: '让 Orvilo 更符合你的工作习惯。' },
@@ -50,7 +50,7 @@ export function SettingsView({ user, onBack, onSignOut, signingOut, accountError
         {accountError && <p role="alert" className="text-sm text-destructive">{accountError}</p>}
         {section === 'preferences' && <section className="flex flex-col gap-3" aria-labelledby="appearance-heading"><h2 id="appearance-heading" className="text-sm font-medium">外观</h2><div className="rounded-xl border bg-muted/30 px-5"><SettingRow title="界面主题" description="选择浅色、深色或跟随系统。"><ToggleGroup aria-label="界面主题" variant="outline" spacing={0} value={theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}><ToggleGroupItem value="light" aria-label="浅色"><Sun />浅色</ToggleGroupItem><ToggleGroupItem value="dark" aria-label="深色"><Moon />深色</ToggleGroupItem><ToggleGroupItem value="system" aria-label="跟随系统"><Monitor />系统</ToggleGroupItem></ToggleGroup></SettingRow><Separator /><SettingRow title="界面语言" description="当前版本的显示语言。"><span className="text-muted-foreground">简体中文</span></SettingRow></div></section>}
         {section === 'profile' && <section className="flex flex-col gap-3" aria-labelledby="profile-heading"><h2 id="profile-heading" className="text-sm font-medium">账户信息</h2><div className="rounded-xl border bg-muted/30 px-5"><SettingRow title="头像" description="根据账户名称自动生成。"><Avatar className="size-10"><AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></SettingRow><Separator /><SettingRow title="名称"><span>{user.name || '未设置'}</span></SettingRow><Separator /><SettingRow title="电子邮箱"><span className="break-all">{user.email}</span></SettingRow></div><p className="text-xs text-muted-foreground">账户信息为只读，当前版本暂不支持在此修改。</p></section>}
-        {section === 'workspace' && <section className="flex flex-col gap-3" aria-labelledby="workspace-heading"><h2 id="workspace-heading" className="text-sm font-medium">基本信息</h2><div className="rounded-xl border bg-muted/30 px-5"><SettingRow title="工作区名称"><span>{WORKSPACE_NAME}</span></SettingRow><Separator /><SettingRow title="用途"><span className="text-muted-foreground">任务与文档</span></SettingRow></div><p className="text-xs text-muted-foreground">工作区信息由应用统一配置，当前为只读。</p></section>}
+        {section === 'workspace' && <section className="flex flex-col gap-3" aria-labelledby="workspace-heading"><h2 id="workspace-heading" className="text-sm font-medium">基本信息</h2><div className="rounded-xl border bg-muted/30 px-5"><SettingRow title="工作区名称"><span>{WORKSPACE_NAME}</span></SettingRow><Separator /><SettingRow title="Slug" description="工作区的 URL 标识。当前仅展示，尚未用于路由。"><code>{WORKSPACE_SLUG}</code></SettingRow><Separator /><SettingRow title="用途"><span className="text-muted-foreground">任务与文档</span></SettingRow></div><p className="text-xs text-muted-foreground">工作区信息由应用统一配置，当前为只读。</p></section>}
       </div>
     </AppShellContent>
   </>
