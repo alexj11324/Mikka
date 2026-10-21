@@ -35,9 +35,10 @@ function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () =>
 }
 
 export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
-  const { data, error, mutate } = useSWR(['issue', id], () => getIssue(id), { revalidateOnFocus: false })
+  const [loadedId, setLoadedId] = useState<string | null>(null)
+  const { data, error, mutate } = useSWR(['issue', id], () => getIssue(id), { revalidateOnFocus: false, revalidateOnMount: true, dedupingInterval: 0, onSuccess: () => setLoadedId(id) })
   if (error) return <UnavailableIssue id={id} onRetry={() => { void mutate() }} onClose={props.onClose} />
-  if (!data) return <div role="status" aria-label="正在读取任务" className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div>
+  if (!data || loadedId !== id) return <div role="status" aria-label="正在读取任务" className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div>
   return <TaskForm key={id} initial={data} {...props} />
 }
 
