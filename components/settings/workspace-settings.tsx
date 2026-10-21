@@ -23,7 +23,7 @@ export function WorkspaceSettings() {
       <Separator />
       <Field data-invalid={invalidSlug || undefined} className="py-5 sm:flex-row sm:items-center sm:justify-between">
         <FieldLabel htmlFor="workspace-url">URL</FieldLabel>
-        <div className="flex w-full flex-col gap-2 sm:w-72">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:max-w-md sm:flex-1">
           <InputGroup>
             <InputGroupAddon><InputGroupText>{host}/</InputGroupText></InputGroupAddon>
             <InputGroupInput id="workspace-url" aria-describedby="workspace-url-help" aria-invalid={invalidSlug} value={slug} maxLength={48} autoCapitalize="none" spellCheck={false} onChange={event => setSlug(event.target.value)} />
