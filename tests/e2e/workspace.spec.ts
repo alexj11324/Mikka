@@ -62,7 +62,7 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   const title = `按钮回归 ${randomUUID()}`
   await dialog.getByLabel('任务标题', { exact: true }).fill(title)
   await dialog.getByRole('button', { name: /^任务状态/ }).click()
-  await page.getByRole('menuitem', { name: 'In Progress', exact: true }).click()
+  await page.getByRole('menuitem', { name: '进行中', exact: true }).click()
   await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
   await expect(dialog).not.toBeVisible()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true })).toBeVisible()

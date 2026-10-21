@@ -2,14 +2,17 @@
 
 import { useRef, useState, type DragEvent, type FormEvent } from "react";
 import { Copy, FileSpreadsheet, Loader2, Mail, Upload, X } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import { createWorkspaceInvitation } from "@/app/actions/workspace";
 import {
+  InvitationCsvError,
   invitationEmails,
   MAX_INVITATION_CSV_BYTES,
   MAX_INVITATION_EMAILS,
   parseInvitationCsv,
   validateInvitationEmails,
 } from "@/lib/invitation-csv";
+import { useActionError } from "@/lib/use-action-error";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -54,6 +57,10 @@ export function InviteMembersDialog({
   onOpenChange: (open: boolean) => void;
   onCreated: () => Promise<unknown>;
 }) {
+  const t = useTranslations("Invite");
+  const commonT = useTranslations("Common");
+  const format = useFormatter();
+  const translateError = useActionError();
   const [emails, setEmails] = useState("");
   const [role, setRole] = useState("member");
   const [pending, setPending] = useState(false);
@@ -66,6 +73,48 @@ export function InviteMembersDialog({
   const fileRef = useRef<HTMLInputElement>(null);
   const busy = pending || importing;
   const recipients = invitationEmails(emails);
+  const roleItems = [
+    { value: "member", label: t("roles.member") },
+    { value: "admin", label: t("roles.admin") },
+  ];
+
+  function csvErrorMessage(cause: unknown) {
+    if (!(cause instanceof InvitationCsvError)) return t("errors.readFailed");
+    switch (cause.code) {
+      case "emailRequired":
+        return t("errors.emailRequired");
+      case "tooManyEmails":
+        return t("errors.tooManyEmails", {
+          max: cause.params.max ?? MAX_INVITATION_EMAILS,
+          count: cause.params.count ?? 0,
+        });
+      case "invalidEmails":
+        return t("errors.invalidEmails", {
+          emails: format.list(cause.params.emails ?? [], {
+            type: "conjunction",
+          }),
+        });
+      case "csvQuote":
+        return t("errors.csvQuote", { line: cause.params.line ?? 0 });
+      case "csvUnclosedQuote":
+        return t("errors.csvUnclosedQuote");
+      case "csvEmpty":
+        return t("errors.csvEmpty");
+      case "csvMissingHeader":
+        return t("errors.csvMissingHeader");
+      case "csvHeaderOnly":
+        return t("errors.csvHeaderOnly");
+      case "csvInvalidRows":
+        return t("errors.csvInvalidRows", {
+          lines: format.list(
+            (cause.params.lines ?? []).map(String),
+            { type: "conjunction" },
+          ),
+        });
+      default:
+        return t("errors.readFailed");
+    }
+  }
 
   async function importFile(files: File[]) {
     if (busy) return;
@@ -73,12 +122,12 @@ export function InviteMembersDialog({
     setError("");
     setNotice("");
     if (files.length !== 1 || !files[0].name.toLowerCase().endsWith(".csv")) {
-      setError("请选择一个 .csv 文件。");
+      setError(t("errors.notCsv"));
       return;
     }
     const file = files[0];
     if (file.size > MAX_INVITATION_CSV_BYTES) {
-      setError("CSV 文件不能超过 1 MB。");
+      setError(t("errors.fileTooLarge"));
       return;
     }
     setImporting(true);
@@ -94,14 +143,19 @@ export function InviteMembersDialog({
       setEmails(merged.join("\n"));
       setFileName(file.name);
       setNotice(
-        `已导入 ${parsed.emails.length} 个有效邮箱${duplicates ? `，已去重 ${duplicates} 个` : ""}；共 ${merged.length} 位待邀请。`,
+        duplicates
+          ? t("importedDuplicates", {
+              count: parsed.emails.length,
+              duplicates,
+              total: merged.length,
+            })
+          : t("imported", {
+              count: parsed.emails.length,
+              total: merged.length,
+            }),
       );
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "文件读取失败，请使用 UTF-8 编码的 CSV 文件。",
-      );
+      setError(csvErrorMessage(cause));
     } finally {
       setImporting(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -120,7 +174,11 @@ export function InviteMembersDialog({
     try {
       validateInvitationEmails(recipients);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "请检查邮箱地址。");
+      setError(
+        cause instanceof InvitationCsvError
+          ? csvErrorMessage(cause)
+          : t("errors.checkEmails"),
+      );
       return;
     }
     setPending(true);
@@ -130,12 +188,12 @@ export function InviteMembersDialog({
         emails: recipients,
         role,
       });
-      if (!result.ok) {
-        setError(result.error);
+      if (!Array.isArray(result)) {
+        setError(translateError(result.error));
         return;
       }
       setLinks(
-        result.data.map((link) => ({
+        result.map((link) => ({
           email: link.email,
           url: new URL(link.path, window.location.origin).href,
         })),
@@ -143,12 +201,10 @@ export function InviteMembersDialog({
       try {
         await onCreated();
       } catch {
-        setNotice(
-          "邀请已创建，但列表刷新失败。请关闭弹窗后刷新页面，不要重复创建。",
-        );
+        setNotice(t("refreshFailed"));
       }
     } catch {
-      setError("邀请未完成，请稍后重试。");
+      setError(t("errors.createFailed"));
     } finally {
       setPending(false);
     }
@@ -156,9 +212,9 @@ export function InviteMembersDialog({
   async function copy(url: string) {
     try {
       await navigator.clipboard.writeText(url);
-      setNotice("邀请链接已复制。");
+      setNotice(t("linkCopied"));
     } catch {
-      setNotice("自动复制不可用，请选中链接后手动复制。");
+      setNotice(t("copyManually"));
     }
   }
   function close() {
@@ -186,10 +242,10 @@ export function InviteMembersDialog({
         <DialogHeader className="mb-3 pr-7">
           <div className="flex items-center gap-2.5">
             <UserAvatar user={currentUser} size="sm" />
-            <DialogTitle>邀请成员</DialogTitle>
+            <DialogTitle>{t("title")}</DialogTitle>
           </div>
           <DialogDescription className="sr-only">
-            邀请同事加入{workspaceName}，可输入邮箱或拖入 CSV 批量导入。
+            {t("description", { workspace: workspaceName })}
           </DialogDescription>
         </DialogHeader>
         {error && (
@@ -201,11 +257,8 @@ export function InviteMembersDialog({
           <div className="flex flex-col gap-4">
             <Alert>
               <Mail />
-              <AlertTitle>已创建 {links.length} 个邀请链接</AlertTitle>
-              <AlertDescription>
-                尚未发送邮件。请将链接私下发送给对应成员；7
-                天内有效，仅限对应邮箱登录后接受。
-              </AlertDescription>
+              <AlertTitle>{t("linksCreated", { count: links.length })}</AlertTitle>
+              <AlertDescription>{t("linksDescription")}</AlertDescription>
             </Alert>
             <FieldGroup>
               {links.map((link) => (
@@ -213,7 +266,7 @@ export function InviteMembersDialog({
                   <FieldLabel>{link.email}</FieldLabel>
                   <div className="flex gap-2">
                     <Input
-                      aria-label={`${link.email} 的邀请链接`}
+                      aria-label={t("inviteLinkFor", { email: link.email })}
                       value={link.url}
                       readOnly
                       onFocus={(event) => event.currentTarget.select()}
@@ -221,7 +274,7 @@ export function InviteMembersDialog({
                     <Button
                       variant="outline"
                       size="icon"
-                      aria-label={`复制 ${link.email} 的邀请链接`}
+                      aria-label={t("copyLinkFor", { email: link.email })}
                       onClick={() => void copy(link.url)}
                     >
                       <Copy data-icon="inline-start" />
@@ -240,7 +293,7 @@ export function InviteMembersDialog({
                 className="rounded-full bg-workspace-accent text-workspace-accent-foreground hover:bg-workspace-accent/90"
                 onClick={close}
               >
-                完成
+                {t("done")}
               </Button>
             </DialogFooter>
           </div>
@@ -248,7 +301,7 @@ export function InviteMembersDialog({
           <form onSubmit={submit} className="flex flex-col gap-6">
             <FieldGroup className="gap-5">
               <Field>
-                <FieldLabel htmlFor="invite-emails">邮箱地址</FieldLabel>
+                <FieldLabel htmlFor="invite-emails">{t("emailLabel")}</FieldLabel>
                 <Textarea
                   id="invite-emails"
                   value={emails}
@@ -267,12 +320,12 @@ export function InviteMembersDialog({
                   className="min-h-24 resize-y"
                 />
                 <FieldDescription id="invite-email-help">
-                  用逗号或换行分隔，一次最多 {MAX_INVITATION_EMAILS} 人。
+                  {t("emailHelp", { max: MAX_INVITATION_EMAILS })}
                 </FieldDescription>
               </Field>
               <Field>
                 <FieldLabel htmlFor="invite-csv" className="sr-only">
-                  上传 CSV 文件
+                  {t("csv.label")}
                 </FieldLabel>
                 <Input
                   ref={fileRef}
@@ -316,9 +369,7 @@ export function InviteMembersDialog({
                   />
                   <div className="flex flex-wrap items-center justify-center gap-1 text-sm">
                     <span>
-                      {dragging
-                        ? "松开即可导入 CSV"
-                        : "将 CSV 文件拖到这里，或"}
+                      {dragging ? t("csv.dropNow") : t("csv.dropHint")}
                     </span>
                     <Button
                       type="button"
@@ -328,11 +379,11 @@ export function InviteMembersDialog({
                       disabled={busy}
                       onClick={() => fileRef.current?.click()}
                     >
-                      {importing ? "正在读取…" : "选择文件"}
+                      {importing ? t("csv.reading") : t("csv.chooseFile")}
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    支持 email / 邮箱列 · UTF-8 · 最大 1 MB
+                    {t("csv.hint")}
                   </p>
                 </div>
                 {fileName && (
@@ -342,7 +393,7 @@ export function InviteMembersDialog({
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      aria-label="清空导入邮箱"
+                      aria-label={t("csv.clear")}
                       disabled={busy}
                       onClick={() => {
                         setEmails("");
@@ -362,23 +413,20 @@ export function InviteMembersDialog({
                 )}
               </Field>
               <Field>
-                <FieldLabel htmlFor="invite-role">工作区角色</FieldLabel>
+                <FieldLabel htmlFor="invite-role">{t("roleLabel")}</FieldLabel>
                 <Select
                   value={role}
                   onValueChange={(value) => setRole(value ?? "member")}
                   disabled={busy}
-                  items={[
-                    { value: "member", label: "成员" },
-                    { value: "admin", label: "管理员" },
-                  ]}
+                  items={roleItems}
                 >
                   <SelectTrigger id="invite-role" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="member">成员</SelectItem>
-                      <SelectItem value="admin">管理员</SelectItem>
+                      <SelectItem value="member">{t("roles.member")}</SelectItem>
+                      <SelectItem value="admin">{t("roles.admin")}</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -386,15 +434,13 @@ export function InviteMembersDialog({
             </FieldGroup>
             <div className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
               <Mail className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-              <p>
-                当前未接入邮件服务，将生成邮箱专属邀请链接，不会自动发送邮件。
-              </p>
+              <p>{t("noEmailService")}</p>
             </div>
             <DialogFooter className="m-0 mt-1 flex-row items-center justify-between border-0 bg-transparent p-0 sm:justify-between">
               <span className="text-xs text-muted-foreground">
                 {recipients.length
-                  ? `${recipients.length} 位待邀请`
-                  : "邀请同事一起协作"}
+                  ? t("pendingCount", { count: recipients.length })
+                  : t("inviteHint")}
               </span>
               <div className="flex items-center gap-2">
                 <Button
@@ -404,7 +450,7 @@ export function InviteMembersDialog({
                   disabled={busy}
                   onClick={close}
                 >
-                  取消
+                  {commonT("cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -419,7 +465,7 @@ export function InviteMembersDialog({
                   ) : (
                     <Upload data-icon="inline-start" />
                   )}
-                  {pending ? "正在创建…" : "创建邀请链接"}
+                  {pending ? t("creating") : t("createLinks")}
                 </Button>
               </div>
             </DialogFooter>

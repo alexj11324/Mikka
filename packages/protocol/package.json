@@ -1,0 +1,58 @@
+{
+  "name": "@mikka/protocol",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./bridge": "./src/bridge.ts",
+    "./ipc": "./src/ipc.ts",
+    "./accounts": "./src/accounts.ts",
+    "./issue-share": "./src/issue-share.ts",
+    "./auth": "./src/auth.ts",
+    "./relay": "./src/relay.ts",
+    "./relay-client": "./src/relay-client.ts",
+    "./run-transcript": "./src/run-transcript.ts",
+    "./run": "./src/run.ts",
+    "./skill": "./src/skill.ts",
+    "./skill-presets": "./src/skill-presets/index.ts",
+    "./version": "./src/version.ts",
+    "./daemon": "./src/daemon.ts",
+    "./device": "./src/device.ts",
+    "./estimates": "./src/estimates.ts",
+    "./harness": "./src/harness.ts",
+    "./orchestrator": "./src/orchestrator.ts",
+    "./cycles": "./src/cycles.ts",
+    "./plan": "./src/plan.ts",
+    "./preview": "./src/preview.ts",
+    "./profile": "./src/profile.ts",
+    "./agent-policy": "./src/agent-policy.ts",
+    "./api": "./src/api.ts",
+    "./analytics": "./src/analytics.ts",
+    "./analytics-client": "./src/analytics-client.ts",
+    "./export": "./src/export.ts",
+    "./flags": "./src/flags.ts",
+    "./git-remote": "./src/git-remote.ts",
+    "./saved-view": "./src/saved-view.ts",
+    "./integrations": "./src/integrations.ts",
+    "./roles": "./src/roles.ts",
+    "./label-colors": "./src/label-colors.ts",
+    "./members": "./src/members.ts",
+    "./collab": "./src/collab.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:changed": "vitest run --changed origin/main --passWithNoTests"
+  },
+  "dependencies": {
+    "ai": "7.0.142",
+    "semver": "7.8.5",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@mikka/config": "workspace:*",
+    "@types/semver": "7.8.0",
+    "vitest": "5.0.5"
+  }
+}

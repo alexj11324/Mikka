@@ -1,30 +1,40 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { authClient } from '@/lib/auth-client'
+import { getPathname } from '@/i18n/navigation'
 import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { SignInCard } from '@/components/blocks/auth-19/components/sign-in-card'
 import { safeAuthReturn } from '@/lib/auth-return'
+import { Button } from '@/components/ui/button'
+import { listIssues, saveIssue } from '@/app/actions/issues'
 
-export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, continueGitHub = false, callbackURL, next }: { mode: 'sign-in' | 'sign-up'; githubEnabled?: boolean; oauthFailed?: boolean; continueGitHub?: boolean; callbackURL?: string; next?: string }) {
-  const returnTo = safeAuthReturn(next)
-  const [error, setError] = useState(oauthFailed ? 'GitHub 登录未完成，可能已取消或授权已过期。请重新尝试。' : '')
-  const [notice, setNotice] = useState(continueGitHub ? '请点击下方按钮，在此标签页完成 GitHub 授权。' : '')
+export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, continueGitHub = false, callbackURL, testWorkspaceEnabled = false, next }: { mode: 'sign-in' | 'sign-up'; githubEnabled?: boolean; oauthFailed?: boolean; continueGitHub?: boolean; callbackURL?: string; testWorkspaceEnabled?: boolean; next?: string }) {
+  const t = useTranslations('Auth')
+  const locale = useLocale()
+  const returnPath = safeAuthReturn(next)
+  const home = returnPath.startsWith('/?')
+    ? `${getPathname({ locale, href: '/' })}${returnPath.slice(1)}`
+    : getPathname({ locale, href: returnPath })
+  const signIn = getPathname({ locale, href: '/sign-in' })
+  const [error, setError] = useState(oauthFailed ? t('oauthFailed') : '')
+  const [notice, setNotice] = useState(continueGitHub ? t('continueNotice') : '')
   async function signInWithGitHub() {
     if (pending || !githubEnabled) return
     if (window.self !== window.top) {
-      const tab = window.open(`/sign-in?continue=github&next=${encodeURIComponent(returnTo)}`, '_blank')
+      const tab = window.open(`${signIn}?continue=github&next=${encodeURIComponent(returnPath)}`, '_blank')
       if (tab) tab.opener = null
-      setNotice(tab ? '请在新标签页点击 GitHub 登录并完成授权；完成后可刷新此预览。' : '浏览器阻止了新标签页，请允许弹出窗口后重试。')
+      setNotice(tab ? t('tabOpened') : t('tabBlocked'))
       return
     }
     setPending(true); setError(''); setNotice('')
     try {
-      const result = await authClient.signIn.social({ provider: 'github', callbackURL: returnTo, errorCallbackURL: `/sign-in?oauth=failed&next=${encodeURIComponent(returnTo)}`, disableRedirect: true })
+      const result = await authClient.signIn.social({ provider: 'github', callbackURL: home, errorCallbackURL: `${signIn}?oauth=failed&next=${encodeURIComponent(returnPath)}`, disableRedirect: true })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
     } catch {
-      setError('暂时无法开始 GitHub 登录，请稍后重试。')
+      setError(t('githubStartFailed'))
       setPending(false)
     }
   }
@@ -38,14 +48,46 @@ export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, con
     try {
       const credentials = { email: String(data.get('email')).trim(), password: String(data.get('password')) }
       const result = registering ? await authClient.signUp.email({ ...credentials, name: String(data.get('name')).trim() }) : await authClient.signIn.email(credentials)
-      if (result.error) { setError('操作未成功，请检查填写的信息或稍后重试。'); return }
+      if (result.error) { setError(t('submitFailed')); return }
       const session = await authClient.getSession({ query: { disableCookieCache: true } })
-      if (!session.data?.user) { setError('登录已响应，但浏览器未能保持会话。请允许此预览的第三方 Cookie，或在独立标签页打开后登录。'); return }
-      window.location.replace(returnTo)
-    } catch { setError('暂时无法连接，请稍后重试。') }
+      if (!session.data?.user) { setError(t('sessionNotKept')); return }
+      window.location.replace(home)
+    } catch { setError(t('connectionFailed')) }
     finally { setPending(false) }
   }
-  return <Auth registering={registering} next={returnTo}>
-    <SignInCard registering={registering} pending={pending} githubEnabled={githubEnabled} error={error} notice={notice} callbackURL={callbackURL} next={returnTo} onSubmit={submit} onGitHubSignIn={signInWithGitHub} />
+  async function enterTestWorkspace() {
+    if (pending) return
+    setPending(true); setError(''); setNotice('')
+    try {
+      const response = await fetch('/api/test-workspace', { method: 'POST' })
+      if (!response.ok) throw new Error('Test workspace unavailable')
+      const session = await authClient.getSession({ query: { disableCookieCache: true } })
+      if (!session.data?.user) {
+        setError(t('testWorkspaceSessionFailed'))
+        return
+      }
+      const existing = await listIssues()
+      const fixtures = [
+        { title: t('testIssueLayoutTitle'), description: t('testIssueLayoutDescription') },
+        { title: t('testIssueSwitchTitle'), description: t('testIssueSwitchDescription') },
+      ]
+      for (const fixture of fixtures) {
+        if (existing.some(issue => issue.title === fixture.title)) continue
+        const result = await saveIssue({ title: fixture.title, status: 'todo', priority: 'normal', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: fixture.description }] }] } })
+        if (result.error) throw new Error('Test task initialization failed')
+      }
+      window.location.replace(home)
+    } catch {
+      setError(t('testWorkspaceFailed'))
+    } finally {
+      setPending(false)
+    }
+  }
+  return <Auth registering={registering} next={returnPath}>
+    <SignInCard registering={registering} pending={pending} githubEnabled={githubEnabled} error={error} notice={notice} callbackURL={callbackURL} next={returnPath} onSubmit={submit} onGitHubSignIn={signInWithGitHub} />
+    {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
+      <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>{t('testWorkspaceCta')}</Button>
+      <p className="text-muted-foreground text-xs">{t('testWorkspaceHint')}</p>
+    </div>}
   </Auth>
 }

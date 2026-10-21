@@ -1,3 +1,7 @@
+import createNextIntlPlugin from 'next-intl/plugin'
+
+const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   turbopack: {
@@ -9,6 +13,7 @@ const nextConfig = {
     config.resolve.alias['react-syntax-highlighter$'] = new URL('./components/workspace/agent-syntax-highlighter.tsx', import.meta.url).pathname
     return config
   },
+  transpilePackages: ['@mikka/protocol'],
   async headers() {
     return [{ source: '/(.*)', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -18,9 +23,12 @@ const nextConfig = {
       { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
     ] }]
   },
+  experimental: {
+    globalNotFound: true,
+  },
   images: {
     unoptimized: true,
   },
 }
 
-export default nextConfig
+export default withNextIntl(nextConfig)

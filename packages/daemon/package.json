@@ -1,0 +1,51 @@
+{
+  "name": "@mikka/daemon",
+  "version": "0.0.1",
+  "description": "Local Mikka daemon: runs agents through the user's own CLIs",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "mikka": "./bin/mikka.ts"
+  },
+  "exports": {
+    ".": "./src/main.ts",
+    "./cli": "./src/cli.ts",
+    "./client": "./src/rpc/client.ts",
+    "./env": "./src/env.ts",
+    "./paths": "./src/paths.ts",
+    "./http-link": "./src/server-link-http.ts",
+    "./login": "./src/login.ts",
+    "./log": "./src/log.ts",
+    "./sandbox": "./src/agents/sandbox.ts"
+  },
+  "scripts": {
+    "daemon": "tsx bin/mikka.ts daemon",
+    "dev": "tsx watch bin/mikka.ts daemon --dev --server memory",
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "codex:types": "codex app-server generate-ts --out \"${TMPDIR:-/tmp}/mikka-codex-types\" && echo \"Generated; compare v2/ with src/adapters/codex-protocol.ts\"",
+    "test:real": "MIKKA_REAL_AGENTS=${MIKKA_REAL_AGENTS:-claude_code,codex,cursor} vitest run test/real-agents.test.ts",
+    "test:changed": "vitest run --changed origin/main --passWithNoTests"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "1.9.0",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.305",
+    "@anthropic-ai/sandbox-runtime": "0.0.80",
+    "@mikka/protocol": "workspace:*",
+    "ai": "7.0.142",
+    "execa": "10.1.1",
+    "pino": "10.4.0",
+    "proper-lockfile": "4.1.2",
+    "rotating-file-stream": "3.2.10",
+    "simple-git": "4.0.2",
+    "vscode-jsonrpc": "9.0.3",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@mikka/config": "workspace:*",
+    "@types/node": "24.19.2",
+    "@types/proper-lockfile": "4.1.4",
+    "tsx": "4.23.15",
+    "vitest": "5.0.5"
+  }
+}

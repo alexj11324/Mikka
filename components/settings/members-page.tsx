@@ -1,6 +1,7 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { AppShell } from '@/components/app-shell'
 import { SettingsView } from '@/components/settings/settings-view'
 import { authClient } from '@/lib/auth-client'
@@ -8,6 +9,7 @@ import { useState } from 'react'
 
 export function MembersPageView({ user, workspaceId, inviteInitially }: { user: { name: string; email: string }; workspaceId?: string; inviteInitially: boolean }) {
   const router = useRouter()
+  const t = useTranslations('Workspace')
   const [signingOut, setSigningOut] = useState(false)
   const [error, setError] = useState('')
   async function signOut() {
@@ -20,7 +22,7 @@ export function MembersPageView({ user, workspaceId, inviteInitially }: { user: 
       router.replace('/sign-in')
       router.refresh()
     } catch {
-      setError('退出失败，请重试。')
+      setError(t('signOutFailed'))
       setSigningOut(false)
     }
   }

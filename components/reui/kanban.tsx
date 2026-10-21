@@ -202,6 +202,7 @@ function Kanban<T>({
   modifiers,
   ...props
 }: KanbanRootProps<T>) {
+  const dndContextId = React.useId()
   const columns = value
   const setColumns = onValueChange
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
@@ -639,8 +640,9 @@ function Kanban<T>({
 
   return (
     <KanbanContext.Provider value={contextValue}>
-      <DndContext
-        sensors={sensors}
+    <DndContext
+      id={dndContextId}
+      sensors={sensors}
         modifiers={modifiers}
         accessibility={accessibility}
         measuring={MEASURING_CONFIG}

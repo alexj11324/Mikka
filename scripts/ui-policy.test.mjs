@@ -133,6 +133,7 @@ test('CSS cannot bypass typography restrictions', () => {
 
 test('framework html/body shell is not mistaken for a handmade widget', () => {
   assert.deepEqual(auditSource('app/layout.tsx', '<html lang="zh-CN"><body>{children}</body></html>', policy), [])
+  assert.deepEqual(auditSource('app/[locale]/layout.tsx', '<html lang={locale}><body>{children}</body></html>', policy), [])
   assert.ok(auditSource('app/layout.tsx', '<html><body><button /></body></html>', policy).some(d => d.rule === 'components/no-handwritten-ui'))
 })
 
@@ -169,9 +170,9 @@ test('only the configured component-library directories are outside the business
 })
 
 test('lint permits imported components but fails handwritten business UI without any source lock', async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), 'orvilo-ui-policy-'))
+  const cwd = mkdtempSync(path.join(tmpdir(), 'mikka-ui-policy-'))
   const filename = 'components/example.tsx'
-  const original = 'import { Button } from "@/components/ui/button"; export const Example = () => <Button variant="outline">Save</Button>'
+  const original = 'import { Button } from "@/components/ui/button"; export const Example = ({ onSave }) => <Button variant="outline" onClick={onSave}>Save</Button>'
   const execute = async () => {
     let result
     try {
@@ -187,7 +188,7 @@ test('lint permits imported components but fails handwritten business UI without
     execFileSync('git', ['init', '--quiet'], { cwd })
     for (const library of policy.componentRoots) {
       mkdirSync(path.join(cwd, library), { recursive: true })
-      writeFileSync(path.join(cwd, library, 'example.tsx'), 'export const LibraryComponent = () => <button className="text-[13px]">Save</button>')
+      writeFileSync(path.join(cwd, library, 'example.tsx'), 'export const LibraryComponent = ({ onSave }) => <button className="text-[13px]" onClick={onSave}>Save</button>')
     }
     writeFileSync(path.join(cwd, 'ui-policy.json'), JSON.stringify(policy))
     writeFileSync(path.join(cwd, 'components.json'), JSON.stringify({ style: policy.style, iconLibrary: policy.iconLibrary.replace('-react', '') }))
@@ -207,6 +208,12 @@ test('lint permits imported components but fails handwritten business UI without
     assert.equal(styled.status, 1)
     assert.ok(styled.report.diagnostics.some(d => d.rule === 'style/no-inline-ui'))
     assert.ok(styled.report.diagnostics.some(d => d.rule === 'typography/no-inline-values'))
+    writeFileSync(path.join(cwd, filename), original)
+    writeFileSync(path.join(cwd, 'components/blocks/example.tsx'), 'export const Example = () => <Button onClick={() => {}}>Save</Button>')
+    const deadBlock = await execute()
+    assert.equal(deadBlock.status, 1)
+    assert.ok(deadBlock.report.diagnostics.some(d => d.file === 'components/blocks/example.tsx' && d.rule === 'interaction/no-placeholder-action'))
+    assert.ok(deadBlock.report.interactionFiles > 0)
   } finally {
     rmSync(cwd, { recursive: true, force: true })
   }

@@ -61,11 +61,15 @@
 --color-info: var(--info);
 --color-success-foreground: var(--success-foreground);
 --color-success: var(--success);
+--color-label-violet: var(--label-violet);
+--color-label-blue: var(--label-blue);
 }
 
 :root {
---project-action: oklch(0.56 0.17 277);
---project-action-foreground: oklch(0.985 0 0);
+  --project-action: oklch(0.56 0.17 277);
+  --project-action-foreground: oklch(0.985 0 0);
+  --label-violet: var(--color-violet-600);
+  --label-blue: var(--color-blue-600);
   --background: oklch(1 0 0);
 --foreground: oklch(0.145 0 0);
 --card: oklch(1 0 0);
@@ -91,11 +95,11 @@
 --chart-5: oklch(0.269 0 0);
 --radius: 0.625rem;
 --sidebar: oklch(0.985 0 0);
---sidebar-foreground: oklch(0.145 0 0);
+--sidebar-foreground: oklch(0.44 0 0);
 --sidebar-primary: oklch(0.205 0 0);
 --sidebar-primary-foreground: oklch(0.985 0 0);
 --sidebar-accent: oklch(0.97 0 0);
---sidebar-accent-foreground: oklch(0.205 0 0);
+--sidebar-accent-foreground: oklch(0.30 0 0);
 --sidebar-border: oklch(0.922 0 0);
 --sidebar-ring: oklch(0.708 0 0);
 --destructive-foreground: var(--color-red-800);
@@ -110,6 +114,8 @@
 }
 
 .dark {
+--label-violet: var(--color-violet-400);
+--label-blue: var(--color-blue-400);
   --background: oklch(0.145 0 0);
 --foreground: oklch(0.985 0 0);
 --card: oklch(0.205 0 0);
