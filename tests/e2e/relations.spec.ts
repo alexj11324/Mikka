@@ -83,6 +83,13 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await expect(parentSection.getByRole('button').filter({ hasText: parent })).toBeVisible()
     await parentSection.getByRole('button').filter({ hasText: parent }).click()
     await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(parent)
+    await properties(page)
+    await page.getByRole('button', { name: '任务优先级：普通优先级', exact: true }).click()
+    await page.getByRole('menuitem', { name: '高优先级', exact: true }).click()
+    await expect(page.getByRole('status').filter({ hasText: /^已自动保存$/ })).toBeVisible()
+    await page.reload()
+    await properties(page)
+    await expect(page.getByRole('button', { name: '任务优先级：高优先级', exact: true })).toBeVisible()
 
     const blocked = await chooseRelation(page, '被以下任务阻塞', blocker, true)
     await expect(blocked).not.toBeVisible()
