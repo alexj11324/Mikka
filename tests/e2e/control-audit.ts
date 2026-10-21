@@ -53,7 +53,7 @@ export async function inspectControl(control: Locator, page: Page) {
     let skip = ''
     if (element.closest('[inert], [aria-hidden="true"]')) skip = '浮层下的不可交互背景'
     else if (element.matches(':disabled, [aria-disabled="true"]')) skip = '禁用态，不可执行'
-    else if (element.matches('[aria-selected="true"], [aria-current]:not([aria-current="false"]), [data-active="true"]') || element.querySelector('[aria-label="已选中"]')) skip = '当前已选项，允许幂等'
+    else if (element.matches('[aria-selected="true"], [aria-current]:not([aria-current="false"]), [data-active]:not([data-active="false"])') || element.querySelector('[aria-label="已选中"]')) skip = '当前已选项，允许幂等'
     else if (element.getAttribute('aria-pressed') === 'true' && element.closest('[data-slot="toggle-group"]')) skip = '当前视图，允许幂等'
     else if (element.matches('button[type="submit"], input[type="submit"]')) skip = '提交由 workspace.spec.ts 和 members.spec.ts 业务断言覆盖'
     else if (label === '退出登录') skip = '退出由 workspace.spec.ts 覆盖，避免撤销后续测试会话'

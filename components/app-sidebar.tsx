@@ -40,7 +40,7 @@ export function AppSidebar({ user, view, counts, recentIssues, selected, onNavig
   onSignOut: () => void
   signingOut: boolean
 }) {
-  const { setOpenMobile } = useSidebar()
+  const { setOpenMobile, open, openMobile, isMobile } = useSidebar()
   function navigate(next: IssueView) { if (onNavigate(next)) setOpenMobile(false) }
   function create() { setOpenMobile(false); onCreate() }
   const personalItems = [
@@ -87,7 +87,7 @@ export function AppSidebar({ user, view, counts, recentIssues, selected, onNavig
         </SidebarMenu>
         <NavUser user={user} onSignOut={onSignOut} signingOut={signingOut} />
       </SidebarFooter>
-      <SidebarRail />
+      <SidebarRail aria-label="展开或收起侧栏边轨" title="展开或收起侧栏" aria-expanded={isMobile ? openMobile : open} />
     </Sidebar>
   )
 }
