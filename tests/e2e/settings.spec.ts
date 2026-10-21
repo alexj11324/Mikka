@@ -1,5 +1,65 @@
 import { test, expect, register } from './fixtures'
 
+test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立即切走', async ({ page }) => {
+  const navigations: string[] = []
+  let releaseRead!: () => void
+  let readingMembers = false
+  const waitingForData = new Promise<void>(resolve => { releaseRead = resolve })
+  await page.route('**/api/workspace*', async route => {
+    readingMembers = true
+    await waitingForData
+    await route.continue()
+  })
+  await register(page)
+  await expect(page.getByRole('button', { name: '账户菜单', exact: true })).toBeEnabled()
+  await page.route('**/*', route => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (request.method() === 'GET' && (request.headers().rsc === '1' || url.searchParams.has('_rsc'))) {
+      navigations.push(url.href)
+      return route.abort()
+    }
+    return route.continue()
+  })
+  await page.getByRole('button', { name: '账户菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '设置', exact: true }).click()
+  await expect(page.getByRole('group', { name: '界面主题', exact: true })).toBeVisible()
+  const sidebar = page.locator('[data-slot="sidebar-container"]')
+  await sidebar.getByRole('link', { name: '成员', exact: true }).click()
+  await expect.poll(() => readingMembers).toBe(true)
+  await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeVisible()
+  await expect(sidebar.getByRole('link', { name: '成员', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('status', { name: '正在读取成员', exact: true })).toBeVisible()
+  await sidebar.getByRole('link', { name: '个人资料', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '个人资料', exact: true })).toBeVisible()
+  releaseRead()
+  await sidebar.getByRole('link', { name: '成员', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: '搜索成员或邀请', exact: true })).toBeVisible()
+  await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()
+  await sidebar.getByRole('link', { name: '团队', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: '搜索团队', exact: true })).toBeVisible()
+  await sidebar.getByRole('link', { name: '成员', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: '搜索成员或邀请', exact: true })).toBeVisible()
+  await sidebar.getByRole('link', { name: '返回工作台', exact: true }).click()
+  await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeVisible()
+  expect(navigations).toEqual([])
+  await page.goBack()
+  await expect(page.getByRole('textbox', { name: '搜索成员或邀请', exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('textbox', { name: '搜索成员或邀请', exact: true })).toBeVisible()
+})
+
+test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', async ({ page }) => {
+  await register(page, '/settings/members')
+  await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()
+  await page.route('**/api/workspace?workspace=unavailable-workspace', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: '没有查看此工作区的权限。' }) }))
+  await page.evaluate(() => window.history.pushState(null, '', '/settings/members?workspace=unavailable-workspace'))
+  await expect(page.getByRole('alert')).toContainText('没有查看此工作区的权限。')
+  await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toHaveCount(0)
+  await page.goBack()
+  await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()
+})
+
 test('个人设置切换不请求服务端，并保持 URL、历史记录与跨页导航一致', async ({ page }) => {
   await register(page, '/settings?section=preferences')
   const sidebar = page.locator('[data-slot="sidebar-container"]')

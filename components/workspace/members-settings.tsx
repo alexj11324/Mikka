@@ -2,7 +2,10 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
+import useSWR, { useSWRConfig, type KeyedMutator } from "swr";
+import { fetchSettingsData, isSettingsAccessError, memberSettingsKey, settingsReadOptions } from '@/lib/settings-data';
+import { pushSettingsHistory } from '@/lib/settings-navigation';
+import { SettingsDataState } from '@/components/settings/settings-data-state';
 import {
   ArrowDown,
   ArrowUp,
@@ -69,11 +72,6 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty";
 
-async function fetchSettings(url: string): Promise<WorkspaceSettings> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("成员数据读取失败，请刷新页面确认权限。");
-  return response.json();
-}
 const date = (value: string) =>
   new Date(value).toLocaleDateString("zh-CN", {
     year: "numeric",
@@ -94,29 +92,26 @@ type Change = {
   status: "active" | "suspended";
 };
 
-export function MembersSettings({
-  initial,
-  inviteInitially,
-}: {
-  initial: WorkspaceSettings;
-  inviteInitially: boolean;
-}) {
+export function MembersSettings({ workspaceId, inviteInitially, onWorkspaceResolved }: { workspaceId?: string; inviteInitially: boolean; onWorkspaceResolved: (id: string) => void }) {
+  const { mutate: updateCache } = useSWRConfig();
+  const { data, error, mutate } = useSWR<WorkspaceSettings>(memberSettingsKey(workspaceId), fetchSettingsData<WorkspaceSettings>, settingsReadOptions);
+  useEffect(() => {
+    if (data && !workspaceId) {
+      void updateCache(`/api/workspace?workspace=${encodeURIComponent(data.workspace.id)}`, data, { revalidate: false });
+      onWorkspaceResolved(data.workspace.id);
+    }
+  }, [data, workspaceId, onWorkspaceResolved, updateCache]);
+  if (!data || isSettingsAccessError(error)) return <SettingsDataState title="成员" error={error} onRetry={() => void mutate()} />;
+  return <MembersSettingsContent key={`${data.workspace.id}-${inviteInitially}`} data={data} fetchError={Boolean(error)} mutate={mutate} inviteInitially={inviteInitially} />;
+}
+
+function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: { data: WorkspaceSettings; fetchError: boolean; mutate: KeyedMutator<WorkspaceSettings>; inviteInitially: boolean }) {
   const router = useRouter();
-  const {
-    data = initial,
-    error: fetchError,
-    mutate,
-  } = useSWR(
-    `/api/workspace?workspace=${initial.workspace.id}`,
-    fetchSettings,
-    { fallbackData: initial, revalidateOnMount: false },
-  );
-  useEffect(() => { void mutate(initial, { revalidate: false }); }, [initial, mutate]);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [ascending, setAscending] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(
-    inviteInitially && initial.role === "admin",
+    inviteInitially && data.role === "admin",
   );
   const [change, setChange] = useState<Change | null>(null);
   const [pending, setPending] = useState(false);
@@ -227,8 +222,8 @@ export function MembersSettings({
   }
   return (
     <>
-          <section aria-label="工作区成员管理" className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-8 sm:px-10 sm:py-12">
-            <header className="flex flex-wrap items-center justify-between gap-4"><div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">成员</h1><p className="text-sm text-muted-foreground">管理工作区成员、角色与邀请。</p></div><Select value={data.workspace.id} items={data.choices.map(item => ({ value: item.id, label: item.name }))} onValueChange={value => { if (value) router.push(`/settings/members?workspace=${encodeURIComponent(value)}`) }}><SelectTrigger aria-label="当前工作区"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{data.choices.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectGroup></SelectContent></Select></header>
+          <section aria-label="工作区成员管理" data-settings-state={fetchError ? 'error' : 'ready'} className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-8 sm:px-10 sm:py-12">
+            <header className="flex flex-wrap items-center justify-between gap-4"><div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">成员</h1><p className="text-sm text-muted-foreground">管理工作区成员、角色与邀请。</p></div><Select value={data.workspace.id} items={data.choices.map(item => ({ value: item.id, label: item.name }))} onValueChange={value => { if (value) { const href = `/settings/members?workspace=${encodeURIComponent(value)}`; if (!pushSettingsHistory(href)) router.push(href); } }}><SelectTrigger aria-label="当前工作区"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{data.choices.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectGroup></SelectContent></Select></header>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex w-full items-center gap-2 sm:w-auto">
                 <div className="min-w-0 flex-1 sm:w-72">

@@ -13,6 +13,7 @@
     "lint:ui": "node scripts/lint-ui.mjs",
     "test:ui-policy": "node --test scripts/ui-policy.test.mjs",
     "test:e2e": "playwright test",
+    "test:performance": "playwright test --grep @performance",
     "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
     "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
     "test:analytics": "node --experimental-strip-types --test tests/analytics-policy.test.mjs",

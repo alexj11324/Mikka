@@ -6,7 +6,9 @@ import { pushSettingsHistory } from '@/lib/settings-navigation'
 import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR, { useSWRConfig } from 'swr'
 import { ChevronLeft, Globe2, Plus } from 'lucide-react'
-import { loadTeamDirectory, changeTeamMember } from '@/app/actions/teams'
+import { changeTeamMember, type loadTeamDirectory } from '@/app/actions/teams'
+import { fetchTeamDirectory, isSettingsAccessError, settingsReadOptions, teamDirectoryKey } from '@/lib/settings-data'
+import { SettingsDataState } from '@/components/settings/settings-data-state'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -20,25 +22,34 @@ import { TeamMembersSettings } from './team-members-settings'
 import { TeamSettingsDetails } from './team-settings-details'
 
 type Directory = Awaited<ReturnType<typeof loadTeamDirectory>>
-export function TeamDirectory({ initial }: { initial: Directory }) {
+export function TeamDirectory({ workspaceId, onWorkspaceResolved }: { workspaceId?: string; onWorkspaceResolved: (id: string) => void }) {
   const router = useRouter()
   const params = useSearchParams()
   const initialTeamId = params.get('team') ?? undefined
   const createInitially = params.get('create') === '1'
   const initialView = params.get('view')
   const { mutate: refresh } = useSWRConfig()
-  const { data = initial, error: readError, mutate } = useSWR(['team-directory', initial.workspace.id], () => loadTeamDirectory(initial.workspace.id), { fallbackData: initial, revalidateOnMount: false })
-  useEffect(() => { void mutate(initial, { revalidate: false }) }, [initial, mutate])
-  function navigate(href: string) { if (!pushSettingsHistory(href, initial.workspace.id)) router.push(href) }
+  const { data, error: readError, mutate } = useSWR<Directory>(teamDirectoryKey(workspaceId), fetchTeamDirectory, settingsReadOptions)
+  useEffect(() => {
+    if (data && !workspaceId) {
+      void refresh(['team-directory', data.workspace.id], data, { revalidate: false })
+      onWorkspaceResolved(data.workspace.id)
+    }
+  }, [data, workspaceId, onWorkspaceResolved, refresh])
+  function navigate(href: string) { if (!pushSettingsHistory(href, workspaceId)) router.push(href) }
   const [query, setQuery] = useState('')
   const [view, setView] = useState('all')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   function updated() { void mutate(); void refresh('teams') }
+  if (!data || isSettingsAccessError(readError)) return <SettingsDataState title="团队" error={readError} onRetry={() => void mutate()} />
   const directoryHref = `/settings/teams?workspace=${encodeURIComponent(data.workspace.id)}`
   function teamHref(teamId: string, page?: 'general' | 'members') { return `${directoryHref}&team=${encodeURIComponent(teamId)}${page ? `&view=${page}` : ''}` }
   function createTeam() { navigate(`${directoryHref}&create=1`) }
-  function saved(teamId: string) { updated(); router.push(teamHref(teamId)) }
+  async function saved(teamId: string) {
+    try { await mutate(); void refresh('teams'); navigate(teamHref(teamId)) }
+    catch { setError('团队已保存，但目录更新失败。请重新读取团队。') }
+  }
   async function membership(teamId: string, joined: boolean) {
     if (pending) return
     setPending(true); setError('')
@@ -53,7 +64,7 @@ export function TeamDirectory({ initial }: { initial: Directory }) {
   if (initialTeamId && selectedTeam) return <div className="w-full px-4 py-4 sm:px-6">
     {initialView === 'members' ? <section className="flex flex-col gap-8"><Button variant="ghost" size="sm" className="self-start" nativeButton={false} role="link" render={<Link workspaceId={data.workspace.id} href={teamHref(selectedTeam.id)} />}><ChevronLeft data-icon="inline-start" />团队设置</Button><div className="mx-auto flex w-full max-w-3xl flex-col gap-8 pb-12 sm:pt-4"><header className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">团队成员</h1><p className="text-sm text-muted-foreground">{selectedTeam.name} · {selectedTeam.memberCount} 位成员</p></header><TeamMembersSettings key={selectedTeam.id} team={selectedTeam} onUpdated={updated} /></div></section> : <TeamSettingsDetails key={selectedTeam.id} team={selectedTeam} />}
   </div>
-  return <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-8 sm:px-10 sm:py-12">
+  return <div data-settings-state={readError ? 'error' : 'ready'} className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-8 sm:px-10 sm:py-12">
     <div className="flex flex-wrap items-center justify-between gap-4"><div className="text-sm text-muted-foreground">{data.workspace.name} · 工作区设置</div><NativeSelect aria-label="团队目录工作区" value={data.workspace.id} onChange={event => navigate(`/settings/teams?workspace=${encodeURIComponent(event.target.value)}`)}>{data.choices.map(workspace => <NativeSelectOption key={workspace.id} value={workspace.id}>{workspace.name}</NativeSelectOption>)}</NativeSelect></div>
     {initialTeamId ? <Empty><EmptyHeader><EmptyTitle>团队不存在或不可访问</EmptyTitle><EmptyDescription>请从当前工作区的团队目录重新选择。</EmptyDescription></EmptyHeader><Button variant="outline" nativeButton={false} role="link" render={<Link workspaceId={data.workspace.id} href={directoryHref} />}>查看全部团队</Button></Empty> : <section className="flex flex-col gap-6"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex flex-col gap-2"><div className="flex items-center gap-3"><h1 className="text-2xl font-semibold tracking-tight">团队</h1><Badge variant="secondary">{data.teams.length}</Badge></div><p className="max-w-xl text-sm leading-relaxed text-muted-foreground">让成员围绕共同职责协作。团队、任务与项目对本工作区启用成员公开，不对外网公开。</p></div><Button size="sm" onClick={createTeam}><Plus data-icon="inline-start" />新建团队</Button></div>
       <div className="flex flex-wrap items-center justify-between gap-3"><ToggleGroup aria-label="团队范围" variant="outline" spacing={0} value={[view]} onValueChange={values => { if (values[0]) setView(values[0]) }}><ToggleGroupItem value="all">全部团队</ToggleGroupItem><ToggleGroupItem value="mine">我加入的</ToggleGroupItem></ToggleGroup><Input aria-label="搜索团队" placeholder="搜索名称或团队标识…" className="w-full sm:w-64" value={query} onChange={event => setQuery(event.target.value)} /></div>

@@ -1,19 +1,23 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSWRConfig } from 'swr'
 import { authClient } from '@/lib/auth-client'
 import { AppShell } from '@/components/app-shell'
 import { SettingsView, type SettingsSection } from './settings-view'
+import { TeamDirectory } from '@/components/teams/team-directory'
+import { MembersSettings } from '@/components/workspace/members-settings'
+import { pushSettingsHistory } from '@/lib/settings-navigation'
 
-export function SettingsShell({ user, children }: { user: { id: string; name: string; email: string; image?: string | null }; children: ReactNode }) {
+export function SettingsShell({ user, defaultWorkspaceId, onWorkspaceResolved }: { user: { id: string; name: string; email: string; image?: string | null }; defaultWorkspaceId?: string; onWorkspaceResolved: (id: string) => void }) {
   const pathname = usePathname()
   const params = useSearchParams()
   const router = useRouter()
   const { mutate } = useSWRConfig()
   const [signingOut, setSigningOut] = useState(false)
   const [error, setError] = useState('')
+  const workspaceId = params.get('workspace') ?? defaultWorkspaceId
   const requested = params.get('section')
   const section: SettingsSection = pathname === '/settings/teams' ? 'teams' : pathname === '/settings/members' ? 'members' : requested === 'profile' || requested === 'workspace' ? requested : 'preferences'
   async function signOut() {
@@ -26,5 +30,5 @@ export function SettingsShell({ user, children }: { user: { id: string; name: st
       router.replace('/sign-in?login=1'); router.refresh()
     } catch { setError('退出失败，请稍后重试。'); setSigningOut(false) }
   }
-  return <AppShell variant="settings"><SettingsView user={user} activeSection={section} workspaceId={params.get('workspace') ?? undefined} selectedTeamId={params.get('team') ?? undefined} onBack={() => router.push(params.get('team') ? `/?team=${encodeURIComponent(params.get('team')!)}` : '/')} onSignOut={() => void signOut()} signingOut={signingOut} accountError={error}>{children}</SettingsView></AppShell>
+  return <AppShell variant="settings"><SettingsView user={user} activeSection={section} workspaceId={workspaceId} selectedTeamId={params.get('team') ?? undefined} onBack={() => pushSettingsHistory(params.get('team') ? `/?team=${encodeURIComponent(params.get('team')!)}` : '/')} onSignOut={() => void signOut()} signingOut={signingOut} accountError={error}>{section === 'teams' && <TeamDirectory key={workspaceId ?? 'default'} workspaceId={workspaceId} onWorkspaceResolved={onWorkspaceResolved} />}{section === 'members' && <MembersSettings key={`${workspaceId ?? 'default'}-${params.get('invite') ?? ''}`} workspaceId={workspaceId} inviteInitially={params.get('invite') === '1'} onWorkspaceResolved={onWorkspaceResolved} />}</SettingsView></AppShell>
 }

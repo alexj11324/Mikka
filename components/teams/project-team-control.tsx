@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import Link from 'next/link'
+import { SettingsLink as Link } from '@/components/settings/settings-link'
 import useSWR from 'swr'
 import { listTeams } from '@/app/actions/teams'
 import { listProjectTeams, setProjectTeams } from '@/app/actions/team-relations'

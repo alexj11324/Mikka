@@ -96,7 +96,12 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:setup
       - run: pnpm build
-      - run: pnpm test:e2e
+      - name: Navigation and real content ready within 1000ms (desktop + mobile, no retries)
+        run: pnpm test:performance --output=performance-results
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
+      - name: Browser functionality regression
+        run: pnpm test:e2e --grep-invert @performance
       - name: Upload browser failure evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -105,5 +110,7 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            playwright-performance-report/
+            performance-results/
           if-no-files-found: ignore
           retention-days: 7

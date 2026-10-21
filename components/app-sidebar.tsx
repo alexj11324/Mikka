@@ -3,7 +3,7 @@
 import * as React from 'react'
 import useSWR from 'swr'
 import { listTeams } from '@/app/actions/teams'
-import Link from 'next/link'
+import { SettingsLink as Link } from '@/components/settings/settings-link'
 import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound, Settings, Users } from 'lucide-react'
 import { NavUser } from '@/components/nav-user'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
@@ -19,7 +19,7 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
   onNavigate: (section: WorkspaceSection) => boolean
   onSearch: () => void
   onCreate: () => void
-  onSettings: () => void
+  onSettings: (href?: string) => void
   onSignOut: () => void
   signingOut: boolean
   teamId: string | null
@@ -36,7 +36,7 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
         <SidebarMenu className="min-w-0 flex-1"><SidebarMenuItem>
           <DropdownMenu><DropdownMenuTrigger render={<SidebarMenuButton aria-label="工作区菜单" className="h-10" />}>
             <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">O</span><span className="flex-1 font-semibold">{WORKSPACE_NAME}</span><ChevronDown />
-          </DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup><DropdownMenuItem onClick={() => navigate('projects')}><Box />工作区项目</DropdownMenuItem><DropdownMenuItem render={<Link href="/settings/teams" />}><SquareUserRound />团队管理</DropdownMenuItem><DropdownMenuItem onClick={onSettings}><Settings />设置</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
+          </DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup><DropdownMenuItem onClick={() => navigate('projects')}><Box />工作区项目</DropdownMenuItem><DropdownMenuItem render={<Link href="/settings/teams" onNavigate={event => { event.preventDefault(); onSettings('/settings/teams') }} />}><SquareUserRound />团队管理</DropdownMenuItem><DropdownMenuItem onClick={() => onSettings()}><Settings />设置</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
         </SidebarMenuItem></SidebarMenu>
         <Button variant="ghost" size="icon-sm" aria-label="搜索任务" title="搜索任务（⌘ / Ctrl K）" onClick={() => { setOpenMobile(false); onSearch() }}><Search data-icon="inline-start" /></Button>
         <Button variant="secondary" size="icon-sm" aria-label="新建任务" title="新建任务（C）" onClick={() => { setOpenMobile(false); onCreate() }}><SquarePen data-icon="inline-start" /></Button>
@@ -50,7 +50,7 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
           <SidebarMenuItem><SidebarMenuButton isActive={section === 'projects'} onClick={() => navigate('projects')}><Box /><span>项目</span></SidebarMenuButton></SidebarMenuItem>
           <SidebarMenuItem><SidebarMenuButton isActive={section === 'all-issues'} onClick={() => navigate('all-issues')}><Layers /><span>任务</span></SidebarMenuButton></SidebarMenuItem>
           <SidebarMenuItem><SidebarMenuButton isActive={section === 'views'} onClick={() => navigate('views')}><Layers /><span>视图</span></SidebarMenuButton></SidebarMenuItem>
-          <SidebarMenuItem><DropdownMenu><DropdownMenuTrigger render={<SidebarMenuButton />}><Ellipsis /><span>更多</span></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup><DropdownMenuItem onClick={() => navigate('all-issues')}><Layers />全部任务</DropdownMenuItem><DropdownMenuItem render={<a href="https://linear.app/docs/projects" target="_blank" rel="noreferrer" />}><CircleHelp />项目使用指南</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu></SidebarMenuItem>
+          <SidebarMenuItem><DropdownMenu><DropdownMenuTrigger render={<SidebarMenuButton />}><Ellipsis /><span>更多</span></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup><DropdownMenuItem onClick={() => navigate('all-issues')}><Layers />全部任务</DropdownMenuItem><DropdownMenuItem render={<a href="https://linear.app/docs/projects" target="_blank" rel="noreferrer" />}><CircleHelp />项目使��指南</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu></SidebarMenuItem>
         </SidebarMenu></CollapsibleContent>
       </SidebarGroup></Collapsible>
       <Collapsible defaultOpen className="group/teams"><SidebarGroup>
@@ -59,15 +59,15 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
           <Collapsible defaultOpen className="group/team"><CollapsibleTrigger render={<SidebarMenuButton aria-label={`展开或收起 ${team.name} 团队`} />}><SquareUserRound className="text-info-foreground" /><span>{team.name}</span><ChevronDown className="ml-auto transition-transform group-data-closed/team:-rotate-90" /></CollapsibleTrigger>
             <CollapsibleContent><SidebarMenuSub className="mx-0 ml-4 border-0 px-0">{teamItems.map(item => <SidebarMenuSubItem key={item.id}><SidebarMenuSubButton render={<Button variant="ghost" />} isActive={teamId === team.id && section === item.id} onClick={() => { if (onTeamNavigate(team.id, item.id)) setOpenMobile(false) }}><item.icon /><span>{item.title}</span></SidebarMenuSubButton></SidebarMenuSubItem>)}</SidebarMenuSub></CollapsibleContent>
           </Collapsible>
-        </SidebarMenuItem>)}<SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/teams" />}><Users /><span>浏览与管理团队</span></SidebarMenuButton></SidebarMenuItem>{teamsError && <SidebarMenuItem><SidebarMenuButton onClick={() => void refreshTeams()}>团队读取失败，重试</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></CollapsibleContent>
+        </SidebarMenuItem>)}<SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/teams" onNavigate={event => { event.preventDefault(); onSettings('/settings/teams') }} />}><Users /><span>浏览与管理团队</span></SidebarMenuButton></SidebarMenuItem>{teamsError && <SidebarMenuItem><SidebarMenuButton onClick={() => void refreshTeams()}>团队读取失败，重试</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></CollapsibleContent>
       </SidebarGroup></Collapsible>
     </SidebarContent>
     <SidebarFooter>
       <SidebarMenu>
-        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members" />} tooltip="成员管理"><Users /><span>成员管理</span></SidebarMenuButton></SidebarMenuItem>
-        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members?invite=1" />} tooltip="邀请成员"><SquarePen /><span>邀请成员</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members" onNavigate={event => { event.preventDefault(); onSettings('/settings/members') }} />} tooltip="成员管理"><Users /><span>成员管理</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members?invite=1" onNavigate={event => { event.preventDefault(); onSettings('/settings/members?invite=1') }} />} tooltip="邀请成员"><SquarePen /><span>邀请成员</span></SidebarMenuButton></SidebarMenuItem>
       </SidebarMenu>
-      <NavUser user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} />
+      <NavUser user={user} onSettings={() => onSettings()} onSignOut={onSignOut} signingOut={signingOut} />
     </SidebarFooter>
     <SidebarRail aria-label="展开或收起侧栏边轨" title="展开或收起侧栏" aria-expanded={isMobile ? openMobile : open} />
   </Sidebar>

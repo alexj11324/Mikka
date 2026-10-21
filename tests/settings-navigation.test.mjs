@@ -4,9 +4,18 @@ import { isLocalSettingsNavigation, pushSettingsHistory } from '../lib/settings-
 
 const url = path => new URL(path, 'https://orvilo.example')
 
-test('个人设置与同工作区团队子页使用即时导航', () => {
+test('工作台入口、设置跨页与团队子页均使用即时导航', () => {
   for (const [from, to, workspace] of [
+    ['/', '/settings'],
+    ['/', '/settings/members?invite=1'],
     ['/settings?section=preferences', '/settings?section=profile'],
+    ['/settings', '/settings/teams'],
+    ['/settings/teams', '/settings/members'],
+    ['/settings/teams?workspace=a', '/settings/teams?workspace=b'],
+    ['/settings/teams', '/settings/teams?workspace=a'],
+    ['/settings/members?workspace=a', '/settings/members?workspace=a&invite=1'],
+    ['/settings/teams?workspace=a&team=one', '/?team=one'],
+    ['/', '/?team=one'],
     ['/settings?section=profile', '/settings?section=workspace'],
     ['/settings/teams?workspace=a', '/settings/teams?workspace=a&create=1'],
     ['/settings/teams?workspace=a&team=one', '/settings/teams?workspace=a&team=two&view=general'],
@@ -15,19 +24,17 @@ test('个人设置与同工作区团队子页使用即时导航', () => {
   ]) assert.equal(isLocalSettingsNavigation(url(from), url(to), workspace), true)
 })
 
-test('跨页、跨工作区与不明默认工作区必须重新经过服务端', () => {
+test('认证页、未知页面及外站不绕过 Next.js 路由', () => {
   for (const [from, to] of [
-    ['/settings', '/settings/teams'],
-    ['/settings/teams', '/settings/members'],
-    ['/settings/teams?workspace=a', '/settings/teams?workspace=b'],
-    ['/settings/teams', '/settings/teams?workspace=a'],
-    ['/settings/members?workspace=a', '/settings/members?workspace=a&invite=1'],
-    ['/', '/?team=one'],
+    ['/sign-in', '/settings'],
+    ['/settings', '/sign-in'],
+    ['/acceptance', '/settings'],
+    ['/settings', '/settings/unknown'],
     ['/settings', 'https://other.example/settings'],
   ]) assert.equal(isLocalSettingsNavigation(url(from), url(to)), false)
 })
 
-test('即时导航只写入一次历史记录，跨工作区不改写 URL', t => {
+test('即时导航只写入一次历史记录，未知路径不改写 URL', t => {
   const entries = []
   const scrolls = []
   const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window')
@@ -43,7 +50,7 @@ test('即时导航只写入一次历史记录，跨工作区不改写 URL', t =>
   })
   assert.equal(pushSettingsHistory('/settings/teams?workspace=a&team=one'), true)
   assert.equal(pushSettingsHistory('/settings/teams?workspace=a&team=one'), true)
-  assert.equal(pushSettingsHistory('/settings/teams?workspace=b'), false)
+  assert.equal(pushSettingsHistory('/sign-in'), false)
   assert.deepEqual(entries, ['/settings/teams?workspace=a&team=one'])
   assert.deepEqual(scrolls, [{ top: 0 }])
 })

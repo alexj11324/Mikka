@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import { SettingsLink as Link } from '@/components/settings/settings-link'
 import useSWR from 'swr'
 import { Box, Layers, Settings2, SquareUserRound, Users } from 'lucide-react'
-import { listTeamMembers, type listTeams } from '@/app/actions/teams'
+import type { listTeams } from '@/app/actions/teams'
+import { fetchTeamMembers, settingsReadOptions, teamMembersKey } from '@/lib/settings-data'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { UserAvatar } from '@/components/user-avatar'
@@ -18,7 +19,7 @@ type Project = { id: string; name: string; summary: string }
 
 export function TeamHome({ team, projects, issueCount, onIssues, onProjects, onProject }: { team: Team; projects: Project[]; issueCount: number; onIssues: () => void; onProjects: () => void; onProject: (id: string) => void }) {
   const [tab, setTab] = useState('overview')
-  const { data, error, mutate } = useSWR(['team-members', team.id], () => listTeamMembers(team.id))
+  const { data, error, mutate } = useSWR(teamMembersKey(team.id), fetchTeamMembers, settingsReadOptions)
   const members = data?.members.filter(member => member.status === 'active') ?? []
   const settingsHref = `/settings/teams?workspace=${encodeURIComponent(team.workspaceId)}&team=${encodeURIComponent(team.id)}`
   return <Tabs value={tab} onValueChange={value => setTab(String(value))} className="flex flex-1 flex-col gap-0">

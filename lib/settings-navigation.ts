@@ -1,9 +1,8 @@
-export function isLocalSettingsNavigation(current: URL, destination: URL, workspaceId?: string) {
-  if (current.origin !== destination.origin || current.pathname !== destination.pathname) return false
-  if (current.pathname !== '/settings' && current.pathname !== '/settings/teams') return false
-  const currentWorkspace = current.searchParams.get('workspace') ?? workspaceId
-  const destinationWorkspace = destination.searchParams.get('workspace') ?? workspaceId
-  return currentWorkspace === destinationWorkspace
+const appPaths = new Set(['/', '/settings', '/settings/teams', '/settings/members'])
+
+export function isLocalSettingsNavigation(current: URL, destination: URL, _workspaceId?: string) {
+  // Every supported path renders WorkspaceApp; data requests still enforce session and workspace access.
+  return current.origin === destination.origin && appPaths.has(current.pathname) && appPaths.has(destination.pathname)
 }
 
 export function pushSettingsHistory(href: string, workspaceId?: string) {

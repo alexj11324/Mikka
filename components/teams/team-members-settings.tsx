@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import useSWR from 'swr'
-import { changeTeamMember, listTeamMembers, type loadTeamDirectory } from '@/app/actions/teams'
+import { changeTeamMember, type loadTeamDirectory } from '@/app/actions/teams'
+import { fetchTeamMembers, settingsReadOptions, teamMembersKey } from '@/lib/settings-data'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Button } from '@/components/ui/button'
@@ -13,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 type Directory = Awaited<ReturnType<typeof loadTeamDirectory>>
 export function TeamMembersSettings({ team, onUpdated }: { team: Directory['teams'][number]; onUpdated: () => void }) {
-  const { data, error: readError, mutate } = useSWR(['team-members', team.id], () => listTeamMembers(team.id))
+  const { data, error: readError, mutate } = useSWR(teamMembersKey(team.id), fetchTeamMembers, settingsReadOptions)
   const [adding, setAdding] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')

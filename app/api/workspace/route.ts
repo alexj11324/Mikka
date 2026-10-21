@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { loadWorkspaceSettings, WorkspaceError } from '@/lib/workspace-access'
 
 export async function GET(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
+  const session = await getSession()
   if (!session?.user) return NextResponse.json({ error: '请先登录。' }, { status: 401 })
   try {
     const data = await loadWorkspaceSettings(new URL(request.url).searchParams.get('workspace') ?? undefined)
