@@ -67,3 +67,15 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 故障窗口通常就在最近，所以「最近的都失败」会强烈暗示「一直失败」。
 这是个采样偏差，不是数据问题。
 
+## 2026-10-20 用户偏好：不要全宽水平长线
+
+**发生了什么**：截图指出表格头下方那条贯穿整行的分割线，明确说「agent 很喜欢用这种长线，
+我喜欢不带线的」。
+
+**规则**：
+
+1. 业务 UI 不做全宽水平分割线：不用 `border-t/b/y`、`divide-y`、水平 `<Separator />`、
+   `h-px bg-*`。分组用间距（`gap-*`）或背景（`bg-muted/*`）。
+2. 竖线（`border-l/r`、`orientation="vertical"`）和盒状边框（`border`）可以保留。
+3. 这条已经落在 `style/no-horizontal-rule`；先跑 `node scripts/lint-ui.mjs`，不要靠肉眼。
+

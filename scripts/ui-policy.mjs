@@ -71,6 +71,12 @@ function checkUtility(token, policy, report) {
     const slash = base.match(/^text-(xs|sm|base|lg|xl|\d+xl)\/(.+)$/)
     if (slash && !policy.typography.leading.includes(slash[2])) report('typography/preset-only', `未批准的行高 ${token}。`)
   }
+  // 用户偏好无分割线：全宽水平长线一律用留白 / 背景分组替代。
+  // 竖线（border-l/r、orientation="vertical"）不在此列；0 宽与 transparent 不构成可见线。
+  const horizontalBorder = base.match(/^border-([tby])(?:-(.+))?$/)
+  if (horizontalBorder && !['0', '0px', '[0px]', 'transparent', '[transparent]'].includes(horizontalBorder[2])) report('style/no-horizontal-rule', `禁止全宽水平长线 ${token}；用间距或背景分组。`)
+  const divide = base.match(/^divide-y(?:-(.+))?$/)
+  if (divide && !['0', 'reverse'].includes(divide[1])) report('style/no-horizontal-rule', `禁止全宽水平长线 ${token}；用间距或背景分组。`)
   if (palette.test(base) || arbitraryTextColor || /^(?:bg|border|ring|fill|stroke|outline)-(?:\[|\()/.test(base)) report('style/semantic-colors', `颜色必须使用语义 token：${token}。`)
   if (/^space-[xy]-/.test(base)) report('style/gap', `使用 flex/grid + gap，不使用 ${token}。`)
   if (/(?:^|:)dark:/.test(token) && /^(?:bg|text|border|ring|fill|stroke|outline)-/.test(base) && !base.endsWith('-transparent')) report('style/no-dark-color-override', `用语义 token 处理明暗主题，不单独覆盖 ${token}。`)
@@ -174,7 +180,7 @@ export function auditSource(file, text, policy) {
   }
   function visit(node) {
     if (ts.isStringLiteralLike(node)) {
-      for (const token of splitUtilities(node.text)) if (/^(?:text-|font-|leading-|tracking-|bg-|border-|ring-|outline-|fill-|stroke-|space-[xy]-|\[(?:font|line-height|letter-spacing))/.test(utilityBase(token))) checkUtility(token, policy, (rule, message) => add(node, rule, message))
+      for (const token of splitUtilities(node.text)) if (/^(?:text-|font-|leading-|tracking-|bg-|border-|divide-|ring-|outline-|fill-|stroke-|space-[xy]-|\[(?:font|line-height|letter-spacing))/.test(utilityBase(token))) checkUtility(token, policy, (rule, message) => add(node, rule, message))
     }
     if (ts.isPropertyAssignment(node) && /^(?:fontSize|fontFamily|fontWeight|lineHeight|letterSpacing|fontVariant|fontStyle)$/.test(node.name.getText(source).replaceAll(/['"]/g, ''))) add(node, 'typography/no-inline-values', '排版只能通过预设档位；不允许 style/配置对象手写字体值。')
     if (ts.isCallExpression(node)) {
@@ -212,6 +218,8 @@ export function auditSource(file, text, policy) {
           const tokens = splitUtilities(value)
           if (tokens.includes('overflow-hidden') && tokens.includes('text-ellipsis') && tokens.includes('whitespace-nowrap')) add(classAttr, 'style/truncate', '使用 truncate 简写。')
           const bases = tokens.map(utilityBase)
+          const drawnRule = bases.some(base => /^h-(?:px|0\.5)$/.test(base)) && bases.some(base => /^bg-(?!transparent|none$|clip-|origin-|cover|contain|center|left|right|top|bottom|repeat|no-repeat|fixed|local|scroll|auto|blend-)/.test(base))
+          if (drawnRule) add(classAttr, 'style/no-horizontal-rule', '禁止用 h-px/0.5 + bg-* 手画水平细线；用间距或背景分组。')
           for (const token of tokens) {
             const base = utilityBase(token)
             // 组件调用处的视觉 class 不做限制。Orvilo 的规则集里没有这一条，
@@ -231,6 +239,13 @@ export function auditSource(file, text, policy) {
       if (groupRules.has(name) && !parents.includes(groupRules.get(name))) add(node, 'composition/group', `${name} 必须位于 ${groupRules.get(name)} 内。`)
       if (['DialogContent', 'AlertDialogContent', 'SheetContent', 'DrawerContent'].includes(name) && !contains(node, name.replace('Content', 'Title'))) add(node, 'composition/title', `${name} 必须包含可访问的 Title（跨文件封装需人工核实）。`)
       if (name === 'Avatar' && !contains(node, 'AvatarFallback')) add(node, 'composition/avatar-fallback', 'Avatar 必须包含 AvatarFallback。')
+      if (name === 'Separator') {
+        const orientation = attr(node, 'orientation')
+        const expression = orientation?.initializer && (ts.isJsxExpression(orientation.initializer) ? orientation.initializer.expression : orientation.initializer)
+        const value = expression ? resolve(expression) : { strings: [], known: true }
+        const vertical = value.known && value.strings.length > 0 && value.strings.every(item => item === 'vertical')
+        if (!vertical) add(node, 'style/no-horizontal-rule', '禁止水平 <Separator />；用间距或背景分组，只保留竖线分隔。')
+      }
       if (name === 'Button' && (attr(node, 'isLoading') || attr(node, 'isPending'))) add(node, 'composition/button-loading', 'Button 使用 Spinner + disabled，不存在 isLoading/isPending。')
       if (['Input', 'Textarea'].includes(name) && parents.includes('InputGroup')) add(node, 'forms/input-group', 'InputGroup 内使用 InputGroupInput/InputGroupTextarea。')
       if (['Input', 'Textarea', 'Checkbox', 'Switch', 'NativeSelect'].includes(name) && parents.includes('form') && !parents.includes('Field')) add(node, 'forms/field', '表单控件使用 FieldGroup + Field，不手写字段容器。')

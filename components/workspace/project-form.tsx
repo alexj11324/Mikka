@@ -12,7 +12,6 @@ import { IssueEditor } from './issue-editor'
 import { readProjectDescription } from '@/lib/project-description'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PROJECT_COLORS, PROJECT_ICON_COLORS, type Project, type ProjectControlField } from './project-properties'
 import { ProjectPicker, ProjectPropertyControl } from './project-property-controls'
@@ -53,11 +52,10 @@ export function ProjectForm({ project, projects = [], userName = '我', onClose,
         <FieldGroup><Field className="gap-0"><FieldLabel className="sr-only" htmlFor="project-name">项目名称</FieldLabel><Input id="project-name" className="h-10 rounded-none border-0 bg-transparent! px-0 text-2xl font-semibold shadow-none md:text-2xl focus-visible:ring-0" value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} maxLength={200} required disabled={pending} placeholder="项目名称" /></Field></FieldGroup>
         <div className="flex flex-wrap items-center gap-2">{FIELDS.map(field => <ProjectPropertyControl key={field} field={field} value={draft} userName={userName} projects={projects} projectId={project?.id} disabled={pending} onChange={changes => setDraft(current => ({ ...current, ...changes }))} />)}</div>
         <section aria-labelledby="project-form-description-heading" className="flex min-w-0 flex-col gap-4 pt-4"><h2 id="project-form-description-heading" className="text-sm font-medium text-muted-foreground">描述</h2><IssueEditor layout="description" label="项目描述" content={readProjectDescription(initial.description)} disabled={pending} onChange={content => setDraft(current => ({ ...current, description: JSON.stringify(content) }))} /></section>
-        <Separator className="my-1" />
         <ProjectMilestones value={draft.properties.milestones} disabled={pending} onChange={milestones => setDraft(current => ({ ...current, properties: { ...current.properties, milestones } }))} />
         {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
       </div>
-      <footer className="flex shrink-0 items-center justify-end gap-3 border-t px-5 py-4 sm:px-7"><span className="mr-auto hidden text-xs text-muted-foreground sm:inline">⌘ / Ctrl + Enter {project ? '保存' : '创建'}</span><Button type="submit" className="rounded-full bg-project-action px-4 text-project-action-foreground hover:bg-project-action/90" disabled={pending || !draft.name.trim()}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}{pending ? '正在保存…' : project ? '保存修改' : '创建项目'}</Button></footer>
+      <footer className="flex shrink-0 items-center justify-end gap-3 px-5 py-4 sm:px-7"><span className="mr-auto hidden text-xs text-muted-foreground sm:inline">⌘ / Ctrl + Enter {project ? '保存' : '创建'}</span><Button type="submit" className="rounded-full bg-project-action px-4 text-project-action-foreground hover:bg-project-action/90" disabled={pending || !draft.name.trim()}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}{pending ? '正在保存…' : project ? '保存修改' : '创建项目'}</Button></footer>
     </form>
   </DialogContent></Dialog>
 }
