@@ -22,6 +22,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# private temporary test credentials and sessions
+/.cache/e2e/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
