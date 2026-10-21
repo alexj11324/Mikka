@@ -10,8 +10,8 @@ import { firstLine, listSshHosts, parseSshTarget, rsync, sshRun } from '@/lib/ss
 import { routing } from '@/i18n/routing'
 
 export const dynamic = 'force-dynamic'
-/** ssh, rsync and a remote install; long, but bounded. */
-export const maxDuration = 800
+/** ssh, rsync and a remote install; 300s is the Hobby plan's ceiling. */
+export const maxDuration = 300
 
 const bodySchema = z.object({
   host: z.string().trim().min(1).max(255),
