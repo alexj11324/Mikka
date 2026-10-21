@@ -8,10 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IssueBoard } from './issue-board'
 import { AppSidebar } from '@/components/app-sidebar'
 import { SettingsView } from '@/components/settings/settings-view'
-import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import { Separator } from '@/components/ui/separator'
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
+import { AppShell, AppShellContent } from '@/components/app-shell'
 import { CreateIssueDialog } from './create-issue-dialog'
 import { IssueList } from './issue-list'
 import { IssueSearch } from './issue-search'
@@ -95,18 +92,10 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
     counts[task.ownerId === user.id ? 'mine' : 'shared']++
   }
   const viewTitle = view === 'all' ? '全部任务' : view === 'mine' ? '我创建的' : view === 'shared' ? '协作任务' : ISSUE_STATUSES.find(status => status.value === view)?.label ?? '全部任务'
-  return <TooltipProvider><SidebarProvider>
+  return <AppShell>
     {settingsOpen ? <SettingsView user={user} onBack={() => setSettingsOpen(false)} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
     <AppSidebar onSettings={() => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsOpen(true) }) }} user={user} view={view} counts={counts} recentIssues={tasks} selected={selected} onNavigate={navigate} onOpen={open} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
-    <SidebarInset className="min-w-0">
-      <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b px-4">
-        <div className="flex min-w-0 items-center gap-2">
-          <SidebarTrigger className="-ml-1" aria-label="展开或收起侧栏" />
-          <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
-          <Breadcrumb aria-label="当前位置"><BreadcrumbList><BreadcrumbItem className="hidden sm:inline-flex"><span>{WORKSPACE_NAME}</span></BreadcrumbItem><BreadcrumbSeparator className="hidden sm:block" /><BreadcrumbItem><BreadcrumbPage>{selected ? issueIdentifier(selected) : viewTitle}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
-        </div>
-        <div className="flex shrink-0 items-center gap-2"><Button variant="ghost" size="icon-sm" aria-label="打开全局搜索" disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button></div>
-      </header>
+    <AppShellContent parent={WORKSPACE_NAME} title={selected ? issueIdentifier(selected) : viewTitle} actions={<Button variant="ghost" size="icon-sm" aria-label="打开全局搜索" disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {error && <p role="alert" className="px-6 py-2 text-xs text-destructive">列表更新失败，已保留上次结果。</p>}
       {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} /> : <>
@@ -116,9 +105,9 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
         </div>
         {layout === 'board' ? <IssueBoard issues={filtered} onOpen={open} onCreate={create} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={open} onCreate={() => create()} />}
       </>}
-    </SidebarInset>
+    </AppShellContent>
     </>}
     {creating && <CreateIssueDialog initialStatus={createStatus} open={creating} onOpenChange={setCreating} onCreated={() => { void mutate() }} author={user.name || user.email} />}
     {searchOpen && <IssueSearch open={searchOpen} onOpenChange={setSearchOpen} issues={tasks} onOpen={open} onCreate={() => create()} />}
-  </SidebarProvider></TooltipProvider>
+  </AppShell>
 }

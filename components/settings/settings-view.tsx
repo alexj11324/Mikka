@@ -3,7 +3,8 @@
 import { useState, type ReactNode } from 'react'
 import { useTheme } from 'next-themes'
 import { ArrowLeft, Building2, Monitor, Moon, Search, SlidersHorizontal, Sun, UserRound } from 'lucide-react'
-import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
+import { AppShellContent } from '@/components/app-shell'
 import { NavUser } from '@/components/nav-user'
 import { Separator } from '@/components/ui/separator'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -43,8 +44,7 @@ export function SettingsView({ user, onBack, onSignOut, signingOut, accountError
       <SidebarFooter><NavUser user={user} onSignOut={onSignOut} signingOut={signingOut} /></SidebarFooter>
       <SidebarRail />
     </Sidebar>
-    <SidebarInset className="min-w-0">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b px-4"><SidebarTrigger aria-label="展开或收起侧栏" /><Separator orientation="vertical" className="data-vertical:h-4 data-vertical:self-auto" /><span className="text-sm text-muted-foreground">设置</span><span className="text-sm">/</span><span className="text-sm">{current.title}</span></header>
+    <AppShellContent parent="设置" title={current.title}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-6 py-10 sm:px-10 sm:py-16">
         <div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">{current.title}</h1><p className="text-sm text-muted-foreground">{current.description}</p></div>
         {accountError && <p role="alert" className="text-sm text-destructive">{accountError}</p>}
@@ -52,6 +52,6 @@ export function SettingsView({ user, onBack, onSignOut, signingOut, accountError
         {section === 'profile' && <section className="flex flex-col gap-3" aria-labelledby="profile-heading"><h2 id="profile-heading" className="text-sm font-medium">账户信息</h2><div className="rounded-xl border bg-muted/30 px-5"><SettingRow title="头像" description="根据账户名称自动生成。"><Avatar className="size-10"><AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></SettingRow><Separator /><SettingRow title="名称"><span>{user.name || '未设置'}</span></SettingRow><Separator /><SettingRow title="电子邮箱"><span className="break-all">{user.email}</span></SettingRow></div><p className="text-xs text-muted-foreground">账户信息为只读，当前版本暂不支持在此修改。</p></section>}
         {section === 'workspace' && <section className="flex flex-col gap-3" aria-labelledby="workspace-heading"><h2 id="workspace-heading" className="text-sm font-medium">基本信息</h2><div className="rounded-xl border bg-muted/30 px-5"><SettingRow title="工作区名称"><span>{WORKSPACE_NAME}</span></SettingRow><Separator /><SettingRow title="用途"><span className="text-muted-foreground">任务与文档</span></SettingRow></div><p className="text-xs text-muted-foreground">工作区信息由应用统一配置，当前为只读。</p></section>}
       </div>
-    </SidebarInset>
+    </AppShellContent>
   </>
 }
