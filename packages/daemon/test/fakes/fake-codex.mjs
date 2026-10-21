@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Stand-in for `codex app-server` (newline-delimited JSON-RPC). Turn input:
-//   contains "SUBMIT" -> runs a command, writes NOTES.md, calls orvilo submit
+//   contains "SUBMIT" -> runs a command, writes NOTES.md, calls mikka submit
 //   contains "WAIT"   -> keeps the turn open until `turn/steer` or interrupt
 //   anything else     -> one agent message, then the turn completes
 // Threads are kept as files under `$CODEX_HOME/sessions`; `thread/resume`
@@ -12,16 +12,16 @@ import { createInterface } from "node:readline"
 
 import { callMcpTool } from "./mcp-call.mjs"
 
-// `-c mcp_servers.orvilo.command="..."` / `.args=[...]` / `.env.K="..."`
+// `-c mcp_servers.mikka.command="..."` / `.args=[...]` / `.env.K="..."`
 const mcp = { command: "", args: [], env: {} }
 const argv = process.argv.slice(2)
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] !== "-c") continue
   const [key, ...rest] = argv[++i].split("=")
   const value = JSON.parse(rest.join("="))
-  if (key === "mcp_servers.orvilo.command") mcp.command = value
-  if (key === "mcp_servers.orvilo.args") mcp.args = value
-  if (key.startsWith("mcp_servers.orvilo.env."))
+  if (key === "mcp_servers.mikka.command") mcp.command = value
+  if (key === "mcp_servers.mikka.args") mcp.args = value
+  if (key.startsWith("mcp_servers.mikka.env."))
     mcp.env[key.split(".").pop()] = value
 }
 

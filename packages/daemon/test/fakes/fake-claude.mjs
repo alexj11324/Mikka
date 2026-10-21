@@ -3,7 +3,7 @@
 // stream-json --output-format stream-json`; the SDK spawns it through
 // `spawnClaudeCodeProcess` when the daemon names a binary). Each user
 // message is one turn:
-//   contains "SUBMIT" -> writes NOTES.md, calls orvilo submit via MCP
+//   contains "SUBMIT" -> writes NOTES.md, calls mikka submit via MCP
 //   contains "WAIT"   -> answers, then holds the turn until the next message
 //   contains "LATE"   -> (sent to a WAIT turn) its result comes out only once
 //                        the next turn has handed in, as when the daemon
@@ -34,7 +34,7 @@ if (flag("--resume")?.startsWith("gone-")) {
   process.stderr.write(`No conversation found with session ID: ${sessionId}\n`)
   process.exit(1)
 }
-const mcp = JSON.parse(flag("--mcp-config")).mcpServers.orvilo
+const mcp = JSON.parse(flag("--mcp-config")).mcpServers.mikka
 const out = (event) =>
   process.stdout.write(
     `${JSON.stringify({ session_id: sessionId, ...event })}\n`

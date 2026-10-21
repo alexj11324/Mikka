@@ -1,4 +1,4 @@
-// The pieces real adapters share: Orvilo's MCP hand-in server, the run
+// The pieces real adapters share: Mikka's MCP hand-in server, the run
 // context's handoff file, sandbox-runtime's write and network limits on this
 // machine, and the daemon's commit and push of a verified run.
 import { spawn } from "node:child_process"
@@ -10,7 +10,7 @@ import { join } from "node:path"
 import { execa } from "execa"
 import { afterAll, afterEach, describe, expect, it } from "vitest"
 
-import { defaultRunPolicy } from "@orvilo/protocol/agent-policy"
+import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
 
 import { onLines } from "../src/agents/child"
 import { commitMessage, publishRun, snapshotTree } from "../src/agents/publish"
@@ -29,7 +29,7 @@ afterEach(() => cleanupTempDirs())
 
 async function worktreeOf(repo: string) {
   const path = join(tempDir("orvw-"), "wt")
-  await execa("git", ["worktree", "add", "-q", "-b", "orvilo/run-t", path], {
+  await execa("git", ["worktree", "add", "-q", "-b", "mikka/run-t", path], {
     cwd: repo,
   })
   return path
@@ -62,7 +62,7 @@ function mcpClient(handoff: string) {
   }
 }
 
-describe("orvilo MCP server", () => {
+describe("mikka MCP server", () => {
   it("lists the hand-in tools and records a submit as the session's exit", async () => {
     const repo = await makeRepo()
     const ctx = new RunContext({
@@ -79,7 +79,7 @@ describe("orvilo MCP server", () => {
         clientInfo: { name: "test", version: "1" },
       })
       expect(init).toMatchObject({
-        result: { serverInfo: { name: "orvilo" } },
+        result: { serverInfo: { name: "mikka" } },
       })
       const list = (await client.request("tools/list")) as {
         result: { tools: { name: string }[] }
@@ -266,7 +266,7 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
     )
     expect(denied.exitCode).not.toBe(0)
     expect(existsSync(join(outside, "b.txt"))).toBe(false)
-    const home = await run(`echo hi > "$HOME/.orvilo-sandbox-probe"`, [inside])
+    const home = await run(`echo hi > "$HOME/.mikka-sandbox-probe"`, [inside])
     expect(home.exitCode).not.toBe(0)
   })
 
@@ -408,7 +408,7 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
     }
   )
 
-  it.skipIf(!process.env.ORVILO_NETWORK_TESTS)(
+  it.skipIf(!process.env.MIKKA_NETWORK_TESTS)(
     "reaches listed domains only",
     async () => {
       const curl = (url: string, domains: string[]) =>
@@ -462,7 +462,7 @@ describe("publish", () => {
     const worktree = join(tempDir("orvw-"), runId)
     await execa(
       "git",
-      ["worktree", "add", "-q", "-b", `orvilo/run-${runId}`, worktree],
+      ["worktree", "add", "-q", "-b", `mikka/run-${runId}`, worktree],
       { cwd: repo }
     )
     return worktree
@@ -502,7 +502,7 @@ describe("publish", () => {
       push: { approved: true, remote: "origin" },
     })
     expect(result).toMatchObject({
-      branch: "orvilo/run-run-1",
+      branch: "mikka/run-run-1",
       pushed: true,
       remote: "origin",
     })
@@ -513,11 +513,11 @@ describe("publish", () => {
       "log",
       "-1",
       "--format=%s%n%b",
-      "orvilo/run-run-1",
+      "mikka/run-run-1",
     ])
-    expect(log).toContain("orvilo: Add NEW.md")
-    expect(log).toContain("Orvilo-Run: run-1")
-    const files = await remote(["ls-tree", "--name-only", "orvilo/run-run-1"])
+    expect(log).toContain("mikka: Add NEW.md")
+    expect(log).toContain("Mikka-Run: run-1")
+    const files = await remote(["ls-tree", "--name-only", "mikka/run-run-1"])
     expect(files.split("\n")).toContain("NEW.md")
     expect(files.split("\n")).not.toContain("LATE.md")
     // The worktree's own branch moved to the commit.
@@ -547,7 +547,7 @@ describe("publish", () => {
     expect(result.commit).toMatch(/^[0-9a-f]{40}$/)
     const branch = await execa(
       "git",
-      ["rev-parse", "refs/heads/orvilo/run-run-3"],
+      ["rev-parse", "refs/heads/mikka/run-run-3"],
       { cwd: repo }
     )
     expect(branch.stdout).toBe(result.commit)
@@ -578,7 +578,7 @@ describe("publish", () => {
     })
     expect(held.commit).not.toBeNull()
     expect(held).toMatchObject({
-      branch: "orvilo/run-run-2",
+      branch: "mikka/run-run-2",
       pushed: false,
       remote: null,
       skipped: "not_approved",
@@ -595,9 +595,9 @@ describe("publish", () => {
   describe("to the issue branch", () => {
     const PERSON = {
       GIT_AUTHOR_NAME: "Person",
-      GIT_AUTHOR_EMAIL: "person@orvilo.invalid",
+      GIT_AUTHOR_EMAIL: "person@mikka.invalid",
       GIT_COMMITTER_NAME: "Person",
-      GIT_COMMITTER_EMAIL: "person@orvilo.invalid",
+      GIT_COMMITTER_EMAIL: "person@mikka.invalid",
     }
     const remoteRev = (origin: string, ref: string) =>
       execa("git", ["--git-dir", origin, "rev-parse", ref], {
@@ -609,7 +609,7 @@ describe("publish", () => {
       worktree: string,
       runId: string,
       approved = true,
-      pushBranch = "orvilo/orv-1"
+      pushBranch = "mikka/orv-1"
     ) {
       return publishRun({
         runId,
@@ -626,7 +626,7 @@ describe("publish", () => {
 
     /** What a continued run does to the worktree: same tree, its own branch. */
     const continueAs = (worktree: string, runId: string) =>
-      execa("git", ["checkout", "-q", "-b", `orvilo/run-${runId}`], {
+      execa("git", ["checkout", "-q", "-b", `mikka/run-${runId}`], {
         cwd: worktree,
       })
 
@@ -636,31 +636,31 @@ describe("publish", () => {
       writeFileSync(join(worktree, "one.txt"), "1\n")
       const first = await publishTo(repo, worktree, "run-1")
       expect(first).toMatchObject({
-        branch: "orvilo/orv-1",
+        branch: "mikka/orv-1",
         pushed: true,
         remote: "origin",
       })
       expect(first.skipped).toBeUndefined()
-      expect(await remoteRev(origin, "orvilo/orv-1")).toBe(first.commit)
+      expect(await remoteRev(origin, "mikka/orv-1")).toBe(first.commit)
       // The local commit stays on the run's own branch, which is not pushed.
       expect(
-        (await execa("git", ["rev-parse", "orvilo/run-run-1"], { cwd: repo }))
+        (await execa("git", ["rev-parse", "mikka/run-run-1"], { cwd: repo }))
           .stdout
       ).toBe(first.commit)
-      expect(await remoteRev(origin, "orvilo/run-run-1")).toBeNull()
+      expect(await remoteRev(origin, "mikka/run-run-1")).toBeNull()
 
       await continueAs(worktree, "run-2")
       writeFileSync(join(worktree, "two.txt"), "2\n")
       const second = await publishTo(repo, worktree, "run-2")
-      expect(second).toMatchObject({ branch: "orvilo/orv-1", pushed: true })
-      expect(await remoteRev(origin, "orvilo/orv-1")).toBe(second.commit)
-      expect(await remoteRev(origin, "orvilo/orv-1^")).toBe(first.commit)
+      expect(second).toMatchObject({ branch: "mikka/orv-1", pushed: true })
+      expect(await remoteRev(origin, "mikka/orv-1")).toBe(second.commit)
+      expect(await remoteRev(origin, "mikka/orv-1^")).toBe(first.commit)
 
       // A run that changes nothing re-pushes the issue's head (a no-op).
       await continueAs(worktree, "run-3")
       const third = await publishTo(repo, worktree, "run-3")
       expect(third).toEqual({
-        branch: "orvilo/orv-1",
+        branch: "mikka/orv-1",
         commit: second.commit,
         pushed: true,
         remote: "origin",
@@ -672,12 +672,12 @@ describe("publish", () => {
       const { repo, origin } = await repoWithRemote()
       const worktree = await runWorktree(repo, "run-1")
       expect(await publishTo(repo, worktree, "run-1")).toMatchObject({
-        branch: "orvilo/run-run-1",
+        branch: "mikka/run-run-1",
         commit: null,
         pushed: false,
         skipped: "no_changes",
       })
-      expect(await remoteRev(origin, "orvilo/orv-1")).toBeNull()
+      expect(await remoteRev(origin, "mikka/orv-1")).toBeNull()
     })
 
     it("commits without pushing when push is not approved", async () => {
@@ -686,13 +686,13 @@ describe("publish", () => {
       writeFileSync(join(worktree, "one.txt"), "1\n")
       const result = await publishTo(repo, worktree, "run-1", false)
       expect(result).toMatchObject({
-        branch: "orvilo/run-run-1",
+        branch: "mikka/run-run-1",
         pushed: false,
         remote: null,
         skipped: "not_approved",
       })
       expect(result.commit).toMatch(/^[0-9a-f]{40}$/)
-      expect(await remoteRev(origin, "orvilo/orv-1")).toBeNull()
+      expect(await remoteRev(origin, "mikka/orv-1")).toBeNull()
     })
 
     it("never forces over commits it does not have, and reports the failure", async () => {
@@ -705,24 +705,24 @@ describe("publish", () => {
       })
       await execa(
         "git",
-        ["push", "-q", origin, "main:refs/heads/orvilo/orv-1"],
+        ["push", "-q", origin, "main:refs/heads/mikka/orv-1"],
         {
           cwd: other,
         }
       )
-      const theirs = await remoteRev(origin, "orvilo/orv-1")
+      const theirs = await remoteRev(origin, "mikka/orv-1")
       const worktree = await runWorktree(repo, "run-1")
       writeFileSync(join(worktree, "one.txt"), "1\n")
       const result = await publishTo(repo, worktree, "run-1")
       expect(result).toMatchObject({
-        branch: "orvilo/orv-1",
+        branch: "mikka/orv-1",
         pushed: false,
         remote: "origin",
         note: /Push failed/,
       })
       expect(result.commit).toMatch(/^[0-9a-f]{40}$/)
       expect(result.skipped).toBeUndefined()
-      expect(await remoteRev(origin, "orvilo/orv-1")).toBe(theirs)
+      expect(await remoteRev(origin, "mikka/orv-1")).toBe(theirs)
     })
 
     it("refuses a branch name that is not a plain branch", async () => {
@@ -740,7 +740,7 @@ describe("publish", () => {
   it("builds a commit message from the agent's summary", () => {
     expect(
       commitMessage({ runId: "r", issueId: "i", summary: "  Fix bug  " })
-    ).toBe("orvilo: Fix bug\n\nOrvilo-Run: r\nOrvilo-Issue: i")
+    ).toBe("mikka: Fix bug\n\nMikka-Run: r\nMikka-Issue: i")
   })
 })
 

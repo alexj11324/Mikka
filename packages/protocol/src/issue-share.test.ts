@@ -44,17 +44,17 @@ describe("share tokens", () => {
 
 describe("share links", () => {
   it("puts the token under the share path", () => {
-    expect(issueShareUrl("https://orvilo.example", "tok")).toBe(
-      "https://orvilo.example/share/tok"
+    expect(issueShareUrl("https://mikka.example", "tok")).toBe(
+      "https://mikka.example/share/tok"
     )
   })
 
   it("does not double the slash when the base ends with one", () => {
-    expect(issueShareUrl("https://orvilo.example/", "tok")).toBe(
-      "https://orvilo.example/share/tok"
+    expect(issueShareUrl("https://mikka.example/", "tok")).toBe(
+      "https://mikka.example/share/tok"
     )
-    expect(issueShareUrl("https://orvilo.example///", "tok")).toBe(
-      "https://orvilo.example/share/tok"
+    expect(issueShareUrl("https://mikka.example///", "tok")).toBe(
+      "https://mikka.example/share/tok"
     )
   })
 })

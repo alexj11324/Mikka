@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { projectInput, projectPatch, hasDependencyCycle, DEFAULT_PROJECT_PROPERTIES } from '../lib/project-input'
 
-const input = { name: '项目验收', summary: '', description: '', status: 'backlog', priority: 'none', lead: '', team: 'Orvilo', startDate: '', targetDate: '', properties: DEFAULT_PROJECT_PROPERTIES }
+const input = { name: '项目验收', summary: '', description: '', status: 'backlog', priority: 'none', lead: '', team: 'Mikka', startDate: '', targetDate: '', properties: DEFAULT_PROJECT_PROPERTIES }
 const a = '00000000-0000-4000-8000-000000000001'
 const b = '00000000-0000-4000-8000-000000000002'
 const c = '00000000-0000-4000-8000-000000000003'

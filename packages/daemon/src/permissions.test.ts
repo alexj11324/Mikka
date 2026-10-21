@@ -8,7 +8,7 @@ import {
   PACKAGE_REGISTRY_DOMAINS,
   resolveAgentSettings,
   type RunPolicy,
-} from "@orvilo/protocol/agent-policy"
+} from "@mikka/protocol/agent-policy"
 
 import { acpPermissionResponse } from "./adapters/cursor"
 import { claudeSandboxSettings, claudeSettings } from "./adapters/claude"

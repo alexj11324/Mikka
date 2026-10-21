@@ -1,5 +1,5 @@
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
-// headless `orvilo daemon`, and `tsx watch` in dev.
+// headless `mikka daemon`, and `tsx watch` in dev.
 //
 //   lock data dir -> secret -> journal / outbox / worktrees -> RPC socket
 //   -> resume journaled runs -> loop: lease + watchdog check, then the
@@ -35,7 +35,7 @@ import {
   type HarnessInfo,
   unknownQuotaReport,
   type RunCommand,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 
 import { ClaudeAdapter } from "./adapters/claude"
 import { CodexAdapter } from "./adapters/codex"
@@ -129,7 +129,7 @@ interface DeviceFile {
    * (ADR ORV-284). Kept across sign-outs and workspace switches.
    */
   deviceId?: string
-  /** Set by `orvilo daemon login --workspace` for multi-workspace users. */
+  /** Set by `mikka daemon login --workspace` for multi-workspace users. */
   workspaceId?: string
   /** Last allow-list from the server, so runs resume while offline. */
   repos?: DeviceRepo[]
@@ -642,7 +642,7 @@ export class Daemon {
       this.server = "offline"
       if (error instanceof SessionRejectedError) {
         // Signed out on the server: drop the dead credential and wait for
-        // `orvilo daemon login` (or the app, which signs in again when it
+        // `mikka daemon login` (or the app, which signs in again when it
         // sees no credential, ADR 0026).
         this.server = "unregistered"
         this.registered = false

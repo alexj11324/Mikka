@@ -643,13 +643,13 @@
       "sshExitCode": "ssh 退出码 {code}",
       "noNode": "这台机器上没有 node",
       "noPnpm": "这台机器上没有 pnpm",
-      "copyDaemon": "复制 daemon 到 ~/.orvilo",
+      "copyDaemon": "复制 daemon 到 ~/.mikka",
       "rsyncExitCode": "rsync 退出码 {code}",
       "installExitCode": "pnpm install 退出码 {code}",
       "depsInstalled": "依赖已安装",
       "startExitCode": "启动失败，退出码 {code}",
       "daemonRunning": "daemon 已在后台运行",
-      "heartbeatTimeout": "等待心跳超时，请查看 ~/.orvilo/daemon.log",
+      "heartbeatTimeout": "等待心跳超时，请查看 ~/.mikka/daemon.log",
       "connectionError": "连接过程出错"
     }
   },

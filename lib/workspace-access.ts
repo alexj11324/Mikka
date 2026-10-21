@@ -42,7 +42,7 @@ export async function loadWorkspaceSettings(requestedId?: string) {
     const choices = await tx.select({ id: workspaces.id, name: workspaces.name }).from(workspaces)
       .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
       .where(and(eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'))).orderBy(asc(workspaces.createdAt))
-    const savedId = (await cookies()).get('orvilo-workspace')?.value
+    const savedId = ((await cookies()).get('mikka-workspace') ?? (await cookies()).get('orvilo-workspace'))?.value
     const workspaceId = requestedId ?? choices.find(item => item.id === savedId)?.id ?? choices[0]?.id
     if (!workspaceId) throw new WorkspaceError('workspaceNotFound')
     const { workspace, membership } = await requireWorkspace(tx, workspaceId, user.id)

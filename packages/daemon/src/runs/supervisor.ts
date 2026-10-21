@@ -43,7 +43,7 @@ import {
   type RunState,
   type RunSummary,
   type StopReason,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 
 import type {
   AgentAdapter,

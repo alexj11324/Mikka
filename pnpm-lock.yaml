@@ -20,7 +20,7 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.3.1)
-      '@orvilo/protocol':
+      '@mikka/protocol':
         specifier: workspace:*
         version: link:packages/protocol
       '@shadcn/react':
@@ -237,7 +237,7 @@ importers:
       '@anthropic-ai/sandbox-runtime':
         specifier: 0.0.80
         version: 0.0.80
-      '@orvilo/protocol':
+      '@mikka/protocol':
         specifier: workspace:*
         version: link:../protocol
       ai:
@@ -265,7 +265,7 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
-      '@orvilo/config':
+      '@mikka/config':
         specifier: workspace:*
         version: link:../config
       '@types/node':
@@ -293,7 +293,7 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
-      '@orvilo/config':
+      '@mikka/config':
         specifier: workspace:*
         version: link:../config
       '@types/semver':

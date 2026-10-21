@@ -643,13 +643,13 @@
       "sshExitCode": "ssh exited with code {code}",
       "noNode": "node is not installed on this machine",
       "noPnpm": "pnpm is not installed on this machine",
-      "copyDaemon": "Copying the daemon to ~/.orvilo",
+      "copyDaemon": "Copying the daemon to ~/.mikka",
       "rsyncExitCode": "rsync exited with code {code}",
       "installExitCode": "pnpm install exited with code {code}",
       "depsInstalled": "Dependencies installed",
       "startExitCode": "Failed to start; exit code {code}",
       "daemonRunning": "The daemon is running in the background",
-      "heartbeatTimeout": "Timed out waiting for a heartbeat. Check ~/.orvilo/daemon.log",
+      "heartbeatTimeout": "Timed out waiting for a heartbeat. Check ~/.mikka/daemon.log",
       "connectionError": "The connection failed"
     }
   },

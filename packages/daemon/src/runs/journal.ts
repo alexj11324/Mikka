@@ -4,7 +4,7 @@ import {
   isTerminalRunState,
   type RunState,
   type StopReason,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 
 import { readJson, writeJsonAtomic } from "../fs-util"
 import type { RunAssignment } from "../server-link"

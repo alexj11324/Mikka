@@ -1,5 +1,5 @@
 {
-  "extends": "@orvilo/config/tsconfig.base.json",
+  "extends": "@mikka/config/tsconfig.base.json",
   "compilerOptions": {
     // URL is a global in every runtime that loads this package.
     "lib": ["ES2023", "DOM"],

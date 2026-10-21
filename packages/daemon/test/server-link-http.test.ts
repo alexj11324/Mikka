@@ -1,9 +1,9 @@
-// HttpServerLink and `orvilo daemon login` against a scripted fetch: paths,
+// HttpServerLink and `mikka daemon login` against a scripted fetch: paths,
 // headers, credentials (the device session everywhere), status handling and response
 // decoding with the packages/protocol schemas.
 import { describe, expect, it } from "vitest"
 
-import { CLIENT_VERSION_HEADER, emptyRunReport } from "@orvilo/protocol"
+import { CLIENT_VERSION_HEADER, emptyRunReport } from "@mikka/protocol"
 
 import {
   DaemonError,
@@ -159,12 +159,12 @@ describe("HttpServerLink", () => {
   })
 })
 
-describe("orvilo daemon login (device authorization)", () => {
+describe("mikka daemon login (device authorization)", () => {
   const grant = {
     device_code: "dc-1",
     user_code: "ABCD-EFGH",
-    verification_uri: "orvilo-dev://device",
-    verification_uri_complete: "orvilo-dev://device?user_code=ABCD-EFGH",
+    verification_uri: "mikka-dev://device",
+    verification_uri_complete: "mikka-dev://device?user_code=ABCD-EFGH",
     expires_in: 600,
     interval: 5,
   }
@@ -190,11 +190,11 @@ describe("orvilo daemon login (device authorization)", () => {
     })
     expect(token).toBe("session-xyz")
     expect(shown).toEqual(["ABCD-EFGH"])
-    expect(calls[0]?.body).toEqual({ client_id: "orvilo-daemon" })
+    expect(calls[0]?.body).toEqual({ client_id: "mikka-daemon" })
     expect(calls[1]?.body).toEqual({
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
       device_code: "dc-1",
-      client_id: "orvilo-daemon",
+      client_id: "mikka-daemon",
     })
     // slow_down adds 5 s to the interval (RFC 8628).
     expect(waits).toEqual([5_000, 5_000, 10_000])

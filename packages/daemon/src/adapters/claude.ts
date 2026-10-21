@@ -24,7 +24,7 @@
 // dir, so a separate `CLAUDE_CONFIG_DIR` would mean copying the token.
 // Instead the CLI keeps `~/.claude` and is told to ignore the host's config:
 // `settingSources: []` loads no user, project or local settings (hooks,
-// plugins, permissions, CLAUDE.md), and `strictMcpConfig` with only Orvilo's
+// plugins, permissions, CLAUDE.md), and `strictMcpConfig` with only Mikka's
 // server drops every host MCP server. The only writable path outside the
 // worktree is this worktree's session store under `~/.claude/projects`, so
 // `resume` works after a daemon restart and for a follow-up run in the same

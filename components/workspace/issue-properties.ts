@@ -21,8 +21,6 @@ export type IssueStatus = typeof ISSUE_STATUSES[number]['value']
 export type IssueView = 'all' | 'mine' | 'shared' | 'favorites' | 'following' | IssueStatus
 export const WORKSPACE_NAME = 'Mikka'
 export const WORKSPACE_SLUG = 'mikka'
-// Stored on project rows; keep stable across app rebrands.
-export const WORKSPACE_TEAM_KEY = 'Orvilo'
 
 export function issueIdentifier(number: number | undefined, pendingLabel = 'Unassigned') {
   return number ? `ORV-${number}` : pendingLabel
