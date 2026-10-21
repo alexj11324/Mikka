@@ -104,6 +104,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
               </DropdownMenuGroup>}
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
+                <DropdownMenuLabel>账户</DropdownMenuLabel>
                 <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => run(async () => { setAccessOpen(true) })}>创建或加入工作区</DropdownMenuItem>
                 <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={addAccount}>添加账户</DropdownMenuItem>
               </DropdownMenuGroup>

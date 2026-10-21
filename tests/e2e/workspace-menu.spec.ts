@@ -40,6 +40,7 @@ test('菜单与参考一致，创建持久工作区、切换并同步成员上�
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText(name)
   const switcher = await openSwitcher(page)
   await expect(switcher).toContainText(account.email)
+  await expect(switcher.getByRole('group', { name: '账户', exact: true })).toBeVisible()
   await expect(switcher.getByRole('menuitem', { name, exact: true })).toHaveAttribute('aria-current', 'true')
   await expect(switcher.getByRole('menuitem', { name: '添加账户', exact: true })).toBeVisible()
   await expect(switcher.getByRole('menuitem', { name: /个人资料|偏好设置|切换明暗主题/ })).toHaveCount(0)
