@@ -2,6 +2,9 @@
 
 import { useIsStreaming, useTriggerAction } from '@openuidev/react-lang'
 import { Info } from 'lucide-react'
+import { Button as BeButton } from '@/components/motion/button/base'
+import { AnimatedBadge } from '@/components/motion/animated-badge'
+import { AnimatedNumber } from '@/components/motion/animated-number'
 import { createAgentLibrary, type AgentComponentRenderers } from '@/lib/agent-ui-catalog'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -16,6 +19,22 @@ import { Badge as ReuiBadge } from '@/components/reui/badge'
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '@/components/reui/frame'
 
 const renderers = {
+  BeButton: function BePromptButton({ props }) {
+    const trigger = useTriggerAction()
+    const streaming = useIsStreaming()
+    return <BeButton type="button" variant={props.variant} size="sm" disabled={streaming} onClick={() => trigger(props.action)}>{props.label}</BeButton>
+  },
+  BeBadge: ({ props }) => <AnimatedBadge status={props.status} size="sm" pulse={false}>{props.text}</AnimatedBadge>,
+  BeStat: ({ props }) => {
+    const formatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: props.precision ?? 0, maximumFractionDigits: props.precision ?? 0 })
+    return <Card size="sm" className="min-w-0">
+      <CardHeader><CardTitle>{props.label}</CardTitle></CardHeader>
+      <CardContent><p className="text-2xl font-semibold">
+        <span aria-hidden="true"><AnimatedNumber value={props.value} format={value => formatter.format(value)} />{props.unit}</span>
+        <span className="sr-only">{formatter.format(props.value)}{props.unit}</span>
+      </p></CardContent>
+    </Card>
+  },
   ShadcnCard: ({ props, renderNode }) => <Card size="sm" className="min-w-0">
     <CardHeader><CardTitle>{props.title}</CardTitle>{props.description && <CardDescription>{props.description}</CardDescription>}</CardHeader>
     <CardContent className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</CardContent>

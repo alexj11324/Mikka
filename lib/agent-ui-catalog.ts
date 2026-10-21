@@ -1,4 +1,4 @@
-import { defineComponent, type ComponentRenderer } from '@openuidev/react-lang'
+import { createLibrary, defineComponent, type ComponentRenderer, type DefinedAction } from '@openuidev/react-lang'
 import { openuiLibrary } from '@openuidev/react-ui/genui-lib'
 import { z } from 'zod/v4'
 
@@ -6,6 +6,18 @@ const text = z.string().max(8000)
 const children = z.array(z.any()).max(30)
 
 export const agentComponentCatalog = {
+  BeButton: {
+    description: 'beUI 弹簧动效按钮。label 为“填入提问”或“继续细化”；action 必须是包含上下文的完整独立问题。只填入提问，不自动发送或保存。',
+    props: z.object({ label: z.enum(['填入提问', '继续细化']), action: text, variant: z.enum(['primary', 'secondary', 'ghost', 'outline']).optional() }),
+  },
+  BeBadge: {
+    description: 'beUI 动效状态徽标。只展示用户提供的状态或明确标注的建议，不表示执行了工作区操作。',
+    props: z.object({ text: z.string().min(1).max(80), status: z.enum(['neutral', 'info', 'success', 'warning', 'danger', 'loading']).optional() }),
+  },
+  BeStat: {
+    description: 'beUI 动态数字指标。label 为指标名，value 必须来自用户提供的数据，unit 为单位，precision 为小数位数。不编造数据、不读取工作区。',
+    props: z.object({ label: z.string().min(1).max(80), value: z.number().min(-1e12).max(1e12), unit: z.string().max(12).optional(), precision: z.number().int().min(0).max(4).optional() }),
+  },
   ShadcnCard: {
     description: '本地 shadcn 卡片。用于有标题的建议、说明或内容分组，可嵌套已注册组件。',
     props: z.object({ title: text, children, description: text.optional() }),
@@ -67,5 +79,15 @@ export function createAgentLibrary(renderers: Partial<AgentComponentRenderers> =
       component: (renderers[name] ?? (() => null)) as ComponentRenderer<z.infer<typeof definition.props>>,
     })
   })
-  return openuiLibrary.extend({ components: { add: components } })
+  const extended = openuiLibrary.extend({ components: { add: components } })
+  return createLibrary({
+    root: 'Stack',
+    components: Object.values(extended.components),
+    functions: Object.values(extended.functions),
+    actions: Object.values(extended.actions) as DefinedAction[],
+    componentGroups: [
+      { name: 'beUI', components: ['BeButton', 'BeBadge', 'BeStat'], notes: ['优先使用 beUI 按钮、状态徽标和数字指标；数字只能来自用户输入。'] },
+      { name: '本地内容组件', components: names.filter(name => !name.startsWith('Be')), notes: ['使用本地 shadcn 与 REUI 组件组织内容。'] },
+    ],
+  })
 }

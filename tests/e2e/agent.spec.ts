@@ -41,7 +41,9 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(panel.locator('iframe')).toHaveCount(0)
   await expect(page.getByRole('link', { name: /独立打开/ })).toHaveCount(0)
   await expect(panel.getByRole('button', { name: /重新加载/ })).toHaveCount(0)
-  await expect(panel.locator('[data-slot="frame"]')).toBeVisible()
+  await expect(panel.locator('[data-slot="frame"]')).toHaveCount(0)
+  await expect(panel.locator('[data-slot="input-group"]')).toBeVisible()
+  await expect(panel.locator('[data-slot="empty"]')).toBeVisible()
   await expect(panel.locator('[data-slot="message-scroller"]')).toBeVisible()
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   await expect(input).toHaveAttribute('data-slot', 'input-group-control')
@@ -145,6 +147,38 @@ function openUIStream(response: string) {
     { type: 'finish' },
   ].map(event => `data: ${JSON.stringify(event)}\n\n`).join('') + 'data: [DONE]\n\n'
 }
+
+test('beUI 注册组件展示用户数字且动效按钮只填入提问', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await register(page)
+  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  const panel = page.getByRole('region', { name: '有什么可以帮你？' })
+  const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
+  let requests = 0
+  await page.route('**/api/agent', route => {
+    requests++
+    return route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      headers: { 'x-vercel-ai-ui-message-stream': 'v1' },
+      body: openUIStream(`root = Stack([badge, statistic, button])
+badge = BeBadge("用户提供的状态", "info")
+statistic = BeStat("本周完成任务", 12.5, "项", 1)
+button = BeButton("继续细化", "请根据本周完成12.5项任务的数据给出改进建议", "outline")`),
+    })
+  })
+  await input.fill('本周完成12.5项任务，请展示我提供的数据')
+  await panel.getByRole('button', { name: '发送消息' }).click()
+  await expect(panel.locator('[data-badge-label]')).toHaveText('用户提供的状态')
+  await expect(panel.getByText('12.5项', { exact: true }).first()).toBeVisible()
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  await panel.getByRole('button', { name: '继续细化', exact: true }).click()
+  await expect(input).toHaveValue('请根据本周完成12.5项任务的数据给出改进建议')
+  await expect(input).toBeFocused()
+  expect(requests).toBe(1)
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
 
 const generatedUI = `root = Stack([heading, tabs, form, note])
 heading = TextContent("项目规划建议", "large-heavy")

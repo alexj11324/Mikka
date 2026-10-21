@@ -2,7 +2,10 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createUIMessageStreamResponse, streamText, toUIMessageStream } from 'ai'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
-import { systemPrompt } from '@/lib/agent-ui-prompt.json'
+import { generateSystemPrompt } from '@openuidev/lang-core'
+import agentUISpec from '@/lib/agent-ui.spec.json'
+
+const systemPrompt = generateSystemPrompt(agentUISpec)
 
 export const maxDuration = 60
 

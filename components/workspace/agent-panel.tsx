@@ -9,7 +9,7 @@ import { createTheme, ThemeProvider } from '@openuidev/react-ui/ThemeProvider'
 import { AgentComposer } from './agent-composer'
 import { AgentStarters } from './agent-starters'
 import { AgentResponse } from './agent-response'
-import { AiChat } from '@/components/blocks/ai-chat-1/components/ai-chat'
+import { AgentChat } from './agent-chat'
 import { fetchAgentResponse } from '@/lib/agent-fetch'
 
 const agentTheme = createTheme({
@@ -81,7 +81,7 @@ function AgentSession({ onReset }: { onReset: () => void }) {
   }
 
   return <ThemeProvider cssSelector="#orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
-    <AiChat
+    <AgentChat
       question={question}
       streaming={isLoading}
       onReset={onReset}

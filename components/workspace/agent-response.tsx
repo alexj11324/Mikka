@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic'
 import type { ActionEvent } from '@openuidev/react-lang'
 import { Sparkles } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/reui/alert'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageHeader } from '@/components/ui/message'
 import { Spinner } from '@/components/ui/spinner'
