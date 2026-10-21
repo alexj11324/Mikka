@@ -114,7 +114,7 @@ for (const stage of ['headers', 'body'] as const) {
         if (stage === 'headers') return new Promise<Response>(() => {})
         return new Response(new ReadableStream({
           start(controller) {
-            const events = [{ type: 'start' }, { type: 'text-start', id: 'partial' }, { type: 'text-delta', id: 'partial', delta: 'root = TextContent("取消前的部分回复")' }]
+            const events = [{ type: 'start' }, { type: 'text-start', id: 'partial' }, { type: 'text-delta', id: 'partial', delta: 'root = Stack([intro, missing])\nintro = TextContent("取消前的部分回复")' }]
             controller.enqueue(new TextEncoder().encode(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')))
           },
         }), { headers: { 'Content-Type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' } })
@@ -381,6 +381,69 @@ test('真实配图异步展示来源，支持放大缩放和 Escape 关闭，失
   await expect(panel.getByText(/未找到“Missing photo query”的可用配图/)).toBeVisible()
 })
 
+test('紧凑图文卡片使用 beUI Card、来源可展开、无冗余等待文案', async ({ page }) => {
+  await register(page)
+  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
+  const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
+  let releaseImage!: () => void
+  const imageReady = new Promise<void>(resolve => { releaseImage = resolve })
+  const imageUrl = 'https://upload.wikimedia.org/wikipedia/commons/a/ab/hong-kong.jpg'
+  await page.route(imageUrl, route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><rect width="960" height="540" fill="#ddd"/></svg>' }))
+  await page.route('**/api/agent/images?*', async route => {
+    await imageReady
+    await route.fulfill({ json: { image: { src: imageUrl, width: 960, height: 540, title: 'Hong Kong', source: 'https://commons.wikimedia.org/wiki/File:Hong_Kong.jpg', author: '摄影师', license: 'CC BY-SA 4.0' } } })
+  })
+  const cards = 'root = Stack([intro, cards])\nintro = TextContent("香港景点速览")\ncards = BeCardGrid([BeImageCard("太平山顶", "Victoria Peak", "山顶看维港全景。", ["城市全景"]), BeImageCard("维多利亚港", "Victoria Harbour", "海滨步道适合散步。", ["海滨散步"])])'
+  await page.route('**/api/agent', route => route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream(cards) }))
+  await input.fill('介绍香港景点')
+  await panel.getByRole('button', { name: '发送消息' }).click()
+  await expect(panel.getByText('香港景点速览', { exact: true })).toBeVisible()
+  await expect(panel.getByText('山顶看维港全景。', { exact: true })).toBeVisible()
+  await expect(panel.getByText(/正在查找真实配图|不影响正文生成/)).toHaveCount(0)
+  const card = panel.getByRole('group', { name: '太平山顶', exact: true })
+  await expect(card).toHaveAttribute('data-slot', 'card')
+  await expect(card).toHaveClass(/py-4/)
+  const grid = panel.getByRole('group', { name: '图文推荐卡片', exact: true })
+  expect(await grid.evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBeGreaterThan(1)
+  releaseImage()
+  await card.getByRole('button', { name: '图片来源与许可', exact: true }).click()
+  await expect(card.getByRole('link', { name: /CC BY-SA 4.0/ })).toBeVisible()
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await grid.evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('可恢复格式不报错，真正缺段可原位重试且不覆盖草稿', async ({ page }) => {
+  await register(page)
+  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
+  const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
+  await page.route('**/api/agent', route => route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream('root = TextContent("格式已自动恢复的完整正文"') }))
+  await input.fill('验证格式恢复')
+  await panel.getByRole('button', { name: '发送消息' }).click()
+  await expect(panel.getByText('格式已自动恢复的完整正文', { exact: true })).toBeVisible()
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  await page.route('**/api/agent', route => route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream('root = Stack([TextContent("已收到的正文"), missing])') }))
+  await input.fill('验证真实缺段')
+  await panel.getByRole('button', { name: '发送消息' }).click()
+  await expect(panel.getByRole('alert')).toContainText('没有返回这些段落')
+  await expect(panel.getByText('已收到的正文', { exact: true })).toBeVisible()
+  await input.fill('这是未发送的独立草稿')
+  let retryPrompt = ''
+  await page.route('**/api/agent', route => {
+    retryPrompt = route.request().postDataJSON().prompt
+    return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream('root = TextContent("重试后返回完整正文")') })
+  })
+  await panel.getByRole('button', { name: '重试此回复', exact: true }).click()
+  await expect(panel.getByText('重试后返回完整正文', { exact: true })).toBeVisible()
+  expect(retryPrompt).toBe('验证真实缺段')
+  await expect(input).toHaveValue('这是未发送的独立草稿')
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(2)
+})
+
 const generatedUI = `root = Stack([heading, tabs, form, note])
 heading = TextContent("项目规划建议", "large-heavy")
 tabs = Tabs([TabItem("plan", "阶段计划", [table]), TabItem("summary", "交付说明", [description])])
@@ -461,6 +524,8 @@ button = ShadcnButton("继续细化", "请细化本地组件注册方案", "outl
   await page.route('**/api/agent', route => route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream('root = Stack([missing])') }))
   await input.fill('测试不完整的模型输出')
   await panel.getByRole('button', { name: '发送消息' }).click()
-  await expect(panel.getByRole('alert')).toContainText('界面未能完整生成')
-  await expect(input).toHaveValue('测试不完整的模型输出')
+  await expect(panel.getByRole('alert')).toContainText('回复缺少部分内容')
+  await expect(panel.getByRole('alert')).toContainText('没有返回这些段落')
+  await expect(panel.getByRole('alert')).not.toContainText('简化问题')
+  await expect(panel.getByRole('button', { name: '重试此回复', exact: true })).toBeVisible()
 })

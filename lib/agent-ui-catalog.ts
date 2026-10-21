@@ -6,8 +6,26 @@ const text = z.string().max(8000)
 const children = z.array(z.any()).max(30)
 
 export const agentComponentCatalog = {
+  BeCard: {
+    description: 'beUI Card 紧凑内容卡片。用于有标题的建议、说明或内容分组，children 可嵌套已注册组件；description 可选。图文推荐使用 BeImageCard，不用普通内容卡片代替详细正文。',
+    props: z.object({ title: z.string().min(1).max(120), children, description: text.optional() }),
+  },
+  BeCardGrid: {
+    description: '紧凑推荐卡片网格。children 为 1–6 个 BeImageCard，按回答区实际宽度自动排为 1、2 或 3 列，不按整个浏览器宽度判断。多个景点、酒店、地点或其他视觉推荐默认使用此网格，不要把多张 BeImage 纵向堆成大图。先输出网格引用，再逐张定义卡片，以便流式展示。',
+    props: z.object({ children: children.min(1).max(6) }),
+  },
+  BeImageCard: {
+    description: '紧凑图文推荐卡片，包含 16:9 小图、标题、标签和简介。title 为对象名称；query 为准确英文图片检索词而非 URL；description 为实质简介；tags 可选，最多 3 个短标签；prompt 可选，必须是携带完整上下文的继续了解问题，点击后在回答区直接继续，不触碰输入框。不伪造预订、收藏、评分或实时价格。图片异步检索，来源和许可可展开，不阻塞文字。搭配 BeCardGrid 使用。',
+    props: z.object({
+      title: z.string().min(1).max(120),
+      query: z.string().trim().min(2).max(160).refine(value => !/[\r\n<>]/.test(value) && !/https?:\/\//i.test(value)),
+      description: z.string().min(1).max(800),
+      tags: z.array(z.string().min(1).max(40)).max(3).optional(),
+      prompt: z.string().min(1).max(4000).optional(),
+    }),
+  },
   BeImage: {
-    description: '异步查找 Wikimedia Commons 真实资料配图并展示来源、作者与许可。query 是具体主题检索词，优先使用准确英文名称，不是 URL；alt 为中文替代文字；caption 可选。适合旅游、建筑、自然、艺术或明确要求图片的问题。最多使用 3 张，不阻塞正文，不伪造图片，不表示历史照片已经核实。',
+    description: '单张正文资料配图，不是推荐卡片。仅适合单一主题的文章插图或用户明确要求大图时使用；多个景点、酒店、地点推荐应优先用 BeCardGrid + BeImageCard。异步查找 Wikimedia Commons 真实资料配图并展示来源、作者与许可。query 是具体主题检索词，优先使用准确英文名称，不是 URL；alt 为中文替代文字；caption 可选。最多使用 3 张，不阻塞正文，不伪造图片，不表示历史照片已经核实。',
     props: z.object({ query: z.string().trim().min(2).max(160).refine(value => !/[\r\n<>]/.test(value) && !/https?:\/\//i.test(value)), alt: z.string().min(1).max(300), caption: z.string().max(500).optional() }),
   },
   BeButton: {
@@ -114,7 +132,7 @@ export const agentComponentGroups: { name: string; components: AgentComponentNam
   { name: '审批与问题', components: ['BeApproval', 'BeQuestions'], notes: ['Confirmation → ApprovalCard；选择问题复用 ApprovalCard 提问模式。在回答区直接提交并继续对话，不执行工具、不持久保存审批。ToolApproval 已安装但仅供未来真实工具授权流程使用，不开放给模型伪造授权。'] },
   { name: '任务与进度', components: ['BeTodoList', 'BeStat', 'ShadcnProgress'], notes: ['Plan/Task → TodoList；Loader/Shimmer → AgentProgress、ReasoningText、ThinkingShimmer，由宿主根据请求状态控制。建议计划保持待开始；数字只能来自用户输入。'] },
   { name: '图标状态与操作', components: ['AgentIcon', 'BeBadge', 'BeButton'], notes: ['Lucide 提供图标；beUI AnimatedBadge 提供动态状态图标；Button 提供操作反馈。不得用动态图标伪造执行结果。'] },
-  { name: '本地内容与兼容组件', components: ['BeImage', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame'], notes: ['复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock、FileDiff、ToolResult、AgentActivity、Citations、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不自动生成虚构工具记录。'] },
+  { name: '本地内容与兼容组件', components: ['BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame'], notes: ['复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock、FileDiff、ToolResult、AgentActivity、Citations、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不自动生成虚构工具记录。'] },
 ]
 
 export function createAgentLibrary(renderers: Partial<AgentComponentRenderers> = {}) {

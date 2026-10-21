@@ -13,7 +13,7 @@ export function validateAgentStream() {
         finished = true
         if (!failed && (part.finishReason === 'length' || !hasText)) {
           controller.enqueue({ type: 'error', errorText: part.finishReason === 'length'
-            ? '本次生成达到输出上限，回复未完整生成。已有内容已保留，可以在此重试。'
+            ? '模型达到单次回复的输出上限，最后一部分被截断。已收到的内容已保留，请重试此回复。'
             : '模型未返回正文，请在此重试。' })
           failed = true
         }

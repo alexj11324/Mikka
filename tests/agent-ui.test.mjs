@@ -4,6 +4,7 @@ import test from 'node:test'
 import { createParser, generateSystemPrompt } from '@openuidev/lang-core'
 import { agentComponentCatalog, agentComponentGroups, createAgentLibrary } from '../lib/agent-ui-catalog.ts'
 import { agentImageQuery, findAgentImage, parseAgentImage } from '../lib/agent-images.ts'
+import { getAgentUIIssue } from '../lib/agent-ui-status.ts'
 
 function commonsImage(overrides = {}) {
   return { title: 'File:Victoria Harbour.jpg', index: 1, imageinfo: [{ thumburl: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/photo.jpg', thumbwidth: 960, thumbheight: 540, descriptionurl: 'https://commons.wikimedia.org/wiki/File:Victoria_Harbour.jpg', mime: 'image/jpeg', extmetadata: { Artist: { value: '<a>摄影师</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' } }, ...overrides }] }
@@ -54,6 +55,47 @@ test('资料配图和详细回答规则进入模型规范', async () => {
 })
 
 const library = createAgentLibrary()
+
+test('完整正文和可自动补齐的括号不会误报失败', () => {
+  const parser = createParser(library.toJSONSchema(), library.root)
+  for (const source of ['root = TextContent("完整正文")', 'root = TextContent("完整正文"']) {
+    const result = parser.parse(source)
+    assert.ok(result.root)
+    assert.deepEqual(result.meta.errors, [])
+    assert.equal(getAgentUIIssue(result), null)
+  }
+})
+
+test('真实缺少段落与组件格式错误分别说明原因', () => {
+  const parser = createParser(library.toJSONSchema(), library.root)
+  const missing = getAgentUIIssue(parser.parse('root = Stack([TextContent("已有正文"), missing])'))
+  assert.match(missing.message, /没有返回这些段落/)
+  assert.match(missing.message, /已收到的内容会保留/)
+  const invalid = getAgentUIIssue(parser.parse('root = ShadcnTable("错误类型", [])'))
+  assert.match(invalid.message, /表格数据格式不正确/)
+  assert.match(getAgentUIIssue(null).message, /内容格式有误/)
+  assert.equal(getAgentUIIssue(parser.parse('root = TextContent("正文")'), [{ source: 'parser', code: 'no-root', severity: 'warning', message: 'recoverable' }]), null)
+})
+
+test('紧凑推荐卡片可解析且模型规范优先小卡片', async () => {
+  const parser = createParser(library.toJSONSchema(), library.root)
+  const result = parser.parse('root = BeCardGrid([BeImageCard("太平山顶", "Victoria Peak Hong Kong", "俯瞰维港，建议日落前上山。", ["城市全景"])])')
+  assert.ok(result.root)
+  assert.deepEqual(result.meta.errors, [])
+  assert.deepEqual(result.meta.unresolved, [])
+  const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
+  assert.ok(spec.promptOptions.additionalRules.some(rule => rule.includes('BeCardGrid') && rule.includes('不要逐条堆放通栏 BeImage')))
+  const image = await readFile(new URL('../components/workspace/agent-image.tsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(image, /正在查找真实配图|不影响正文生成|不使用占位图片/)
+  const card = await readFile(new URL('../components/workspace/agent-image-card.tsx', import.meta.url), 'utf8')
+  assert.ok(card.includes("from '@/components/motion/card'"))
+  assert.match(card, /size="compact"/)
+  assert.doesNotMatch(card, /from ['"]@\/components\/ui\/card/)
+  const contentCard = parser.parse('root = BeCard("建议", [TextContent("完整建议内容")], "内容分组")')
+  assert.ok(contentCard.root)
+  assert.deepEqual(contentCard.meta.errors, [])
+})
+
 const beuiResponse = `root = Stack([badge, statistic, button])
 badge = BeBadge("用户提供的状态", "info")
 statistic = BeStat("本周完成任务", 12, "项", 0)

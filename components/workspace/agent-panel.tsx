@@ -47,7 +47,8 @@ function AgentSession({ onReset }: { onReset: () => void }) {
   const sessionIdRef = useRef<string | null>(null)
   const [generation, setGeneration] = useState(0)
   const [question, setQuestion] = useState('')
-  const [previousTurns, setPreviousTurns] = useState<{ id: number; question: string; completion: string; error?: Error }[]>([])
+  const [stopped, setStopped] = useState(false)
+  const [previousTurns, setPreviousTurns] = useState<{ id: number; question: string; completion: string; error?: Error; stopped: boolean }[]>([])
 
   async function handleUIAction(event: ActionEvent) {
     if (isLoading || submittingRef.current) return
@@ -72,11 +73,12 @@ function AgentSession({ onReset }: { onReset: () => void }) {
       sessionIdRef.current ??= crypto.randomUUID()
       const retrying = lastRequestRef.current?.failed && lastRequestRef.current.prompt === prompt.trim()
       if (!retrying) {
-        if (question) setPreviousTurns(turns => [...turns, { id: generation, question, completion, error }])
+        if (question) setPreviousTurns(turns => [...turns, { id: generation, question, completion, error, stopped }])
         else setPreviousTurns([])
         setGeneration(value => value + 1)
       }
       setQuestion(prompt.trim())
+      setStopped(false)
       lastRequestRef.current = { prompt: prompt.trim(), failed: true }
       const result = await complete(prompt.trim(), { body: { sessionId: sessionIdRef.current } })
       lastRequestRef.current.failed = !result?.trim()
@@ -91,12 +93,12 @@ function AgentSession({ onReset }: { onReset: () => void }) {
     <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt, 'inline') }}>
       <AgentChat
         turns={[
-          ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse completion={turn.completion} error={turn.error} isLoading={false} onAction={handleUIAction} /> })),
-          ...(question ? [{ id: generation, question, response: <AgentResponse completion={completion} error={error} isLoading={isLoading} onAction={handleUIAction} onRetry={() => { void request(question, 'inline') }} /> }] : []),
+          ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse completion={turn.completion} error={turn.error} stopped={turn.stopped} isLoading={false} onAction={handleUIAction} /> })),
+          ...(question ? [{ id: generation, question, response: <AgentResponse completion={completion} error={error} stopped={stopped} isLoading={isLoading} onAction={handleUIAction} onRetry={() => { if (lastRequestRef.current) lastRequestRef.current.failed = true; void request(question, 'inline') }} /> }] : []),
         ]}
         streaming={isLoading}
         onReset={onReset}
-        composer={<AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={stop} />}
+        composer={<AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} />}
       />
     </AgentInteractionContext>
   </ThemeProvider>

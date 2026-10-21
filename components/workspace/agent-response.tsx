@@ -12,10 +12,10 @@ import { StreamingResponse } from '@/components/agents/streaming-response'
 
 const AgentGenerativeUI = dynamic(() => import('./agent-generative-ui').then(module => module.AgentGenerativeUI), {
   ssr: false,
-  loading: () => <p role="status" className="text-xs text-muted-foreground">正在加载生成界面…</p>,
+  loading: () => null,
 })
 
-export function AgentResponse({ completion, error, isLoading, onAction, onRetry }: { completion: string; error?: Error; isLoading: boolean; onAction: (event: ActionEvent) => void; onRetry?: () => void }) {
+export function AgentResponse({ completion, error, isLoading, stopped = false, onAction, onRetry }: { completion: string; error?: Error; isLoading: boolean; stopped?: boolean; onAction: (event: ActionEvent) => void; onRetry?: () => void }) {
   if (!completion && !error && !isLoading) return null
 
   return <Message from="assistant" aria-label="Agent 回复" animateIn>
@@ -26,7 +26,7 @@ export function AgentResponse({ completion, error, isLoading, onAction, onRetry 
         <BubbleContent className="flex w-full min-w-0 flex-col gap-4">
           {isLoading && <AgentProgress label={completion ? '正在继续生成回复' : '正在思考并准备正文，可随时停止'} />}
           {completion && <StreamingResponse status={error ? 'error' : isLoading ? 'streaming' : 'complete'} announce={false} showActions={false}>
-            <div className="w-full min-w-0 overflow-x-auto break-words"><AgentGenerativeUI response={completion} isStreaming={isLoading} onAction={onAction} /></div>
+            <div className="w-full min-w-0 overflow-x-auto break-words"><AgentGenerativeUI response={completion} isStreaming={isLoading} onAction={onAction} showErrors={!error && !stopped} onRetry={onRetry} /></div>
           </StreamingResponse>}
           {error && <Alert variant="destructive"><AlertDescription>{error.message || '请求失败，请稍后重试。'} 你的输入已保留。{onRetry && <Button type="button" variant="outline" size="sm" disabled={isLoading} onClick={onRetry}>重试此回复</Button>}</AlertDescription></Alert>}
         </BubbleContent>
