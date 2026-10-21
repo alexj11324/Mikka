@@ -5,12 +5,14 @@ import { auth } from '@/lib/auth'
 import { generateSystemPrompt } from '@openuidev/lang-core'
 import agentUISpec from '@/lib/agent-ui.spec.json'
 import { validateAgentStream } from '@/lib/agent-fetch'
+import { persistAgentStream } from '@/lib/agent-history'
+import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
 
 const systemPrompt = generateSystemPrompt(agentUISpec)
 
 export const maxDuration = 300
 
-const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional() }).strict()
+const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional(), turnId: z.uuid().optional(), retry: z.boolean().optional() }).strict()
 const errorHeaders = { 'Cache-Control': 'private, no-store', 'Content-Type': 'text/plain; charset=utf-8' }
 
 function agentErrorMessage(error: unknown) {
@@ -63,16 +65,35 @@ export async function POST(request: Request) {
   const apiKey = process.env.OPENCODE_API_KEY
   if (!apiKey) return new Response('服务端尚未配置 OPENCODE_API_KEY，请添加环境变量后重试。', { status: 503, headers: errorHeaders })
 
+  const sessionId = parsed.data.sessionId ?? crypto.randomUUID()
+  const turnId = parsed.data.turnId ?? crypto.randomUUID()
+  let turn: Awaited<ReturnType<typeof beginAgentTurn>>
+  try {
+    turn = await beginAgentTurn(session.user.id, sessionId, turnId, parsed.data.prompt, parsed.data.retry)
+  } catch (error) {
+    return new Response(error instanceof AgentStoreError ? error.message : '无法保存本次提问，请稍后重试。', {
+      status: error instanceof AgentStoreError ? error.status : 503, headers: errorHeaders,
+    })
+  }
+  const messages: { role: 'user' | 'assistant'; content: string }[] = []
+  let historySize = 0
+  for (const previous of [...turn.history].reverse()) {
+    historySize += previous.prompt.length + previous.completion.length
+    if (historySize > 80000) break
+    messages.unshift({ role: 'user', content: previous.prompt }, { role: 'assistant', content: previous.completion })
+  }
+  messages.push({ role: 'user', content: parsed.data.prompt })
+
   const opencode = createOpenAICompatible({
     name: 'opencode',
     apiKey,
     baseURL: 'https://opencode.ai/zen/go/v1',
-    headers: { 'User-Agent': 'Orvilo-UI-Agent/1.0', 'x-opencode-session': parsed.data.sessionId ?? crypto.randomUUID() },
+    headers: { 'User-Agent': 'Orvilo-UI-Agent/1.0', 'x-opencode-session': sessionId },
   })
   const result = streamText({
     model: opencode('deepseek-v4.1-flash'),
     system: systemPrompt,
-    prompt: parsed.data.prompt,
+    messages,
     maxRetries: 1,
     timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
     abortSignal: request.signal,
@@ -81,11 +102,11 @@ export async function POST(request: Request) {
     },
   })
   return createUIMessageStreamResponse({
-    headers: { 'Cache-Control': 'private, no-store', 'X-Accel-Buffering': 'no' },
-    stream: toUIMessageStream({
+    headers: { 'Cache-Control': 'private, no-store', 'X-Accel-Buffering': 'no', 'X-Agent-Session-Id': sessionId, 'X-Agent-Turn-Id': turnId },
+    stream: persistAgentStream(toUIMessageStream({
       stream: result.stream,
       sendReasoning: false,
       onError: agentErrorMessage,
-    }).pipeThrough(validateAgentStream()),
+    }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),
   })
 }
