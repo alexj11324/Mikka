@@ -27,6 +27,7 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/motion/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { SPRING_SWAP } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 
@@ -95,6 +96,7 @@ export function PromptInput({
   const reduce = useReducedMotion() ?? false;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const measurementRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [internalValue, setInternalValue] = useState(defaultValue);
   const [internalModel, setInternalModel] = useState(
     defaultModel ?? models[0]?.value,
@@ -110,15 +112,18 @@ export function PromptInput({
   const resizeTextarea = useCallback(() => {
     const textarea = textareaRef.current;
     const measurement = measurementRef.current;
-    if (!textarea || !measurement || textarea.value !== currentValue) return;
+    const scrollArea = scrollAreaRef.current;
+    if (!textarea || !measurement || !scrollArea || textarea.value !== currentValue) return;
 
-    const lineHeight = 24;
-    const nextHeight = Math.min(
-      Math.max(measurement.scrollHeight, minRows * lineHeight),
-      maxRows * lineHeight,
-    );
-    const height = `${nextHeight}px`;
+    const styles = getComputedStyle(textarea);
+    const lineHeight = Number.parseFloat(styles.lineHeight);
+    const padding = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
+    const contentHeight = Math.max(measurement.scrollHeight, minRows * lineHeight + padding);
+    const viewportHeight = Math.min(contentHeight, maxRows * lineHeight + padding);
+    const height = `${contentHeight}px`;
     if (textarea.style.height !== height) textarea.style.height = height;
+    const boundedHeight = `${viewportHeight}px`;
+    if (scrollArea.style.height !== boundedHeight) scrollArea.style.height = boundedHeight;
   }, [currentValue, maxRows, minRows]);
 
   useLayoutEffect(() => {
@@ -179,10 +184,15 @@ export function PromptInput({
       <div
         ref={measurementRef}
         aria-hidden="true"
-        className="pointer-events-none invisible absolute inset-x-2 top-0 whitespace-pre-wrap px-2 text-sm leading-6 [overflow-wrap:break-word]"
+        className="pointer-events-none invisible absolute inset-x-2 top-0 whitespace-pre-wrap py-1.5 pl-2 pr-4 text-sm leading-6 [overflow-wrap:break-word]"
       >
         {`${currentValue}\u200b`}
       </div>
+      <ScrollArea
+        ref={scrollAreaRef}
+        style={{ height: `calc(${minRows} * 1.5rem + 0.75rem)` }}
+        className="min-w-0 **:data-[slot=scroll-area-scrollbar]:w-1.5 **:data-[slot=scroll-area-thumb]:bg-foreground/15"
+      >
       <textarea
         ref={node => {
           textareaRef.current = node;
@@ -197,8 +207,9 @@ export function PromptInput({
         {...textareaProps}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={handleKeyDown}
-        className="scrollbar-hide block w-full resize-none overflow-y-auto bg-transparent px-2 pt-1.5 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground/55"
+        className="block w-full resize-none overflow-hidden bg-transparent py-1.5 pl-2 pr-4 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground/55"
       />
+      </ScrollArea>
 
       <div className="mt-1 flex min-h-8 items-center gap-1">
         {actions.length ? (

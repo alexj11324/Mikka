@@ -97,6 +97,39 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(panel).toHaveCount(0)
 })
 
+test('Agent 输入完整显示单行文字，超过四行才显示自定义滚动条', async ({ page }) => {
+  await register(page)
+  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
+  const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
+  const scroller = panel.locator('form [data-slot="scroll-area"]')
+  const viewport = scroller.locator('[data-slot="scroll-area-viewport"]')
+
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 844 })
+    for (const value of ['', '国 Agj 一行']) {
+      await input.fill(value)
+      await expect.poll(() => input.evaluate(element => element.scrollHeight - element.clientHeight)).toBe(0)
+      await expect.poll(() => viewport.evaluate(element => element.scrollHeight - element.clientHeight)).toBe(0)
+      await expect(scroller).not.toHaveAttribute('data-has-overflow-y')
+      expect(await input.evaluate(element => getComputedStyle(element).overflowY)).toBe('hidden')
+    }
+    await input.fill(Array.from({ length: 12 }, (_, i) => `第 ${i + 1} 行：文字完整显示`).join('\n'))
+    await expect(scroller).toHaveAttribute('data-has-overflow-y', '')
+    await expect.poll(() => viewport.evaluate(element => element.clientHeight)).toBe(108)
+    await expect.poll(() => input.evaluate(element => element.scrollHeight - element.clientHeight)).toBe(0)
+    await input.press('Control+Home')
+    await expect.poll(() => viewport.evaluate(element => element.scrollTop)).toBe(0)
+    await input.press('Control+End')
+    await expect.poll(() => viewport.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+    await expect(panel.getByRole('button', { name: '发送消息' })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  }
+  await input.fill('')
+  await expect(scroller).not.toHaveAttribute('data-has-overflow-y')
+  await expect.poll(() => viewport.evaluate(element => element.scrollTop)).toBe(0)
+})
+
 for (const stage of ['headers', 'body'] as const) {
   test(`停止生成在 ${stage} 阶段取消请求且不重新提交`, async ({ page }) => {
     await register(page)
