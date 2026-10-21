@@ -1,4 +1,14 @@
+import { test as apiTest } from '@playwright/test'
 import { test, expect, register } from './fixtures'
+
+apiTest('开发预览验收入口不跳转到内部主机', async ({ request, baseURL }) => {
+  const response = await request.get('/api/acceptance', { maxRedirects: 0 })
+  test.skip(response.status() === 404, '生产环境不提供开发验收入口')
+  expect(response.status()).toBe(307)
+  expect(response.headers()['location']).toBe('/?acceptance=1')
+  expect(response.headers()['cache-control']).toBe('no-store')
+  expect(new URL(response.headers()['location'], baseURL).origin).toBe(new URL(baseURL!).origin)
+})
 
 test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区导航', async ({ page }) => {
   const externalRequests: string[] = []
