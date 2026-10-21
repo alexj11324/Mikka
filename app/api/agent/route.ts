@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     headers: { 'User-Agent': 'Orvilo-UI-Agent/1.0', 'x-opencode-session': parsed.data.sessionId ?? crypto.randomUUID() },
   })
   const result = streamText({
-    model: opencode.chat('glm-5.3-flash'),
+    model: opencode.chat('deepseek-v4.1-flash'),
     system: systemPrompt,
     prompt: parsed.data.prompt,
     maxOutputTokens: 4096,

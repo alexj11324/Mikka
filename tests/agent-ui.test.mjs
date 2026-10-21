@@ -137,6 +137,17 @@ test('Chat App 整页使用官网外壳、导航与输入配置，不保留旧�
   assert.match(panel, /if \(result\) updateDraft\(''\)/)
 })
 
+test('服务端和 beUI 界面均使用 DS 4.1 Flash', async () => {
+  const route = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
+  const composer = await readFile(new URL('../components/workspace/agent-composer.tsx', import.meta.url), 'utf8')
+  const chat = await readFile(new URL('../components/workspace/agent-chat.tsx', import.meta.url), 'utf8')
+  assert.ok(route.includes("opencode.chat('deepseek-v4.1-flash')"))
+  assert.ok(composer.includes('model="deepseek-v4.1-flash"'))
+  assert.match(composer, /DS 4\.1 Flash/)
+  assert.match(chat, /DS 4\.1 Flash/)
+  for (const source of [route, composer, chat]) assert.doesNotMatch(source, /glm-5\.3|GLM-5\.3/)
+})
+
 test('停止按钮先取消表单默认行为，避免同步恢复后误发草稿', async () => {
   const source = await readFile(new URL('../components/agents/prompt-input.tsx', import.meta.url), 'utf8')
   assert.match(source, /onClick=\{loading \? event => \{[\s\S]*?event\.preventDefault\(\);\s*onStop\?\.\(\);/)

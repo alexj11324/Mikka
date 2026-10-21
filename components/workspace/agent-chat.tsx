@@ -23,7 +23,7 @@ export function AgentChat({ turns, composer, streaming, onReset }: {
             <AnimatedSidebarTrigger aria-label="切换对话侧栏" className="text-muted-foreground hover:bg-muted hover:text-foreground"><PanelLeft className="size-4" /></AnimatedSidebarTrigger>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-medium">{turns.at(-1)?.question || '新任务'}</h1>
-              <p className="truncate text-xs text-muted-foreground">Agent 工作区 · GLM-5.3-Flash</p>
+              <p className="truncate text-xs text-muted-foreground">Agent 工作区 · DS 4.1 Flash</p>
             </div>
           </div>
           <span role="status" className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{streaming ? '正在生成' : '临时会话'}</span>

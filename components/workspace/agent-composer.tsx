@@ -19,8 +19,8 @@ export function AgentComposer({ ref, draft, onChange, onSubmit, isLoading, onSto
     placeholder="让 Agent 继续…"
     minRows={1}
     maxRows={4}
-    models={[{ value: 'glm-5.3-flash', label: 'GLM-5.3-Flash' }]}
-    model="glm-5.3-flash"
+    models={[{ value: 'deepseek-v4.1-flash', label: 'DS 4.1 Flash' }]}
+    model="deepseek-v4.1-flash"
     actions={agentStarters.map(starter => ({ value: starter.title, label: starter.title, icon: <starter.icon /> }))}
     onAction={value => {
       const starter = agentStarters.find(item => item.title === value)
