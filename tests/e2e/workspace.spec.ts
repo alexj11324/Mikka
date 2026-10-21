@@ -29,7 +29,7 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await page.getByRole('button', { name: '列表视图', exact: true }).click()
   await expect(page.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: title })).toBeVisible()
   await page.getByRole('button', { name: '打开全局搜索', exact: true }).click()
-  await page.getByLabel('全局搜索任务', { exact: true }).fill(title)
+  await page.getByRole('dialog', { name: '搜索任务', exact: true }).getByRole('combobox', { name: '全局搜索任务', exact: true }).fill(title)
   await page.getByRole('option').filter({ hasText: title }).click()
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
   const wasDark = await page.locator('html').evaluate(element => element.classList.contains('dark'))

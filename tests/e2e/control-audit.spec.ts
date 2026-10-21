@@ -13,6 +13,14 @@ for (const handler of ['', 'console.log("没有业务效果")', 'void fetch("/po
   })
 }
 
+test('点击断言接受原生文件选择器', async ({ page }) => {
+  await page.setContent('<input type="file" hidden><button type="button">选择文件</button>')
+  await page.getByRole('button').evaluate(element => {
+    element.addEventListener('click', () => document.querySelector<HTMLInputElement>('input')!.click())
+  })
+  await clickWithEffect(page, page.getByRole('button'))
+})
+
 test('点击断言接受真实界面变化', async ({ page }) => {
   await page.setContent('<button type="button">展开</button><section hidden>内容已展开</section>')
   await page.getByRole('button').evaluate(element => {
