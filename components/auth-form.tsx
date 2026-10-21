@@ -7,6 +7,7 @@ import { getPathname } from '@/i18n/navigation'
 import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { SignInCard } from '@/components/blocks/auth-19/components/sign-in-card'
 import { safeAuthReturn } from '@/lib/auth-return'
+import { withBasePath } from '@/lib/base-path'
 import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
 
@@ -14,10 +15,11 @@ export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, con
   const t = useTranslations('Auth')
   const locale = useLocale()
   const returnPath = safeAuthReturn(next)
-  const home = returnPath.startsWith('/?')
+  // Used for full-page navigations and OAuth callbacks, so they carry the base path.
+  const home = withBasePath(returnPath.startsWith('/?')
     ? `${getPathname({ locale, href: '/' })}${returnPath.slice(1)}`
-    : getPathname({ locale, href: returnPath })
-  const signIn = getPathname({ locale, href: '/sign-in' })
+    : getPathname({ locale, href: returnPath }))
+  const signIn = withBasePath(getPathname({ locale, href: '/sign-in' }))
   const [error, setError] = useState(oauthFailed ? t('oauthFailed') : '')
   const [notice, setNotice] = useState(continueGitHub ? t('continueNotice') : '')
   async function signInWithGitHub() {
@@ -59,7 +61,7 @@ export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, con
     if (pending) return
     setPending(true); setError(''); setNotice('')
     try {
-      const response = await fetch('/api/test-workspace', { method: 'POST' })
+      const response = await fetch(withBasePath('/api/test-workspace'), { method: 'POST' })
       if (!response.ok) throw new Error('Test workspace unavailable')
       const session = await authClient.getSession({ query: { disableCookieCache: true } })
       if (!session.data?.user) {

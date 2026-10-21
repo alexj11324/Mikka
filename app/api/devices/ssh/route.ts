@@ -3,6 +3,7 @@ import { and, desc, eq, gt } from 'drizzle-orm'
 import { z } from 'zod'
 import { getTranslations } from 'next-intl/server'
 import { auth, authBaseURL } from '@/lib/auth'
+import { BASE_PATH } from '@/lib/base-path'
 import { db } from '@/lib/db'
 import { deviceTokens, devices } from '@/lib/db/schema'
 import { hashDeviceToken, newDeviceToken } from '@/lib/device-link'
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
           'chmod 600 ~/.mikka/data/device.json',
         ].join('\n'))
         const startedAt = new Date()
-        const start = await sshRun(target, `cd ~/.mikka && nohup ./node_modules/.bin/tsx packages/daemon/bin/mikka.ts daemon --server '${origin}' --data-dir ~/.mikka/data > ~/.mikka/daemon.log 2>&1 < /dev/null & echo started`)
+        const start = await sshRun(target, `cd ~/.mikka && nohup ./node_modules/.bin/tsx packages/daemon/bin/mikka.ts daemon --server '${origin}${BASE_PATH}' --data-dir ~/.mikka/data > ~/.mikka/daemon.log 2>&1 < /dev/null & echo started`)
         if (start.code !== 0) {
           send({ step: 'start', state: 'failed', detail: firstLine(start.stderr) || t('startExitCode', { code: start.code }) })
           return

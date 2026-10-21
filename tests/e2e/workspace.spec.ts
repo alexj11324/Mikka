@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register } from './fixtures'
+import { test, expect, register, app } from './fixtures'
 
 test('未登录访问受保护页面、注册和登录链接', async ({ page }) => {
-  await page.goto('/settings/members')
+  await page.goto(app('/settings/members'))
   await expect(page).toHaveURL(/\/sign-in/)
   await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
   await page.getByRole('link', { name: '创建账号', exact: true }).last().click()
@@ -45,7 +45,7 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await page.getByLabel('邮箱', { exact: true }).fill(account.email)
   await page.getByLabel('密码', { exact: true }).fill(account.password)
   await page.getByRole('button', { name: '登录工作台', exact: true }).click()
-  await expect(page).toHaveURL(url => url.pathname === '/')
+  await expect(page).toHaveURL(url => url.pathname === app('/'))
   await page.getByRole('button', { name: '任务', exact: true }).click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true })).toBeVisible()
 })
