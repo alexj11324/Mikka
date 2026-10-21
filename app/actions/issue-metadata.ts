@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { agents, issues, issueMembers, issueVersions, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
+import { listProjects } from '@/app/actions/projects'
 import { assigneeSchema, issueWithMetadata, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 
 const patchSchema = z.object({
@@ -12,6 +13,8 @@ const patchSchema = z.object({
   project: z.string().trim().min(1).max(100).nullable().optional(),
   labels: z.array(labelSchema).max(12).optional(),
   pullRequests: z.array(pullRequestSchema).max(10).optional(),
+  dueDate: z.iso.date().nullable().optional(),
+  estimate: z.number().int().min(0).max(100).nullable().optional(),
 }).strict()
 export type IssueMetadataPatch = z.infer<typeof patchSchema>
 
@@ -22,10 +25,13 @@ export async function getIssuePropertyOptions(id: string) {
   const availableAgents = await db.select({ id: agents.id, name: agents.name, harness: agents.harness }).from(agents).where(eq(agents.userId, issue.userId))
   const ownedIssues = await db.select({ content: issues.content }).from(issues).where(eq(issues.userId, user.id))
   const metadata = ownedIssues.map(row => readIssueMetadata(row.content))
+  const projectRecords = await listProjects()
   return {
     members: owner ? [owner, ...members.filter(member => member.id !== owner.id)] : members,
     agents: availableAgents,
-    projects: [...new Set(metadata.map(item => item.project).filter((item): item is string => Boolean(item)))].sort(),
+    projects: [...new Set(projectRecords.map(item => item.name))].sort(),
+    projectRecords: projectRecords.map(item => ({ id: item.id, name: item.name })),
+
     labels: [...new Map(metadata.flatMap(item => item.labels).map(label => [label.name, label])).values()],
     isOwner: user.id === issue.userId,
   }

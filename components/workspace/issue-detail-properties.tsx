@@ -1,25 +1,31 @@
 'use client'
 
-import { ChartNoAxesColumnIncreasing, CircleDashed, History, LockKeyhole, Users } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Calendar, ChartNoAxesColumnIncreasing, CircleDashed, Signal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
-import { IssueMetadataControls, type MetadataSavedIssue } from './issue-metadata-controls'
+import { IssueMetadataControls, type MetadataRequest, type MetadataSavedIssue } from './issue-metadata-controls'
 import type { IssueMetadata } from '@/lib/issue-metadata'
 
-export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled, onMetadataBusy, status, priority, revision, createdAt, updatedAt, pending, onStatus, onPriority, onMembers, onHistory }: {
+export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled, onMetadataBusy, status, priority, pending, onStatus, onPriority, request, relations, onDate, onEstimate }: {
   task: { id: string; revision: number; metadata: IssueMetadata }; onMetadataSaved: (issue: MetadataSavedIssue) => void; metadataDisabled: boolean; onMetadataBusy: (busy: boolean) => void
-  status: string; priority: string; revision: number; createdAt: Date | string; updatedAt: Date | string; pending: boolean
-  onStatus: (value: string) => void; onPriority: (value: string) => void; onMembers: () => void; onHistory: () => void
+  status: string; priority: string; pending: boolean; onStatus: (value: string) => void; onPriority: (value: string) => void
+  request: MetadataRequest | null; relations: ReactNode; onDate: () => void; onEstimate: () => void
 }) {
-  return <aside aria-label="任务属性" className="flex w-full shrink-0 flex-col gap-8 px-4 py-6 sm:px-6 lg:sticky lg:top-20 lg:w-60 lg:self-start lg:px-0 lg:py-0 xl:w-72">
-    <div className="flex flex-col items-start gap-2"><h2 className="mb-1 px-2 text-sm font-medium text-muted-foreground">属性</h2>
+  const control = { task, disabled: metadataDisabled, onSaved: onMetadataSaved, onBusyChange: onMetadataBusy, request }
+  return <aside id="issue-properties" aria-label="任务属性" className="flex w-full min-w-0 shrink-0 flex-col gap-7 px-5 py-6 sm:px-8 lg:sticky lg:top-20 lg:w-60 lg:self-start lg:px-0 lg:py-0 xl:w-64">
+    <section className="flex flex-col items-start gap-1"><h2 className="mb-2 px-2 text-xs font-medium text-muted-foreground">属性</h2>
       <IssuePropertyMenu label="任务状态" value={status} options={ISSUE_STATUSES} icon={CircleDashed} disabled={pending} onChange={onStatus} />
       <IssuePropertyMenu label="任务优先级" value={priority} options={ISSUE_PRIORITIES} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} />
-      <div className="flex w-full flex-wrap items-center gap-2"><IssueMetadataControls task={task} disabled={metadataDisabled} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>
-      <Button variant="ghost" size="sm" onClick={onMembers}><Users data-icon="inline-start" />协作成员</Button>
-    </div>
-    <div className="flex flex-col gap-4 px-2"><h2 className="text-xs font-medium text-muted-foreground">访问权限</h2><p className="flex items-center gap-2 text-xs"><LockKeyhole className="size-3.5 text-muted-foreground" />仅授权成员可访问</p></div>
-    <div className="flex flex-col items-start gap-3"><Button size="sm" variant="ghost" onClick={onHistory}><History data-icon="inline-start" />版本历史<span className="text-muted-foreground">v{revision}</span></Button><dl className="flex flex-col gap-3 px-2 text-xs text-muted-foreground"><div className="flex flex-wrap gap-2"><dt>创建于</dt><dd><time dateTime={new Date(createdAt).toISOString()}>{new Date(createdAt).toLocaleDateString('zh-CN')}</time></dd></div><div className="flex flex-wrap gap-2"><dt>更新于</dt><dd><time dateTime={new Date(updatedAt).toISOString()}>{new Date(updatedAt).toLocaleDateString('zh-CN')}</time></dd></div></dl></div>
+      <IssueMetadataControls {...control} section="assignee" />
+      {task.metadata.estimate !== null && <Button variant="ghost" size="sm" disabled={metadataDisabled} onClick={onEstimate}><Signal data-icon="inline-start" />{task.metadata.estimate} 点估算</Button>}
+      {task.metadata.dueDate && <Button variant="ghost" size="sm" disabled={metadataDisabled} onClick={onDate}><Calendar data-icon="inline-start" /><time dateTime={task.metadata.dueDate}>{task.metadata.dueDate}</time></Button>}
+    </section>
+    <section className="flex flex-col items-start gap-2"><h3 className="px-2 text-xs font-medium text-muted-foreground">标签</h3><div className="flex flex-wrap gap-2 px-2"><IssueMetadataControls {...control} section="labels" /></div></section>
+    <section className="flex flex-col items-start gap-1"><h3 className="mb-1 px-2 text-xs font-medium text-muted-foreground">项目</h3><IssueMetadataControls {...control} section="project" /></section>
+    {task.metadata.pullRequests.length > 0 && <section className="flex flex-col items-start gap-2"><h3 className="px-2 text-xs font-medium text-muted-foreground">关联 PR</h3><div className="flex flex-wrap gap-2 px-2"><IssueMetadataControls {...control} section="pullRequests" /></div></section>}
+    {task.metadata.pullRequests.length === 0 && request?.target === 'pullRequests' && <IssueMetadataControls {...control} section="pullRequests" />}
+    <div className="flex min-w-0 flex-col gap-6 px-2">{relations}</div>
   </aside>
 }

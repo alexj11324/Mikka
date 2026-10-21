@@ -33,7 +33,7 @@ import { CommentMark, CommentPaint, addThread, createThreadStore, replyToThread,
 const EMPTY_DOCUMENT: JSONContent = { type: "doc", content: [{ type: "paragraph" }] }
 const EMPTY_THREADS: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadIndex = {}
 
-function createEditorExtensions(isOpen: (id: string) => boolean, author: string, collaborative: boolean, compact = false) {
+export function createEditorExtensions(isOpen: (id: string) => boolean, author: string, collaborative: boolean, compact = false) {
   return [
     ...createRichTextExtensions({ placeholder: compact ? '添加描述…' : '描述背景与验收标准，输入 / 插入内容…', collaborative }),
     RichTextBlockActions, RichTextTable, RichTextOutlineBlock, createRichTextMention([]),
@@ -49,7 +49,7 @@ export function createDocumentSeed(content: JSONContent) {
   doc.destroy()
   return update
 }
-export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作者', syncLabel = '未保存草稿', replacement, persisted = false, compact = false, layout = 'document', activity, label = '任务描述', disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; label?: string; disabled?: boolean }) {
+export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作者', syncLabel = '未保存草稿', replacement, persisted = false, compact = false, layout = 'document', activity, afterDescription, label = '任务描述', disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
   const [localDoc] = useState(() => new Y.Doc())
   const threadDoc = sharedDoc ?? localDoc
   const threadStore = useMemo(() => createThreadStore(threadDoc), [threadDoc])
@@ -129,10 +129,10 @@ export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作�
 
   if (compact || layout === 'description' || layout === 'issue') return <TooltipProvider delay={300}>
     <section aria-label={`${label}编辑器`} className="flex min-w-0 flex-col gap-2">
-      <div className={cn('min-w-0 [--frame-panel-header-px:--spacing(2)] [--frame-panel-header-py:--spacing(2)]', layout === 'description' ? '[&>[role=toolbar]]:rounded-lg [&>[role=toolbar]]:border' : 'rounded-lg border')}>
-        <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />
+      <div className={cn('min-w-0 [--frame-panel-header-px:--spacing(2)] [--frame-panel-header-py:--spacing(2)]', layout === 'description' ? '[&>[role=toolbar]]:rounded-lg [&>[role=toolbar]]:border' : layout === 'issue' ? '' : 'rounded-lg border')}>
+        {layout !== 'issue' && <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
         <div ref={pageRef} className="relative min-w-0">
-          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-36 px-4 py-4 text-sm/7', layout === 'description' ? 'sm:pl-16' : 'sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-28 py-2 text-sm/7', layout === 'description' ? 'px-4 sm:pl-16' : layout === 'issue' ? 'px-0' : 'px-4 sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
           {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
         </div>
       </div>
@@ -147,6 +147,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作�
         {commentError && <p role="alert" className="text-xs text-destructive">{commentError}</p>}
       </div>}</>}
     </section>
+    {layout === 'issue' && !compact && afterDescription}
     {layout === 'issue' && !compact && <IssueActivity author={author} threads={threadList} anchors={anchors} events={activity} onComment={body => {
       const now = new Date().toISOString()
       addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, createdAt: now, messages: [{ author, body, at: now }] }, 'issue-discussion')

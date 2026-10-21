@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { MetadataRequest } from './issue-metadata-controls'
 import useSWR from 'swr'
 import { Bot, Check, CircleUserRound, Send, UserRound } from 'lucide-react'
 import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
@@ -16,13 +17,14 @@ export function AssigneeAvatar({ assignee, compact = false }: { assignee: IssueM
   return <Avatar size={compact ? 'xs' : 'sm'}><AvatarImage src={assignee.image ?? undefined} alt="" draggable={false} /><AvatarFallback>{assignee.name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
 }
 
-export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, onInvite }: {
+export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, onInvite, request }: {
   id: string; assignee: IssueMetadata['assignee']; disabled?: boolean; compact?: boolean
   onChange: (value: { kind: 'member' | 'agent'; id: string } | null) => Promise<boolean>
-  onInvite: () => void
+  onInvite: () => void; request?: MetadataRequest | null
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  useEffect(() => { if (request?.target === 'assignee') { setOpen(true); setQuery('') } }, [request])
   const { data, error, mutate } = useSWR(open ? ['issue-property-options', id] : null, () => getIssuePropertyOptions(id))
   async function select(value: { kind: 'member' | 'agent'; id: string } | null) {
     if (await onChange(value)) { setOpen(false); setQuery('') }

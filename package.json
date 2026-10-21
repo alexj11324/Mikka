@@ -15,9 +15,9 @@
     "test:e2e": "playwright test",
     "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
     "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
-    "check": "pnpm test:ui-policy && pnpm test:csv && pnpm lint && pnpm typecheck",
+    "check": "pnpm test:ui-policy && pnpm test:csv && pnpm test:issues && pnpm lint && pnpm typecheck",
     "check:ci": "pnpm check && pnpm build && pnpm test:e2e",
-    "test:issues": "node --test scripts/issue-checklist.test.mjs scripts/issue-metadata.test.mjs",
+    "test:issues": "node --test scripts/issue-checklist.test.mjs scripts/issue-metadata.test.mjs scripts/issue-relations.test.mjs",
     "start": "next start",
     "typecheck": "tsgo --noEmit"
   },

@@ -1,9 +1,9 @@
 'use client'
 
-import { ArrowDown, ArrowUp, Check, FileText, History, MoreHorizontal, Users, X } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { ArrowDown, ArrowUp, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -11,12 +11,12 @@ import { WORKSPACE_NAME, issueIdentifier } from './issue-properties'
 
 export type IssueDetailNavigation = { index: number; total: number; onOpen: (offset: -1 | 1) => void }
 
-export function IssueDetailHeader({ number, title, saveLabel, saved, pending, documentTools, navigation, onDocumentTools, onHistory, onMembers, onClose }: {
-  number: number | undefined; title: string; saveLabel: string; saved: boolean; pending: boolean; documentTools: boolean
-  navigation: IssueDetailNavigation
-  onDocumentTools: () => void; onHistory: () => void; onMembers: () => void; onClose: () => void
+export function IssueDetailHeader({ number, title, saveLabel, saved, pending, navigation, actions, onClose }: {
+  number: number | undefined; title: string; saveLabel: string; saved: boolean; pending: boolean
+  navigation: IssueDetailNavigation; actions: ReactNode
+  onClose: () => void
 }) {
-  return <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b bg-background px-3 sm:px-4">
+  return <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 bg-background px-3 sm:px-4">
     <div className="flex min-w-0 flex-1 items-center gap-2">
       <SidebarTrigger className="-ml-1" aria-label="展开或收起侧栏" />
       <Separator orientation="vertical" className="mr-1 data-vertical:h-4 data-vertical:self-auto" />
@@ -33,11 +33,7 @@ export function IssueDetailHeader({ number, title, saveLabel, saved, pending, do
       <Tooltip><TooltipTrigger render={<span tabIndex={0} className="mr-2 hidden items-center gap-1.5 text-xs text-muted-foreground md:flex" />}>
         {saved && <span className="inline-flex"><Check className="size-3.5" aria-hidden="true" /></span>}<span>{saveLabel}</span>
       </TooltipTrigger><TooltipContent>标题、描述和属性会自动保存</TooltipContent></Tooltip>
-      <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="更多任务操作" disabled={pending} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuGroup>
-        <DropdownMenuItem onClick={onDocumentTools}><FileText />{documentTools ? '返回任务描述' : '高级文档工具'}</DropdownMenuItem>
-        <DropdownMenuItem onClick={onHistory}><History />版本历史</DropdownMenuItem>
-        <DropdownMenuItem onClick={onMembers}><Users />管理协作成员</DropdownMenuItem>
-      </DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
+      {actions}
       {navigation.index >= 0 && <>
         <span className="hidden px-2 text-xs tabular-nums text-muted-foreground sm:inline">{navigation.index + 1} / {navigation.total}</span>
         <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label="上一个任务" disabled={pending || navigation.index === 0} onClick={() => navigation.onOpen(-1)} />}><ArrowUp /></TooltipTrigger><TooltipContent>上一个任务</TooltipContent></Tooltip>

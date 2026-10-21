@@ -14,6 +14,15 @@ export const metadataSchema = z.object({
   project: z.string().trim().max(100).nullable().default(null),
   labels: z.array(labelSchema).max(12).default([]),
   pullRequests: z.array(pullRequestSchema).max(10).default([]),
+  parentId: z.uuid().nullable().default(null),
+  blockedByIds: z.array(z.uuid()).max(100).default([]),
+  relatedIds: z.array(z.uuid()).max(100).default([]),
+  duplicateOfId: z.uuid().nullable().default(null),
+  dueDate: z.iso.date().nullable().default(null),
+  estimate: z.number().int().min(0).max(100).nullable().default(null),
+  favoriteUserIds: z.array(z.string().max(128)).max(200).default([]),
+  subscriberUserIds: z.array(z.string().max(128)).max(200).default([]),
+  deletedAt: z.iso.datetime().nullable().default(null),
 })
 export type IssueMetadata = z.infer<typeof metadataSchema>
 export type IssueLabel = z.infer<typeof labelSchema>
@@ -21,7 +30,7 @@ export type IssuePullRequest = z.infer<typeof pullRequestSchema>
 
 export function readIssueMetadata(content: JSONContent): IssueMetadata {
   const parsed = metadataSchema.safeParse(content.attrs?.orvilo)
-  return parsed.success ? parsed.data : { assignee: null, project: null, labels: [], pullRequests: [] }
+  return parsed.success ? parsed.data : metadataSchema.parse({})
 }
 
 export function withIssueMetadata(content: JSONContent, metadata: IssueMetadata): JSONContent {

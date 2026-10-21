@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import { changeIssuePriority, moveIssue, type listIssues } from '@/app/actions/issues'
 import { type KanbanCommitMeta } from '@/components/reui/kanban'
 import { KanbanBoard } from '@/components/blocks/kanban-board-1/components/kanban-board'
@@ -110,7 +111,6 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
     void persist(issue, { priority }, columns)
   }
 
-<<<<<<< HEAD
   return <section aria-label="任务看板" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 px-4 pb-2 sm:px-6">
     <div className="flex shrink-0 items-center justify-between gap-3">
       <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || '点击卡片打开详情，拖动卡片或使用状态菜单更新状态。'}</p>
@@ -120,17 +120,11 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
       </div>
     </div>
     <p id={instructionsId} className="sr-only">使用触控板左右滑动、底部滚动条或左右按钮浏览。聚焦此区域后，可用左右方向键滚动，Home 返回开头，End 移至末尾。聚焦卡片后，按 Enter 打开详情，按空格开始拖动，使用方向键跨列移动，再按空格放下；Escape 取消。</p>
-    <KanbanBoard value={columns} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onCreate={onCreate} onStatusChange={changeStatus} onPriorityChange={changePriority} viewportRef={viewportRef} viewportId={viewportId} instructionsId={instructionsId} onViewportKeyDown={event => {
-=======
-  return <section aria-label="任务看板" className="flex min-h-0 min-w-0 flex-1 select-none flex-col px-4 pb-2 sm:px-6">
-    <p role="status" aria-live="polite" className="sr-only">{message}</p>
-    <p id={instructionsId} className="sr-only">使用触控板左右滑动或底部滚动条浏览。聚焦此区域后，可用左右方向键滚动，Home 返回开头，End 移至末尾。聚焦卡片后，按 Enter 打开详情，按空格开始拖动，使用方向键跨列移动，再按空格放下；Escape 取消。</p>
     <KanbanBoard value={columns} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onCreate={onCreate} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
       setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
       setMessage('任务属性已保存。')
       void onUpdated().catch(() => {})
     }} viewportRef={viewportRef} viewportId={viewportId} instructionsId={instructionsId} onViewportKeyDown={event => {
->>>>>>> 227aae8 (feat: add issueVersions and metadata handling in collaboration actions)
       if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         event.preventDefault()

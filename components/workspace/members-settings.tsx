@@ -127,6 +127,7 @@ export function MembersSettings({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const downloadRef = useRef<HTMLAnchorElement>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | undefined>();
   const canManage = data.role === "admin" && !fetchError;
   const query = search.trim().toLowerCase();
   const members = data.members
@@ -225,6 +226,7 @@ export function MembersSettings({
     const url = URL.createObjectURL(
       new Blob([memberCsv(rows)], { type: "text/csv;charset=utf-8" }),
     );
+    setDownloadUrl(url);
     downloadRef.current.href = url;
     downloadRef.current.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -369,6 +371,7 @@ export function MembersSettings({
               </div>
               <a
                 ref={downloadRef}
+                href={downloadUrl}
                 className="sr-only"
                 download="members.csv"
                 tabIndex={-1}

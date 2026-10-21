@@ -18,7 +18,7 @@ export const ISSUE_PRIORITIES = [
 ] as const
 
 export type IssueStatus = typeof ISSUE_STATUSES[number]['value']
-export type IssueView = 'all' | 'mine' | 'shared' | IssueStatus
+export type IssueView = 'all' | 'mine' | 'shared' | 'favorites' | 'following' | IssueStatus
 export const WORKSPACE_NAME = 'Orvilo3'
 export const WORKSPACE_SLUG = 'orvilo3'
 

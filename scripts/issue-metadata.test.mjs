@@ -5,12 +5,12 @@ import { issueWithMetadata, readIssueMetadata, withIssueMetadata, metadataSchema
 const metadata = { number: 155, assignee: { kind: 'member', id: 'member-1', name: '测试成员', image: null }, project: '任务管理', labels: [{ name: 'Feature', color: 'violet' }], pullRequests: [{ url: 'https://github.com/alexj11324/Orvilo3/pull/81', state: 'open' }] }
 
 test('legacy documents have no invented attributes', () => {
-  assert.deepEqual(readIssueMetadata({ type: 'doc' }), { assignee: null, project: null, labels: [], pullRequests: [] })
+  assert.deepEqual(readIssueMetadata({ type: 'doc' }), metadataSchema.parse({}))
 })
 test('attributes round-trip through persisted JSON without altering body content', () => {
   const content = { type: 'doc', attrs: { other: 'preserved' }, content: [{ type: 'paragraph', content: [{ type: 'text', text: '真实正文' }] }] }
   const saved = JSON.parse(JSON.stringify(withIssueMetadata(content, metadata)))
-  assert.deepEqual(readIssueMetadata(saved), metadata)
+  assert.deepEqual(readIssueMetadata(saved), metadataSchema.parse(metadata))
   assert.deepEqual(saved.content, content.content)
   assert.equal(saved.attrs.other, 'preserved')
   assert.equal(content.attrs.orvilo, undefined)
@@ -18,7 +18,7 @@ test('attributes round-trip through persisted JSON without altering body content
 test('collaborative body replacement preserves the latest card attributes', () => {
   const latest = withIssueMetadata({ type: 'doc' }, metadata)
   const synchronized = withIssueMetadata({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '协作更新' }] }] }, readIssueMetadata(latest))
-  assert.deepEqual(readIssueMetadata(synchronized), metadata)
+  assert.deepEqual(readIssueMetadata(synchronized), metadataSchema.parse(metadata))
   assert.equal(synchronized.content[0].content[0].text, '协作更新')
 })
 test('issue hydration exposes stable numeric identifiers', () => {
