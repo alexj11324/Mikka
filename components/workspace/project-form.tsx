@@ -36,7 +36,7 @@ export function ProjectForm({ project, onClose, onSaved }: { project?: Project; 
     submitting.current = true; setPending(true); setError('')
     try {
       const result = await saveProject({ id: project?.id, revision: project?.revision, name, summary, description, status: status as 'backlog', priority: priority as 'normal', lead: lead as '' | 'me', team: WORKSPACE_NAME, startDate, targetDate })
-      if (result.error || !result.project) { setError(result.error ?? '保存失败。'); return }
+      if (!('project' in result) || !result.project) { setError(result.error ?? '保存失败。'); return }
       onSaved(result.project)
     } catch { setError('保存失败，输入已保留，请重试。') }
     finally { submitting.current = false; setPending(false) }

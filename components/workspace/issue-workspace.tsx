@@ -97,7 +97,7 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
       try {
         const result = await authClient.signOut()
         if (result.error) throw new Error('sign out failed')
-        await mutate([], { revalidate: false }); router.replace('/sign-in'); router.refresh()
+        await mutate([], { revalidate: false }); router.replace('/sign-in?login=1'); router.refresh()
       } catch { setAccountError('退出失败，请稍后重试。'); setSigningOut(false) }
     })
   }

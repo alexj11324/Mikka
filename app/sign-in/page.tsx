@@ -3,14 +3,16 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth, githubEnabled, authBaseURL } from '@/lib/auth'
 import { AuthForm } from '@/components/auth-form'
+import { isAcceptanceEnabled } from '@/lib/acceptance'
 export const metadata: Metadata = {
   title: '登录 · Orvilo2',
   description: '登录 Orvilo2 工作台，继续管理任务与文档。',
 }
 
-export default async function SignInPage({ searchParams }: { searchParams: Promise<{ oauth?: string; continue?: string }> }) {
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ oauth?: string; continue?: string; login?: string; error?: string }> }) {
   const query = await searchParams
   const session = await auth.api.getSession({ headers: await headers() })
   if (session?.user) redirect('/')
+  if (isAcceptanceEnabled() && query.login !== '1' && !query.oauth && !query.continue && !query.error) redirect('/api/acceptance')
   return <AuthForm mode="sign-in" githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean((query as Record<string, string>).error)} continueGitHub={query.continue === 'github'} callbackURL={authBaseURL ? `${authBaseURL.replace(/\/$/, '')}/api/auth/callback/github` : undefined} />
 }
