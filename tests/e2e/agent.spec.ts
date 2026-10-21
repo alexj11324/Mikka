@@ -554,6 +554,32 @@ field = FormControl("项目名称", Input("projectName", "输入项目名称", "
 buttons = Buttons([Button("提交回答并继续", @ToAssistant("请根据填写的项目名称细化项目计划"), "primary")])
 note = TextContent("表单提交后直接继续提供建议，不会创建项目。")`
 
+test('代码块按需高亮，正文和复制功能保持可用', async ({ page }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await register(page)
+  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
+  const code = 'const answer = 42;'
+  const response = `root = TextContent(${JSON.stringify(`代码示例：\n\n\`\`\`javascript\n${code}\n\`\`\``)})`
+  await page.route('**/api/agent', route => route.fulfill({
+    status: 200,
+    contentType: 'text/event-stream',
+    headers: { 'x-vercel-ai-ui-message-stream': 'v1' },
+    body: openUIStream(response),
+  }))
+  await panel.getByRole('textbox', { name: '向 Agent 提问' }).fill('给出 JavaScript 代码示例')
+  await panel.getByRole('button', { name: '发送消息' }).click()
+  await expect(panel.getByText('代码示例：', { exact: true })).toBeVisible()
+  const block = panel.locator('.openui-code-block-syntax-highlighter')
+  await expect(block).toContainText(code)
+  const keyword = block.locator('code span').filter({ hasText: /^const$/ })
+  await expect(keyword).toHaveAttribute('style', /color:/)
+  await panel.getByRole('button', { name: 'Copy code', exact: true }).click()
+  await expect(panel.getByRole('button', { name: 'Copied to clipboard', exact: true })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(code)
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+})
+
 test('OpenUI 表格、Tabs 和表单直接提交，兼容按钮续问且会话稳定', async ({ page }) => {
   await register(page)
   await page.getByRole('button', { name: 'Agent', exact: true }).click()
