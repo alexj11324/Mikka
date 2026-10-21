@@ -5,6 +5,7 @@ import { listIssues } from '@/app/actions/issues'
 import { IssueWorkspace } from '@/components/workspace/issue-workspace'
 
 export default async function Page() {
+  if (process.env.NODE_ENV === 'development') redirect('/preview/settings')
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/sign-in')
   const initialIssues = await listIssues()
