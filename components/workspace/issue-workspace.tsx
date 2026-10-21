@@ -129,7 +129,7 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
   return <TooltipProvider><SidebarProvider>
     <AppSidebar user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
     <SidebarInset className="min-w-0">
-      <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b px-4">
+      <header className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
         <div className="flex min-w-0 items-center gap-2">
           <WorkspaceSidebarTrigger />
           <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />

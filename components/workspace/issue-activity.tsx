@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/textarea'
-import { Separator } from '@/components/ui/separator'
 
 export function IssueActivity({ author, threads, anchors, events, onComment, onReply, onResolve, onSelect }: {
   author: string
@@ -29,7 +28,6 @@ export function IssueActivity({ author, threads, anchors, events, onComment, onR
     setBody('')
   }
   return <section aria-label="任务活动" className="flex flex-col gap-6">
-    <Separator />
     <div className="flex items-center gap-2"><h2 className="text-sm font-semibold">活动</h2><span className="text-xs text-muted-foreground">{threads.length ? `${threads.length} 条讨论` : '更新与讨论'}</span></div>
     {events}
     {[...threads].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(thread => <article key={thread.id} className="flex gap-3">

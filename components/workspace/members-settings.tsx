@@ -73,7 +73,6 @@ import {
   EmptyDescription,
   EmptyMedia,
 } from "@/components/ui/empty";
-import { Separator } from "@/components/ui/separator";
 
 async function fetchSettings(url: string): Promise<WorkspaceSettings> {
   const response = await fetch(url);
@@ -233,7 +232,7 @@ export function MembersSettings({
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground md:flex-row">
       <aside
-        className="flex shrink-0 flex-col gap-7 border-b p-3 md:w-60 md:border-0 md:py-5"
+        className="flex shrink-0 flex-col gap-7 p-3 md:w-60 md:py-5"
         aria-label="工作区设置导航"
       >
         <Link
@@ -290,7 +289,7 @@ export function MembersSettings({
           </Link>
         </div>
         <div className="mt-auto hidden flex-col gap-3 px-3 pb-2 md:flex">
-          <Separator />
+
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Shield className="size-3.5" />
             {data.role === "admin" ? "管理员访问权限" : "成员访问权限"}
