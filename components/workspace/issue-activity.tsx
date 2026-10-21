@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/textarea'
+import { ShortcutKeys } from '@/components/shortcut-keys'
 
 export function IssueActivity({ author, threads, anchors, events, onComment, onReply, onResolve, onSelect }: {
   author: string
@@ -42,7 +43,7 @@ export function IssueActivity({ author, threads, anchors, events, onComment, onR
     </article>)}
     <form onSubmit={event => { event.preventDefault(); submit() }} className="flex gap-3" onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); submit() } }}>
       <Avatar className="size-7 shrink-0"><AvatarFallback>{author.slice(0, 1)}</AvatarFallback></Avatar>
-      <div className="flex min-w-0 flex-1 flex-col gap-2"><FieldGroup><Field><FieldLabel htmlFor="issue-comment" className="sr-only">评论内容</FieldLabel><Textarea id="issue-comment" value={body} onChange={event => setBody(event.target.value)} placeholder="留下评论…" maxLength={2000} /></Field></FieldGroup><div className="flex items-center justify-between gap-2"><span className="text-xs text-muted-foreground">⌘ / Ctrl + Enter 发送</span><Button type="submit" size="icon-sm" disabled={!body.trim()} aria-label="发送评论"><ArrowUp data-icon="inline-start" /></Button></div></div>
+      <div className="flex min-w-0 flex-1 flex-col gap-2"><FieldGroup><Field><FieldLabel htmlFor="issue-comment" className="sr-only">评论内容</FieldLabel><Textarea id="issue-comment" value={body} onChange={event => setBody(event.target.value)} placeholder="留下评论…" maxLength={2000} /></Field></FieldGroup><div className="flex items-center justify-between gap-2"><span className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShortcutKeys keys={['mod', 'Enter']} />发送</span><Button type="submit" size="icon-sm" disabled={!body.trim()} aria-label="发送评论"><ArrowUp data-icon="inline-start" /></Button></div></div>
     </form>
   </section>
 }

@@ -41,7 +41,7 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await page.getByRole('menuitem', { name: '切换工作区', exact: true }).hover()
   const switcher = page.getByRole('menu', { name: '切换工作区', exact: true })
   await expect(switcher).toContainText(account.email)
-  await expect(switcher.getByRole('menuitem', { name: '创建或加入工作区', exact: true })).toBeVisible()
+  await expect(switcher.getByRole('menuitem', { name: '创建工作区', exact: true })).toBeVisible()
   await expect(switcher.getByRole('menuitem', { name: '添加账户', exact: true })).toBeVisible()
   await expect(switcher.getByRole('menuitem', { name: '个人资料', exact: true })).toHaveCount(0)
   await expect(switcher.getByRole('menuitem', { name: '切换明暗主题', exact: true })).toHaveCount(0)

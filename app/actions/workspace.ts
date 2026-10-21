@@ -18,7 +18,7 @@ async function result<T>(operation: () => Promise<T>) {
   try { return { ok: true as const, data: await operation() } }
   catch (error) {
     if (error instanceof WorkspaceError) return { ok: false as const, error: error.message }
-    if (error instanceof z.ZodError) return { ok: false as const, error: '请检查邮箱、角色或操作参数。' }
+    if (error instanceof z.ZodError) return { ok: false as const, error: '请检查填写内容或操作参数。' }
     console.error('Workspace operation failed', error instanceof Error ? error.name : 'UnknownError')
     return { ok: false as const, error: '操作未完成，请刷新页面或稍后重试。' }
   }
@@ -28,17 +28,18 @@ async function rememberWorkspace(workspaceId: string) {
   ;(await cookies()).set('orvilo-workspace', workspaceId, { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' : 'lax', secure: true, path: '/', maxAge: 31536000 })
 }
 
-export async function createWorkspace(name: string) {
+export async function createWorkspace(input: { name: string; slug: string }) {
   return result(async () => {
     const user = await requireUser()
-    const validName = z.string().trim().min(1).max(120).parse(name)
+    const { name, slug } = z.object({ name: z.string().trim().min(1).max(120), slug: z.string().trim().min(3).max(64).regex(/^[a-z0-9]([a-z0-9-]{1,62}[a-z0-9])$/) }).parse(input)
     const workspaceId = crypto.randomUUID()
     await workspaceDb.transaction(async tx => {
-      await tx.insert(workspaces).values({ id: workspaceId, userId: user.id, name: validName })
+      const [created] = await tx.insert(workspaces).values({ id: workspaceId, userId: user.id, name, slug }).onConflictDoNothing({ target: workspaces.slug }).returning({ id: workspaces.id })
+      if (!created) throw new WorkspaceError('此工作区网址已被使用，请换一个。')
       await tx.insert(workspaceMembers).values({ workspaceId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: 'admin' })
     })
     await rememberWorkspace(workspaceId)
-    return { workspaceId }
+    return { workspaceId, slug }
   })
 }
 

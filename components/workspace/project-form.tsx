@@ -22,6 +22,7 @@ import { PROJECT_COLORS, PROJECT_ICON_COLORS, type Project, type ProjectControlF
 import { ProjectPicker, ProjectPropertyControl } from './project-property-controls'
 import { ProjectMilestones } from './project-milestones'
 import { WORKSPACE_NAME } from './issue-properties'
+import { ShortcutKeys } from '@/components/shortcut-keys'
 
 const FIELDS: ProjectControlField[] = ['status', 'priority', 'lead', 'members', 'startDate', 'targetDate', 'labels', 'dependencyIds']
 
@@ -70,7 +71,7 @@ export function ProjectForm({ project, initialTeamId = '', projects = [], userNa
         <ProjectMilestones value={draft.properties.milestones} disabled={pending} onChange={milestones => setDraft(current => ({ ...current, properties: { ...current.properties, milestones } }))} />
         {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
       </div>
-      <footer className="flex shrink-0 items-center justify-end gap-3 px-5 py-4 sm:px-7"><span className="mr-auto hidden text-xs text-muted-foreground sm:inline">⌘ / Ctrl + Enter {project ? '保存' : '创建'}</span><Button type="submit" className="rounded-full bg-project-action px-4 text-project-action-foreground hover:bg-project-action/90" disabled={pending || !draft.name.trim()}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}{pending ? '正在保存…' : project ? '保存修改' : '创建项目'}</Button></footer>
+      <footer className="flex shrink-0 items-center justify-end gap-3 px-5 py-4 sm:px-7"><span className="mr-auto hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><ShortcutKeys keys={['mod', 'Enter']} />{project ? '保存' : '创建'}</span><Button type="submit" className="rounded-full bg-project-action px-4 text-project-action-foreground hover:bg-project-action/90" disabled={pending || !draft.name.trim()}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}{pending ? '正在保存…' : project ? '保存修改' : '创建项目'}</Button></footer>
     </form>
   </DialogContent></Dialog>
 }

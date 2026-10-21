@@ -5,6 +5,7 @@ import { FieldError } from '@/components/ui/field'
 import { cn } from '@/lib/utils'
 import { readProjectDescription } from '@/lib/project-description'
 import { IssueEditor } from './issue-editor'
+import { useShortcutLabel } from '@/components/shortcut-keys'
 
 type TextField = 'name' | 'description'
 const FIELD_OPTIONS = {
@@ -14,6 +15,7 @@ const FIELD_OPTIONS = {
 
 export function ProjectTextEditor({ field, value, onSave, onRegisterFlush }: { field: TextField; value: string; onSave: (value: string) => Promise<boolean>; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }) {
   const id = useId()
+  const saveShortcut = useShortcutLabel(['mod', 'Enter'])
   const options = FIELD_OPTIONS[field]
   const [draft, setDraft] = useState(value)
   const [initialContent] = useState(() => readProjectDescription(value))
@@ -57,21 +59,21 @@ export function ProjectTextEditor({ field, value, onSave, onRegisterFlush }: { f
           const next = field === 'description' ? latest.current : latest.current.trim()
           if (field === 'name' && !next) { setError('项目名称不能为空。'); return false }
           if (next.length > FIELD_OPTIONS[field].maxLength) { setError('内容超过长度限制，请精简后再保存。'); return false }
-          if (next !== acknowledged.current && !await saveRef.current(next)) { setError('自动保存失败，输入已保留；点击其他位置或按 ⌘ / Ctrl + Enter 重试。'); return false }
+          if (next !== acknowledged.current && !await saveRef.current(next)) { setError(`自动保存失败，输入已保留；点击其他位置或按 ${saveShortcut} 重试。`); return false }
           acknowledged.current = next
           dirty.current = (field === 'description' ? latest.current : latest.current.trim()) !== next
           setHasChanges(dirty.current)
         } while (dirty.current && !composing.current)
         return !dirty.current
       } catch {
-        setError('自动保存失败，输入已保留；点击其他位置或按 ⌘ / Ctrl + Enter 重试。')
+        setError(`自动保存失败，输入已保留；点击其他位置或按 ${saveShortcut} 重试。`)
         return false
       } finally { setSaving(false) }
     })()
     flight.current = operation
     void operation.finally(() => { flight.current = null })
     return operation
-  }, [field])
+  }, [field, saveShortcut])
 
   useEffect(() => {
     onRegisterFlush(save)

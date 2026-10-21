@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Kbd, KbdGroup } from '@/components/ui/kbd'
 import { ISSUE_STATUSES, issueIdentifier } from './issue-properties'
 
 export function IssueSearch({ open, onOpenChange, issues, onOpen, onCreate }: {
@@ -33,6 +34,7 @@ export function IssueSearch({ open, onOpenChange, issues, onOpen, onCreate }: {
           <CommandGroup heading="快捷操作"><CommandItem value="新建任务 create issue" onSelect={() => { onOpenChange(false); onCreate() }}><Plus />新建任务</CommandItem></CommandGroup>
         </CommandList>
       </Command>
+      <div className="flex flex-wrap items-center gap-4 bg-muted/30 px-4 py-3 text-xs text-muted-foreground"><span className="flex items-center gap-1.5"><KbdGroup><Kbd>↑</Kbd><Kbd>↓</Kbd></KbdGroup>选择</span><span className="flex items-center gap-1.5"><Kbd>Enter</Kbd>打开</span><span className="ml-auto flex items-center gap-1.5"><Kbd>Esc</Kbd>关闭</span></div>
     </DialogContent>
   </Dialog>
 }

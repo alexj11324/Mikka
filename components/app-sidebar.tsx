@@ -8,6 +8,9 @@ import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Sea
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
+import { Kbd } from '@/components/ui/kbd'
+import { ShortcutKeys } from '@/components/shortcut-keys'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { WorkspaceSection } from '@/components/workspace/workspace-navigation'
@@ -36,8 +39,8 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
         <SidebarMenu className="min-w-0 flex-1"><SidebarMenuItem>
           <WorkspaceMenu user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} onBeforeChange={onBeforeChange} />
         </SidebarMenuItem></SidebarMenu>
-        <Button variant="ghost" size="icon-sm" aria-label="搜索任务" title="搜索任务（⌘ / Ctrl K）" onClick={() => { setOpenMobile(false); onSearch() }}><Search data-icon="inline-start" /></Button>
-        <Button variant="secondary" size="icon-sm" aria-label="新建任务" title="新建任务（C）" onClick={() => { setOpenMobile(false); onCreate() }}><SquarePen data-icon="inline-start" /></Button>
+        <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label="搜索任务" aria-keyshortcuts="Control+k Meta+k" onClick={() => { setOpenMobile(false); onSearch() }} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">搜索任务<ShortcutKeys keys={['mod', 'K']} /></TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger render={<Button variant="secondary" size="icon-sm" aria-label="新建任务" aria-keyshortcuts="c" onClick={() => { setOpenMobile(false); onCreate() }} />}><SquarePen data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">新建任务<Kbd>C</Kbd></TooltipContent></Tooltip>
       </div>
     </SidebarHeader>
     <SidebarContent className="gap-5">

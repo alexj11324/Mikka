@@ -20,11 +20,13 @@ import { useProjectUpdate } from './use-project-update'
 import { ProjectTextEditor } from './project-text-editor'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useShortcutLabel } from '@/components/shortcut-keys'
 
 export function ProjectDetail({ project, projects, issues, userName, onBack, onOpenIssue, onCreateIssue, onUpdated }: { project: Project; projects: Project[]; issues: Awaited<ReturnType<typeof listIssues>>; userName: string; onBack: () => void; onOpenTeam: () => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void }) {
   const [editing, setEditing] = useState(false)
   const [linking, setLinking] = useState(false)
   const [showDetails, setShowDetails] = useState(true)
+  const detailsShortcut = useShortcutLabel(['mod', 'I'])
   const [tab, setTab] = useState('overview')
   const { update, pending, error: saveError } = useProjectUpdate(onUpdated)
   const flushes = useRef(new Map<string, () => Promise<boolean>>())
@@ -52,7 +54,7 @@ export function ProjectDetail({ project, projects, issues, userName, onBack, onO
   return <div className="flex min-w-0 flex-1 flex-col">
     <div className="flex items-center justify-between gap-2 px-4 py-2"><div className="flex min-w-0 items-center gap-2"><Button variant="ghost" size="icon-sm" aria-label="返回项目列表" onClick={() => { void afterSave(onBack) }}><ArrowLeft data-icon="inline-start" /></Button><Box className={cn('size-4 shrink-0', PROJECT_ICON_TINTS[project.properties.color])} /><span className="truncate text-sm">{project.name}</span></div><Button variant="ghost" size="sm" onClick={() => { void afterSave(() => setEditing(true)) }}><Pencil data-icon="inline-start" />编辑项目</Button></div>
     <Tabs value={tab} onValueChange={value => { void afterSave(() => setTab(String(value))) }} className="min-w-0 flex-1 gap-0">
-      <div className="flex items-center justify-between gap-3 px-4 py-3"><TabsList><TabsTrigger value="overview">概览</TabsTrigger><TabsTrigger value="activity">活动</TabsTrigger><TabsTrigger value="issues">任务<Badge variant="secondary">{linked.length}</Badge></TabsTrigger></TabsList><Button variant="ghost" size="icon-sm" aria-label="切换项目属性侧栏" aria-pressed={showDetails} title="⌘ / Ctrl I" onClick={() => setShowDetails(value => !value)}><PanelRight data-icon="inline-start" /></Button></div>
+      <div className="flex items-center justify-between gap-3 px-4 py-3"><TabsList><TabsTrigger value="overview">概览</TabsTrigger><TabsTrigger value="activity">活动</TabsTrigger><TabsTrigger value="issues">任务<Badge variant="secondary">{linked.length}</Badge></TabsTrigger></TabsList><Button variant="ghost" size="icon-sm" aria-label="切换项目属性侧栏" aria-pressed={showDetails} title={detailsShortcut} onClick={() => setShowDetails(value => !value)}><PanelRight data-icon="inline-start" /></Button></div>
       <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
         <div className="min-w-0 flex-1">
           <TabsContent value="overview" className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-8 sm:px-12 lg:py-16">

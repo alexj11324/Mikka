@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { Check, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
@@ -8,7 +8,7 @@ import { authClient } from '@/lib/auth-client'
 import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import { switchWorkspace } from '@/app/actions/workspace'
-import { WorkspaceAccessDialog } from '@/components/workspace/workspace-access-dialog'
+import { ShortcutKeys } from '@/components/shortcut-keys'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,9 +36,22 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
 }) {
   const { setOpenMobile } = useSidebar()
   const { data, error, mutate } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
-  const [accessOpen, setAccessOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const workspaceName = data?.workspace.name ?? '工作区'
+  useEffect(() => {
+    function shortcut(event: KeyboardEvent) {
+      if (event.isComposing || event.keyCode === 229 || event.repeat || pending || signingOut || event.altKey || event.shiftKey) return
+      if (!(event.ctrlKey || event.metaKey) || event.code !== 'Comma') return
+      if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="alertdialog"]')) return
+      event.preventDefault()
+      setMenuOpen(false)
+      onSettings('/settings')
+      setOpenMobile(false)
+    }
+    window.addEventListener('keydown', shortcut)
+    return () => window.removeEventListener('keydown', shortcut)
+  }, [onSettings, pending, setOpenMobile, signingOut])
   function settings(href = '/settings') {
     onSettings(href)
     setOpenMobile(false)
@@ -73,7 +86,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
     })
   }
   return <>
-    <DropdownMenu>
+    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenuTrigger render={<SidebarMenuButton aria-label="工作区菜单" className="h-10" />}>
         <WorkspaceAvatar name={workspaceName} />
         <span className="flex-1 truncate font-semibold">{workspaceName}</span>
@@ -81,7 +94,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-1rem)]">
         <DropdownMenuGroup>
-          <DropdownMenuItem className="min-h-9" onClick={() => settings()}>设置</DropdownMenuItem>
+          <DropdownMenuItem className="min-h-9" aria-label="设置" aria-keyshortcuts="Control+, Meta+," onClick={() => settings()}><span className="flex-1">设置</span><ShortcutKeys keys={['mod', ',']} aria-hidden="true" /></DropdownMenuItem>
           <DropdownMenuItem className="min-h-9" onClick={() => settings('/settings/members')}>邀请和管理成员</DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
@@ -105,7 +118,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuLabel>账户</DropdownMenuLabel>
-                <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => run(async () => { setAccessOpen(true) })}>创建或加入工作区</DropdownMenuItem>
+                <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => run(async () => { setOpenMobile(false); window.location.assign('/workspaces/new') })}>创建工作区</DropdownMenuItem>
                 <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={addAccount}>添加账户</DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuSubContent>
@@ -114,6 +127,5 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
-    {accessOpen && <WorkspaceAccessDialog open={accessOpen} onOpenChange={setAccessOpen} />}
   </>
 }
