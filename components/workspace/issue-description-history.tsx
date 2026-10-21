@@ -71,7 +71,7 @@ export function IssueDescriptionHistory({ open, onOpenChange, number, title, cur
               <div className="mb-5 flex items-center gap-2 text-xs text-muted-foreground"><History className="size-3.5" /><time>{selected ? new Date(selected.createdAt).toLocaleString('zh-CN') : '当前描述'}</time></div>
               <DescriptionPreview key={`${selected?.id ?? 'current'}-${highlight}`} content={highlight ? compared.content : selected?.content ?? currentContent} />
             </div>
-            <div className="sticky bottom-0 flex flex-wrap items-center justify-center gap-2 bg-muted/40 px-3 py-3">
+            <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 bg-muted/40 px-3 py-3">
               <FieldLabel className="flex cursor-pointer items-center gap-2"><Switch size="sm" checked={highlight} onCheckedChange={value => { setHighlight(value); setChangeIndex(1) }} />高亮变更</FieldLabel>
               <span className="px-2 text-xs tabular-nums text-muted-foreground">{compared.changes ? `${Math.min(changeIndex, compared.changes)} / ${compared.changes}` : '无描述变更'}</span>
               <Button size="icon-xs" variant="ghost" aria-label="上一处变更" disabled={!highlight || !compared.changes} onClick={() => jump(-1)}><ArrowUp data-icon="inline-start" /></Button><Button size="icon-xs" variant="ghost" aria-label="下一处变更" disabled={!highlight || !compared.changes} onClick={() => jump(1)}><ArrowDown data-icon="inline-start" /></Button>

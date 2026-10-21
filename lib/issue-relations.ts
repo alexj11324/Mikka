@@ -13,15 +13,26 @@ export function createsIssueCycle(id: string, targets: string[], graph: Map<stri
   return false
 }
 
+function canonicalDescription(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalDescription)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).flatMap(([key, entry]) => {
+    if (entry === null || entry === undefined) return []
+    const normalized = canonicalDescription(entry)
+    if (key === 'attrs' && Object.keys(normalized as object).length === 0) return []
+    return [[key, normalized]]
+  }))
+}
+
 export function descriptionKey(content: JSONContent) {
-  return JSON.stringify(content.content ?? [])
+  return JSON.stringify(canonicalDescription(content.content ?? []))
 }
 
 export function compareDescriptions(before: JSONContent, after: JSONContent) {
   const left = before.content ?? []
   const right = after.content ?? []
-  const a = left.map(node => JSON.stringify(node))
-  const b = right.map(node => JSON.stringify(node))
+  const a = left.map(node => JSON.stringify(canonicalDescription(node)))
+  const b = right.map(node => JSON.stringify(canonicalDescription(node)))
   const table = Array.from({ length: a.length + 1 }, () => new Uint16Array(b.length + 1))
   if (a.length * b.length > 250000) return { content: after, changes: descriptionKey(before) === descriptionKey(after) ? 0 : 1 }
   for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) table[i][j] = a[i] === b[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1])

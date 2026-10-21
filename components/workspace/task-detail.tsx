@@ -9,7 +9,6 @@ import { IssueDetailActions, type IssueActionRequest } from './issue-detail-acti
 import { IssueDescriptionHistory } from './issue-description-history'
 import { IssueRelations } from './issue-relations'
 import type { MetadataRequest } from './issue-metadata-controls'
-import { descriptionKey } from '@/lib/issue-relations'
 import { toast } from 'sonner'
 import { getDeletedIssue, setIssueDeleted } from '@/app/actions/issue-operations'
 import { getIssue, saveIssue, listIssueVersions } from '@/app/actions/issues'
@@ -26,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea'
 
 type Issue = Awaited<ReturnType<typeof getIssue>>
 type WorkspaceUser = { id: string; name: string; email: string }
-type DetailProps = { navigation: IssueDetailNavigation; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
+type DetailProps = { navigation: IssueDetailNavigation; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onDeleted: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
 
 function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () => void; onClose: () => void }) {
   const { data } = useSWR(['deleted-issue', id], () => getDeletedIssue(id))
@@ -42,7 +41,7 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
   return <TaskForm key={id} initial={data} {...props} />
 }
 
-function TaskForm({ initial, user, onSaved, onDirty, onClose, onRegisterFlush, navigation, onOpen }: DetailProps & { initial: Issue }) {
+function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegisterFlush, navigation, onOpen }: DetailProps & { initial: Issue }) {
   const [saved, setSaved] = useState(initial)
   const [sync] = useState(() => new DocumentSync(initial.id, createDocumentSeed(initial.content)))
   const syncState = useSyncExternalStore(sync.subscribe, sync.getSnapshot, sync.getSnapshot)
@@ -71,7 +70,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onRegisterFlush, n
   const [documentTools, setDocumentTools] = useState(false)
   const [propertyRequest, setPropertyRequest] = useState<MetadataRequest | null>(null)
   const [actionRequest, setActionRequest] = useState<IssueActionRequest | null>(null)
-  const restoration = useRef<{ content: JSONContent; resolve: (success: boolean) => void } | null>(null)
+  const restoration = useRef<{ resolve: (success: boolean) => void } | null>(null)
   const [replacement, setReplacement] = useState<{ content: JSONContent; version: number }>()
   const { data: versions, error: historyError, mutate: refreshVersions } = useSWR(['versions', saved.id], () => listIssueVersions(saved.id), { revalidateOnFocus: false })
   const hasUnsavedChanges = dirty || syncState.pending
@@ -141,16 +140,19 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onRegisterFlush, n
   async function restore(version: NonNullable<typeof versions>[number]) {
     if (!await save()) return false
     return new Promise<boolean>(resolve => {
-      restoration.current = { content: version.content, resolve }
+      restoration.current = { resolve }
       setReplacement(value => ({ content: version.content, version: (value?.version ?? 0) + 1 }))
     })
   }
   function descriptionChanged(value: JSONContent) {
     changed({ content: value })
-    if (restoration.current && descriptionKey(value) === descriptionKey(restoration.current.content)) {
-      const restorationResult = restoration.current; restoration.current = null
-      queueMicrotask(() => { void save().then(success => { restorationResult.resolve(success); if (success) toast.success('描述已恢复并保存为新版本') }) })
-    }
+  }
+  function replacementApplied(applied: boolean) {
+    const result = restoration.current
+    restoration.current = null
+    if (!result) return
+    if (!applied) { result.resolve(false); return }
+    queueMicrotask(() => { void save().then(success => { result.resolve(success); if (success) toast.success('描述已恢复并保存为新版本') }, () => result.resolve(false)) })
   }
   function requestAction(kind: IssueActionRequest['kind']) { setActionRequest(value => ({ kind, sequence: (value?.sequence ?? 0) + 1 })) }
   function requestProperty(target: MetadataRequest['target']) { setPropertyRequest(value => ({ target, sequence: (value?.sequence ?? 0) + 1 })) }
@@ -159,7 +161,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onRegisterFlush, n
   </div>
 
   return <div className="flex min-w-0 flex-1 flex-col">
-    <IssueDetailHeader number={saved.metadata.number} title={title} saveLabel={error ? '保存失败' : pending ? '正在保存…' : syncState.error ? '同步失败' : !syncState.ready ? '正在连接…' : syncState.pending || syncState.syncing ? '正在同步…' : dirty ? '等待自动保存…' : '已自动保存'} saved={syncState.ready && !error && !pending && !syncState.error && !syncState.pending && !syncState.syncing && !dirty} pending={pending} navigation={navigation} onClose={onClose} actions={<IssueDetailActions task={saved} userId={user.id} disabled={pending || !syncState.ready} documentTools={documentTools} request={actionRequest} getCurrent={getCurrent} onSaved={adopt} onOpen={onOpen} onClose={onClose} onHistory={() => { void save().then(success => { if (success) { void refreshVersions(); setHistory(true) } }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)} onProperty={requestProperty} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} />} />
+    <IssueDetailHeader number={saved.metadata.number} title={title} saveLabel={error ? '保存失败' : pending ? '正在保存…' : syncState.error ? '同步失败' : !syncState.ready ? '正在连接…' : syncState.pending || syncState.syncing ? '正在同步…' : dirty ? '等待自动保存…' : '已自动保存'} saved={syncState.ready && !error && !pending && !syncState.error && !syncState.pending && !syncState.syncing && !dirty} pending={pending} navigation={navigation} onClose={onClose} actions={<IssueDetailActions task={saved} userId={user.id} disabled={pending || !syncState.ready} documentTools={documentTools} request={actionRequest} getCurrent={getCurrent} onSaved={adopt} onOpen={onOpen} onDeleted={onDeleted} onHistory={() => { void save().then(success => { if (success) { void refreshVersions(); setHistory(true) } }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)} onProperty={requestProperty} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} />} />
     <div className="mx-auto flex w-full min-w-0 max-w-screen-2xl flex-1 flex-col gap-8 lg:flex-row lg:gap-12 lg:px-10 lg:py-14 xl:gap-16 xl:px-16">
       <div className="min-w-0 flex-1 px-5 pt-8 pb-6 sm:px-10 sm:pt-12 lg:px-0 lg:py-0">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
@@ -167,7 +169,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onRegisterFlush, n
           <div className="flex min-w-0 flex-col gap-7">
             <FieldGroup><Field><FieldLabel htmlFor="task-title" className="sr-only">任务标题</FieldLabel><Textarea id="task-title" rows={1} placeholder="任务标题" value={title} onChange={event => changed({ title: event.target.value })} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; setEditSequence(value => value + 1) }} onBlur={() => { if (title.trim() && title !== saved.title) void save() }} maxLength={200} className="field-sizing-content min-h-10 w-full resize-none rounded-sm border-none bg-transparent px-0 py-0 text-2xl leading-snug font-semibold tracking-tight shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring md:text-3xl dark:bg-transparent" onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }} /></Field></FieldGroup>
             {documentTools && <div><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />返回简洁描述</Button></div>}
-            {syncState.ready ? <IssueEditor persisted content={content} layout={documentTools ? 'document' : 'issue'} activity={activity} afterDescription={<IssueRelations mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={pending} />} sharedDoc={sync.doc} author={user.name || user.email} replacement={replacement} syncLabel={syncState.error ? '同步失败' : syncState.pending || syncState.syncing ? '正在同步' : '已同步'} onChange={descriptionChanged} /> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>重试文档同步</Button>}</div>}
+            {syncState.ready ? <IssueEditor persisted content={content} layout={documentTools ? 'document' : 'issue'} activity={activity} afterDescription={<IssueRelations mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={pending} />} sharedDoc={sync.doc} author={user.name || user.email} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={syncState.error ? '同步失败' : syncState.pending || syncState.syncing ? '正在同步' : '已同步'} onChange={descriptionChanged} /> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>重试文档同步</Button>}</div>}
           </div>
           {syncState.error && <p role="alert" className="text-xs text-destructive">同步失败，正在重试。请保留本页，避免丢失尚未同步的修改。</p>}
         </div>

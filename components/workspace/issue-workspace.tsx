@@ -72,10 +72,22 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null }: 
       await action()
     } finally { leaving.current = false }
   }
+  function showIssue(id: string | null) {
+    setSelected(id); setDraftKey(value => value + 1)
+    const url = new URL(window.location.href)
+    if (id) url.searchParams.set('issue', id)
+    else url.searchParams.delete('issue')
+    window.history.replaceState(null, '', url)
+  }
   function open(id: string | null) {
     if (boardBusy || leaving.current) return false
-    void leave(() => { setSelected(id); setDraftKey(value => value + 1); const url = new URL(window.location.href); if (id) url.searchParams.set('issue', id); else url.searchParams.delete('issue'); window.history.replaceState(null, '', url) })
+    void leave(() => showIssue(id))
     return true
+  }
+  function deleted() {
+    flushDetail.current = null
+    setDirty(false)
+    showIssue(null)
   }
   const saved = useCallback((id: string) => { setSelected(id); void mutate() }, [mutate])
   function create(status: IssueStatus = ISSUE_STATUSES.some(item => item.value === view) ? view as IssueStatus : 'todo') { if (boardBusy) return; setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreateStatus(status); setCreating(true) }
@@ -128,7 +140,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null }: 
     <AppShellContent hideHeader={!!selected} parent={WORKSPACE_NAME} title={SECTION_TITLES[section]} actions={<Button variant="ghost" size="icon-sm" aria-label="打开全局搜索" disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {error && <p role="alert" className="px-6 py-2 text-xs text-destructive">列表更新失败，已保留上次结果。</p>}
-      {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onOpen={id => open(id)} navigation={{ index: filtered.findIndex(task => task.id === selected), total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={projects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? WORKSPACE_NAME : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create('todo')} onUpdated={() => { void refreshProjects() }} /> : isOverview ? <WorkspaceOverview section={section} counts={counts} projectCount={projects.length} tasks={tasks} userId={user.id} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : <>
+      {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: filtered.findIndex(task => task.id === selected), total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={projects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? WORKSPACE_NAME : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create('todo')} onUpdated={() => { void refreshProjects() }} /> : isOverview ? <WorkspaceOverview section={section} counts={counts} projectCount={projects.length} tasks={tasks} userId={user.id} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : <>
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <div className="flex flex-wrap items-center gap-2"><h1 className="text-sm font-semibold">{section === 'my-issues' ? '我创建的任务' : viewTitle}</h1><Badge variant="secondary">{filtered.length}</Badge>{section !== 'my-issues' && <NativeSelect aria-label="筛选任务状态" value={view} disabled={boardBusy} onChange={event => navigate(event.target.value as IssueView)}><NativeSelectOption value="all">全部状态</NativeSelectOption><NativeSelectOption value="favorites">收藏的任务</NativeSelectOption><NativeSelectOption value="following">关注的任务</NativeSelectOption>{ISSUE_STATUSES.map(status => <NativeSelectOption key={status.value} value={status.value}>{status.label}</NativeSelectOption>)}</NativeSelect>}</div>
           <div className="flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto"><div className="flex min-w-0 items-center gap-2 sm:w-48"><span className="inline-flex shrink-0 text-muted-foreground"><Search className="size-3.5" aria-hidden="true" /></span><Input aria-label="搜索任务" placeholder="搜索任务…" value={query} onChange={event => setQuery(event.target.value)} disabled={boardBusy} /></div><ToggleGroup aria-label="任务视图" size="sm" variant="outline" spacing={0} disabled={boardBusy} value={[layout]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') setLayout(next) }}><ToggleGroupItem value="list" aria-label="列表视图"><List /></ToggleGroupItem><ToggleGroupItem value="board" aria-label="看板视图"><Columns3 /></ToggleGroupItem></ToggleGroup></div>

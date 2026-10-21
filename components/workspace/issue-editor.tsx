@@ -49,7 +49,7 @@ export function createDocumentSeed(content: JSONContent) {
   doc.destroy()
   return update
 }
-export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作者', syncLabel = '未保存草稿', replacement, persisted = false, compact = false, layout = 'document', activity, afterDescription, label = '任务描述', disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
+export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作者', syncLabel = '未保存草稿', replacement, onReplacementApplied, persisted = false, compact = false, layout = 'document', activity, afterDescription, label = '任务描述', disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
   const [localDoc] = useState(() => new Y.Doc())
   const threadDoc = sharedDoc ?? localDoc
   const threadStore = useMemo(() => createThreadStore(threadDoc), [threadDoc])
@@ -66,6 +66,8 @@ export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作�
   const pageRef = useRef<HTMLDivElement>(null)
   const changeRef = useRef(onChange)
   changeRef.current = onChange
+  const replacementCallback = useRef(onReplacementApplied)
+  replacementCallback.current = onReplacementApplied
   const extensions = useMemo(() => [
     ...createEditorExtensions(threadStore.isOpen, author, !!sharedDoc, compact),
     ...(sharedDoc ? [Collaboration.configure({ document: sharedDoc })] : []),
@@ -83,8 +85,16 @@ export function IssueEditor({ content, onChange, sharedDoc, author = '草稿作�
     if (!editor || !replacement) return
     const tracking = editor.storage.richTextChanges.tracking
     editor.storage.richTextChanges.tracking = false
-    editor.commands.setContent(replacement.content, { emitUpdate: layout !== 'description' })
-    editor.storage.richTextChanges.tracking = tracking
+    let applied = false
+    try {
+      applied = editor.commands.setContent(replacement.content, { emitUpdate: false })
+      if (applied && layout !== 'description') changeRef.current(editor.getJSON())
+    } catch {
+      applied = false
+    } finally {
+      editor.storage.richTextChanges.tracking = tracking
+      replacementCallback.current?.(applied)
+    }
   }, [editor, replacement, layout])
   const { changes } = useRichTextChanges(editor)
   const { anchors, activeId } = useCommentAnchors(editor)

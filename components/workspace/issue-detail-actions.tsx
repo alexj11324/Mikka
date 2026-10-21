@@ -22,8 +22,8 @@ type Issue = Awaited<ReturnType<typeof getIssue>>
 export type IssueActionRequest = { kind: RelationKind | 'createChild' | 'dueDate' | 'estimate'; sequence: number }
 type OperationResult = { issue?: Issue; error?: string }
 
-export function IssueDetailActions({ task, userId, disabled, documentTools, request, getCurrent, onSaved, onOpen, onClose, onHistory, onMembers, onDocumentTools, onProperty, onStatus, onPriority }: {
-  task: Issue; userId: string; disabled: boolean; documentTools: boolean; request: IssueActionRequest | null; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; onOpen: (id: string) => void; onClose: () => void; onHistory: () => void; onMembers: () => void; onDocumentTools: () => void; onProperty: (target: MetadataRequest['target']) => void; onStatus: (value: string) => void; onPriority: (value: string) => void
+export function IssueDetailActions({ task, userId, disabled, documentTools, request, getCurrent, onSaved, onOpen, onDeleted, onHistory, onMembers, onDocumentTools, onProperty, onStatus, onPriority }: {
+  task: Issue; userId: string; disabled: boolean; documentTools: boolean; request: IssueActionRequest | null; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; onOpen: (id: string) => void; onDeleted: () => void; onHistory: () => void; onMembers: () => void; onDocumentTools: () => void; onProperty: (target: MetadataRequest['target']) => void; onStatus: (value: string) => void; onPriority: (value: string) => void
 }) {
   const { mutate } = useSWRConfig()
   const [relation, setRelation] = useState<RelationKind | null>(null)
@@ -57,7 +57,7 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       await Promise.all([mutate(['issue-connections', task.id]), mutate('issues')])
       if (mode === 'duplicate') onOpen(result.issue.id)
       if (mode === 'delete') {
-        onClose()
+        onDeleted()
         toast.success('任务已删除', { description: '任务内容保留 30 天，可通过原链接恢复。', action: { label: '撤销', onClick: () => { void setIssueDeleted({ id: task.id, restore: true }).then(async response => { if (response.error) toast.error(response.error); else { await mutate('issues'); onOpen(task.id) } }).catch(() => toast.error('恢复失败，请通过原任务链接重试。')) } } })
       } else toast.success(mode === 'child' ? '子任务已创建' : mode === 'duplicate' ? '任务副本已创建' : '任务已更新')
       return true

@@ -20,6 +20,17 @@ test('description comparisons ignore issue properties', () => {
   assert.equal(descriptionKey(before), descriptionKey(after))
   assert.equal(compareDescriptions(before, after).changes, 0)
 })
+test('description equality tolerates editor defaults and reordered persisted keys', () => {
+  const original = doc('正文')
+  const normalized = { type: 'doc', content: [{ content: [{ text: '正文', type: 'text' }], attrs: { textAlign: null }, type: 'paragraph' }] }
+  assert.equal(descriptionKey(original), descriptionKey(normalized))
+  assert.equal(compareDescriptions(original, normalized).changes, 0)
+})
+test('description equality preserves meaningful rich text attributes', () => {
+  const checklist = checked => ({ type: 'doc', content: [{ type: 'taskList', content: [{ type: 'taskItem', attrs: { checked }, content: doc('验收').content }] }] })
+  assert.notEqual(descriptionKey(checklist(false)), descriptionKey(checklist(true)))
+  assert.equal(compareDescriptions(checklist(false), checklist(true)).changes, 1)
+})
 test('description diff preserves rich nodes and identifies separate changes', () => {
   const result = compareDescriptions(doc('旧段落', '不变', '删除'), doc('新段落', '不变', '添加'))
   assert.equal(result.changes, 2)
