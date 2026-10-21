@@ -1,4 +1,4 @@
-import { DAEMON_RPC_ERRORS } from "@orvilo/protocol"
+import { DAEMON_RPC_ERRORS } from "@mikka/protocol"
 
 /**
  * An error the daemon reports to RPC callers with a stable code. Anything

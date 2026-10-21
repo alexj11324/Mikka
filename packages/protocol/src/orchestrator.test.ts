@@ -11,9 +11,9 @@ import {
 
 describe("issueBranch", () => {
   it("defaults to the ADR 0024 branch", () => {
-    expect(issueBranch("ORV", 25)).toBe("orvilo/orv-25")
+    expect(issueBranch("ORV", 25)).toBe("mikka/orv-25")
     expect(issueBranch("ORV", 25, DEFAULT_BRANCH_TEMPLATE)).toBe(
-      "orvilo/orv-25"
+      "mikka/orv-25"
     )
   })
 
@@ -31,15 +31,15 @@ describe("issueBranch", () => {
       "bad branch {number}",
       "{number}..x",
     ])
-      expect(issueBranch("ORV", 3, template)).toBe("orvilo/orv-3")
+      expect(issueBranch("ORV", 3, template)).toBe("mikka/orv-3")
   })
 })
 
 describe("branchTemplateSchema", () => {
   it("requires {number}", () => {
-    expect(branchTemplateSchema.safeParse("orvilo/{team}").success).toBe(false)
+    expect(branchTemplateSchema.safeParse("mikka/{team}").success).toBe(false)
     expect(
-      branchTemplateSchema.safeParse("orvilo/{team}-{number}").success
+      branchTemplateSchema.safeParse("mikka/{team}-{number}").success
     ).toBe(true)
   })
 
@@ -92,10 +92,10 @@ describe("reviewRule", () => {
 })
 
 describe("pullRequestBody", () => {
-  it("keeps Orvilo's text without a template", () => {
+  it("keeps Mikka's text without a template", () => {
     expect(
       pullRequestBody(null, { key: "ORV-25", title: "Review rules" })
-    ).toBe("Opened by Orvilo for ORV-25. Later fix rounds push to this branch.")
+    ).toBe("Opened by Mikka for ORV-25. Later fix rounds push to this branch.")
     expect(
       pullRequestBody(null, {
         key: "ORV-25",
@@ -103,7 +103,7 @@ describe("pullRequestBody", () => {
         summary: "Adds the table.",
       })
     ).toBe(
-      "Adds the table.\n\n---\n\nOpened by Orvilo for ORV-25. Later fix rounds push to this branch."
+      "Adds the table.\n\n---\n\nOpened by Mikka for ORV-25. Later fix rounds push to this branch."
     )
   })
 

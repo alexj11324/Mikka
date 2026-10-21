@@ -27,7 +27,7 @@ import {
   type RunPatch,
   type RunState,
   type StopReason,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 
 import type { RunChunk } from "./chunks"
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
@@ -38,7 +38,7 @@ export type {
   RunCommand,
   RunPatch,
   SetupRecipe,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 
 /** What the daemon sends when it registers (`deviceId` re-registers). */
 export type DeviceInfo = Omit<DeviceRegistration, "deviceId">
@@ -57,7 +57,7 @@ export interface ChunkBatch {
  */
 export interface ServerLink {
   /**
-   * `credential` is the session from `orvilo daemon login` (Better Auth
+   * `credential` is the session from `mikka daemon login` (Better Auth
    * device authorization, RFC 8628) or one the signed-in desktop handed
    * over. `knownDeviceId` re-registers a device this daemon registered
    * before.

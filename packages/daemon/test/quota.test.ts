@@ -1,7 +1,7 @@
 import pino from "pino"
 import { afterEach, describe, expect, it } from "vitest"
 
-import type { QuotaSnapshot } from "@orvilo/protocol"
+import type { QuotaSnapshot } from "@mikka/protocol"
 
 import { Daemon } from "../src/main"
 import type { QuotaSource } from "../src/quota/poller"

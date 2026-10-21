@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Stand-in for `agent acp` (Cursor) built on the ACP SDK. Prompt text:
-//   contains "SUBMIT" -> asks permission, writes NOTES.md, calls orvilo submit
+//   contains "SUBMIT" -> asks permission, writes NOTES.md, calls mikka submit
 //   contains "HANG"   -> runs until `session/cancel`
 //   contains "MODEL"  -> reports the model `--model` named, so a test can
 //                        prove the assignment's model reached the CLI
@@ -111,7 +111,7 @@ new acp.AgentSideConnection(
               rawOutput: { exitCode: 0 },
             },
           })
-          const server = session.mcp.find((s) => s.name === "orvilo")
+          const server = session.mcp.find((s) => s.name === "mikka")
           await callMcpTool(
             {
               command: server.command,

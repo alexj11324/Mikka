@@ -1,9 +1,9 @@
-// `orvilo daemon login`: OAuth 2.0 device authorization (RFC 8628) against
+// `mikka daemon login`: OAuth 2.0 device authorization (RFC 8628) against
 // the server's Better Auth device-authorization plugin, like `gh auth login`.
 //
-//   1. POST /api/auth/device/code   { client_id: "orvilo-daemon" }
+//   1. POST /api/auth/device/code   { client_id: "mikka-daemon" }
 //   2. show the user code and the verification link (the desktop app's
-//      approve screen, `orvilo[-dev]://device?user_code=...`)
+//      approve screen, `mikka[-dev]://device?user_code=...`)
 //   3. poll POST /api/auth/device/token every `interval` seconds until the
 //      user approved (or denied, or the code expired)
 //
@@ -12,7 +12,7 @@ import {
   AUTH_BASE_PATH,
   CLIENT_VERSION_HEADER,
   DAEMON_CLIENT_ID,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 import { z } from "zod"
 
 import { DaemonError, ServerUnreachableError } from "./errors"

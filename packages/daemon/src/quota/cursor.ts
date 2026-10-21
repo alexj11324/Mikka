@@ -5,7 +5,7 @@
 import { lstat } from "node:fs/promises"
 import { join } from "node:path"
 
-import type { QuotaMeter, QuotaSnapshot, QuotaWindow } from "@orvilo/protocol"
+import type { QuotaMeter, QuotaSnapshot, QuotaWindow } from "@mikka/protocol"
 
 import { sanitizeError } from "./files"
 import { cleanText, isoString, percentPoints, quotaGet, ratio } from "./parse"
@@ -256,7 +256,7 @@ export async function readCursorQuota(
       {
         Accept: "application/json",
         Cookie: cookie,
-        "User-Agent": "orvilo-daemon",
+        "User-Agent": "mikka-daemon",
       },
       options.fetch,
       options.signal

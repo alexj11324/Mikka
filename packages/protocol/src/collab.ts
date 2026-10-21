@@ -2,7 +2,7 @@
 // description, carrying Yjs updates and awareness between the members editing
 // it. The wire format is y-websocket's, so the desktop side is y-websocket's
 // own `WebsocketProvider` and the server side is the same y-protocols calls
-// that provider expects — Orvilo defines no collaboration protocol of its own.
+// that provider expects — Mikka defines no collaboration protocol of its own.
 //
 // The channel is a sibling of the relay (`/v1/stream`, ADR 0002), not part of
 // it: the relay is keyed by run id and carries JSON frames, while a Yjs

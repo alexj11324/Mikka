@@ -123,13 +123,13 @@
     "signUpLabel": "Create account",
     "signInLabel": "Sign in",
     "tagline": "Tasks and documents, always in sync.",
-    "accountNote": "This is an Orvilo account; it is separate from your v0 account.",
+    "accountNote": "This is an Mikka account; it is separate from your v0 account.",
     "dataNote": "Data is stored on Neon · tasks are private by default",
-    "home": "Orvilo home",
+    "home": "Mikka home",
     "createTitle": "Create your work account",
     "welcome": "Welcome back",
     "createDescription": "Start with your first task and turn ideas into traceable progress.",
-    "welcomeDescription": "Sign in to Orvilo and continue with your tasks and documents.",
+    "welcomeDescription": "Sign in to Mikka and continue with your tasks and documents.",
     "continueGithub": "Continue with GitHub",
     "githubScope": "Only the identity and email needed to sign in are requested; repository read/write access is not.",
     "githubNotConfigured": "GitHub sign-in is not configured yet. Continue with email.",
@@ -160,11 +160,11 @@
     "testIssueSwitchDescription": "Used to check previous/next task switching. Re-entering the test workspace reuses the account and existing tasks."
   },
   "Metadata": {
-    "title": "Orvilo · Tasks and documents workspace",
+    "title": "Mikka · Tasks and documents workspace",
     "description": "Manage tasks with lists and a drag-and-drop board, edit descriptions together, discuss progress, and trace versions.",
-    "signInTitle": "Sign in · Orvilo",
-    "signInDescription": "Sign in to Orvilo to keep managing your tasks and documents.",
-    "signUpTitle": "Create account · Orvilo",
+    "signInTitle": "Sign in · Mikka",
+    "signInDescription": "Sign in to Mikka to keep managing your tasks and documents.",
+    "signUpTitle": "Create account · Mikka",
     "signUpDescription": "Create a work account and start managing tasks and documents.",
     "property": {
       "setProject": "Set project",
@@ -276,13 +276,13 @@
       "reload": "Reload members",
       "agents": "Agents"
     },
-    "membersTitle": "Members · Orvilo",
+    "membersTitle": "Members · Mikka",
     "membersDescription": "Manage workspace members, roles, and invitations, with CSV bulk invites and member export.",
-    "inviteTitle": "Accept workspace invitation · Orvilo",
-    "inviteDescription": "Sign in with the invited email and join the Orvilo workspace securely.",
-    "acceptanceTitle": "Acceptance · Orvilo",
+    "inviteTitle": "Accept workspace invitation · Mikka",
+    "inviteDescription": "Sign in with the invited email and join the Mikka workspace securely.",
+    "acceptanceTitle": "Acceptance · Mikka",
     "acceptanceDescription": "A separate acceptance workspace entry for development previews.",
-    "settingsPreviewTitle": "Settings preview · Orvilo",
+    "settingsPreviewTitle": "Settings preview · Mikka",
     "settingsPreviewDescription": "A signed-out settings preview with demo data."
   },
   "NotFound": {
@@ -606,7 +606,7 @@
     "connect": {
       "trigger": "Connect device",
       "title": "Connect a remote host",
-      "description": "A machine you can reach over SSH. Orvilo installs and starts the daemon there, then brings back the harnesses it detected.",
+      "description": "A machine you can reach over SSH. Mikka installs and starts the daemon there, then brings back the harnesses it detected.",
       "host": "Host",
       "hostPlaceholder": "SSH host, hostname, or IP[:port]",
       "actAs": "Connect as",
@@ -643,13 +643,13 @@
       "sshExitCode": "ssh exited with code {code}",
       "noNode": "node is not installed on this machine",
       "noPnpm": "pnpm is not installed on this machine",
-      "copyDaemon": "Copying the daemon to ~/.orvilo",
+      "copyDaemon": "Copying the daemon to ~/.mikka",
       "rsyncExitCode": "rsync exited with code {code}",
       "installExitCode": "pnpm install exited with code {code}",
       "depsInstalled": "Dependencies installed",
       "startExitCode": "Failed to start; exit code {code}",
       "daemonRunning": "The daemon is running in the background",
-      "heartbeatTimeout": "Timed out waiting for a heartbeat. Check ~/.orvilo/daemon.log",
+      "heartbeatTimeout": "Timed out waiting for a heartbeat. Check ~/.mikka/daemon.log",
       "connectionError": "The connection failed"
     }
   },
@@ -1029,7 +1029,7 @@
     "manage": "Manage",
     "adminAccess": "Admin access",
     "memberAccess": "Member access",
-    "brandFooter": "Orvilo · Workspace settings",
+    "brandFooter": "Mikka · Workspace settings",
     "searchLabel": "Search members or invitations",
     "filterLabel": "Filter by member status",
     "filters": {
@@ -1305,7 +1305,7 @@
     "sections": {
       "preferences": {
         "title": "Preferences",
-        "description": "Make Orvilo fit the way you work."
+        "description": "Make Mikka fit the way you work."
       },
       "profile": {
         "title": "Profile",
@@ -1401,7 +1401,7 @@
       "csvInvalidRows": "These CSV lines have an empty or invalid email: {lines}. Nothing was imported; fix them and try again."
     },
     "joinTitle": "Join workspace",
-    "joinDescription": "You received an Orvilo workspace invitation. Sign in with the invited email to join.",
+    "joinDescription": "You received an Mikka workspace invitation. Sign in with the invited email to join.",
     "invalidToken": "This invite link is malformed. Ask an admin for the complete link.",
     "signedInAs": "Signed in as: {email}",
     "validity": "Invite links are valid for 7 days and only work with the invited email address.",

@@ -4,7 +4,7 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@orvilo/protocol'],
+  transpilePackages: ['@mikka/protocol'],
   async headers() {
     return [{ source: '/(.*)', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },

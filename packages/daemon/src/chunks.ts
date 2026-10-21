@@ -1,11 +1,11 @@
 // Run output format: Vercel AI SDK `UIMessageChunk`s (types only, the `ai`
 // package is never used to call a model). AI Elements and `useChat` render
-// them directly; Orvilo-specific facts travel as `data-*` parts.
-import type { RunPublish, RunState, StopReason } from "@orvilo/protocol"
-import type { PlanSection } from "@orvilo/protocol/plan"
+// them directly; Mikka-specific facts travel as `data-*` parts.
+import type { RunPublish, RunState, StopReason } from "@mikka/protocol"
+import type { PlanSection } from "@mikka/protocol/plan"
 import type { UIMessage, UIMessageChunk } from "ai"
 
-export type OrviloDataTypes = {
+export type MikkaDataTypes = {
   /** A file the agent changed, path relative to the worktree root. */
   "file-change": { path: string; change: "added" | "modified" | "deleted" }
   /** Usage as reported by the harness; `source` says where it came from. */
@@ -47,8 +47,8 @@ export type OrviloDataTypes = {
   }
 }
 
-export type RunChunk = UIMessageChunk<unknown, OrviloDataTypes>
-export type RunMessage = UIMessage<unknown, OrviloDataTypes>
+export type RunChunk = UIMessageChunk<unknown, MikkaDataTypes>
+export type RunMessage = UIMessage<unknown, MikkaDataTypes>
 
 export function runStateChunk(
   state: RunState,

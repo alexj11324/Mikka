@@ -306,7 +306,7 @@ export class CodexAdapter implements AgentAdapter {
       if (event) queue.exit(event)
     }
 
-    // Orvilo's sandbox decides; inside it every action is allowed.
+    // Mikka's sandbox decides; inside it every action is allowed.
     rpc.onRequest((method) => {
       if (method.endsWith("requestApproval") || method.endsWith("Approval"))
         return { decision: "accept" }
@@ -431,8 +431,8 @@ export class CodexAdapter implements AgentAdapter {
       await ready(
         rpc.sendRequest("initialize", {
           clientInfo: {
-            name: "orvilo",
-            title: "Orvilo",
+            name: "mikka",
+            title: "Mikka",
             version: DAEMON_VERSION,
           },
           capabilities: null,

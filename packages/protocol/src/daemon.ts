@@ -1,11 +1,11 @@
 // Contracts between the daemon and its local peers: the JSON-RPC control
-// channel (desktop main / `orvilo daemon status` <-> daemon), harness ids
+// channel (desktop main / `mikka daemon status` <-> daemon), harness ids
 // and run states. The daemon and the desktop supervisor both decode with
 // these schemas; nobody re-declares the shapes locally
 // (docs/architecture.md, "Package rules").
 //
 // Run output is not declared here: the daemon emits Vercel AI SDK
-// `UIMessageChunk`s (`ai` package, types only) with Orvilo data parts
+// `UIMessageChunk`s (`ai` package, types only) with Mikka data parts
 // (`packages/daemon/src/chunks.ts`), appended to one durable stream per run.
 //
 // The daemon <-> server REST contract lives in ./device, run completion and
@@ -200,7 +200,7 @@ export const daemonRpc = {
     result: runSummarySchema,
   },
   /**
-   * Dev only (`orvilo daemon --dev --server memory`): queue and start a mock
+   * Dev only (`mikka daemon --dev --server memory`): queue and start a mock
    * run on an allow-listed repo without a server. Refused otherwise.
    */
   "dev.mockRun": {

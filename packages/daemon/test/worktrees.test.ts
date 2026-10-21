@@ -13,7 +13,7 @@ const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8" }).trim()
 
 describe("starting on the issue branch", () => {
-  /** A repo with an `origin` that has `main` and a person's commit on `orvilo/orv-1`. */
+  /** A repo with an `origin` that has `main` and a person's commit on `mikka/orv-1`. */
   async function repoWithIssueBranch() {
     const repo = await makeRepo()
     const origin = tempDir("orvo-")
@@ -22,7 +22,7 @@ describe("starting on the issue branch", () => {
     git(repo, "push", "-q", "origin", "main")
     const person = join(tempDir("orvp-"), "clone")
     git(origin, "clone", "-q", origin, person)
-    git(person, "checkout", "-q", "-b", "orvilo/orv-1")
+    git(person, "checkout", "-q", "-b", "mikka/orv-1")
     writeFileSync(join(person, "PERSON.md"), "by hand\n")
     git(person, "add", "PERSON.md")
     git(
@@ -30,42 +30,42 @@ describe("starting on the issue branch", () => {
       "-c",
       "user.name=Person",
       "-c",
-      "user.email=person@orvilo.invalid",
+      "user.email=person@mikka.invalid",
       "commit",
       "-q",
       "-m",
       "person"
     )
-    git(person, "push", "-q", "origin", "orvilo/orv-1")
+    git(person, "push", "-q", "origin", "mikka/orv-1")
     return { repo, origin, tip: git(person, "rev-parse", "HEAD") }
   }
 
   it("builds a fresh worktree on the remote branch, with a person's commits", async () => {
     const { repo, tip } = await repoWithIssueBranch()
     const trees = new WorktreeManager(tempDir())
-    const start = await trees.fetchBranch(repo, "origin", "orvilo/orv-1", "r1")
+    const start = await trees.fetchBranch(repo, "origin", "mikka/orv-1", "r1")
     expect(start).toBe(tip)
     const path = await trees.create("r1", repo, start)
     expect(readFileSync(join(path, "PERSON.md"), "utf8")).toBe("by hand\n")
     expect(git(path, "rev-parse", "HEAD")).toBe(tip)
     expect(git(path, "symbolic-ref", "--short", "HEAD")).toBe(runBranch("r1"))
     // The fetch leaves no refs of its own behind.
-    expect(git(repo, "for-each-ref", "refs/orvilo")).toBe("")
+    expect(git(repo, "for-each-ref", "refs/mikka")).toBe("")
   })
 
   it("throws when the branch or the remote is missing", async () => {
     const { repo } = await repoWithIssueBranch()
     const trees = new WorktreeManager(tempDir())
     await expect(
-      trees.fetchBranch(repo, "origin", "orvilo/orv-2", "r1")
+      trees.fetchBranch(repo, "origin", "mikka/orv-2", "r1")
     ).rejects.toThrow()
     await expect(
-      trees.fetchBranch(repo, "nowhere", "orvilo/orv-1", "r1")
+      trees.fetchBranch(repo, "nowhere", "mikka/orv-1", "r1")
     ).rejects.toThrow()
     await expect(
       trees.fetchBranch(repo, "origin", "--upload-pack=x", "r1")
     ).rejects.toThrow(/branch name/)
-    expect(git(repo, "for-each-ref", "refs/orvilo")).toBe("")
+    expect(git(repo, "for-each-ref", "refs/mikka")).toBe("")
   })
 })
 
@@ -115,7 +115,7 @@ describe("discarding an empty run", () => {
       "-c",
       "user.name=Agent",
       "-c",
-      "user.email=agent@orvilo.invalid",
+      "user.email=agent@mikka.invalid",
       "commit",
       "-q",
       "-m",
@@ -152,7 +152,7 @@ describe("discarding an empty run", () => {
     expect(await trees.continueFrom(repo, path, "r2")).toBe(path)
     expect(await trees.discardIfEmpty(["r1", "r2"], path, repo)).toBe(true)
     expect(existsSync(path)).toBe(false)
-    expect(git(repo, "branch", "--list", "orvilo/run-*")).toBe("")
+    expect(git(repo, "branch", "--list", "mikka/run-*")).toBe("")
   })
 
   it("keeps a shared worktree when the follow-up run committed", async () => {

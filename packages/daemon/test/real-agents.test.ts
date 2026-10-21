@@ -1,12 +1,12 @@
 // End-to-end runs with the real, signed-in CLIs on this machine: the daemon
 // claims a run, creates the worktree, drives the CLI inside sandbox-runtime,
-// the agent hands in through Orvilo's MCP tool, the daemon verifies,
+// the agent hands in through Mikka's MCP tool, the daemon verifies,
 // commits and pushes the run branch to the repo's remote. Uses the user's
 // subscription, so it only runs when asked:
 //
-//   ORVILO_REAL_AGENTS=claude_code,codex,cursor bunx vitest run test/real-agents.test.ts
+//   MIKKA_REAL_AGENTS=claude_code,codex,cursor bunx vitest run test/real-agents.test.ts
 //
-// Transcripts (the run's chunks) are written to ORVILO_REAL_AGENTS_OUT when set.
+// Transcripts (the run's chunks) are written to MIKKA_REAL_AGENTS_OUT when set.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
@@ -17,11 +17,11 @@ import { Daemon } from "../src/main"
 import { MemoryServer } from "../src/server-link"
 import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
 
-const HARNESSES = (process.env.ORVILO_REAL_AGENTS ?? "")
+const HARNESSES = (process.env.MIKKA_REAL_AGENTS ?? "")
   .split(",")
   .map((h) => h.trim())
   .filter(Boolean) as ("claude_code" | "codex" | "cursor")[]
-const OUT = process.env.ORVILO_REAL_AGENTS_OUT
+const OUT = process.env.MIKKA_REAL_AGENTS_OUT
 const DEVICE = "device-real"
 const daemons: Daemon[] = []
 
@@ -70,7 +70,7 @@ function save(name: string, value: unknown) {
 }
 
 // The half of a planning run no mock can stand in for (ADR ORV-205): whether a
-// real CLI, given `planInstructions()` and the `orvilo` submit tool, really
+// real CLI, given `planInstructions()` and the `mikka` submit tool, really
 // hands in a spec and a split — and really writes no code while doing it.
 // The mock replays a report verbatim, so it never exercises the tool's
 // nested `spec` / `split` arguments or the agent's choice to use them.
@@ -184,8 +184,8 @@ describe.skipIf(HARNESSES.length === 0)("real agent CLIs", () => {
           harness,
           prompt: [
             "Create `src/greet.mjs` exporting `function greet(name)` that returns `Hello, <name>!` (for example greet('Ada') returns 'Hello, Ada!').",
-            "Also try once to create the file `/tmp/orvilo-escape-test.txt`; it is expected to fail, just mention the result in your summary.",
-            "Then hand in your work with the orvilo submit tool.",
+            "Also try once to create the file `/tmp/mikka-escape-test.txt`; it is expected to fail, just mention the result in your summary.",
+            "Then hand in your work with the mikka submit tool.",
           ].join("\n"),
           verifyCommand: VERIFY,
         })
@@ -213,7 +213,7 @@ describe.skipIf(HARNESSES.length === 0)("real agent CLIs", () => {
 
         const publish = chunks.find((c) => c.type === "data-publish")
         expect(publish?.type === "data-publish" && publish.data).toMatchObject({
-          branch: `orvilo/run-${runId}`,
+          branch: `mikka/run-${runId}`,
           pushed: true,
         })
         // The branch really is on the remote, with the agent's file.
@@ -221,12 +221,12 @@ describe.skipIf(HARNESSES.length === 0)("real agent CLIs", () => {
           "--git-dir",
           origin,
           "show",
-          `orvilo/run-${runId}:src/greet.mjs`,
+          `mikka/run-${runId}:src/greet.mjs`,
         ])
         expect(stdout).toMatch(/greet/)
         // The sandbox kept the agent out of /tmp.
         expect(() =>
-          readFileSync("/tmp/orvilo-escape-test.txt", "utf8")
+          readFileSync("/tmp/mikka-escape-test.txt", "utf8")
         ).toThrow()
       },
       15 * 60_000
@@ -244,7 +244,7 @@ describe.skipIf(HARNESSES.length === 0)("real agent CLIs", () => {
           prompt: [
             "First run the shell command `sleep 20 && echo waited` in the foreground and wait for it to finish.",
             "Then create `src/greet.mjs` exporting `function greet(name)` that returns `Hello, <name>!`.",
-            "Then hand in your work with the orvilo submit tool.",
+            "Then hand in your work with the mikka submit tool.",
           ].join("\n"),
           verifyCommand: VERIFY,
         })

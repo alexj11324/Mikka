@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
-import { deviceRegistration } from '@orvilo/protocol/device'
+import { deviceRegistration } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { devices } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice, WORKSPACE_ID } from '@/lib/device-link'

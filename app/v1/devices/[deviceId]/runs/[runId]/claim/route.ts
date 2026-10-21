@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
-import { RUN_LEASE_MS } from '@orvilo/protocol/device'
+import { RUN_LEASE_MS } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'

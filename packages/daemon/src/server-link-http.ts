@@ -33,7 +33,7 @@ import {
   type RunCommand,
   type RunCompletion,
   type RunPatch,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 
 import {
   DaemonError,
@@ -70,7 +70,7 @@ export class SessionRejectedError extends DaemonError {
   constructor() {
     super(
       DAEMON_RPC_ERRORS.unauthorized,
-      "The server refused this device's session; run `orvilo daemon login` again."
+      "The server refused this device's session; run `mikka daemon login` again."
     )
   }
 }

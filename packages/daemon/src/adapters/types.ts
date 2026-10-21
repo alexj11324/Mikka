@@ -12,7 +12,7 @@ import type {
   RunPolicy,
   RunSkill,
   StopReason,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 
 import type { RunChunk } from "../chunks"
 import type { Logger } from "../log"

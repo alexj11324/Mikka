@@ -27,10 +27,10 @@ export async function makeRepo(): Promise<string> {
     execa("git", args, {
       cwd: repo,
       env: {
-        GIT_AUTHOR_NAME: "Orvilo Test",
-        GIT_AUTHOR_EMAIL: "test@orvilo.invalid",
-        GIT_COMMITTER_NAME: "Orvilo Test",
-        GIT_COMMITTER_EMAIL: "test@orvilo.invalid",
+        GIT_AUTHOR_NAME: "Mikka Test",
+        GIT_AUTHOR_EMAIL: "test@mikka.invalid",
+        GIT_COMMITTER_NAME: "Mikka Test",
+        GIT_COMMITTER_EMAIL: "test@mikka.invalid",
       },
     })
   await git("init", "-q", "-b", "main")

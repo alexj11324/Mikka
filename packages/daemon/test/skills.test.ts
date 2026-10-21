@@ -6,7 +6,7 @@ import { join } from "node:path"
 
 import { afterAll, describe, expect, it } from "vitest"
 
-import type { RunSkill } from "@orvilo/protocol"
+import type { RunSkill } from "@mikka/protocol"
 
 import { RunContext } from "../src/agents/run-context"
 import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
@@ -92,7 +92,7 @@ describe("run skills", () => {
   it("reads the skills into the instructions, with the run's rules", async () => {
     const ctx = await context([skill()])
     const instructions = ctx.instructions()
-    expect(instructions).toContain("You are running as an Orvilo agent")
+    expect(instructions).toContain("You are running as an Mikka agent")
     expect(instructions).toContain("Skills from your workspace")
     expect(instructions).toContain("### Triage")
     expect(instructions).toContain("Read the inbox, then label everything.")

@@ -25,7 +25,7 @@ import {
   type PermissionAction,
   type PermissionDecision,
   type RunPolicy,
-} from "@orvilo/protocol/agent-policy"
+} from "@mikka/protocol/agent-policy"
 
 export { PERMISSION_ACTIONS, PERMISSION_DEFAULTS }
 export type { PermissionAction, PermissionDecision, RunPolicy }
