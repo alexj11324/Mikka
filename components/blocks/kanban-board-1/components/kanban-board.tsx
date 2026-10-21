@@ -13,9 +13,9 @@ import { ISSUE_PRIORITIES, issueIdentifier, type IssueStatus } from '@/component
 import { BOARD_COLUMNS, type BoardColumns, type BoardTask } from './data'
 
 function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typeof ScrollAreaPrimitive.Viewport> & { viewportRef: Ref<HTMLDivElement> }) {
-  return <ScrollAreaPrimitive.Root data-slot="scroll-area" className="relative w-full min-w-0 pb-3">
-    <ScrollAreaPrimitive.Viewport {...props} ref={viewportRef} data-slot="scroll-area-viewport" className="w-full overscroll-x-contain rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
-      <ScrollAreaPrimitive.Content data-slot="scroll-area-content" className="w-max min-w-full">{children}</ScrollAreaPrimitive.Content>
+  return <ScrollAreaPrimitive.Root data-slot="scroll-area" className="relative min-h-0 w-full min-w-0 flex-1 pb-3">
+    <ScrollAreaPrimitive.Viewport {...props} ref={viewportRef} data-slot="scroll-area-viewport" className="h-full w-full overscroll-x-contain rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+      <ScrollAreaPrimitive.Content data-slot="scroll-area-content" className="h-full w-max min-w-full">{children}</ScrollAreaPrimitive.Content>
     </ScrollAreaPrimitive.Viewport>
     <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="flex h-2.5 touch-none flex-col p-px select-none"><ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-foreground/15" /></ScrollAreaPrimitive.Scrollbar>
     <ScrollAreaPrimitive.Corner />
@@ -100,7 +100,7 @@ function TaskCard({ task, status, disabled, isOverlay = false, onOpen }: {
     </CardContent>
   </Card>
 
-  return <KanbanItem value={task.id} disabled={disabled} role="group" tabIndex={-1} aria-label={task.title}>
+  return <KanbanItem value={task.id} disabled={disabled} className="shrink-0" role="group" tabIndex={-1} aria-label={task.title}>
     {isOverlay ? card : <KanbanItemHandle className="block touch-pan-y rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`拖动任务：${task.title}`} aria-roledescription="可拖动任务">{card}</KanbanItemHandle>}
   </KanbanItem>
 }
@@ -117,18 +117,18 @@ type KanbanBoardProps = Omit<ComponentProps<typeof Kanban<BoardTask>>, 'children
 }
 
 export function KanbanBoard({ pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onOpen, onCreate, ...props }: KanbanBoardProps) {
-  return <Kanban {...props} getItemValue={item => item.id} className="w-full min-w-0">
+  return <Kanban {...props} getItemValue={item => item.id} className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
     <BoardScrollArea viewportRef={viewportRef} id={viewportId} role="region" aria-label="横向滚动任务看板" aria-describedby={instructionsId} tabIndex={0} onKeyDown={onViewportKeyDown}>
-      <KanbanBoardPrimitive className="grid w-max min-w-full auto-cols-[17.5rem] grid-flow-col grid-cols-none items-start gap-3 px-1 pb-2">
-        {BOARD_COLUMNS.map(column => <KanbanColumn key={column.value} value={column.value} className="w-70 min-w-70">
-          <section className={cn('flex min-h-64 flex-col gap-2 rounded-lg border p-2.5 transition-colors', column.surfaceClassName, column.borderClassName)} aria-label={`${column.label}任务列`}>
-            <div className="flex h-8 items-center gap-2 px-0.5">
+      <KanbanBoardPrimitive className="grid h-full min-h-0 w-max min-w-full auto-cols-[17.5rem] grid-flow-col grid-cols-none items-stretch gap-3 px-1 pb-2">
+        {BOARD_COLUMNS.map(column => <KanbanColumn key={column.value} value={column.value} className="min-h-0 w-70 min-w-70">
+          <section className={cn('flex min-h-0 flex-1 flex-col gap-2 rounded-lg border p-2.5 transition-colors', column.surfaceClassName, column.borderClassName)} aria-label={`${column.label}任务列`}>
+            <div className="flex h-8 shrink-0 items-center gap-2 px-0.5">
               <column.icon className={cn('size-4 shrink-0', column.indicatorClassName)} aria-hidden="true" />
               <h2 className="truncate text-sm font-semibold">{column.label}</h2>
               <Badge variant="outline">{props.value[column.value]?.length ?? 0}</Badge>
               <Button type="button" variant="ghost" size="icon-xs" className="ml-auto" aria-label={`新建${column.label}任务`} disabled={pending} onClick={() => onCreate(column.value)}><Plus /></Button>
             </div>
-            <KanbanColumnContent value={column.value} className="min-h-28 gap-2" aria-label={`${column.label}列`}>
+            <KanbanColumnContent value={column.value} className="min-h-0 flex-1 gap-2 overflow-y-auto overscroll-y-contain" aria-label={`${column.label}列`}>
               {(props.value[column.value] ?? []).map(task => <TaskCard key={task.id} task={task} status={column.value} disabled={pending} onOpen={onOpen} />)}
               {!props.value[column.value]?.length && <p className="rounded-lg border border-dashed border-border/70 bg-background/55 px-3 py-6 text-center text-xs text-muted-foreground">拖动任务到这里</p>}
             </KanbanColumnContent>

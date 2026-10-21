@@ -21,6 +21,7 @@ import { TaskDetail } from './task-detail'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 export function IssueWorkspace({ user, initialIssues }: { user: { id: string; name: string; email: string }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
   const [boardBusy, setBoardBusy] = useState(false)
   const { data: tasks = [], mutate, error } = useSWR('issues', listIssues, { fallbackData: initialIssues, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
@@ -93,9 +94,9 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
     counts[task.ownerId === user.id ? 'mine' : 'shared']++
   }
   const viewTitle = view === 'all' ? '全部任务' : view === 'mine' ? '我创建的' : view === 'shared' ? '协作任务' : ISSUE_STATUSES.find(status => status.value === view)?.label ?? '全部任务'
-  return <TooltipProvider><SidebarProvider>
+  return <TooltipProvider><SidebarProvider className={cn(!selected && layout === 'board' && 'h-svh overflow-hidden')}>
     <AppSidebar user={user} view={view} counts={counts} recentIssues={tasks} selected={selected} onNavigate={navigate} onOpen={open} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
-    <SidebarInset className="min-w-0">
+    <SidebarInset className="min-h-0 min-w-0">
       {!selected && <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b px-4">
         <div className="flex min-w-0 items-center gap-2">
           <SidebarTrigger className="-ml-1" aria-label="展开或收起侧栏" />
@@ -107,7 +108,7 @@ export function IssueWorkspace({ user, initialIssues }: { user: { id: string; na
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {error && <p role="alert" className="px-6 py-2 text-xs text-destructive">列表更新失败，已保留上次结果。</p>}
       {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} navigation={{ index: filtered.findIndex(task => task.id === selected), total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : <>
-        <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <div className="flex items-center gap-2"><h1 className="text-sm font-semibold">{viewTitle}</h1><Badge variant="secondary">{filtered.length}</Badge></div>
           <div className="flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto"><div className="flex min-w-0 items-center gap-2 sm:w-48"><span className="inline-flex shrink-0 text-muted-foreground"><Search className="size-3.5" aria-hidden="true" /></span><Input aria-label="搜索任务" placeholder="搜索任务…" value={query} onChange={event => setQuery(event.target.value)} disabled={boardBusy} /></div><ToggleGroup aria-label="任务视图" size="sm" variant="outline" spacing={0} disabled={boardBusy} value={[layout]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') setLayout(next) }}><ToggleGroupItem value="list" aria-label="列表视图"><List /></ToggleGroupItem><ToggleGroupItem value="board" aria-label="看板视图"><Columns3 /></ToggleGroupItem></ToggleGroup></div>
         </div>
