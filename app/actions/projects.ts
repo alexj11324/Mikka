@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { projectDb, projects, projectEvents } from '@/lib/db/projects'
 import { requireIssueAccess } from '@/lib/issue-access'
+import { updateIssueMetadata } from '@/app/actions/issue-metadata'
 import { projectInput, projectPatch, hasDependencyCycle, type ProjectChanges } from '@/lib/project-input'
 import { accessibleProjects } from '@/lib/project-access'
 import { teamIssues, teamProjects } from '@/lib/db/team-schema'
@@ -58,6 +59,30 @@ export async function saveProject(input: z.input<typeof projectInput>) {
 export async function updateProjectProperties(input: { id: string; revision: number; changes: ProjectChanges }) {
   return persistProject(await userId(), input, true)
 }
+export async function moveIssueToProject(input: { issueId: string; revision: number; projectId: string | null }) {
+  const owner = await userId()
+  const parsed = z.object({ issueId: z.uuid(), revision: z.number().int().positive(), projectId: z.uuid().nullable() }).safeParse(input)
+  if (!parsed.success) return { error: '项目移动信息不正确。' }
+  await requireIssueAccess(input.issueId)
+  try {
+    return await projectDb.transaction(async tx => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${owner}, 0))`)
+      const owned = await tx.select().from(projects).where(eq(projects.userId, owner)).for('update')
+      const destination = owned.find(project => project.id === input.projectId)
+      if (input.projectId && !destination) return { error: '项目不存在或无访问权限。' }
+      if (destination && !destination.issueIds.includes(input.issueId) && destination.issueIds.length >= 100) return { error: '目标项目已达到 100 项任务上限。' }
+      const result = await updateIssueMetadata({ id: input.issueId, revision: input.revision, patch: { project: destination?.name ?? null } })
+      if (!('issue' in result) || !result.issue) return result
+      for (const project of owned.filter(project => project.issueIds.includes(input.issueId) || project.id === input.projectId)) {
+        const issueIds = project.id === input.projectId ? [...new Set([...project.issueIds, input.issueId])] : project.issueIds.filter(id => id !== input.issueId)
+        await tx.update(projects).set({ issueIds, revision: project.revision + 1, updatedAt: new Date() }).where(and(eq(projects.id, project.id), eq(projects.userId, owner)))
+        await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: owner, projectId: project.id, message: project.id === input.projectId ? '添加了任务' : '移除了任务' })
+      }
+      return result
+    })
+  } catch { return { error: '项目移动未完成，请刷新项目与任务后重试。' } }
+}
+
 export async function listProjectEvents(id: string) {
   const owner = await userId()
   z.uuid().parse(id)

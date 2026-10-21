@@ -118,7 +118,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="new-issue-title" className="sr-only">任务标题</FieldLabel>
-              <Input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder="任务标题" value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
+              <Input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder="任务标题" value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent px-0 py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
             </Field>
             <Field>
               <FieldLabel className="sr-only">任务描述</FieldLabel>

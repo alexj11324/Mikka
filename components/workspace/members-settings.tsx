@@ -111,6 +111,7 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const downloadRef = useRef<HTMLAnchorElement>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | undefined>();
   const canManage = data.role === "admin" && !fetchError;
   const query = search.trim().toLowerCase();
   const members = data.members
@@ -209,6 +210,7 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
     const url = URL.createObjectURL(
       new Blob([memberCsv(rows)], { type: "text/csv;charset=utf-8" }),
     );
+    setDownloadUrl(url);
     downloadRef.current.href = url;
     downloadRef.current.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -277,6 +279,7 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
               </div>
               <a
                 ref={downloadRef}
+                href={downloadUrl}
                 className="sr-only"
                 download="members.csv"
                 tabIndex={-1}

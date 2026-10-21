@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group'
 import { Field, FieldLabel, FieldGroup } from '@/components/ui/field'
-import { Button } from '@/components/ui/button'
 import { WORKSPACE_NAME, WORKSPACE_SLUG } from '@/components/workspace/issue-properties'
 
 export function WorkspaceSettings() {
@@ -35,7 +34,7 @@ export function WorkspaceSettings() {
     <p id="workspace-url-help" className="text-xs text-muted-foreground">URL 中的标识用于访问工作区。修改地址会影响现有链接。</p>
     <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
       <p role="status" className="text-xs text-muted-foreground">表单预览：尚未连接工作区存储，修改不会保存。</p>
-      <Button disabled>保存更改</Button>
+      <span className="text-xs text-muted-foreground">工作区表单预览</span>
     </div>
   </section>
 }

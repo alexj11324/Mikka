@@ -4,6 +4,9 @@ import type { JSONContent } from '@tiptap/react'
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
 })
+export const agents = pgTable('agents', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(), name: text('name').notNull(), harness: text('harness').notNull(),
+})
 export const issueMembers = pgTable('issue_members', {
   issueId: uuid('issueId').notNull(), userId: text('userId').notNull(), memberId: text('memberId').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),

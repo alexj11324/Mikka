@@ -11,8 +11,9 @@ import { SettingsShell } from '@/components/settings/settings-shell'
 import { SettingsDataPreloader } from '@/components/settings/settings-data-preloader'
 import { memberSettingsKey, teamDirectoryKey } from '@/lib/settings-data'
 
-export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers }: {
+export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers, initialSelected }: {
   user: { id: string; name: string; email: string; image?: string | null }
+  initialSelected?: string | null
   initialIssues?: Awaited<ReturnType<typeof listIssues>>
   initialTeams?: Awaited<ReturnType<typeof loadTeamDirectory>>
   initialMembers?: WorkspaceSettings
@@ -34,6 +35,6 @@ export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers
     <SettingsDataPreloader workspaceId={params.get('workspace') ?? initialWorkspaceId} onWorkspaceResolved={setWorkspaceId} />
     {pathname.startsWith('/settings')
       ? <SettingsShell user={user} defaultWorkspaceId={workspaceId} />
-      : <IssueWorkspace user={user} initialIssues={initialIssues} />}
+      : <IssueWorkspace user={user} initialIssues={initialIssues} initialSelected={initialSelected} />}
   </SWRConfig>
 }
