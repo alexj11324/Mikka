@@ -27,7 +27,7 @@ const inputSchema = z.object({
 
 export async function listIssues() {
   const userId = await getUserId()
-  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))).orderBy(desc(issues.updatedAt)).limit(100)
+  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))).orderBy(desc(issues.updatedAt)).limit(100)
   return rows.map(({ content, ...issue }) => ({ ...issue, checklist: issueChecklist(content) }))
 }
 export async function getIssue(id: string) {

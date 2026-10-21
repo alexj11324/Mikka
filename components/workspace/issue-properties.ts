@@ -1,4 +1,4 @@
-import { Circle, CircleDashed, CircleDot, CircleCheck, CircleX, CircleSlash2, CircleGauge } from 'lucide-react'
+import { Circle, CircleDashed, CircleDot, CircleCheck, CircleX, CircleSlash2, CircleGauge, CircleAlert, SignalHigh, SignalMedium, SignalLow } from 'lucide-react'
 
 export const ISSUE_STATUSES = [
   { value: 'backlog', label: 'Backlog', icon: CircleDashed, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
@@ -11,10 +11,10 @@ export const ISSUE_STATUSES = [
 ] as const
 
 export const ISSUE_PRIORITIES = [
-  { value: 'urgent', label: '紧急' },
-  { value: 'high', label: '高优先级' },
-  { value: 'normal', label: '普通优先级' },
-  { value: 'low', label: '低优先级' },
+  { value: 'urgent', label: '紧急', icon: CircleAlert },
+  { value: 'high', label: '高优先级', icon: SignalHigh },
+  { value: 'normal', label: '普通优先级', icon: SignalMedium },
+  { value: 'low', label: '低优先级', icon: SignalLow },
 ] as const
 
 export type IssueStatus = typeof ISSUE_STATUSES[number]['value']
