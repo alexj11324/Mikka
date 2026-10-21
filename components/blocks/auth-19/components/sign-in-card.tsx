@@ -13,6 +13,7 @@ import { GithubLight } from '@/components/ui/svgs/githubLight'
 
 type SignInCardProps = {
   registering: boolean
+  addAccount?: boolean
   pending: boolean
   githubEnabled: boolean
   error: string
@@ -23,16 +24,16 @@ type SignInCardProps = {
   onGitHubSignIn: () => Promise<void>
 }
 
-export function SignInCard({ registering, pending, githubEnabled, error, notice, callbackURL, next = '/', onSubmit, onGitHubSignIn }: SignInCardProps) {
+export function SignInCard({ registering, addAccount = false, pending, githubEnabled, error, notice, callbackURL, next = '/', onSubmit, onGitHubSignIn }: SignInCardProps) {
   return (
     <Card className="w-full max-w-[26rem] overflow-hidden p-0">
       <CardHeader className="px-7 pt-8 pb-5 sm:px-9 sm:pt-9 sm:pb-6">
         <div className="flex flex-col gap-1">
           <CardTitle className="text-2xl font-semibold tracking-tight text-balance">
-            <h1>{registering ? '创建你的工作账号' : '欢迎回来'}</h1>
+            <h1>{registering ? '创建你的工作账号' : addAccount ? '添加账户' : '欢迎回来'}</h1>
           </CardTitle>
           <CardDescription className="text-pretty">
-            {registering ? '从第一个任务开始，把想法变成可追踪的进展。' : '登录 Orvilo2，继续你的任务与文档。'}
+            {addAccount ? '登录另一个账户，当前账户会保持登录。' : registering ? '从第一个任务开始，把想法变成可追踪的进展。' : '登录 Orvilo2，继续你的任务与文档。'}
           </CardDescription>
         </div>
       </CardHeader>
@@ -86,7 +87,7 @@ export function SignInCard({ registering, pending, githubEnabled, error, notice,
         </form>
         <p className="text-muted-foreground text-center text-xs">
           {registering ? '已经有账号？' : '还没有账号？'}{' '}
-          <Link href={`${registering ? '/sign-in' : '/sign-up'}?next=${encodeURIComponent(next)}`} className="text-foreground underline underline-offset-4">{registering ? '去登录' : '创建账号'}</Link>
+          <Link href={`${registering ? '/sign-in' : '/sign-up'}?next=${encodeURIComponent(next)}${addAccount ? '&addAccount=1' : ''}`} className="text-foreground underline underline-offset-4">{registering ? '去登录' : '创建账号'}</Link>
         </p>
       </CardContent>
     </Card>

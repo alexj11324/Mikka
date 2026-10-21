@@ -12,7 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { WorkspaceSection } from '@/components/workspace/workspace-navigation'
 
-export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, onSearch, onCreate, onSettings, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
+export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, onSearch, onCreate, onSettings, onSignOut, signingOut, onBeforeChange, ...props }: React.ComponentProps<typeof Sidebar> & {
   user: { name: string; email: string; image?: string | null }
   section: WorkspaceSection
   onNavigate: (section: WorkspaceSection) => boolean
@@ -21,6 +21,7 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
   onSettings: (href?: string) => void
   onSignOut: () => void
   signingOut: boolean
+  onBeforeChange?: (action: () => Promise<void>) => void
   teamId: string | null
   onTeamNavigate: (teamId: string, section: WorkspaceSection) => boolean
 }) {
@@ -33,7 +34,7 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
     <SidebarHeader className="pb-4">
       <div className="flex items-center gap-1">
         <SidebarMenu className="min-w-0 flex-1"><SidebarMenuItem>
-          <WorkspaceMenu user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} />
+          <WorkspaceMenu user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} onBeforeChange={onBeforeChange} />
         </SidebarMenuItem></SidebarMenu>
         <Button variant="ghost" size="icon-sm" aria-label="搜索任务" title="搜索任务（⌘ / Ctrl K）" onClick={() => { setOpenMobile(false); onSearch() }}><Search data-icon="inline-start" /></Button>
         <Button variant="secondary" size="icon-sm" aria-label="新建任务" title="新建任务（C）" onClick={() => { setOpenMobile(false); onCreate() }}><SquarePen data-icon="inline-start" /></Button>

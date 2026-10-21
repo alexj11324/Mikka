@@ -2,7 +2,8 @@
 
 import { createHash, randomBytes } from 'node:crypto'
 import { and, eq, gt, ne } from 'drizzle-orm'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
+import { auth } from '@/lib/auth'
 import { z } from 'zod'
 import { requireUser } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -21,6 +22,39 @@ async function result<T>(operation: () => Promise<T>) {
     console.error('Workspace operation failed', error instanceof Error ? error.name : 'UnknownError')
     return { ok: false as const, error: '操作未完成，请刷新页面或稍后重试。' }
   }
+}
+
+async function rememberWorkspace(workspaceId: string) {
+  ;(await cookies()).set('orvilo-workspace', workspaceId, { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' : 'lax', secure: true, path: '/', maxAge: 31536000 })
+}
+
+export async function createWorkspace(name: string) {
+  return result(async () => {
+    const user = await requireUser()
+    const validName = z.string().trim().min(1).max(120).parse(name)
+    const workspaceId = crypto.randomUUID()
+    await workspaceDb.transaction(async tx => {
+      await tx.insert(workspaces).values({ id: workspaceId, userId: user.id, name: validName })
+      await tx.insert(workspaceMembers).values({ workspaceId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: 'admin' })
+    })
+    await rememberWorkspace(workspaceId)
+    return { workspaceId }
+  })
+}
+
+export async function switchWorkspace(input: { workspaceId?: string; accountId?: string }) {
+  return result(async () => {
+    const user = await requireUser()
+    const parsed = z.object({ workspaceId: z.uuid().optional(), accountId: z.string().min(1).max(200).optional() }).parse(input)
+    const accountId = parsed.accountId ?? user.id
+    const deviceSession = accountId === user.id ? null : (await auth.api.listDeviceSessions({ headers: await headers() })).find(item => item.user.id === accountId)
+    if (accountId !== user.id && !deviceSession) throw new WorkspaceError('此账户会话已过期，请重新添加账户。')
+    if (parsed.workspaceId) await workspaceDb.transaction(tx => requireWorkspace(tx, parsed.workspaceId!, accountId))
+    if (deviceSession) await auth.api.setActiveSession({ body: { sessionToken: deviceSession.session.token }, headers: await headers() })
+    if (parsed.workspaceId) await rememberWorkspace(parsed.workspaceId)
+    else (await cookies()).delete('orvilo-workspace')
+    return { workspaceId: parsed.workspaceId }
+  })
 }
 
 export async function createWorkspaceInvitation(input: { workspaceId: string; emails: string[]; role: string }) {
@@ -90,7 +124,7 @@ export async function acceptWorkspaceInvitation(token: string) {
       await tx.update(workspaceInvitations).set({ status: 'accepted' }).where(and(eq(workspaceInvitations.id, invitation.id), eq(workspaceInvitations.workspaceId, candidate.workspaceId), eq(workspaceInvitations.email, user.email.toLowerCase())))
       return candidate.workspaceId
     })
-    ;(await cookies()).set('orvilo-workspace', workspaceId, { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' : 'lax', secure: true, path: '/', maxAge: 31536000 })
+    await rememberWorkspace(workspaceId)
     return { workspaceId }
   })
 }

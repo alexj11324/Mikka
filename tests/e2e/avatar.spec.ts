@@ -29,21 +29,12 @@ test("中文姓名不参与头像，账号图片优先，加载失败回退邮�
   await expect(dialog.getByRole("img", { name: label, exact: true }).locator("img")).toBeVisible();
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
 
-  await page.getByRole("link", { name: "返回工作台", exact: true }).click();
-  const menu = page.getByRole("button", { name: "工作区菜单", exact: true });
-  await menu.click();
-  await page.getByRole("menuitem", { name: "工作区与账户", exact: true }).hover();
-  const account = page.getByRole("menuitem", { name: "个人资料", exact: true });
-  await expect(account.getByRole("img", { name: label, exact: true }).locator("img")).toBeVisible();
-
   await page.unroute(image);
   await page.route(image, route => route.fulfill({ contentType: "image/png", body: "invalid-image" }));
   await page.reload();
-  await menu.click();
-  await page.getByRole("menuitem", { name: "工作区与账户", exact: true }).hover();
-  await expect(account.getByRole("img", { name: label, exact: true })).toHaveText("A");
-  await page.keyboard.press("Escape");
-  await page.keyboard.press("Escape");
+  await expect(memberAvatar).toHaveText("A");
+  await page.getByRole("link", { name: "返回工作台", exact: true }).click();
+  const menu = page.getByRole("button", { name: "工作区菜单", exact: true });
   await menu.click();
   await page.getByRole("menuitem", { name: "邀请和管理成员", exact: true }).click();
   await page.getByRole("button", { name: "邀请成员", exact: true }).click();

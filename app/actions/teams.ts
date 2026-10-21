@@ -19,7 +19,10 @@ async function result<T>(operation: () => Promise<T>) {
     return { ok: false as const, error: '操作失败，团队标识可能已存在，请检查后重试。' }
   }
 }
-export async function listTeams() { return accessibleTeams((await requireUser()).id) }
+export async function listTeams() {
+  const context = await loadWorkspaceContext()
+  return accessibleTeams(context.currentUserId, context.workspace.id)
+}
 export async function loadTeamDirectory(workspaceId?: string) {
   const context = await loadWorkspaceContext(workspaceId)
   const [all, counts] = await Promise.all([

@@ -1,8 +1,14 @@
 'use client'
 
-import { Check, ChevronDown, Moon, Sun } from 'lucide-react'
-import { useTheme } from 'next-themes'
-import { UserAvatar } from '@/components/user-avatar'
+import { useState } from 'react'
+import useSWR from 'swr'
+import { Check, ChevronDown } from 'lucide-react'
+import { toast } from 'sonner'
+import { authClient } from '@/lib/auth-client'
+import { fetchSettingsData } from '@/lib/settings-data'
+import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
+import { switchWorkspace } from '@/app/actions/workspace'
+import { WorkspaceAccessDialog } from '@/components/workspace/workspace-access-dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,69 +22,97 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenuButton, useSidebar } from '@/components/ui/sidebar'
-import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
 
-function WorkspaceAvatar() {
-  return <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">{WORKSPACE_NAME.slice(0, 1)}</span>
+function WorkspaceAvatar({ name }: { name: string }) {
+  return <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">{name.slice(0, 1)}</span>
 }
 
-export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut }: {
+export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBeforeChange }: {
   user: { name: string; email: string; image?: string | null }
   onSettings: (href?: string) => void
   onSignOut: () => void
   signingOut: boolean
+  onBeforeChange?: (action: () => Promise<void>) => void
 }) {
   const { setOpenMobile } = useSidebar()
-  const { resolvedTheme, setTheme } = useTheme()
+  const { data, error, mutate } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
+  const [accessOpen, setAccessOpen] = useState(false)
+  const [pending, setPending] = useState(false)
+  const workspaceName = data?.workspace.name ?? '工作区'
   function settings(href = '/settings') {
     onSettings(href)
     setOpenMobile(false)
   }
-  return <DropdownMenu>
-    <DropdownMenuTrigger render={<SidebarMenuButton aria-label="工作区菜单" className="h-10" />}>
-      <WorkspaceAvatar />
-      <span className="flex-1 truncate font-semibold">{WORKSPACE_NAME}</span>
-      <ChevronDown />
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-1rem)]">
-      <DropdownMenuGroup>
-        <DropdownMenuItem className="min-h-9" onClick={() => settings()}>设置</DropdownMenuItem>
-        <DropdownMenuItem className="min-h-9" onClick={() => settings('/settings/members')}>邀请和管理成员</DropdownMenuItem>
-      </DropdownMenuGroup>
-      <DropdownMenuSeparator />
-      <DropdownMenuGroup>
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger className="min-h-9">工作区与账户</DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className="w-72 max-w-[calc(100vw-1rem)]">
-          <DropdownMenuGroup>
-            <DropdownMenuLabel className="truncate" title={user.email}>{user.email}</DropdownMenuLabel>
-            <DropdownMenuItem className="min-h-10" aria-label={`${WORKSPACE_NAME} 工作区设置，当前工作区`} onClick={() => settings('/settings?section=workspace')}>
-              <WorkspaceAvatar />
-              <span className="truncate">{WORKSPACE_NAME}</span>
-              <Check className="ml-auto" aria-hidden="true" />
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>账户</DropdownMenuLabel>
-            <DropdownMenuItem className="min-h-12" aria-label="个人资料" onClick={() => settings('/settings?section=profile')}>
-              <UserAvatar user={user} />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate">{user.name || user.email}</span>
-                <span className="truncate text-muted-foreground">{user.email}</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="min-h-9" onClick={() => settings('/settings?section=preferences')}>偏好设置</DropdownMenuItem>
-            <DropdownMenuItem className="min-h-9" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
-              {resolvedTheme === 'dark' ? <Sun /> : <Moon />}切换明暗主题
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
-      </DropdownMenuGroup>
-      <DropdownMenuGroup>
-        <DropdownMenuItem className="min-h-9" onClick={onSignOut} disabled={signingOut}>{signingOut ? '正在退出…' : '退出登录'}</DropdownMenuItem>
-      </DropdownMenuGroup>
-    </DropdownMenuContent>
-  </DropdownMenu>
+  function run(action: () => Promise<void>) {
+    if (pending || signingOut) return
+    if (onBeforeChange) onBeforeChange(action)
+    else void action()
+  }
+  function selectWorkspace(accountId: string, workspaceId?: string) {
+    if (accountId === data?.accounts[0]?.id && workspaceId === data.workspace.id) return
+    run(async () => {
+      setPending(true)
+      try {
+        const result = await switchWorkspace({ accountId, workspaceId })
+        if (!result.ok) { toast.error(result.error); return }
+        window.location.assign('/')
+      } catch { toast.error('切换未完成，请重试。') }
+      finally { setPending(false) }
+    })
+  }
+  function addAccount() {
+    run(async () => {
+      setPending(true)
+      try {
+        const session = await authClient.getSession({ query: { disableCookieCache: true } })
+        if (session.error || !session.data?.user) throw new Error('Session unavailable')
+        if ((data?.accounts.length ?? 0) >= 5) { toast.error('最多同时登录 5 个账户，请先退出不用的账户。'); return }
+        window.location.assign('/sign-in?addAccount=1')
+      } catch { toast.error('无法添加账户，请重试。') }
+      finally { setPending(false) }
+    })
+  }
+  return <>
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<SidebarMenuButton aria-label="工作区菜单" className="h-10" />}>
+        <WorkspaceAvatar name={workspaceName} />
+        <span className="flex-1 truncate font-semibold">{workspaceName}</span>
+        <ChevronDown />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-1rem)]">
+        <DropdownMenuGroup>
+          <DropdownMenuItem className="min-h-9" onClick={() => settings()}>设置</DropdownMenuItem>
+          <DropdownMenuItem className="min-h-9" onClick={() => settings('/settings/members')}>邀请和管理成员</DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="min-h-9">切换工作区</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-72 max-w-[calc(100vw-1rem)]">
+              {data?.accounts.map(account => <DropdownMenuGroup key={account.id}>
+                <DropdownMenuLabel className="truncate" title={account.email}>{account.email}</DropdownMenuLabel>
+                {account.choices.map(workspace => <DropdownMenuItem key={workspace.id} className="min-h-10" disabled={pending || signingOut} aria-current={account.id === data.accounts[0].id && workspace.id === data.workspace.id ? 'true' : undefined} onClick={() => selectWorkspace(account.id, workspace.id)}>
+                  <WorkspaceAvatar name={workspace.name} />
+                  <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
+                  {account.id === data.accounts[0].id && workspace.id === data.workspace.id && <Check aria-hidden="true" />}
+                </DropdownMenuItem>)}
+                {!account.choices.length && <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => selectWorkspace(account.id)}>进入此账户</DropdownMenuItem>}
+              </DropdownMenuGroup>)}
+              {!data && <DropdownMenuGroup>
+                <DropdownMenuLabel className="truncate" title={user.email}>{user.email}</DropdownMenuLabel>
+                {error ? <DropdownMenuItem className="min-h-9" onClick={() => void mutate()}>读取失败，点击重试</DropdownMenuItem> : <DropdownMenuLabel>正在读取工作区…</DropdownMenuLabel>}
+              </DropdownMenuGroup>}
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => run(async () => { setAccessOpen(true) })}>创建或加入工作区</DropdownMenuItem>
+                <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={addAccount}>添加账户</DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuItem className="min-h-9" onClick={onSignOut} disabled={signingOut || pending}>{signingOut ? '正在退出…' : '退出登录'}</DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+    {accessOpen && <WorkspaceAccessDialog open={accessOpen} onOpenChange={setAccessOpen} />}
+  </>
 }

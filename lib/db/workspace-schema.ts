@@ -2,7 +2,7 @@ import { pgTable, text, timestamp, uuid, varchar, primaryKey, unique } from 'dri
 
 export const workspaces = pgTable('orvilo_workspaces', {
   id: uuid('id').primaryKey(),
-  userId: text('userId').notNull().unique(),
+  userId: text('userId').notNull(),
   name: varchar('name', { length: 120 }).notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })

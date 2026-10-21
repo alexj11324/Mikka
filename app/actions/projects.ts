@@ -9,6 +9,7 @@ import { requireIssueAccess } from '@/lib/issue-access'
 import { updateIssueMetadata } from '@/app/actions/issue-metadata'
 import { projectInput, projectPatch, hasDependencyCycle, type ProjectChanges } from '@/lib/project-input'
 import { accessibleProjects } from '@/lib/project-access'
+import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { teamIssues, teamProjects } from '@/lib/db/team-schema'
 import { inArray } from 'drizzle-orm'
 import { lockTeamRelations } from '@/lib/team-access'
@@ -19,8 +20,8 @@ async function userId() {
   return session.user.id
 }
 export async function listProjects() {
-  const owner = await userId()
-  return (await accessibleProjects(owner)).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+  const context = await loadWorkspaceContext()
+  return (await accessibleProjects(context.currentUserId, projectDb, context.workspace.id)).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
 }
 async function persistProject(owner: string, input: unknown, partial: boolean) {
   try {

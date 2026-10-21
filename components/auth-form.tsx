@@ -8,21 +8,21 @@ import { safeAuthReturn } from '@/lib/auth-return'
 import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
 
-export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, continueGitHub = false, callbackURL, testWorkspaceEnabled = false, next }: { mode: 'sign-in' | 'sign-up'; githubEnabled?: boolean; oauthFailed?: boolean; continueGitHub?: boolean; callbackURL?: string; testWorkspaceEnabled?: boolean; next?: string }) {
+export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, continueGitHub = false, callbackURL, testWorkspaceEnabled = false, next, addAccount = false }: { mode: 'sign-in' | 'sign-up'; githubEnabled?: boolean; oauthFailed?: boolean; continueGitHub?: boolean; callbackURL?: string; testWorkspaceEnabled?: boolean; next?: string; addAccount?: boolean }) {
   const returnTo = safeAuthReturn(next)
   const [error, setError] = useState(oauthFailed ? 'GitHub 登录未完成，可能已取消或授权已过期。请重新尝试。' : '')
   const [notice, setNotice] = useState(continueGitHub ? '请点击下方按钮，在此标签页完成 GitHub 授权。' : '')
   async function signInWithGitHub() {
     if (pending || !githubEnabled) return
     if (window.self !== window.top) {
-      const tab = window.open(`/sign-in?continue=github&next=${encodeURIComponent(returnTo)}`, '_blank')
+      const tab = window.open(`/sign-in?continue=github&next=${encodeURIComponent(returnTo)}${addAccount ? '&addAccount=1' : ''}`, '_blank')
       if (tab) tab.opener = null
       setNotice(tab ? '请在新标签页点击 GitHub 登录并完成授权；完成后可刷新此预览。' : '浏览器阻止了新标签页，请允许弹出窗口后重试。')
       return
     }
     setPending(true); setError(''); setNotice('')
     try {
-      const result = await authClient.signIn.social({ provider: 'github', callbackURL: returnTo, errorCallbackURL: `/sign-in?oauth=failed&next=${encodeURIComponent(returnTo)}`, disableRedirect: true })
+      const result = await authClient.signIn.social({ provider: 'github', callbackURL: returnTo, errorCallbackURL: `/sign-in?oauth=failed&next=${encodeURIComponent(returnTo)}${addAccount ? '&addAccount=1' : ''}`, disableRedirect: true })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
     } catch {
@@ -75,8 +75,8 @@ export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, con
       setPending(false)
     }
   }
-  return <Auth registering={registering} next={returnTo}>
-    <SignInCard registering={registering} pending={pending} githubEnabled={githubEnabled} error={error} notice={notice} callbackURL={callbackURL} next={returnTo} onSubmit={submit} onGitHubSignIn={signInWithGitHub} />
+  return <Auth addAccount={addAccount} registering={registering} next={returnTo}>
+    <SignInCard addAccount={addAccount} registering={registering} pending={pending} githubEnabled={githubEnabled} error={error} notice={notice} callbackURL={callbackURL} next={returnTo} onSubmit={submit} onGitHubSignIn={signInWithGitHub} />
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
       <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>跳过登录，进入测试工作台</Button>
       <p className="text-muted-foreground text-xs">仅开发预览可用 · 专用测试账号</p>

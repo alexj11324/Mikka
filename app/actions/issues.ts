@@ -3,6 +3,7 @@
 import { headers } from 'next/headers'
 import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { accessibleTeams } from '@/lib/team-access'
+import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
@@ -31,7 +32,8 @@ const inputSchema = z.object({
 
 export async function listIssues() {
   const userId = await getUserId()
-  const teams = await accessibleTeams(userId)
+  const context = await loadWorkspaceContext()
+  const teams = await accessibleTeams(userId, context.workspace.id)
   const publicLinks = await issueTeamScope(userId)
   const publicIds = publicLinks.map(link => link.issueId)
   const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId), publicIds.length ? inArray(issues.id, publicIds) : undefined), sql`${issues.content}->'attrs'->'orvilo'->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)

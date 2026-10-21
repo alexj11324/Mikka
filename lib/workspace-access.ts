@@ -1,6 +1,6 @@
 import 'server-only'
 import { cookies } from 'next/headers'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { z } from 'zod'
@@ -33,8 +33,11 @@ export async function loadWorkspaceContext(requestedId?: string) {
   ])
   if (!own.length) {
     await workspaceDb.transaction(async tx => {
-      const [created] = await tx.insert(workspaces).values({ id: crypto.randomUUID(), userId: user.id, name: `${user.name || '我的'}的工作区`.slice(0, 120) }).onConflictDoNothing().returning({ id: workspaces.id })
-      if (created) await tx.insert(workspaceMembers).values({ workspaceId: created.id, userId: user.id, email: user.email.toLowerCase(), name: user.name, role: 'admin' })
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`workspace-owner:${user.id}`}, 0))`)
+      const [existing] = await tx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.userId, user.id)).limit(1)
+      if (existing) return
+      const [created] = await tx.insert(workspaces).values({ id: crypto.randomUUID(), userId: user.id, name: `${user.name || '我的'}的工作区`.slice(0, 120) }).returning({ id: workspaces.id })
+      await tx.insert(workspaceMembers).values({ workspaceId: created.id, userId: user.id, email: user.email.toLowerCase(), name: user.name, role: 'admin' })
     })
   }
   const choices = own.length ? existingChoices : await readChoices()
