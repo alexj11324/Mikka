@@ -20,7 +20,9 @@ test("成员导航、邀请取消、角色选择、创建和撤销邀请、管�
   page,
 }) => {
   await register(page);
-  await page.getByRole("link", { name: "邀请成员", exact: true }).click();
+  await page.getByRole("button", { name: "工作区菜单", exact: true }).click();
+  await page.getByRole("menuitem", { name: "邀请和管理成员", exact: true }).click();
+  await page.getByRole("button", { name: "邀请成员", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "邀请成员", exact: true });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "取消", exact: true }).click();

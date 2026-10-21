@@ -121,7 +121,9 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
   const privateTitle = `个人保密 ${randomUUID()}`
   await createTask(page, publicTitle, 'SHARED · 共享团队')
   await createTask(page, privateTitle)
-  await page.getByRole('link', { name: '邀请成员', exact: true }).click()
+  await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '邀请和管理成员', exact: true }).click()
+  await page.getByRole('button', { name: '邀请成员', exact: true }).click()
   const invitation = page.getByRole('dialog', { name: '邀请成员', exact: true })
   const email = `team-member-${randomUUID()}@example.com`
   await invitation.getByLabel('邮箱地址', { exact: true }).fill(email)

@@ -6,8 +6,9 @@ import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import { Activity, ArrowLeft, ArrowLeftRight, Blocks, Building2, ChartNoAxesCombined, CodeXml, ContactRound, CreditCard, FileText, Flag, Grid2X2, HandHelping, Orbit, PackageCheck, Plus, Search, ShieldCheck, SlidersHorizontal, Smile, Sparkles, SquareUserRound, UserRound, Users } from 'lucide-react'
 import { listTeams } from '@/app/actions/teams'
-import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
-import { NavUser } from '@/components/nav-user'
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
+import { WorkspaceMenu } from '@/components/workspace-menu'
+import { pushSettingsHistory } from '@/lib/settings-navigation'
 import type { SettingsSection } from './settings-view'
 import { useFeatureAvailability } from '@/hooks/use-feature-availability'
 
@@ -76,8 +77,19 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
     if (id !== 'members' && id !== 'teams') search.set('section', id)
     return `${id === 'members' || id === 'teams' ? `/settings/${id}` : '/settings'}?${search}`
   }
+  function openSettings(href = '/settings') {
+    const destination = new URL(href, window.location.origin)
+    if (activeSection) {
+      if (workspaceId) destination.searchParams.set('workspace', workspaceId)
+      pushSettingsHistory(`${destination.pathname}${destination.search}`, workspaceId)
+      return
+    }
+    const next = destination.pathname.endsWith('/members') ? 'members' : destination.searchParams.get('section')
+    onSectionChange(next === 'profile' || next === 'workspace' || next === 'members' ? next : 'preferences')
+  }
   return <Sidebar variant="sidebar" aria-label="设置导航">
-    <SidebarHeader className="px-4 pt-5 pb-2">
+    <SidebarHeader className="px-4 pt-3 pb-2">
+      <SidebarMenu><SidebarMenuItem><WorkspaceMenu user={user} onSettings={openSettings} onSignOut={onSignOut} signingOut={signingOut} /></SidebarMenuItem></SidebarMenu>
       <SidebarMenu><SidebarMenuItem><SidebarMenuButton aria-label="返回工作台" render={activeSection ? <Link href={selectedTeamId ? `/?team=${encodeURIComponent(selectedTeamId)}` : '/'} /> : undefined} onClick={() => { setOpenMobile(false); if (!activeSection) onBack() }}><ArrowLeft /><span lang="en">Back to app</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>
       <div className="relative mt-3"><Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" aria-hidden="true" /><SidebarInput className="pl-8" aria-label="搜索设置" placeholder="Search…" value={query} onChange={event => setQuery(event.target.value)} /></div>
     </SidebarHeader>
@@ -97,7 +109,6 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
         return <SidebarMenuItem key={team.id}><SidebarMenuButton render={<Link href={teamHref} />} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => setOpenMobile(false)}><SquareUserRound className="text-info" /><span>{team.name}</span></SidebarMenuButton></SidebarMenuItem>
       })}<SidebarMenuItem><SidebarMenuButton render={<Link href={`${href('teams')}&create=1`} />} aria-label="创建团队" isActive={creating} aria-current={creating ? 'page' : undefined} onClick={() => setOpenMobile(false)}><Plus /><span lang="en">Create a team</span></SidebarMenuButton></SidebarMenuItem>{error && <SidebarMenuItem><SidebarMenuButton onClick={() => void mutate()}>团队读取失败，重试</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></SidebarGroup>}
     </SidebarContent>
-    <SidebarFooter className="px-4"><NavUser user={user} onSignOut={onSignOut} signingOut={signingOut} /></SidebarFooter>
     <SidebarRail />
   </Sidebar>
 }
