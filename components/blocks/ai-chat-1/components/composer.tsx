@@ -27,8 +27,8 @@ export function Composer({ ref, draft, onChange, onSubmit, isLoading, onStop }: 
           <InputGroupAddon align="block-end" className="justify-between gap-3">
             <span className="flex items-center gap-1 text-xs"><Kbd>Shift</Kbd><span>+</span><Kbd>Enter</Kbd><span>换行</span></span>
             {isLoading
-              ? <InputGroupButton type="button" size="icon-sm" variant="outline" onClick={onStop} aria-label="停止生成"><Square aria-hidden="true" /></InputGroupButton>
-              : <InputGroupButton type="submit" size="icon-sm" variant="default" disabled={!draft.trim()} aria-label="发送消息"><ArrowUp aria-hidden="true" /></InputGroupButton>}
+              ? <InputGroupButton key="stop" type="button" size="icon-sm" variant="outline" onClick={event => { event.preventDefault(); onStop() }} aria-label="停止生成"><Square aria-hidden="true" /></InputGroupButton>
+              : <InputGroupButton key="send" type="submit" size="icon-sm" variant="default" disabled={!draft.trim()} aria-label="发送消息"><ArrowUp aria-hidden="true" /></InputGroupButton>}
           </InputGroupAddon>
         </InputGroup>
       </form>

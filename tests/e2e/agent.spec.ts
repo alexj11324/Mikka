@@ -95,6 +95,47 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(panel).toHaveCount(0)
 })
 
+for (const stage of ['headers', 'body'] as const) {
+  test(`停止生成在 ${stage} 阶段取消请求且不重新提交`, async ({ page }) => {
+    await register(page)
+    await page.getByRole('button', { name: 'Agent', exact: true }).click()
+    const panel = page.getByRole('region', { name: '有什么可以帮你？' })
+    const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
+    await page.evaluate(stage => {
+      const state = { requests: 0, aborted: false }
+      Object.assign(window, { agentCancellationTest: state })
+      const original = window.fetch.bind(window)
+      window.fetch = async (url, options) => {
+        if (!String(url).endsWith('/api/agent')) return original(url, options)
+        state.requests++
+        options?.signal?.addEventListener('abort', () => { state.aborted = true }, { once: true })
+        if (stage === 'headers') return new Promise<Response>(() => {})
+        return new Response(new ReadableStream({
+          start(controller) {
+            const events = [{ type: 'start' }, { type: 'text-start', id: 'partial' }, { type: 'text-delta', id: 'partial', delta: 'root = TextContent("取消前的部分回复")' }]
+            controller.enqueue(new TextEncoder().encode(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')))
+          },
+        }), { headers: { 'Content-Type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' } })
+      }
+    }, stage)
+    await input.fill('停止后保留的提问')
+    await panel.getByRole('button', { name: '发送消息' }).click()
+    if (stage === 'body') await expect(panel.getByText('取消前的部分回复', { exact: true })).toBeVisible()
+    await panel.getByRole('button', { name: '停止生成' }).click()
+    await expect(panel.getByRole('button', { name: '发送消息' })).toBeEnabled()
+    await expect(input).toHaveValue('停止后保留的提问')
+    await expect(input).toBeEditable()
+    await expect(panel.getByRole('alert')).toHaveCount(0)
+    expect(await page.evaluate(() => Reflect.get(window, 'agentCancellationTest'))).toEqual({ requests: 1, aborted: true })
+    await panel.getByRole('button', { name: '发送消息' }).click()
+    await panel.getByRole('button', { name: '停止生成' }).click()
+    await expect(panel.getByRole('button', { name: '发送消息' })).toBeEnabled()
+    expect(await page.evaluate(() => Reflect.get(window, 'agentCancellationTest').requests)).toBe(2)
+    await panel.getByRole('button', { name: '新问题', exact: true }).click()
+    await expect(input).toHaveValue('')
+  })
+}
+
 function openUIStream(response: string) {
   return [
     { type: 'start' },

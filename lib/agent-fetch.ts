@@ -1,6 +1,5 @@
 export const fetchAgentResponse: typeof fetch = async (input, options) => {
   const signal = options?.signal
-  console.log('[v0] agent transport signal', { present: Boolean(signal), aborted: signal?.aborted })
   if (!signal) return fetch(input, options)
   signal.throwIfAborted()
 

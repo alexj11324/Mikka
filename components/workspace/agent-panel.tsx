@@ -85,7 +85,7 @@ function AgentSession({ onReset }: { onReset: () => void }) {
       question={question}
       streaming={isLoading}
       onReset={onReset}
-      composer={<AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={submit} isLoading={isLoading} onStop={() => { console.log('[v0] stop requested'); stop() }} />}
+      composer={<AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={submit} isLoading={isLoading} onStop={stop} />}
       response={<AgentResponse key={generation} completion={completion} error={error} isLoading={isLoading} onAction={handleUIAction} />}
       starters={<AgentStarters onSelect={selectStarter} />}
     />
