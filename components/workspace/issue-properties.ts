@@ -11,10 +11,10 @@ export const ISSUE_STATUSES = [
 ] as const
 
 export const ISSUE_PRIORITIES = [
-  { value: 'urgent', label: '紧急', icon: CircleAlert },
-  { value: 'high', label: '高优先级', icon: SignalHigh },
-  { value: 'normal', label: '普通优先级', icon: SignalMedium },
-  { value: 'low', label: '低优先级', icon: SignalLow },
+  { value: 'urgent', label: '紧急', icon: CircleAlert, iconProps: { strokeWidth: 2.5 } },
+  { value: 'high', label: '高优先级', icon: SignalHigh, iconProps: { strokeWidth: 3, viewBox: '-0.5 4 20 20' } },
+  { value: 'normal', label: '普通优先级', icon: SignalMedium, iconProps: { strokeWidth: 3, viewBox: '-3 6 20 20' } },
+  { value: 'low', label: '低优先级', icon: SignalLow, iconProps: { strokeWidth: 3, viewBox: '-5.5 8 20 20' } },
 ] as const
 
 export type IssueStatus = typeof ISSUE_STATUSES[number]['value']

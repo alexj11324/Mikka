@@ -1,6 +1,6 @@
 'use client'
 
-import type { LucideIcon } from 'lucide-react'
+import type { LucideIcon, LucideProps } from 'lucide-react'
 import { Check, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 export function IssuePropertyMenu({ label, value, options, icon: Icon, disabled, pill = false, compact = false, iconOnly = false, displayValue, onChange }: {
   label: string
   value: string
-  options: readonly { value: string; label: string; icon?: LucideIcon; indicatorClassName?: string }[]
+  options: readonly { value: string; label: string; icon?: LucideIcon; iconProps?: Pick<LucideProps, 'viewBox' | 'strokeWidth'>; indicatorClassName?: string }[]
   icon: LucideIcon
   disabled?: boolean
   pill?: boolean
@@ -22,7 +22,7 @@ export function IssuePropertyMenu({ label, value, options, icon: Icon, disabled,
   const ValueIcon = option?.icon ?? Icon
   return <DropdownMenu>
     <DropdownMenuTrigger render={<Button type="button" variant={pill ? 'outline' : 'ghost'} size={iconOnly ? compact ? 'icon-compact' : 'icon-sm' : compact ? 'xs' : 'sm'} className={cn(pill && 'rounded-full', iconOnly && !pill && '-ml-1')} disabled={disabled} title={`${label}：${option?.label ?? value}`} aria-label={`${label}：${option?.label ?? value}`} />}>
-      <ValueIcon data-icon="inline-start" className={cn({
+      <ValueIcon {...option?.iconProps} data-icon="inline-start" className={cn({
         'text-muted-foreground': option?.indicatorClassName === 'text-muted-foreground',
         'text-warning-foreground': option?.indicatorClassName === 'text-warning-foreground',
         'text-success-foreground': option?.indicatorClassName === 'text-success-foreground',
@@ -33,7 +33,7 @@ export function IssuePropertyMenu({ label, value, options, icon: Icon, disabled,
       <DropdownMenuGroup>
         <DropdownMenuLabel>{label}</DropdownMenuLabel>
         {options.map(item => <DropdownMenuItem key={item.value} onClick={() => { if (item.value !== value) onChange(item.value) }}>
-          {item.icon && <item.icon className={cn({
+          {item.icon && <item.icon {...item.iconProps} className={cn({
             'text-muted-foreground': item.indicatorClassName === 'text-muted-foreground',
             'text-warning-foreground': item.indicatorClassName === 'text-warning-foreground',
             'text-success-foreground': item.indicatorClassName === 'text-success-foreground',
