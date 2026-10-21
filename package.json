@@ -15,7 +15,8 @@
     "test:e2e": "playwright test",
     "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
     "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
-    "check": "pnpm test:ui-policy && pnpm test:csv && pnpm lint && pnpm typecheck",
+    "test:analytics": "node --experimental-strip-types --test tests/analytics-policy.test.mjs",
+    "check": "pnpm test:ui-policy && pnpm test:csv && pnpm test:analytics && pnpm lint && pnpm typecheck",
     "check:ci": "pnpm check && pnpm build && pnpm test:e2e",
     "start": "next start",
     "typecheck": "tsgo --noEmit"
@@ -54,6 +55,7 @@
     "next": "16.1.6",
     "next-themes": "latest",
     "pg": "^8.23.1",
+    "posthog-js": "1.438.13",
     "react": "^19.2.4",
     "react-day-picker": "9.8.0",
     "react-dom": "^19.2.4",

@@ -114,6 +114,20 @@ test('business code cannot bypass typography presets', () => {
   has('<Button className="hover:!text-[13px]" />', 'typography/preset-only')
 })
 
+test('field titles retain the shared primary hierarchy', () => {
+  const imports = `import { FieldLabel, FieldTitle, FieldContent, FieldDescription } from '@/components/ui/field';`
+  has(`${imports} const ui = <FieldLabel className="text-muted-foreground">Name</FieldLabel>`, 'forms/label-hierarchy')
+  has(`${imports} const ui = <FieldTitle className="font-normal">Name</FieldTitle>`, 'forms/label-hierarchy')
+  has(`${imports} const ui = <FieldContent><span className="text-sm text-muted-foreground">Name</span><FieldLabel className="sr-only" htmlFor="name">Name</FieldLabel></FieldContent>`, 'forms/visible-label')
+  assert.deepEqual(rules(`${imports} const ui = <FieldContent><FieldLabel htmlFor="name">Name</FieldLabel><FieldDescription>Help</FieldDescription></FieldContent>`), [])
+  assert.deepEqual(rules(`${imports} const ui = <FieldContent><FieldLabel className="sr-only" htmlFor="query">Search</FieldLabel></FieldContent>`), [])
+})
+
+test('browser CSS assertions are not typography utilities, while test JSX remains checked', () => {
+  assert.deepEqual(auditSource('tests/e2e/settings.spec.ts', `await expect(label).toHaveCSS('font-weight', '500')`, policy), [])
+  assert.ok(auditSource('tests/e2e/settings.spec.ts', '<Button className="text-[13px]" />', policy).some(d => d.rule === 'typography/preset-only'))
+})
+
 test('system colors are not mistaken for arbitrary font sizes', () => {
   const diagnostics = rules('<div className="text-[CanvasText] text-[color:var(--color)]" />')
   assert.ok(!diagnostics.includes('typography/preset-only'))

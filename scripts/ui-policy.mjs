@@ -179,7 +179,8 @@ export function auditSource(file, text, policy) {
     return found
   }
   function visit(node) {
-    if (ts.isStringLiteralLike(node)) {
+    const cssAssertionProperty = /\.spec\.[jt]sx?$/.test(file) && !!node.parent && ts.isCallExpression(node.parent) && ts.isPropertyAccessExpression(node.parent.expression) && node.parent.expression.name.text === 'toHaveCSS' && node.parent.arguments[0] === node
+    if (ts.isStringLiteralLike(node) && !cssAssertionProperty) {
       for (const token of splitUtilities(node.text)) if (/^(?:text-|font-|leading-|tracking-|bg-|border-|divide-|ring-|outline-|fill-|stroke-|space-[xy]-|\[(?:font|line-height|letter-spacing))/.test(utilityBase(token))) checkUtility(token, policy, (rule, message) => add(node, rule, message))
     }
     if (ts.isPropertyAssignment(node) && /^(?:fontSize|fontFamily|fontWeight|lineHeight|letterSpacing|fontVariant|fontStyle)$/.test(node.name.getText(source).replaceAll(/['"]/g, ''))) add(node, 'typography/no-inline-values', '排版只能通过预设档位；不允许 style/配置对象手写字体值。')
@@ -218,6 +219,7 @@ export function auditSource(file, text, policy) {
           const tokens = splitUtilities(value)
           if (tokens.includes('overflow-hidden') && tokens.includes('text-ellipsis') && tokens.includes('whitespace-nowrap')) add(classAttr, 'style/truncate', '使用 truncate 简写。')
           const bases = tokens.map(utilityBase)
+          if (['FieldLabel', 'FieldTitle'].includes(name) && bases.some(base => base === 'font-normal' || /^text-(?:muted-foreground|secondary-foreground)(?:\/|$)/.test(base))) add(classAttr, 'forms/label-hierarchy', '字段主标题使用 FieldLabel / FieldTitle 默认的 foreground + medium；辅助说明使用 FieldDescription，不降低标题层级。')
           const drawnRule = bases.some(base => /^h-(?:px|0\.5)$/.test(base)) && bases.some(base => /^bg-(?!transparent|none$|clip-|origin-|cover|contain|center|left|right|top|bottom|repeat|no-repeat|fixed|local|scroll|auto|blend-)/.test(base))
           if (drawnRule) add(classAttr, 'style/no-horizontal-rule', '禁止用 h-px/0.5 + bg-* 手画水平细线；用间距或背景分组。')
           for (const token of tokens) {
@@ -248,6 +250,17 @@ export function auditSource(file, text, policy) {
       }
       if (name === 'Button' && (attr(node, 'isLoading') || attr(node, 'isPending'))) add(node, 'composition/button-loading', 'Button 使用 Spinner + disabled，不存在 isLoading/isPending。')
       if (['Input', 'Textarea'].includes(name) && parents.includes('InputGroup')) add(node, 'forms/input-group', 'InputGroup 内使用 InputGroupInput/InputGroupTextarea。')
+      if (name === 'FieldContent' && ts.isJsxElement(node.parent)) {
+        const children = node.parent.children.map(opening).filter(Boolean)
+        const hiddenLabel = children.some(child => {
+          if (canonical(child) !== 'FieldLabel') return false
+          const initializer = attr(child, 'className')?.initializer
+          const expression = initializer && (ts.isJsxExpression(initializer) ? initializer.expression : initializer)
+          return resolve(expression).strings.some(value => splitUtilities(value).map(utilityBase).includes('sr-only'))
+        })
+        const replacementText = children.some(child => ['span', 'div', 'p'].includes(canonical(child)) && ts.isJsxElement(child.parent) && child.parent.children.some(content => ts.isJsxText(content) && content.text.trim()))
+        if (hiddenLabel && replacementText) add(node, 'forms/visible-label', '不要隐藏 FieldLabel 后手写可见字段标题；直接显示 FieldLabel，说明文字使用 FieldDescription。')
+      }
       if (['Input', 'Textarea', 'Checkbox', 'Switch', 'NativeSelect'].includes(name) && parents.includes('form') && !parents.includes('Field')) add(node, 'forms/field', '表单控件使用 FieldGroup + Field，不手写字段容器。')
       if (name === 'Field' && !parents.includes('FieldGroup')) add(node, 'forms/field-group', 'Field 必须在 FieldGroup 中组合。')
       if (name === 'Field' && attr(node, 'data-invalid') && !containsInvalidControl(node, source)) add(node, 'forms/invalid-state', 'Field data-invalid 需配合控件 aria-invalid。')

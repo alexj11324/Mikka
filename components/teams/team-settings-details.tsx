@@ -11,6 +11,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
+import { useFeatureAvailability } from '@/hooks/use-feature-availability'
 
 type Team = { id: string; workspaceId: string; name: string; identifier: string; description: string; memberCount: number; role: string | null }
 function SlackIcon() { return <img src="/icons/slack.svg" alt="" className="size-4" /> }
@@ -40,8 +41,9 @@ const sections = [
 ] satisfies { title: string; rows: SettingsRow[] }[]
 
 function SettingsRows({ rows }: { rows: SettingsRow[] }) {
+  const release = useFeatureAvailability('teamSettings')
   return <ItemGroup className="gap-0 rounded-xl border bg-card px-4 sm:px-5">{rows.map(row => <div key={row.title} role="listitem">
-    <Item render={row.href ? <Link href={row.href} aria-label={row.label} /> : undefined} aria-disabled={row.unavailable || undefined} title={row.unavailable ? '暂未开放：当前版本尚未实现此设置。' : undefined} className="min-h-18 flex-nowrap gap-3 rounded-none px-0 py-4">
+    <Item render={row.href && (!row.unavailable || release.enabled) ? <Link href={row.href} aria-label={row.label} /> : undefined} data-feature-flag={row.unavailable ? release.key : undefined} aria-disabled={row.unavailable && !release.enabled || undefined} title={row.unavailable ? release.reason : undefined} className="min-h-18 flex-nowrap gap-3 rounded-none px-0 py-4">
       {row.icon && <ItemMedia variant="icon" className="size-9 rounded-lg bg-muted text-muted-foreground"><row.icon aria-hidden="true" /></ItemMedia>}
       <ItemContent className="min-w-0"><ItemTitle lang="en">{row.title}</ItemTitle>{row.description && <ItemDescription lang="en">{row.description}</ItemDescription>}</ItemContent>
       <ItemActions className="max-w-24 shrink-0 sm:max-w-none">{row.action ?? <>{(row.status || row.unavailable) && <span className="text-right text-xs text-muted-foreground sm:text-sm">{row.status ?? '暂未开放'}</span>}{row.href && <ChevronRight className="shrink-0 text-muted-foreground" aria-hidden="true" />}</>}</ItemActions>

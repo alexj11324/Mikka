@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { PostHogAnalytics } from '@/components/posthog-analytics';
 
 const fontSans = Geist({ subsets: ['latin'], variable: '--font-geist' });
 
@@ -27,7 +28,7 @@ export default function RootLayout({
       <body
         className="antialiased"
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider><PostHogAnalytics />{children}</ThemeProvider>
       </body>
     </html>
   );

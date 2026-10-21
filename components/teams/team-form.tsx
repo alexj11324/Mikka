@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, SquareUserRound } from 'lucide-react'
+import posthog from 'posthog-js'
 import { saveTeam } from '@/app/actions/teams'
 import { Field, FieldContent, FieldGroup, FieldLabel, FieldDescription } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -38,6 +39,7 @@ export function TeamForm({ workspaceId, team, editable = true, onClose, onSaved 
     try {
       const result = await saveTeam({ id: team?.id, workspaceId, name, identifier, description })
       if (!result.ok) { setError(result.error); return }
+      posthog.capture(team ? 'orvilo_team_updated' : 'orvilo_team_created')
       onSaved(result.data.id)
     } catch { setError('保存失败，输入已保留，请重试。') }
     finally { busy.current = false; setPending(false) }
@@ -49,11 +51,11 @@ export function TeamForm({ workspaceId, team, editable = true, onClose, onSaved 
       <form aria-label={team ? '团队常规设置' : '创建新团队'} className="flex flex-col gap-8" onSubmit={event => { event.preventDefault(); void submit() }} onKeyDown={event => { if (event.nativeEvent.isComposing || event.keyCode === 229) return; if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); event.currentTarget.requestSubmit() } }}>
         <FieldGroup className="gap-0 rounded-xl border bg-card px-5 py-1">
           <Field orientation="responsive" className="min-h-20 gap-5 py-5" data-disabled={pending}>
-            <FieldContent><span className="text-sm text-muted-foreground" aria-hidden="true" lang="en">Icon &amp; Name</span><FieldLabel className="sr-only" htmlFor="team-name">团队名称</FieldLabel></FieldContent>
+            <FieldContent><FieldLabel htmlFor="team-name" lang="en">Icon &amp; Name</FieldLabel></FieldContent>
             <div className="flex items-center gap-2 @md/field-group:shrink-0"><span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground" aria-hidden="true"><SquareUserRound className="size-4" /></span><Input id="team-name" required maxLength={100} value={name} onChange={event => setName(event.target.value)} disabled={pending} readOnly={!editable} aria-label="团队名称" placeholder="e.g. Engineering" className="min-w-0 @md/field-group:w-48" /></div>
           </Field>
           <Field orientation="responsive" className="min-h-24 gap-5 py-5" data-disabled={pending}>
-            <FieldContent><span className="text-sm text-muted-foreground" aria-hidden="true" lang="en">Identifier</span><FieldLabel htmlFor="team-identifier" className="sr-only">团队标识</FieldLabel><FieldDescription id="team-identifier-description"><span lang="en">Used to identify issues from this team<br /> (e.g. ENG-123)</span></FieldDescription></FieldContent>
+            <FieldContent><FieldLabel htmlFor="team-identifier" lang="en">Identifier</FieldLabel><FieldDescription id="team-identifier-description"><span lang="en">Used to identify issues from this team<br /> (e.g. ENG-123)</span></FieldDescription></FieldContent>
             <Input id="team-identifier" required maxLength={12} pattern="[A-Z][A-Z0-9]{1,11}" value={identifier} onChange={event => setIdentifier(event.target.value.toUpperCase())} disabled={pending} readOnly={!editable} aria-label="团队标识" aria-describedby="team-identifier-description" title="2–12 位大写字母或数字，以字母开头" placeholder="e.g. ENG" className="min-w-0 @md/field-group:max-w-36 @md/field-group:self-center" />
           </Field>
           {team && <><Field orientation="responsive" className="gap-4 py-5" data-disabled={pending}><FieldContent><FieldLabel htmlFor="team-description">团队简介</FieldLabel><FieldDescription>介绍团队的职责与工作范围。</FieldDescription></FieldContent><Textarea id="team-description" maxLength={500} rows={3} value={description} onChange={event => setDescription(event.target.value)} disabled={pending} readOnly={!editable} placeholder="这个团队负责什么？" className="min-w-0 @md/field-group:w-64" /></Field></>}

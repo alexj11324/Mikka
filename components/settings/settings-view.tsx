@@ -8,6 +8,7 @@ import { SettingsSidebar } from './settings-sidebar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { WorkspaceSettings } from '@/components/settings/workspace-settings'
+import { FieldTitle, FieldDescription } from '@/components/ui/field'
 
 const sections = [
   { id: 'preferences', title: '偏好设置', group: '个人', icon: SlidersHorizontal, description: '让 Orvilo 更符合你的工作习惯。' },
@@ -20,7 +21,7 @@ const sections = [
 export type SettingsSection = (typeof sections)[number]['id']
 
 function SettingRow({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
-  return <div className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-col gap-1"><div className="text-sm font-medium">{title}</div>{description && <p className="text-sm text-muted-foreground">{description}</p>}</div><div className="shrink-0 text-sm">{children}</div></div>
+  return <div className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-col gap-1"><FieldTitle>{title}</FieldTitle>{description && <FieldDescription>{description}</FieldDescription>}</div><div className="shrink-0 text-sm">{children}</div></div>
 }
 
 export function SettingsView({ user, onBack, onSignOut, signingOut, accountError, activeSection, workspaceId, selectedTeamId, children }: { user: { name: string; email: string; image?: string | null }; onBack: () => void; onSignOut: () => void; signingOut: boolean; accountError: string; activeSection?: SettingsSection; workspaceId?: string; selectedTeamId?: string; children?: ReactNode }) {

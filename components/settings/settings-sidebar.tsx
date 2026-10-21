@@ -9,6 +9,7 @@ import { listTeams } from '@/app/actions/teams'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { NavUser } from '@/components/nav-user'
 import type { SettingsSection } from './settings-view'
+import { useFeatureAvailability } from '@/hooks/use-feature-availability'
 
 function GithubIcon() { return <img src="/icons/github.svg" alt="" className="size-4 shrink-0" /> }
 
@@ -65,6 +66,9 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
   useEffect(() => {
     contentRef.current?.querySelector('[aria-current="page"]')?.closest('[data-slot="sidebar-group"]')?.scrollIntoView({ block: 'nearest' })
   }, [creating, section, selectedTeamId, teams.length])
+  const productRelease = useFeatureAvailability('product')
+  const integrationsRelease = useFeatureAvailability('integrations')
+  const administrationRelease = useFeatureAvailability('administration')
   const normalizedQuery = query.trim().toLowerCase()
   const joinedTeams = teams.filter(team => team.role && (!workspaceId || team.workspaceId === workspaceId) && `${team.name} ${team.identifier}`.toLowerCase().includes(normalizedQuery))
   function href(id: SettingsSection) {
@@ -83,7 +87,8 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
         return items.length > 0 && <SidebarGroup key={group.title} className="py-2"><SidebarGroupLabel lang="en">{group.title}</SidebarGroupLabel><SidebarMenu>{items.map(item => {
           const id = 'section' in item ? item.section : undefined
           const selected = id === section && !selectedTeamId && !creating
-          return <SidebarMenuItem key={item.title}><SidebarMenuButton aria-label={'label' in item ? item.label : item.title} disabled={!id} title={!id ? '暂未开放' : undefined} render={id && activeSection ? <Link href={href(id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => { if (id && !activeSection) onSectionChange(id); setOpenMobile(false) }}><item.icon /><span lang="en">{item.title}</span></SidebarMenuButton></SidebarMenuItem>
+          const release = id ? undefined : group.title === 'Features' ? productRelease : group.title === 'Integrations' ? integrationsRelease : administrationRelease
+          return <SidebarMenuItem key={item.title}><SidebarMenuButton aria-label={'label' in item ? item.label : item.title} disabled={!id || !!release && !release.enabled} data-feature-flag={release?.key} title={release?.reason} render={id && activeSection ? <Link href={href(id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => { if (id && !activeSection) onSectionChange(id); setOpenMobile(false) }}><item.icon /><span lang="en">{item.title}</span></SidebarMenuButton></SidebarMenuItem>
         })}</SidebarMenu></SidebarGroup>
       })}
       {activeSection && <SidebarGroup className="py-2"><SidebarGroupLabel lang="en">Your teams</SidebarGroupLabel><SidebarMenu>{joinedTeams.map(team => {
