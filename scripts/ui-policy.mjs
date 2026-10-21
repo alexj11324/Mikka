@@ -57,7 +57,7 @@ const groupRules = new Map([
 ])
 const overlays = /^(?:Dialog|AlertDialog|Sheet|Drawer|DropdownMenu|ContextMenu|Menubar|Popover|Tooltip|HoverCard).*(?:Content|Overlay)$/
 
-function checkUtility(token, policy, report) {
+function checkUtility(token, policy, report, options = {}) {
   const base = utilityBase(token)
   const arbitraryTextColor = /^text-(?:\[(?:color:|#|(?:rgb|rgba|hsl|hsla|hwb|lab|lch|oklab|oklch|color|color-mix)\(|(?:Canvas|CanvasText|LinkText|VisitedText|ActiveText|ButtonFace|ButtonText|ButtonBorder|Field|FieldText|Highlight|HighlightText|SelectedItem|SelectedItemText|Mark|MarkText|GrayText|AccentColor|AccentColorText|transparent|currentColor)\])|\(color:)/i.test(base)
   if ((/^text-(?:\[|\()/.test(base) && !arbitraryTextColor) || /^(?:font|leading|tracking)-(?:\[|\()/.test(base) || /^\[(?:font|line-height|letter-spacing)/.test(base)) {
@@ -73,16 +73,20 @@ function checkUtility(token, policy, report) {
   }
   // 用户偏好无分割线：全宽水平长线一律用留白 / 背景分组替代。
   // 竖线（border-l/r、orientation="vertical"）不在此列；0 宽与 transparent 不构成可见线。
-  const horizontalBorder = base.match(/^border-([tby])(?:-(.+))?$/)
-  if (horizontalBorder && !['0', '0px', '[0px]', 'transparent', '[transparent]'].includes(horizontalBorder[2])) report('style/no-horizontal-rule', `禁止全宽水平长线 ${token}；用间距或背景分组。`)
-  const divide = base.match(/^divide-y(?:-(.+))?$/)
-  if (divide && !['0', 'reverse'].includes(divide[1])) report('style/no-horizontal-rule', `禁止全宽水平长线 ${token}；用间距或背景分组。`)
+  // 设置页按 Comma 的分组卡片采用 0.5px 行分隔线；其余界面保持无分割线。
+  if (!options.allowHorizontalRule) {
+    const horizontalBorder = base.match(/^border-([tby])(?:-(.+))?$/)
+    if (horizontalBorder && !['0', '0px', '[0px]', 'transparent', '[transparent]'].includes(horizontalBorder[2])) report('style/no-horizontal-rule', `禁止全宽水平长线 ${token}；用间距或背景分组。`)
+    const divide = base.match(/^divide-y(?:-(.+))?$/)
+    if (divide && !['0', 'reverse'].includes(divide[1])) report('style/no-horizontal-rule', `禁止全宽水平长线 ${token}；用间距或背景分组。`)
+  }
   if (palette.test(base) || arbitraryTextColor || /^(?:bg|border|ring|fill|stroke|outline)-(?:\[|\()/.test(base)) report('style/semantic-colors', `颜色必须使用语义 token：${token}。`)
   if (/^space-[xy]-/.test(base)) report('style/gap', `使用 flex/grid + gap，不使用 ${token}。`)
   if (/(?:^|:)dark:/.test(token) && /^(?:bg|text|border|ring|fill|stroke|outline)-/.test(base) && !base.endsWith('-transparent')) report('style/no-dark-color-override', `用语义 token 处理明暗主题，不单独覆盖 ${token}。`)
 }
 
 export function auditSource(file, text, policy) {
+  const allowHorizontalRule = /^components\/settings\//.test(file)
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), variables = new Map(), seen = new Set()
   const add = (node, rule, message) => {
@@ -180,7 +184,7 @@ export function auditSource(file, text, policy) {
   }
   function visit(node) {
     if (ts.isStringLiteralLike(node)) {
-      for (const token of splitUtilities(node.text)) if (/^(?:text-|font-|leading-|tracking-|bg-|border-|divide-|ring-|outline-|fill-|stroke-|space-[xy]-|\[(?:font|line-height|letter-spacing))/.test(utilityBase(token))) checkUtility(token, policy, (rule, message) => add(node, rule, message))
+      for (const token of splitUtilities(node.text)) if (/^(?:text-|font-|leading-|tracking-|bg-|border-|divide-|ring-|outline-|fill-|stroke-|space-[xy]-|\[(?:font|line-height|letter-spacing))/.test(utilityBase(token))) checkUtility(token, policy, (rule, message) => add(node, rule, message), { allowHorizontalRule })
     }
     if (ts.isPropertyAssignment(node) && /^(?:fontSize|fontFamily|fontWeight|lineHeight|letterSpacing|fontVariant|fontStyle)$/.test(node.name.getText(source).replaceAll(/['"]/g, ''))) add(node, 'typography/no-inline-values', '排版只能通过预设档位；不允许 style/配置对象手写字体值。')
     if (ts.isCallExpression(node)) {

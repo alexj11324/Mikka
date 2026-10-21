@@ -23,7 +23,7 @@ export function SettingsSection({
 }) {
   return (
     <section className="flex flex-col gap-1" aria-labelledby={id}>
-      <header className="flex items-baseline justify-between gap-3 pb-2">
+      <header className="flex items-baseline justify-between gap-3 px-1">
         <div className="flex flex-col gap-0.5">
           <h2 id={id} className="text-sm font-medium">
             {title}
@@ -32,7 +32,9 @@ export function SettingsSection({
         </div>
         {action}
       </header>
-      <div className="flex flex-col gap-2">{children}</div>
+      <div className="overflow-hidden rounded-xl border bg-card px-5">
+        <div className="divide-y divide-border">{children}</div>
+      </div>
     </section>
   )
 }
