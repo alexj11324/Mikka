@@ -162,6 +162,10 @@ export function auditSource(file, text, policy) {
     if (!node) return ''
     const raw = node.tagName?.getText(source) ?? ''
     const entry = imports.get(raw)
+    if (entry?.from === '@/components/ui/settings-layout') {
+      if (entry.name === 'SettingsRow') return 'Field'
+      if (entry.name === 'SettingsGroup') return 'FieldGroup'
+    }
     return entry && (entry.from.startsWith('@/components/') || entry.from.startsWith('.')) ? entry.name === 'default' ? raw : entry.name : raw
   }
   const opening = node => ts.isJsxElement(node) ? node.openingElement : ts.isJsxSelfClosingElement(node) ? node : null

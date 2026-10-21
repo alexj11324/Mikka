@@ -84,6 +84,13 @@ test('component composition + business data/event wiring + layout are allowed', 
   assert.deepEqual(rules(source), [])
 })
 
+test('shared settings fields retain form grouping checks without accepting lookalike wrappers', () => {
+  const imports = `import { SettingsGroup as Group, SettingsRow as Row } from '@/components/ui/settings-layout'; import { Input } from '@/components/ui/input';`
+  assert.deepEqual(rules(`${imports} const ui = <form><Group><Row title="Name" htmlFor="name"><Input id="name" /></Row></Group></form>`), [])
+  has(`${imports} const ui = <form><Row title="Name"><Input /></Row></form>`, 'forms/field-group')
+  has(`import { SettingsGroup, SettingsRow } from './custom'; import { Input } from '@/components/ui/input'; const ui = <form><SettingsGroup><SettingsRow><Input /></SettingsRow></SettingsGroup></form>`, 'forms/field')
+})
+
 test('valid grouped items + title + avatar', () => {
   const source = `import { SelectGroup, SelectItem } from '@/components/ui/select';
     import { DialogContent, DialogTitle } from '@/components/ui/dialog';

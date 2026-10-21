@@ -9,6 +9,13 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeVisible()
   await sidebar.getByRole('link', { name: '偏好设置', exact: true }).click()
   await expect(page.getByRole('group', { name: '界面主题', exact: true })).toBeVisible()
+  const preferenceTitleStyle = await page.locator('[data-slot="field-label"]').first().evaluate(element => {
+    const style = getComputedStyle(element)
+    return { color: style.color, weight: style.fontWeight, size: style.fontSize, leading: style.lineHeight }
+  })
+  const preferenceCard = page.locator('[data-slot="field-group"]').first()
+  const preferenceCardBounds = await preferenceCard.boundingBox()
+  const preferenceCardBackground = await preferenceCard.evaluate(element => getComputedStyle(element).backgroundColor)
   await sidebar.getByRole('link', { name: '团队', exact: true }).click()
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
   const form = page.getByRole('form', { name: '创建新团队', exact: true })
@@ -19,6 +26,26 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   await expect(identifierLabel).toBeVisible()
   await expect(nameLabel).toHaveCSS('font-weight', '500')
   await expect(identifierLabel).toHaveCSS('font-weight', '500')
+  for (const label of [nameLabel, identifierLabel]) {
+    await expect(label).toHaveCSS('color', preferenceTitleStyle.color)
+    await expect(label).toHaveCSS('font-size', preferenceTitleStyle.size)
+    await expect(label).toHaveCSS('font-weight', preferenceTitleStyle.weight)
+    await expect(label).toHaveCSS('line-height', preferenceTitleStyle.leading)
+  }
+  const teamCard = form.locator('[data-slot="field-group"]')
+  await expect(teamCard).toHaveCSS('background-color', preferenceCardBackground)
+  const teamCardBounds = await teamCard.boundingBox()
+  const headingBounds = await page.getByRole('heading', { name: 'Create a new team', exact: true }).boundingBox()
+  expect(teamCardBounds!.x).toBe(preferenceCardBounds!.x)
+  expect(teamCardBounds!.width).toBe(preferenceCardBounds!.width)
+  expect(headingBounds!.x).toBe(teamCardBounds!.x)
+  const rows = form.locator('[data-slot="field"]')
+  for (let index = 0; index < await rows.count(); index++) {
+    const row = rows.nth(index)
+    const content = await row.locator('[data-slot="field-content"]').boundingBox()
+    const control = await row.locator('[data-slot="settings-control"]').boundingBox()
+    expect(Math.abs(content!.y + content!.height / 2 - control!.y - control!.height / 2)).toBeLessThan(1)
+  }
   const descriptionColor = await form.locator('[data-slot="field-description"]').first().evaluate(element => getComputedStyle(element).color)
   expect(await nameLabel.evaluate(element => getComputedStyle(element).color)).not.toBe(descriptionColor)
   await expect(page.getByRole('dialog')).toHaveCount(0)
