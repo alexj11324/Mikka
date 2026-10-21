@@ -5,7 +5,8 @@
   "type": "module",
   "packageManager": "pnpm@10.34.3",
   "scripts": {
-    "build": "pnpm lint && next build",
+    "build": "pnpm lint && pnpm migrate && next build",
+    "migrate": "node scripts/migrate.mjs",
     "dev": "next dev --webpack",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "lint": "pnpm lint:code && pnpm lint:ui",
