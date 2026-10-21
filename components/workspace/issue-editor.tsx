@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
+import { useTranslations } from "next-intl"
 import { IssueActivity } from './issue-activity'
 import { useEditor, getSchema, type JSONContent } from "@tiptap/react"
 import { Collaboration } from "@tiptap/extension-collaboration"
 import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap"
 import * as Y from "yjs"
 import { Check, FileText, MessageSquare, X } from "lucide-react"
-import { useTranslations } from 'next-intl'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -22,7 +22,7 @@ import { RichTextBlockActions } from "@/components/blocks/rich-text-editor-2/com
 import { RichTextBlockGutter } from "@/components/blocks/rich-text-editor-2/components/rich-text-block-gutter"
 import { RichTextFormatBubble, showRichTextFormatBubble } from "@/components/blocks/rich-text-editor-2/components/rich-text-format-bubble"
 import { RichTextLinkBubble } from "@/components/blocks/rich-text-editor-2/components/rich-text-link"
-import { RichTextSlashCommand, RICH_TEXT_BASIC_SLASH_ITEMS, localizeSlashItems } from "@/components/blocks/rich-text-editor-2/components/rich-text-slash-menu"
+import { RichTextSlashCommand, RICH_TEXT_BASIC_SLASH_ITEMS } from "@/components/blocks/rich-text-editor-2/components/rich-text-slash-menu"
 import { RichTextOutlineBlock, RICH_TEXT_OUTLINE_SLASH_ITEM } from "@/components/blocks/rich-text-editor-2/components/rich-text-outline-node"
 import { useRichTextOutline, scrollToRichTextHeading } from "@/components/blocks/rich-text-editor-2/components/rich-text-outline"
 import { RichTextTable, RichTextTableBubble, RICH_TEXT_TABLE_PROSE, RICH_TEXT_TABLE_SLASH_ITEM } from "@/components/blocks/rich-text-editor-2/components/rich-text-table"
@@ -34,26 +34,28 @@ import { CommentMark, CommentPaint, addThread, createThreadStore, replyToThread,
 const EMPTY_DOCUMENT: JSONContent = { type: "doc", content: [{ type: "paragraph" }] }
 const EMPTY_THREADS: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadIndex = {}
 
-function createEditorExtensions(isOpen: (id: string) => boolean, author: string, collaborative: boolean, placeholders: { compact: string; full: string }, compact = false, slashItems: ReturnType<typeof localizeSlashItems> = [...RICH_TEXT_BASIC_SLASH_ITEMS, RICH_TEXT_TABLE_SLASH_ITEM, RICH_TEXT_OUTLINE_SLASH_ITEM]) {
+export function createEditorExtensions(isOpen: (id: string) => boolean, author: string, collaborative: boolean, compact = false, placeholder = '') {
   return [
-    ...createRichTextExtensions({ placeholder: compact ? placeholders.compact : placeholders.full, collaborative }),
+    ...createRichTextExtensions({ placeholder, collaborative }),
     RichTextBlockActions, RichTextTable, RichTextOutlineBlock, createRichTextMention([]),
-    RichTextSlashCommand.configure({ items: slashItems }),
+    RichTextSlashCommand.configure({ items: [...RICH_TEXT_BASIC_SLASH_ITEMS, RICH_TEXT_TABLE_SLASH_ITEM, RICH_TEXT_OUTLINE_SLASH_ITEM] }),
     RichTextChanges.configure({ author, tracking: false, now: () => new Date().toISOString() }),
     CommentMark, CommentPaint.configure({ isOpen }),
   ]
 }
 export function createDocumentSeed(content: JSONContent) {
-  const schema = getSchema(createEditorExtensions(() => false, 'seed', true, { compact: '', full: '' }))
+  const schema = getSchema(createEditorExtensions(() => false, 'seed', true))
   const doc = prosemirrorJSONToYDoc(schema, content, 'default')
   const update = Y.encodeStateAsUpdate(doc)
   doc.destroy()
   return update
 }
-export function IssueEditor({ content, onChange, sharedDoc, author, syncLabel, replacement, persisted = false, compact = false, layout = 'document', activity }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue'; activity?: ReactNode }) {
+export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, syncLabel: syncLabelProp, replacement, onReplacementApplied, persisted = false, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
   const t = useTranslations('Editor')
-  const authorName = author ?? t('draftAuthor')
-  const syncText = syncLabel ?? t('unsavedDraft')
+  const author = authorProp ?? t('draftAuthor')
+  const syncLabel = syncLabelProp ?? t('unsavedDraft')
+  const label = labelProp ?? t('descriptionLabel')
+  const placeholder = compact ? t('placeholderCompact') : t('placeholderFull')
   const [localDoc] = useState(() => new Y.Doc())
   const threadDoc = sharedDoc ?? localDoc
   const threadStore = useMemo(() => createThreadStore(threadDoc), [threadDoc])
@@ -70,16 +72,17 @@ export function IssueEditor({ content, onChange, sharedDoc, author, syncLabel, r
   const pageRef = useRef<HTMLDivElement>(null)
   const changeRef = useRef(onChange)
   changeRef.current = onChange
-  const slashItems = useMemo(() => localizeSlashItems(t as unknown as (key: string) => string, [...RICH_TEXT_BASIC_SLASH_ITEMS, RICH_TEXT_TABLE_SLASH_ITEM, RICH_TEXT_OUTLINE_SLASH_ITEM]), [t])
+  const replacementCallback = useRef(onReplacementApplied)
+  replacementCallback.current = onReplacementApplied
   const extensions = useMemo(() => [
-    ...createEditorExtensions(threadStore.isOpen, authorName, !!sharedDoc, { compact: t('placeholderCompact'), full: t('placeholderFull') }, compact, slashItems),
+    ...createEditorExtensions(threadStore.isOpen, author, !!sharedDoc, compact, placeholder),
     ...(sharedDoc ? [Collaboration.configure({ document: sharedDoc })] : []),
-  ], [threadStore, authorName, sharedDoc, compact, slashItems, t])
+  ], [threadStore, author, sharedDoc, compact, placeholder])
   const editor = useEditor({
     extensions,
     content: sharedDoc ? undefined : content ?? EMPTY_DOCUMENT,
     immediatelyRender: false,
-    editorProps: { attributes: { role: "textbox", "aria-label": t('editorLabel'), "aria-multiline": "true" } },
+    editorProps: { attributes: { role: "textbox", "aria-label": label, "aria-multiline": "true" } },
     onUpdate: ({ editor: current, transaction }) => {
       if (transaction.docChanged) changeRef.current(current.getJSON())
     },
@@ -88,13 +91,21 @@ export function IssueEditor({ content, onChange, sharedDoc, author, syncLabel, r
     if (!editor || !replacement) return
     const tracking = editor.storage.richTextChanges.tracking
     editor.storage.richTextChanges.tracking = false
-    editor.commands.setContent(replacement.content)
-    editor.storage.richTextChanges.tracking = tracking
-  }, [editor, replacement])
+    let applied = false
+    try {
+      applied = editor.commands.setContent(replacement.content, { emitUpdate: false })
+      if (applied && layout !== 'description') changeRef.current(editor.getJSON())
+    } catch {
+      applied = false
+    } finally {
+      editor.storage.richTextChanges.tracking = tracking
+      replacementCallback.current?.(applied)
+    }
+  }, [editor, replacement, layout])
   const { changes } = useRichTextChanges(editor)
   const { anchors, activeId } = useCommentAnchors(editor)
   const outline = useRichTextOutline(editor)
-  const editable = mode !== "viewing" && markup === "all"
+  const editable = !disabled && mode !== "viewing" && markup === "all"
   useEffect(() => {
     if (!editor) return
     editor.storage.richTextChanges.tracking = mode === "suggesting"
@@ -119,32 +130,29 @@ export function IssueEditor({ content, onChange, sharedDoc, author, syncLabel, r
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
     if (!editor.chain().setMark("comment", { id }).run()) return
-    addThread(threadDoc, { id, author: authorName, createdAt: now, messages: [{ author: authorName, body: comment.trim(), at: now }] }, "draft-comment")
+    addThread(threadDoc, { id, author, createdAt: now, messages: [{ author, body: comment.trim(), at: now }] }, "draft-comment")
     setComment("")
     setCommentError("")
   }
   function submitReply(id: string) {
     if (!reply.trim()) return
-    replyToThread(threadDoc, id, { author: authorName, body: reply.trim(), at: new Date().toISOString() })
+    replyToThread(threadDoc, id, { author, body: reply.trim(), at: new Date().toISOString() })
     setReply("")
     setReplyId(null)
   }
   const threadList = Object.values(threads)
   const openCount = threadList.filter(thread => !thread.resolved).length
 
-  if (compact) return <TooltipProvider delay={300}><section aria-label={t('editorLabel')}>
-    <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn("min-h-28 text-sm/7", RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE)} />
-    {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
-    <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
-  </section></TooltipProvider>
-
-  if (layout === 'issue') return <TooltipProvider delay={300}>
-    <section aria-label={t('editorLabel')} className="flex min-w-0 flex-col gap-2">
-      <div ref={pageRef} className="relative min-w-0">
-        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-36 py-1 text-sm/7', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
-        {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
+  if (compact || layout === 'description' || layout === 'issue') return <TooltipProvider delay={300}>
+    <section aria-label={t('editorAria', { label })} className="flex min-w-0 flex-col gap-2">
+      <div className={cn('min-w-0 [--frame-panel-header-px:--spacing(2)] [--frame-panel-header-py:--spacing(2)]', layout === 'description' ? '[&>[role=toolbar]]:rounded-lg [&>[role=toolbar]]:border' : layout === 'issue' ? '' : 'rounded-lg border')}>
+        {layout !== 'issue' && <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
+        <div ref={pageRef} className="relative min-w-0">
+          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-28 py-2 text-sm/7', layout === 'description' ? 'px-4 sm:pl-16' : layout === 'issue' ? 'px-0' : 'px-4 sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+          {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
+        </div>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-7">
+      {layout === 'issue' && !compact && <><div className="flex flex-wrap items-center justify-between gap-2 pb-7">
         <span className="text-xs text-muted-foreground">{t('hint')}</span>
         <Button variant="ghost" size="xs" onClick={() => setPanel(panel === 'comments' ? '' : 'comments')} aria-expanded={panel === 'comments'}><MessageSquare data-icon="inline-start" />{t('selectionComment')}</Button>
       </div>
@@ -153,24 +161,25 @@ export function IssueEditor({ content, onChange, sharedDoc, author, syncLabel, r
         <FieldGroup><Field><FieldLabel htmlFor="selection-comment" className="sr-only">{t('selectionCommentLabel')}</FieldLabel><Input id="selection-comment" value={comment} onChange={event => setComment(event.target.value)} maxLength={2000} placeholder={t('selectionCommentPlaceholder')} /></Field></FieldGroup>
         <div className="flex justify-end"><Button size="sm" variant="outline" disabled={!comment.trim()} onClick={addComment}>{t('addSelectionComment')}</Button></div>
         {commentError && <p role="alert" className="text-xs text-destructive">{commentError}</p>}
-      </div>}
+      </div>}</>}
     </section>
-    <IssueActivity author={authorName} threads={threadList} anchors={anchors} events={activity} onComment={body => {
+    {layout === 'issue' && !compact && afterDescription}
+    {layout === 'issue' && !compact && <IssueActivity author={author} threads={threadList} anchors={anchors} events={activity} onComment={body => {
       const now = new Date().toISOString()
-      addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author: authorName, createdAt: now, messages: [{ author: authorName, body, at: now }] }, 'issue-discussion')
-    }} onReply={(id, body) => { replyToThread(threadDoc, id, { author: authorName, body, at: new Date().toISOString() }) }} onResolve={(id, resolved) => { setThreadResolved(threadDoc, id, resolved) }} onSelect={id => {
+      addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, createdAt: now, messages: [{ author, body, at: now }] }, 'issue-discussion')
+    }} onReply={(id, body) => { replyToThread(threadDoc, id, { author, body, at: new Date().toISOString() }) }} onResolve={(id, resolved) => { setThreadResolved(threadDoc, id, resolved) }} onSelect={id => {
       if (!editor) return
       let from: number | undefined
       let to = 0
       editor.state.doc.descendants((node, pos) => { if (node.isText && node.marks.some(mark => mark.type.name === 'comment' && mark.attrs.id === id)) { from ??= pos; to = pos + node.nodeSize } })
       if (from !== undefined) editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run()
-    }} />
+    }} />}
     <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
   </TooltipProvider>
 
-  return <TooltipProvider delay={300}><section aria-label={t('editorLabel')} className="overflow-hidden rounded-lg border bg-background">
+  return <TooltipProvider delay={300}><section aria-label={t('editorAria', { label: t('descriptionLabel') })} className="overflow-hidden rounded-lg border bg-background">
     <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/20 px-3 py-2">
-      <span className="flex items-center gap-2 text-xs font-medium"><FileText className="size-3.5 text-muted-foreground" />{t('document')}<Badge variant="outline">{syncText}</Badge></span>
+      <span className="flex items-center gap-2 text-xs font-medium"><FileText className="size-3.5 text-muted-foreground" />{t('document')}<Badge variant="outline">{syncLabel}</Badge></span>
       <div className="flex items-center gap-2"><NativeSelect aria-label={t('editMode')} size="sm" value={mode} onChange={e => setMode(e.target.value)}><NativeSelectOption value="editing">{t('mode.editing')}</NativeSelectOption><NativeSelectOption value="suggesting">{t('mode.suggesting')}</NativeSelectOption><NativeSelectOption value="viewing">{t('mode.viewing')}</NativeSelectOption></NativeSelect><NativeSelect aria-label={t('markupView')} size="sm" value={markup} onChange={e => setMarkup(e.target.value as RichTextMarkupView)}><NativeSelectOption value="all">{t('markup.all')}</NativeSelectOption><NativeSelectOption value="final">{t('markup.final')}</NativeSelectOption><NativeSelectOption value="original">{t('markup.original')}</NativeSelectOption></NativeSelect></div>
     </div>
     {editable && <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
@@ -187,7 +196,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author, syncLabel, r
       </div>
       {panel && <aside aria-label={panel === "outline" ? t('outline') : panel === "changes" ? t('changesReview') : t('commentsPanel')} className="flex w-full shrink-0 flex-col gap-3 bg-muted/15 p-4 lg:w-60 lg:border-l">
         {panel === "outline" && <><h3 className="text-xs font-medium">{t('outline')}</h3>{outline.length ? outline.map((heading, index) => <Button key={index} variant="ghost" size="sm" className="justify-start" onClick={() => editor && scrollToRichTextHeading(editor, index)}>{heading.text}</Button>) : <p className="text-xs leading-6 text-muted-foreground">{t('outlineEmpty')}</p>}</>}
-        {panel === "changes" && <><h3 className="text-xs font-medium">{t('changesReviewCount', { count: changes.length })}</h3><p className="text-xs leading-5 text-muted-foreground">{t('changesHint')}</p>{changes.length === 0 && <p className="text-xs leading-6 text-muted-foreground">{t('changesEmpty')}</p>}{changes.map(change => <article key={change.id} className="flex flex-col gap-2 rounded-md border bg-background p-3"><Button variant="ghost" size="sm" className="justify-start" onClick={() => editor?.commands.selectChange(change.id)}>{t('changeSummary', { author: authorName, kind: t(`changeKind.${change.kind}`) })}</Button>{change.deleted && <del className="break-words text-xs">{change.deleted}</del>}{change.inserted && <ins className="break-words text-xs">{change.inserted}</ins>}<div className="flex gap-1"><Button size="sm" variant="outline" disabled={!editable} onClick={() => editor?.commands.acceptChange(change.id)}><Check data-icon="inline-start" />{t('accept')}</Button><Button size="sm" variant="ghost" disabled={!editable} onClick={() => editor?.commands.rejectChange(change.id)}><X data-icon="inline-start" />{t('reject')}</Button></div></article>)}</>}
+        {panel === "changes" && <><h3 className="text-xs font-medium">{t('changesReviewCount', { count: changes.length })}</h3><p className="text-xs leading-5 text-muted-foreground">{t('changesHint')}</p>{changes.length === 0 && <p className="text-xs leading-6 text-muted-foreground">{t('changesEmpty')}</p>}{changes.map(change => <article key={change.id} className="flex flex-col gap-2 rounded-md border bg-background p-3"><Button variant="ghost" size="sm" className="justify-start" onClick={() => editor?.commands.selectChange(change.id)}>{t('changeSummary', { author: t('draftAuthor'), kind: change.kind === "insert" ? t('changeKind.insert') : change.kind === "delete" ? t('changeKind.delete') : t('changeKind.replace') })}</Button>{change.deleted && <del className="break-words text-xs">{change.deleted}</del>}{change.inserted && <ins className="break-words text-xs">{change.inserted}</ins>}<div className="flex gap-1"><Button size="sm" variant="outline" disabled={!editable} onClick={() => editor?.commands.acceptChange(change.id)}><Check data-icon="inline-start" />{t('accept')}</Button><Button size="sm" variant="ghost" disabled={!editable} onClick={() => editor?.commands.rejectChange(change.id)}><X data-icon="inline-start" />{t('reject')}</Button></div></article>)}</>}
         {panel === "comments" && <><h3 className="text-xs font-medium">{t('commentsPanelCount', { count: openCount })}</h3><p className="text-xs leading-5 text-muted-foreground">{persisted ? t('commentsPersistedHint') : t('commentsDraftHint')}</p><FieldGroup><Field><FieldLabel htmlFor="draft-comment" className="sr-only">{t('commentLabel')}</FieldLabel><Input id="draft-comment" value={comment} onChange={e => setComment(e.target.value)} placeholder={t('commentPlaceholder')} maxLength={2000} disabled={!editable} /></Field></FieldGroup><Button size="sm" variant="outline" disabled={!editable || !comment.trim()} onClick={addComment}>{t('addSelectionComment')}</Button>{commentError && <p role="alert" className="text-xs text-destructive">{commentError}</p>}{threadList.map(thread => { const anchor = anchors.find(item => item.id === thread.id); return <article key={thread.id} className={cn("flex flex-col gap-2 rounded-md border bg-background p-3", activeId === thread.id && "border-primary")}><Button variant="ghost" size="sm" className="justify-start" onClick={() => { if (!editor) return; let start: number | undefined; let end = 0; editor.state.doc.descendants((node, pos) => { if (node.isText && node.marks.some(mark => mark.type.name === "comment" && mark.attrs.id === thread.id)) { start ??= pos; end = pos + node.nodeSize } }); if (start !== undefined) editor.chain().focus().setTextSelection({ from: start, to: end }).run() }}><span className="block truncate">{anchor?.excerpt ?? t('anchorRemoved')}</span></Button>{thread.messages.map(message => <div key={message.id}><p className="text-xs text-muted-foreground">{message.author}</p><p className="break-words text-xs leading-6">{message.body}</p></div>)}<div className="flex gap-1"><Button size="sm" variant="ghost" disabled={!editable} onClick={() => { setReplyId(thread.id); setReply("") }}>{t('reply')}</Button><Button size="sm" variant="ghost" disabled={!editable} onClick={() => setThreadResolved(threadDoc, thread.id, !thread.resolved)}>{thread.resolved ? t('reopen') : t('resolve')}</Button></div>{thread.resolved && <Badge variant="secondary">{t('resolved')}</Badge>}{replyId === thread.id && <><Input aria-label={t('replyLabel')} placeholder={t('replyPlaceholder')} value={reply} onChange={e => setReply(e.target.value)} maxLength={2000} /><Button size="sm" disabled={!reply.trim() || !editable} onClick={() => submitReply(thread.id)}>{t('submitReply')}</Button></>}</article> })}</>}
       </aside>}
     </div>

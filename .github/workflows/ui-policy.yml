@@ -1,4 +1,4 @@
-name: UI policy
+name: CI
 
 on:
   pull_request:
@@ -36,6 +36,8 @@ jobs:
       - run: pnpm test:i18n
       - run: pnpm i18n:check
       - run: pnpm test:ssh-target
+      - run: pnpm test:csv
+      - run: pnpm test:issues
       - name: Audit business UI composition
         run: pnpm --silent lint:ui --json > ui-audit.json
       - name: Show audit summary
@@ -45,7 +47,7 @@ jobs:
             import fs from "node:fs";
             if (fs.existsSync("ui-audit.json")) {
               const audit = JSON.parse(fs.readFileSync("ui-audit.json", "utf8"));
-              const summary = `## Strict UI policy\n\n${audit.files} business files scanned; ${audit.errors} errors. ${audit.libraryFiles} component-library implementation files excluded. No upstream source verification.\n\n` + Object.entries(audit.counts).map(([rule, count]) => `- ${rule}: ${count}`).join("\n") + "\n";
+              const summary = `## Strict UI policy\n\n${audit.files} business files style-scanned; ${audit.interactionFiles} files interaction-scanned (including business blocks); ${audit.errors} errors. ${audit.libraryFiles} component-library files excluded from style checks only. No upstream source verification.\n\n` + Object.entries(audit.counts).map(([rule, count]) => `- ${rule}: ${count}`).join("\n") + "\n";
               console.log(summary);
               fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
             }
@@ -63,5 +65,55 @@ jobs:
         if: always()
       - run: pnpm typecheck
         if: always()
+
+  browser-tests:
+    name: Production build and browser interactions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: orvilo_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d orvilo_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/orvilo_e2e
+      ORVILO_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/orvilo_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/orvilo_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate ephemeral test-only auth secret
+        run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e:setup
       - run: pnpm build
+      - run: pnpm test:e2e
+      - name: Upload browser failure evidence
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

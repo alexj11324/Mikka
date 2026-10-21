@@ -1,105 +1,70 @@
-"use client"
+'use client'
 
-import * as React from "react"
-
-import { NavMain } from "@/components/nav-main"
-import { NavUser } from "@/components/nav-user"
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuBadge,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarRail,
-} from "@/components/ui/sidebar"
-import { Command, Eye, ListTodo, MonitorSmartphone, Search, SquarePen, UserRound, Users } from "lucide-react"
+import * as React from 'react'
+import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound, Users } from 'lucide-react'
+import { NavUser } from '@/components/nav-user'
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
-import { Kbd } from '@/components/ui/kbd'
-import { cn } from '@/lib/utils'
-import type { listIssues } from '@/app/actions/issues'
-import { useSidebar } from '@/components/ui/sidebar'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
+import type { WorkspaceSection } from '@/components/workspace/workspace-navigation'
 
-import { ISSUE_STATUSES, WORKSPACE_NAME, type IssueView } from '@/components/workspace/issue-properties'
-
-export function AppSidebar({ user, view, counts, recentIssues, selected, onNavigate, onOpen, onSearch, onCreate, onDevices, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
-  user: { name: string; email: string }
-  view: IssueView
-  counts: Record<IssueView, number>
-  recentIssues: Awaited<ReturnType<typeof listIssues>>
-  selected: string | null
-  onNavigate: (view: IssueView) => boolean
-  onOpen: (id: string) => boolean
+export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSettings, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
+  user: { name: string; email: string; image?: string | null }
+  section: WorkspaceSection
+  onNavigate: (section: WorkspaceSection) => boolean
   onSearch: () => void
   onCreate: () => void
-  onDevices: () => void
+  onSettings: () => void
   onSignOut: () => void
   signingOut: boolean
 }) {
-  const { setOpenMobile } = useSidebar()
+  const { setOpenMobile, open, openMobile, isMobile } = useSidebar()
   const t = useTranslations('Nav')
-  const commonT = useTranslations('Common')
-  const statusT = useTranslations('Issue.status')
-  const statusLabel = (value: string) => statusT.has(value as never) ? statusT(value as never) : value
-  function navigate(next: IssueView) { if (onNavigate(next)) setOpenMobile(false) }
-  function create() { setOpenMobile(false); onCreate() }
-  const personalItems = [
-    { view: 'mine' as const, title: t('mine'), icon: UserRound },
-    { view: 'shared' as const, title: t('shared'), icon: Users },
-    { view: 'review' as const, title: statusLabel('review'), icon: Eye },
-  ]
-  return (
-    <Sidebar variant="inset" mobileTitle={t('sidebarTitle')} mobileDescription={t('sidebarDescription')} mobileCloseLabel={commonT('close')} {...props}>
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" onClick={() => navigate('all')} aria-label={t('workspaceAll', { name: WORKSPACE_NAME })}>
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <Command className="size-4" />
-              </div>
-              <div className="flex flex-1 flex-col gap-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{WORKSPACE_NAME}</span>
-                <span className="truncate text-xs text-muted-foreground">{t('tagline')}</span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-        <div className="flex items-center gap-1 px-2 pb-1"><SidebarMenuButton onClick={() => { setOpenMobile(false); onSearch() }} tooltip={t('searchTooltip')}><Search data-icon="inline-start" /><span>{t('search')}</span><Kbd className="ml-auto">⌘ K</Kbd></SidebarMenuButton><Button variant="outline" size="icon-sm" aria-label={t('newTask')} title={t('newTaskHint')} onClick={create}><SquarePen data-icon="inline-start" /></Button></div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>{t('personal')}</SidebarGroupLabel>
-          <SidebarMenu>{personalItems.map(item => <SidebarMenuItem key={item.view}><SidebarMenuButton tooltip={item.title} isActive={!selected && view === item.view} onClick={() => navigate(item.view)}><item.icon /><span>{item.title}</span></SidebarMenuButton><SidebarMenuBadge>{counts[item.view]}</SidebarMenuBadge></SidebarMenuItem>)}</SidebarMenu>
-        </SidebarGroup>
-        <NavMain items={[{
-          title: t('allIssues'), icon: ListTodo, count: counts.all, isActive: !selected && view === 'all', onClick: () => navigate('all'),
-          items: ISSUE_STATUSES.map(status => ({ title: statusLabel(status.value), count: counts[status.value], isActive: !selected && view === status.value, onClick: () => navigate(status.value) })),
-        }]} />
-        {recentIssues.length > 0 && <SidebarGroup><SidebarGroupLabel>{t('recent')}</SidebarGroupLabel><SidebarMenu>{recentIssues.slice(0, 5).map(issue => {
-          const status = ISSUE_STATUSES.find(item => item.value === issue.status) ?? ISSUE_STATUSES[0]
-          return <SidebarMenuItem key={issue.id}><SidebarMenuButton tooltip={issue.title} isActive={selected === issue.id} onClick={() => { if (onOpen(issue.id)) setOpenMobile(false) }}><status.icon className={cn('text-muted-foreground', status.value === 'doing' && 'text-warning-foreground', status.value === 'review' && 'text-success-foreground', status.value === 'done' && 'text-info-foreground')} /><span>{issue.title}</span></SidebarMenuButton></SidebarMenuItem>
-        })}</SidebarMenu></SidebarGroup>}
-        <SidebarGroup>
-          <SidebarGroupLabel>{t('automation')}</SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip={t('devices')} onClick={onDevices}>
-                <MonitorSmartphone />
-                <span>{t('devices')}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter>
-        <NavUser user={user} onSignOut={onSignOut} signingOut={signingOut} />
-      </SidebarFooter>
-      <SidebarRail label={t('toggleSidebar')} />
-    </Sidebar>
-  )
+  function navigate(next: WorkspaceSection) { if (onNavigate(next)) setOpenMobile(false) }
+  const personal = [{ id: 'inbox', title: t('inbox'), icon: Inbox }, { id: 'my-issues', title: t('myTasks'), icon: Scan }, { id: 'agent', title: t('agent'), icon: Send }] as const
+  const teamItems = [{ id: 'team-home', title: t('home'), icon: House }, { id: 'team-issues', title: t('tasks'), icon: Layers }, { id: 'team-projects', title: t('projects'), icon: Box }] as const
+  return <Sidebar variant="inset" {...props}>
+    <SidebarHeader className="pb-4">
+      <div className="flex items-center gap-1">
+        <SidebarMenu className="min-w-0 flex-1"><SidebarMenuItem>
+          <DropdownMenu><DropdownMenuTrigger render={<SidebarMenuButton aria-label={t('workspaceMenu')} className="h-10" />}>
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">O</span><span className="flex-1 font-semibold">{WORKSPACE_NAME}</span><ChevronDown />
+          </DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup><DropdownMenuItem onClick={() => navigate('projects')}><Box />{t('workspaceProjects')}</DropdownMenuItem><DropdownMenuItem onClick={() => navigate('team-home')}><SquareUserRound />{t('teamHome')}</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
+        </SidebarMenuItem></SidebarMenu>
+        <Button variant="ghost" size="icon-sm" aria-label={t('search')} title={t('searchTooltip')} onClick={() => { setOpenMobile(false); onSearch() }}><Search data-icon="inline-start" /></Button>
+        <Button variant="secondary" size="icon-sm" aria-label={t('newTask')} title={t('newTaskHint')} onClick={() => { setOpenMobile(false); onCreate() }}><SquarePen data-icon="inline-start" /></Button>
+      </div>
+    </SidebarHeader>
+    <SidebarContent className="gap-5">
+      <SidebarGroup className="pt-0"><SidebarMenu>{personal.map(item => <SidebarMenuItem key={item.id}><SidebarMenuButton tooltip={item.title} isActive={section === item.id} onClick={() => navigate(item.id)}><item.icon /><span>{item.title}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroup>
+      <Collapsible defaultOpen className="group/workspace"><SidebarGroup>
+        <SidebarGroupLabel render={<CollapsibleTrigger />} className="mb-1 cursor-pointer">{t('workspace')}<ChevronDown className="ml-1 transition-transform group-data-closed/workspace:-rotate-90" /></SidebarGroupLabel>
+        <CollapsibleContent><SidebarMenu>
+          <SidebarMenuItem><SidebarMenuButton isActive={section === 'projects'} onClick={() => navigate('projects')}><Box /><span>{t('projects')}</span></SidebarMenuButton></SidebarMenuItem>
+          <SidebarMenuItem><SidebarMenuButton isActive={section === 'views'} onClick={() => navigate('views')}><Layers /><span>{t('views')}</span></SidebarMenuButton></SidebarMenuItem>
+          <SidebarMenuItem><DropdownMenu><DropdownMenuTrigger render={<SidebarMenuButton />}><Ellipsis /><span>{t('more')}</span></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup><DropdownMenuItem onClick={() => navigate('all-issues')}><Layers />{t('allIssues')}</DropdownMenuItem><DropdownMenuItem render={<a href="https://linear.app/docs/projects" target="_blank" rel="noreferrer" />}><CircleHelp />{t('projectGuide')}</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu></SidebarMenuItem>
+        </SidebarMenu></CollapsibleContent>
+      </SidebarGroup></Collapsible>
+      <Collapsible defaultOpen className="group/teams"><SidebarGroup>
+        <SidebarGroupLabel render={<CollapsibleTrigger />} className="mb-1 cursor-pointer">{t('yourTeams')}<ChevronDown className="ml-1 transition-transform group-data-closed/teams:-rotate-90" /></SidebarGroupLabel>
+        <CollapsibleContent><SidebarMenu><SidebarMenuItem>
+          <Collapsible defaultOpen className="group/team"><CollapsibleTrigger render={<SidebarMenuButton aria-label={t('toggleTeam', { name: WORKSPACE_NAME })} />}><SquareUserRound className="text-info-foreground" /><span>{WORKSPACE_NAME}</span><ChevronDown className="ml-auto transition-transform group-data-closed/team:-rotate-90" /></CollapsibleTrigger>
+            <CollapsibleContent><SidebarMenuSub className="mx-0 ml-4 border-0 px-0">{teamItems.map(item => <SidebarMenuSubItem key={item.id}><SidebarMenuSubButton render={<Button variant="ghost" />} isActive={section === item.id} onClick={() => navigate(item.id)}><item.icon /><span>{item.title}</span></SidebarMenuSubButton></SidebarMenuSubItem>)}</SidebarMenuSub></CollapsibleContent>
+          </Collapsible>
+        </SidebarMenuItem></SidebarMenu></CollapsibleContent>
+      </SidebarGroup></Collapsible>
+    </SidebarContent>
+    <SidebarFooter>
+      <SidebarMenu>
+        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members" />} tooltip={t('members')}><Users /><span>{t('members')}</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members?invite=1" />} tooltip={t('inviteMembers')}><SquarePen /><span>{t('inviteMembers')}</span></SidebarMenuButton></SidebarMenuItem>
+      </SidebarMenu>
+      <NavUser user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} />
+    </SidebarFooter>
+    <SidebarRail aria-label={t('sidebarRail')} title={t('toggleSidebar')} aria-expanded={isMobile ? openMobile : open} />
+  </Sidebar>
 }

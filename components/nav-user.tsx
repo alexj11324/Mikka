@@ -1,9 +1,6 @@
 "use client"
 
-import {
-  Avatar,
-  AvatarFallback,
-} from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/user-avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,16 +16,17 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, Languages, LogOutIcon, Moon, Sun } from "lucide-react"
+import { ChevronsUpDownIcon, Languages, LogOutIcon, Moon, Settings, Sun } from "lucide-react"
 import { useTheme } from 'next-themes'
 import { useLocale, useTranslations } from 'next-intl'
 
 import { usePathname, useRouter } from '@/i18n/navigation'
 
 export function NavUser({
-  user, onSignOut, signingOut,
+  user, onSignOut, signingOut, onSettings,
 }: {
-  user: { name: string; email: string }
+  onSettings?: () => void
+  user: { name: string; email: string; image?: string | null }
   onSignOut: () => void
   signingOut: boolean
 }) {
@@ -51,9 +49,7 @@ export function NavUser({
               <SidebarMenuButton size="lg" aria-label={t('accountMenu')} className="aria-expanded:bg-muted" />
             }
           >
-            <Avatar>
-              <AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
+            <UserAvatar user={user} />
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{user.name}</span>
               <span className="truncate text-xs">{user.email}</span>
@@ -69,9 +65,7 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                  <Avatar>
-                    <AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar user={user} />
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">{user.name}</span>
                     <span className="truncate text-xs">{user.email}</span>
@@ -81,6 +75,7 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
+              {onSettings && <DropdownMenuItem onClick={onSettings}><Settings />{t('settings')}</DropdownMenuItem>}
               <DropdownMenuItem onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
                 {resolvedTheme === 'dark' ? <Sun /> : <Moon />}{t('toggleTheme')}
               </DropdownMenuItem>

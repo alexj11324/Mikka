@@ -6,7 +6,7 @@ import { Link } from '@/i18n/navigation'
 import { buttonVariants } from '@/components/ui/button'
 import { AuthLogo } from './auth-logo'
 
-export function Auth({ registering = false, children }: { registering?: boolean; children: ReactNode }) {
+export function Auth({ registering = false, children, next = '/' }: { registering?: boolean; children: ReactNode; next?: string }) {
   const t = useTranslations('Auth')
   return (
     <main className="bg-background text-foreground flex min-h-svh w-full flex-col">
@@ -14,7 +14,7 @@ export function Auth({ registering = false, children }: { registering?: boolean;
         <AuthLogo />
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground hidden sm:inline">{registering ? t('haveAccount') : t('noAccount')}</span>
-          <Link href={registering ? '/sign-in' : '/sign-up'} className={buttonVariants({ variant: 'link' })}>
+          <Link href={`${registering ? '/sign-in' : '/sign-up'}${next === '/' ? '' : `?next=${encodeURIComponent(next)}`}`} className={buttonVariants({ variant: 'link' })}>
             {registering ? t('signIn') : t('createAccount')}
           </Link>
         </div>

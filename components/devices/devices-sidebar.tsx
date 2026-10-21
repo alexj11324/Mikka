@@ -47,7 +47,7 @@ export function DevicesSidebar({ user, onSignOut, signingOut }: {
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip={t('devices')} isActive>
+              <SidebarMenuButton tooltip={t('devices')} isActive onClick={() => router.push('/devices')}>
                 <MonitorSmartphone />
                 <span>{t('devices')}</span>
               </SidebarMenuButton>

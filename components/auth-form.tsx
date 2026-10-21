@@ -6,25 +6,29 @@ import { authClient } from '@/lib/auth-client'
 import { getPathname } from '@/i18n/navigation'
 import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { SignInCard } from '@/components/blocks/auth-19/components/sign-in-card'
+import { safeAuthReturn } from '@/lib/auth-return'
+import { Button } from '@/components/ui/button'
+import { listIssues, saveIssue } from '@/app/actions/issues'
 
-export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, continueGitHub = false, callbackURL }: { mode: 'sign-in' | 'sign-up'; githubEnabled?: boolean; oauthFailed?: boolean; continueGitHub?: boolean; callbackURL?: string }) {
+export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, continueGitHub = false, callbackURL, testWorkspaceEnabled = false, next }: { mode: 'sign-in' | 'sign-up'; githubEnabled?: boolean; oauthFailed?: boolean; continueGitHub?: boolean; callbackURL?: string; testWorkspaceEnabled?: boolean; next?: string }) {
   const t = useTranslations('Auth')
   const locale = useLocale()
-  const home = getPathname({ locale, href: '/' })
+  const returnPath = safeAuthReturn(next)
+  const home = getPathname({ locale, href: returnPath })
   const signIn = getPathname({ locale, href: '/sign-in' })
   const [error, setError] = useState(oauthFailed ? t('oauthFailed') : '')
   const [notice, setNotice] = useState(continueGitHub ? t('continueNotice') : '')
   async function signInWithGitHub() {
     if (pending || !githubEnabled) return
     if (window.self !== window.top) {
-      const tab = window.open(`${signIn}?continue=github`, '_blank')
+      const tab = window.open(`${signIn}?continue=github&next=${encodeURIComponent(returnPath)}`, '_blank')
       if (tab) tab.opener = null
       setNotice(tab ? t('tabOpened') : t('tabBlocked'))
       return
     }
     setPending(true); setError(''); setNotice('')
     try {
-      const result = await authClient.signIn.social({ provider: 'github', callbackURL: home, errorCallbackURL: `${signIn}?oauth=failed`, disableRedirect: true })
+      const result = await authClient.signIn.social({ provider: 'github', callbackURL: home, errorCallbackURL: `${signIn}?oauth=failed&next=${encodeURIComponent(returnPath)}`, disableRedirect: true })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
     } catch {
@@ -49,7 +53,39 @@ export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, con
     } catch { setError(t('connectionFailed')) }
     finally { setPending(false) }
   }
-  return <Auth registering={registering}>
-    <SignInCard registering={registering} pending={pending} githubEnabled={githubEnabled} error={error} notice={notice} callbackURL={callbackURL} onSubmit={submit} onGitHubSignIn={signInWithGitHub} />
+  async function enterTestWorkspace() {
+    if (pending) return
+    setPending(true); setError(''); setNotice('')
+    try {
+      const response = await fetch('/api/test-workspace', { method: 'POST' })
+      if (!response.ok) throw new Error('Test workspace unavailable')
+      const session = await authClient.getSession({ query: { disableCookieCache: true } })
+      if (!session.data?.user) {
+        setError(t('testWorkspaceSessionFailed'))
+        return
+      }
+      const existing = await listIssues()
+      const fixtures = [
+        { title: t('testIssueLayoutTitle'), description: t('testIssueLayoutDescription') },
+        { title: t('testIssueSwitchTitle'), description: t('testIssueSwitchDescription') },
+      ]
+      for (const fixture of fixtures) {
+        if (existing.some(issue => issue.title === fixture.title)) continue
+        const result = await saveIssue({ title: fixture.title, status: 'todo', priority: 'normal', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: fixture.description }] }] } })
+        if (result.error) throw new Error('Test task initialization failed')
+      }
+      window.location.replace(home)
+    } catch {
+      setError(t('testWorkspaceFailed'))
+    } finally {
+      setPending(false)
+    }
+  }
+  return <Auth registering={registering} next={returnPath}>
+    <SignInCard registering={registering} pending={pending} githubEnabled={githubEnabled} error={error} notice={notice} callbackURL={callbackURL} next={returnPath} onSubmit={submit} onGitHubSignIn={signInWithGitHub} />
+    {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
+      <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>{t('testWorkspaceCta')}</Button>
+      <p className="text-muted-foreground text-xs">{t('testWorkspaceHint')}</p>
+    </div>}
   </Auth>
 }

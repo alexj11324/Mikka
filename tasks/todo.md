@@ -277,6 +277,7 @@ next/font 在构建期把字体自托管到本地，运行时同样不联网；�
 
 ---
 
+
 # 禁止全宽水平长线（2026-10-20）
 
 要求：截图里表格头下面那种贯穿整行的长线不要；lint 加规则禁止。
@@ -291,6 +292,12 @@ next/font 在构建期把字体自托管到本地，运行时同样不联网；�
 - 默认水平方向的 `<Separator />`（`orientation="vertical"` 保留）
 
 竖线、盒状 `border`、背景分组、间距分组不受影响。
+- `border-t` / `border-b` / `border-y`（含 `-2`、颜色后缀、任意值；`-0`、`-[0px]`、`-transparent` 豁免）
+- `divide-y`（`-0`、`-reverse` 豁免）
+- `h-px` / `h-0.5` 同时带绘制背景的 `bg-*`（手画细线）
+- 默认水平方向的 `<Separator />`；`orientation` 支持字面量、表达式、模板字符串与本地常量，动态条件保守判违规
+
+竖线（`border-l/r`、`divide-x`、`orientation="vertical"`）与盒状 `border` 不受影响。
 
 ## 代码侧
 
@@ -308,6 +315,12 @@ next/font 在构建期把字体自托管到本地，运行时同样不联网；�
 ## 验证
 
 - [x] `node scripts/lint-ui.mjs` → 0 违规（62 个业务文件）
+  `accordion.tsx` 的 Item 去掉 `not-last:border-b`（否则对话框与折叠面板仍会出现长线）
+- 业务代码 8 个文件清掉 16 处水平线，保留 `bg-muted/*` 分组与 `lg:border-l` 竖线
+
+## 验证
+
+- [x] `node scripts/lint-ui.mjs` → 0 违规
 - [x] `node --test scripts/ui-policy.test.mjs` → 68/68
 - [x] `pnpm lint:code`（oxlint）→ 退出码 0
 - [x] `pnpm typecheck`（tsgo --noEmit）→ 退出码 0
@@ -609,3 +622,4 @@ MCP servers, and hooks run outside it*）。无人值守下 `permissionMode` 也
 - [x] CI 增加 `pnpm test:ssh-target`
 
 保留为后续项：SSH 连接端点的目标 allowlist / 限流；`app/actions/agents.ts` 未接入 UI 的 action 仍直接 throw；next-intl `timeZone` 未固定；`minimumReleaseAge: 0` 属于既有基础设施改动。
+

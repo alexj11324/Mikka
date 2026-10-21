@@ -19,11 +19,12 @@ type SignInCardProps = {
   error: string
   notice: string
   callbackURL?: string
+  next?: string
   onSubmit: FormEventHandler<HTMLFormElement>
   onGitHubSignIn: () => Promise<void>
 }
 
-export function SignInCard({ registering, pending, githubEnabled, error, notice, callbackURL, onSubmit, onGitHubSignIn }: SignInCardProps) {
+export function SignInCard({ registering, pending, githubEnabled, error, notice, callbackURL, next = '/', onSubmit, onGitHubSignIn }: SignInCardProps) {
   const t = useTranslations('Auth')
   return (
     <Card className="w-full max-w-[26rem] overflow-hidden p-0">
@@ -87,7 +88,7 @@ export function SignInCard({ registering, pending, githubEnabled, error, notice,
         </form>
         <p className="text-muted-foreground text-center text-xs">
           {registering ? t('haveAccount') : t('noAccountShort')}{' '}
-          <Link href={registering ? '/sign-in' : '/sign-up'} className="text-foreground underline underline-offset-4">{registering ? t('signIn') : t('createAccount')}</Link>
+          <Link href={`${registering ? '/sign-in' : '/sign-up'}${next === '/' ? '' : `?next=${encodeURIComponent(next)}`}`} className="text-foreground underline underline-offset-4">{registering ? t('signIn') : t('createAccount')}</Link>
         </p>
       </CardContent>
     </Card>

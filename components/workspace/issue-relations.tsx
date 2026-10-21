@@ -1,0 +1,80 @@
+'use client'
+
+import { useRef, useState } from 'react'
+import useSWR from 'swr'
+import { useTranslations } from 'next-intl'
+import { ChevronDown, ChevronRight, Circle, Flag, GitBranch, Link2, Plus, X } from 'lucide-react'
+import { toast } from 'sonner'
+import { listIssueConnections, updateIssueRelation } from '@/app/actions/issue-operations'
+import { moveIssue, type getIssue } from '@/app/actions/issues'
+import { useActionError } from '@/lib/use-action-error'
+import { Button } from '@/components/ui/button'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Progress } from '@/components/ui/progress'
+import { ISSUE_STATUSES, issueIdentifier } from './issue-properties'
+import { IssuePropertyMenu } from './issue-property-menu'
+import { cn } from '@/lib/utils'
+
+type Issue = Awaited<ReturnType<typeof getIssue>>
+export type RelationKind = 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'
+const closed = (status: string) => ['done', 'canceled', 'duplicate'].includes(status)
+
+export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, onSelect, validationError }: { kind: RelationKind; task: Issue; open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; onSelect: (id: string) => void; validationError?: string }) {
+  const t = useTranslations('Metadata.relations')
+  const relationTitle = (value: RelationKind) => t.has(`title.${value}` as never) ? t(`title.${value}` as never) : value
+  const { data, error, mutate } = useSWR(open ? ['issue-connections', task.id] : null, () => listIssueConnections(task.id))
+  return <Dialog open={open} onOpenChange={value => { if (!pending) onOpenChange(value) }}><DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg"><DialogHeader className="p-4 pr-10"><DialogTitle>{relationTitle(kind)}</DialogTitle><DialogDescription>{t('dialogDescription')}</DialogDescription></DialogHeader>{validationError && <p role="alert" className="px-4 pb-3 text-sm text-destructive">{validationError}</p>}<Command className="[&_[cmdk-item]]:min-h-11 lg:[&_[cmdk-item]]:min-h-0"><CommandInput placeholder={t('searchPlaceholder')} aria-label={t('searchAria')} disabled={pending} /><CommandList><CommandEmpty>{error ? t('loadFailed') : data ? t('noTasks') : t('loading')}</CommandEmpty><CommandGroup heading={t('group')}>{data?.filter(row => row.id !== task.id && (kind !== 'child' || row.metadata.parentId !== task.id)).map(row => { const Icon = ISSUE_STATUSES.find(status => status.value === row.status)?.icon ?? Circle; return <CommandItem key={row.id} value={`${row.id} ${issueIdentifier(row.metadata.number)} ${row.title}`} disabled={pending} onSelect={() => onSelect(row.id)}><Icon /><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row.metadata.number)}</span><span className="truncate">{row.title}</span></CommandItem> })}{error && <CommandItem onSelect={() => { void mutate() }}>{t('reload')}</CommandItem>}</CommandGroup></CommandList></Command></DialogContent></Dialog>
+}
+
+export function IssueRelations({ task, mode, onOpen, onCreate, onPick, getCurrent, onSaved, disabled }: { task: Issue; mode: 'subissues' | 'sidebar'; onOpen: (id: string) => void; onCreate: () => void; onPick: (kind: RelationKind) => void; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; disabled: boolean }) {
+  const t = useTranslations('Metadata.relations')
+  const tIssue = useTranslations('Issue')
+  const actionError = useActionError()
+  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
+  const groupLabel = (value: RelationKind) => t.has(`groupLabel.${value}` as never) ? t(`groupLabel.${value}` as never) : value
+  const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
+  const { data: rows, error, mutate } = useSWR(['issue-connections', task.id], () => listIssueConnections(task.id), { refreshInterval: 10000 })
+  const [expanded, setExpanded] = useState(true)
+  const [pending, setPending] = useState(false)
+  const busy = useRef(false)
+  const current = rows?.find(row => row.id === task.id)?.metadata ?? task.metadata
+  const children = rows?.filter(row => row.metadata.parentId === task.id) ?? []
+  async function remove(kind: RelationKind, targetId: string) {
+    if (busy.current || disabled) return
+    busy.current = true; setPending(true)
+    try {
+      const latest = await getCurrent()
+      if (!latest) return
+      const result = await updateIssueRelation({ id: task.id, revision: latest.revision, kind, targetId, remove: true })
+      if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error))
+      onSaved(result.issue); await mutate(); toast.success(t('removed'))
+    } catch (error) { toast.error(error instanceof Error ? error.message : t('removeFailed')) }
+    finally { busy.current = false; setPending(false) }
+  }
+  async function status(id: string, revision: number, status: string) {
+    if (busy.current || disabled) return
+    busy.current = true; setPending(true)
+    try { const result = await moveIssue({ id, revision, status }); if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error)); await mutate(); toast.success(t('childStatusUpdated')) }
+    catch (error) { toast.error(error instanceof Error ? error.message : t('statusSaveFailed')) }
+    finally { busy.current = false; setPending(false) }
+  }
+  if (error) return <Button variant="ghost" size="sm" onClick={() => { void mutate() }}>{t('readFailedRetry')}</Button>
+  if (mode === 'subissues') {
+    const done = children.filter(row => closed(row.status)).length
+    return <section aria-label={t('subissuesAria')} className="flex flex-col gap-3 py-3 [&_button]:min-h-11 [&_button[aria-label]]:min-w-11 lg:[&_button]:min-h-0 lg:[&_button[aria-label]]:min-w-0">
+      <div className="flex items-center justify-between gap-2"><Button variant="ghost" size="xs" onClick={() => setExpanded(value => !value)} aria-expanded={expanded}>{expanded ? <ChevronDown data-icon="inline-start" /> : <ChevronRight data-icon="inline-start" />}{t('subissues')}<span className="text-muted-foreground">{done} / {children.length}</span></Button><div className="flex items-center gap-1"><Button variant="ghost" size="xs" disabled={disabled || pending} onClick={() => onPick('child')}>{t('addExisting')}</Button><Button variant="ghost" size="icon-xs" disabled={disabled || pending} aria-label={t('createChildAria')} onClick={onCreate}><Plus data-icon="inline-start" /></Button></div></div>
+      {children.length > 0 && <Progress value={done / children.length * 100} aria-label={t('progressAria', { done, total: children.length })} className="h-1" />}
+      {expanded && children.map(row => <div key={row.id} className="group flex min-w-0 items-center gap-2"><IssuePropertyMenu label={t('statusOf', { title: row.title })} value={row.status} options={statusOptions} icon={Circle} compact disabled={disabled || pending} onChange={value => { void status(row.id, row.revision, value) }} /><Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start" onClick={() => onOpen(row.id)}><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row.metadata.number)}</span><span className="truncate">{row.title}</span></Button><Button variant="ghost" size="icon-xs" disabled={disabled || pending} aria-label={t('removeChildAria', { title: row.title })} onClick={() => { void remove('child', row.id) }}><X data-icon="inline-start" /></Button></div>)}
+      {expanded && children.length === 0 && <Button variant="ghost" size="sm" className="justify-start" disabled={disabled || pending} onClick={onCreate}><Plus data-icon="inline-start" />{t('addChild')}</Button>}
+    </section>
+  }
+  const groups: { kind: RelationKind; label: string; items: NonNullable<typeof rows>; icon: typeof Flag; warning?: boolean }[] = [
+    { kind: 'parent', label: groupLabel('parent'), items: rows?.filter(row => row.id === current.parentId) ?? [], icon: GitBranch },
+    { kind: 'blockedBy', label: groupLabel('blockedBy'), items: rows?.filter(row => current.blockedByIds.includes(row.id) && !closed(row.status)) ?? [], icon: Flag, warning: true },
+    { kind: 'blocks', label: groupLabel('blocks'), items: rows?.filter(row => row.metadata.blockedByIds.includes(task.id) && !closed(task.status)) ?? [], icon: Flag, warning: true },
+    { kind: 'duplicate', label: groupLabel('duplicate'), items: rows?.filter(row => row.id === current.duplicateOfId) ?? [], icon: Link2 },
+    { kind: 'related', label: groupLabel('related'), items: rows?.filter(row => current.relatedIds.includes(row.id) || row.metadata.relatedIds.includes(task.id) || (current.blockedByIds.includes(row.id) && closed(row.status)) || (row.metadata.blockedByIds.includes(task.id) && closed(task.status))) ?? [], icon: Link2 },
+  ]
+  return <>{groups.filter(group => group.items.length).map(group => <section key={group.kind} aria-label={group.label} className="flex min-w-0 flex-col gap-2 [&_button]:min-h-11 [&_button[aria-label]]:min-w-11 lg:[&_button]:min-h-0 lg:[&_button[aria-label]]:min-w-0"><h3 className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><group.icon className={cn('size-3.5', group.warning && 'text-warning-foreground')} />{group.label}</h3>{group.items.map(row => <div key={row.id} className="flex min-w-0 items-center gap-1"><Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start" title={row.title} onClick={() => onOpen(row.id)}><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row.metadata.number)}</span><span className="truncate">{row.title}</span></Button><Button variant="ghost" size="icon-xs" disabled={disabled || pending} aria-label={t('removeAria', { label: group.label, title: row.title })} onClick={() => { void remove(group.kind === 'related' && current.blockedByIds.includes(row.id) ? 'blockedBy' : group.kind === 'related' && row.metadata.blockedByIds.includes(task.id) ? 'blocks' : group.kind, row.id) }}><X data-icon="inline-start" /></Button></div>)}</section>)}</>
+}

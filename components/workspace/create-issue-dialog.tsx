@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import type { JSONContent } from '@tiptap/react'
 import { ChartNoAxesColumnIncreasing, ChevronRight, CircleDashed, LockKeyhole, Maximize2, Minimize2, SquareUserRound, X } from 'lucide-react'
-import { useTranslations } from 'next-intl'
 import { saveIssue } from '@/app/actions/issues'
+import { useActionError } from '@/lib/use-action-error'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldGroup, FieldLabel, FieldSet } from '@/components/ui/field'
@@ -13,7 +14,6 @@ import { Spinner } from '@/components/ui/spinner'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
-import { useActionError } from '@/lib/use-action-error'
 import { IssueEditor } from './issue-editor'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, WORKSPACE_NAME } from './issue-properties'
@@ -28,12 +28,12 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   initialStatus?: string
 }) {
   const t = useTranslations('Issue.create')
-  const issueT = useTranslations('Issue')
-  const statusT = useTranslations('Issue.status')
-  const priorityT = useTranslations('Issue.priority')
-  const statusLabel = (value: string) => statusT.has(value as never) ? statusT(value as never) : value
-  const priorityLabel = (value: string) => priorityT.has(value as never) ? priorityT(value as never) : value
-  const translateError = useActionError()
+  const tIssue = useTranslations('Issue')
+  const actionError = useActionError()
+  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
+  const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
+  const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
+  const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
   const [title, setTitle] = useState('')
   const [content, setContent] = useState<JSONContent>(EMPTY)
   const [status, setStatus] = useState(initialStatus)
@@ -71,8 +71,8 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
     setNotice('')
     try {
       const result = await saveIssue({ title, content, status, priority })
-      if ('error' in result) {
-        setError(translateError(result.error))
+      if (!('issue' in result) || !result.issue) {
+        setError(actionError(result.error ?? 'issueCreateFailed'))
         return
       }
       onCreated(result.issue.id)
@@ -113,7 +113,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="new-issue-title" className="sr-only">{t('titleLabel')}</FieldLabel>
-              <Input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder={t('titleLabel')} value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
+              <Input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder={t('titleLabel')} value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent px-0 py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
             </Field>
             <Field>
               <FieldLabel className="sr-only">{t('descriptionLabel')}</FieldLabel>
@@ -121,11 +121,13 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
             </Field>
           </FieldGroup>
           <div className="flex flex-wrap items-center gap-2">
-            <IssuePropertyMenu pill label={issueT('statusLabel')} value={status} options={ISSUE_STATUSES} getLabel={statusLabel} icon={CircleDashed} disabled={pending} onChange={setStatus} />
-            <IssuePropertyMenu pill label={issueT('priorityLabel')} value={priority} options={ISSUE_PRIORITIES} getLabel={priorityLabel} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={setPriority} />
-            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><SquareUserRound />{WORKSPACE_NAME}</Badge>
-            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><LockKeyhole />{t('private')}</Badge>
+            <IssuePropertyMenu pill label={tIssue('statusLabel')} value={status} options={statusOptions} icon={CircleDashed} disabled={pending} onChange={setStatus} />
+            <IssuePropertyMenu pill label={tIssue('priorityLabel')} value={priority} options={priorityOptions} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={setPriority} />
           </div>
+          <p className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5"><SquareUserRound aria-hidden="true" className="size-3.5" />{t('workspace', { name: WORKSPACE_NAME })}</span>
+            <span className="inline-flex items-center gap-1.5"><LockKeyhole aria-hidden="true" className="size-3.5" />{t('privateHint')}</span>
+          </p>
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
           {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
         </FieldSet>

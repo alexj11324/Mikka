@@ -6,18 +6,19 @@ import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { issues, issueMembers } from '@/lib/db/schema'
+import { readIssueMetadata } from '@/lib/issue-metadata'
 
 export async function requireUser() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   return session.user
 }
-export async function requireIssueAccess(id: string) {
+export async function requireIssueAccess(id: string, includeDeleted = false) {
   if (!z.uuid().safeParse(id).success) throw new ActionFailureError('issueNotFound')
   const user = await requireUser()
   const [row] = await db.select({ issue: issues }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, user.id)))
     .where(and(eq(issues.id, id), or(eq(issues.userId, user.id), eq(issueMembers.memberId, user.id)))).limit(1)
-  if (!row) throw new ActionFailureError('issueNotFound')
+  if (!row || (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt)) throw new ActionFailureError('issueNotFound')
   return { issue: row.issue, user }
 }

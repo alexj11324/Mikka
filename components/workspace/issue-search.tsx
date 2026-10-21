@@ -26,14 +26,14 @@ export function IssueSearch({ open, onOpenChange, issues, onOpen, onCreate }: {
           <CommandGroup heading={t('tasks')}>
             {issues.map(issue => {
               const status = ISSUE_STATUSES.find(item => item.value === issue.status) ?? ISSUE_STATUSES[0]
-              return <CommandItem key={issue.id} value={`${issueIdentifier(issue.id)} ${issue.title}`} onSelect={() => { if (onOpen(issue.id)) onOpenChange(false) }}>
-                <status.icon /><span className="shrink-0 font-mono text-xs text-muted-foreground">{issueIdentifier(issue.id)}</span><span className="truncate">{issue.title}</span>
+              return <CommandItem key={issue.id} value={`${issueIdentifier(issue.metadata.number)} ${issue.title}`} onSelect={() => { if (onOpen(issue.id)) onOpenChange(false) }}>
+                <status.icon /><span className="shrink-0 font-mono text-xs text-muted-foreground">{issueIdentifier(issue.metadata.number)}</span><span className="truncate">{issue.title}</span>
               </CommandItem>
             })}
           </CommandGroup>
           <CommandSeparator />
           {/* i18n-ignore: bilingual search keywords, not rendered */}
-          <CommandGroup heading={t('quickActions')}><CommandItem value="新建任务 create issue new task" onSelect={() => { onOpenChange(false); onCreate() }}><Plus />{t('newTask')}</CommandItem></CommandGroup>
+          <CommandGroup heading={t('quickActions')}><CommandItem value="新建任务 create issue new task" onSelect={() => { onOpenChange(false); onCreate() }}>{/* i18n-ignore: bilingual search keywords */}<Plus />{t('newTask')}</CommandItem></CommandGroup>
         </CommandList>
       </Command>
     </DialogContent>

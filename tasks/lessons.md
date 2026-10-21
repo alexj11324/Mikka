@@ -129,6 +129,7 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 
 ---
 
+
 ## 2026-10-20 用户偏好：不要全宽水平长线
 
 **发生了什么**：截图指出表格头下方那条贯穿整行的分割线，明确说「agent 很喜欢用这种长线，
@@ -173,3 +174,4 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 **规则**：顶层动态段下的 404 要加 `app/[locale]/[...rest]/page.tsx` 调 `notFound()`；
 验证时看 HTTP 状态（404）、浏览器 `document.documentElement.lang` 与页面文案三者是否一致。
 另外 `JSON.parse` 会静默丢掉重复 key，检查器应能发现重复键，或至少用 `jq`/脚本单独查一次。
+

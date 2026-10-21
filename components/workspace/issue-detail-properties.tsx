@@ -1,28 +1,45 @@
 'use client'
 
-import { ChartNoAxesColumnIncreasing, CircleDashed, History, LockKeyhole, Users } from 'lucide-react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useId, useState, type ReactNode } from 'react'
+import { useTranslations } from 'next-intl'
+import { Calendar, ChartNoAxesColumnIncreasing, ChevronDown, CircleDashed, Signal, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
+import { IssueMetadataControls, type MetadataRequest, type MetadataSavedIssue } from './issue-metadata-controls'
+import type { IssueMetadata } from '@/lib/issue-metadata'
+import { cn } from '@/lib/utils'
 
-export function IssueDetailProperties({ status, priority, revision, createdAt, updatedAt, pending, onStatus, onPriority, onMembers, onHistory }: {
-  status: string; priority: string; revision: number; createdAt: Date | string; updatedAt: Date | string; pending: boolean
-  onStatus: (value: string) => void; onPriority: (value: string) => void; onMembers: () => void; onHistory: () => void
+export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled, onMetadataBusy, status, priority, pending, onStatus, onPriority, request, relations, onDate, onEstimate }: {
+  task: { id: string; revision: number; metadata: IssueMetadata }; onMetadataSaved: (issue: MetadataSavedIssue) => void; metadataDisabled: boolean; onMetadataBusy: (busy: boolean) => void
+  status: string; priority: string; pending: boolean; onStatus: (value: string) => void; onPriority: (value: string) => void
+  request: MetadataRequest | null; relations: ReactNode; onDate: () => void; onEstimate: () => void
 }) {
   const t = useTranslations('Issue')
-  const statusT = useTranslations('Issue.status')
-  const priorityT = useTranslations('Issue.priority')
-  const format = useFormatter()
-  const statusLabel = (value: string) => statusT.has(value as never) ? statusT(value as never) : value
-  const priorityLabel = (value: string) => priorityT.has(value as never) ? priorityT(value as never) : value
-  return <aside aria-label={t('properties')} className="flex w-full shrink-0 flex-col gap-6 px-5 py-6 lg:w-64 xl:w-72">
-    <div className="flex flex-col items-start gap-3"><h2 className="px-2 text-xs font-medium text-muted-foreground">{t('properties')}</h2>
-      <IssuePropertyMenu label={t('statusLabel')} value={status} options={ISSUE_STATUSES} getLabel={statusLabel} icon={CircleDashed} disabled={pending} onChange={onStatus} />
-      <IssuePropertyMenu label={t('priorityLabel')} value={priority} options={ISSUE_PRIORITIES} getLabel={priorityLabel} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} />
-      <Button variant="ghost" size="sm" onClick={onMembers}><Users data-icon="inline-start" />{t('members')}</Button>
+  const tDetail = useTranslations('IssueDetail')
+  const tMetadata = useTranslations('Metadata.property')
+  const statusLabel = (value: string) => t.has(`status.${value}` as never) ? t(`status.${value}` as never) : value
+  const priorityLabel = (value: string) => t.has(`priority.${value}` as never) ? t(`priority.${value}` as never) : value
+  const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
+  const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
+  const [expanded, setExpanded] = useState(false)
+  const contentId = useId()
+  const control = { task, disabled: metadataDisabled, onSaved: onMetadataSaved, onBusyChange: onMetadataBusy, request }
+  return <aside id="issue-properties" aria-label={t('properties')} className="order-first w-full min-w-0 shrink-0 px-5 pt-3 sm:px-8 lg:sticky lg:top-20 lg:order-last lg:w-60 lg:self-start lg:px-0 lg:pt-0 xl:w-64">
+    <Button variant="ghost" className="min-h-11 w-full justify-between lg:hidden" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded(value => !value)}><SlidersHorizontal data-icon="inline-start" /><span className="flex-1 text-left">{tDetail('propertiesRelations')}</span><ChevronDown data-icon="inline-end" className={cn(expanded && 'rotate-180')} /></Button>
+    <div id={contentId} className={cn('flex-col gap-6 lg:flex lg:py-0', expanded ? 'flex py-4' : 'hidden')}>
+    <section className="flex flex-col items-start gap-1 [&_button]:min-h-11 lg:[&_button]:min-h-0"><h2 className="mb-2 hidden px-2 text-xs font-medium text-muted-foreground lg:block">{tDetail('propertiesHeading')}</h2>
+      <IssuePropertyMenu label={t('statusLabel')} value={status} options={statusOptions} icon={CircleDashed} disabled={pending} onChange={onStatus} />
+      <IssuePropertyMenu label={t('priorityLabel')} value={priority} options={priorityOptions} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} />
+      <IssueMetadataControls {...control} section="assignee" />
+      {task.metadata.estimate !== null && <Button variant="ghost" size="sm" disabled={metadataDisabled} onClick={onEstimate}><Signal data-icon="inline-start" />{tMetadata('estimatePoints', { count: task.metadata.estimate })}</Button>}
+      {task.metadata.dueDate && <Button variant="ghost" size="sm" disabled={metadataDisabled} onClick={onDate}><Calendar data-icon="inline-start" /><time dateTime={task.metadata.dueDate}>{task.metadata.dueDate}</time></Button>}
+    </section>
+    <section className="flex flex-col items-start gap-2"><h3 className="px-2 text-xs font-medium text-muted-foreground">{tMetadata('labels')}</h3><div className="flex flex-wrap gap-2 px-2"><IssueMetadataControls {...control} section="labels" /></div></section>
+    <section className="flex flex-col items-start gap-1"><h3 className="mb-1 px-2 text-xs font-medium text-muted-foreground">{tMetadata('project')}</h3><IssueMetadataControls {...control} section="project" /></section>
+    {task.metadata.pullRequests.length > 0 && <section className="flex flex-col items-start gap-2"><h3 className="px-2 text-xs font-medium text-muted-foreground">{tMetadata('pullRequests')}</h3><div className="flex flex-wrap gap-2 px-2"><IssueMetadataControls {...control} section="pullRequests" /></div></section>}
+    {task.metadata.pullRequests.length === 0 && request?.target === 'pullRequests' && <IssueMetadataControls {...control} section="pullRequests" />}
+    <div className="flex min-w-0 flex-col gap-6 px-2">{relations}</div>
     </div>
-    <div className="flex flex-col gap-4 px-2"><h2 className="text-xs font-medium text-muted-foreground">{t('access')}</h2><p className="flex items-center gap-2 text-xs"><LockKeyhole className="size-3.5 text-muted-foreground" />{t('restricted')}</p></div>
-    <div className="flex flex-col items-start gap-3"><Button size="sm" variant="ghost" onClick={onHistory}><History data-icon="inline-start" />{t('history')}<span className="text-muted-foreground">v{revision}</span></Button><dl className="flex flex-col gap-3 px-2 text-xs text-muted-foreground"><div className="flex flex-wrap gap-2"><dt>{t('createdAt')}</dt><dd><time dateTime={new Date(createdAt).toISOString()}>{format.dateTime(new Date(createdAt), { year: 'numeric', month: 'short', day: 'numeric' })}</time></dd></div><div className="flex flex-wrap gap-2"><dt>{t('updatedAt')}</dt><dd><time dateTime={new Date(updatedAt).toISOString()}>{format.dateTime(new Date(updatedAt), { year: 'numeric', month: 'short', day: 'numeric' })}</time></dd></div></dl></div>
   </aside>
 }
