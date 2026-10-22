@@ -864,8 +864,6 @@
     "noFollowingTitle": "尚未关注任务",
     "noFollowingDescription": "在任务的更多操作中选择「关注任务活动」，即可在这里追踪更新。",
     "viewAllTasks": "查看全部任务",
-    "agentDescription": "Agent 服务尚未接入，当前不会自动执行任务。",
-    "viewTeamTasks": "查看团队任务",
     "viewsTitle": "工作区视图",
     "viewsDescription": "按工作流状态查看任务，不改变任务本身。",
     "teamOverview": "团队工作概览",
@@ -1421,5 +1419,20 @@
     "cookieNote": "如果预览限制了第三方 Cookie，请使用新标签页入口。",
     "devOnly": "仅限开发预览。任务与项目真实保存，且与正式账号数据隔离。",
     "switchAccount": "改用自己的账号登录"
+  },
+  "Coordinator": {
+    "label": "Coordinator",
+    "conversation": "与 Coordinator 的对话",
+    "emptyTitle": "和你的 Coordinator 聊聊",
+    "emptyDescription": "让它接手一个 issue、查看运行进度，或记住你的工作习惯。它会把 issue 派给你的 agent，并在运行结束时告诉你。",
+    "usedTools": "调用了 {tools}",
+    "working": "Coordinator 正在处理…",
+    "loadError": "对话加载失败，正在重试。",
+    "disabledTitle": "Coordinator 在这里没有运行",
+    "disabledDescription": "消息已保存，等这个部署配置好 Coordinator 后会得到回复。",
+    "failedTitle": "上一次回复失败了",
+    "input": "给 Coordinator 发消息",
+    "placeholder": "让 Coordinator 开始处理一个 issue…",
+    "send": "发送"
   }
 }

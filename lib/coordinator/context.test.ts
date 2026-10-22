@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
-import { compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, SUMMARY_PREFIX, type StoredMessage } from './context'
+import { chatItems, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, SUMMARY_PREFIX, type StoredMessage } from './context'
 
 function stored(messages: ModelMessage[]): StoredMessage[] {
   return messages.map((message, index) => ({ position: index + 1, message }))
@@ -74,4 +74,21 @@ test('events read as messages from Mikka', () => {
     '[Event] Run r1 ended with status succeeded (submitted).\nIssue: i1.\nThe agent\'s summary: Fixed it',
   )
   assert.match(eventPrompt({ kind: 'issue_done', issueId: 'i1', runId: null, payload: { title: 'Login', previousStatus: 'review' } }), /moved from review to done/)
+})
+
+test('the chat folds one reply\'s steps together and marks events', () => {
+  const at = new Date('2026-10-22T00:00:00Z')
+  const rows = [
+    { role: 'user', content: 'list my issues' },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'list_issues', input: {} }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'list_issues', output: { type: 'json', value: [] } }] },
+    { role: 'assistant', content: [{ type: 'text', text: 'You have none.' }] },
+    { role: 'user', content: '[Event] Run r1 ended with status succeeded (submitted).' },
+  ] as ModelMessage[]
+  const items = chatItems(rows.map((message, index) => ({ position: index + 1, message, createdAt: at })))
+  assert.deepEqual(items.map(item => [item.from, item.text, item.tools]), [
+    ['person', 'list my issues', []],
+    ['coordinator', 'You have none.', ['list_issues']],
+    ['event', '[Event] Run r1 ended with status succeeded (submitted).', []],
+  ])
 })
