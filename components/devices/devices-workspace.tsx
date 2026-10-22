@@ -22,6 +22,7 @@ import { ConnectDeviceDialog } from './connect-device-dialog'
 import { DevicesSidebar } from './devices-sidebar'
 import { SUPPORTED_HARNESSES, type SupportedHarness } from '@/lib/db/schema'
 import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
+import { cn } from '@/lib/utils'
 
 const HARNESS_LABELS: Record<SupportedHarness, string> = { claude_code: 'Claude Code', codex: 'Codex' }
 
@@ -127,13 +128,14 @@ function DeviceCard({ device, localHostname, onChanged }: { device: DeviceView; 
 }
 
 /**
- * The Device page: the machines that run agents. Everything shown here comes
- * from the daemon's own detection — this app never guesses what a machine has.
+ * Device settings for machines that run agents. The legacy route redirects
+ * here through Settings; every status comes from the daemon's own detection.
  */
-export function DevicesWorkspace({ user, localHostname, initialDevices }: {
+export function DevicesWorkspace({ user, localHostname, initialDevices, embedded = false }: {
   user: { id: string; name: string; email: string }
   localHostname: string
   initialDevices: DeviceView[]
+  embedded?: boolean
 }) {
   const t = useTranslations('Devices')
   const router = useRouter()
@@ -148,64 +150,56 @@ export function DevicesWorkspace({ user, localHostname, initialDevices }: {
   }
 
   const online = devices.filter(device => device.online).length
+  const content = (
+    <div className={cn('flex flex-col gap-6', !embedded && 'px-4 py-6 sm:px-6')}>
+      <div className={cn('flex flex-wrap items-start gap-3', embedded ? 'justify-end' : 'justify-between')}>
+        {!embedded && <div className="flex flex-col gap-0.5"><h1 className="text-sm font-semibold tracking-tight">{t('title')}</h1><p className="text-xs text-muted-foreground">{t('description')}</p></div>}
+        <ConnectDeviceDialog />
+      </div>
+
+      {devices.length > 0 && <p className="text-xs text-muted-foreground">{t('summary', { total: devices.length, online })}</p>}
+      {error && <p role="alert" className="text-xs text-destructive">{t('listError')}</p>}
+      {devices.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><Laptop aria-hidden="true" /></EmptyMedia>
+            <EmptyTitle>{t('emptyTitle')}</EmptyTitle>
+            <EmptyDescription>{t('emptyDescription')}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent><ConnectDeviceDialog /></EmptyContent>
+        </Empty>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {devices.map(device => <DeviceCard key={device.id} device={device} localHostname={localHostname} onChanged={() => { void mutate() }} />)}
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">{t('footer')}</p>
+    </div>
+  )
 
   return (
     <TooltipProvider>
-      <SidebarProvider>
-        <DevicesSidebar user={user} onSignOut={signOut} signingOut={signingOut} />
-        <SidebarInset className="min-w-0">
-          <header className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
-            <div className="flex min-w-0 items-center gap-2">
-              <SidebarTrigger className="-ml-1" aria-label={t('toggleSidebar')} />
-              <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
-              <Breadcrumb aria-label={t('breadcrumb')}>
-                <BreadcrumbList>
-                  <BreadcrumbItem className="hidden sm:inline-flex"><span>{WORKSPACE_NAME}</span></BreadcrumbItem>
-                  <BreadcrumbSeparator className="hidden sm:block" />
-                  <BreadcrumbItem><BreadcrumbPage>{t('title')}</BreadcrumbPage></BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            </div>
-          </header>
-          <div className="flex flex-col gap-6 px-4 py-6 sm:px-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex flex-col gap-0.5">
-                <h1 className="text-sm font-semibold tracking-tight">{t('title')}</h1>
-                <p className="text-xs text-muted-foreground">{t('description')}</p>
+      {embedded ? content : (
+        <SidebarProvider>
+          <DevicesSidebar user={user} onSignOut={signOut} signingOut={signingOut} />
+          <SidebarInset className="min-w-0">
+            <header className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
+              <div className="flex min-w-0 items-center gap-2">
+                <SidebarTrigger className="-ml-1" aria-label={t('toggleSidebar')} />
+                <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
+                <Breadcrumb aria-label={t('breadcrumb')}>
+                  <BreadcrumbList>
+                    <BreadcrumbItem className="hidden sm:inline-flex"><span>{WORKSPACE_NAME}</span></BreadcrumbItem>
+                    <BreadcrumbSeparator className="hidden sm:block" />
+                    <BreadcrumbItem><BreadcrumbPage>{t('title')}</BreadcrumbPage></BreadcrumbItem>
+                  </BreadcrumbList>
+                </Breadcrumb>
               </div>
-              <ConnectDeviceDialog />
-            </div>
-
-            {devices.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {t('summary', { total: devices.length, online })}
-              </p>
-            )}
-
-            {error && <p role="alert" className="text-xs text-destructive">{t('listError')}</p>}
-            {devices.length === 0 ? (
-              <Empty>
-                <EmptyHeader>
-                  <EmptyMedia variant="icon"><Laptop aria-hidden="true" /></EmptyMedia>
-                  <EmptyTitle>{t('emptyTitle')}</EmptyTitle>
-                  <EmptyDescription>{t('emptyDescription')}</EmptyDescription>
-                </EmptyHeader>
-                <EmptyContent><ConnectDeviceDialog /></EmptyContent>
-              </Empty>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {devices.map(device => (
-                  <DeviceCard key={device.id} device={device} localHostname={localHostname} onChanged={() => { void mutate() }} />
-                ))}
-              </div>
-            )}
-
-            <p className="text-xs text-muted-foreground">
-              {t('footer')}
-            </p>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
+            </header>
+            {content}
+          </SidebarInset>
+        </SidebarProvider>
+      )}
     </TooltipProvider>
   )
 }

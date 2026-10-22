@@ -107,26 +107,17 @@ export function AgentsPanel() {
 
   return (
     <section aria-label={t('title')} className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 md:px-6 md:py-8 xl:px-8">
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex max-w-2xl flex-col gap-2">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-project-action">
-            <span className="size-1.5 rounded-full bg-project-action" aria-hidden="true" />
-            {t('eyebrow')}
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{t('title')}</h1>
-            <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{t('description')}</p>
-          </div>
-        </div>
+      <div className="flex justify-end">
         <Button
-          className="shrink-0 rounded-full bg-workspace-accent text-workspace-accent-foreground shadow-sm hover:bg-workspace-accent/90"
+          size="sm"
+          className="rounded-full bg-workspace-accent text-workspace-accent-foreground shadow-sm hover:bg-workspace-accent/90"
           disabled={!agents}
           onClick={() => setSelectedId('new')}
         >
           <Plus data-icon="inline-start" />
           {t('createTrigger')}
         </Button>
-      </header>
+      </div>
 
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <MetricCard icon={Bot} label={t('rolesMetric')} value={agents?.length ?? '—'} detail={t('rolesMetricHint')} />

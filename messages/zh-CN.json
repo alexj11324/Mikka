@@ -1311,9 +1311,16 @@
         "title": "个人资料",
         "description": "查看你在工作区中的账户信息。"
       },
+      "agents": {
+        "title": "Agent 管理",
+        "description": "管理 Agent 角色、提示词和运行所用的机器、Harness 与模型。"
+      },
       "workspace": {
         "title": "工作区",
         "description": "当前工作区的基本信息。"
+      },
+      "devices": {
+        "description": "查看已连接设备、在线状态和可用 Harness。"
       }
     },
     "appearance": {
@@ -1385,7 +1392,7 @@
     "imported": "已导入 {count} 个有效邮箱；共 {total} 位待邀请。",
     "importedDuplicates": "已导入 {count} 个有效邮箱，已去重 {duplicates} 个；共 {total} 位待邀请。",
     "errors": {
-      "notCsv": "请选择一个 .csv 文件��",
+      "notCsv": "请选择一个 .csv ��件��",
       "fileTooLarge": "CSV 文件不能超过 1 MB。",
       "readFailed": "文件读取失败，请使用 UTF-8 编码的 CSV 文件。",
       "checkEmails": "请检查邮箱地址。",

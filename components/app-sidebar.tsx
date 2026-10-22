@@ -1,9 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import { Link } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
-import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, MonitorSmartphone, Scan, Search, Send, SquarePen, SquareUserRound, Users } from 'lucide-react'
+import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, SquarePen, SquareUserRound } from 'lucide-react'
 import { NavUser } from '@/components/nav-user'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
@@ -26,7 +25,7 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
   const t = useTranslations('Nav')
   const commonT = useTranslations('Common')
   function navigate(next: WorkspaceSection) { if (onNavigate(next)) setOpenMobile(false) }
-  const personal = [{ id: 'inbox', title: t('inbox'), icon: Inbox }, { id: 'my-issues', title: t('myTasks'), icon: Scan }, { id: 'agent', title: t('agent'), icon: Send }] as const
+  const personal = [{ id: 'inbox', title: t('inbox'), icon: Inbox }, { id: 'my-issues', title: t('myTasks'), icon: Scan }] as const
   const teamItems = [{ id: 'team-home', title: t('home'), icon: House }, { id: 'team-issues', title: t('tasks'), icon: Layers }, { id: 'team-projects', title: t('projects'), icon: Box }] as const
   return <Sidebar variant="inset" mobileTitle={t('sidebarTitle')} mobileDescription={t('sidebarDescription')} mobileCloseLabel={commonT('close')} {...props}>
     <SidebarHeader className="pb-4">
@@ -60,11 +59,6 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
       </SidebarGroup></Collapsible>
     </SidebarContent>
     <SidebarFooter>
-      <SidebarMenu>
-        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members" />} tooltip={t('members')}><Users /><span>{t('members')}</span></SidebarMenuButton></SidebarMenuItem>
-        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members?invite=1" />} tooltip={t('inviteMembers')}><SquarePen /><span>{t('inviteMembers')}</span></SidebarMenuButton></SidebarMenuItem>
-        <SidebarMenuItem><SidebarMenuButton render={<Link href="/devices" />} tooltip={t('devices')}><MonitorSmartphone /><span>{t('devices')}</span></SidebarMenuButton></SidebarMenuItem>
-      </SidebarMenu>
       <NavUser user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} />
     </SidebarFooter>
     <SidebarRail aria-label={t('sidebarRail')} title={t('toggleSidebar')} aria-expanded={isMobile ? openMobile : open} />

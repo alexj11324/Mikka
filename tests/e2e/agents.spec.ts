@@ -1,9 +1,34 @@
 import { randomUUID } from 'node:crypto'
+import type { Page } from '@playwright/test'
 import { test, expect, register } from './fixtures'
 
-test('默认三个角色、编辑放置、新建并删除自定义角色', async ({ page }) => {
+async function openAgentSettings(page: Page) {
+  const mainUrl = page.url()
+  await expect(page.getByRole('button', { name: 'Agent', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Agent 管理', exact: true })).toHaveCount(0)
+  for (const label of ['成员管理', '邀请成员', '设备']) {
+    await expect(page.getByRole('link', { name: label, exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: label, exact: true })).toHaveCount(0)
+  }
+  await page.getByRole('button', { name: '账户菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '设置', exact: true }).click()
+  for (const label of ['成员管理', '邀请成员']) {
+    await expect(page.getByRole('link', { name: label, exact: true })).toBeVisible()
+  }
+  await page.getByRole('button', { name: '设备', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '设备', exact: true })).toBeVisible()
+  await expect(page).toHaveURL(mainUrl)
+  await page.getByRole('button', { name: 'Agent 管理', exact: true }).click()
+}
+
+test('设置中的Agent角色、运行环境、新建与删除', async ({ page }) => {
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.goto('/devices')
+  await expect(page).toHaveURL(url => url.searchParams.get('settings') === 'devices')
+  await expect(page.getByRole('heading', { name: '设备', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '返回应用', exact: true }).click()
+  await expect(page).not.toHaveURL(/settings=devices/)
+  await openAgentSettings(page)
   const panel = page.getByRole('region', { name: 'Agent 角色', exact: true })
   await expect(panel.getByRole('heading', { name: 'Agent 角色', exact: true })).toBeVisible()
   for (const name of ['Coordinator', 'Worker', 'Reviewer']) {
@@ -29,7 +54,7 @@ test('默认三个角色、编辑放置、新建并删除自定义角色', async
   await expect(panel.getByRole('button', { name: new RegExp(`^${name}`) })).toBeVisible()
 
   await page.reload()
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await openAgentSettings(page)
   await panel.getByRole('button', { name: new RegExp(`^${name}`) }).click()
   await panel.getByRole('region', { name: `编辑 ${name}`, exact: true }).getByRole('button', { name: '删除', exact: true }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: '删除', exact: true }).click()

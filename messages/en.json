@@ -1311,9 +1311,16 @@
         "title": "Profile",
         "description": "See the account details used in your workspace."
       },
+      "agents": {
+        "title": "Agent settings",
+        "description": "Manage agent roles, instructions, and runtime assignments."
+      },
       "workspace": {
         "title": "Workspace",
         "description": "Basic information about the current workspace."
+      },
+      "devices": {
+        "description": "Review connected devices, their status, and available harnesses."
       }
     },
     "appearance": {

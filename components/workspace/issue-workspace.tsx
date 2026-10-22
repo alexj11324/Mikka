@@ -8,7 +8,7 @@ import { Columns3, List, Search } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IssueBoard } from './issue-board'
 import { AppSidebar } from '@/components/app-sidebar'
-import { SettingsView } from '@/components/settings/settings-view'
+import { SettingsView, type SettingsSection } from '@/components/settings/settings-view'
 import { AppShell, AppShellContent } from '@/components/app-shell'
 import { CreateIssueDialog } from './create-issue-dialog'
 import { IssueList } from './issue-list'
@@ -26,7 +26,7 @@ import { ProjectWorkspace } from './project-workspace'
 import { WorkspaceOverview } from './workspace-overview'
 import type { WorkspaceSection } from './workspace-navigation'
 
-export function IssueWorkspace({ user, initialIssues, initialSelected = null }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
+export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialSettingsSection }: { initialSelected?: string | null; initialSettingsSection?: SettingsSection; user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
   const t = useTranslations('Workspace')
   const tIssue = useTranslations('Issue')
   const tNav = useTranslations('Nav')
@@ -34,7 +34,6 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null }: 
   const sectionTitles: Record<WorkspaceSection, string> = {
     inbox: tOverview('sections.inbox'),
     'my-issues': tOverview('sections.myIssues'),
-    agent: tOverview('sections.agent'),
     projects: tOverview('sections.projects'),
     views: tOverview('sections.views'),
     'team-home': tOverview('sections.teamHome'),
@@ -43,7 +42,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null }: 
     'all-issues': tOverview('sections.allIssues'),
   }
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(initialSettingsSection === 'devices')
   const [boardBusy, setBoardBusy] = useState(false)
   const { data: tasks = [], mutate, error } = useSWR('issues', listIssues, { fallbackData: initialIssues, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)
@@ -132,7 +131,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null }: 
   }
   function navigate(next: IssueView) {
     if (boardBusy || leaving.current) return false
-    void leave(() => { setSelected(null); if (['inbox', 'agent', 'views', 'team-home'].includes(section)) setSection('team-issues'); setView(next); setQuery(''); setDraftKey(value => value + 1) })
+    void leave(() => { setSelected(null); if (['inbox', 'views', 'team-home'].includes(section)) setSection('team-issues'); setView(next); setQuery(''); setDraftKey(value => value + 1) })
     return true
   }
   function navigateSection(next: WorkspaceSection) {
@@ -141,7 +140,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null }: 
     return true
   }
   const isProjects = section === 'projects' || section === 'team-projects'
-  const isOverview = ['inbox', 'agent', 'views', 'team-home'].includes(section)
+  const isOverview = ['inbox', 'views', 'team-home'].includes(section)
   const filtered = tasks.filter(task => (view === 'all' || (view === 'mine' ? task.ownerId === user.id : view === 'shared' ? task.ownerId !== user.id : view === 'favorites' ? task.metadata.favoriteUserIds.includes(user.id) : view === 'following' ? task.metadata.subscriberUserIds.includes(user.id) : task.status === view)) && `${issueIdentifier(task.metadata.number, tIssue('unassignedNumber'))} ${task.title}`.toLowerCase().includes(query.trim().toLowerCase()))
   const counts: Record<IssueView, number> = { all: tasks.length, mine: 0, shared: 0, favorites: 0, following: 0, backlog: 0, todo: 0, doing: 0, review: 0, done: 0, canceled: 0, duplicate: 0 }
   for (const task of tasks) {
@@ -152,7 +151,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null }: 
   }
   const viewTitle = view === 'all' ? t('allIssues') : view === 'mine' ? t('mine') : view === 'shared' ? t('shared') : view === 'favorites' ? t('favorites') : view === 'following' ? t('following') : statusLabel(view)
   return <AppShell fixed={!settingsOpen && !selected && !isProjects && !isOverview && layout === 'board'}>
-    {settingsOpen ? <SettingsView user={user} onBack={() => setSettingsOpen(false)} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
+    {settingsOpen ? <SettingsView user={user} initialSection={initialSettingsSection} onBack={() => { setSettingsOpen(false); if (initialSettingsSection === 'devices') router.replace('/') }} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
     <AppSidebar onSettings={() => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsOpen(true) }) }} user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
     <AppShellContent hideHeader={!!selected} parent={WORKSPACE_NAME} title={sectionTitles[section]} actions={<Button variant="ghost" size="icon-sm" aria-label={t('openSearch')} disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}

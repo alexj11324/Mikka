@@ -11,7 +11,7 @@ export function SettingsPreview() {
   return (
     <AppShell>
         <SettingsView
-          user={{ name: t('preview.userName'), email: 'preview@example.com' }}
+          user={{ id: 'preview', name: t('preview.userName'), email: 'preview@example.com' }}
           onBack={() => router.push('/sign-in')}
           onSignOut={() => router.push('/sign-in')}
           signingOut={false}
