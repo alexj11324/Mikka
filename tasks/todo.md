@@ -647,3 +647,13 @@ MCP servers, and hooks run outside it*）。无人值守下 `permissionMode` 也
 - [x] SSH 路由拒绝缺失 `authBaseURL` 的请求，并限制每账号一个并发连接
 - [x] 指派菜单 Agents 分组、设置页 Sheet/rail、workspaceReadFailed 文案
 - [x] 验收页改用 locale redirect
+
+## 2026-10-22 Google OAuth and Composio integrations
+
+- [ ] Add Google social login using the existing Better Auth flow and show the exact localhost callback URL.
+- [ ] Add authenticated, per-user Composio connections for Notion and Slack and a shared signature-verified webhook receiver.
+- [ ] Keep provider credentials out of tracked files; handle missing Composio configuration without breaking login or settings.
+- [ ] Update English and Chinese UI text and run the relevant checks.
+
+Success: Google login uses `http://localhost:3000/mikka/api/auth/callback/google` locally and `https://app.aspectlylabs.com/mikka/api/auth/callback/google` in production; only the signed-in user can manage their Notion/Slack connections; Composio webhook deliveries without a valid signature are rejected.
+Failure conditions: invalid OAuth setup must not disable email/GitHub login; unauthenticated or unsupported integration requests must not initiate OAuth; webhook requests without a configured secret must fail closed.

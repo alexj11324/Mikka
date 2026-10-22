@@ -8,6 +8,7 @@ import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { db } from '@/lib/db'
 import { agentRuns, agents, coordinatorMessages, coordinatorSessions, issueMembers, issues } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
+import { issueOwnerScope } from '@/lib/issue-owner-scope'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
 
@@ -104,7 +105,9 @@ export async function getIssue(userId: string, issueId: string) {
     .where(and(eq(agentRuns.issueId, issue.id), eq(agentRuns.userId, userId))).orderBy(desc(agentRuns.createdAt)).limit(5)
   const metadata = readIssueMetadata(issue.content)
   // Children and the issues this one blocks point at it, so they are found by looking the other way.
-  const siblings = await db.select({ id: issues.id, title: issues.title, status: issues.status, content: issues.content }).from(issues).where(eq(issues.userId, issue.userId))
+  const siblings = await db.select({ id: issues.id, title: issues.title, status: issues.status, content: issues.content }).from(issues)
+    .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
+    .where(issueOwnerScope(userId, issue.userId))
   const linked = new Map(siblings.filter(row => !readIssueMetadata(row.content).deletedAt).map(row => [row.id, { id: row.id, title: row.title, status: row.status, parentId: readIssueMetadata(row.content).parentId, blockedByIds: readIssueMetadata(row.content).blockedByIds }]))
   const pick = (ids: (string | null)[]) => ids.flatMap(id => {
     const row = id ? linked.get(id) : undefined

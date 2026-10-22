@@ -7,7 +7,7 @@ import { SettingsView } from '@/components/settings/settings-view'
 import { authClient } from '@/lib/auth-client'
 import { useState } from 'react'
 
-export function MembersPageView({ user, workspaceId, inviteInitially }: { user: { name: string; email: string }; workspaceId?: string; inviteInitially: boolean }) {
+export function MembersPageView({ user, workspaceId, inviteInitially, googleEnabled }: { user: { name: string; email: string }; workspaceId?: string; inviteInitially: boolean; googleEnabled: boolean }) {
   const router = useRouter()
   const t = useTranslations('Workspace')
   const [signingOut, setSigningOut] = useState(false)
@@ -26,5 +26,5 @@ export function MembersPageView({ user, workspaceId, inviteInitially }: { user: 
       setSigningOut(false)
     }
   }
-  return <AppShell><SettingsView user={user} initialSection="members" workspaceId={workspaceId} inviteInitially={inviteInitially} onBack={() => router.push('/')} onSignOut={signOut} signingOut={signingOut} accountError={error} /></AppShell>
+  return <AppShell><SettingsView user={user} googleEnabled={googleEnabled} initialSection="members" workspaceId={workspaceId} inviteInitially={inviteInitially} onBack={() => router.push('/')} onSignOut={signOut} signingOut={signingOut} accountError={error} /></AppShell>
 }
