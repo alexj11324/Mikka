@@ -66,23 +66,18 @@ function installedOn(device: DeviceView | undefined, harness: SupportedHarness):
   return Boolean(device?.harnesses.some(info => info.harness === harness && info.installed))
 }
 
-function EditorSectionHeading({ id, index, title, description }: { id: string; index: string; title: string; description: string }) {
+function EditorSectionHeading({ id, title, description }: { id: string; title: string; description: string }) {
   return (
-    <div className="mb-4 flex items-start gap-3">
-      <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-border/70 text-xs font-semibold tabular-nums text-muted-foreground">{index}</span>
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <h3 id={id} className="text-sm font-semibold">{title}</h3>
-        <p className="text-xs leading-5 text-muted-foreground">{description}</p>
-      </div>
+    <div className="mb-4 flex min-w-0 flex-col gap-1">
+      <h3 id={id} className="text-sm font-semibold tracking-tight">{title}</h3>
+      <p className="text-xs leading-5 text-muted-foreground">{description}</p>
     </div>
   )
 }
 
 /**
- * The right-hand side of the Agent page: one role, edited in place. Who it is
- * (name, summary, prompt) and where it runs (machine, harness, model). Each
- * placement field may stay on auto, which the server resolves when a run is
- * queued; the preview line shows what auto would pick right now.
+ * Edits one selected role in place: its identity, instructions and runtime.
+ * Placement may stay on auto; the preview shows what the scheduler picks now.
  */
 export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }: {
   /** null: a new custom role that is not saved yet. */
@@ -204,8 +199,8 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
   ]
 
   return (
-    <Card className="min-w-0" role="region" aria-label={agent ? t('editTitle', { name: agent.name }) : t('createTitle')}>
-      <CardHeader className="flex-row items-start gap-4">
+    <Card className="min-w-0 overflow-hidden border-border/70 bg-transparent shadow-none" role="region" aria-label={agent ? t('editTitle', { name: agent.name }) : t('createTitle')}>
+      <CardHeader className="flex-row items-start gap-4 px-5 py-5 sm:px-6">
         <IconTile size="default" variant="soft" className="text-project-action" aria-hidden="true"><Icon /></IconTile>
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
@@ -217,9 +212,9 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
         </div>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-6 pt-5">
-        <section aria-labelledby="agent-identity-heading">
-          <EditorSectionHeading id="agent-identity-heading" index="01" title={t('identitySection')} description={t('identityDescription')} />
+      <CardContent className="flex flex-col gap-0 px-5 pt-0 sm:px-6">
+        <section aria-labelledby="agent-identity-heading" className="py-5">
+          <EditorSectionHeading id="agent-identity-heading" title={t('identitySection')} description={t('identityDescription')} />
           <FieldGroup>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
@@ -234,8 +229,8 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
           </FieldGroup>
         </section>
 
-        <section aria-labelledby="agent-runtime-heading" className="pt-1">
-          <EditorSectionHeading id="agent-runtime-heading" index="02" title={t('runtime')} description={t('runtimeDescription')} />
+        <section aria-labelledby="agent-runtime-heading" className="py-5">
+          <EditorSectionHeading id="agent-runtime-heading" title={t('runtime')} description={t('runtimeDescription')} />
           <FieldGroup>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <Field>
@@ -293,7 +288,7 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
                 <Input id="agent-custom-model" value={draft.customModel} maxLength={120} placeholder={t('customModelPlaceholder')} onChange={event => patch({ customModel: event.target.value })} />
               </Field>
             )}
-            <div className={cn('flex items-start gap-3 rounded-xl border px-3.5 py-3', preview.ok ? 'border-success/20 bg-success/5' : 'border-warning/20 bg-warning/5')} role="status">
+            <div className={cn('flex items-start gap-3 rounded-lg border px-3.5 py-3', preview.ok ? 'border-success/20 bg-success/5' : 'border-warning/20 bg-warning/5')} role="status">
               <IconTile size="xs" variant="soft" className={cn(preview.ok ? 'text-success' : 'text-warning')} aria-hidden="true"><Sparkles /></IconTile>
               <div className="min-w-0 pt-0.5">
                 <p className="text-xs font-semibold">{t('previewLabel')}</p>
@@ -303,9 +298,9 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
           </FieldGroup>
         </section>
 
-        <section aria-labelledby="agent-instructions-heading" className="pt-1">
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-            <EditorSectionHeading id="agent-instructions-heading" index="03" title={t('instructionsSection')} description={t('instructionsDescription')} />
+        <section aria-labelledby="agent-instructions-heading" className="py-5">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <EditorSectionHeading id="agent-instructions-heading" title={t('instructionsSection')} description={t('instructionsDescription')} />
             {builtIn && (
               <Button size="xs" variant="outline" disabled={pending} onClick={resetPrompt}>
                 <RotateCcw data-icon="inline-start" />
@@ -315,26 +310,26 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
           </div>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="agent-instructions" className="sr-only">{t('instructions')}</FieldLabel>
+              <FieldLabel htmlFor="agent-instructions">{t('instructions')}</FieldLabel>
               <Textarea
                 id="agent-instructions"
                 value={draft.instructions}
                 maxLength={MAX_AGENT_INSTRUCTIONS_LENGTH}
                 placeholder={t('instructionsPlaceholder')}
-                className="h-64 min-h-48 max-h-80 resize-y overflow-y-auto font-mono text-xs leading-5"
+                className="min-h-56 max-h-96 resize-y overflow-y-auto px-4 py-3 font-mono text-xs leading-6"
                 onChange={event => patch({ instructions: event.target.value })}
               />
               <FieldDescription className="flex items-center justify-between gap-3">
-                <span>{t('instructions')}</span>
-                <span className="text-right tabular-nums">{t('instructionsCount', { count: draft.instructions.length, max: MAX_AGENT_INSTRUCTIONS_LENGTH })}</span>
+                <span>{t('instructionsDescription')}</span>
+                <span className="shrink-0 text-right tabular-nums">{t('instructionsCount', { count: draft.instructions.length, max: MAX_AGENT_INSTRUCTIONS_LENGTH })}</span>
               </FieldDescription>
             </Field>
           </FieldGroup>
         </section>
       </CardContent>
 
-      <CardFooter className="flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-        {error && <span role="alert" className="text-xs text-destructive">{error}</span>}
+      <CardFooter className="flex-col items-stretch gap-3 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
+        {error && <span role="alert" className="text-sm text-destructive">{error}</span>}
         <div className="flex w-full flex-wrap items-center justify-between gap-2">
           {agent && !builtIn ? (
             <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" disabled={pending} onClick={() => setConfirmDelete(true)}>
