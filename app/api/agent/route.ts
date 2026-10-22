@@ -2,6 +2,8 @@ import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createUIMessageStreamResponse, isStepCount, streamText, toUIMessageStream } from 'ai'
 import { agentWebInstructions, createAgentWebTools } from '@/lib/agent-web-tools'
+import { createComposioAITools } from '@/lib/composio-actions'
+import { runComposioAction } from '@/lib/composio'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import systemPrompt from '@/lib/agent-system-prompt.json'
@@ -104,7 +106,10 @@ export async function POST(request: Request) {
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
     system: `${systemPrompt}\n\n${agentWebInstructions()}`,
     messages,
-    tools: createAgentWebTools({ signal: request.signal }),
+    tools: {
+      ...createAgentWebTools({ signal: request.signal }),
+      ...createComposioAITools((action, input) => runComposioAction(session.user.id, action, input)),
+    },
     stopWhen: isStepCount(5),
     prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
     maxRetries: 1,

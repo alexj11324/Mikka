@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { Link } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
-import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, MonitorSmartphone, Scan, Search, Send, SquarePen, SquareUserRound, Users, Workflow } from 'lucide-react'
+import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, MonitorSmartphone, Puzzle, Scan, Search, Send, SquarePen, SquareUserRound, Users, Workflow } from 'lucide-react'
 import { NavUser } from '@/components/nav-user'
 import { WorkspaceSwitcher } from '@/components/workspace/workspace-switcher'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
@@ -63,6 +63,7 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
       <SidebarMenu>
         <SidebarMenuItem><SidebarMenuButton onClick={() => { setOpenMobile(false); onSettings('members') }} tooltip={t('members')}><Users /><span>{t('members')}</span></SidebarMenuButton></SidebarMenuItem>
         <SidebarMenuItem><SidebarMenuButton onClick={() => { setOpenMobile(false); onSettings('members', true) }} tooltip={t('inviteMembers')}><SquarePen /><span>{t('inviteMembers')}</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton isActive={section === 'plugins'} aria-current={section === 'plugins' ? 'location' : undefined} onClick={() => navigate('plugins')} tooltip={t('plugins')}><Puzzle /><span>{t('plugins')}</span></SidebarMenuButton></SidebarMenuItem>
         <SidebarMenuItem><SidebarMenuButton render={<Link href="/devices" />} tooltip={t('devices')}><MonitorSmartphone /><span>{t('devices')}</span></SidebarMenuButton></SidebarMenuItem>
       </SidebarMenu>
       <NavUser user={user} onSettings={() => { setOpenMobile(false); onSettings('preferences') }} onSignOut={onSignOut} signingOut={signingOut} />
