@@ -153,6 +153,8 @@ jobs:
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:setup
+      - name: Verify legacy workspace migration and idempotency
+        run: node --test tests/workspace-migration.test.mjs
       - run: pnpm build
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
         run: pnpm test:performance --output=performance-results
