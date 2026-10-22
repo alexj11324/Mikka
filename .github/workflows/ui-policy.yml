@@ -1,20 +1,29 @@
 name: CI
 
+# Three layers, as in large monorepos:
+# - presubmit: every push to any branch runs CI, with or without a PR;
+# - merge queue: merge_group tests the change on top of the latest main;
+# - postsubmit: every push to main runs CI again.
+# A PR from a branch in this repo is already covered by its push run, so the
+# pull_request run is kept only for PRs from forks (see the job conditions).
 on:
-  pull_request:
   push:
-    branches: [main, 'v0/**']
+    branches-ignore: ['gh-readonly-queue/**']
+  pull_request:
+  merge_group:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ui-policy-${{ github.ref }}
-  cancel-in-progress: true
+  group: ui-policy-${{ github.event_name }}-${{ github.ref }}
+  # Superseded branch pushes are cancelled; every commit on main finishes.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   ui-policy:
     name: UI policy (strict)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -70,6 +79,7 @@ jobs:
 
   browser-tests:
     name: Production build and browser interactions
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
