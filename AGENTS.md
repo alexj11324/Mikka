@@ -6,3 +6,4 @@
 - Preserve environment and Neon branch boundaries. Preview application data must use the matching cloud database with the required schema. Verify the deployed path after changing credentials or callbacks.
 - Preserve unrelated changes and keep secret values out of terminal output, screenshots and reports.
 - Follow `docs/acceptance.md` for runtime acceptance. Use direct Google/GitHub OAuth and reuse authorized browser sessions; do not require the user to enter a Mikka password for routine acceptance. Diagnose account-linking conflicts separately without weakening account ownership checks.
+- Hand off the Agent's branch, commit SHA and unique Preview deployment URL. Keep that version fixed during acceptance; v0 `Latest`, moving branch aliases and the shared production domain cannot identify a frozen Agent delivery.
