@@ -93,7 +93,7 @@ test("成员导航、邀请取消、角色选择、创建和撤销邀请、管�
   await expect(confirmation.getByRole("alert")).toContainText("管理员");
   await confirmation.getByRole("button", { name: "取消", exact: true }).click();
   await expect(confirmation).not.toBeVisible();
-  await page.getByRole("button", { name: "返回应用", exact: true }).click();
+  await page.getByRole("link", { name: "返回工作台", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "项目", exact: true }),
   ).toBeVisible();

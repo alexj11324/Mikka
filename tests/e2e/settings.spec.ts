@@ -61,7 +61,7 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
 
 test.describe('工作区访问拒绝', () => {
   // oxlint-disable-next-line no-empty-pattern -- Playwright fixture functions require destructured arguments.
-  test.use({ expectedConsoleErrors: async ({}, use) => { await use(['/api/workspace', '/api/teams/directory'].map(path => ({ path: app(`${path}?workspace=00000000-0000-4000-8000-000000000099`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' }))) } })
+  test.use({ expectedConsoleErrors: async ({}, use) => { await use(['/api/workspace', '/api/teams/directory', '/api/workspace'].map(path => ({ path: app(`${path}?workspace=00000000-0000-4000-8000-000000000099`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' }))) } })
 
 test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', async ({ page }) => {
   await register(page, '/settings/members')

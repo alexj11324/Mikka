@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getTranslations } from 'next-intl/server'
 import { auth } from '@/lib/auth'
 import { loadWorkspaceSettings, WorkspaceError } from '@/lib/workspace-access'
 
@@ -15,7 +16,8 @@ export async function GET(request: Request) {
     } })
   } catch (error) {
     if (error instanceof WorkspaceError) {
-      return NextResponse.json({ error: error.code }, { status: 403 })
+      const t = await getTranslations('Errors')
+      return NextResponse.json({ error: t.has(error.code as never) ? t(error.code as never) : error.message }, { status: 403 })
     }
     console.error('Workspace settings could not be loaded', error instanceof Error ? error.name : 'UnknownError')
     return NextResponse.json({ error: 'workspaceReadFailed' }, { status: 500 })
