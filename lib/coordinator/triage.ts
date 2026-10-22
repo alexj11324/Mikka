@@ -24,6 +24,12 @@ export function ruleTier(event: TriageEvent): CoordinatorEventTier | null {
       if (event.payload.status === 'stopped' || event.payload.status === 'cancelled') return 'background'
       // A success that says nothing needs no judgment.
       return typeof event.payload.summary === 'string' && event.payload.summary.trim() ? null : 'result'
+    // Placeholders until the worker-event rules land.
+    case 'run_question':
+    case 'run_blocked':
+      return 'attention'
+    case 'run_report':
+      return 'result'
   }
 }
 

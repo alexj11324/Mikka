@@ -48,3 +48,22 @@ plugin, configured in `lib/auth.ts`, tables in `drizzle/0009_oauth_provider.sql`
   consent page at `/oauth/consent`.
 - Access tokens (`mka_…`, one hour) and refresh tokens (`mkr_…`) are opaque and
   stored hashed. `lib/mcp/auth.ts` checks them against the database.
+
+## Worker tools (inside a run)
+
+The agent inside a run talks to the same URL with a run token (`mkw_…`)
+instead of OAuth. The claim response (`POST /v1/devices/:deviceId/runs/:runId/claim`)
+hands the daemon `mcp: { url, token }`; the daemon mounts the server into the
+run with `Authorization: Bearer <token>`. The token's prefix makes the route
+serve these tools instead of the ones above (`lib/mcp/worker.ts`):
+
+| Tool | Coordinator event | Payload |
+| --- | --- | --- |
+| `report` | `run_report` | `{ text }`, a milestone note; use sparingly |
+| `ask` | `run_question` | `{ question, options?, context? }`; returns at once, the answer arrives as a follow-up instruction |
+| `blocked` | `run_blocked` | `{ reason }` |
+
+Each call writes one event with the run's `userId`, `runId` and `issueId` and
+wakes the Coordinator. Tokens are stored hashed (`run_tokens`,
+`drizzle/0012_run_tokens.sql`), live at most 24 hours, work only while the run
+is live, and are revoked when the run completes.

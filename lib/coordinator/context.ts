@@ -93,6 +93,13 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
       ].filter(Boolean).join('\n')
     case 'issue_done':
       return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to done.`, note].filter(Boolean).join('\n')
+    // Placeholders until the worker-event prompts land.
+    case 'run_report':
+      return [`[Event] Run ${event.runId} reports: ${payload.text}`, note].filter(Boolean).join('\n')
+    case 'run_question':
+      return [`[Event] Run ${event.runId} asks: ${payload.question}`, Array.isArray(payload.options) ? `Options: ${payload.options.join(' / ')}` : null, payload.context ? `Context: ${payload.context}` : null, note].filter(Boolean).join('\n')
+    case 'run_blocked':
+      return [`[Event] Run ${event.runId} is blocked: ${payload.reason}`, note].filter(Boolean).join('\n')
   }
 }
 
