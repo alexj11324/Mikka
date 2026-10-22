@@ -4,6 +4,7 @@ import { withBasePath } from '@/lib/base-path'
 import { mcpUserId, verifyMcpToken } from '@/lib/mcp/auth'
 import { MCP_SCOPE } from '@/lib/mcp/resource'
 import * as tools from '@/lib/mcp/tools'
+import * as worker from '@/lib/mcp/worker'
 
 export const dynamic = 'force-dynamic'
 // Leaves room for read_coordinator_messages to wait for a reply.
@@ -11,6 +12,10 @@ export const maxDuration = 120
 
 function json(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] }
+}
+
+function message(value: string) {
+  return { content: [{ type: 'text' as const, text: value }] }
 }
 
 function notFound(what: string) {
@@ -83,4 +88,40 @@ const authed = withMcpAuth(handler, verifyMcpToken, {
   resourceMetadataPath: withBasePath('/.well-known/oauth-protected-resource'),
 })
 
-export { authed as GET, authed as POST, authed as DELETE }
+/**
+ * The worker tools, for the agent inside a run. The daemon mounts this same
+ * URL into each run with the run token from the claim; the token's prefix
+ * picks these tools instead of the person's.
+ */
+const workerHandler = createMcpHandler(server => {
+  server.registerTool('report', {
+    title: 'Report progress',
+    description: 'Tell the person\'s Coordinator about progress on this run. Use it sparingly, at milestones (a plan settled, a hard part solved, ready for review), not after every step.',
+    inputSchema: z.object({ text: z.string().trim().min(1).max(4000) }),
+  }, async ({ text }, ctx) => message(await worker.report(worker.workerRun(ctx.http?.authInfo), text)))
+
+  server.registerTool('ask', {
+    title: 'Ask the person',
+    description: 'Ask the person a question through their Coordinator when you need a decision you should not make alone. Returns right away and does not wait: keep working on what you can, and the answer will arrive later as a follow-up instruction.',
+    inputSchema: z.object({
+      question: z.string().trim().min(1).max(2000),
+      options: z.array(z.string().trim().min(1).max(200)).min(2).max(4).optional().describe('Two to four answers to pick from.'),
+      context: z.string().trim().max(4000).optional().describe('What the person needs to know to answer.'),
+    }),
+  }, async (input, ctx) => message(await worker.ask(worker.workerRun(ctx.http?.authInfo), input)))
+
+  server.registerTool('blocked', {
+    title: 'Say you are blocked',
+    description: 'Tell the person\'s Coordinator you cannot go on, and why: missing access, a broken environment, a contradiction in the task. The Coordinator tells the person.',
+    inputSchema: z.object({ reason: z.string().trim().min(1).max(4000) }),
+  }, async ({ reason }, ctx) => message(await worker.blocked(worker.workerRun(ctx.http?.authInfo), reason)))
+}, { serverInfo: { name: 'mikka-worker', version: '1.0.0' } })
+
+const workerAuthed = withMcpAuth(workerHandler, worker.verifyRunToken, { required: true, resourceMetadataPath: withBasePath('/.well-known/oauth-protected-resource') })
+
+function route(request: Request) {
+  const bearer = request.headers.get('authorization')?.match(/^Bearer\s+(\S+)/i)?.[1]
+  return bearer?.startsWith(worker.RUN_TOKEN_PREFIX) ? workerAuthed(request) : authed(request)
+}
+
+export { route as GET, route as POST, route as DELETE }

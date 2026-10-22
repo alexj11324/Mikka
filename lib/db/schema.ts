@@ -117,12 +117,29 @@ export const runChunks = pgTable('run_chunks', {
 }, table => [uniqueIndex('run_chunks_run_seq_key').on(table.runId, table.seq)])
 
 /**
+ * A token the agent inside one run uses for the worker tools of the MCP
+ * server. Handed to the daemon with the claim; good only while the run is
+ * live. Only the SHA-256 hash is stored.
+ */
+export const runTokens = pgTable('run_tokens', {
+  id: uuid('id').primaryKey(), runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(), tokenHash: text('tokenHash').notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  revokedAt: timestamp('revokedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('run_tokens_hash_key').on(table.tokenHash), index('run_tokens_run_idx').on(table.runId)])
+
+/**
  * Something a person's Coordinator should hear about: a message from the
  * person, a run that ended, or an issue that moved to done. Written where it
  * happens; the Coordinator reads the undelivered rows and marks them.
  * `dedupeKey` keeps a repeated write to one row.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done'] as const
+/**
+ * `run_report`, `run_question` and `run_blocked` come from the agent inside a
+ * run, through the worker tools of the MCP server (lib/mcp/worker.ts).
+ */
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth

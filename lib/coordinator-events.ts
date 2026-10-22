@@ -45,3 +45,29 @@ export function issueDoneEvent(before: { status: string }, after: { id: string; 
     payload: { title: after.title, previousStatus: before.status },
   }
 }
+
+/** The run an agent's worker tool call came from. */
+interface WorkerRun { id: string; userId: string; issueId: string | null }
+
+function workerEvent(kind: 'run_report' | 'run_question' | 'run_blocked', run: WorkerRun, payload: Record<string, unknown>): CoordinatorEventInput {
+  return { userId: run.userId, kind, dedupeKey: `${kind}:${run.id}:${crypto.randomUUID()}`, issueId: run.issueId, runId: run.id, payload }
+}
+
+/** The agent inside a run reached a milestone and says so (MCP `report`). */
+export function runReportEvent(run: WorkerRun, text: string): CoordinatorEventInput {
+  return workerEvent('run_report', run, { text })
+}
+
+/** The agent inside a run asks the person something (MCP `ask`); the answer comes back as an instruction. */
+export function runQuestionEvent(run: WorkerRun, question: { question: string; options?: string[]; context?: string }): CoordinatorEventInput {
+  return workerEvent('run_question', run, {
+    question: question.question,
+    ...(question.options ? { options: question.options } : {}),
+    ...(question.context ? { context: question.context } : {}),
+  })
+}
+
+/** The agent inside a run cannot go on (MCP `blocked`). */
+export function runBlockedEvent(run: WorkerRun, reason: string): CoordinatorEventInput {
+  return workerEvent('run_blocked', run, { reason })
+}
