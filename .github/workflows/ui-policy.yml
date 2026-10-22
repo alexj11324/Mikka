@@ -85,6 +85,7 @@ jobs:
       - run: pnpm test:coordinator-events
       - run: pnpm test:auth-composio
       - run: pnpm test:integrations
+      - run: pnpm test:slack
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:issues
@@ -141,6 +142,13 @@ jobs:
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3100
+      # Isolated callback fixtures; no real Slack API calls are allowed in these tests.
+      SLACK_BOT_TOKEN: ci-only-slack-bot-token
+      SLACK_SIGNING_SECRET: ci-only-slack-signing-secret
+      SLACK_APP_ID: A123
+      SLACK_TEAM_ID: T123
+      SLACK_BOT_USER_ID: U123
+      SLACK_USER_BINDINGS: '{"U456":"ci-only-mikka-user"}'
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
