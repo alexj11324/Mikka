@@ -2,8 +2,10 @@ import 'server-only'
 import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
-import { coordinatorEvents, coordinatorMessages, coordinatorSessions, type CoordinatorEventTier } from '@/lib/db/schema'
+import { agentRuns, agents, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, type CoordinatorEventTier } from '@/lib/db/schema'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
+import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
+import { readIssueMetadata } from '@/lib/issue-metadata'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -138,6 +140,34 @@ export interface ChatView {
   working: boolean
   /** Why the last turn failed, when no turn has answered since. */
   error: string | null
+  /** The issues and runs the replies cite, by id, that this person can see. */
+  sources: Record<string, CitationSource>
+}
+
+/** Looks up the issues and runs cited in `texts`, keeping only what `userId` may see. */
+export async function citationSources(userId: string, texts: readonly string[]): Promise<Record<string, CitationSource>> {
+  const { issueIds, runIds } = citedIds(texts)
+  const sources: Record<string, CitationSource> = {}
+  if (issueIds.length) {
+    const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content })
+      .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
+      .where(and(inArray(issues.id, issueIds), or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))))
+    for (const { content, ...row } of rows) {
+      const metadata = readIssueMetadata(content)
+      if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null }
+    }
+  }
+  if (runIds.length) {
+    const rows = await db.select({ id: agentRuns.id, agentName: agents.name, harness: agents.harness, status: agentRuns.status, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, issueId: issues.id, issueTitle: issues.title, issueContent: issues.content })
+      .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
+      .where(and(inArray(agentRuns.id, runIds), eq(agentRuns.userId, userId)))
+    for (const row of rows) {
+      const issue = row.issueId && row.issueTitle && row.issueContent && !readIssueMetadata(row.issueContent).deletedAt
+        ? { id: row.issueId, title: row.issueTitle, number: readIssueMetadata(row.issueContent).number ?? null } : null
+      sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
+    }
+  }
+  return sources
 }
 
 /** The latest of the conversation for the chat, oldest first. */
@@ -155,10 +185,12 @@ export async function chatView(userId: string, limit = 200): Promise<ChatView> {
     position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage,
   }))
   const leased = Boolean(session?.leaseUntil && session.leaseUntil.getTime() > Date.now())
+  const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   return {
-    items: chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending]),
+    items,
     working: leased || waiting.some(event => event.tier !== 'background'),
     error: session?.lastError ?? null,
+    sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text)),
   }
 }
 
