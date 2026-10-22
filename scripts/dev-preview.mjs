@@ -6,7 +6,11 @@ import { basePath as appBasePath } from '../lib/base-path-config.mjs'
 
 export const previewWarmupPaths = ['/', '/api/agent', '/api/agent/sessions', '/api/workspace']
 
-export async function warmPreview(origin, { basePath = appBasePath, fetcher = fetch, log = console.info, timeout = 15000 } = {}) {
+export function isPreviewWarmupEnabled(env = process.env) {
+  return env.PREVIEW_WARMUP !== '0'
+}
+
+export async function warmPreview(origin, { basePath = appBasePath, fetcher = fetch, log = console.info, timeout = 120000 } = {}) {
   await Promise.all(previewWarmupPaths.map(async path => {
     // HEAD compiles the page's split client chunks and API routes without invoking models or creating data.
     const pathname = path === '/' ? basePath || '/' : `${basePath}${path}`
@@ -30,7 +34,7 @@ export function startPreview() {
     const text = chunk.toString()
     process.stdout.write(text)
     output = (output + stripVTControlCharacters(text)).slice(-8192)
-    if (process.env.PREVIEW_WARMUP !== '1' || warming || !/Ready in/.test(output)) return
+    if (!isPreviewWarmupEnabled() || warming || !/Ready in/.test(output)) return
     warming = true
     const local = output.match(/Local:\s+http:\/\/[^\s:]+:(\d+)/)
     const port = local?.[1] ?? process.env.PORT ?? '3000'
