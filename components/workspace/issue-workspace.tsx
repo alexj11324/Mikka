@@ -12,7 +12,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IssueBoard } from './issue-board'
 import { AppSidebar } from '@/components/app-sidebar'
 import { TeamHome } from '@/components/teams/team-home'
-import { AppShell, AppShellContent } from '@/components/app-shell'
+import { AppShell, AppShellContent, SignOutBoundary } from '@/components/app-shell'
 import { IssueList } from './issue-list'
 import { IssueSearch } from './issue-search'
 import { ISSUE_STATUSES, issueIdentifier, type IssueStatus, type IssueView } from './issue-properties'
@@ -111,7 +111,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const [searchOpen, setSearchOpen] = useState(false)
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
-      if (event.isComposing || event.keyCode === 229 || boardBusy) return
+      if (event.isComposing || event.keyCode === 229 || boardBusy || settingsOpen || leaving.current) return
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         if (document.querySelector('[role="dialog"][data-open]') && !searchOpen) return
         event.preventDefault(); setSearchOpen(value => !value)
@@ -207,7 +207,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   const viewTitle = view === 'all' ? t('allIssues') : view === 'mine' ? t('mine') : view === 'shared' ? t('shared') : view === 'favorites' ? t('favorites') : view === 'following' ? t('following') : statusLabel(view)
   if (pathname.startsWith('/settings')) return <SettingsShell user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onBack={() => { const href = teamId ? `/?team=${encodeURIComponent(teamId)}` : '/'; if (!pushSettingsHistory(href)) router.push(href) }} />
-  return <AppShell fixed={!settingsOpen && !selected && (!isProjects && ((!isOverview && layout === 'board') || section === 'coordinator' || section === 'agent'))}>
+  return <SignOutBoundary pending={signingOut}><AppShell fixed={!settingsOpen && !selected && (!isProjects && ((!isOverview && layout === 'board') || section === 'coordinator' || section === 'agent'))}>
     {settingsOpen ? <SettingsView initialSection={settingsTarget.section} inviteInitially={settingsTarget.invite} user={user} googleEnabled={googleEnabled} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
     <AppSidebar onBeforeChange={action => { if (!boardBusy && !leaving.current) void leave(action) }} onSettings={(href = '/settings') => { if (!boardBusy && !leaving.current) void leave(() => { if (!pushSettingsHistory(href)) router.push(href) }) }} user={user} section={section} teamId={teamId} onTeamNavigate={(id, next) => { if (boardBusy || leaving.current) return false; void leave(() => { setTeamId(id); setSelected(null); changeSection(next); setProjectId(null); setView('all'); setQuery('') }); return true }} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
     <AppShellContent hideHeader={!!selected || section === 'agent'} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : workspaceContext?.workspace.name ?? i18nText("Settings.sections.workspace.title")} title={sectionTitles[section]} actions={section === 'plugins' ? undefined : <Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
@@ -224,5 +224,5 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     </>}
     {creating && <CreateIssueDialog initialTeamId={(creationProject ? projectTeams.find(link => link.projectId === creationProject && link.isPrimary)?.teamId : section.startsWith('team-') ? teamId : null) ?? ''} initialStatus={createStatus} open={creating} onOpenChange={setCreating} onCreated={id => { void issueCreated(id) }} author={user.name || user.email} />}
     {searchOpen && <IssueSearch open={searchOpen} onOpenChange={setSearchOpen} issues={tasks} onOpen={open} onCreate={() => create()} />}
-  </AppShell>
+  </AppShell></SignOutBoundary>
 }
