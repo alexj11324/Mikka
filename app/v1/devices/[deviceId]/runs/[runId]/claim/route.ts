@@ -58,6 +58,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     kind: run.kind, leaseExpiresAt,
     ...(run.model ? { model: run.model } : {}),
     ...(run.effort ? { effort: run.effort } : {}),
+    ...(run.permissionMode ? { permissionMode: run.permissionMode } : {}),
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
   })

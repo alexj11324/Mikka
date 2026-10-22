@@ -1869,7 +1869,24 @@
       "defaultEffort": "默认",
       "noEffortLevels": "这个模型没有档位",
       "effortNeedsModel": "选好机器和 Harness 后显示可选档位",
-      "noDevice": "未选择机器"
+      "noDevice": "未选择机器",
+      "permissionMode": "权限模式",
+      "defaultPermission": "Mikka 默认",
+      "permissionModesUnreported": "这台机器的 Harness 没有上报权限模式",
+      "permissionAsks": "需要确认的操作目前会被拒绝，审批卡片还没做。",
+      "permissionModes": {
+        "default": "每步确认",
+        "manual": "每步确认",
+        "acceptEdits": "自动接受编辑",
+        "auto": "自动判断",
+        "bypassPermissions": "跳过所有确认",
+        "dontAsk": "不询问，未允许的拒绝",
+        "plan": "只做计划",
+        "on-request": "需要时询问",
+        "never": "从不询问",
+        "untrusted": "不受信任的命令询问",
+        "on-failure": "失败时询问"
+      }
     },
     "picker": {
       "title": "选择头像",

@@ -32,5 +32,12 @@ export const harnessInfoSchema = z.object({
    * out); the server then offers only the CLI's default.
    */
   models: z.array(harnessModelSchema).max(100).optional(),
+  /**
+   * The permission modes the CLI takes, as its own `--help` lists them
+   * (Claude Code's `--permission-mode` choices, Codex's `--ask-for-approval`
+   * values), in the CLI's order. Absent from older daemons and when the help
+   * could not be read; the server then offers only Mikka's default.
+   */
+  permissionModes: z.array(z.string().min(1).max(40)).max(20).optional(),
 })
 export type HarnessInfo = z.infer<typeof harnessInfoSchema>

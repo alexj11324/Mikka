@@ -76,7 +76,7 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   const runId = crypto.randomUUID()
   await db.insert(agentRuns).values({
     id: runId, userId, issueId: issue.id, agentId: agent.id, deviceId: placement.deviceId,
-    deviceRepoId: repo.id, harness: placement.harness, model: placement.model, effort: agent.effort, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
+    deviceRepoId: repo.id, harness: placement.harness, model: placement.model, effort: agent.effort, permissionMode: placement.harness === agent.harness ? agent.permissionMode : null, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
     prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note),
   })
   return { runId }

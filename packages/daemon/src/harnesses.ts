@@ -1,7 +1,8 @@
 // Detects which harness CLIs are installed on this device, their versions
 // and the models each offers; reported on device registration and
-// heartbeats. The model lists come from the CLIs themselves, so the server
-// never offers a model or effort level a harness would not take.
+// heartbeats. The model lists and permission modes come from the CLIs
+// themselves, so the server never offers a model, effort level or
+// permission mode a harness would not take.
 import { query } from "@anthropic-ai/claude-agent-sdk"
 import type { Harness, HarnessInfo, HarnessModel } from "@mikka/protocol"
 import { execa } from "execa"
@@ -143,6 +144,69 @@ async function codexModels(binary: string): Promise<HarnessModel[]> {
   }
 }
 
+/** The flag each CLI takes its permission mode with. */
+const PERMISSION_FLAGS: Partial<Record<Exclude<Harness, "mock">, string>> = {
+  claude_code: "--permission-mode",
+  codex: "--ask-for-approval",
+}
+
+/**
+ * The values a flag takes, read from a CLI's `--help`: commander's
+ * `(choices: "a", "b")` (Claude Code), clap's `[possible values: a, b]`, or
+ * clap's long form with one `- value: description` line per value (Codex).
+ */
+export function flagChoices(help: string, flag: string): string[] {
+  const lines = help.split("\n")
+  // The flag's own line, not a description that mentions it.
+  const start = lines.findIndex((line) =>
+    new RegExp(`^\\s*(-[A-Za-z], )?${flag}([\\s=<]|$)`).test(line)
+  )
+  if (start === -1) return []
+  const indent = lines[start]!.search(/\S/)
+  const block = [lines[start]!]
+  for (const line of lines.slice(start + 1)) {
+    // The next option starts at the flag's own indentation.
+    if (/^\s*-/.test(line) && line.search(/\S/) <= indent) break
+    block.push(line)
+  }
+  const text = block.join("\n")
+  const commander = /\(choices:\s*([^)]*)\)/.exec(text)
+  if (commander)
+    return [...commander[1]!.matchAll(/"([^"]+)"/g)].map((match) => match[1]!)
+  const short = /\[possible values:\s*([^\]]*)\]/.exec(text)
+  if (short)
+    return short[1]!
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+  const long = text.split(/Possible values:\s*\n/)[1]
+  if (!long) return []
+  return [...long.matchAll(/^\s*-\s*([A-Za-z0-9_-]+)\s*:/gm)].map(
+    (match) => match[1]!
+  )
+}
+
+/** The permission modes an installed CLI lists in its help; undefined when it could not be read. */
+async function permissionModesOf(
+  harness: Exclude<Harness, "mock">,
+  binary: string
+): Promise<string[] | undefined> {
+  const flag = PERMISSION_FLAGS[harness]
+  if (!flag) return undefined
+  try {
+    const { stdout } = await execa(binary, ["--help"], {
+      env: buildChildEnv(),
+      extendEnv: false,
+      timeout: 5_000,
+      stdin: "ignore",
+    })
+    const modes = flagChoices(stdout, flag)
+    return modes.length ? modes : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** The models an installed CLI offers; undefined when it could not be asked. */
 async function modelsOf(
   harness: Exclude<Harness, "mock">,
@@ -164,12 +228,16 @@ export async function detectHarnesses(): Promise<HarnessInfo[]> {
         for (const binary of HARNESS_BINARIES[harness]) {
           const version = await versionOf(binary)
           if (!version) continue
-          const models = await modelsOf(harness, binary)
+          const [models, permissionModes] = await Promise.all([
+            modelsOf(harness, binary),
+            permissionModesOf(harness, binary),
+          ])
           return {
             harness,
             installed: true,
             version,
             ...(models?.length ? { models } : {}),
+            ...(permissionModes ? { permissionModes } : {}),
           }
         }
         return { harness, installed: false, version: null }

@@ -1869,7 +1869,24 @@
       "defaultEffort": "Default",
       "noEffortLevels": "This model has no effort levels",
       "effortNeedsModel": "Pick a machine and harness to see the levels",
-      "noDevice": "No machine"
+      "noDevice": "No machine",
+      "permissionMode": "Permission mode",
+      "defaultPermission": "Mikka default",
+      "permissionModesUnreported": "This machine's harness reported no permission modes",
+      "permissionAsks": "Actions that need approval are denied for now; approval cards are not built yet.",
+      "permissionModes": {
+        "default": "Ask every time",
+        "manual": "Ask every time",
+        "acceptEdits": "Accept edits",
+        "auto": "Auto",
+        "bypassPermissions": "Bypass permissions",
+        "dontAsk": "Don't ask, deny the rest",
+        "plan": "Plan only",
+        "on-request": "Ask when needed",
+        "never": "Never ask",
+        "untrusted": "Ask for untrusted commands",
+        "on-failure": "Ask on failure"
+      }
     },
     "picker": {
       "title": "Choose avatar",

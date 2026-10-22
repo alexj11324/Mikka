@@ -45,7 +45,7 @@ export function AgentsSettings() {
     if (agent) return <AgentEditor key={agent.id} agent={agent} initial={draftOf(agent)} devices={devices} onBack={toList} onSaved={() => mutate()} onCreated={toList} onDeleted={() => { void mutate(); toList() }} />
   }
   if (view.kind === 'custom') {
-    const initial: AgentDraft = { role: 'custom', name: '', description: '', instructions: '', deviceId: defaultDeviceId(devices), harness: null, model: null, effort: null, icon: null, color: null }
+    const initial: AgentDraft = { role: 'custom', name: '', description: '', instructions: '', deviceId: defaultDeviceId(devices), harness: null, model: null, effort: null, permissionMode: null, icon: null, color: null }
     return <AgentEditor initial={initial} devices={devices} onBack={() => setView({ kind: 'new' })} onSaved={() => mutate()}
       onCreated={id => { void mutate().then(() => setView({ kind: 'agent', id })) }} onDeleted={toList} />
   }
@@ -115,7 +115,7 @@ function AgentPresets({ devices, onBack, onCustom, onCreated }: { devices: Devic
     setError('')
     const result = await createAgent({
       name: shownName.trim(), description: t(`templates.${template}.summary`), instructions: AGENT_TEMPLATES[template].instructions,
-      icon: null, color: null, deviceId: defaultDeviceId(devices), harness: null, model: null, effort: null,
+      icon: null, color: null, deviceId: defaultDeviceId(devices), harness: null, model: null, effort: null, permissionMode: null,
     })
     setBusy(false)
     if ('error' in result) { setError(translateError(result.error)); return }

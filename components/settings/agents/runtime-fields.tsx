@@ -17,6 +17,7 @@ export interface Runtime {
   harness: SupportedHarness | null
   model: string | null
   effort: string | null
+  permissionMode: string | null
 }
 
 /** The models a device's harness reported; empty when it reported none or nothing is chosen. */
@@ -25,6 +26,16 @@ export function reportedModels(devices: DeviceView[], deviceId: string | null, h
   const info = devices.find(device => device.id === deviceId)?.harnesses.find(item => item.harness === harness && item.installed)
   return info?.models ?? []
 }
+
+/** The permission modes a device's harness listed in its own help; empty when it reported none or nothing is chosen. */
+export function reportedPermissionModes(devices: DeviceView[], deviceId: string | null, harness: SupportedHarness | null): string[] {
+  if (!deviceId || !harness) return []
+  const info = devices.find(device => device.id === deviceId)?.harnesses.find(item => item.harness === harness && item.installed)
+  return info?.permissionModes ?? []
+}
+
+/** The picker's value for Mikka's default (a null mode): no harness uses it as a mode name. */
+const DEFAULT_PERMISSION = 'mikka:default'
 
 /**
  * The model entry the runtime points at. A null model is the CLI's default;
@@ -86,11 +97,16 @@ export function RuntimeFields({ devices, runtime, onChange }: { devices: DeviceV
   const models = reportedModels(devices, runtime.deviceId, runtime.harness)
   const model = currentModel(models, runtime.model)
   const levels = model?.efforts ?? []
+  const permissionModes = reportedPermissionModes(devices, runtime.deviceId, runtime.harness)
+  const tMode = useTranslations('Agents.runtime.permissionModes')
+  // Known modes get a translated name; a mode a newer CLI adds shows as the CLI spells it.
+  const permissionLabel = (mode: string) => tMode.has(mode as Parameters<typeof tMode>[0]) ? tMode(mode as Parameters<typeof tMode>[0]) : mode
 
   const pickDevice = (deviceId: string) => {
     const keepHarness = runtime.harness && harnessOptions(devices, deviceId).includes(runtime.harness) ? runtime.harness : null
     const keepModel = keepHarness && reportedModels(devices, deviceId, keepHarness).some(item => item.value === runtime.model) ? runtime.model : null
-    onChange({ deviceId, harness: keepHarness, model: keepModel, effort: keepModel === runtime.model ? runtime.effort : null })
+    const keepMode = keepHarness && reportedPermissionModes(devices, deviceId, keepHarness).includes(runtime.permissionMode ?? '') ? runtime.permissionMode : null
+    onChange({ deviceId, harness: keepHarness, model: keepModel, effort: keepModel === runtime.model ? runtime.effort : null, permissionMode: keepMode })
   }
   const pickModel = (value: string) => {
     const next = models.find(item => item.value === value)
@@ -107,7 +123,7 @@ export function RuntimeFields({ devices, runtime, onChange }: { devices: DeviceV
     </SettingRow>
     <SettingRow title="Harness">
       <Picker label="Harness" value={runtime.harness} placeholder={harnesses.length ? t('pickHarness') : t('noHarness')} disabled={!harnesses.length}
-        onChange={harness => onChange({ ...runtime, harness: harness as SupportedHarness, model: null, effort: null })}
+        onChange={harness => onChange({ ...runtime, harness: harness as SupportedHarness, model: null, effort: null, permissionMode: null })}
         options={harnesses.map(harness => ({ value: harness, label: HARNESS_LABELS[harness], icon: <HarnessIcon harness={harness} size="md" /> }))} />
     </SettingRow>
     <SettingRow title={t('model')} description={runtime.harness && !models.length ? t('modelsUnreported') : undefined}>
@@ -117,5 +133,10 @@ export function RuntimeFields({ devices, runtime, onChange }: { devices: DeviceV
     {levels.length > 0
       ? <EffortSlider key={model?.value} levels={levels} value={runtime.effort} onChange={effort => onChange({ ...runtime, effort })} formatLabel={effortLabel} placeholder={t('defaultEffort')} />
       : <SettingRow title="Effort" description={models.length ? t('noEffortLevels') : t('effortNeedsModel')} />}
+    <SettingRow title={t('permissionMode')} description={runtime.harness && !permissionModes.length ? t('permissionModesUnreported') : runtime.permissionMode ? t('permissionAsks') : undefined}>
+      <Picker label={t('permissionMode')} value={runtime.permissionMode ?? DEFAULT_PERMISSION} placeholder={t('defaultPermission')} disabled={!permissionModes.length}
+        onChange={mode => onChange({ ...runtime, permissionMode: mode === DEFAULT_PERMISSION ? null : mode })}
+        options={[DEFAULT_PERMISSION, ...permissionModes].map(mode => ({ value: mode, label: mode === DEFAULT_PERMISSION ? t('defaultPermission') : permissionLabel(mode) }))} />
+    </SettingRow>
   </SettingsSection>
 }

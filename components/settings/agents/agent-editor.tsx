@@ -21,8 +21,8 @@ import { modelSummary, reportedModels, RuntimeFields, type Runtime } from './run
 export type AgentDraft = AgentInput & { role: AgentRole }
 
 export function draftOf(agent: AgentView): AgentDraft {
-  const { role, name, description, instructions, deviceId, harness, model, effort, icon, color } = agent
-  return { role, name, description, instructions, deviceId, harness, model, effort, icon, color }
+  const { role, name, description, instructions, deviceId, harness, model, effort, permissionMode, icon, color } = agent
+  return { role, name, description, instructions, deviceId, harness, model, effort, permissionMode, icon, color }
 }
 
 /**
@@ -50,7 +50,7 @@ export function AgentEditor({ agent, initial, devices, onBack, onSaved, onCreate
   const [confirmDelete, setConfirmDelete] = useState(false)
   const builtIn = isBuiltInAgentRole(draft.role)
   const summary = draft.description || (isBuiltInAgentRole(draft.role) ? t(`roles.${draft.role}.summary`) : '')
-  const runtime: Runtime = { deviceId: draft.deviceId, harness: draft.harness, model: draft.model, effort: draft.effort }
+  const runtime: Runtime = { deviceId: draft.deviceId, harness: draft.harness, model: draft.model, effort: draft.effort, permissionMode: draft.permissionMode }
   const device = devices.find(item => item.id === draft.deviceId)
   const models = reportedModels(devices, draft.deviceId, draft.harness)
   const promptDirty = draft.instructions !== saved.instructions

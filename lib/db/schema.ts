@@ -100,6 +100,8 @@ export const agents = pgTable('agents', {
   model: text('model'),
   /** Reasoning effort, one of the levels the harness reports for the model; null: the CLI's default. */
   effort: text('effort'),
+  /** A permission mode the harness reports (Claude Code's mode, Codex's approval policy); null: Mikka's default. */
+  permissionMode: text('permissionMode'),
   /** A lucide icon id from the avatar picker, or an emoji; null: the role's own icon. */
   icon: text('icon'),
   /** null: picked from the name. */
@@ -128,6 +130,7 @@ export const agentRuns = pgTable('agent_runs', {
   deviceRepoId: uuid('deviceRepoId').references(() => deviceRepos.id, { onDelete: 'set null' }),
   /** What auto resolved to when the run was queued; null on runs from older builds. */
   harness: text('harness').$type<SupportedHarness>(), model: text('model'), effort: text('effort'),
+  permissionMode: text('permissionMode'),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),

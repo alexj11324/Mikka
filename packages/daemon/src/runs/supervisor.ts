@@ -868,6 +868,7 @@ export class RunSupervisor {
       fixture: assignment.fixture,
       model: assignment.model,
       effort: assignment.effort,
+      permissionMode: assignment.permissionMode,
     }
     const resuming =
       entry.sessionId !== null && adapter.capabilities.supportsResume

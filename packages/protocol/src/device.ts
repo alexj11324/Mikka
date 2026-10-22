@@ -227,6 +227,13 @@ export const runAssignmentSchema = z.object({
    * daemons ignore it.
    */
   effort: z.string().min(1).max(40).optional(),
+  /**
+   * The permission mode the CLI is started in, one the harness reported
+   * (Claude Code's permission mode, Codex's approval policy). Absent:
+   * Mikka's default, everything allowed inside Mikka's sandbox. Older
+   * daemons ignore it.
+   */
+  permissionMode: z.string().min(1).max(40).optional(),
   /** Mock harness only: fixture name under `packages/daemon/fixtures`. */
   fixture: z.string().max(200).optional(),
   /**

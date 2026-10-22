@@ -39,6 +39,7 @@ import {
   query,
   type SDKMessage,
   type SDKResultMessage,
+  type PermissionMode,
   type SDKUserMessage,
   type Settings,
   type SpawnOptions,
@@ -438,8 +439,15 @@ export class ClaudeAdapter implements AgentAdapter {
           preset: "claude_code",
           append: ctx.instructions(),
         },
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
+        // Mikka's default is bypass inside the sandbox. A mode that asks has
+        // no one to answer yet (approval cards are not built), so Claude
+        // Code denies what it would have asked about.
+        permissionMode: (options.permissionMode ??
+          "bypassPermissions") as PermissionMode,
+        ...((options.permissionMode ?? "bypassPermissions") ===
+        "bypassPermissions"
+          ? { allowDangerouslySkipPermissions: true }
+          : {}),
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
         ...(isClaudeEffort(options.effort) ? { effort: options.effort } : {}),

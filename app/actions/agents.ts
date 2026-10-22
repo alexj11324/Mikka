@@ -60,6 +60,8 @@ export interface AgentView {
   model: string | null
   /** null: the CLI's default effort for the model. */
   effort: string | null
+  /** A permission mode the harness reported; null: Mikka's default, everything allowed inside its sandbox. */
+  permissionMode: string | null
   /** A lucide icon id from the avatar picker or an emoji; null: the role's own icon. */
   icon: string | null
   /** null: picked from the name. */
@@ -197,7 +199,7 @@ export async function listAgents(): Promise<AgentView[]> {
   const rows = await db.select({
     id: agents.id, role: agents.role, name: agents.name, description: agents.description,
     instructions: agents.instructions, harness: agents.harness, model: agents.model, effort: agents.effort,
-    icon: agents.icon, color: agents.color, deviceId: agents.deviceId, deviceName: devices.name,
+    permissionMode: agents.permissionMode, icon: agents.icon, color: agents.color, deviceId: agents.deviceId, deviceName: devices.name,
     deviceLastSeenAt: devices.lastSeenAt,
   }).from(agents).leftJoin(devices, eq(devices.id, agents.deviceId))
     .where(eq(agents.userId, userId)).orderBy(asc(agents.name))
@@ -222,6 +224,7 @@ const agentFields = {
   harness: z.enum(SUPPORTED_HARNESSES).nullable(),
   model: modelNameSchema.nullable(),
   effort: z.string().trim().min(1).max(40).nullable(),
+  permissionMode: z.string().trim().min(1).max(40).nullable(),
   icon: z.string().trim().min(1).max(40).nullable(),
   color: z.enum(AGENT_COLORS).nullable(),
 }
