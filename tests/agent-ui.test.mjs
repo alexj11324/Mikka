@@ -206,22 +206,33 @@ test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 
   assert.doesNotMatch(starters, /<Button|function AgentStarters/)
 })
 
-test('Chat App 保留官网外壳与输入配置，会话导航收进标题菜单', async () => {
+test('Agent 只保留应用外壳，初始输入居中且会话导航收进标题菜单', async () => {
   const source = await readFile(new URL('../components/workspace/agent-chat.tsx', import.meta.url), 'utf8')
-  for (const name of ['ChatApp', 'AnimatedSidebarInset', 'Popover', 'PopoverTrigger', 'Command', 'CommandItem']) {
+  for (const name of ['SidebarTrigger', 'AgentWelcome', 'Popover', 'PopoverTrigger', 'Command', 'CommandItem']) {
     assert.match(source, new RegExp(`<${name}[\\s>]`))
   }
   assert.doesNotMatch(source, /<AnimatedSidebar[\s>]|<AnimatedSidebarTrigger|<AISidebar/)
   assert.match(source, /aria-label=\{`切换会话：\$\{title\}`\}/)
   for (const label of ['新任务', '搜索']) assert.ok(source.includes(`size="icon" aria-label="${label}"`))
-  assert.ok(source.includes("from '@/components/agents/chat-app'"))
+  assert.doesNotMatch(source, /ChatApp|AnimatedSidebarInset/)
+  assert.match(source, /turns\.length === 0 \? <AgentWelcome/)
+  const welcome = await readFile(new URL('../components/workspace/agent-welcome.tsx', import.meta.url), 'utf8')
+  assert.match(welcome, /min-h-full[^"]*justify-center/)
+  assert.match(welcome, /\{composer\}[\s\S]*aria-label="推荐建议"/)
+  assert.match(welcome, /onSuggestion\(starter\.prompt\)/)
+  const shell = await readFile(new URL('../components/workspace/issue-workspace.tsx', import.meta.url), 'utf8')
+  assert.ok(shell.includes("hideHeader={!!selected || section === 'agent'}"))
+  const layout = await readFile(new URL('../app/[locale]/layout.tsx', import.meta.url), 'utf8')
+  assert.match(layout, /strategy="beforeInteractive"/)
+  assert.ok(layout.includes('globalThis[Symbol.for("openui.devtools.autoMount")] = true;'))
   const conversation = await readFile(new URL('../components/workspace/agent-conversation.tsx', import.meta.url), 'utf8')
   assert.match(conversation, /<MessageGroup spacing="default">/)
   assert.match(conversation, /<MessageAvatar>/)
   assert.match(conversation, /variant="solid"/)
   assert.doesNotMatch(conversation, /<Empty|AgentStarters|有什么可以帮你/)
   const composer = await readFile(new URL('../components/workspace/agent-composer.tsx', import.meta.url), 'utf8')
-  assert.match(composer, /minRows=\{1\}/)
+  assert.match(composer, /minRows=\{isEmpty \? 2 : 1\}/)
+  assert.doesNotMatch(conversation, /今天想完成什么|Agent 使用说明/)
   assert.match(composer, /models=\{/)
   assert.match(composer, /actions=\{/)
   assert.doesNotMatch(composer, /leadingAction|<Kbd/)

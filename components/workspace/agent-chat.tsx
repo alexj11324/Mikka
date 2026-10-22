@@ -2,8 +2,8 @@
 
 import { useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, FileText, LoaderCircle, MessageSquarePlus, Search } from 'lucide-react'
-import { ChatApp, ChatAppFooter, ChatAppHeader } from '@/components/agents/chat-app'
-import { AnimatedSidebarInset } from '@/components/motion/animated-sidebar'
+import { SidebarTrigger } from '@/components/ui/sidebar'
+import { AgentWelcome } from './agent-welcome'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
@@ -19,23 +19,22 @@ type AgentChatNavigation = {
   onReset: () => void
 }
 
-export function AgentChat({ turns, composer, streaming, sessions, sessionId, onSelect, onReset }: AgentChatNavigation & {
+export function AgentChat({ turns, composer, streaming, sessions, sessionId, onSelect, onReset, onSuggestion }: AgentChatNavigation & {
   turns: AgentTurn[]
   composer: ReactNode
   streaming: boolean
+  onSuggestion: (prompt: string) => void
 }) {
-  const title = sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || '新任务'
+  const title = sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || '新对话'
 
-  return <section aria-label="Agent 对话工作区" className="orvilo-agent h-[calc(100svh-4rem)] min-h-0 w-full p-2 sm:p-4">
-    <ChatApp open={false} className="h-full">
-      <AnimatedSidebarInset className="min-h-0 bg-background">
-        <AgentChatHeader title={title} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} />
-        <AgentConversation turns={turns} streaming={streaming} />
-        <ChatAppFooter>
-          <div className="mx-auto max-w-3xl">{composer}</div>
-        </ChatAppFooter>
-      </AnimatedSidebarInset>
-    </ChatApp>
+  return <section aria-label="Agent 对话工作区" className="orvilo-agent flex size-full min-h-0 flex-col">
+    <AgentChatHeader title={title} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} />
+    {turns.length === 0 ? <AgentWelcome composer={composer} sessions={sessions} onSelect={onSelect} onSuggestion={onSuggestion} /> : <>
+      <AgentConversation turns={turns} streaming={streaming} />
+      <footer className="shrink-0 px-4 pb-4 pt-2 sm:px-8 sm:pb-6">
+        <div className="mx-auto w-full max-w-3xl">{composer}</div>
+      </footer>
+    </>}
   </section>
 }
 
@@ -56,7 +55,8 @@ function AgentChatHeader({ title, streaming, sessions, sessionId, onSelect, onRe
     onSelect(id)
   }
 
-  return <ChatAppHeader className="gap-2 px-3">
+  return <header className="flex h-12 shrink-0 items-center gap-2 px-4">
+    <SidebarTrigger aria-label="展开或收起侧边栏" />
     <Popover open={open} onOpenChange={value => { setOpen(value); if (!value) setSearching(false) }}>
       <h1 className="min-w-0">
         <PopoverTrigger render={<Button variant="ghost" className="max-w-full justify-start" aria-label={`切换会话：${title}`} />}>
@@ -85,7 +85,7 @@ function AgentChatHeader({ title, streaming, sessions, sessionId, onSelect, onRe
       <Button variant="ghost" size="icon" aria-label="新任务" title="新任务" onClick={onReset}><MessageSquarePlus aria-hidden="true" data-icon="inline-start" /></Button>
       <Button variant="ghost" size="icon" aria-label="搜索" title="搜索历史会话" onClick={() => { setSearching(true); setOpen(true) }}><Search aria-hidden="true" data-icon="inline-start" /></Button>
     </div>
-  </ChatAppHeader>
+  </header>
 }
 
 function relativeDate(date: string) {

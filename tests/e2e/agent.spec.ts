@@ -43,13 +43,20 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(panel.getByRole('button', { name: /重新加载/ })).toHaveCount(0)
   await expect(panel.locator('[data-slot="frame"]')).toHaveCount(0)
   await expect(panel.locator('form')).toBeVisible()
-  await expect(panel.getByText('今天想完成什么？', { exact: true })).toBeVisible()
-  await expect(panel.locator('[data-slot="message-scroller"]')).toBeVisible()
+  await expect(panel.getByText('今天想完成什么？', { exact: true })).toHaveCount(0)
+  await expect(panel.getByRole('region', { name: '推荐建议' })).toBeVisible()
+  await expect(panel.locator('[data-slot="message-scroller"]')).toHaveCount(0)
+  await expect(page.locator('main')).toHaveCount(1)
+  await expect(panel.locator('header')).toHaveCount(1)
+  await expect(page.locator('[data-openui-devtools-auto-mount]')).toHaveCount(0)
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   await expect(input).toHaveAttribute('maxlength', '8000')
   const send = panel.getByRole('button', { name: '发送消息' })
   await expect(send).toBeDisabled()
 
+  await panel.getByRole('button', { name: '拆解项目计划 把想法拆成清晰的阶段和可执行任务', exact: true }).click()
+  await expect(input).toHaveValue('帮我把一个新项目拆解成清晰的阶段、交付物和可执行任务。')
+  await expect(input).toBeFocused()
   await panel.getByRole('button', { name: '添加到提问', exact: true }).click()
   await page.getByRole('dialog', { name: '添加到提问', exact: true }).getByRole('button', { name: '拆解项目计划', exact: true }).click()
   await expect(input).toHaveValue('帮我把一个新项目拆解成清晰的阶段、交付物和可执行任务。')
@@ -78,6 +85,8 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   }))
   await send.click()
   await expect(panel.getByText('已收到你的问题。', { exact: true })).toBeVisible()
+  await expect(panel.getByRole('region', { name: '推荐建议' })).toHaveCount(0)
+  await expect(panel.locator('footer form')).toBeVisible()
   await expect(panel.getByRole('alert')).toHaveCount(0)
   await expect(send).toBeDisabled()
   expect(externalRequests).toEqual([])
@@ -86,7 +95,7 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(input).toHaveValue('')
   await expect(send).toBeDisabled()
   await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
-  await expect(panel.getByText('今天想完成什么？', { exact: true })).toBeVisible()
+  await expect(panel.getByRole('region', { name: '推荐建议' })).toBeVisible()
 
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(input).toBeVisible()
@@ -241,7 +250,7 @@ test('生成期间可新建和切换任务，独立保留草稿、回复与停�
   await expect(panel.getByRole('alert')).toHaveCount(0)
 })
 
-test('标题下拉切换历史，右侧图标搜索和新建，桌面与手机均不占侧栏空间', async ({ page }) => {
+test('标题下拉切换历史，右侧图标搜索和新建，桌面与手机均���占侧栏空间', async ({ page }) => {
   await register(page)
   await page.getByRole('button', { name: 'Agent', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区', exact: true })
@@ -404,7 +413,7 @@ icon = AgentIcon("question", "等待你的意见")`) })
   await expect(input).toHaveValue('')
 })
 
-test('beUI 内联回答失败与停止后保留选择，可在原卡片重试且不重复提交', async ({ page }) => {
+test('beUI 内联回答失败与停止后���留选择，可在原卡片重试且不重复提交', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await register(page)
   await page.getByRole('button', { name: 'Agent', exact: true }).click()

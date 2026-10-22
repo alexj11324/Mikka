@@ -85,7 +85,7 @@ function AgentSessions({ userId, initial, onSaved }: { userId: string; initial: 
     setActiveKey(key)
   }
 
-  return opened.map(entry => <div key={entry.key} hidden={entry.key !== activeKey}>
+  return opened.map(entry => <div key={entry.key} hidden={entry.key !== activeKey} className="h-full min-h-0">
     <AgentSessionLoader entry={entry} userId={userId} sessions={history} onSelect={select} onReset={reset} onSaved={onSaved}
       onState={session => setLive(current => ({ ...current, [entry.key]: { ...session, key: entry.key } }))} />
   </div>)
@@ -179,7 +179,8 @@ function AgentSession({ onReset, onSelect, onSaved, onState, initial, sessions, 
         sessionId={sessionIdRef.current}
         onSelect={onSelect}
         onReset={onReset}
-        composer={<AgentComposer ref={inputRef} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} />}
+        onSuggestion={prompt => { updateDraft(prompt); inputRef.current?.focus() }}
+        composer={<AgentComposer ref={inputRef} isEmpty={!question} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} />}
       />
     </AgentInteractionContext>
 }
