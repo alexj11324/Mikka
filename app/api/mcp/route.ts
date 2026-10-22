@@ -4,6 +4,8 @@ import { withBasePath } from '@/lib/base-path'
 import { mcpUserId, verifyMcpToken } from '@/lib/mcp/auth'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { MCP_SCOPE } from '@/lib/mcp/resource'
+import { COMPOSIO_ACTIONS } from '@/lib/composio-actions'
+import { runComposioAction } from '@/lib/composio'
 import * as actions from '@/lib/mcp/actions'
 import * as tools from '@/lib/mcp/tools'
 import * as worker from '@/lib/mcp/worker'
@@ -118,6 +120,34 @@ const handler = createMcpHandler(server => {
     inputSchema: z.object({}),
     annotations: { readOnlyHint: true },
   }, async (_input, ctx) => json(await actions.listLabels(mcpUserId(ctx.http?.authInfo))))
+
+  server.registerTool('search_notion_pages', {
+    title: COMPOSIO_ACTIONS.search_notion_pages.title,
+    description: COMPOSIO_ACTIONS.search_notion_pages.description,
+    inputSchema: COMPOSIO_ACTIONS.search_notion_pages.inputSchema,
+    annotations: { readOnlyHint: true },
+  }, async (input, ctx) => outcome(await runComposioAction(mcpUserId(ctx.http?.authInfo), 'search_notion_pages', input)))
+
+  server.registerTool('read_notion_page_blocks', {
+    title: COMPOSIO_ACTIONS.read_notion_page_blocks.title,
+    description: COMPOSIO_ACTIONS.read_notion_page_blocks.description,
+    inputSchema: COMPOSIO_ACTIONS.read_notion_page_blocks.inputSchema,
+    annotations: { readOnlyHint: true },
+  }, async (input, ctx) => outcome(await runComposioAction(mcpUserId(ctx.http?.authInfo), 'read_notion_page_blocks', input)))
+
+  server.registerTool('search_slack_messages', {
+    title: COMPOSIO_ACTIONS.search_slack_messages.title,
+    description: COMPOSIO_ACTIONS.search_slack_messages.description,
+    inputSchema: COMPOSIO_ACTIONS.search_slack_messages.inputSchema,
+    annotations: { readOnlyHint: true },
+  }, async (input, ctx) => outcome(await runComposioAction(mcpUserId(ctx.http?.authInfo), 'search_slack_messages', input)))
+
+  server.registerTool('read_slack_thread', {
+    title: COMPOSIO_ACTIONS.read_slack_thread.title,
+    description: COMPOSIO_ACTIONS.read_slack_thread.description,
+    inputSchema: COMPOSIO_ACTIONS.read_slack_thread.inputSchema,
+    annotations: { readOnlyHint: true },
+  }, async (input, ctx) => outcome(await runComposioAction(mcpUserId(ctx.http?.authInfo), 'read_slack_thread', input)))
 
   server.registerTool('list_agents', {
     title: 'List agents',
