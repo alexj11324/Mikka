@@ -30,6 +30,9 @@ import type { WorkspaceSection } from './workspace-navigation'
 import type { AgentHistory } from '@/lib/agent-history'
 import { useAgentHistory } from '@/hooks/use-agent-history'
 
+// Start the chunk download during module evaluation, before hydration and its effects.
+if (typeof window !== 'undefined') void import('./agent-panel').catch(() => {})
+
 function DetailLoading() {
   const t = useTranslations('Workspace')
   return <div role="status" aria-label={t('loadingEditor')} className="flex flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>
@@ -44,9 +47,6 @@ const CreateIssueDialog = dynamic(() => import('./create-issue-dialog').then(mod
 export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'projects', initialSettingsSection, googleEnabled }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations'; googleEnabled: boolean }) {
   const { data: workspaceData } = useWorkspace(user.email)
   useAgentHistory(user.id, initialAgentHistory)
-  useEffect(() => {
-    void import('./agent-panel').catch(() => {})
-  }, [])
   const t = useTranslations('Workspace')
   const tIssue = useTranslations('Issue')
   const tNav = useTranslations('Nav')

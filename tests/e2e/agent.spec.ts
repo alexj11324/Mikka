@@ -107,6 +107,58 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(panel).toHaveCount(0)
 })
 
+test('组件演示的 LaTeX 字体、复杂排版与窄屏滚动正确，返回后保留草稿', async ({ page }) => {
+  await register(page)
+  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  const panel = page.getByRole('region', { name: 'Agent 对话工作区', exact: true })
+  const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
+  await input.fill('演示后保留的草稿')
+  let modelRequests = 0
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === app('/api/agent') && request.method() === 'POST') modelRequests++
+  })
+  await panel.getByRole('button', { name: '组件演示', exact: true }).click()
+  const demo = page.locator('[data-agent-demo]')
+  const formulas = demo.locator('#demo-rich-text .katex-display')
+  await expect(formulas).toHaveCount(5)
+  await expect(demo.locator('.katex-error')).toHaveCount(0)
+  await expect(demo.locator('#demo-rich-text .katex')).toHaveCount(7)
+  await expect(demo.locator('#demo-rich-text .mtable')).toHaveCount(2)
+  await page.evaluate(async () => {
+    await document.fonts.load('16px KaTeX_Main', '0123=')
+    await document.fonts.load('italic 16px KaTeX_Math', 'xyz')
+  })
+  expect(await formulas.first().locator('.katex-mathml').evaluate(element => {
+    const style = getComputedStyle(element)
+    return style.position === 'absolute' && element.getBoundingClientRect().width <= 1
+  })).toBe(true)
+  expect(await formulas.first().locator('.frac-line').first().evaluate(element => parseFloat(getComputedStyle(element).borderBottomWidth))).toBeGreaterThan(0)
+  expect(await page.evaluate(() => document.fonts.check('16px KaTeX_Main', '0123='))).toBe(true)
+
+  for (const width of [1280, 402]) {
+    await page.setViewportSize({ width, height: 527 })
+    const longFormula = formulas.last()
+    await longFormula.scrollIntoViewIfNeeded()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    expect(await longFormula.evaluate(element => {
+      element.scrollLeft = 0
+      return element.querySelector('.katex-html > .base')!.getBoundingClientRect().left >= element.getBoundingClientRect().left - 1
+    })).toBe(true)
+    if (width === 402) {
+      expect(await longFormula.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+      expect(await longFormula.evaluate(element => {
+        element.scrollLeft = element.scrollWidth
+        const terms = element.querySelectorAll('.katex-html > .base')
+        return element.scrollLeft > 0 && terms[terms.length - 1].getBoundingClientRect().right <= element.getBoundingClientRect().right + 1
+      })).toBe(true)
+    }
+  }
+  expect(modelRequests).toBe(0)
+  await page.getByRole('button', { name: '返回对话', exact: true }).click()
+  await expect(input).toHaveValue('演示后保留的草稿')
+  await expect(panel.getByRole('button', { name: '发送消息', exact: true })).toBeEnabled()
+})
+
 test('Agent 输入完整显示单行文字，超过四行才显示自定义滚动条', async ({ page }) => {
   await register(page)
   await page.getByRole('button', { name: 'Agent', exact: true }).click()

@@ -12,6 +12,40 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import Markdown from 'react-markdown'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
+import { createRequire } from 'node:module'
+import katex from 'katex'
+import { AGENT_DEMO_MATH } from '../lib/agent-demo.ts'
+
+test('KaTeX 样式字体与 rehype 渲染引擎使用同一版本', () => {
+  const require = createRequire(import.meta.url)
+  const rendererRequire = createRequire(require.resolve('rehype-katex'))
+  assert.equal(katex.version, rendererRequire('katex').version)
+})
+
+test('演示公式覆盖行内、对齐、矩阵及长公式，且不输出解析错误', () => {
+  const markup = renderToStaticMarkup(Markdown({
+    remarkPlugins: [remarkMath],
+    rehypePlugins: [[rehypeKatex, { trust: false, strict: 'ignore', throwOnError: false, maxExpand: 1000, maxSize: 20 }]],
+    children: AGENT_DEMO_MATH,
+  }))
+  assert.equal([...markup.matchAll(/class="katex-display"/g)].length, 3)
+  assert.equal([...markup.matchAll(/class="katex"/g)].length, 5)
+  assert.match(markup, /class="mtable"/)
+  assert.match(markup, /class="frac-line"/)
+  assert.match(markup, /<p>行内公式：<span class="katex">/)
+  assert.doesNotMatch(markup, /katex-error|language-math|\$\$/)
+})
+
+test('Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀', async () => {
+  const workspace = await readFile(new URL('../components/workspace/issue-workspace.tsx', import.meta.url), 'utf8')
+  const overview = await readFile(new URL('../components/workspace/workspace-overview.tsx', import.meta.url), 'utf8')
+  const demo = await readFile(new URL('../components/workspace/agent-demo.tsx', import.meta.url), 'utf8')
+  assert.match(workspace, /if \(typeof window !== 'undefined'\) void import\('\.\/agent-panel'\)/)
+  assert.match(overview, /dynamic\(\(\) => import\('\.\/agent-panel'\)/)
+  assert.match(demo, /src: withBasePath\('\/placeholder\.svg/)
+  const tools = await readFile(new URL('../components/workspace/agent-demo-tools.tsx', import.meta.url), 'utf8')
+  assert.match(tools, /src=\{withBasePath\('\/placeholder\.svg/)
+})
 
 test('综合演示每个分组都可解析，覆盖全部本地回复组件', () => {
   assert.ok(AGENT_DEMO_CODE.includes('export function summarize'))
