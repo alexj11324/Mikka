@@ -51,3 +51,13 @@ export const SPRING_GLIDE = {
   damping: 50,
   mass: 0.5,
 } as const;
+
+/** Semantic timing tokens shared by repeated application interactions.
+ * Values are seconds, matching Motion transition APIs. */
+export const MOTION_DURATION = {
+  tooltipEnter: 0.18,
+  tooltipExit: 0.12,
+  panelEnter: 0.26,
+  panelExit: 0.2,
+  drawer: 0.36,
+} as const;
