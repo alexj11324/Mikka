@@ -75,7 +75,7 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              {onSettings && <DropdownMenuItem onClick={onSettings}><Settings />{t('settings')}</DropdownMenuItem>}
+              {onSettings && <DropdownMenuItem onClick={() => onSettings()}><Settings />{t('settings')}</DropdownMenuItem>}
               <DropdownMenuItem onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
                 {resolvedTheme === 'dark' ? <Sun /> : <Moon />}{t('toggleTheme')}
               </DropdownMenuItem>

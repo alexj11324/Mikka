@@ -1,13 +1,13 @@
 import ts from 'typescript'
 
 const actionControls = /^(?:button|Button|SidebarMenu(?:Sub)?Button|SidebarMenu(?:Sub)?Action|InputGroupButton|DropdownMenuItem|ContextMenuItem|MenubarItem|CommandItem|NavigationMenuLink)$/
-const behaviorControls = /^(?:(?:Dialog|AlertDialog|Sheet|Drawer)(?:Trigger|Close|Cancel)|(?:DropdownMenu|ContextMenu|Menubar|Popover|HoverCard|Collapsible|Accordion|Select|Combobox|NavigationMenu)(?:Trigger|SubTrigger)|(?:Tabs|ToggleGroup|RadioGroup)(?:Trigger|Item)|Toggle|SidebarTrigger|SidebarRail|KanbanItemHandle)$/
+const behaviorControls = /^(?:MorphPopoverTrigger|(?:Dialog|AlertDialog|Sheet|Drawer)(?:Trigger|Close|Cancel)|(?:DropdownMenu|ContextMenu|Menubar|Popover|HoverCard|Collapsible|Accordion|Select|Combobox|NavigationMenu)(?:Trigger|SubTrigger)|(?:Tabs|ToggleGroup|RadioGroup)(?:Trigger|Item)|Toggle|SidebarTrigger|SidebarRail|KanbanItemHandle)$/
 const ignoredCalls = /^(?:console\.(?:log|info|debug|warn|error)|(?:[\w.]+\.)?(?:preventDefault|stopPropagation|stopImmediatePropagation))$/
 const placeholderText = /(?:coming\s+soon|not\s+implemented|待实现|尚未实现|敬请期待|功能开发中)/i
 
 export function auditInteractions(file, text) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
-  const diagnostics = [], imports = new Map(), declarations = new Map(), forms = new Map()
+  const diagnostics = [], imports = new Map(), iconImports = new Set(), declarations = new Map(), forms = new Map()
   const opening = node => node && (ts.isJsxElement(node) ? node.openingElement : ts.isJsxSelfClosingElement(node) ? node : null)
   const attr = (node, name) => node.attributes.properties.find(p => ts.isJsxAttribute(p) && p.name.getText(source) === name)
   const expression = attribute => attribute?.initializer && (ts.isJsxExpression(attribute.initializer) ? attribute.initializer.expression : attribute.initializer)
@@ -19,7 +19,10 @@ export function auditInteractions(file, text) {
   }
   function index(node) {
     if (ts.isImportDeclaration(node) && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
-      for (const spec of node.importClause.namedBindings.elements) imports.set(spec.name.text, spec.propertyName?.text ?? spec.name.text)
+      for (const spec of node.importClause.namedBindings.elements) {
+        imports.set(spec.name.text, spec.propertyName?.text ?? spec.name.text)
+        if (ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === 'lucide-react') iconImports.add(spec.name.text)
+      }
     }
     if ((ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) || ts.isFunctionDeclaration(node) && node.name) {
       const entries = declarations.get(node.name.text) ?? []
@@ -147,10 +150,9 @@ export function auditInteractions(file, text) {
       if (name === 'button' || intrinsic && role === 'button' || intrinsic && /^(?:div|span|p|li|td|tr|svg)$/.test(name) && hasAction(tag)) {
         add(tag, 'interaction/use-button-component', '操作按钮必须使用共享 Button 或对应交互组件；禁止裸 button、role="button" 或可点击普通元素。导航使用真实链接，菜单使用菜单组件。')
       }
-      const isAction = actionControls.test(name) || ['button', 'menuitem', 'link'].includes(role) || ['a', 'Link'].includes(name)
+      const isAction = !iconImports.has(tag.tagName.getText(source)) && (actionControls.test(name) || ['button', 'menuitem', 'link'].includes(role) || ['a', 'Link'].includes(name))
       if (isAction) {
         const handlers = ['onClick', 'onSelect'].map(key => attr(tag, key)).filter(Boolean)
-        for (const handler of handlers) if (!meaningful(expression(handler))) add(handler, 'interaction/no-placeholder-action', '按钮动作为空、仅日志/拦截事件或占位提示；必须接入实际功能。')
         const type = literal(expression(attr(tag, 'type')))
         const formId = literal(expression(attr(tag, 'form')))
         const form = formId ? forms.get(formId) : parents.find(parent => nameOf(parent) === 'form')
@@ -158,6 +160,7 @@ export function auditInteractions(file, text) {
         const formAction = submit && (meaningful(expression(attr(tag, 'formAction'))) || !!form && ['onSubmit', 'action'].some(key => meaningful(expression(attr(form, key)))))
         const renderParent = tag.parent && ts.isJsxExpression(tag.parent) && ts.isJsxAttribute(tag.parent.parent) && tag.parent.parent.name.getText(source) === 'render' ? tag.parent.parent.parent.parent : null
         const composed = !!renderParent && hasAction(renderParent) || parents.some(parent => behaviorControls.test(nameOf(parent)) || nameOf(parent) === 'Slot' && hasAction(parent))
+        for (const handler of handlers) if (!meaningful(expression(handler)) && !composed) add(handler, 'interaction/no-placeholder-action', '按钮动作为空、仅日志/拦截事件或占位提示；必须接入实际功能。')
         const navigation = realHref(tag) || renderedNavigation(tag)
         const unavailable = !!attr(tag, 'disabled') && (literal(expression(attr(tag, 'data-feature-flag'))) ?? '').startsWith('orvilo-upcoming-') && expression(attr(tag, 'data-feature-implemented'))?.kind === ts.SyntaxKind.FalseKeyword && !!attr(tag, 'aria-describedby') && !!attr(tag, 'title')
         if (!hasAction(tag) && !behaviorControls.test(name) && !composed && !formAction && !(type === 'reset' && form) && !navigation && !unavailable) {

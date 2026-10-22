@@ -1,3 +1,4 @@
+@layer theme, base, openui, components, utilities;
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -80,6 +81,12 @@
 }
 
 :root {
+  --diagram-surface: color-mix(in oklch, var(--label-blue) 6%, var(--card));
+  --diagram-border: color-mix(in oklch, var(--label-blue) 30%, var(--border));
+  --diagram-line: color-mix(in oklch, var(--label-blue) 30%, var(--muted-foreground));
+  --diagram-focus-fill: color-mix(in oklch, var(--label-blue) 14%, var(--card));
+  --diagram-success-fill: color-mix(in oklch, var(--success) 12%, var(--card));
+  --diagram-warning-fill: color-mix(in oklch, var(--warning) 12%, var(--card));
   --page: var(--background);
   --canvas: var(--muted);
   --surface: var(--card);

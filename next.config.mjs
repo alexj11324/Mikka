@@ -1,14 +1,27 @@
 import createNextIntlPlugin from 'next-intl/plugin'
 import { withWorkflow } from 'workflow/next'
+import { basePath } from './lib/base-path-config.mjs'
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
 // The app lives at app.aspectlylabs.com/mikka. lib/base-path.ts reads this
 // back for the places Next does not prefix on its own.
-const basePath = '/mikka'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: {
+    resolveAlias: {
+      'react-syntax-highlighter': './components/workspace/agent-syntax-highlighter.tsx',
+    },
+  },
+  webpack(config) {
+    config.resolve.alias['react-syntax-highlighter$'] = new URL('./components/workspace/agent-syntax-highlighter.tsx', import.meta.url).pathname
+    return config
+  },
+  onDemandEntries: {
+    maxInactiveAge: 60 * 60 * 1000,
+    pagesBufferLength: 8,
+  },
   basePath,
   env: { MIKKA_BASE_PATH: basePath },
   async redirects() {
@@ -25,6 +38,7 @@ const nextConfig = {
     ]
   },
   transpilePackages: ['@mikka/protocol'],
+  serverExternalPackages: ['ai', 'better-auth', 'drizzle-orm'],
   async headers() {
     return [{ source: '/(.*)', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },
