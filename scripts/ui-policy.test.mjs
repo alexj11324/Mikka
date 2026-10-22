@@ -84,6 +84,13 @@ test('component composition + business data/event wiring + layout are allowed', 
   assert.deepEqual(rules(source), [])
 })
 
+test('shared settings fields retain form grouping checks without accepting lookalike wrappers', () => {
+  const imports = `import { SettingsGroup as Group, SettingsRow as Row } from '@/components/ui/settings-layout'; import { Input } from '@/components/ui/input';`
+  assert.deepEqual(rules(`${imports} const ui = <form><Group><Row title="Name" htmlFor="name"><Input id="name" /></Row></Group></form>`), [])
+  has(`${imports} const ui = <form><Row title="Name"><Input /></Row></form>`, 'forms/field-group')
+  has(`import { SettingsGroup, SettingsRow } from './custom'; import { Input } from '@/components/ui/input'; const ui = <form><SettingsGroup><SettingsRow><Input /></SettingsRow></SettingsGroup></form>`, 'forms/field')
+})
+
 test('valid grouped items + title + avatar', () => {
   const source = `import { SelectGroup, SelectItem } from '@/components/ui/select';
     import { DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -112,6 +119,20 @@ test('business code cannot bypass typography presets', () => {
   has('<Button style={{ fontSize: 13 }} />', 'typography/no-inline-values')
   has('<Button className="[font-size:13px]" />', 'typography/preset-only')
   has('<Button className="hover:!text-[13px]" />', 'typography/preset-only')
+})
+
+test('field titles retain the shared primary hierarchy', () => {
+  const imports = `import { FieldLabel, FieldTitle, FieldContent, FieldDescription } from '@/components/ui/field';`
+  has(`${imports} const ui = <FieldLabel className="text-muted-foreground">Name</FieldLabel>`, 'forms/label-hierarchy')
+  has(`${imports} const ui = <FieldTitle className="font-normal">Name</FieldTitle>`, 'forms/label-hierarchy')
+  has(`${imports} const ui = <FieldContent><span className="text-sm text-muted-foreground">Name</span><FieldLabel className="sr-only" htmlFor="name">Name</FieldLabel></FieldContent>`, 'forms/visible-label')
+  assert.deepEqual(rules(`${imports} const ui = <FieldContent><FieldLabel htmlFor="name">Name</FieldLabel><FieldDescription>Help</FieldDescription></FieldContent>`), [])
+  assert.deepEqual(rules(`${imports} const ui = <FieldContent><FieldLabel className="sr-only" htmlFor="query">Search</FieldLabel></FieldContent>`), [])
+})
+
+test('browser CSS assertions are not typography utilities, while test JSX remains checked', () => {
+  assert.deepEqual(auditSource('tests/e2e/settings.spec.ts', `await expect(label).toHaveCSS('font-weight', '500')`, policy), [])
+  assert.ok(auditSource('tests/e2e/settings.spec.ts', '<Button className="text-[13px]" />', policy).some(d => d.rule === 'typography/preset-only'))
 })
 
 test('system colors are not mistaken for arbitrary font sizes', () => {
@@ -170,7 +191,7 @@ test('only the configured component-library directories are outside the business
 })
 
 test('lint permits imported components but fails handwritten business UI without any source lock', async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), 'orvilo-ui-policy-'))
+  const cwd = mkdtempSync(path.join(tmpdir(), 'mikka-ui-policy-'))
   const filename = 'components/example.tsx'
   const original = 'import { Button } from "@/components/ui/button"; export const Example = ({ onSave }) => <Button variant="outline" onClick={onSave}>Save</Button>'
   const execute = async () => {
@@ -188,7 +209,7 @@ test('lint permits imported components but fails handwritten business UI without
     execFileSync('git', ['init', '--quiet'], { cwd })
     for (const library of policy.componentRoots) {
       mkdirSync(path.join(cwd, library), { recursive: true })
-      writeFileSync(path.join(cwd, library, 'example.tsx'), 'export const LibraryComponent = ({ onSave }) => <button className="text-[13px]" onClick={onSave}>Save</button>')
+      writeFileSync(path.join(cwd, library, 'example.tsx'), !['components/ui/', 'components/reui/'].includes(library) ? 'import { Button } from "@/components/ui/button"; export const LibraryComponent = ({ onSave }) => <Button onClick={onSave}>Save</Button>' : 'export const LibraryComponent = ({ onSave }) => <button className="text-[13px]" onClick={onSave}>Save</button>')
     }
     writeFileSync(path.join(cwd, 'ui-policy.json'), JSON.stringify(policy))
     writeFileSync(path.join(cwd, 'components.json'), JSON.stringify({ style: policy.style, iconLibrary: policy.iconLibrary.replace('-react', '') }))
@@ -214,6 +235,10 @@ test('lint permits imported components but fails handwritten business UI without
     assert.equal(deadBlock.status, 1)
     assert.ok(deadBlock.report.diagnostics.some(d => d.file === 'components/blocks/example.tsx' && d.rule === 'interaction/no-placeholder-action'))
     assert.ok(deadBlock.report.interactionFiles > 0)
+    writeFileSync(path.join(cwd, 'components/blocks/example.tsx'), 'export const Example = ({ onSave }) => <button onClick={onSave}>Save</button>')
+    const rawBlock = await execute()
+    assert.equal(rawBlock.status, 1)
+    assert.ok(rawBlock.report.diagnostics.some(d => d.file === 'components/blocks/example.tsx' && d.rule === 'interaction/use-button-component'))
   } finally {
     rmSync(cwd, { recursive: true, force: true })
   }

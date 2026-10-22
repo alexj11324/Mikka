@@ -15,6 +15,13 @@ test('attributes round-trip through persisted JSON without altering body content
   assert.equal(saved.attrs.other, 'preserved')
   assert.equal(content.attrs.orvilo, undefined)
 })
+test('pre-rename orvilo metadata is read and moved to the mikka key on write', () => {
+  const legacy = { type: 'doc', attrs: { orvilo: metadata } }
+  assert.deepEqual(readIssueMetadata(legacy), metadataSchema.parse(metadata))
+  const saved = withIssueMetadata(legacy, readIssueMetadata(legacy))
+  assert.equal(saved.attrs.orvilo, undefined)
+  assert.deepEqual(saved.attrs.mikka, metadataSchema.parse(metadata))
+})
 test('collaborative body replacement preserves the latest card attributes', () => {
   const latest = withIssueMetadata({ type: 'doc' }, metadata)
   const synchronized = withIssueMetadata({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '协作更新' }] }] }, readIssueMetadata(latest))

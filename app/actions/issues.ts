@@ -1,11 +1,10 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { and, desc, eq, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
-import { auth } from '@/lib/auth'
+import { currentUser } from '@/lib/acting-user'
 import { db } from '@/lib/db'
 import { issueMembers, issueVersions, issues, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
@@ -14,14 +13,18 @@ import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
 import { issueWithMetadata, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers, ensureIssueNumbers } from '@/lib/issue-numbering'
+import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
+import { issueDoneEvent } from '@/lib/coordinator-events'
+import { wakeCoordinator } from '@/lib/coordinator/wake'
+import { after } from 'next/server'
 
 type IssueRow = typeof issues.$inferSelect
 type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata> }
 
 async function getUserId() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user.id
+  const user = await currentUser()
+  if (!user) throw new ActionFailureError('authRequired')
+  return user.id
 }
 
 const documentSchema = z.custom<JSONContent>(value => {
@@ -45,7 +48,7 @@ function validationCode(error: z.ZodError): ActionErrorCode {
 
 export async function listIssues() {
   const userId = await getUserId()
-  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)), sql`${issues.content}->'attrs'->'orvilo'->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
+  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)), sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
   const ownersWithoutNumbers = [...new Set(rows.filter(row => !readIssueMetadata(row.content).number).map(row => row.ownerId))]
   if (ownersWithoutNumbers.length) {
     for (const ownerId of ownersWithoutNumbers) await ensureIssueNumbers(ownerId)
@@ -77,13 +80,20 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
     }
     const ownerId = input.id ? (await requireIssueAccess(id)).issue.userId : userId
     if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: 'issueRevisionInvalid' }
+    let doneEvent = false
     try {
-      return await db.transaction(async tx => {
+      const result = await db.transaction(async tx => {
         let issue
         if (input.id) {
           const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, ownerId))).for('update')
           if (!latest) return { error: 'issueNotFound' }
           ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
+          // Moving to done tells the owner's Coordinator.
+          const done = issue && issueDoneEvent(latest, issue)
+          if (done) {
+            await recordCoordinatorEvent(tx, done)
+            doneEvent = true
+          }
         } else {
           const number = await allocateIssueNumbers(tx, userId)
           const metadata = { ...readIssueMetadata({ type: 'doc' }), number }
@@ -93,6 +103,8 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
         return { issue: issueWithMetadata(issue) }
       })
+      if (doneEvent && 'issue' in result) after(() => wakeCoordinator(ownerId))
+      return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
       console.error('Failed to save issue', error instanceof Error ? error.message : 'database error')

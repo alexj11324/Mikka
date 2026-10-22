@@ -14,7 +14,7 @@ import {
   type FsBrowseRequest,
   type FsEntry,
   type FsResult,
-} from "@orvilo/protocol/device"
+} from "@mikka/protocol/device"
 
 const run = promisify(execFile)
 
@@ -90,7 +90,7 @@ export async function browseFolder(
       ? {
           ok: false,
           code: "denied",
-          message: `Orvilo may not read ${path}. Allow access in system settings.`,
+          message: `Mikka may not read ${path}. Allow access in system settings.`,
         }
       : { ok: false, code: "failed", message: `Could not read ${path}.` }
   }

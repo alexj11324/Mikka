@@ -1,5 +1,5 @@
 // AC4: SIGKILL the headless daemon mid-run, start it again, and the run
-// resumes to completion. Uses the real CLI entry (`orvilo daemon --dev
+// resumes to completion. Uses the real CLI entry (`mikka daemon --dev
 // --server memory`) in a child process.
 import { existsSync } from "node:fs"
 import { join, resolve } from "node:path"
@@ -12,7 +12,7 @@ import { daemonPaths } from "../src/paths"
 import { connectDaemonInDataDir, type DaemonClient } from "../src/rpc/client"
 import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
 
-const BIN = resolve(import.meta.dirname, "../bin/orvilo.ts")
+const BIN = resolve(import.meta.dirname, "../bin/mikka.ts")
 const children: ResultPromise[] = []
 
 function spawnDaemon(dataDir: string) {

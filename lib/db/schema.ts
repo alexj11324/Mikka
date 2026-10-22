@@ -1,7 +1,7 @@
-import { pgTable, text, uuid, varchar, jsonb, integer, timestamp, primaryKey, index, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, integer, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
-import type { HarnessInfo } from '@orvilo/protocol/harness'
+import type { HarnessInfo } from '@mikka/protocol/harness'
 import type { AgentRole } from '../agent-roles'
 
 export const users = pgTable('user', {
@@ -25,6 +25,21 @@ export const issues = pgTable('issues', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+export const agentSessions = pgTable('agent_sessions', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(), title: varchar('title', { length: 200 }).notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('agent_sessions_user_updated_idx').on(table.userId, table.updatedAt.desc())])
+
+export const agentTurns = pgTable('agent_turns', {
+  id: uuid('id').primaryKey(), sessionId: uuid('sessionId').notNull(), userId: text('userId').notNull(),
+  prompt: text('prompt').notNull(), completion: text('completion').notNull().default(''),
+  status: text('status').$type<'pending' | 'complete' | 'failed' | 'stopped'>().notNull().default('pending'),
+  error: text('error'), attemptId: uuid('attemptId').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('agent_turns_session_user_created_idx').on(table.sessionId, table.userId, table.createdAt)])
+
 export const issueVersions = pgTable('issue_versions', {
   id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull(), userId: text('userId').notNull(),
   revision: integer('revision').notNull(), title: varchar('title', { length: 200 }).notNull(),
@@ -129,6 +144,79 @@ export const runChunks = pgTable('run_chunks', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('run_chunks_run_seq_key').on(table.runId, table.seq)])
 
+/**
+ * A token the agent inside one run uses for the worker tools of the MCP
+ * server. Handed to the daemon with the claim; good only while the run is
+ * live. Only the SHA-256 hash is stored.
+ */
+export const runTokens = pgTable('run_tokens', {
+  id: uuid('id').primaryKey(), runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(), tokenHash: text('tokenHash').notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  revokedAt: timestamp('revokedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('run_tokens_hash_key').on(table.tokenHash), index('run_tokens_run_idx').on(table.runId)])
+
+/**
+ * Something a person's Coordinator should hear about: a message from the
+ * person, a run that ended, or an issue that moved to done. Written where it
+ * happens; the Coordinator reads the undelivered rows and marks them.
+ * `dedupeKey` keeps a repeated write to one row.
+ */
+/**
+ * `run_report`, `run_question` and `run_blocked` come from the agent inside a
+ * run, through the worker tools of the MCP server (lib/mcp/worker.ts).
+ */
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked'] as const
+export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
+/**
+ * How much an event matters: `attention` needs the person, `result` is worth
+ * a short note, `background` waits for the next turn without waking one.
+ */
+export const COORDINATOR_EVENT_TIERS = ['attention', 'result', 'background'] as const
+export type CoordinatorEventTier = (typeof COORDINATOR_EVENT_TIERS)[number]
+
+export const coordinatorEvents = pgTable('coordinator_events', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  kind: text('kind').$type<CoordinatorEventKind>().notNull(),
+  dedupeKey: text('dedupeKey').notNull().unique('coordinator_events_dedupe_key'),
+  issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
+  runId: uuid('runId').references(() => agentRuns.id, { onDelete: 'cascade' }),
+  payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+  /** Null until triaged; an untriaged event wakes the Coordinator. */
+  tier: text('tier').$type<CoordinatorEventTier>(),
+  deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt)])
+
+/**
+ * One person's Coordinator. A turn holds the lease (`leaseHolder` until
+ * `leaseUntil`) while it works, so two wakes never run the same conversation
+ * at once. `summary` replaces every message at or before `summaryThrough`
+ * when the history is sent to the model. `memory` is what the person asked it to remember, as Markdown lines; it
+ * goes into every prompt.
+ */
+export const coordinatorSessions = pgTable('coordinator_sessions', {
+  userId: text('userId').primaryKey(),
+  leaseHolder: text('leaseHolder'),
+  leaseUntil: timestamp('leaseUntil', { withTimezone: true }),
+  summary: text('summary'),
+  summaryThrough: integer('summaryThrough').notNull().default(0),
+  memory: text('memory').notNull().default(''),
+  /** Why the last turn failed; cleared when a turn answers. */
+  lastError: text('lastError'),
+  lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** The Coordinator's conversation, one AI SDK model message per row, in `position` order. */
+export const coordinatorMessages = pgTable('coordinator_messages', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  position: integer('position').notNull(),
+  message: jsonb('message').$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('coordinator_messages_position_key').on(table.userId, table.position)])
+
 /** A message a person sent a running agent, delivered on its next poll. */
 export const runMessages = pgTable('run_messages', {
   id: uuid('id').primaryKey(), runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
@@ -136,3 +224,13 @@ export const runMessages = pgTable('run_messages', {
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('run_messages_run_idx').on(table.runId, table.createdAt)])
+
+/**
+ * An OAuth client, such as Claude Code or Codex, registered with the OAuth
+ * provider plugin in lib/auth.ts. The plugin owns this table (0009); only the
+ * columns the app reads are listed.
+ */
+export const oauthClients = pgTable('oauthClient', {
+  id: text('id').primaryKey(), clientId: text('clientId').notNull().unique(),
+  name: text('name'), uri: text('uri'),
+})

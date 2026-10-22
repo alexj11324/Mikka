@@ -2,6 +2,14 @@ import { randomBytes, randomInt, randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { test as base, expect, type BrowserContext, type Page } from '@playwright/test'
 
+// The app is served under next.config.mjs's basePath. page.goto('/x') resolves
+// against the origin, so app paths go through app().
+export const BASE_PATH = '/mikka'
+export function app(path: string) {
+  if (path === '/' || path.startsWith('/?')) return `${BASE_PATH}${path.slice(1)}`
+  return `${BASE_PATH}${path}`
+}
+
 export function watchRuntime(context: BrowserContext) {
   const failures: string[] = []
   context.on('page', page => {
@@ -38,13 +46,13 @@ export { expect }
 
 export async function register(page: Page, next = '/', email = `e2e-${randomUUID()}@example.com`) {
   const password = randomBytes(32).toString('base64url')
-  await page.goto(`/sign-up?next=${encodeURIComponent(next)}`)
+  await page.goto(app(`/sign-up?next=${encodeURIComponent(next)}`))
   await page.getByLabel('称呼', { exact: true }).fill('回归测试成员')
   await page.getByLabel('邮箱', { exact: true }).fill(email)
   await page.getByLabel('密码', { exact: true }).fill(password)
   // Better Auth 的生产规则为同一来源每 10 秒最多注册 3 次；CI 所有浏览器共享来源。
   await delay(4000)
   await page.getByRole('button', { name: '创建账号并进入', exact: true }).click()
-  await expect(page).toHaveURL(url => `${url.pathname}${url.search}` === next)
+  await expect(page).toHaveURL(url => `${url.pathname}${url.search}` === app(next))
   return { email, password }
 }

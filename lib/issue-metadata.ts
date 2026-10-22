@@ -29,12 +29,14 @@ export type IssueLabel = z.infer<typeof labelSchema>
 export type IssuePullRequest = z.infer<typeof pullRequestSchema>
 
 export function readIssueMetadata(content: JSONContent): IssueMetadata {
-  const parsed = metadataSchema.safeParse(content.attrs?.orvilo)
+  // `orvilo` is the pre-rename key; drizzle/0005 moves stored issues to `mikka`.
+  const parsed = metadataSchema.safeParse(content.attrs?.mikka ?? content.attrs?.orvilo)
   return parsed.success ? parsed.data : metadataSchema.parse({})
 }
 
 export function withIssueMetadata(content: JSONContent, metadata: IssueMetadata): JSONContent {
-  return { ...content, attrs: { ...content.attrs, orvilo: metadata } }
+  const { orvilo: _legacy, ...attrs } = content.attrs ?? {}
+  return { ...content, attrs: { ...attrs, mikka: metadata } }
 }
 
 export function issueWithMetadata<T extends { content: JSONContent }>(issue: T) {

@@ -1,5 +1,5 @@
 // The one isolation layer for agent CLIs (ADR 0009, "Stage 1 isolation"):
-// Anthropic's sandbox-runtime, behind Orvilo's own interface so it can be
+// Anthropic's sandbox-runtime, behind Mikka's own interface so it can be
 // swapped. Reads stay open (sandbox-runtime's default) except the paths a
 // run denies (credential stores), writes are limited to the paths a run
 // declares (its worktree, its run dir, the harness's own state), and the network goes through sandbox-runtime's

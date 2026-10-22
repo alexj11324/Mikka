@@ -1,0 +1,73 @@
+import type { RunReport } from '@mikka/protocol/run'
+import type { CoordinatorEventKind, RunStatus } from '@/lib/db/schema'
+
+/** One row for `coordinator_events`, before it gets an id. */
+export interface CoordinatorEventInput {
+  userId: string
+  kind: CoordinatorEventKind
+  dedupeKey: string
+  issueId: string | null
+  runId: string | null
+  payload: Record<string, unknown>
+}
+
+/** A message the person wrote to their Coordinator. */
+export function userMessageEvent(userId: string, text: string): CoordinatorEventInput {
+  const id = crypto.randomUUID()
+  return { userId, kind: 'user_message', dedupeKey: `user_message:${id}`, issueId: null, runId: null, payload: { text } }
+}
+
+/** A run ended. One event per run, however often the daemon reports it. */
+export function runFinishedEvent(run: { id: string; userId: string; issueId: string | null; kind: string; status: RunStatus; stopReason: string; report?: RunReport | null }): CoordinatorEventInput {
+  return {
+    userId: run.userId,
+    kind: 'run_finished',
+    dedupeKey: `run_finished:${run.id}`,
+    issueId: run.issueId,
+    runId: run.id,
+    payload: { status: run.status, stopReason: run.stopReason, runKind: run.kind, summary: run.report?.summary ?? null },
+  }
+}
+
+/**
+ * An issue moved to done, or null when this save is not that move. Keyed by
+ * the revision that made the move, so reopening and finishing again is a new
+ * event.
+ */
+export function issueDoneEvent(before: { status: string }, after: { id: string; userId: string; title: string; status: string; revision: number }): CoordinatorEventInput | null {
+  if (before.status === 'done' || after.status !== 'done') return null
+  return {
+    userId: after.userId,
+    kind: 'issue_done',
+    dedupeKey: `issue_done:${after.id}:${after.revision}`,
+    issueId: after.id,
+    runId: null,
+    payload: { title: after.title, previousStatus: before.status },
+  }
+}
+
+/** The run an agent's worker tool call came from. */
+interface WorkerRun { id: string; userId: string; issueId: string | null }
+
+function workerEvent(kind: 'run_report' | 'run_question' | 'run_blocked', run: WorkerRun, payload: Record<string, unknown>): CoordinatorEventInput {
+  return { userId: run.userId, kind, dedupeKey: `${kind}:${run.id}:${crypto.randomUUID()}`, issueId: run.issueId, runId: run.id, payload }
+}
+
+/** The agent inside a run reached a milestone and says so (MCP `report`). */
+export function runReportEvent(run: WorkerRun, text: string): CoordinatorEventInput {
+  return workerEvent('run_report', run, { text })
+}
+
+/** The agent inside a run asks the person something (MCP `ask`); the answer comes back as an instruction. */
+export function runQuestionEvent(run: WorkerRun, question: { question: string; options?: string[]; context?: string }): CoordinatorEventInput {
+  return workerEvent('run_question', run, {
+    question: question.question,
+    ...(question.options ? { options: question.options } : {}),
+    ...(question.context ? { context: question.context } : {}),
+  })
+}
+
+/** The agent inside a run cannot go on (MCP `blocked`). */
+export function runBlockedEvent(run: WorkerRun, reason: string): CoordinatorEventInput {
+  return workerEvent('run_blocked', run, { reason })
+}

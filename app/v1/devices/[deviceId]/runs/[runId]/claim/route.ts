@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
-import { RUN_LEASE_MS } from '@orvilo/protocol/device'
+import { RUN_LEASE_MS } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
+import { withBasePath } from '@/lib/base-path'
+import { mcpResourceURL } from '@/lib/mcp/resource'
+import { issueRunToken } from '@/lib/mcp/worker'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,14 +41,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
-  await db.update(agentRuns)
+  const claimed = await db.update(agentRuns)
     .set({ status: 'preparing', startedAt: new Date(), leaseExpiresAt: new Date(leaseExpiresAt), updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
+    .returning({ id: agentRuns.id })
+  // The worker tools of the MCP server for the agent in this run. A failure
+  // here should not keep the run from starting.
+  const mcp = claimed.length
+    ? await issueRunToken(run)
+      .then(({ token }) => ({ url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token }))
+      .catch((error: unknown) => { console.error('Could not issue a run token', error instanceof Error ? error.message : error); return undefined })
+    : undefined
   return NextResponse.json({
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
     baseBranch: repo.baseBranch, harness, prompt: run.prompt,
     kind: run.kind, leaseExpiresAt,
     ...(run.model ? { model: run.model } : {}),
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
+    ...(mcp ? { mcp } : {}),
   })
 }

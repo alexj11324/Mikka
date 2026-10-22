@@ -6,11 +6,11 @@
 {"t":300,"chunk":{"type":"text-end","id":"txt-1"}}
 {"t":420,"chunk":{"type":"tool-input-available","toolCallId":"call-read-1","toolName":"read","input":{"path":"README.md"}}}
 {"t":520,"chunk":{"type":"tool-output-available","toolCallId":"call-read-1","output":{"ok":true}}}
-{"t":700,"chunk":{"type":"tool-input-available","toolCallId":"call-write-1","toolName":"write","input":{"path":"ORVILO_MOCK.md"}}}
-{"t":760,"write":{"path":"ORVILO_MOCK.md","content":"# Mock change\n\nWritten by the Orvilo mock harness.\n"},"chunk":{"type":"tool-output-available","toolCallId":"call-write-1","output":{"ok":true}}}
-{"t":770,"chunk":{"type":"data-file-change","data":{"path":"ORVILO_MOCK.md","change":"added"}}}
+{"t":700,"chunk":{"type":"tool-input-available","toolCallId":"call-write-1","toolName":"write","input":{"path":"MIKKA_MOCK.md"}}}
+{"t":760,"write":{"path":"MIKKA_MOCK.md","content":"# Mock change\n\nWritten by the Mikka mock harness.\n"},"chunk":{"type":"tool-output-available","toolCallId":"call-write-1","output":{"ok":true}}}
+{"t":770,"chunk":{"type":"data-file-change","data":{"path":"MIKKA_MOCK.md","change":"added"}}}
 {"t":900,"chunk":{"type":"text-start","id":"txt-2"}}
-{"t":960,"chunk":{"type":"text-delta","id":"txt-2","delta":"Added ORVILO_MOCK.md. Next I will update the docs."}}
+{"t":960,"chunk":{"type":"text-delta","id":"txt-2","delta":"Added MIKKA_MOCK.md. Next I will update the docs."}}
 {"t":1000,"chunk":{"type":"text-end","id":"txt-2"}}
 {"t":1000,"chunk":{"type":"finish-step"}}
 {"t":1010,"chunk":{"type":"data-usage","data":{"inputTokens":1200,"outputTokens":340,"costUsd":0,"source":"fixture"}}}

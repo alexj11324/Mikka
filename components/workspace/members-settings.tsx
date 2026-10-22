@@ -1,20 +1,14 @@
 "use client";
 
 import { Fragment, useRef, useState } from "react";
-import { useRouter, Link } from "@/i18n/navigation";
-import useSWR from "swr";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import {
   ArrowDown,
-  ArrowLeft,
   ArrowUp,
-  Building2,
-  ChevronRight,
   Download,
   Info,
   MoreHorizontal,
   Search,
-  Shield,
   Users,
 } from "lucide-react";
 import type { WorkspaceSettings } from "@/lib/workspace-access";
@@ -25,7 +19,7 @@ import {
 } from "@/app/actions/workspace";
 import { useActionError } from "@/lib/use-action-error";
 import { InviteMembersDialog } from "@/components/workspace/invite-members-dialog";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/reui/badge";
 import { UserAvatar } from "@/components/user-avatar";
 import {
@@ -75,11 +69,7 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty";
 
-async function fetchSettings(url: string): Promise<WorkspaceSettings> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Failed to load members.");
-  return response.json();
-}
+
 type Change = {
   userId: string;
   name: string;
@@ -88,32 +78,27 @@ type Change = {
 };
 
 export function MembersSettings({
-  initial,
+  data,
   inviteInitially,
+  fetchError,
+  mutate,
 }: {
-  initial: WorkspaceSettings;
+  data: WorkspaceSettings;
   inviteInitially: boolean;
+  fetchError?: Error;
+  mutate: () => Promise<unknown>;
 }) {
-  const router = useRouter();
   const t = useTranslations("Members");
   const commonT = useTranslations("Common");
   const format = useFormatter();
   const locale = useLocale();
   const translateError = useActionError();
-  const {
-    data = initial,
-    error: fetchError,
-    mutate,
-  } = useSWR(
-    `/api/workspace?workspace=${initial.workspace.id}`,
-    fetchSettings,
-    { fallbackData: initial, revalidateOnMount: true },
-  );
+
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [ascending, setAscending] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(
-    inviteInitially && initial.role === "admin",
+    inviteInitially && data.role === "admin",
   );
   const [change, setChange] = useState<Change | null>(null);
   const [pending, setPending] = useState(false);
@@ -244,85 +229,7 @@ export function MembersSettings({
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground md:flex-row">
-      <aside
-        className="flex shrink-0 flex-col gap-7 p-3 md:w-60 md:py-5"
-        aria-label={t("navLabel")}
-      >
-        <Link
-          href="/"
-          className={buttonVariants({
-            variant: "ghost",
-            className: "justify-start text-muted-foreground",
-          })}
-        >
-          <ArrowLeft data-icon="inline-start" />
-          {t("backToWorkspace")}
-        </Link>
-        <div className="flex flex-col gap-3 px-1">
-          <div className="flex items-center gap-2 px-2 text-sm text-muted-foreground">
-            <Building2 className="size-4" />
-            <span>{t("workspace")}</span>
-          </div>
-          <Select
-            value={data.workspace.id}
-            items={data.choices.map((item) => ({
-              value: item.id,
-              label: item.name,
-            }))}
-            onValueChange={(value) => {
-              if (value) router.push(`/settings/members?workspace=${value}`);
-            }}
-          >
-            <SelectTrigger aria-label={t("currentWorkspace")} className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {data.choices.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-2">
-          <p className="px-3 text-xs text-muted-foreground">{t("manage")}</p>
-          <Link
-            href={`/settings/members?workspace=${data.workspace.id}`}
-            className={buttonVariants({
-              variant: "secondary",
-              className: "justify-start rounded-lg",
-            })}
-            aria-current="page"
-          >
-            <Users data-icon="inline-start" />
-            {t("title")}
-          </Link>
-        </div>
-        <div className="mt-auto hidden flex-col gap-3 px-3 pb-2 md:flex">
-
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Shield className="size-3.5" />
-            {data.role === "admin" ? t("adminAccess") : t("memberAccess")}
-          </div>
-          <span className="text-xs text-muted-foreground">
-            {t("brandFooter")}
-          </span>
-        </div>
-      </aside>
-      <main className="flex min-w-0 flex-1 flex-col md:py-2 md:pr-2">
-        <div className="flex min-h-[calc(100dvh-1rem)] flex-col rounded-xl border bg-sidebar/40">
-          <header className="flex h-12 items-center gap-2 px-5 text-xs text-muted-foreground md:px-8">
-            <Users className="size-3.5" />
-            <span>{t("breadcrumbSettings")}</span>
-            <ChevronRight className="size-3" />
-            <span>{t("title")}</span>
-          </header>
-          <div className="flex w-full flex-col gap-6 px-5 py-5 md:px-10 lg:px-14 lg:py-8">
-            <h1 className="text-2xl font-medium tracking-tight">{t("title")}</h1>
+    <section className="flex min-w-0 flex-col gap-6" aria-label={t("title")}>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex w-full items-center gap-2 sm:w-auto">
                 <div className="min-w-0 flex-1 sm:w-72">
@@ -640,9 +547,6 @@ export function MembersSettings({
                 {canManage ? t("footer.admin") : t("footer.member")}
               </p>
             </div>
-          </div>
-        </div>
-      </main>
       <InviteMembersDialog
         key={data.workspace.id}
         workspaceId={data.workspace.id}
@@ -699,6 +603,6 @@ export function MembersSettings({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </section>
   );
 }

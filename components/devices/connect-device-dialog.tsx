@@ -13,6 +13,7 @@ import { IconTile } from '@/components/reui/icon-tile'
 import { createDeviceToken, listLocalSshHosts, type SshHostView } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
+import { withBasePath } from '@/lib/base-path'
 
 type Mode = 'form' | 'progress' | 'manual'
 type StepKey = 'login' | 'check' | 'install' | 'start' | 'connect'
@@ -81,7 +82,7 @@ export function ConnectDeviceDialog() {
     const controller = new AbortController()
     abort.current = controller
     try {
-      const response = await fetch('/api/devices/ssh', {
+      const response = await fetch(withBasePath('/api/devices/ssh'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ host, user: actAs, name: '', locale }),

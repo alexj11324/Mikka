@@ -1,4 +1,4 @@
-// Fake CLIs call Orvilo's MCP server the way a real harness does: spawn it
+// Fake CLIs call Mikka's MCP server the way a real harness does: spawn it
 // from the config they were given, initialize, then `tools/call`.
 import { spawn } from "node:child_process"
 import { createInterface } from "node:readline"

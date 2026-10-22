@@ -5,7 +5,7 @@
 //
 // Auth:
 //   - device routes (`/v1/devices/...`): the daemon's session from
-//     `orvilo daemon login` (Better Auth device authorization, RFC 8628),
+//     `mikka daemon login` (Better Auth device authorization, RFC 8628),
 //     sent as `Authorization: Bearer <session token>`; only the device's
 //     owner may call them.
 //   - run routes (`/v1/runs/:runId/...`): the same device session; only the
@@ -224,7 +224,7 @@ export const runAssignmentSchema = z.object({
   /** Mock harness only: fixture name under `packages/daemon/fixtures`. */
   fixture: z.string().max(200).optional(),
   /**
-   * The issue's branch (`orvilo/<team>-<number>`, ADR 0024): every run of
+   * The issue's branch (`mikka/<team>-<number>`, ADR 0024): every run of
    * the issue pushes its verified commit here, so one pull request follows
    * the issue across fix rounds. A run that starts a new worktree builds on
    * this branch from the remote when it exists. Without it the daemon
@@ -235,6 +235,13 @@ export const runAssignmentSchema = z.object({
   verifyCommand: z.string().max(2_000).optional(),
   /** Run lease; renewed through the device heartbeat. */
   leaseExpiresAt: isoTime.optional(),
+  /**
+   * The Mikka MCP server for the agent inside this run: `report`, `ask` and
+   * `blocked` reach the person's Coordinator. Send `token` as a bearer token;
+   * it stops working when the run ends. Absent: the server could not issue
+   * one, and the run goes ahead without it.
+   */
+  mcp: z.object({ url: z.url(), token: z.string().min(1).max(200) }).optional(),
   /**
    * What the orchestrator dispatched this run for (ADR 0023). `plan` writes a
    * spec and proposes a split instead of changing code (ADR ORV-205).

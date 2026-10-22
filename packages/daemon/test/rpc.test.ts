@@ -1,4 +1,4 @@
-import { DAEMON_PROTOCOL_VERSION, DAEMON_RPC_ERRORS } from "@orvilo/protocol"
+import { DAEMON_PROTOCOL_VERSION, DAEMON_RPC_ERRORS } from "@mikka/protocol"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { Daemon } from "../src/main"

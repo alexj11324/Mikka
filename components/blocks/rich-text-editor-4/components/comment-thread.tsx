@@ -96,8 +96,10 @@ export function CommentThread({
           <ItemTitle className="w-full">
             {/* Stretched over the row, ring drawn on the row; author plus
                 excerpt names it, so no two rows sound alike. */}
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => onSelect(thread.id)}
               aria-current={current ? "true" : undefined}
               aria-labelledby={`${nameId} ${excerptId}`}
@@ -105,7 +107,7 @@ export function CommentThread({
               className="min-w-0 truncate text-start font-normal outline-none after:absolute after:inset-0 aria-[current=true]:font-medium"
             >
               <span id={nameId}>{author}</span>
-            </button>
+            </Button>
             <span className="text-muted-foreground shrink-0 text-xs font-normal tabular-nums">
               {formatTime(thread.createdAt)}
             </span>

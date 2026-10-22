@@ -1,6 +1,6 @@
-// The preload bridge (`window.orvilo`): the only surface the sandboxed
+// The preload bridge (`window.mikka`): the only surface the sandboxed
 // renderer has into the Electron main process. The preload script and the
-// browser shim used by `dev:ui` both implement `OrviloBridge`, so they are
+// browser shim used by `dev:ui` both implement `MikkaBridge`, so they are
 // type-checked against the same contract. Main validates every payload with
 // the schemas below because the renderer is untrusted.
 import { z } from "zod"
@@ -192,7 +192,7 @@ export const pickRepoResult = z.discriminatedUnion("status", [
 ])
 export type PickRepoResult = z.infer<typeof pickRepoResult>
 
-export interface OrviloBridge {
+export interface MikkaBridge {
   app: {
     /** App version from `apps/desktop/package.json`. */
     version: string
