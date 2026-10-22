@@ -102,6 +102,7 @@
     "inbox": "Inbox",
     "myTasks": "My tasks",
     "agent": "Agent",
+    "coordinator": "Coordinator",
     "yourTeams": "Your teams",
     "home": "Home",
     "tasks": "Tasks",
@@ -289,7 +290,9 @@
     "acceptanceTitle": "Acceptance · Mikka",
     "acceptanceDescription": "A separate acceptance workspace entry for development previews.",
     "settingsPreviewTitle": "Settings preview · Mikka",
-    "settingsPreviewDescription": "A signed-out settings preview with demo data."
+    "settingsPreviewDescription": "A signed-out settings preview with demo data.",
+    "oauthConsentTitle": "Authorize agent · Mikka",
+    "oauthConsentDescription": "Let an external agent use Mikka as you."
   },
   "NotFound": {
     "title": "Page not found",
@@ -858,6 +861,7 @@
       "inbox": "Inbox",
       "myIssues": "My tasks",
       "agent": "Agent",
+      "coordinator": "Coordinator",
       "projects": "Projects",
       "views": "Views",
       "teamHome": "Team home",
@@ -871,6 +875,8 @@
     "noFollowingTitle": "No followed tasks yet",
     "noFollowingDescription": "Choose “Follow task activity” in a task's more actions to track updates here.",
     "viewAllTasks": "View all tasks",
+    "agentDescription": "The Agent service is not connected yet; tasks do not run automatically.",
+    "viewTeamTasks": "View team tasks",
     "viewsTitle": "Workspace views",
     "viewsDescription": "View tasks by workflow status without changing the tasks.",
     "teamOverview": "Team work overview",
@@ -957,7 +963,7 @@
       "duplicateSubissues": "Also copy accessible subtasks",
       "deleteTitle": "Delete {id}?",
       "deleteDescription": "The task is removed from lists and boards, but its body, comments, and subtasks are not deleted immediately. You can restore it from the original link within 30 days.",
-      "deleting": "Deleting…",
+      "deleting": "Deleting���",
       "deleteAction": "Delete task"
     },
     "history": {
@@ -1650,6 +1656,18 @@
     "c_494c8a54": "Loading {value0}",
     "c_352987c4": "Remove from team: {value0}",
     "c_fdab9a02": "The project was created, but its team associations were not saved: {value0} Retry from project properties."
+  },
+  "OAuthConsent": {
+    "label": "Authorize agent",
+    "title": "Allow {name} to use Mikka?",
+    "description": "It will act as {account}.",
+    "scopeCoordinator": "Send messages to your Coordinator and read its replies",
+    "scopeRead": "See your issues and agent runs",
+    "note": "Only allow agents you trust.",
+    "allow": "Allow",
+    "deny": "Deny",
+    "failed": "Authorization did not finish. Go back to the agent and connect again.",
+    "unknownClient": "An unnamed app"
   },
   "Coordinator": {
     "label": "Coordinator",

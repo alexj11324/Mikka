@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl'
 import * as React from 'react'
 import useSWR from 'swr'
 import { listTeams } from '@/app/actions/teams'
-import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, SquarePen, SquareUserRound } from 'lucide-react'
+import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound, Workflow } from 'lucide-react'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
@@ -32,9 +32,9 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
   const { data: teams = [], error: teamsError, mutate: refreshTeams } = useSWR('teams', listTeams)
   const { setOpenMobile, open, openMobile, isMobile } = useSidebar()
   function navigate(next: WorkspaceSection) { if (onNavigate(next)) setOpenMobile(false) }
-  const personal = [{ id: 'inbox', title: i18nText("Overview.sections.inbox"), icon: Inbox }, { id: 'my-issues', title: i18nText("Overview.sections.myIssues"), icon: Scan }] as const
+  const personal = [{ id: 'inbox', title: i18nText("Overview.sections.inbox"), icon: Inbox }, { id: 'my-issues', title: i18nText("Overview.sections.myIssues"), icon: Scan }, { id: 'agent', title: i18nText("Nav.agent"), icon: Send }, { id: 'coordinator', title: i18nText("Nav.coordinator"), icon: Workflow }] as const
   const teamItems = [{ id: 'team-home', title: i18nText("Nav.home"), icon: House }, { id: 'team-issues', title: i18nText("Projects.detail.issues"), icon: Layers }, { id: 'team-projects', title: i18nText("Projects.title"), icon: Box }] as const
-  return <Sidebar variant="inset" {...props}>
+  return <Sidebar variant="inset" mobileTitle={i18nText("Nav.sidebarTitle")} mobileDescription={i18nText("Nav.sidebarDescription")} mobileCloseLabel={i18nText("Common.close")} {...props}>
     <SidebarHeader className="pb-4">
       <div className="flex items-center gap-1">
         <SidebarMenu className="min-w-0 flex-1"><SidebarMenuItem>

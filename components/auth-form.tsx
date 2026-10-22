@@ -11,12 +11,13 @@ import { withBasePath } from '@/lib/base-path'
 import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
 
-export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, continueGitHub = false, callbackURL, testWorkspaceEnabled = false, next }: { mode: 'sign-in' | 'sign-up'; githubEnabled?: boolean; oauthFailed?: boolean; continueGitHub?: boolean; callbackURL?: string; testWorkspaceEnabled?: boolean; next?: string }) {
+export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, continueGitHub = false, callbackURL, testWorkspaceEnabled = false, next, continueURL }: { mode: 'sign-in' | 'sign-up'; githubEnabled?: boolean; oauthFailed?: boolean; continueGitHub?: boolean; callbackURL?: string; testWorkspaceEnabled?: boolean; next?: string; continueURL?: string }) {
   const t = useTranslations('Auth')
   const locale = useLocale()
   const returnPath = safeAuthReturn(next)
   // Used for full-page navigations and OAuth callbacks, so they carry the base path.
-  const home = withBasePath(returnPath.startsWith('/?')
+  // An agent's OAuth sign-in (continueURL) goes back to its authorize request instead.
+  const home = continueURL ?? withBasePath(returnPath.startsWith('/?')
     ? `${getPathname({ locale, href: '/' })}${returnPath.slice(1)}`
     : getPathname({ locale, href: returnPath }))
   const signIn = withBasePath(getPathname({ locale, href: '/sign-in' }))

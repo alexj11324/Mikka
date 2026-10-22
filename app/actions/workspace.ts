@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import { createHash, randomBytes } from 'node:crypto'
 import { and, eq, gt, ne } from 'drizzle-orm'
 import { cookies, headers } from 'next/headers'
-import { auth } from '@/lib/auth'
+import { auth, type DeviceSessionSummary } from '@/lib/auth'
 import { z } from 'zod'
 import { requireUser } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -52,7 +52,8 @@ export async function switchWorkspace(input: { workspaceId?: string; accountId?:
     const user = await requireUser()
     const parsed = z.object({ workspaceId: z.uuid().optional(), accountId: z.string().min(1).max(200).optional() }).parse(input)
     const accountId = parsed.accountId ?? user.id
-    const deviceSession = accountId === user.id ? null : (await auth.api.listDeviceSessions({ headers: await headers() })).find(item => item.user.id === accountId)
+    const deviceSessions: DeviceSessionSummary[] = accountId === user.id ? [] : await auth.api.listDeviceSessions({ headers: await headers() })
+    const deviceSession = deviceSessions.find(item => item.user.id === accountId)
     if (accountId !== user.id && !deviceSession) throw new WorkspaceError(i18nText("FeatureCopy.c_c2e795ad"))
     if (parsed.workspaceId) await workspaceDb.transaction(tx => requireWorkspace(tx, parsed.workspaceId!, accountId))
     if (deviceSession) await auth.api.setActiveSession({ body: { sessionToken: deviceSession.session.token }, headers: await headers() })

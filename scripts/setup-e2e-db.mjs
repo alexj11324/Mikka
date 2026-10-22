@@ -1,6 +1,7 @@
 import { Pool } from 'pg'
 import { getMigrations } from 'better-auth/db/migration'
-import { SQL, sql } from 'drizzle-orm'
+import { oauthProvider } from '@better-auth/oauth-provider'
+import { SQL, is, sql } from 'drizzle-orm'
 import { getTableConfig, PgDialect, PgTable } from 'drizzle-orm/pg-core'
 import * as issueSchema from '../lib/db/schema.ts'
 import * as workspaceSchema from '../lib/db/workspace-schema.ts'
@@ -16,7 +17,8 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || !target.pa
 
 const authPool = new Pool({ connectionString, max: 1 })
 try {
-  const migration = await getMigrations({ database: authPool, emailAndPassword: { enabled: true } })
+  // The OAuth provider's tables (drizzle/0009); its pages do not matter here.
+  const migration = await getMigrations({ database: authPool, emailAndPassword: { enabled: true }, plugins: [oauthProvider({ loginPage: '/sign-in', consentPage: '/oauth/consent', disableJwtPlugin: true })] })
   await migration.runMigrations()
 } finally {
   if (!authPool.ended) await authPool.end()
@@ -39,7 +41,7 @@ function defaultValue(value, dataType) {
 
 try {
   const tables = [...Object.values(issueSchema), ...Object.values(workspaceSchema), ...Object.values(projectSchema), ...Object.values(teamSchema)]
-  for (const table of tables.filter(value => value instanceof PgTable)) {
+  for (const table of tables.filter(value => is(value, PgTable))) {
     const config = getTableConfig(table)
     if (config.name === 'user') continue
     const columns = config.columns.map(column => [

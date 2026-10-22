@@ -48,3 +48,20 @@ export function safeAuthReturn(value?: string) {
 
   return '/'
 }
+
+/**
+ * When an agent's OAuth sign-in (lib/auth.ts) sends the person to the sign-in
+ * page, its query holds the signed authorization request. After signing in,
+ * the person goes back to the authorize endpoint with the same request, which
+ * now finds a session and moves on to consent. Null for an ordinary sign-in.
+ * The path has no base path; the authorize endpoint checks every parameter.
+ */
+export function oauthResumePath(query: Record<string, string | string[] | undefined>): string | null {
+  if (typeof query.sig !== 'string' || typeof query.client_id !== 'string') return null
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || key === 'sig' || key === 'exp' || key === 'prompt' || key.startsWith('ba_')) continue
+    for (const item of Array.isArray(value) ? value : [value]) params.append(key, item)
+  }
+  return `/api/auth/oauth2/authorize?${params}`
+}
