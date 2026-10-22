@@ -34,7 +34,7 @@ test('团队主页、任务和项目菜单右侧空白区域均可点击导航',
   const submenu = page.locator('[data-sidebar="menu-sub"]').first()
   const breadcrumb = page.getByRole('navigation', { name: '当前位置', exact: true })
 
-  for (const title of ['主页', '任务', '项目']) {
+  for (const [title, heading] of [['主页', '团队主页'], ['任务', '团队任务'], ['项目', '团队项目']]) {
     const button = submenu.getByRole('button', { name: title, exact: true })
     const row = button.locator('..')
     await expect(row).toBeVisible()
@@ -43,7 +43,7 @@ test('团队主页、任务和项目菜单右侧空白区域均可点击导航',
     await row.click({ position: { x: bounds.width - 12, y: bounds.height / 2 } })
     await expect(button).toHaveAttribute('data-active')
     await expect(breadcrumb).toContainText('导航团队')
-    await expect(breadcrumb.getByText(title, { exact: true })).toBeVisible()
+    await expect(breadcrumb.getByText(heading, { exact: true })).toBeVisible()
   }
 })
 
@@ -99,11 +99,11 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await page.getByRole('tab', { name: /^任务/ }).click()
   await page.getByRole('button', { name: '关联任务', exact: true }).click()
   const picker = page.getByRole('dialog', { name: '关联项目任务', exact: true })
-  await picker.getByLabel(privateTitle, { exact: false }).check()
+  await picker.getByRole('checkbox', { name: privateTitle, exact: false }).check()
   await picker.getByRole('button', { name: '保存关联', exact: true }).click()
   await expect(picker.getByRole('alert')).toContainText('公开项目只能关联')
-  await picker.getByLabel(privateTitle, { exact: false }).uncheck()
-  await picker.getByLabel(publicTitle, { exact: false }).check()
+  await picker.getByRole('checkbox', { name: privateTitle, exact: false }).uncheck()
+  await picker.getByRole('checkbox', { name: publicTitle, exact: false }).check()
   await picker.getByRole('button', { name: '保存关联', exact: true }).click()
   await expect(picker).not.toBeVisible()
   await expect(page.locator('[aria-label="任务列表"]').getByText(publicTitle, { exact: true })).toBeVisible()
@@ -122,7 +122,8 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
   await createTask(page, publicTitle, 'SHARED · 共享团队')
   await createTask(page, privateTitle)
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
-  await page.getByRole('menuitem', { name: '邀请和管理成员', exact: true }).click()
+  await page.getByRole('menuitem', { name: '设置', exact: true }).click()
+  await page.getByRole('link', { name: '成员', exact: true }).click()
   await page.getByRole('button', { name: '邀请成员', exact: true }).click()
   const invitation = page.getByRole('dialog', { name: '邀请成员', exact: true })
   const email = `team-member-${randomUUID()}@example.com`

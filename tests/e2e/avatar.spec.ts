@@ -5,7 +5,7 @@ test("中文姓名不参与头像，账号图片优先，加载失败回退邮�
   const email = `alex-${randomUUID()}@example.com`;
   await register(page, "/settings/members", email);
   const label = `${email} 的头像`;
-  const memberAvatar = page.getByRole("region", { name: "成员", exact: true }).getByRole("img", { name: label, exact: true });
+  const memberAvatar = page.getByRole("table").getByRole("row").filter({ hasText: email }).getByRole("img", { name: label, exact: true });
   await expect(memberAvatar).toHaveText("A");
   await page.getByRole("button", { name: "邀请成员", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "邀请成员", exact: true });

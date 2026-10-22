@@ -41,7 +41,9 @@ test("成员导航、邀请取消、角色选择、创建和撤销邀请、管�
   const dialog = page.getByRole("dialog", { name: "邀请成员", exact: true });
   await expect(dialog).toBeVisible();
   expect(initialRequests).toBe(1);
+  const resumed = page.waitForResponse(response => new URL(response.url()).pathname === app('/api/workspace'));
   release();
+  await resumed;
   await page.unroute('**/api/workspace');
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
   await expect(dialog).not.toBeVisible();
