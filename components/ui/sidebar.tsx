@@ -39,6 +39,7 @@ type SidebarContextProps = {
   openMobile: boolean
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
+  isReady: boolean
   toggleSidebar: () => void
 }
 
@@ -66,7 +67,9 @@ function SidebarProvider({
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
-  const isMobile = useIsMobile()
+  const mobileViewport = useIsMobile()
+  const isMobile = mobileViewport === true
+  const isReady = mobileViewport !== undefined
   const [openMobile, setOpenMobile] = React.useState(false)
 
   // This is the internal state of the sidebar.
@@ -90,8 +93,9 @@ function SidebarProvider({
 
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
+    if (!isReady) return
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
-  }, [isMobile, setOpen, setOpenMobile])
+  }, [isMobile, isReady, setOpen, setOpenMobile])
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
@@ -119,11 +123,12 @@ function SidebarProvider({
       open,
       setOpen,
       isMobile,
+      isReady,
       openMobile,
       setOpenMobile,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, isReady, openMobile, setOpenMobile, toggleSidebar]
   )
 
   return (
@@ -263,7 +268,7 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, isReady } = useSidebar()
 
   return (
     <Button
@@ -277,6 +282,7 @@ function SidebarTrigger({
         toggleSidebar()
       }}
       {...props}
+      disabled={!isReady || props.disabled}
     >
       <PanelLeftIcon className="cn-rtl-flip" />
       <span className="sr-only">Toggle Sidebar</span>

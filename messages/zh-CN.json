@@ -1505,7 +1505,7 @@
   "Acceptance": {
     "recovering": "正在恢复验收会话…",
     "allowAndRetry": "允许预览会话并重试",
-    "safeSessionNote": "预览使用独立的安全会话。如果 Safari 阻止会话，请允许访问后重试，或在新标签页打开。",
+    "safeSessionNote": "iOS Safari 可能阻止内嵌预览的会话。请优先在新标签页打开验收，使用独立页面建立安全会话，无需关闭“阻止跨网站跟踪”。如需留在预览内，可尝试下方授权重试。",
     "storageBlocked": "浏览器未允许内嵌预览使用会话。请点击“在新标签页打开验收”，在独立页面继续，无需关闭 Safari 的隐私保护。",
     "title": "继续验收",
     "description": "未能建立或保留验收会话。无需填写邮箱、密码或进行 GitHub 授权。",
