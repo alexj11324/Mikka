@@ -6,7 +6,7 @@ create table if not exists coordinator_events (
   id uuid primary key,
   "userId" text not null,
   kind text not null,
-  "dedupeKey" text not null,
+  "dedupeKey" text not null constraint coordinator_events_dedupe_key unique,
   "issueId" uuid references issues(id) on delete cascade,
   "runId" uuid references agent_runs(id) on delete cascade,
   payload jsonb not null,
@@ -14,5 +14,4 @@ create table if not exists coordinator_events (
   "createdAt" timestamptz not null default now()
 );
 
-create unique index if not exists coordinator_events_dedupe_key on coordinator_events ("dedupeKey");
 create index if not exists coordinator_events_pending_idx on coordinator_events ("userId", "deliveredAt", "createdAt");
