@@ -36,7 +36,8 @@ export async function linearTeams(token: string): Promise<LinearTeamOption[]> {
   let after: string | null = null
   do {
     type TeamWire = Omit<LinearTeamOption, 'states'> & { states: { nodes: LinearStateOption[] } }
-    const data = await linearGraphQL<{ teams: { nodes: TeamWire[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } }>(token, `query OrviloLinearTeams($first: Int!, $after: String) {
+    type TeamPage = { teams: { nodes: TeamWire[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } }
+    const data: TeamPage = await linearGraphQL<TeamPage>(token, `query OrviloLinearTeams($first: Int!, $after: String) {
       teams(first: $first, after: $after) {
         nodes { id key name states(first: 50) { nodes { id name type position } } }
         pageInfo { hasNextPage endCursor }
@@ -65,7 +66,8 @@ export async function linearIssue(token: string, id: string): Promise<LinearIssu
 export async function findLinearUserByEmail(token: string, email: string) {
   let after: string | null = null
   do {
-    const data = await linearGraphQL<{ users: { nodes: { id: string; email: string | null }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } }>(token, `query OrviloLinearUsers($first: Int!, $after: String) {
+    type UserPage = { users: { nodes: { id: string; email: string | null }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } }
+    const data: UserPage = await linearGraphQL<UserPage>(token, `query OrviloLinearUsers($first: Int!, $after: String) {
       users(first: $first, after: $after) { nodes { id email } pageInfo { hasNextPage endCursor } }
     }`, { first: CONNECTION_PAGE, after })
     const user = data.users.nodes.find(candidate => candidate.email?.toLowerCase() === email.toLowerCase())
@@ -78,7 +80,8 @@ export async function findLinearUserByEmail(token: string, email: string) {
 export async function ensureLinearLabel(token: string, teamId: string, name: string, color: string) {
   let after: string | null = null
   do {
-    const data = await linearGraphQL<{ team: { labels: { nodes: { id: string; name: string }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } | null } | null }>(token, `query OrviloLinearLabels($id: String!, $first: Int!, $after: String) {
+    type LabelsPage = { team: { labels: { nodes: { id: string; name: string }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } | null } | null }
+    const data: LabelsPage = await linearGraphQL<LabelsPage>(token, `query OrviloLinearLabels($id: String!, $first: Int!, $after: String) {
       team(id: $id) { labels(first: $first, after: $after) { nodes { id name } pageInfo { hasNextPage endCursor } } }
     }`, { id: teamId, first: CONNECTION_PAGE, after })
     const labels = data.team?.labels
