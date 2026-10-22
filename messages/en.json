@@ -1520,7 +1520,7 @@
   "Acceptance": {
     "recovering": "Restoring acceptance session…",
     "allowAndRetry": "Allow the preview session and retry",
-    "safeSessionNote": "The preview uses an isolated, secure session. If Safari blocks it, allow access and retry, or open it in a new tab.",
+    "safeSessionNote": "iOS Safari may block sessions in embedded previews. Open acceptance in a new tab to establish a secure session on a standalone page, without disabling Prevent Cross-Site Tracking. To stay in the preview, try granting access below.",
     "storageBlocked": "The browser did not allow the embedded preview to use a session. Open acceptance in a new tab to continue without disabling Safari privacy protection.",
     "title": "Continue acceptance",
     "description": "The acceptance session could not be created or kept. You do not need to enter an email or password, or authorize GitHub.",

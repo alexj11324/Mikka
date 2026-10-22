@@ -6,10 +6,7 @@ import { AgentCodeBlock } from './agent-code-block'
 import dynamic from 'next/dynamic'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import remarkMath from 'remark-math'
-import rehypeKatex from 'rehype-katex'
 import { cn } from '@/lib/utils'
-import 'katex/dist/katex.min.css'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 const MermaidDiagram = dynamic(() => import('./agent-mermaid').then(module => module.AgentMermaid), {
@@ -17,15 +14,22 @@ const MermaidDiagram = dynamic(() => import('./agent-mermaid').then(module => mo
   loading: () => { const agentCopy = useAgentCopy(); return (<p role="status" className="text-sm text-muted-foreground">{agentCopy.loadingDiagram}</p>) },
 })
 
-const remarkPlugins = [remarkGfm, remarkMath]
-const rehypePlugins: NonNullable<ComponentProps<typeof Markdown>['rehypePlugins']> = [
-  [rehypeKatex, { trust: false, strict: 'ignore', throwOnError: false, maxExpand: 1000, maxSize: 20 }],
-]
+const remarkPlugins = [remarkGfm]
+const MathMarkdown = dynamic(() => import('./agent-math-markdown').then(module => module.AgentMathMarkdown))
 
-export const AgentMarkdown = memo(function AgentMarkdown({ text, isStreaming = false, size = 'default' }: {
+export type AgentMarkdownProps = {
   text: string
   isStreaming?: boolean
   size?: 'small' | 'default' | 'large' | 'small-heavy' | 'large-heavy'
+}
+
+export const AgentMarkdown = memo(function AgentMarkdown(props: AgentMarkdownProps) {
+  return props.text.includes('$') ? <MathMarkdown {...props} /> : <AgentMarkdownContent {...props} />
+})
+
+export function AgentMarkdownContent({ text, isStreaming = false, size = 'default', mathRemarkPlugins = [], rehypePlugins = [] }: AgentMarkdownProps & {
+  mathRemarkPlugins?: NonNullable<ComponentProps<typeof Markdown>['remarkPlugins']>
+  rehypePlugins?: NonNullable<ComponentProps<typeof Markdown>['rehypePlugins']>
 }) {
   const agentCopy = useAgentCopy()
 
@@ -34,7 +38,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({ text, isStreaming = f
     'text-base': size === 'large' || size === 'large-heavy',
     'font-semibold': size === 'small-heavy' || size === 'large-heavy',
   })}>
-    <Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} skipHtml components={{
+    <Markdown remarkPlugins={[...remarkPlugins, ...mathRemarkPlugins]} rehypePlugins={rehypePlugins} skipHtml components={{
       h1: ({ node: _node, ...props }) => <h1 {...props} className="mt-3 text-2xl font-semibold leading-snug" />,
       h2: ({ node: _node, ...props }) => <h2 {...props} className="mt-3 text-xl font-semibold leading-snug" />,
       h3: ({ node: _node, ...props }) => <h3 {...props} className="mt-2 text-lg font-semibold leading-snug" />,
@@ -65,4 +69,4 @@ export const AgentMarkdown = memo(function AgentMarkdown({ text, isStreaming = f
       hr: () => <div className="h-3" />,
     }}>{text}</Markdown>
   </div>
-})
+}

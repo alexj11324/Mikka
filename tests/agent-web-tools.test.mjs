@@ -13,6 +13,7 @@ test('联网工具只暴露搜索和网页读取，保留 DS 聊天及认证', a
   assert.match(source, /opencode\('deepseek-v4\.1-flash'\)/)
   assert.match(source, /auth\.api\.getSession/)
   assert.match(source, /tools:\s*\{\s*\.\.\.createAgentWebTools\(\{ signal: request\.signal \}\),/)
+  assert.match(source, /\.\.\.createComposioAITools\(\(action, input\) => runComposioAction\(session\.user\.id, action, input\)\)/)
   assert.match(source, /stopWhen: isStepCount\(5\)/)
   assert.match(source, /stepNumber >= 4 \? \{ toolChoice: 'none' \}/)
   const instructions = agentWebInstructions(new Date('2026-10-21T00:00:00Z'))

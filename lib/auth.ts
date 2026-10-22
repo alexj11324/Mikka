@@ -3,13 +3,17 @@ import { createAuthMiddleware } from 'better-auth/api'
 import { multiSession } from 'better-auth/plugins'
 import { nextCookies } from 'better-auth/next-js'
 import { oauthProvider } from '@better-auth/oauth-provider'
+import { oAuthProxy } from 'better-auth/plugins'
 import { pool } from '@/lib/db'
 import { withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
+import { authOAuthProxyOptions, authTrustedOrigins } from '@/lib/auth-config'
 
 export const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
 export const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
 export const authBaseURL = appOrigin
+const proxyOptions = authOAuthProxyOptions(process.env)
+export const oauthCallbackBaseURL = proxyOptions?.productionURL ?? authBaseURL
 
 export type DeviceSessionSummary = {
   session: { token: string }
@@ -45,12 +49,16 @@ export const auth = betterAuth({
   basePath: withBasePath('/api/auth'),
   emailAndPassword: { enabled: true, autoSignIn: true },
   trustedOrigins: [
-    ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000', ...[process.env.V0_RUNTIME_URL, process.env.V0_DEV_APP_URL, process.env.V0_BUILD_URL, process.env.V0_SANDBOX_URL].filter((value): value is string => !!value)] : []),
-    ...(process.env.NODE_ENV === 'production' ? [...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []), ...(process.env.VERCEL_PROJECT_PRODUCTION_URL ? [`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`] : [])] : []),
+    ...authTrustedOrigins(process.env),
+    ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : []),
   ],
+  // Makes the app an OAuth 2.1 server so agents (Claude Code, Codex…) can sign
+  // in to the MCP server at /api/mcp as the person. Clients register
+  // themselves (RFC 7591) and use PKCE; access tokens are opaque and hashed in
+  // the database, and lib/mcp/auth.ts checks them.
   plugins: [
+    ...(proxyOptions ? [oAuthProxy(proxyOptions)] : []),
     multiSession(),
-    // OAuth 2.1 lets external agents access the MCP server as the signed-in person.
     oauthProvider({
       loginPage: withBasePath('/sign-in'),
       consentPage: withBasePath('/oauth/consent'),

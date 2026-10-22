@@ -13,10 +13,40 @@ export const AGENT_DEMO_CODE = [
   '}',
 ].join('\n')
 
+export const AGENT_DEMO_MATH = String.raw`
+
+### 行内公式与复杂排版
+
+行内公式：$$E = mc^2$$，以及根式 $$\sqrt{a^2+b^2}$$；它们应与正文在同一行。
+
+多行等式：
+
+$$
+\begin{aligned}
+f(x) &= (x+1)^2 \\
+     &= x^2 + 2x + 1
+\end{aligned}
+$$
+
+矩阵与定界符：
+
+$$
+A = \begin{pmatrix} a & b \\ c & d \end{pmatrix},
+\qquad \det(A) = ad-bc
+$$
+
+长公式在窄屏中可横向滚动，不应裁掉开头或撑宽整个页面：
+
+$$
+\operatorname{Attention}(Q,K,V) = \operatorname{softmax}\!\left(\frac{QK^{\mathsf{T}}}{\sqrt{d_k}} + M\right)V,
+\qquad Q,K \in \mathbb{R}^{n\times d_k},\quad V \in \mathbb{R}^{n\times d_v}
+$$
+`
+
 export const AGENT_DEMO_SECTIONS = [
   {
     id: 'rich-text', title: '富文本与数学公式', description: '与真实回复共用 Markdown 渲染器：标题、列表、引用、表格、链接、行内代码和 KaTeX。',
-    response: `root = BeResponse([${content('## 从需求到可交付成果\n\n这是一段 **加粗重点**、*强调文字* 和 `summarize()` 行内代码。\n\n- 普通列表：支持结构化说明\n- [x] 已确认范围（演示）\n- [ ] 完成设计评审（演示）\n\n1. 明确目标\n2. 拆分工作\n3. 检查交付物\n\n> 演示中的数据和进度均为虚构，不会写入工作区。\n\n| 阶段 | 交付物 |\n| --- | --- |\n| 发现 | 需求清单 |\n| 设计 | 交互原型 |\n\n参考 [Markdown 指南](https://www.markdownguide.org/)。\n\n### 数学公式\n\n$$\nP(\\text{完成}) = \\frac{n_{\\text{已完成}}}{n_{\\text{全部}}} = \\frac{3}{5} = 60\\%\n$$\n\n$$\n\\int_0^1 x^2\\,dx = \\frac{1}{3}\n$$')}])`,
+    response: `root = BeResponse([${content('## 从需求到可交付成果\n\n这是一段 **加粗重点**、*强调文字* 和 `summarize()` 行内代码。\n\n- 普通列表：支持结构化说明\n- [x] 已确认范围（演示）\n- [ ] 完成设计评审（演示）\n\n1. 明确目标\n2. 拆分工作\n3. 检查交付物\n\n> 演示中的数据和进度均为虚构，不会写入工作区。\n\n| 阶段 | 交付物 |\n| --- | --- |\n| 发现 | 需求清单 |\n| 设计 | 交互原型 |\n\n参考 [Markdown 指南](https://www.markdownguide.org/)。\n\n### 数学公式\n\n$$\nP(\\text{完成}) = \\frac{n_{\\text{已完成}}}{n_{\\text{全部}}} = \\frac{3}{5} = 60\\%\n$$\n\n$$\n\\int_0^1 x^2\\,dx = \\frac{1}{3}\n$$' + AGENT_DEMO_MATH)}])`,
   },
   {
     id: 'diagrams', title: 'Mermaid 图表与代码围栏', description: '流程图和时序图自动渲染；代码围栏直接使用 beUI Code Block。',

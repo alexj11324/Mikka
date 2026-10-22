@@ -4,16 +4,19 @@ import { useTranslations } from 'next-intl'
 import { Inbox, Layers, Star, Bell } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import { IssueList } from './issue-list'
-import { AgentPanel } from './agent-panel'
-import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
+import dynamic from 'next/dynamic'
+import { WorkspaceContentLoading } from './workspace-loading'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
 import { ISSUE_STATUSES, WORKSPACE_NAME, type IssueView } from './issue-properties'
 import type { WorkspaceSection } from './workspace-navigation'
 import type { AgentHistory } from '@/lib/agent-history'
 
+const AgentPanel = dynamic(() => import('./agent-panel').then(module => module.AgentPanel), { loading: WorkspaceContentLoading })
+const CoordinatorChat = dynamic(() => import('@/components/coordinator/coordinator-chat').then(module => module.CoordinatorChat), { loading: WorkspaceContentLoading })
+
 export function WorkspaceOverview({ section, teamName, counts, projectCount, onView, onProjects, tasks, userId, onOpen, initialAgentHistory }: { section: WorkspaceSection; teamName?: string; counts: Record<IssueView, number>; projectCount: number; onView: (view: IssueView) => void; onProjects: () => void; tasks: Awaited<ReturnType<typeof listIssues>>; userId: string; onOpen: (id: string) => void; initialAgentHistory?: AgentHistory }) {
-  const i18nText = useTranslations();
+  const i18nText = useTranslations()
   const tIssue = useTranslations('Issue')
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   if (section === 'agent') return <AgentPanel key={userId} userId={userId} initialHistory={initialAgentHistory} />

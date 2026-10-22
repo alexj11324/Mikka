@@ -2,12 +2,10 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getLocale } from 'next-intl/server'
 
-import { listIssues } from '@/app/actions/issues'
 import { IssueWorkspace } from '@/components/workspace/issue-workspace'
 import { redirect as localeRedirect } from '@/i18n/navigation'
 import { isAcceptanceEnabled } from '@/lib/acceptance'
 import { auth, googleEnabled } from '@/lib/auth'
-import { getAgentHistory } from '@/lib/agent-store'
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ acceptance?: string; issue?: string; section?: string; settings?: string }> }) {
   const query = await searchParams
@@ -20,9 +18,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
     if (query.acceptance === '1') localeRedirect({ href: '/acceptance', locale: await getLocale() })
     redirect('/api/acceptance')
   }
-  const [initialIssues, initialAgentHistory] = await Promise.all([
-    listIssues(),
-    getAgentHistory(user.id).catch(() => undefined),
-  ])
-  return <IssueWorkspace key={user.id} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialIssues={initialIssues} initialAgentHistory={initialAgentHistory} initialSection={query.section === 'agent' ? 'agent' : 'projects'} initialSettingsSection={query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
+  return <IssueWorkspace key={user.id} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialSection={query.section === 'agent' ? 'agent' : 'projects'} initialSettingsSection={query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
 }
