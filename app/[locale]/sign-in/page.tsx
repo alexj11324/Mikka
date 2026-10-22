@@ -9,6 +9,7 @@ import { isAcceptanceEnabled } from '@/lib/acceptance'
 import { auth, authBaseURL, githubEnabled, googleEnabled } from '@/lib/auth'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { COMPOSIO_AUTH_CALLBACK_PATH, oauthResumePath, safeAuthReturn } from '@/lib/auth-return'
+import { oauthAccountNotLinkedProvider } from '@/lib/auth-error'
 import { authCallbackURL } from '@/lib/auth-callback'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -31,5 +32,5 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
     localeRedirect({ href: next, locale })
   }
   if (isAcceptanceEnabled() && !oauthResume && query.login !== '1' && !query.oauth && !query.continue && !query.error && !query.next) redirect('/api/acceptance')
-  return <AuthForm next={next} mode="sign-in" googleEnabled={googleEnabled} githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean(query.error)} continueGoogle={query.continue === 'google'} continueGitHub={query.continue === 'github'} continueComposio={Boolean(composioResume)} continueURL={oauthResume ? withBasePath(oauthResume) : composioResume} googleCallbackURL={authCallbackURL(authBaseURL, 'google', BASE_PATH)} githubCallbackURL={authCallbackURL(authBaseURL, 'github', BASE_PATH)} />
+  return <AuthForm next={next} mode="sign-in" googleEnabled={googleEnabled} githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean(query.error)} oauthAccountNotLinked={oauthAccountNotLinkedProvider(query.error, query.provider)} continueGoogle={query.continue === 'google'} continueGitHub={query.continue === 'github'} continueComposio={Boolean(composioResume)} continueURL={oauthResume ? withBasePath(oauthResume) : composioResume} googleCallbackURL={authCallbackURL(authBaseURL, 'google', BASE_PATH)} githubCallbackURL={authCallbackURL(authBaseURL, 'github', BASE_PATH)} />
 }
