@@ -1,5 +1,6 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
-import { createUIMessageStreamResponse, streamText, toUIMessageStream } from 'ai'
+import { createUIMessageStreamResponse, isStepCount, streamText, toUIMessageStream } from 'ai'
+import { agentWebInstructions, createAgentWebTools } from '@/lib/agent-web-tools'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import systemPrompt from '@/lib/agent-system-prompt.json'
@@ -100,8 +101,11 @@ export async function POST(request: Request) {
   const result = streamText({
     model: opencode('deepseek-v4.1-flash'),
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
-    system: systemPrompt,
+    system: `${systemPrompt}\n\n${agentWebInstructions()}`,
     messages,
+    tools: createAgentWebTools({ signal: request.signal }),
+    stopWhen: isStepCount(5),
+    prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
     maxRetries: 1,
     timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
     abortSignal: request.signal,

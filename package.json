@@ -23,7 +23,7 @@
     "test:performance": "playwright test agent-performance.spec.ts",
     "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
     "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
-    "test:agent": "node --experimental-strip-types --test tests/agent-fetch.test.mjs tests/agent-ui.test.mjs tests/agent-history.test.mjs",
+    "test:agent": "node --experimental-strip-types --test tests/agent-fetch.test.mjs tests/agent-ui.test.mjs tests/agent-history.test.mjs tests/agent-web-tools.test.mjs",
     "test:acceptance": "node --test tests/acceptance.test.mjs",
     "check": "pnpm check:agent-ui && pnpm test:preview && pnpm test:agent && pnpm test:acceptance && pnpm test:ui-policy && pnpm test:i18n && pnpm i18n:check && pnpm test:ssh-target && pnpm test:csv && pnpm test:issues && pnpm lint && pnpm typecheck",
     "check:ci": "pnpm check && pnpm build && pnpm test:e2e",
