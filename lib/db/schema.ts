@@ -271,3 +271,27 @@ export const oauthClients = pgTable('oauthClient', {
   id: text('id').primaryKey(), clientId: text('clientId').notNull().unique(),
   name: text('name'), uri: text('uri'),
 })
+
+export const telegramLinks = pgTable('telegram_links', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  telegramUserId: text('telegramUserId').notNull(),
+  telegramUserName: text('telegramUserName'),
+  linkedAt: timestamp('linkedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('telegram_links_telegram_user_key').on(table.telegramUserId)])
+
+export const telegramLinkTokens = pgTable('telegram_link_tokens', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('tokenHash').notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('telegram_link_tokens_hash_key').on(table.tokenHash)])
+
+export const telegramConversations = pgTable('telegram_conversations', {
+  threadId: text('threadId').primaryKey(),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  issueId: uuid('issueId').references(() => issues.id, { onDelete: 'set null' }),
+  draftTitle: varchar('draftTitle', { length: 200 }),
+  draftDescription: text('draftDescription').notNull().default(''),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('telegram_conversations_user_idx').on(table.userId)])

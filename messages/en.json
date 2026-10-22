@@ -1366,7 +1366,7 @@
       },
       "integrations": {
         "title": "Integrations",
-        "description": "Connect your personal Notion and Slack accounts."
+        "description": "Manage connected apps and message platforms."
       },
       "workspace": {
         "title": "Workspace",
@@ -1476,9 +1476,74 @@
       "webhookReady": "The API key and signing secret are set. Register the public URL in Composio to deliver events.",
       "webhookSecretMissing": "Set COMPOSIO_API_KEY and COMPOSIO_WEBHOOK_SECRET on the server to receive verified webhooks."
     },
+    "telegram": {
+      "heading": "Messaging",
+      "description": "Link a private Telegram chat to create and follow Mikka tasks.",
+      "title": "Telegram",
+      "statusDescription": "Only your Telegram account can use this connection.",
+      "loading": "Checking…",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "connectTitle": "Connect Telegram",
+      "connectDescription": "Generate a one-time link that expires after 10 minutes.",
+      "disconnectDescription": "Disconnecting removes the link and any unconfirmed task draft.",
+      "connect": "Generate link",
+      "newLink": "Generate new link",
+      "openTelegram": "Open Telegram",
+      "linkTitle": "Finish linking",
+      "linkDescription": "Open the link and press Start in the private chat.",
+      "refresh": "Refresh status",
+      "disconnect": "Disconnect",
+      "disconnectConfirm": "Disconnect Telegram and delete this chat's unconfirmed draft?",
+      "notConfigured": "Telegram is not configured for this deployment yet.",
+      "error": "Could not load or update the Telegram connection.",
+      "previewDescription": "Telegram account linking is available after you sign in."
+    },
     "preview": {
       "userName": "Preview user"
     }
+  },
+  "TelegramBot": {
+    "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nSend details, then /confirm to create it in Backlog\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
+    "connect": "Connect Telegram from Mikka Settings → Integrations, then open the link here.",
+    "alreadyConnected": "Your Telegram account is already connected. Send /help for commands.",
+    "paired": "Telegram is connected to Mikka. Send /help to see commands.",
+    "pairInvalid": "That link has expired or was already used. Generate a fresh one in Mikka Settings → Integrations.",
+    "pairConflict": "This Telegram account is already connected to another Mikka account.",
+    "titleRequired": "Use /new followed by a title up to 200 characters.",
+    "draftStarted": "Draft started: {title}\nSend one or more detail messages, then /confirm. Use /cancel to discard.",
+    "noDraft": "There is no draft to discard.",
+    "draftDiscarded": "Draft discarded.",
+    "startDraft": "Start a draft with /new <title> first.",
+    "draftInvalid": "The draft is invalid. Use /new <title> to start again.",
+    "created": "Created {issue} in Backlog: {title}\nUse /status to view it.",
+    "noTasks": "No tasks are available yet.",
+    "finishDraft": "Finish or discard the current draft before linking a task.",
+    "linkUsage": "Use /link ORV-123 or /link <issue UUID>.",
+    "taskUnavailable": "That task was not found or is not available to this account.",
+    "ambiguous": "That task number is ambiguous. Use its full issue UUID.",
+    "linked": "Linked this chat to {issue}: {title}",
+    "notLinked": "This chat is not linked to a task. Use /link ORV-123.",
+    "linkedUnavailable": "The linked task is no longer available.",
+    "unlinkNoTask": "This chat is not linked to a task.",
+    "unlinked": "Task link cleared.",
+    "unknownCommand": "I did not recognize that command. Send /help for the list.",
+    "textDetailsRequired": "Send text details, or use /confirm to create without a description.",
+    "draftTooLong": "The draft has reached its 20,000 character limit. Use /confirm or /cancel.",
+    "detailsAdded": "Details added. Send more, or use /confirm to create the Backlog task.",
+    "linkedChat": "This chat is linked to a task. Use /status, /unlink, or /new <title>.",
+    "startDraftMessage": "Start a task draft with /new <title>. Send details, then /confirm.",
+    "status": {
+      "backlog": "Backlog",
+      "todo": "Todo",
+      "doing": "In progress",
+      "review": "In review",
+      "done": "Done",
+      "canceled": "Canceled",
+      "duplicate": "Duplicate",
+      "unknown": "Unknown"
+    },
+    "issueLine": "{issue} [{status}] {title}"
   },
   "Invite": {
     "title": "Invite members",
