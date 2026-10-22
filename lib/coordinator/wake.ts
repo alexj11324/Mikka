@@ -1,5 +1,4 @@
 import 'server-only'
-import { experimental_decide as decide, gateway } from 'ai'
 import { start } from 'workflow/api'
 import { hasWakingEvents, setEventTier, untriagedEvents } from '@/lib/coordinator/store'
 import { ruleTier, tierFromDecision, TRIAGE_MODEL, TRIAGE_QUESTIONS, triageState } from '@/lib/coordinator/triage'
@@ -18,17 +17,22 @@ export function coordinatorEnabled(): boolean {
   return process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY)
 }
 
-/** Asks the decision model whether a finished run needs the person. A failed call counts as an ordinary result. */
+/** Asks the decision model whether a finished run needs the person. A failed call, or no Workers AI credentials, counts as an ordinary result. */
 async function decideTier(event: Parameters<typeof triageState>[0]): Promise<CoordinatorEventTier> {
+  const account = process.env.CLOUDFLARE_ACCOUNT_ID
+  const token = process.env.CLOUDFLARE_AI_TOKEN
+  if (!account || !token) return 'result'
   try {
-    const { answers } = await decide({
-      model: gateway.decisionModel(TRIAGE_MODEL),
-      state: triageState(event),
-      questions: TRIAGE_QUESTIONS,
-      maxRetries: 1,
-      abortSignal: AbortSignal.timeout(TRIAGE_TIMEOUT_MS),
+    const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/@cf/cloudflare/${TRIAGE_MODEL}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: TRIAGE_MODEL, state: triageState(event), questions: TRIAGE_QUESTIONS }),
+      signal: AbortSignal.timeout(TRIAGE_TIMEOUT_MS),
     })
-    return tierFromDecision(answers.needsPerson.probability)
+    const body = await response.json() as { result?: { answers?: { needsPerson?: { noul?: number } } } }
+    const probability = body.result?.answers?.needsPerson?.noul
+    if (!response.ok || typeof probability !== 'number') throw new Error(`Workers AI answered ${response.status}`)
+    return tierFromDecision(probability)
   } catch (error) {
     console.error('Coordinator triage failed', error instanceof Error ? error.message : error)
     return 'result'
