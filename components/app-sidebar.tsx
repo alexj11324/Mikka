@@ -4,8 +4,7 @@ import { useTranslations } from 'next-intl'
 import * as React from 'react'
 import useSWR from 'swr'
 import { listTeams } from '@/app/actions/teams'
-import { SettingsLink as Link } from '@/components/settings/settings-link'
-import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound, Users } from 'lucide-react'
+import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, SquarePen, SquareUserRound } from 'lucide-react'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
@@ -33,7 +32,7 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
   const { data: teams = [], error: teamsError, mutate: refreshTeams } = useSWR('teams', listTeams)
   const { setOpenMobile, open, openMobile, isMobile } = useSidebar()
   function navigate(next: WorkspaceSection) { if (onNavigate(next)) setOpenMobile(false) }
-  const personal = [{ id: 'inbox', title: i18nText("Overview.sections.inbox"), icon: Inbox }, { id: 'my-issues', title: i18nText("Overview.sections.myIssues"), icon: Scan }, { id: 'agent', title: 'Agent', icon: Send }] as const
+  const personal = [{ id: 'inbox', title: i18nText("Overview.sections.inbox"), icon: Inbox }, { id: 'my-issues', title: i18nText("Overview.sections.myIssues"), icon: Scan }] as const
   const teamItems = [{ id: 'team-home', title: i18nText("Nav.home"), icon: House }, { id: 'team-issues', title: i18nText("Projects.detail.issues"), icon: Layers }, { id: 'team-projects', title: i18nText("Projects.title"), icon: Box }] as const
   return <Sidebar variant="inset" {...props}>
     <SidebarHeader className="pb-4">
@@ -62,7 +61,7 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
           <Collapsible defaultOpen className="group/team"><CollapsibleTrigger render={<SidebarMenuButton aria-label={i18nText("FeatureCopy.c_3e984369", { value0: (team.name) })} />}><SquareUserRound className="text-info-foreground" /><span>{team.name}</span><ChevronDown className="ml-auto transition-transform group-data-closed/team:-rotate-90" /></CollapsibleTrigger>
             <CollapsibleContent><SidebarMenuSub className="mx-0 ml-4 border-0 px-0">{teamItems.map(item => <SidebarMenuSubItem key={item.id}><SidebarMenuSubButton render={<Button variant="ghost" />} className="h-8 w-full justify-start" isActive={teamId === team.id && section === item.id} onClick={() => { if (onTeamNavigate(team.id, item.id)) setOpenMobile(false) }}><item.icon /><span>{item.title}</span></SidebarMenuSubButton></SidebarMenuSubItem>)}</SidebarMenuSub></CollapsibleContent>
           </Collapsible>
-        </SidebarMenuItem>)}<SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/teams" onNavigate={event => { event.preventDefault(); onSettings('/settings/teams') }} />}><Users /><span>{i18nText("FeatureCopy.c_64c7a3ca")}</span></SidebarMenuButton></SidebarMenuItem>{teamsError && <SidebarMenuItem><SidebarMenuButton onClick={() => void refreshTeams()}>{i18nText("FeatureCopy.c_c401eee8")}</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></CollapsibleContent>
+        </SidebarMenuItem>)}{teamsError && <SidebarMenuItem><SidebarMenuButton onClick={() => void refreshTeams()}>{i18nText("FeatureCopy.c_c401eee8")}</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></CollapsibleContent>
       </SidebarGroup></Collapsible>
     </SidebarContent>
     <SidebarRail aria-label={i18nText("Nav.sidebarRail")} title={i18nText("Workspace.toggleSidebar")} aria-expanded={isMobile ? openMobile : open} />

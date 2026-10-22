@@ -11,6 +11,9 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
     await route.continue()
   })
   await register(page)
+  const workspaceSidebar = page.locator('[data-slot="sidebar-container"]')
+  await expect(workspaceSidebar.getByRole('button', { name: 'Agent', exact: true })).toHaveCount(0)
+  await expect(workspaceSidebar.getByRole('link', { name: '浏览与管理团队', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeEnabled()
   await page.route('**/*', route => {
     const request = route.request()

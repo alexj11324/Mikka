@@ -2,7 +2,8 @@
 import { useTranslations } from 'next-intl'
 
 import { useEffect, useState } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { usePathname } from '@/i18n/navigation'
 import { SWRConfig, unstable_serialize } from 'swr'
 import type { listIssues } from '@/app/actions/issues'
 import type { loadTeamDirectory } from '@/app/actions/teams'
