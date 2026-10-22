@@ -12,8 +12,9 @@ import { WorkspaceMenu } from '@/components/workspace-menu'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 import type { SettingsSection } from './settings-view'
 import { useFeatureAvailability } from '@/hooks/use-feature-availability'
+import { withBasePath } from '@/lib/base-path'
 
-function GithubIcon() { return <img src="/icons/github.svg" alt="" className="size-4 shrink-0" /> }
+function GithubIcon() { return <img src={withBasePath('/icons/github.svg')} alt="" className="size-4 shrink-0" /> }
 
 const navigation = [
   { title: 'Personal', items: [

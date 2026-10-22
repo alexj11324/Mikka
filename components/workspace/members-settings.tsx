@@ -75,6 +75,7 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty";
 import { withBasePath } from "@/lib/base-path";
+import { cn } from "@/lib/utils";
 
 async function fetchSettings(url: string): Promise<WorkspaceSettings> {
   const response = await fetch(url);
@@ -92,10 +93,12 @@ export function MembersSettings({
   initial,
   workspaceId,
   inviteInitially,
+  embedded = false,
 }: {
   initial?: WorkspaceSettings;
   workspaceId?: string;
   inviteInitially: boolean;
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const t = useTranslations("Members");
@@ -260,9 +263,10 @@ export function MembersSettings({
     downloadRef.current.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+  const MainContent = embedded ? 'div' : 'main'
   return (
-    <div data-settings-state={fetchError ? "error" : ready ? "ready" : "loading"} className="flex min-h-dvh flex-col bg-background text-foreground md:flex-row">
-      <aside
+    <div data-settings-state={fetchError ? "error" : ready ? "ready" : "loading"} className={cn(!embedded && "flex min-h-dvh flex-col bg-background text-foreground md:flex-row", embedded && "w-full min-w-0")}>
+      {!embedded && <aside
         className="flex shrink-0 flex-col gap-7 p-3 md:w-60 md:py-5"
         aria-label={t("navLabel")}
       >
@@ -329,16 +333,16 @@ export function MembersSettings({
             {t("brandFooter")}
           </span>
         </div>
-      </aside>
-      <main className="flex min-w-0 flex-1 flex-col md:py-2 md:pr-2">
-        <div className="flex min-h-[calc(100dvh-1rem)] flex-col rounded-xl border bg-sidebar/40">
-          <header className="flex h-12 items-center gap-2 px-5 text-xs text-muted-foreground md:px-8">
+      </aside>}
+      <MainContent className={cn("min-w-0", embedded ? "w-full" : "flex flex-1 flex-col md:py-2 md:pr-2")}>
+        <div className={cn("flex flex-col", embedded ? "gap-6" : "min-h-[calc(100dvh-1rem)] rounded-xl border bg-sidebar/40")}>
+          {!embedded && <header className="flex h-12 items-center gap-2 px-5 text-xs text-muted-foreground md:px-8">
             <Users className="size-3.5" />
             <span>{t("breadcrumbSettings")}</span>
             <ChevronRight className="size-3" />
             <span>{t("title")}</span>
-          </header>
-          <div className="flex w-full flex-col gap-6 px-5 py-5 md:px-10 lg:px-14 lg:py-8">
+          </header>}
+          <div className={cn("flex w-full flex-col gap-6 px-5 py-5 md:px-10 lg:px-14 lg:py-8", embedded && "px-0 py-0 md:px-0 lg:px-0 lg:py-0")}>
             <h1 className="text-2xl font-medium tracking-tight">{t("title")}</h1>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex w-full items-center gap-2 sm:w-auto">
@@ -659,7 +663,7 @@ export function MembersSettings({
             </div>
           </div>
         </div>
-      </main>
+      </MainContent>
       <InviteMembersDialog
         key={data.workspace.id}
         workspaceId={data.workspace.id}
