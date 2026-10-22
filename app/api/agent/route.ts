@@ -27,7 +27,9 @@ export async function POST(request: Request) {
   if (request.headers.get('sec-fetch-site') === 'cross-site') {
     return new Response('不允许跨站调用。', { status: 403, headers: errorHeaders })
   }
+  const startedAt = performance.now()
   const session = await auth.api.getSession({ headers: request.headers })
+  const authenticatedAt = performance.now()
   if (!session?.user) return new Response('请先登录后再使用 Agent。', { status: 401, headers: errorHeaders })
   if (!request.headers.get('content-type')?.startsWith('application/json')) {
     return new Response('请发送 JSON 格式的请求。', { status: 415, headers: errorHeaders })
@@ -92,6 +94,7 @@ export async function POST(request: Request) {
   })
   const result = streamText({
     model: opencode('deepseek-v4.1-flash'),
+    providerOptions: { opencode: { reasoningEffort: 'medium' } },
     system: systemPrompt,
     messages,
     maxRetries: 1,
@@ -102,7 +105,10 @@ export async function POST(request: Request) {
     },
   })
   return createUIMessageStreamResponse({
-    headers: { 'Cache-Control': 'private, no-store', 'X-Accel-Buffering': 'no', 'X-Agent-Session-Id': sessionId, 'X-Agent-Turn-Id': turnId },
+    headers: {
+      'Cache-Control': 'private, no-store', 'X-Accel-Buffering': 'no', 'X-Agent-Session-Id': sessionId, 'X-Agent-Turn-Id': turnId,
+      'Server-Timing': `auth;dur=${(authenticatedAt - startedAt).toFixed(1)}, prepare;dur=${(performance.now() - authenticatedAt).toFixed(1)}`,
+    },
     stream: persistAgentStream(toUIMessageStream({
       stream: result.stream,
       sendReasoning: false,
