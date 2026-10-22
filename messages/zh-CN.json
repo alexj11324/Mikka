@@ -35,9 +35,9 @@
     },
     "priority": {
       "urgent": "紧急",
-      "high": "高优先级",
-      "normal": "普通优先级",
-      "low": "低优先级"
+      "high": "高",
+      "normal": "中",
+      "low": "低"
     },
     "create": {
       "title": "新建任务",
@@ -187,7 +187,7 @@
     "testWorkspaceSessionFailed": "浏览器未能保持测试会话。请允许第三方 Cookie，或在独立标签页打开预览后再试。",
     "testWorkspaceFailed": "暂时无法进入测试工作台，请稍后重试。",
     "testIssueLayoutTitle": "【测试】Issue 详情页布局与阅读体验",
-    "testIssueLayoutDescription": "这是一条独立测试任务。可验证标题编辑、正文排版、属性修改与自动保存，不会影响其他账号的数据。",
+    "testIssueLayoutDescription": "这是一条独立测试任务。可验证标题编辑、正文排版、属性修改与自动保存，不会影响其他账号的\u6570据。",
     "testIssueSwitchTitle": "【测试】任务切换与会话复用",
     "testIssueSwitchDescription": "用于验证上一条／下一条任务切换。再次进入测试工作台时会复用账号和已有任务。"
   },
@@ -330,7 +330,7 @@
     "moved": "已移至{status}",
     "moveFailed": "移动失败，请重试。",
     "moveRollback": "状态保存失败，已恢复原位置。",
-    "instructions": "左右滚动查看全部状态，拖动卡片跨列更新任务，点击标题打开详情。",
+    "instructions": "左右滚动查看全部状态，拖动卡片跨列更新任\u52a1，点击标题打开详情。",
     "scrollLeft": "向左滚动看板",
     "scrollRight": "向右滚动看板",
     "keyboardHint": "使用触控板左右滑动、底部滚动条或左右按钮浏览。聚焦此区域后，可用左右方向键滚动，Home 返回开头，End 移至末尾。聚焦可拖动卡片后，按空格开始拖动，使用方向键跨列移动，再按空格放下；Escape 取消。",
@@ -357,7 +357,7 @@
     "draftAuthor": "草稿作者",
     "unsavedDraft": "未保存草稿",
     "editorLabel": "任务描述编辑器",
-    "placeholderCompact": "\u6dfb\u52a0\u63cf\u8ff0\u2026",
+    "placeholderCompact": "添加描述…",
     "placeholderFull": "描述背景与验收标准，输入 / 插入内容…",
     "selectionRequired": "请先选中一段尚未评论的正文。",
     "hint": "输入 / 插入内容，选中文字设置格式",
@@ -612,7 +612,7 @@
         }
       }
     },
-    "descriptionLabel": "任务描述",
+    "descriptionLabel": "任务\u63cf述",
     "editorAria": "{label}编辑器"
   },
   "Devices": {
@@ -1083,7 +1083,7 @@
     "invitation": {
       "pending": "待接受 · 链接邀请",
       "expired": "已过期",
-      "revoke": "撤销邀请"
+      "revoke": "撤\u9500邀请"
     },
     "exportCsv": "导出 CSV",
     "downloadCsv": "下载成员 CSV",
@@ -1187,9 +1187,9 @@
     "priority": {
       "none": "无优先级",
       "urgent": "紧急",
-      "high": "高优先级",
-      "normal": "普通优先级",
-      "low": "低优先级"
+      "high": "高",
+      "normal": "中",
+      "low": "低"
     },
     "color": {
       "green": "绿色",
@@ -1457,8 +1457,8 @@
     },
     "noEmailService": "当前未接入邮件服务，将生成邮箱专属邀请链接，不会自动发送邮件。",
     "pendingCount": "{count} 位待邀请",
-    "inviteHint": "邀请同事一起协作",
-    "creating": "正在创建…",
+    "inviteHint": "邀\u8bf7同事一起协作",
+    "creating": "正在\u521b建…",
     "createLinks": "创建邀请链接",
     "linksCreated": "已创建 {count} 个邀请链接",
     "linksDescription": "尚未发送邮件。请将链接私下发送给对应成员；7 天内有效，仅限对应邮箱登录后接受。",
@@ -1501,8 +1501,8 @@
   "Acceptance": {
     "recovering": "正在恢复验收会话…",
     "allowAndRetry": "允许预览会话并重试",
-    "safeSessionNote": "iOS Safari 可能阻止内嵌预览的会话。请优先在新标签页打开验收，使用独立页面建立安全会话，无需关闭“阻止跨网站跟踪”。如需留在预览内，可尝试下方授权重试。",
-    "storageBlocked": "浏览器未允许内嵌预览使用会话。请点击“在新标签页打开验收”，在独立页面继续，无需关闭 Safari 的隐私保护。",
+  "safeSessionNote": "iOS Safari 可能阻止内嵌预览的会话。请优先在新标签页打开验收，使用独立页面建立安全会话，无需关闭“阻止跨网站跟踪”。如需留在预览内，可尝试下方授权重试。",
+  "storageBlocked": "浏览器未允许内嵌预览使用会话。请点击“在新标签页打开验收”，在独立页面继续，无需关闭 Safari 的隐私保护。" ,
     "title": "继续验收",
     "description": "未能建立或保留验收会话。无需填写邮箱、密码或进行 GitHub 授权。",
     "reenter": "重新进入验收工作台",
@@ -1626,7 +1626,7 @@
     "suggestions": "推荐建议",
     "tryStartingWithTheseTasks": "试试从这些事情开始",
     "hideSuggestions": "隐藏推荐建议",
-    "recentConversations": "最近对话",
+    "recentConversations": "最近对\u8bdd",
     "breakDownAProject": "拆解项目计划",
     "turnAnIdeaIntoClearPhasesAnd": "把想法拆成清晰的阶段和可执行任务",
     "helpMeBreakANewProjectInto": "帮我把一个新项目拆解成清晰的阶段、交付物和可执行任务。",
@@ -1759,7 +1759,7 @@
     "ThisPartCannotBeDisplayedThe": "数据格式不正确，这部分无法显示。其余内容已保留。",
     "noDisplayableContent": "回复没有可显示的内容",
     "theModelReturnedNoDisplayableTextOr": "模型没有返回可显示的正文或卡片。",
-    "generatingResponse": "回复生成中",
+    "generatingResponse": "回复\u751f成中",
     "pleaseWait": "请稍候",
     "loading": "加载中",
     "askAgent": "向 Agent 提问",
