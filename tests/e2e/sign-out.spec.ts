@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { test, expect, register, app } from './fixtures'
 
+test.use({ expectedConsoleErrors: [{ path: app('/api/auth/sign-out'), message: 'Failed to load resource: the server responded with a status of 400 (Bad Request)' }] })
+
 for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
   test(`sign-out hides private UI while pending, restores failures, and revokes the session: ${path}`, async ({ page, context }) => {
     const english = path.startsWith('/en/')
@@ -54,8 +56,12 @@ for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
     await hold()
     release(true)
     await expect(pending).not.toBeVisible()
+    if (mobile) {
+      await page.keyboard.press('Escape')
+      await expect(page.locator('[data-slot="sidebar"][data-mobile="true"]')).not.toBeVisible()
+    }
     if (!mobile) await expect(accountMenu).toBeVisible()
-    await expect(page.getByRole('alert')).toContainText(english ? 'Sign out failed. Please try again.' : '退出失败，请稍后重试。')
+    await expect(page.getByRole('alert').filter({ hasText: english ? 'Sign out failed. Please try again.' : '退出失败，请稍后重试。' })).toBeVisible()
     expect((await (await page.request.get(app('/api/auth/get-session'))).json()).user).toBeTruthy()
     await page.unroute(routePattern)
 
@@ -98,7 +104,7 @@ test('sign-out waits for editor validation and preserves saved edits when revoca
   }
   await title.fill('')
   await signOut()
-  await expect(page.getByRole('alert')).toContainText('请填写任务标题，修改尚未保存。')
+  await expect(page.getByRole('alert').filter({ hasText: '请填写任务标题，修改尚未保存。' })).toBeVisible()
   await expect(title).toHaveValue('')
   expect(requests).toBe(0)
   await expect(page.getByRole('status', { name: '正在退出…', exact: true })).toHaveCount(0)
@@ -110,7 +116,7 @@ test('sign-out waits for editor validation and preserves saved edits when revoca
   await expect(title).not.toBeVisible()
   release()
   await expect(title).toHaveValue(updated)
-  await expect(page.getByRole('alert')).toContainText('退出失败，请稍后重试。')
+  await expect(page.getByRole('alert').filter({ hasText: '退出失败，请稍后重试。' })).toBeVisible()
   await page.reload()
   await expect(title).toHaveValue(updated)
 })
