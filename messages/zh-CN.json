@@ -1872,7 +1872,7 @@
       "noDevice": "未选择机器"
     },
     "picker": {
-      "title": "选择图标",
+      "title": "选择头像",
       "open": "更换图标和颜色",
       "icons": "图标",
       "search": "搜索",
@@ -1898,7 +1898,8 @@
         "orange": "橙",
         "pink": "粉",
         "slate": "灰蓝"
-      }
+      },
+      "none": "不用图标"
     },
     "new": {
       "title": "新建 Agent",

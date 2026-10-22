@@ -9,7 +9,7 @@ import type { AgentStatus } from '@/app/actions/agents'
 import type { SupportedHarness } from '@/lib/db/schema'
 import { agentColorFor, isBuiltInAgentRole, type AgentColor, type AgentRole } from '@/lib/agent-roles'
 import { cn } from '@/lib/utils'
-import { agentGlyph, AVATAR_TINTS, ROLE_AVATAR_COLORS, STATUS_DOTS } from './agent-icons'
+import { agentGlyph, AVATAR_GRADIENTS, ROLE_AVATAR_COLORS, STATUS_DOTS } from './agent-icons'
 
 export function AgentGlyph({ role, icon }: { role: AgentRole; icon: string | null }) {
   const glyph = agentGlyph(role, icon)
@@ -17,8 +17,9 @@ export function AgentGlyph({ role, icon }: { role: AgentRole; icon: string | nul
 }
 
 /**
- * A role's avatar: a soft-tinted circle with its icon or emoji. Built-in
- * roles keep their fixed tint until the person picks a colour.
+ * A role's avatar: a gradient sphere in its colour, after HeroUI's avatar
+ * artwork, with the icon or emoji on top only when the person picked one.
+ * Built-in roles keep their fixed colour until the person picks another.
  */
 export function AgentAvatar({ role, name, icon, color, size = 'row' }: {
   role: AgentRole
@@ -28,10 +29,11 @@ export function AgentAvatar({ role, name, icon, color, size = 'row' }: {
   /** preview: the picker footer; row: a list row; header: the detail page. */
   size?: 'preview' | 'row' | 'header'
 }) {
-  const builtInTint = isBuiltInAgentRole(role) && !color ? ROLE_AVATAR_COLORS[role] : null
+  const shade = color ?? (isBuiltInAgentRole(role) ? ROLE_AVATAR_COLORS[role] : agentColorFor(name, null))
   return <SoftAvatar size={size === 'header' ? 'lg' : 'sm'} className={cn(size === 'preview' && 'size-7', size === 'row' && 'size-9', size === 'header' && 'size-11')}>
-    <SoftAvatarFallback color={builtInTint ?? undefined} className={cn(!builtInTint && AVATAR_TINTS[agentColorFor(name, color)])}>
-      <AgentGlyph role={role} icon={icon} />
+    <SoftAvatarFallback className={cn('relative overflow-hidden text-avatar-glyph inset-shadow-sm', AVATAR_GRADIENTS[shade])}>
+      <span className="absolute top-[8%] left-[14%] size-1/2 rounded-full bg-avatar-highlight blur-sm" aria-hidden="true" />
+      {icon && <span className="relative drop-shadow-sm"><AgentGlyph role={role} icon={icon} /></span>}
     </SoftAvatarFallback>
   </SoftAvatar>
 }

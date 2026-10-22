@@ -115,7 +115,7 @@ function AgentPresets({ devices, onBack, onCustom, onCreated }: { devices: Devic
     setError('')
     const result = await createAgent({
       name: shownName.trim(), description: t(`templates.${template}.summary`), instructions: AGENT_TEMPLATES[template].instructions,
-      icon: AGENT_TEMPLATES[template].icon, color: null, deviceId: defaultDeviceId(devices), harness: null, model: null, effort: null,
+      icon: null, color: null, deviceId: defaultDeviceId(devices), harness: null, model: null, effort: null,
     })
     setBusy(false)
     if ('error' in result) { setError(translateError(result.error)); return }

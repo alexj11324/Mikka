@@ -98,6 +98,20 @@
 --color-avatar-violet-foreground: var(--avatar-violet-foreground);
 --color-avatar-sky: var(--avatar-sky);
 --color-effort: var(--effort);
+--color-avatar-glyph: var(--avatar-glyph);
+--color-avatar-violet-from: var(--avatar-violet-from);
+--color-avatar-violet-to: var(--avatar-violet-to);
+--color-avatar-sky-from: var(--avatar-sky-from);
+--color-avatar-sky-to: var(--avatar-sky-to);
+--color-avatar-teal-from: var(--avatar-teal-from);
+--color-avatar-teal-to: var(--avatar-teal-to);
+--color-avatar-orange-from: var(--avatar-orange-from);
+--color-avatar-orange-to: var(--avatar-orange-to);
+--color-avatar-pink-from: var(--avatar-pink-from);
+--color-avatar-pink-to: var(--avatar-pink-to);
+--color-avatar-slate-from: var(--avatar-slate-from);
+--color-avatar-slate-to: var(--avatar-slate-to);
+--color-avatar-highlight: var(--avatar-highlight);
 --color-effort-strong: var(--effort-strong);
 --color-avatar-sky-foreground: var(--avatar-sky-foreground);
 --color-avatar-teal: var(--avatar-teal);
@@ -190,6 +204,20 @@
 --avatar-violet-foreground: oklch(0.5 0.2 295);
 --avatar-sky: oklch(0.95 0.035 230);
 --effort: oklch(0.86 0.08 228);
+--avatar-glyph: oklch(1 0 0);
+--avatar-violet-from: oklch(0.8 0.13 300);
+--avatar-violet-to: oklch(0.56 0.22 330);
+--avatar-sky-from: oklch(0.82 0.1 222);
+--avatar-sky-to: oklch(0.57 0.2 268);
+--avatar-teal-from: oklch(0.84 0.14 155);
+--avatar-teal-to: oklch(0.6 0.12 195);
+--avatar-orange-from: oklch(0.87 0.12 75);
+--avatar-orange-to: oklch(0.66 0.19 40);
+--avatar-pink-from: oklch(0.8 0.12 12);
+--avatar-pink-to: oklch(0.6 0.21 28);
+--avatar-slate-from: oklch(0.8 0.03 255);
+--avatar-slate-to: oklch(0.5 0.05 260);
+--avatar-highlight: oklch(1 0 0 / 0.7);
 --effort-strong: oklch(0.62 0.14 235);
 --avatar-sky-foreground: oklch(0.52 0.13 235);
 --avatar-teal: oklch(0.95 0.04 185);
@@ -262,6 +290,7 @@
 --avatar-violet-foreground: oklch(0.82 0.1 300);
 --avatar-sky: oklch(0.3 0.06 235);
 --effort: oklch(0.45 0.1 235);
+--avatar-glyph: oklch(1 0 0);
 --effort-strong: oklch(0.8 0.1 228);
 --avatar-sky-foreground: oklch(0.82 0.09 230);
 --avatar-teal: oklch(0.3 0.05 185);
@@ -273,6 +302,7 @@
 --avatar-slate: oklch(0.3 0.02 257);
 --avatar-slate-foreground: oklch(0.82 0.02 257);
 }
+
 
 @layer base {
 * {

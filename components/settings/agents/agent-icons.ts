@@ -162,27 +162,17 @@ export function agentGlyph(role: AgentRole, icon: string | null): { icon: Lucide
   return found ? { icon: found } : { emoji: id }
 }
 
-/** Built-in roles keep HeroUI's own soft colours; custom roles use the picker palette. */
-export const ROLE_AVATAR_COLORS = { coordinator: 'accent', worker: 'success', reviewer: 'warning' } as const
+/** Built-in roles' gradient until the person picks a colour: blue, green and orange, after their HeroUI tones. */
+export const ROLE_AVATAR_COLORS = { coordinator: 'sky', worker: 'teal', reviewer: 'orange' } as const satisfies Record<Exclude<AgentRole, 'custom'>, AgentColor>
 
-/** Tailwind classes per palette colour, written out in full so Tailwind sees them. */
-export const AVATAR_TINTS: Record<AgentColor, string> = {
-  violet: 'bg-avatar-violet text-avatar-violet-foreground',
-  sky: 'bg-avatar-sky text-avatar-sky-foreground',
-  teal: 'bg-avatar-teal text-avatar-teal-foreground',
-  orange: 'bg-avatar-orange text-avatar-orange-foreground',
-  pink: 'bg-avatar-pink text-avatar-pink-foreground',
-  slate: 'bg-avatar-slate text-avatar-slate-foreground',
-}
-
-/** The saturated tone of each palette colour, for the picker's swatches. */
-export const AVATAR_SWATCHES: Record<AgentColor, string> = {
-  violet: 'bg-avatar-violet-foreground',
-  sky: 'bg-avatar-sky-foreground',
-  teal: 'bg-avatar-teal-foreground',
-  orange: 'bg-avatar-orange-foreground',
-  pink: 'bg-avatar-pink-foreground',
-  slate: 'bg-avatar-slate-foreground',
+/** The gradient sphere per palette colour, written out in full so Tailwind sees them. */
+export const AVATAR_GRADIENTS: Record<AgentColor, string> = {
+  violet: 'bg-linear-135 from-avatar-violet-from from-20% to-avatar-violet-to',
+  sky: 'bg-linear-135 from-avatar-sky-from from-20% to-avatar-sky-to',
+  teal: 'bg-linear-135 from-avatar-teal-from from-20% to-avatar-teal-to',
+  orange: 'bg-linear-135 from-avatar-orange-from from-20% to-avatar-orange-to',
+  pink: 'bg-linear-135 from-avatar-pink-from from-20% to-avatar-pink-to',
+  slate: 'bg-linear-135 from-avatar-slate-from from-20% to-avatar-slate-to',
 }
 
 /** The dot in each status badge. */

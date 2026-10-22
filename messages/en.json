@@ -1872,7 +1872,7 @@
       "noDevice": "No machine"
     },
     "picker": {
-      "title": "Choose an icon",
+      "title": "Choose avatar",
       "open": "Change icon and colour",
       "icons": "Icons",
       "search": "Search",
@@ -1898,7 +1898,8 @@
         "orange": "Orange",
         "pink": "Pink",
         "slate": "Slate"
-      }
+      },
+      "none": "No icon"
     },
     "new": {
       "title": "New agent",

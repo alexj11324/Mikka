@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Briefcase, Cat, Code, Heart, Lamp, PenLine, Search, ShieldCheck, Shuffle, Smile } from 'lucide-react'
+import { Ban, Briefcase, Cat, Code, Heart, Lamp, PenLine, Search, ShieldCheck, Shuffle, Smile } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover'
@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { AGENT_COLORS, isBuiltInAgentRole, type AgentColor, type AgentRole } from '@/lib/agent-roles'
 import { cn } from '@/lib/utils'
-import { AGENT_EMOJIS, AGENT_ICONS, AVATAR_SWATCHES, EMOJI_CATEGORIES, ICON_CATEGORIES, agentGlyph, type EmojiCategory, type IconCategory } from './agent-icons'
+import { AGENT_EMOJIS, AGENT_ICONS, AVATAR_GRADIENTS, EMOJI_CATEGORIES, ICON_CATEGORIES, agentGlyph, type EmojiCategory, type IconCategory } from './agent-icons'
 import { AgentAvatar } from './agent-parts'
 
 const CATEGORY_GLYPHS: Record<IconCategory | EmojiCategory, typeof Briefcase> = {
@@ -32,7 +32,7 @@ export function AvatarPicker({ role, name, icon, color, onChange }: {
 }) {
   const t = useTranslations('Agents.picker')
   const current = agentGlyph(role, icon)
-  const [kind, setKind] = useState<'icon' | 'emoji'>('emoji' in current ? 'emoji' : 'icon')
+  const [kind, setKind] = useState<'icon' | 'emoji'>(icon && 'emoji' in current ? 'emoji' : 'icon')
   const [iconCategory, setIconCategory] = useState<IconCategory>(() => AGENT_ICONS.find(item => item.id === icon)?.category ?? 'work')
   const [emojiCategory, setEmojiCategory] = useState<EmojiCategory>(() => AGENT_EMOJIS.find(item => item.char === icon)?.category ?? 'faces')
   const [query, setQuery] = useState('')
@@ -41,7 +41,7 @@ export function AvatarPicker({ role, name, icon, color, onChange }: {
   const emojis = AGENT_EMOJIS.filter(item => needle ? item.keywords.includes(needle) : item.category === emojiCategory)
   const categories = kind === 'icon' ? ICON_CATEGORIES : EMOJI_CATEGORIES
   const category = kind === 'icon' ? iconCategory : emojiCategory
-  const chosenLabel = 'icon' in current ? AGENT_ICONS.find(item => item.icon === current.icon)?.id ?? '' : current.emoji
+  const chosenLabel = !icon ? '' : 'icon' in current ? AGENT_ICONS.find(item => item.icon === current.icon)?.id ?? '' : current.emoji
 
   return <Popover onOpenChange={open => { if (!open) setQuery('') }}>
     <PopoverTrigger render={<Button variant="ghost" className="size-11 shrink-0 rounded-full p-0" aria-label={t('open')} title={t('open')} />}>
@@ -69,6 +69,10 @@ export function AvatarPicker({ role, name, icon, color, onChange }: {
       <div className="flex flex-col gap-1 p-2">
         <span className="px-1 text-xs font-medium text-muted-foreground">{needle ? t('results') : t(`categories.${category}`)}</span>
         <div className="grid max-h-36 auto-rows-min grid-cols-8 gap-0.5 overflow-y-auto">
+          {!needle && <Button type="button" variant="ghost" size="icon" aria-label={t('none')} title={t('none')} aria-pressed={!icon}
+            className={cn('text-muted-foreground', !icon && 'bg-agent-accent/10 text-agent-accent hover:bg-agent-accent/15')} onClick={() => onChange({ icon: null, color })}>
+            <Ban data-icon="inline-start" />
+          </Button>}
           {kind === 'icon'
             ? icons.map(item => <Button key={item.id} type="button" variant="ghost" size="icon" aria-label={item.id} aria-pressed={icon === item.id}
                 className={cn(icon === item.id && 'bg-agent-accent/10 text-agent-accent hover:bg-agent-accent/15')} onClick={() => onChange({ icon: item.id, color })}>
@@ -89,7 +93,7 @@ export function AvatarPicker({ role, name, icon, color, onChange }: {
             className="size-6 min-w-6 rounded-full p-0 aria-pressed:ring-2 aria-pressed:ring-agent-accent"><Shuffle aria-hidden="true" /></ToggleGroupItem>
           {AGENT_COLORS.map(item => <ToggleGroupItem key={item} value={item} size="sm" aria-label={t(`colors.${item}`)} title={t(`colors.${item}`)}
             className="size-6 min-w-6 rounded-full p-0 aria-pressed:ring-2 aria-pressed:ring-agent-accent">
-            <span className={cn('size-3.5 rounded-full', AVATAR_SWATCHES[item])} aria-hidden="true" />
+            <span className={cn('size-4 rounded-full', AVATAR_GRADIENTS[item])} aria-hidden="true" />
           </ToggleGroupItem>)}
         </ToggleGroup>
       </div>
