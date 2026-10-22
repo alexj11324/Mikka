@@ -1,9 +1,9 @@
 import 'server-only'
-import { and, asc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
 import { coordinatorEvents, coordinatorMessages, coordinatorSessions } from '@/lib/db/schema'
-import { eventPrompt, type StoredMessage } from '@/lib/coordinator/context'
+import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -68,9 +68,15 @@ export async function appendMessages(userId: string, holder: string, messages: M
         id: crypto.randomUUID(), userId, position: first + index, message: message as unknown as Record<string, unknown>,
       })))
     }
-    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(Date.now() + LEASE_MS), updatedAt: new Date() })
+    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(Date.now() + LEASE_MS), lastError: null, lastErrorAt: null, updatedAt: new Date() })
       .where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.leaseHolder, holder)))
   })
+}
+
+/** Records why a turn failed and lets go of the lease. */
+export async function failTurn(userId: string, holder: string, error: string): Promise<void> {
+  await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, lastError: error.slice(0, 1000), lastErrorAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.leaseHolder, holder)))
 }
 
 /** The summary so far, the memory, and every message after the summary, oldest first. */
@@ -103,10 +109,40 @@ export async function editMemory<T>(userId: string, edit: (memory: string) => { 
   })
 }
 
+export interface ChatView {
+  items: ChatItem[]
+  /** A turn holds the lease or messages wait in the inbox: a reply is coming. */
+  working: boolean
+  /** Why the last turn failed, when no turn has answered since. */
+  error: string | null
+}
+
+/** The latest of the conversation for the chat, oldest first. */
+export async function chatView(userId: string, limit = 200): Promise<ChatView> {
+  const [session] = await db.select().from(coordinatorSessions).where(eq(coordinatorSessions.userId, userId)).limit(1)
+  const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
+    .from(coordinatorMessages).where(eq(coordinatorMessages.userId, userId))
+    .orderBy(desc(coordinatorMessages.position)).limit(limit)
+  // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.
+  const waiting = await db.select().from(coordinatorEvents)
+    .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt)))
+    .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+  const last = rows[0]?.position ?? 0
+  const pending = waiting.filter(event => event.kind === 'user_message').map((event, index) => ({
+    position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage,
+  }))
+  const leased = Boolean(session?.leaseUntil && session.leaseUntil.getTime() > Date.now())
+  return {
+    items: chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending]),
+    working: leased || waiting.length > 0,
+    error: session?.lastError ?? null,
+  }
+}
+
 /** The whole conversation for display, newest last. */
 export async function conversationForDisplay(userId: string, limit = 200) {
   const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(eq(coordinatorMessages.userId, userId))
-    .orderBy(sql`${coordinatorMessages.position} desc`).limit(limit)
+    .orderBy(desc(coordinatorMessages.position)).limit(limit)
   return rows.reverse()
 }
