@@ -28,16 +28,22 @@ test("成员导航、邀请取消、角色选择、创建和撤销邀请、管�
     await route.continue();
   });
   await register(page);
+  const workspaceSidebar = page.locator('[data-slot="sidebar-container"]');
+  await expect(workspaceSidebar.getByRole("link", { name: "成员", exact: true })).toHaveCount(0);
+  await expect(workspaceSidebar.getByRole("link", { name: "团队", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "工作区菜单", exact: true }).click();
+  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  const settingsSidebar = page.locator('[data-slot="sidebar-container"]');
+  await expect(settingsSidebar.getByRole("link", { name: "成员", exact: true })).toBeVisible();
+  await expect(settingsSidebar.getByRole("link", { name: "团队", exact: true })).toBeVisible();
+  await settingsSidebar.getByRole("link", { name: "成员", exact: true }).click();
   await page.getByRole("button", { name: "邀请成员", exact: true }).click();
-  try {
-    await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeVisible();
-    await expect(page.getByRole('status', { name: '正在加载成员' })).toBeVisible();
-  } finally {
-    release();
-  }
   const dialog = page.getByRole("dialog", { name: "邀请成员", exact: true });
   await expect(dialog).toBeVisible();
   expect(initialRequests).toBe(1);
+  const resumed = page.waitForResponse(response => new URL(response.url()).pathname === app('/api/workspace'));
+  release();
+  await resumed;
   await page.unroute('**/api/workspace');
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
   await expect(dialog).not.toBeVisible();

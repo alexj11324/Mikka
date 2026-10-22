@@ -6,5 +6,8 @@
       "*": false,
       "**": false
     }
-  }
+  },
+  "crons": [
+    { "path": "/mikka/api/cron/linear-sync", "schedule": "0 4 * * *" }
+  ]
 }

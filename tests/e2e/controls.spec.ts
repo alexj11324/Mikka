@@ -28,9 +28,9 @@ const surfaces: { name: string; scope?: 'dialog' | 'menu'; prepare: (page: Page)
     await page.getByRole('button', { name: /^任务状态：/ }).click()
     await expect(page.getByRole('menu')).toBeVisible()
   } },
-  { name: '账户菜单', scope: 'menu', prepare: async page => {
+  { name: '工作区菜单', scope: 'menu', prepare: async page => {
     await page.goto(app('/'))
-    await page.getByRole('button', { name: '账户菜单', exact: true }).click()
+    await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
     await expect(page.getByRole('menu')).toBeVisible()
   } },
 ]

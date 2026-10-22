@@ -1,14 +1,20 @@
 "use client";
 
-import { Fragment, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { Link, useRouter } from "@/i18n/navigation";
+import useSWR from "swr";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import {
   ArrowDown,
+  ArrowLeft,
   ArrowUp,
+  Building2,
+  ChevronRight,
   Download,
   Info,
   MoreHorizontal,
   Search,
+  Shield,
   Users,
 } from "lucide-react";
 import type { WorkspaceSettings } from "@/lib/workspace-access";
@@ -17,9 +23,8 @@ import {
   revokeWorkspaceInvitation,
   updateWorkspaceMember,
 } from "@/app/actions/workspace";
-import { useActionError } from "@/lib/use-action-error";
 import { InviteMembersDialog } from "@/components/workspace/invite-members-dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/reui/badge";
 import { UserAvatar } from "@/components/user-avatar";
 import {
@@ -68,8 +73,26 @@ import {
   EmptyDescription,
   EmptyMedia,
 } from "@/components/ui/empty";
+import { withBasePath } from "@/lib/base-path";
+import { useActionError } from "@/lib/use-action-error";
+import { SettingsDataState } from "@/components/settings/settings-data-state";
+import { cn } from "@/lib/utils";
 
-
+async function fetchSettings(url: string): Promise<WorkspaceSettings> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    const message =
+      typeof payload === "object" &&
+      payload !== null &&
+      "error" in payload &&
+      typeof payload.error === "string"
+        ? payload.error
+        : "Failed to load members.";
+    throw new Error(message);
+  }
+  return response.json();
+}
 type Change = {
   userId: string;
   name: string;
@@ -78,28 +101,51 @@ type Change = {
 };
 
 export function MembersSettings({
-  data,
+  initial,
+  workspaceId,
   inviteInitially,
-  fetchError,
-  mutate,
+  embedded = false,
 }: {
-  data: WorkspaceSettings;
+  initial?: WorkspaceSettings;
+  workspaceId?: string;
   inviteInitially: boolean;
-  fetchError?: Error;
-  mutate: () => Promise<unknown>;
+  embedded?: boolean;
 }) {
   const t = useTranslations("Members");
+  const translateError = useActionError();
   const commonT = useTranslations("Common");
   const format = useFormatter();
   const locale = useLocale();
-  const translateError = useActionError();
-
+  const router = useRouter();
+  const requestedWorkspaceId = initial?.workspace.id ?? workspaceId;
+  const settingsUrl = requestedWorkspaceId
+    ? `/api/workspace?workspace=${encodeURIComponent(requestedWorkspaceId)}`
+    : "/api/workspace";
+  const {
+    data: fetchedData,
+    error: fetchError,
+    mutate,
+  } = useSWR<WorkspaceSettings>(withBasePath(settingsUrl), fetchSettings, {
+    fallbackData: initial,
+    revalidateOnMount: true,
+  });
+  const ready = Boolean(fetchedData ?? initial);
+  const data = fetchedData ?? initial ?? {
+    workspace: { id: "", name: "" },
+    choices: [],
+    currentUserId: "",
+    role: "member" as const,
+    currentUser: { email: "", image: null },
+    members: [],
+    invitations: [],
+  };
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [ascending, setAscending] = useState(true);
-  const [inviteOpen, setInviteOpen] = useState(
-    inviteInitially && data.role === "admin",
-  );
+  const [inviteOpen, setInviteOpen] = useState(false);
+  useEffect(() => {
+    if (inviteInitially && ready && data.role === "admin") setInviteOpen(true);
+  }, [inviteInitially, ready, data.role]);
   const [change, setChange] = useState<Change | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -228,8 +274,85 @@ export function MembersSettings({
     downloadRef.current.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+  if (!ready) return <SettingsDataState title={t("title")} error={fetchError} onRetry={() => void mutate()} />
+  const MainContent = embedded ? 'div' : 'main'
   return (
-    <section className="flex min-w-0 flex-col gap-6" aria-label={t("title")}>
+    <div data-settings-state={fetchError ? "error" : ready ? "ready" : "loading"} className={cn(!embedded && "flex min-h-dvh flex-col bg-background text-foreground md:flex-row", embedded && "w-full min-w-0")}>
+      {!embedded && <aside
+        className="flex shrink-0 flex-col gap-7 p-3 md:w-60 md:py-5"
+        aria-label={t("navLabel")}
+      >
+        <Link
+          href="/"
+          className={buttonVariants({
+            variant: "ghost",
+            className: "justify-start text-muted-foreground",
+          })}
+        >
+          <ArrowLeft data-icon="inline-start" />
+          {t("backToWorkspace")}
+        </Link>
+        <div className="flex flex-col gap-3 px-1">
+          <div className="flex items-center gap-2 px-2 text-sm text-muted-foreground">
+            <Building2 className="size-4" />
+            <span>{t("workspace")}</span>
+          </div>
+          <Select
+            value={data.workspace.id}
+            items={data.choices.map((item) => ({
+              value: item.id,
+              label: item.name,
+            }))}
+            onValueChange={(value) => {
+              if (value) router.push(`/settings/members?workspace=${value}`);
+            }}
+          >
+            <SelectTrigger aria-label={t("currentWorkspace")} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {data.choices.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-2">
+          <p className="px-3 text-xs text-muted-foreground">{t("manage")}</p>
+          <Link
+            href={`/settings/members?workspace=${data.workspace.id}`}
+            className={buttonVariants({
+              variant: "secondary",
+              className: "justify-start rounded-lg",
+            })}
+            aria-current="page"
+          >
+            <Users data-icon="inline-start" />
+            {t("title")}
+          </Link>
+        </div>
+        <div className="mt-auto hidden flex-col gap-3 px-3 pb-2 md:flex">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Shield className="size-3.5" />
+            {data.role === "admin" ? t("adminAccess") : t("memberAccess")}
+          </div>
+          <span className="text-xs text-muted-foreground">{t("brandFooter")}</span>
+        </div>
+      </aside>}
+      <MainContent className={cn("min-w-0", embedded ? "w-full" : "flex flex-1 flex-col md:py-2 md:pr-2")}>
+        <div className={cn("flex flex-col", embedded ? "gap-6" : "min-h-[calc(100dvh-1rem)] rounded-xl border bg-sidebar/40")}>
+          {!embedded && <header className="flex h-12 items-center gap-2 px-5 text-xs text-muted-foreground md:px-8">
+            <Users className="size-3.5" />
+            <span>{t("breadcrumbSettings")}</span>
+            <ChevronRight className="size-3" />
+            <span>{t("title")}</span>
+          </header>}
+          <div className={cn("flex w-full flex-col gap-6 px-5 py-5 md:px-10 lg:px-14 lg:py-8", embedded && "px-0 py-0 md:px-0 lg:px-0 lg:py-0")}>
+            <h1 className="text-2xl font-medium tracking-tight">{t("title")}</h1>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex w-full items-center gap-2 sm:w-auto">
                 <div className="min-w-0 flex-1 sm:w-72">
@@ -547,6 +670,9 @@ export function MembersSettings({
                 {canManage ? t("footer.admin") : t("footer.member")}
               </p>
             </div>
+          </div>
+        </div>
+      </MainContent>
       <InviteMembersDialog
         key={data.workspace.id}
         workspaceId={data.workspace.id}
@@ -603,6 +729,6 @@ export function MembersSettings({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </div>
   );
 }

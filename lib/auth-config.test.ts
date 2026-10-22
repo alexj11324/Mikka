@@ -36,8 +36,8 @@ test('proxy requires both explicit settings and an HTTPS hub origin', () => {
 
 test('development and hosted CI allow only HTTP loopback origins; the proxy hub always requires HTTPS', () => {
   for (const origin of ['http://localhost:3100', 'http://127.0.0.1:3100', 'http://[::1]:3100']) {
-    assert.deepEqual(authTrustedOrigins({ CI: 'true', BETTER_AUTH_URL: origin }), [origin])
     assert.deepEqual(authTrustedOrigins({ NODE_ENV: 'development', BETTER_AUTH_URL: origin }), [origin])
+    assert.deepEqual(authTrustedOrigins({ CI: 'true', BETTER_AUTH_URL: origin }), [origin])
     assert.throws(() => authTrustedOrigins({ BETTER_AUTH_URL: origin }))
     assert.throws(() => authTrustedOrigins({ NODE_ENV: 'production', BETTER_AUTH_URL: origin }))
     assert.throws(() => authTrustedOrigins({ CI: 'false', BETTER_AUTH_URL: origin }))

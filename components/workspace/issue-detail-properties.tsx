@@ -3,6 +3,7 @@
 import { useId, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { Calendar, ChartNoAxesColumnIncreasing, ChevronDown, CircleDashed, Signal, SlidersHorizontal } from 'lucide-react'
+import { IssueTeamControl } from '@/components/teams/issue-team-control'
 import { Button } from '@/components/ui/button'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
@@ -39,6 +40,7 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
     <section className="flex flex-col items-start gap-1"><h3 className="mb-1 px-2 text-xs font-medium text-muted-foreground">{tMetadata('project')}</h3><IssueMetadataControls {...control} section="project" /></section>
     {task.metadata.pullRequests.length > 0 && <section className="flex flex-col items-start gap-2"><h3 className="px-2 text-xs font-medium text-muted-foreground">{tMetadata('pullRequests')}</h3><div className="flex flex-wrap gap-2 px-2"><IssueMetadataControls {...control} section="pullRequests" /></div></section>}
     {task.metadata.pullRequests.length === 0 && request?.target === 'pullRequests' && <IssueMetadataControls {...control} section="pullRequests" />}
+    <IssueTeamControl issueId={task.id} disabled={metadataDisabled} />
     <div className="flex min-w-0 flex-col gap-6 px-2">{relations}</div>
     </div>
   </aside>

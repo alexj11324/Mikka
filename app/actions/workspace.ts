@@ -1,12 +1,11 @@
 'use server'
 
+import { getTranslations } from 'next-intl/server'
 import { createHash, randomBytes } from 'node:crypto'
 import { and, eq, gt, ne } from 'drizzle-orm'
-import { cookies } from 'next/headers'
-import { getTranslations } from 'next-intl/server'
+import { cookies, headers } from 'next/headers'
+import { auth, type DeviceSessionSummary } from '@/lib/auth'
 import { z } from 'zod'
-import { runAction } from '@/lib/action-error'
-import type { ActionResult } from '@/lib/action-result'
 import { requireUser } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers, workspaceInvitations, workspaces } from '@/lib/db/workspace-schema'
@@ -14,58 +13,80 @@ import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 
 const roleSchema = z.enum(['admin', 'member'])
 const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/)
+const workspaceSlug = z.string().trim().min(3).max(64).regex(/^[a-z0-9]([a-z0-9-]{1,62}[a-z0-9])$/)
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex')
 
 async function result<T>(operation: () => Promise<T>) {
-  try { return { ok: true as const, data: await operation() } }
-  catch (error) {
+  try {
+    return { ok: true as const, data: await operation() }
+  } catch (error) {
     const t = await getTranslations('Errors')
-    if (error instanceof WorkspaceError) return { ok: false as const, error: t(error.code) }
+    if (error instanceof WorkspaceError) {
+      return { ok: false as const, error: t.has(error.code as never) ? t(error.code as never) : error.message }
+    }
     if (error instanceof z.ZodError) return { ok: false as const, error: t('validationGeneric') }
     console.error('Workspace operation failed', error instanceof Error ? error.name : 'UnknownError')
     return { ok: false as const, error: t('generic') }
   }
 }
 
-async function saveWorkspaceSelection(workspaceId: string) {
-  ;(await cookies()).set('mikka-workspace', workspaceId, { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' : 'lax', secure: true, path: '/', maxAge: 31536000 })
+async function rememberWorkspace(workspaceId: string) {
+  const cookieStore = await cookies()
+  const options = { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' as const : 'lax' as const, secure: true, path: '/', maxAge: 31536000 }
+  cookieStore.set('orvilo-workspace', workspaceId, options)
+  cookieStore.set('mikka-workspace', workspaceId, options)
 }
 
-export async function switchWorkspace(workspaceId: string) {
-  return result(async () => {
-    const user = await requireUser()
-    z.uuid().parse(workspaceId)
-    const [membership] = await workspaceDb.select({ id: workspaceMembers.workspaceId }).from(workspaceMembers)
-      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'))).limit(1)
-    if (!membership) throw new WorkspaceError('workspaceAccessDenied')
-    await saveWorkspaceSelection(workspaceId)
-    return { workspaceId }
-  })
+function createSlug(name: string) {
+  const slug = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64).replace(/-+$/g, '')
+  return slug.length >= 3 ? slug : `team-${crypto.randomUUID().slice(0, 8)}`
 }
 
-export async function createWorkspace(name: string) {
+export async function createWorkspace(input: string | { name: string; slug: string }) {
+  const i18nText = await getTranslations()
   return result(async () => {
     const user = await requireUser()
-    const parsedName = z.string().trim().min(1).max(120).parse(name)
+    const value = typeof input === 'string' ? { name: input, slug: createSlug(input) } : input
+    const { name, slug } = z.object({ name: z.string().trim().min(1).max(120), slug: workspaceSlug }).parse(value)
     const workspaceId = crypto.randomUUID()
     await workspaceDb.transaction(async tx => {
-      await tx.insert(workspaces).values({ id: workspaceId, userId: user.id, name: parsedName })
+      const [created] = await tx.insert(workspaces).values({ id: workspaceId, userId: user.id, name, slug }).onConflictDoNothing({ target: workspaces.slug }).returning({ id: workspaces.id })
+      if (!created) throw new WorkspaceError(i18nText('FeatureCopy.c_a56de3c3'))
       await tx.insert(workspaceMembers).values({ workspaceId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: 'admin' })
     })
-    await saveWorkspaceSelection(workspaceId)
-    return { workspaceId }
+    await rememberWorkspace(workspaceId)
+    return { workspaceId, slug }
   })
 }
 
-export async function createWorkspaceInvitation(input: { workspaceId: string; emails: string[]; role: string }): Promise<ActionResult<{ email: string; path: string }[]>> {
-  return runAction(async () => {
+export async function switchWorkspace(input: string | { workspaceId?: string; accountId?: string }) {
+  const i18nText = await getTranslations()
+  return result(async () => {
     const user = await requireUser()
-    const parsedRole = roleSchema.safeParse(input.role)
-    if (!parsedRole.success) return { error: 'validationGeneric' }
-    const parsedEmails = z.array(z.email().max(254)).min(1).max(20).safeParse(input.emails.map(email => email.trim().toLowerCase()))
-    if (!parsedEmails.success) throw new WorkspaceError('inviteInvalidEmails')
-    const role = parsedRole.data
-    const emails = [...new Set(parsedEmails.data)]
+    const parsed = typeof input === 'string'
+      ? { workspaceId: z.uuid().parse(input), accountId: user.id }
+      : z.object({ workspaceId: z.uuid().optional(), accountId: z.string().min(1).max(200).optional() }).parse(input)
+    const accountId = parsed.accountId ?? user.id
+    const deviceSessions: DeviceSessionSummary[] = accountId === user.id ? [] : await auth.api.listDeviceSessions({ headers: await headers() })
+    const deviceSession = deviceSessions.find(item => item.user.id === accountId)
+    if (accountId !== user.id && !deviceSession) throw new WorkspaceError(i18nText('FeatureCopy.c_c2e795ad'))
+    if (parsed.workspaceId) await workspaceDb.transaction(tx => requireWorkspace(tx, parsed.workspaceId!, accountId))
+    if (deviceSession) await auth.api.setActiveSession({ body: { sessionToken: deviceSession.session.token }, headers: await headers() })
+    if (parsed.workspaceId) await rememberWorkspace(parsed.workspaceId)
+    else {
+      const cookieStore = await cookies()
+      cookieStore.delete('orvilo-workspace')
+      cookieStore.delete('mikka-workspace')
+    }
+    return { workspaceId: parsed.workspaceId }
+  })
+}
+
+export async function createWorkspaceInvitation(input: { workspaceId: string; emails: string[]; role: string }) {
+  return result(async () => {
+    const user = await requireUser()
+    const role = roleSchema.parse(input.role)
+    const emails = [...new Set(z.array(z.email().max(254)).min(1).max(20).parse(input.emails.map(email => email.trim().toLowerCase())))]
     return workspaceDb.transaction(async tx => {
       await requireWorkspace(tx, input.workspaceId, user.id, true)
       const members = await tx.select({ email: workspaceMembers.email }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, input.workspaceId))
@@ -73,8 +94,10 @@ export async function createWorkspaceInvitation(input: { workspaceId: string; em
       const links: { email: string; path: string }[] = []
       for (const email of emails) {
         const token = randomBytes(32).toString('hex')
-        await tx.insert(workspaceInvitations).values({ id: crypto.randomUUID(), workspaceId: input.workspaceId, userId: user.id, email, role, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + 7 * 86400000) })
-          .onConflictDoUpdate({ target: [workspaceInvitations.workspaceId, workspaceInvitations.email], set: { userId: user.id, role, tokenHash: hashToken(token), status: 'pending', expiresAt: new Date(Date.now() + 7 * 86400000), createdAt: new Date() } })
+        const tokenHash = hashToken(token)
+        const expiresAt = new Date(Date.now() + 7 * 86400000)
+        await tx.insert(workspaceInvitations).values({ id: crypto.randomUUID(), workspaceId: input.workspaceId, userId: user.id, email, role, tokenHash, expiresAt })
+          .onConflictDoUpdate({ target: [workspaceInvitations.workspaceId, workspaceInvitations.email], set: { userId: user.id, role, tokenHash, status: 'pending', expiresAt, createdAt: new Date() } })
         links.push({ email, path: `/invite/${token}` })
       }
       return links
@@ -82,15 +105,13 @@ export async function createWorkspaceInvitation(input: { workspaceId: string; em
   })
 }
 
-export async function updateWorkspaceMember(input: { workspaceId: string; userId: string; role: string; status: string }): Promise<ActionResult<{ updated: true }>> {
-  return runAction(async () => {
+export async function updateWorkspaceMember(input: { workspaceId: string; userId: string; role: string; status: string }) {
+  return result(async () => {
     const user = await requireUser()
-    const parsedRole = roleSchema.safeParse(input.role)
-    const parsedStatus = z.enum(['active', 'suspended']).safeParse(input.status)
-    if (!parsedRole.success || !parsedStatus.success || !z.string().min(1).max(200).safeParse(input.userId).success) return { error: 'validationGeneric' }
-    const role = parsedRole.data
-    const status = parsedStatus.data
-    return workspaceDb.transaction(async tx => {
+    const role = roleSchema.parse(input.role)
+    const status = z.enum(['active', 'suspended']).parse(input.status)
+    z.string().min(1).max(200).parse(input.userId)
+    await workspaceDb.transaction(async tx => {
       await requireWorkspace(tx, input.workspaceId, user.id, true)
       const [target] = await tx.select().from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId))).limit(1)
       if (!target) throw new WorkspaceError('workspaceMemberNotFound')
@@ -99,27 +120,25 @@ export async function updateWorkspaceMember(input: { workspaceId: string; userId
         if (!others.length) throw new WorkspaceError('workspaceLastAdmin')
       }
       await tx.update(workspaceMembers).set({ role, status }).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId)))
-      return { updated: true as const }
     })
   })
 }
 
-export async function revokeWorkspaceInvitation(workspaceId: string, invitationId: string): Promise<ActionResult<{ revoked: true }>> {
-  return runAction(async () => {
+export async function revokeWorkspaceInvitation(workspaceId: string, invitationId: string) {
+  return result(async () => {
     const user = await requireUser()
-    if (!z.uuid().safeParse(invitationId).success) return { error: 'validationGeneric' }
-    return workspaceDb.transaction(async tx => {
+    z.uuid().parse(invitationId)
+    await workspaceDb.transaction(async tx => {
       await requireWorkspace(tx, workspaceId, user.id, true)
       await tx.update(workspaceInvitations).set({ status: 'revoked' }).where(and(eq(workspaceInvitations.workspaceId, workspaceId), eq(workspaceInvitations.id, invitationId), eq(workspaceInvitations.status, 'pending')))
-      return { revoked: true as const }
     })
   })
 }
 
-export async function acceptWorkspaceInvitation(token: string): Promise<ActionResult<{ workspaceId: string }>> {
-  return runAction(async () => {
+export async function acceptWorkspaceInvitation(token: string) {
+  return result(async () => {
     const user = await requireUser()
-    if (!tokenSchema.safeParse(token).success) return { error: 'validationGeneric' }
+    tokenSchema.parse(token)
     const workspaceId = await workspaceDb.transaction(async tx => {
       const [candidate] = await tx.select({ workspaceId: workspaceInvitations.workspaceId }).from(workspaceInvitations).where(and(eq(workspaceInvitations.tokenHash, hashToken(token)), eq(workspaceInvitations.email, user.email.toLowerCase()), eq(workspaceInvitations.status, 'pending'), gt(workspaceInvitations.expiresAt, new Date()))).limit(1)
       if (!candidate) throw new WorkspaceError('inviteInvalid')
@@ -132,7 +151,7 @@ export async function acceptWorkspaceInvitation(token: string): Promise<ActionRe
       await tx.update(workspaceInvitations).set({ status: 'accepted' }).where(and(eq(workspaceInvitations.id, invitation.id), eq(workspaceInvitations.workspaceId, candidate.workspaceId), eq(workspaceInvitations.email, user.email.toLowerCase())))
       return candidate.workspaceId
     })
-    ;(await cookies()).set('mikka-workspace', workspaceId, { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' : 'lax', secure: true, path: '/', maxAge: 31536000 })
+    await rememberWorkspace(workspaceId)
     return { workspaceId }
   })
 }

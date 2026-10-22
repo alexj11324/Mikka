@@ -14,7 +14,7 @@ test('聊天历史未返回时壳子已可导航，恢复后显示真实会话',
     await register(page)
     await expect.poll(() => requested).toBe(true)
     await expect(page).not.toHaveURL(/section=agent/)
-    await expect(page.getByRole('button', { name: '账户菜单', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Agent', exact: true }).click()
     await expect(page.getByRole('region', { name: 'Agent 对话工作区', exact: true })).toHaveAttribute('aria-busy', 'true')
     await page.getByRole('button', { name: '我的任务', exact: true }).click()
@@ -44,7 +44,7 @@ test('任务与项目请求未返回时聊天可独立加载', async ({ page }) 
     await page.goto(app('/?section=agent'), { waitUntil: 'domcontentloaded' })
     await expect.poll(() => blocked).toBe(true)
     await expect(page.getByRole('textbox', { name: '向 Agent 提问', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: '账户菜单', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeVisible()
   } finally {
     release()
   }
