@@ -25,7 +25,6 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { listProjects, setProjectIssues } from '@/app/actions/projects'
 import { listTeams } from '@/app/actions/teams'
 import { listProjectTeams } from '@/app/actions/team-relations'
-import { ProjectWorkspace } from './project-workspace'
 import { WorkspaceOverview } from './workspace-overview'
 import { PluginsSkillsView } from '@/components/plugins/plugins-skills-view'
 import type { WorkspaceSection } from './workspace-navigation'
@@ -49,6 +48,7 @@ function CreateLoading() {
 }
 const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })
 const CreateIssueDialog = dynamic(() => import('./create-issue-dialog').then(module => module.CreateIssueDialog), { loading: CreateLoading })
+const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module => module.ProjectWorkspace), { loading: DetailLoading })
 const SettingsShell = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsShell))
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView))
 
