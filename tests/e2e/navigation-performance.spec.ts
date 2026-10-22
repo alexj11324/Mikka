@@ -1,6 +1,32 @@
 import type { Page, TestInfo } from '@playwright/test'
 import { test, expect, register, BASE_PATH } from './fixtures'
 
+test('移动侧栏在水合与尺寸检测完成前不可点击，就绪后首次点击即可打开', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await register(page)
+
+  let releaseScripts!: () => void
+  const scriptsReady = new Promise<void>(resolve => { releaseScripts = resolve })
+  await page.route('**/*.js', async route => {
+    await scriptsReady
+    await route.continue()
+  })
+  try {
+    await page.reload({ waitUntil: 'commit' })
+    const trigger = page.getByRole('button', { name: '展开或收起侧栏', exact: true })
+    await expect(trigger).toBeVisible()
+    await expect(trigger).toBeDisabled()
+    releaseScripts()
+    await expect(trigger).toBeEnabled()
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await trigger.click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+  } finally {
+    releaseScripts()
+    await page.unrouteAll({ behavior: 'wait' })
+  }
+})
+
 const budgetMs = 1000
 
 type Destination = { path: string; selectors: string[]; text?: string }
