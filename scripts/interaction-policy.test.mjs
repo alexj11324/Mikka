@@ -3,10 +3,21 @@ import test from 'node:test'
 import { auditInteractions } from './interaction-policy.mjs'
 
 const rules = source => auditInteractions('components/example.tsx', source).map(d => d.rule)
+
+for (const [name, source] of [
+  ['native working button', '<button onClick={save}>保存</button>'],
+  ['native disabled button', '<button disabled onClick={save}>保存</button>'],
+  ['button role on div', '<div role="button" onClick={save}>保存</div>'],
+  ['clickable span', '<span onClick={save}>编辑</span>'],
+  ['clickable div', '<div onClick={() => navigate(id)}>成员</div>'],
+  ['composed native host', '<SidebarMenuSubButton render={<button type="button" />} onClick={navigate}>任务</SidebarMenuSubButton>'],
+]) test(`requires Button component: ${name}`, () => assert.ok(rules(source).includes('interaction/use-button-component'), source))
 for (const [name, source] of [
   ['missing action', '<Button>保存</Button>'],
   ['native missing action', '<button type="button">保存</button>'],
   ['disabled is not implementation', '<Button disabled>保存</Button>'],
+  ['feature flag alone is not implementation', '<Button disabled data-feature-flag="orvilo-upcoming-example">保存</Button>'],
+  ['feature marked implemented still needs action', '<Button disabled data-feature-flag="orvilo-upcoming-example" data-feature-implemented={true} aria-describedby="reason" title="尚未开放">保存</Button>'],
   ['empty callback', '<Button onClick={() => {}}>保存</Button>'],
   ['undefined callback', '<Button onClick={undefined}>保存</Button>'],
   ['returned undefined', '<Button onClick={() => undefined}>保存</Button>'],
@@ -31,12 +42,15 @@ for (const [name, source] of [
   ['onSelect cannot implement a button click', '<Button onSelect={save}>保存</Button>'],
   ['onSubmit cannot implement a button click', '<Button onSubmit={save}>保存</Button>'],
   ['constant placeholder href', 'const target = "#"; const ui = <Link href={target}>详情</Link>'],
+  ['aliased placeholder href', 'const target = "#"; const alias = target; const ui = <Link href={alias}>详情</Link>'],
+  ['cyclic href aliases', 'const target = alias; const alias = target; const ui = <Link href={target}>详情</Link>'],
   ['object placeholder handler', 'const actions = { save: () => {} }; const ui = <Button onClick={actions.save}>保存</Button>'],
   ['object placeholder method', 'const actions = { save() {} }; const ui = <Button onClick={actions.save}>保存</Button>'],
   ['aliased button', 'import { Button as Save } from "@/components/ui/button"; const ui = <Save>保存</Save>'],
 ]) test(`rejects ${name}`, () => assert.ok(rules(source).length > 0, source))
 
 for (const [name, source] of [
+  ['explicit unimplemented feature presentation', '<Button disabled data-feature-flag="orvilo-upcoming-example" data-feature-implemented={false} aria-describedby="reason" title="尚未开放">保存</Button>'],
   ['real callback', '<Button onClick={() => setOpen(true)}>打开</Button>'],
   ['forwarded callback', 'function Save({ onSave }) { return <Button onClick={onSave}>保存</Button> }'],
   ['async mutation', '<Button onClick={async () => { await saveIssue(data); await mutate() }}>保存</Button>'],
@@ -51,10 +65,13 @@ for (const [name, source] of [
   ['tooltip with real callback', '<TooltipTrigger render={<Button onClick={save}>保存</Button>} />'],
   ['real href', '<Link href="/issues">任务</Link>'],
   ['dynamic href', '<Link href={task.url}>任务</Link>'],
+  ['guarded normalized href', 'const safeHref = href ? normalizeHref(href) : null; const ui = safeHref ? <Button render={<a href={safeHref} />}>链接</Button> : null'],
   ['conditional routes', '<Link href={registering ? "/sign-in" : "/sign-up"}>登录</Link>'],
-  ['render host event delegation', '<SidebarMenuSubButton render={<button type="button" />} onClick={navigate}>任务</SidebarMenuSubButton>'],
+  ['render host event delegation', '<SidebarMenuSubButton render={<Button type="button" variant="ghost" />} onClick={navigate}>任务</SidebarMenuSubButton>'],
   ['fragment target', '<a href="#description">描述</a>'],
   ['template URL', '<Link href={`/issues/${id}`}>详情</Link>'],
+  ['aliased template URL', 'const href = `/issues/${id}`; const ui = <Button render={<Link href={href} />}>详情</Button>'],
+  ['aliased settings URL', 'import { SettingsLink as Link } from "@/components/settings/settings-link"; const href = `/settings/teams?workspace=${id}`; const ui = <Button role="link" render={<Link href={href} />}>团队</Button>'],
   ['object action', 'const actions = { save: () => setOpen(true) }; const ui = <Button onClick={actions.save}>保存</Button>'],
   ['rendered navigation', '<Button render={<Link href="/issues" />}>任务</Button>'],
   ['form submit', '<form onSubmit={save}><Button type="submit">保存</Button></form>'],
