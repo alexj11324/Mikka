@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sidebar"
 import { ChevronRightIcon, type LucideIcon } from "lucide-react"
 import { Button } from '@/components/ui/button'
+import { useTranslations } from 'next-intl'
 
 export function NavMain({
   items,
@@ -36,9 +37,10 @@ export function NavMain({
     }[]
   }[]
 }) {
+  const t = useTranslations('Nav')
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>工作空间</SidebarGroupLabel>
+      <SidebarGroupLabel>{t('workspace')}</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
           <Collapsible
@@ -64,7 +66,7 @@ export function NavMain({
                 >
                   <ChevronRightIcon
                   />
-                  <span className="sr-only">展开或收起状态筛选</span>
+                  <span className="sr-only">{t('toggleStatusFilter')}</span>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>

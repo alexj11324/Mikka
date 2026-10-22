@@ -2,11 +2,13 @@
 
 import { useRef, useState } from 'react'
 import { useSWRConfig } from 'swr'
+import { useTranslations } from 'next-intl'
 import { ArrowUpRight, Bell, BellOff, Box, Calendar, Check, Circle, Copy, FileText, Flag, GitBranch, History, Link2, ListPlus, MoreHorizontal, Plus, Signal, Star, Tag, Trash2, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { createLinkedIssue, setIssueDeleted, toggleIssuePreference, updateIssueRelation } from '@/app/actions/issue-operations'
 import { updateIssueMetadata } from '@/app/actions/issue-metadata'
 import type { getIssue } from '@/app/actions/issues'
+import { useActionError } from '@/lib/use-action-error'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -14,7 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { IssueRelationPicker, RELATION_TITLES, type RelationKind } from './issue-relations'
+import { IssueRelationPicker, type RelationKind } from './issue-relations'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from './issue-properties'
 import type { MetadataRequest } from './issue-metadata-controls'
 
@@ -25,6 +27,26 @@ type OperationResult = { issue?: Issue; error?: string }
 export function IssueDetailActions({ task, userId, disabled, documentTools, request, getCurrent, onSaved, onOpen, onDeleted, onHistory, onMembers, onDocumentTools, onProperty, onStatus, onPriority }: {
   task: Issue; userId: string; disabled: boolean; documentTools: boolean; request: IssueActionRequest | null; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; onOpen: (id: string) => void; onDeleted: () => void; onHistory: () => void; onMembers: () => void; onDocumentTools: () => void; onProperty: (target: MetadataRequest['target']) => void; onStatus: (value: string) => void; onPriority: (value: string) => void
 }) {
+  const t = useTranslations('IssueDetail')
+  const tMenu = useTranslations('IssueDetail.menu')
+  const tDialog = useTranslations('IssueDetail.dialog')
+  const tIssue = useTranslations('Issue')
+  const tMetadata = useTranslations('Metadata.relations')
+  const tCommon = useTranslations('Common')
+  const tWorkspaceDetail = useTranslations('Workspace.detail')
+  const actionError = useActionError()
+  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
+  const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
+  const relationTitle = (kind: RelationKind) => tMetadata.has(`title.${kind}` as never) ? tMetadata(`title.${kind}` as never) : kind
+  const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
+  const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
+  const copyItems = [
+    { kind: 'link', label: tMenu('copyLink') },
+    { kind: 'id', label: tMenu('copyId') },
+    { kind: 'title', label: tMenu('copyTitle') },
+    { kind: 'markdown', label: tMenu('copyMarkdown') },
+    { kind: 'branch', label: tMenu('copyBranch') },
+  ] as const
   const { mutate } = useSWRConfig()
   const [relation, setRelation] = useState<RelationKind | null>(null)
   const [dialog, setDialog] = useState<'createChild' | 'duplicate' | 'dueDate' | 'estimate' | null>(null)
@@ -43,25 +65,25 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
   }
   function openDialog(kind: NonNullable<typeof dialog>) {
     setError(''); setDialog(kind)
-    setValue(kind === 'dueDate' ? task.metadata.dueDate ?? '' : kind === 'estimate' ? task.metadata.estimate?.toString() ?? '' : kind === 'duplicate' ? `${task.title.slice(0, 195)}（副本）` : '')
+    setValue(kind === 'dueDate' ? task.metadata.dueDate ?? '' : kind === 'estimate' ? task.metadata.estimate?.toString() ?? '' : kind === 'duplicate' ? t('defaultDuplicateTitle', { title: task.title.slice(0, 195) }) : '')
   }
   async function run(operation: (issue: Issue) => Promise<OperationResult>, mode: 'current' | 'child' | 'duplicate' | 'delete' = 'current') {
     if (busy.current || disabled) return false
     busy.current = true; setPending(true); setError('')
     try {
       const latest = await getCurrent()
-      if (!latest) throw new Error('请先完成当前修改的保存。')
+      if (!latest) throw new Error(t('saveCurrentFirst'))
       const result = await operation(latest)
-      if (!result.issue) throw new Error(result.error ?? '操作未成功，请重试。')
+      if (!result.issue) throw new Error(actionError(result.error ?? 'generic'))
       if (mode === 'current') onSaved(result.issue)
       await Promise.all([mutate(['issue-connections', task.id]), mutate('issues')])
       if (mode === 'duplicate') onOpen(result.issue.id)
       if (mode === 'delete') {
         onDeleted()
-        toast.success('任务已删除', { description: '任务内容保留 30 天，可通过原链接恢复。', action: { label: '撤销', onClick: () => { void setIssueDeleted({ id: task.id, restore: true }).then(async response => { if (response.error) toast.error(response.error); else { await mutate('issues'); onOpen(task.id) } }).catch(() => toast.error('恢复失败，请通过原任务链接重试。')) } } })
-      } else toast.success(mode === 'child' ? '子任务已创建' : mode === 'duplicate' ? '任务副本已创建' : '任务已更新')
+        toast.success(t('taskDeleted'), { description: t('taskDeletedDescription'), action: { label: t('undo'), onClick: () => { void setIssueDeleted({ id: task.id, restore: true }).then(async response => { if (response.error) toast.error(actionError(response.error)); else { await mutate('issues'); onOpen(task.id) } }).catch(() => toast.error(t('restoreViaLinkFailed'))) } } })
+      } else toast.success(mode === 'child' ? t('childCreated') : mode === 'duplicate' ? t('duplicateCreated') : t('taskUpdated'))
       return true
-    } catch (error) { const message = error instanceof Error ? error.message : '操作失败，请重试。'; setError(message); toast.error(message); return false }
+    } catch (error) { const message = error instanceof Error ? error.message : t('operationFailed'); setError(message); toast.error(message); return false }
     finally { busy.current = false; setPending(false) }
   }
   async function copy(kind: 'link' | 'id' | 'title' | 'markdown' | 'branch') {
@@ -69,51 +91,51 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       const url = new URL(window.location.href); url.search = ''; url.searchParams.set('issue', task.id)
       const identifier = issueIdentifier(task.metadata.number)
       const text = kind === 'link' ? url.href : kind === 'id' ? identifier : kind === 'title' ? `${identifier} ${task.title}` : kind === 'branch' ? `${identifier.toLowerCase()}/${task.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').slice(0, 60)}` : `[${identifier} ${task.title.replace(/[[\]\\]/g, '\\$&')}](${url.href})`
-      await navigator.clipboard.writeText(text); toast.success('已复制到剪贴板')
-    } catch { toast.error('复制失败，请允许浏览器访问剪贴板。') }
+      await navigator.clipboard.writeText(text); toast.success(t('copySuccess'))
+    } catch { toast.error(t('copyFailed')) }
   }
   const favorite = task.metadata.favoriteUserIds.includes(userId)
   const subscribed = task.metadata.subscriberUserIds.includes(userId)
   const unavailable = disabled || pending
   return <>
-    <Button variant="ghost" size="icon-sm" aria-label={favorite ? '取消收藏任务' : '收藏任务'} aria-pressed={favorite} disabled={unavailable} onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'favorite' })) }}><Star data-icon="inline-start" fill={favorite ? 'currentColor' : 'none'} /></Button>
-    <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="更多任务操作" disabled={unavailable} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end" className="max-h-[min(80svh,720px)] w-64 overflow-y-auto">
+    <Button variant="ghost" size="icon-sm" aria-label={favorite ? tMenu('unfavorite') : tMenu('favorite')} aria-pressed={favorite} disabled={unavailable} onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'favorite' })) }}><Star data-icon="inline-start" fill={favorite ? 'currentColor' : 'none'} /></Button>
+    <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={tWorkspaceDetail('moreActions')} disabled={unavailable} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end" className="max-h-[min(80svh,720px)] w-64 overflow-y-auto">
       <DropdownMenuGroup>
-        <DropdownMenuSub><DropdownMenuSubTrigger><Circle />设置状态</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{ISSUE_STATUSES.map(status => <DropdownMenuItem key={status.value} onClick={() => onStatus(status.value)}><status.icon /><span className="flex-1">{status.label}</span>{task.status === status.value && <Check />}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
-        <DropdownMenuSub><DropdownMenuSubTrigger><Signal />设置优先级</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{ISSUE_PRIORITIES.map(priority => <DropdownMenuItem key={priority.value} onClick={() => onPriority(priority.value)}><priority.icon {...priority.iconProps} /><span className="flex-1">{priority.label}</span>{task.priority === priority.value && <Check />}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
-        <DropdownMenuItem onClick={() => onProperty('assignee')}><Users />分配负责人…</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onProperty('project')}><Box />移动到项目…</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onProperty('labels')}><Tag />添加或移除标签…</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openDialog('dueDate')}><Calendar />{task.metadata.dueDate ? '修改截止日期…' : '设置截止日期…'}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openDialog('estimate')}><Signal />设置工作量估算…</DropdownMenuItem>
+        <DropdownMenuSub><DropdownMenuSubTrigger><Circle />{tMenu('setStatus')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{statusOptions.map(status => <DropdownMenuItem key={status.value} onClick={() => onStatus(status.value)}><status.icon /><span className="flex-1">{status.label}</span>{task.status === status.value && <Check />}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
+        <DropdownMenuSub><DropdownMenuSubTrigger><Signal />{tMenu('setPriority')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{priorityOptions.map(priority => <DropdownMenuItem key={priority.value} onClick={() => onPriority(priority.value)}><priority.icon {...priority.iconProps} /><span className="flex-1">{priority.label}</span>{task.priority === priority.value && <Check />}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
+        <DropdownMenuItem onClick={() => onProperty('assignee')}><Users />{tMenu('assignAssignee')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onProperty('project')}><Box />{tMenu('moveToProject')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onProperty('labels')}><Tag />{tMenu('editLabels')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openDialog('dueDate')}><Calendar />{task.metadata.dueDate ? tMenu('editDueDate') : tMenu('setDueDate')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openDialog('estimate')}><Signal />{tMenu('setEstimate')}</DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
-        <DropdownMenuItem onClick={() => openDialog('createChild')}><Plus />创建子任务…</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { setError(''); setRelation('child') }}><ListPlus />添加现有子任务…</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { setError(''); setRelation('parent') }}><GitBranch />设置父任务…</DropdownMenuItem>
-        {task.metadata.parentId && <DropdownMenuItem onClick={() => { void run(issue => updateIssueRelation({ id: task.id, revision: issue.revision, targetId: null, kind: 'parent', remove: true })) }}><X />移除父任务</DropdownMenuItem>}
-        <DropdownMenuSub><DropdownMenuSubTrigger><Link2 />添加任务关系</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{(['related', 'blockedBy', 'blocks', 'duplicate'] as RelationKind[]).map(kind => <DropdownMenuItem key={kind} onClick={() => { setError(''); setRelation(kind) }}>{kind === 'blocks' || kind === 'blockedBy' ? <Flag /> : <Link2 />}{RELATION_TITLES[kind]}…</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
+        <DropdownMenuItem onClick={() => openDialog('createChild')}><Plus />{tMenu('createChild')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { setError(''); setRelation('child') }}><ListPlus />{tMenu('addExistingChild')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { setError(''); setRelation('parent') }}><GitBranch />{tMenu('setParent')}</DropdownMenuItem>
+        {task.metadata.parentId && <DropdownMenuItem onClick={() => { void run(issue => updateIssueRelation({ id: task.id, revision: issue.revision, targetId: null, kind: 'parent', remove: true })) }}><X />{tMenu('removeParent')}</DropdownMenuItem>}
+        <DropdownMenuSub><DropdownMenuSubTrigger><Link2 />{tMenu('addRelation')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{(['related', 'blockedBy', 'blocks', 'duplicate'] as RelationKind[]).map(kind => <DropdownMenuItem key={kind} onClick={() => { setError(''); setRelation(kind) }}>{kind === 'blocks' || kind === 'blockedBy' ? <Flag /> : <Link2 />}{relationTitle(kind)}…</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
-        <DropdownMenuSub><DropdownMenuSubTrigger><Copy />复制</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{([{ kind: 'link', label: '复制任务链接' }, { kind: 'id', label: '复制任务编号' }, { kind: 'title', label: '复制编号与标题' }, { kind: 'markdown', label: '复制 Markdown 链接' }, { kind: 'branch', label: '复制 Git 分支名称' }] as const).map(item => <DropdownMenuItem key={item.kind} onClick={() => { void copy(item.kind) }}>{item.label}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
-        <DropdownMenuItem onClick={() => { const url = new URL(window.location.href); url.search = ''; url.searchParams.set('issue', task.id); window.open(url.href, '_blank', 'noopener,noreferrer') }}><ArrowUpRight />在新标签页中打开</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openDialog('duplicate')}><Copy />创建任务副本…</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'favorite' })) }}><Star />{favorite ? '取消收藏' : '添加到收藏'}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe' })) }}>{subscribed ? <BellOff /> : <Bell />}{subscribed ? '取消关注任务' : '关注任务活动'}</DropdownMenuItem>
+        <DropdownMenuSub><DropdownMenuSubTrigger><Copy />{tMenu('copy')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{copyItems.map(item => <DropdownMenuItem key={item.kind} onClick={() => { void copy(item.kind) }}>{item.label}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
+        <DropdownMenuItem onClick={() => { const url = new URL(window.location.href); url.search = ''; url.searchParams.set('issue', task.id); window.open(url.href, '_blank', 'noopener,noreferrer') }}><ArrowUpRight />{tMenu('openNewTab')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openDialog('duplicate')}><Copy />{tMenu('createDuplicate')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'favorite' })) }}><Star />{favorite ? tMenu('removeFavorite') : tMenu('addFavorite')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe' })) }}>{subscribed ? <BellOff /> : <Bell />}{subscribed ? tMenu('unsubscribe') : tMenu('subscribe')}</DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
-        <DropdownMenuItem onClick={onHistory}><History />显示描述历史…</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onProperty('pullRequests')}><Link2 />管理关联 PR…</DropdownMenuItem>
-        <DropdownMenuItem onClick={onMembers}><Users />管理协作成员…</DropdownMenuItem>
-        <DropdownMenuItem onClick={onDocumentTools}><FileText />{documentTools ? '返回任务描述' : '高级文档工具'}</DropdownMenuItem>
+        <DropdownMenuItem onClick={onHistory}><History />{tMenu('showHistory')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onProperty('pullRequests')}><Link2 />{tMenu('managePullRequests')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={onMembers}><Users />{tMenu('manageMembers')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={onDocumentTools}><FileText />{documentTools ? tMenu('backToDescription') : tWorkspaceDetail('advancedTools')}</DropdownMenuItem>
       </DropdownMenuGroup>
-      {task.userId === userId && <><DropdownMenuSeparator /><DropdownMenuGroup><DropdownMenuItem variant="destructive" onClick={() => { setError(''); setDeleteOpen(true) }}><Trash2 />删除任务…</DropdownMenuItem></DropdownMenuGroup></>}
+      {task.userId === userId && <><DropdownMenuSeparator /><DropdownMenuGroup><DropdownMenuItem variant="destructive" onClick={() => { setError(''); setDeleteOpen(true) }}><Trash2 />{tMenu('deleteTask')}</DropdownMenuItem></DropdownMenuGroup></>}
     </DropdownMenuContent></DropdownMenu>
     {relation && <IssueRelationPicker task={task} kind={relation} validationError={error} open onOpenChange={open => { if (!open) setRelation(null) }} pending={pending} onSelect={targetId => { void run(issue => updateIssueRelation({ id: task.id, revision: issue.revision, kind: relation, targetId })).then(success => { if (success) setRelation(null) }) }} />}
-    <Dialog open={dialog !== null} onOpenChange={open => { if (!open && !pending) setDialog(null) }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{dialog === 'createChild' ? '创建子任务' : dialog === 'duplicate' ? '创建任务副本' : dialog === 'dueDate' ? '设置截止日期' : '设置工作量估算'}</DialogTitle><DialogDescription>{dialog === 'createChild' ? '继承父任务的优先级、项目和访问成员。' : dialog === 'duplicate' ? '创建独立副本，不复制讨论、关注者或阻塞关系。' : '修改将保存到任务属性；留空可以移除此属性。'}</DialogDescription></DialogHeader><form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); const kind = dialog; if (!kind) return; void run(issue => kind === 'createChild' || kind === 'duplicate' ? createLinkedIssue({ id: task.id, revision: issue.revision, kind: kind === 'createChild' ? 'child' : 'duplicate', title: value, includeSubissues: kind === 'duplicate' && includeSubissues }) : updateIssueMetadata({ id: task.id, revision: issue.revision, patch: kind === 'dueDate' ? { dueDate: value || null } : { estimate: value === '' ? null : Number(value) } }), kind === 'createChild' ? 'child' : kind === 'duplicate' ? 'duplicate' : 'current').then(success => { if (success) setDialog(null) }) }}><FieldGroup><Field><FieldLabel htmlFor="issue-action-value">{dialog === 'dueDate' ? '截止日期' : dialog === 'estimate' ? '估算点数（0–100）' : '任务标题'}</FieldLabel><Input id="issue-action-value" autoFocus type={dialog === 'dueDate' ? 'date' : dialog === 'estimate' ? 'number' : 'text'} min={dialog === 'estimate' ? 0 : undefined} max={dialog === 'estimate' ? 100 : undefined} step={dialog === 'estimate' ? 1 : undefined} value={value} onChange={event => setValue(event.target.value)} disabled={pending} required={dialog === 'createChild' || dialog === 'duplicate'} maxLength={200} onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.preventDefault() }} /></Field>{dialog === 'duplicate' && <Field orientation="horizontal"><Checkbox id="duplicate-subissues" checked={includeSubissues} onCheckedChange={checked => setIncludeSubissues(!!checked)} /><FieldLabel htmlFor="duplicate-subissues">同时复制可访问的子任务</FieldLabel></Field>}</FieldGroup>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<DialogFooter><Button type="button" variant="ghost" disabled={pending} onClick={() => setDialog(null)}>取消</Button><Button type="submit" disabled={pending}>{pending ? '正在保存…' : dialog === 'createChild' || dialog === 'duplicate' ? '创建任务' : '保存'}</Button></DialogFooter></form></DialogContent></Dialog>
-    <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>删除 {issueIdentifier(task.metadata.number)}？</AlertDialogTitle><AlertDialogDescription>任务将从列表和看板移除，但不会立即清除正文、评论或子任务。30 天内可以通过原链接恢复。</AlertDialogDescription></AlertDialogHeader>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<AlertDialogFooter><AlertDialogCancel disabled={pending}>取消</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={pending} onClick={event => { event.preventDefault(); void run(issue => setIssueDeleted({ id: task.id, revision: issue.revision }), 'delete').then(success => { if (success) setDeleteOpen(false) }) }}>{pending ? '正在删除…' : '删除任务'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <Dialog open={dialog !== null} onOpenChange={open => { if (!open && !pending) setDialog(null) }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{dialog === 'createChild' ? tDialog('createChildTitle') : dialog === 'duplicate' ? tDialog('duplicateTitle') : dialog === 'dueDate' ? tDialog('dueDateTitle') : tDialog('estimateTitle')}</DialogTitle><DialogDescription>{dialog === 'createChild' ? tDialog('createChildDescription') : dialog === 'duplicate' ? tDialog('duplicateDescription') : tDialog('attributeDescription')}</DialogDescription></DialogHeader><form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); const kind = dialog; if (!kind) return; void run(issue => kind === 'createChild' || kind === 'duplicate' ? createLinkedIssue({ id: task.id, revision: issue.revision, kind: kind === 'createChild' ? 'child' : 'duplicate', title: value, includeSubissues: kind === 'duplicate' && includeSubissues }) : updateIssueMetadata({ id: task.id, revision: issue.revision, patch: kind === 'dueDate' ? { dueDate: value || null } : { estimate: value === '' ? null : Number(value) } }), kind === 'createChild' ? 'child' : kind === 'duplicate' ? 'duplicate' : 'current').then(success => { if (success) setDialog(null) }) }}><FieldGroup><Field><FieldLabel htmlFor="issue-action-value">{dialog === 'dueDate' ? tDialog('dueDateLabel') : dialog === 'estimate' ? tDialog('estimateLabel') : tDialog('taskTitleLabel')}</FieldLabel><Input id="issue-action-value" autoFocus type={dialog === 'dueDate' ? 'date' : dialog === 'estimate' ? 'number' : 'text'} min={dialog === 'estimate' ? 0 : undefined} max={dialog === 'estimate' ? 100 : undefined} step={dialog === 'estimate' ? 1 : undefined} value={value} onChange={event => setValue(event.target.value)} disabled={pending} required={dialog === 'createChild' || dialog === 'duplicate'} maxLength={200} onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.preventDefault() }} /></Field>{dialog === 'duplicate' && <Field orientation="horizontal"><Checkbox id="duplicate-subissues" checked={includeSubissues} onCheckedChange={checked => setIncludeSubissues(!!checked)} /><FieldLabel htmlFor="duplicate-subissues">{tDialog('duplicateSubissues')}</FieldLabel></Field>}</FieldGroup>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<DialogFooter><Button type="button" variant="ghost" disabled={pending} onClick={() => setDialog(null)}>{tCommon('cancel')}</Button><Button type="submit" disabled={pending}>{pending ? tCommon('saving') : dialog === 'createChild' || dialog === 'duplicate' ? tIssue('create.submit') : tCommon('save')}</Button></DialogFooter></form></DialogContent></Dialog>
+    <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{tDialog('deleteTitle', { id: issueIdentifier(task.metadata.number) })}</AlertDialogTitle><AlertDialogDescription>{tDialog('deleteDescription')}</AlertDialogDescription></AlertDialogHeader>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<AlertDialogFooter><AlertDialogCancel disabled={pending}>{tCommon('cancel')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={pending} onClick={event => { event.preventDefault(); void run(issue => setIssueDeleted({ id: task.id, revision: issue.revision }), 'delete').then(success => { if (success) setDeleteOpen(false) }) }}>{pending ? tDialog('deleting') : tDialog('deleteAction')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </>
 }

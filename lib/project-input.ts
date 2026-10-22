@@ -9,21 +9,21 @@ export const projectProperties = z.object({
   members: z.array(z.literal('me')).max(1),
   labels: z.array(z.string().trim().min(1).max(50)).max(20),
   dependencyIds: z.array(z.uuid()).max(50),
-  milestones: z.array(z.object({ id: z.uuid(), name: z.string().trim().min(1, '请填写里程碑名称。').max(200), targetDate: date, completed: z.boolean() })).max(50),
+  milestones: z.array(z.object({ id: z.uuid(), name: z.string().trim().min(1, 'validationProjectMilestoneName').max(200), targetDate: date, completed: z.boolean() })).max(50),
 }).superRefine((value, context) => {
-  for (const key of ['members', 'labels', 'dependencyIds'] as const) if (new Set(value[key]).size !== value[key].length) context.addIssue({ code: 'custom', message: '项目属性不能重复。', path: [key] })
-  if (new Set(value.milestones.map(item => item.id)).size !== value.milestones.length) context.addIssue({ code: 'custom', message: '里程碑不能重复。', path: ['milestones'] })
+  for (const key of ['members', 'labels', 'dependencyIds'] as const) if (new Set(value[key]).size !== value[key].length) context.addIssue({ code: 'custom', message: 'validationProjectDuplicate', path: [key] })
+  if (new Set(value.milestones.map(item => item.id)).size !== value.milestones.length) context.addIssue({ code: 'custom', message: 'validationProjectMilestoneDuplicate', path: ['milestones'] })
 })
 export const projectFields = z.object({
-  name: z.string().trim().min(1, '请填写项目名称。').max(200),
+  name: z.string().trim().min(1, 'validationProjectNameRequired').max(200),
   summary: z.string().trim().max(500), description: z.string().max(50000),
   status: z.enum(['backlog', 'planned', 'started', 'paused', 'completed', 'canceled']),
   priority: z.enum(['none', 'urgent', 'high', 'normal', 'low']), lead: z.enum(['', 'me']),
   team: z.literal(WORKSPACE_NAME), startDate: date, targetDate: date,
   properties: projectProperties.default(DEFAULT_PROJECT_PROPERTIES),
 })
-export const projectInput = projectFields.extend({ id: z.uuid().optional(), revision: z.number().int().positive().optional() }).refine(value => !value.startDate || !value.targetDate || value.startDate <= value.targetDate, '目标日期不能早于开始日期。')
-export const projectPatch = z.object({ id: z.uuid(), revision: z.number().int().positive(), changes: projectFields.partial().extend({ properties: projectProperties.optional() }).refine(value => Object.keys(value).length > 0, '请选择需要修改的属性。') })
+export const projectInput = projectFields.extend({ id: z.uuid().optional(), revision: z.number().int().positive().optional() }).refine(value => !value.startDate || !value.targetDate || value.startDate <= value.targetDate, 'validationProjectDateOrder')
+export const projectPatch = z.object({ id: z.uuid(), revision: z.number().int().positive(), changes: projectFields.partial().extend({ properties: projectProperties.optional() }).refine(value => Object.keys(value).length > 0, 'validationProjectChangesRequired') })
 export type ProjectDraft = z.output<typeof projectFields>
 export type ProjectChanges = z.input<typeof projectPatch>['changes']
 

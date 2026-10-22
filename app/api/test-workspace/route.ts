@@ -13,12 +13,12 @@ export async function POST(request: Request) {
   const secret = process.env.BETTER_AUTH_SECRET
   if (!secret) return new Response(null, { status: 503 })
 
-  const fingerprint = createHmac('sha256', secret).update('orvilo-preview-test-account').digest('hex')
-  const credentials = { email: `orvilo-preview-${fingerprint.slice(0, 16)}@example.com`, password: fingerprint }
+  const fingerprint = createHmac('sha256', secret).update('mikka-preview-test-account').digest('hex')
+  const credentials = { email: `mikka-preview-${fingerprint.slice(0, 16)}@example.com`, password: fingerprint }
   try {
     let response = await auth.api.signInEmail({ body: credentials, headers: request.headers, asResponse: true })
     if (!response.ok) {
-      response = await auth.api.signUpEmail({ body: { ...credentials, name: 'Orvilo 测试账号' }, headers: request.headers, asResponse: true })
+      response = await auth.api.signUpEmail({ body: { ...credentials, name: 'Mikka Test Account' }, headers: request.headers, asResponse: true })
       if (!response.ok) response = await auth.api.signInEmail({ body: credentials, headers: request.headers, asResponse: true })
     }
     if (!response.ok) return new Response(null, { status: 503 })

@@ -2,7 +2,8 @@ import posthog from 'posthog-js'
 import { posthogConfig } from '@/lib/posthog-config'
 import { sanitizeAnalyticsEvent } from '@/lib/analytics-policy'
 
-posthog.init(posthogConfig.token, {
+if (posthogConfig.token) {
+  posthog.init(posthogConfig.token, {
   api_host: posthogConfig.apiHost,
   ui_host: posthogConfig.uiHost,
   defaults: '2026-05-30',
@@ -26,5 +27,6 @@ posthog.init(posthogConfig.token, {
   disable_product_tours: true,
   disable_web_experiments: true,
   before_send: sanitizeAnalyticsEvent,
-  loaded: client => client.register({ app: 'orvilo', environment: process.env.NODE_ENV }),
-})
+    loaded: client => client.register({ app: 'orvilo', environment: process.env.NODE_ENV }),
+  })
+}

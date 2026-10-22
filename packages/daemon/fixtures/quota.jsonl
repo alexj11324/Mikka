@@ -1,0 +1,6 @@
+{"t":0,"chunk":{"type":"start","messageId":"msg-quota-1"}}
+{"t":100,"chunk":{"type":"text-start","id":"txt-1"}}
+{"t":160,"chunk":{"type":"text-delta","id":"txt-1","delta":"Updating the parser."}}
+{"t":200,"chunk":{"type":"text-end","id":"txt-1"}}
+{"t":300,"chunk":{"type":"error","errorText":"Usage limit reached. Resets at 16:40."}}
+{"t":310,"exit":{"outcome":"failed","stopReason":"blocked","error":"usage limit reached","report":{"summary":"Stopped before editing: the usage limit was reached.","blockedOn":"quota_exhausted","nextStep":"Resume the session after the usage window resets."}}}

@@ -1,0 +1,8 @@
+{"t":0,"chunk":{"type":"start","messageId":"msg-tests-1"}}
+{"t":100,"chunk":{"type":"text-start","id":"txt-1"}}
+{"t":150,"chunk":{"type":"text-delta","id":"txt-1","delta":"Running the project's tests in the worktree."}}
+{"t":200,"chunk":{"type":"text-end","id":"txt-1"}}
+{"t":300,"exec":{"toolCallId":"call-test-1","command":"npm test --silent"}}
+{"t":400,"chunk":{"type":"finish","finishReason":"stop"}}
+{"t":400,"submit":{"summary":"Tests pass."}}
+{"t":400,"exit":{"outcome":"succeeded"}}

@@ -3,6 +3,7 @@
 import { UserRound } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 export function UserAvatar({
   user,
@@ -11,6 +12,7 @@ export function UserAvatar({
   user: { email: string; image?: string | null };
   size?: "default" | "sm" | "md";
 }) {
+  const t = useTranslations('Common')
   const initial = user.email.split("@")[0].match(/[a-z]/i)?.[0].toUpperCase();
 
   return (
@@ -18,7 +20,7 @@ export function UserAvatar({
       size={size === "sm" ? "sm" : "default"}
       className={cn(size === "md" && "size-7")}
       role="img"
-      aria-label={`${user.email} 的头像`}
+      aria-label={t('avatarLabel', { email: user.email })}
     >
       {user.image && (
         <AvatarImage src={user.image} alt="" referrerPolicy="no-referrer" />

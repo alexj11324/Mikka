@@ -1,6 +1,6 @@
-// PostHog project token 是公开的采集标识，不是个人 API key，也不能管理项目。
+// PostHog project tokens are public ingestion identifiers; keep them in deployment configuration.
 export const posthogConfig = {
-  token: 'phc_BEa7Yo6uV6o3Y6tu9PdUKat37v7tVZvuphtgEUZcTAoV',
+  token: process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '',
   apiHost: 'https://us.i.posthog.com',
   uiHost: 'https://us.posthog.com',
 } as const

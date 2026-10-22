@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { findParentNodeClosestToPos, type Editor } from "@tiptap/react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 
 import {
   AlertDialog,
@@ -19,7 +20,7 @@ import { TOAST_SUCCESS_ICON } from "./icons"
 const UNDO_TOAST_MS = 8000
 
 /** Tables have no title, so the heading above one names it. */
-function tableName(editor: Editor) {
+function tableHeading(editor: Editor) {
   const table = findParentNodeClosestToPos(
     editor.state.selection.$from,
     (node) => node.type.name === "table"
@@ -34,7 +35,7 @@ function tableName(editor: Editor) {
     return node.type.name !== "heading"
   })
 
-  return heading ? `${heading} table` : "This table"
+  return heading || null
 }
 
 interface DeleteTableDialogProps {
@@ -49,24 +50,25 @@ export function DeleteTableDialog({
   open,
   onOpenChange,
 }: DeleteTableDialogProps) {
-  const [name, setName] = useState("This table")
+  const t = useTranslations('Editor.richText')
+  const [name, setName] = useState(() => t('thisTable'))
   const [shownOpen, setShownOpen] = useState(open)
 
   // Named once on open, so the copy holds through the closing animation.
   if (open !== shownOpen) {
     setShownOpen(open)
-    if (open && editor) setName(tableName(editor))
+    if (open && editor) setName(tableHeading(editor) ?? t('thisTable'))
   }
 
   function deleteTable() {
     editor?.chain().focus().deleteTable().run()
     onOpenChange(false)
-    toast.success("Table deleted", {
+    toast.success(t('tableDeleted'), {
       icon: TOAST_SUCCESS_ICON,
       description: name,
       duration: UNDO_TOAST_MS,
       action: {
-        label: "Undo",
+        label: t('undoDeletion'),
         onClick: () => editor?.chain().focus().undo().run(),
       },
     })
@@ -77,16 +79,15 @@ export function DeleteTableDialog({
       {/* The bar that opened it hides with the table, so focus lands in the page. */}
       <AlertDialogContent size="sm" finalFocus={() => editor?.view.dom ?? true}>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Table?</AlertDialogTitle>
+          <AlertDialogTitle>{t('deleteTableTitle')}</AlertDialogTitle>
           <AlertDialogDescription>
-            <span className="text-foreground font-medium">{name}</span> and
-            every row in it leave the page until you undo it.
+            <span className="text-foreground font-medium">{name}</span> {t('deleteTableDescription')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
           <AlertDialogAction variant="destructive" onClick={deleteTable}>
-            Delete Table
+            {t('deleteTableAction')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

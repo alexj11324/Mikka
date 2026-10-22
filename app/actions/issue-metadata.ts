@@ -2,6 +2,7 @@
 
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { agents, issues, issueMembers, issueVersions, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
@@ -38,51 +39,54 @@ export async function getIssuePropertyOptions(id: string) {
 }
 
 export async function updateIssueMetadata(input: { id: string; revision: number; patch: IssueMetadataPatch; inviteEmail?: string }) {
-  const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), patch: patchSchema, inviteEmail: z.email().max(254).optional() }).safeParse(input)
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? '属性格式不正确。' }
-  const { issue, user } = await requireIssueAccess(parsed.data.id)
-  try {
-    return await db.transaction(async tx => {
-      const [latest] = await tx.select().from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
-      if (!latest || latest.revision !== parsed.data.revision) return { error: '任务已被更新，请刷新后重试。' }
-      if (user.id !== issue.userId) {
-        const [membership] = await tx.select({ id: issueMembers.memberId }).from(issueMembers).where(and(eq(issueMembers.issueId, issue.id), eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, user.id)))
-        if (!membership) return { error: '你已失去此任务的访问权限。' }
-      }
-      const metadata = readIssueMetadata(latest.content)
-      const patch = parsed.data.patch
-      let assignee = metadata.assignee
-      if (parsed.data.inviteEmail) {
-        if (user.id !== issue.userId) return { error: '只有所有者可以邀请并分配成员。' }
-        const [member] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.email, parsed.data.inviteEmail.toLowerCase()))
-        if (!member) return { error: '该邮箱尚未注册，请对方先注册后再邀请。' }
-        if (member.id !== issue.userId) await tx.insert(issueMembers).values({ issueId: issue.id, userId: issue.userId, memberId: member.id }).onConflictDoNothing()
-        assignee = { ...member, kind: 'member' }
-      } else if (patch.assignee === null) assignee = null
-      else if (patch.assignee) {
-        if (patch.assignee.kind === 'agent') {
-          const [agent] = await tx.select({ id: agents.id, name: agents.name }).from(agents).where(and(eq(agents.id, z.uuid().parse(patch.assignee.id)), eq(agents.userId, issue.userId)))
-          if (!agent) return { error: '此 Agent 不存在或无权分配。' }
-          assignee = { ...agent, kind: 'agent', image: null }
-        } else {
-          const [member] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, patch.assignee.id))
-          if (!member) return { error: '成员不存在。' }
-          if (member.id !== issue.userId) {
-            const [membership] = await tx.select({ id: issueMembers.memberId }).from(issueMembers).where(and(eq(issueMembers.issueId, issue.id), eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, member.id)))
-            if (!membership) return { error: '请先邀请该成员加入此任务。' }
-          }
-          assignee = { ...member, kind: 'member' }
+  return runAction(async () => {
+    const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), patch: patchSchema, inviteEmail: z.email().max(254).optional() }).safeParse(input)
+    if (!parsed.success) return { error: 'issueMetadataInvalid' }
+    const { issue, user } = await requireIssueAccess(parsed.data.id)
+    try {
+      return await db.transaction(async tx => {
+        const [latest] = await tx.select().from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
+        if (!latest || latest.revision !== parsed.data.revision) return { error: 'issueOutdated' }
+        if (user.id !== issue.userId) {
+          const [membership] = await tx.select({ id: issueMembers.memberId }).from(issueMembers).where(and(eq(issueMembers.issueId, issue.id), eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, user.id)))
+          if (!membership) return { error: 'issueAccessLost' }
         }
-      }
-      const next = { ...metadata, ...patch, assignee }
-      next.labels = [...new Map(next.labels.map(label => [label.name.toLowerCase(), label])).values()]
-      next.pullRequests = [...new Map(next.pullRequests.map(pr => [pr.url.replace(/\/$/, ''), { ...pr, url: pr.url.replace(/\/$/, '') }])).values()]
-      const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, next), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId), eq(issues.revision, latest.revision))).returning()
-      if (!saved) return { error: '任务已被更新，请重试。' }
-      await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
-      return { issue: issueWithMetadata(saved) }
-    })
-  } catch {
-    return { error: '属性保存失败，请稍后重试。' }
-  }
+        const metadata = readIssueMetadata(latest.content)
+        const patch = parsed.data.patch
+        let assignee = metadata.assignee
+        if (parsed.data.inviteEmail) {
+          if (user.id !== issue.userId) return { error: 'memberOwnerOnly' }
+          const [member] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.email, parsed.data.inviteEmail.toLowerCase()))
+          if (!member) return { error: 'memberNotRegistered' }
+          if (member.id !== issue.userId) await tx.insert(issueMembers).values({ issueId: issue.id, userId: issue.userId, memberId: member.id }).onConflictDoNothing()
+          assignee = { ...member, kind: 'member' }
+        } else if (patch.assignee === null) assignee = null
+        else if (patch.assignee) {
+          if (patch.assignee.kind === 'agent') {
+            const [agent] = await tx.select({ id: agents.id, name: agents.name }).from(agents).where(and(eq(agents.id, z.uuid().parse(patch.assignee.id)), eq(agents.userId, issue.userId)))
+            if (!agent) return { error: 'agentNotFound' }
+            assignee = { ...agent, kind: 'agent', image: null }
+          } else {
+            const [member] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, patch.assignee.id))
+            if (!member) return { error: 'memberNotFound' }
+            if (member.id !== issue.userId) {
+              const [membership] = await tx.select({ id: issueMembers.memberId }).from(issueMembers).where(and(eq(issueMembers.issueId, issue.id), eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, member.id)))
+              if (!membership) return { error: 'memberNotJoined' }
+            }
+            assignee = { ...member, kind: 'member' }
+          }
+        }
+        const next = { ...metadata, ...patch, assignee }
+        next.labels = [...new Map(next.labels.map(label => [label.name.toLowerCase(), label])).values()]
+        next.pullRequests = [...new Map(next.pullRequests.map(pr => [pr.url.replace(/\/$/, ''), { ...pr, url: pr.url.replace(/\/$/, '') }])).values()]
+        const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, next), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId), eq(issues.revision, latest.revision))).returning()
+        if (!saved) return { error: 'issueOutdated' }
+        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
+        return { issue: issueWithMetadata(saved) }
+      })
+    } catch (error) {
+      if (error instanceof ActionFailureError) throw error
+      return { error: 'issueMetadataSaveFailed' }
+    }
+  })
 }

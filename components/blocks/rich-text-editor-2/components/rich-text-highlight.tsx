@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Highlight } from "@tiptap/extension-highlight"
 import type { Editor } from "@tiptap/react"
+import { useTranslations } from "next-intl"
 import { cn } from "cn"
 
 import { Button } from "@/components/ui/button"
@@ -22,7 +23,6 @@ import { HighlighterIcon, CheckIcon, BanIcon } from "lucide-react"
 
 interface HighlightColor {
   id: string
-  label: string
   /** The swatch in the picker. */
   swatch: string
   /** The painted mark inside the document, as a prose descendant class. */
@@ -33,31 +33,26 @@ interface HighlightColor {
 export const HIGHLIGHT_COLORS = [
   {
     id: "yellow",
-    label: "Yellow",
     swatch: "bg-yellow-200 dark:bg-yellow-400/40",
     mark: "[&_.tiptap_mark]:bg-yellow-200 dark:[&_.tiptap_mark]:bg-yellow-400/30",
   },
   {
     id: "green",
-    label: "Green",
     swatch: "bg-emerald-200 dark:bg-emerald-400/40",
     mark: "[&_.tiptap_mark[data-color=green]]:bg-emerald-200 dark:[&_.tiptap_mark[data-color=green]]:bg-emerald-400/30",
   },
   {
     id: "blue",
-    label: "Blue",
     swatch: "bg-sky-200 dark:bg-sky-400/40",
     mark: "[&_.tiptap_mark[data-color=blue]]:bg-sky-200 dark:[&_.tiptap_mark[data-color=blue]]:bg-sky-400/30",
   },
   {
     id: "pink",
-    label: "Pink",
     swatch: "bg-pink-200 dark:bg-pink-400/40",
     mark: "[&_.tiptap_mark[data-color=pink]]:bg-pink-200 dark:[&_.tiptap_mark[data-color=pink]]:bg-pink-400/30",
   },
   {
     id: "violet",
-    label: "Violet",
     swatch: "bg-violet-200 dark:bg-violet-400/40",
     mark: "[&_.tiptap_mark[data-color=violet]]:bg-violet-200 dark:[&_.tiptap_mark[data-color=violet]]:bg-violet-400/30",
   },
@@ -88,6 +83,7 @@ export function RichTextHighlightPopover({
   editor,
   state,
 }: RichTextHighlightPopoverProps) {
+  const t = useTranslations('Editor.richText')
   const [open, setOpen] = useState(false)
 
   function apply(color: HighlightColorId | null) {
@@ -111,7 +107,7 @@ export function RichTextHighlightPopover({
             render={
               <Toggle
                 size="sm"
-                aria-label="Highlight"
+                aria-label={t('highlight')}
                 pressed={state.highlight !== null}
                 disabled={!state.canFormat}
                 onMouseDown={keepEditorFocus}
@@ -124,13 +120,13 @@ export function RichTextHighlightPopover({
           </PopoverTrigger>
         </TooltipTrigger>
         <TooltipContent>
-          Highlight
+          {t('highlight')}
           <ShortcutKeys keys={["mod", "shift", "H"]} />
         </TooltipContent>
       </Tooltip>
       <PopoverContent
         align="start"
-        aria-label="Highlight color"
+        aria-label={t('highlightColor')}
         className="w-auto"
         finalFocus={() => editor?.view.dom ?? true}
       >
@@ -143,7 +139,7 @@ export function RichTextHighlightPopover({
                 key={color.id}
                 variant="ghost"
                 size="icon-sm"
-                aria-label={`${color.label} highlight`}
+                aria-label={t('colorHighlight', { color: t(`colors.${color.id}`) })}
                 aria-pressed={selected}
                 onClick={() => apply(color.id)}
               >
@@ -168,7 +164,7 @@ export function RichTextHighlightPopover({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Remove highlight"
+            aria-label={t('removeHighlight')}
             disabled={state.highlight === null}
             onClick={() => apply(null)}
           >

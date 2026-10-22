@@ -1,0 +1,7 @@
+{"t":0,"chunk":{"type":"start","messageId":"msg-verify-1"}}
+{"t":100,"chunk":{"type":"tool-input-available","toolCallId":"call-write-1","toolName":"write","input":{"path":"BROKEN.md"}}}
+{"t":160,"write":{"path":"BROKEN.md","content":"# Half done\n"},"chunk":{"type":"tool-output-available","toolCallId":"call-write-1","output":{"ok":true}}}
+{"t":170,"chunk":{"type":"data-file-change","data":{"path":"BROKEN.md","change":"added"}}}
+{"t":200,"chunk":{"type":"finish","finishReason":"stop"}}
+{"t":200,"submit":{"summary":"Added BROKEN.md.","nextStep":"Review."}}
+{"t":200,"exit":{"outcome":"succeeded"}}

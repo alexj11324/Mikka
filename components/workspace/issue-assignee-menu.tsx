@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import type { MetadataRequest } from './issue-metadata-controls'
 import useSWR from 'swr'
 import { Bot, Check, CircleUserRound, Send, UserRound } from 'lucide-react'
@@ -22,6 +23,7 @@ export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, o
   onChange: (value: { kind: 'member' | 'agent'; id: string } | null) => Promise<boolean>
   onInvite: () => void; request?: MetadataRequest | null
 }) {
+  const t = useTranslations('Metadata.assignee')
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   useEffect(() => { if (request?.target === 'assignee') { setOpen(true); setQuery('') } }, [request])
@@ -30,8 +32,8 @@ export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, o
     if (await onChange(value)) { setOpen(false); setQuery('') }
   }
   return <Popover open={open} onOpenChange={value => { setOpen(value); setQuery('') }}>
-    <PopoverTrigger render={<Button data-assignee-trigger type="button" variant="ghost" size={compact ? 'icon-compact' : 'sm'} disabled={disabled} aria-label={`负责人：${assignee?.name ?? '未分配'}`} title={`负责人：${assignee?.name ?? '未分配'} · A`} />}>
-      <AssigneeAvatar assignee={assignee} compact={compact} />{!compact && (assignee?.name ?? '未分配负责人')}
+    <PopoverTrigger render={<Button data-assignee-trigger type="button" variant="ghost" size={compact ? 'icon-compact' : 'sm'} disabled={disabled} aria-label={t('aria', { name: assignee?.name ?? t('unassigned') })} title={t('ariaShortcut', { name: assignee?.name ?? t('unassigned') })} />}>
+      <AssigneeAvatar assignee={assignee} compact={compact} />{!compact && (assignee?.name ?? t('unassignedLabel'))}
     </PopoverTrigger>
     <PopoverContent align="end" className="w-72 p-0">
       <Command onKeyDownCapture={event => {
@@ -42,20 +44,20 @@ export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, o
           void select(index === 0 ? null : { kind: 'member', id: data!.members[index - 1].id })
         }
       }}>
-        <CommandInput placeholder="分配给…" aria-label="搜索负责人" value={query} onValueChange={setQuery} />
+        <CommandInput placeholder={t('assignPlaceholder')} aria-label={t('searchAria')} value={query} onValueChange={setQuery} />
         <CommandList>
-          <CommandEmpty>{error ? '成员读取失败，请重试' : data ? '没有匹配的负责人' : '正在读取成员…'}</CommandEmpty>
-          <CommandGroup heading="负责人">
-            <CommandItem value="未分配负责人" disabled={disabled} onSelect={() => { void select(null) }}><CircleUserRound /><span className="flex-1">未分配</span>{!assignee && <Check />}<CommandShortcut>0</CommandShortcut></CommandItem>
+          <CommandEmpty>{error ? t('readFailed') : data ? t('noMatch') : t('loading')}</CommandEmpty>
+          <CommandGroup heading={t('group')}>
+            <CommandItem value={t('unassignedLabel')} disabled={disabled} onSelect={() => { void select(null) }}><CircleUserRound /><span className="flex-1">{t('unassigned')}</span>{!assignee && <Check />}<CommandShortcut>0</CommandShortcut></CommandItem>
             {data?.members.map((member, index) => <CommandItem key={member.id} value={`${member.name} ${member.id}`} disabled={disabled} onSelect={() => { void select({ kind: 'member', id: member.id }) }}><AssigneeAvatar assignee={{ ...member, kind: 'member' }} /><span className="flex-1 truncate">{member.name}</span>{assignee?.kind === 'member' && assignee.id === member.id && <Check />}{index < 9 && <CommandShortcut>{index + 1}</CommandShortcut>}</CommandItem>)}
           </CommandGroup>
           <CommandSeparator />
-          <CommandGroup heading="Agents">
+          <CommandGroup heading={t('agents')}>
             {data?.agents.map(agent => <CommandItem key={agent.id} value={`${agent.name} ${agent.harness}`} disabled={disabled} onSelect={() => { void select({ kind: 'agent', id: agent.id }) }}><Bot /><span className="flex-1 truncate">{agent.name}</span>{assignee?.kind === 'agent' && assignee.id === agent.id && <Check />}</CommandItem>)}
-            {data && !data.agents.length && <p className="px-2 py-3 text-xs text-muted-foreground">尚未配置 Agent</p>}
+            {data && !data.agents.length && <p className="px-2 py-3 text-xs text-muted-foreground">{t('noAgents')}</p>}
           </CommandGroup>
-          {data?.isOwner && <><CommandSeparator /><CommandGroup heading="新成员"><CommandItem value="邀请并分配成员" onSelect={() => { setOpen(false); onInvite() }}><Send />邀请并分配…</CommandItem></CommandGroup></>}
-          {error && <CommandGroup><CommandItem onSelect={() => { void mutate() }}><UserRound />重新读取成员</CommandItem></CommandGroup>}
+          {data?.isOwner && <><CommandSeparator /><CommandGroup heading={t('newMember')}><CommandItem value={t('invite')} onSelect={() => { setOpen(false); onInvite() }}><Send />{t('invite')}</CommandItem></CommandGroup></>}
+          {error && <CommandGroup><CommandItem onSelect={() => { void mutate() }}><UserRound />{t('reload')}</CommandItem></CommandGroup>}
         </CommandList>
       </Command>
     </PopoverContent>

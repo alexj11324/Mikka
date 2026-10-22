@@ -8,14 +8,16 @@ import {
 } from "@tiptap/react"
 
 import { Checkbox } from "@/components/ui/checkbox"
+import { useTranslations } from "next-intl"
 
 function TaskItemView({ node, editor, updateAttributes }: ReactNodeViewProps) {
+  const t = useTranslations('Editor.richText')
   const editable = useEditorState({
     editor,
     selector: ({ editor: current }) => current.isEditable,
   })
   const checked = node.attrs.checked === true
-  const task = node.textContent || "Empty task"
+  const task = node.textContent || t('emptyTask')
 
   return (
     <NodeViewWrapper className="flex items-start gap-2.5">

@@ -3,6 +3,7 @@ import { Mention, type MentionNodeAttrs } from "@tiptap/extension-mention"
 import { PluginKey } from "@tiptap/pm/state"
 import type { SuggestionProps } from "@tiptap/suggestion"
 import { cn } from "cn"
+import { useTranslations } from "next-intl"
 
 import {
   Avatar,
@@ -66,6 +67,7 @@ function MentionMenu({
   loading,
   command,
 }: MentionMenuProps) {
+  const t = useTranslations('Editor.richText')
   // The first lookup is still running: nothing to show yet.
   if (loading && items.length === 0) return null
 
@@ -73,9 +75,9 @@ function MentionMenu({
     <RichTextSuggestionMenu
       ref={ref}
       editor={editor}
-      label="Mention a teammate"
-      empty="No one by that name"
-      groups={[{ heading: "People", items }]}
+      label={t('mentionTeammate')}
+      empty={t('noOneByName')}
+      groups={[{ heading: t('people'), items }]}
       getKey={(candidate) => candidate.id}
       onSelect={(candidate) =>
         command({ id: candidate.id, label: candidate.label })

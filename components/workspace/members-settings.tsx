@@ -1,16 +1,20 @@
 "use client";
 
-import { Fragment, useRef, useState } from "react";
-import useSWR, { type KeyedMutator } from "swr";
-import { fetchSettingsData, isSettingsAccessError, memberSettingsKey, settingsReadOptions } from '@/lib/settings-data';
-import { SettingsDataState } from '@/components/settings/settings-data-state';
+import { Fragment, useEffect, useRef, useState } from "react";
+import { useRouter, Link } from "@/i18n/navigation";
+import useSWR from "swr";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import {
   ArrowDown,
+  ArrowLeft,
   ArrowUp,
+  Building2,
+  ChevronRight,
   Download,
   Info,
   MoreHorizontal,
   Search,
+  Shield,
   Users,
 } from "lucide-react";
 import type { WorkspaceSettings } from "@/lib/workspace-access";
@@ -19,8 +23,9 @@ import {
   revokeWorkspaceInvitation,
   updateWorkspaceMember,
 } from "@/app/actions/workspace";
+import { useActionError } from "@/lib/use-action-error";
 import { InviteMembersDialog } from "@/components/workspace/invite-members-dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/reui/badge";
 import { UserAvatar } from "@/components/user-avatar";
 import {
@@ -70,19 +75,11 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty";
 
-const date = (value: string) =>
-  new Date(value).toLocaleDateString("zh-CN", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-const filters = [
-  { value: "all", label: "全部" },
-  { value: "active", label: "启用中" },
-  { value: "invited", label: "待接受邀请" },
-  { value: "suspended", label: "已停用" },
-];
+async function fetchSettings(url: string): Promise<WorkspaceSettings> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Failed to load members.");
+  return response.json();
+}
 type Change = {
   userId: string;
   name: string;
@@ -90,19 +87,50 @@ type Change = {
   status: "active" | "suspended";
 };
 
-export function MembersSettings({ workspaceId, inviteInitially }: { workspaceId?: string; inviteInitially: boolean }) {
-  const { data, error, mutate } = useSWR<WorkspaceSettings>(memberSettingsKey(workspaceId), fetchSettingsData<WorkspaceSettings>, settingsReadOptions);
-  if (!data || isSettingsAccessError(error)) return <SettingsDataState title="成员" error={error} onRetry={() => void mutate()} />;
-  return <MembersSettingsContent key={`${data.workspace.id}-${inviteInitially}`} data={data} fetchError={Boolean(error)} mutate={mutate} inviteInitially={inviteInitially} />;
-}
-
-function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: { data: WorkspaceSettings; fetchError: boolean; mutate: KeyedMutator<WorkspaceSettings>; inviteInitially: boolean }) {
+export function MembersSettings({
+  initial,
+  workspaceId,
+  inviteInitially,
+}: {
+  initial?: WorkspaceSettings;
+  workspaceId?: string;
+  inviteInitially: boolean;
+}) {
+  const router = useRouter();
+  const t = useTranslations("Members");
+  const commonT = useTranslations("Common");
+  const format = useFormatter();
+  const locale = useLocale();
+  const translateError = useActionError();
+  const requestedWorkspaceId = initial?.workspace.id ?? workspaceId;
+  const settingsUrl = requestedWorkspaceId
+    ? `/api/workspace?workspace=${encodeURIComponent(requestedWorkspaceId)}`
+    : "/api/workspace";
+  const {
+    data: fetchedData,
+    error: fetchError,
+    mutate,
+  } = useSWR<WorkspaceSettings>(settingsUrl, fetchSettings, {
+    fallbackData: initial,
+    revalidateOnMount: true,
+  });
+  const ready = Boolean(fetchedData ?? initial);
+  const data = fetchedData ?? initial ?? {
+    workspace: { id: "", name: "" },
+    choices: [],
+    currentUserId: "",
+    role: "member" as const,
+    currentUser: { email: "", image: null },
+    members: [],
+    invitations: [],
+  };
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [ascending, setAscending] = useState(true);
-  const [inviteOpen, setInviteOpen] = useState(
-    inviteInitially && data.role === "admin",
-  );
+  const [inviteOpen, setInviteOpen] = useState(false);
+  useEffect(() => {
+    if (inviteInitially && ready && data.role === "admin") setInviteOpen(true);
+  }, [inviteInitially, ready, data.role]);
   const [change, setChange] = useState<Change | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -111,6 +139,19 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
   const [downloadUrl, setDownloadUrl] = useState<string | undefined>();
   const canManage = data.role === "admin" && !fetchError;
   const query = search.trim().toLowerCase();
+  const filters = [
+    { value: "all", label: t("filters.all") },
+    { value: "active", label: t("filters.active") },
+    { value: "invited", label: t("filters.invited") },
+    { value: "suspended", label: t("filters.suspended") },
+  ];
+  const date = (value: string) =>
+    format.dateTime(new Date(value), {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
   const members = data.members
     .filter((member) =>
       `${member.name} ${member.email}`.toLowerCase().includes(query),
@@ -118,14 +159,14 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
     .sort(
       (a, b) =>
         (ascending ? 1 : -1) *
-        (a.name || a.email).localeCompare(b.name || b.email, "zh-CN"),
+        (a.name || a.email).localeCompare(b.name || b.email, locale),
     );
   const invitations = data.invitations
     .filter((invite) => invite.email.toLowerCase().includes(query))
     .sort((a, b) => (ascending ? 1 : -1) * a.email.localeCompare(b.email));
   const groups = [
-    { status: "active", label: "启用中" },
-    { status: "suspended", label: "已停用" },
+    { status: "active", label: t("status.active") },
+    { status: "suspended", label: t("status.suspended") },
   ].map((group) => ({
     ...group,
     members: members.filter(
@@ -151,15 +192,15 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
         workspaceId: data.workspace.id,
         ...change,
       });
-      if (!result.ok) {
-        setError(result.error);
+      if ("error" in result) {
+        setError(translateError(result.error));
         return;
       }
       setChange(null);
-      setNotice("成员信息已更新。");
+      setNotice(t("memberUpdated"));
       await mutate();
     } catch {
-      setError("更新失败，请重试。");
+      setError(t("updateFailed"));
     } finally {
       setPending(false);
     }
@@ -171,14 +212,14 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
     setNotice("");
     try {
       const result = await revokeWorkspaceInvitation(data.workspace.id, id);
-      if (!result.ok) {
-        setError(result.error);
+      if ("error" in result) {
+        setError(translateError(result.error));
         return;
       }
-      setNotice("邀请已撤销，原链接已失效。");
+      setNotice(t("invitationRevoked"));
       await mutate();
     } catch {
-      setError("撤销失败，请重试。");
+      setError(t("revokeFailed"));
     } finally {
       setPending(false);
     }
@@ -186,12 +227,18 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
   function exportCsv() {
     if (!downloadRef.current || fetchError) return;
     const rows = [
-      ["姓名", "邮箱", "角色", "状态", "加入时间 / 邀请有效期"],
+      [
+        t("csv.name"),
+        t("csv.email"),
+        t("csv.role"),
+        t("csv.status"),
+        t("csv.joined"),
+      ],
       ...groups.flatMap((group) =>
         group.members.map((member) => [
           member.name,
           member.email,
-          member.role === "admin" ? "管理员" : "成员",
+          member.role === "admin" ? t("role.admin") : t("role.member"),
           group.label,
           member.createdAt,
         ]),
@@ -199,8 +246,8 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
       ...visibleInvitations.map((invite) => [
         "",
         invite.email,
-        invite.role === "admin" ? "管理员" : "成员",
-        "待接受邀请",
+        invite.role === "admin" ? t("role.admin") : t("role.member"),
+        t("status.invited"),
         invite.expiresAt,
       ]),
     ];
@@ -213,9 +260,85 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   return (
-    <>
-          <section aria-label="工作区成员管理" data-settings-state={fetchError ? 'error' : 'ready'} className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-8 sm:px-10 sm:py-12">
-            <header className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">成员</h1><p className="text-sm text-muted-foreground">管理当前工作区的成员、角色与邀请。</p></header>
+    <div data-settings-state={fetchError ? "error" : ready ? "ready" : "loading"} className="flex min-h-dvh flex-col bg-background text-foreground md:flex-row">
+      <aside
+        className="flex shrink-0 flex-col gap-7 p-3 md:w-60 md:py-5"
+        aria-label={t("navLabel")}
+      >
+        <Link
+          href="/"
+          className={buttonVariants({
+            variant: "ghost",
+            className: "justify-start text-muted-foreground",
+          })}
+        >
+          <ArrowLeft data-icon="inline-start" />
+          {t("backToWorkspace")}
+        </Link>
+        <div className="flex flex-col gap-3 px-1">
+          <div className="flex items-center gap-2 px-2 text-sm text-muted-foreground">
+            <Building2 className="size-4" />
+            <span>{t("workspace")}</span>
+          </div>
+          <Select
+            value={data.workspace.id}
+            items={data.choices.map((item) => ({
+              value: item.id,
+              label: item.name,
+            }))}
+            onValueChange={(value) => {
+              if (value) router.push(`/settings/members?workspace=${value}`);
+            }}
+          >
+            <SelectTrigger aria-label={t("currentWorkspace")} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {data.choices.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-2">
+          <p className="px-3 text-xs text-muted-foreground">{t("manage")}</p>
+          <Link
+            href={`/settings/members?workspace=${data.workspace.id}`}
+            className={buttonVariants({
+              variant: "secondary",
+              className: "justify-start rounded-lg",
+            })}
+            aria-current="page"
+          >
+            <Users data-icon="inline-start" />
+            {t("title")}
+          </Link>
+        </div>
+        <div className="mt-auto hidden flex-col gap-3 px-3 pb-2 md:flex">
+
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Shield className="size-3.5" />
+            {data.role === "admin" ? t("adminAccess") : t("memberAccess")}
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {t("brandFooter")}
+          </span>
+        </div>
+      </aside>
+      <main className="flex min-w-0 flex-1 flex-col md:py-2 md:pr-2">
+        <div className="flex min-h-[calc(100dvh-1rem)] flex-col rounded-xl border bg-sidebar/40">
+          <header className="flex h-12 items-center gap-2 px-5 text-xs text-muted-foreground md:px-8">
+            <Users className="size-3.5" />
+            <span>{t("breadcrumbSettings")}</span>
+            <ChevronRight className="size-3" />
+            <span>{t("title")}</span>
+          </header>
+          <div className="flex w-full flex-col gap-6 px-5 py-5 md:px-10 lg:px-14 lg:py-8">
+            <h1 className="text-2xl font-medium tracking-tight">{t("title")}</h1>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex w-full items-center gap-2 sm:w-auto">
                 <div className="min-w-0 flex-1 sm:w-72">
@@ -224,10 +347,10 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                       <Search />
                     </InputGroupAddon>
                     <InputGroupInput
-                      aria-label="搜索成员或邀请"
+                      aria-label={t("searchLabel")}
                       value={search}
                       onChange={(event) => setSearch(event.target.value)}
-                      placeholder="搜索姓名或邮箱"
+                      placeholder={t("searchPlaceholder")}
                     />
                   </InputGroup>
                 </div>
@@ -240,7 +363,7 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                   }
                   onValueChange={(value) => setFilter(value ?? "all")}
                 >
-                  <SelectTrigger aria-label="成员状态筛选">
+                  <SelectTrigger aria-label={t("filterLabel")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -264,14 +387,14 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                   onClick={exportCsv}
                 >
                   <Download data-icon="inline-start" />
-                  导出 CSV
+                  {t("exportCsv")}
                 </Button>
                 <Button
                   className="rounded-full bg-workspace-accent text-workspace-accent-foreground hover:bg-workspace-accent/90"
                   disabled={!canManage}
                   onClick={() => setInviteOpen(true)}
                 >
-                  邀请成员
+                  {t("invite")}
                 </Button>
               </div>
               <a
@@ -282,14 +405,14 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                 tabIndex={-1}
                 aria-hidden="true"
               >
-                下载成员 CSV
+                {t("downloadCsv")}
               </a>
             </div>
             {(error || fetchError) && (
               <Alert variant="destructive">
-                <AlertTitle>操作未完成</AlertTitle>
+                <AlertTitle>{t("operationFailed")}</AlertTitle>
                 <AlertDescription>
-                  {error || "无法刷新成员数据，请确认权限后重试。"}
+                  {error || t("refreshFailed")}
                 </AlertDescription>
               </Alert>
             )}
@@ -307,11 +430,11 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                       variant="ghost"
                       className="-ml-2"
                       aria-label={
-                        ascending ? "按姓名降序排列" : "按姓名升序排列"
+                        ascending ? t("sortDescending") : t("sortAscending")
                       }
                       onClick={() => setAscending(!ascending)}
                     >
-                      姓名
+                      {t("table.name")}
                       {ascending ? (
                         <ArrowDown data-icon="inline-end" />
                       ) : (
@@ -319,13 +442,13 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                       )}
                     </Button>
                   </TableHead>
-                  <TableHead>邮箱</TableHead>
-                  <TableHead>状态 / 角色</TableHead>
+                  <TableHead>{t("table.email")}</TableHead>
+                  <TableHead>{t("table.statusRole")}</TableHead>
                   <TableHead className="hidden lg:table-cell">
-                    加入时间 / 有效期
+                    {t("table.joined")}
                   </TableHead>
                   <TableHead>
-                    <span className="sr-only">操作</span>
+                    <span className="sr-only">{t("table.actions")}</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -357,7 +480,7 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                                     </span>
                                     {member.userId === data.currentUserId && (
                                       <span className="text-xs text-muted-foreground">
-                                        你
+                                        {t("you")}
                                       </span>
                                     )}
                                   </div>
@@ -373,18 +496,18 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                             <TableCell>
                               {member.status === "suspended" ? (
                                 <span className="text-xs text-muted-foreground">
-                                  已停用
+                                  {t("status.suspended")}
                                 </span>
                               ) : member.role === "admin" ? (
                                 <Badge
                                   variant="secondary"
                                   className="bg-workspace-accent/15 text-workspace-accent"
                                 >
-                                  管理员
+                                  {t("role.admin")}
                                 </Badge>
                               ) : (
                                 <span className="text-xs text-muted-foreground">
-                                  成员
+                                  {t("role.member")}
                                 </span>
                               )}
                             </TableCell>
@@ -399,7 +522,9 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                                       <Button
                                         size="icon-sm"
                                         variant="ghost"
-                                        aria-label={`管理 ${member.name || member.email}`}
+                                        aria-label={t("manageMember", {
+                                          name: member.name || member.email,
+                                        })}
                                         disabled={pending}
                                       />
                                     }
@@ -422,8 +547,8 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                                         }
                                       >
                                         {member.role === "admin"
-                                          ? "设为成员"
-                                          : "设为管理员"}
+                                          ? t("menu.makeMember")
+                                          : t("menu.makeAdmin")}
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
                                         onClick={() =>
@@ -439,8 +564,8 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                                         }
                                       >
                                         {member.status === "active"
-                                          ? "停用成员"
-                                          : "恢复成员"}
+                                          ? t("menu.suspend")
+                                          : t("menu.restore")}
                                       </DropdownMenuItem>
                                     </DropdownMenuGroup>
                                   </DropdownMenuContent>
@@ -459,7 +584,7 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                         colSpan={5}
                         className="rounded-lg py-2 text-xs text-muted-foreground"
                       >
-                        待接受邀请
+                        {t("status.invited")}
                         <span className="ml-2 tabular-nums">
                           {visibleInvitations.length}
                         </span>
@@ -475,8 +600,8 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                               <span className="text-xs text-muted-foreground">
                                 {new Date(invite.expiresAt).getTime() >
                                 Date.now()
-                                  ? "待接受 · 链接邀请"
-                                  : "已过期"}
+                                  ? t("invitation.pending")
+                                  : t("invitation.expired")}
                               </span>
                             </div>
                           </div>
@@ -485,7 +610,9 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                           {invite.email}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
-                          {invite.role === "admin" ? "管理员" : "成员"}
+                          {invite.role === "admin"
+                            ? t("role.admin")
+                            : t("role.member")}
                         </TableCell>
                         <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
                           {date(invite.expiresAt)}
@@ -497,7 +624,7 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                             disabled={pending || !canManage}
                             onClick={() => void revoke(invite.id)}
                           >
-                            撤销邀请
+                            {t("invitation.revoke")}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -513,12 +640,12 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
                     <Users />
                   </EmptyMedia>
                   <EmptyTitle>
-                    {query ? "没有匹配的结果" : "暂无此状态的成员"}
+                    {query ? t("empty.noResults") : t("empty.noMembers")}
                   </EmptyTitle>
                   <EmptyDescription>
                     {query
-                      ? "试试其他姓名或邮箱。"
-                      : "可以调整筛选，或邀请同事加入工作区。"}
+                      ? t("empty.noResultsHint")
+                      : t("empty.noMembersHint")}
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -526,12 +653,12 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
             <div className="mt-6 flex max-w-2xl items-start gap-2 text-xs leading-relaxed text-muted-foreground">
               <Info className="mt-0.5 size-3.5 shrink-0" />
               <p>
-                {canManage
-                  ? "管理员可邀请、调整角色和停用成员。工作区须保留至少一位管理员。成员资格不改变已有任务的单独授权。"
-                  : "仅管理员可邀请成员和更改权限。如需操作，请联系工作区管理员。"}
+                {canManage ? t("footer.admin") : t("footer.member")}
               </p>
             </div>
-          </section>
+          </div>
+        </div>
+      </main>
       <InviteMembersDialog
         key={data.workspace.id}
         workspaceId={data.workspace.id}
@@ -555,12 +682,19 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认更新成员权限？</AlertDialogTitle>
+            <AlertDialogTitle>{t("confirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              将「{change?.name || "该成员"}」
               {change?.status === "suspended"
-                ? "停用。该成员将无法访问工作区成员目录；已有任务协作权限不变。"
-                : `设置为${change?.role === "admin" ? "管理员" : "成员"}并保持启用。`}
+                ? t("confirmSuspend", {
+                    name: change?.name || t("thisMember"),
+                  })
+                : t("confirmRole", {
+                    name: change?.name || t("thisMember"),
+                    role:
+                      change?.role === "admin"
+                        ? t("role.admin")
+                        : t("role.member"),
+                  })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error && (
@@ -569,16 +703,18 @@ function MembersSettingsContent({ data, fetchError, mutate, inviteInitially }: {
             </p>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending}>取消</AlertDialogCancel>
+            <AlertDialogCancel disabled={pending}>
+              {commonT("cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
               disabled={pending}
               onClick={() => void applyChange()}
             >
-              {pending ? "正在更新…" : "确认更新"}
+              {pending ? t("updating") : t("confirmUpdate")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

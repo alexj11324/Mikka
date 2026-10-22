@@ -1,22 +1,23 @@
 'use client'
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { FieldError } from '@/components/ui/field'
 import { cn } from '@/lib/utils'
 import { readProjectDescription } from '@/lib/project-description'
 import { IssueEditor } from './issue-editor'
-import { useShortcutLabel } from '@/components/shortcut-keys'
 
 type TextField = 'name' | 'description'
 const FIELD_OPTIONS = {
-  name: { label: '项目名称', placeholder: '项目名称', maxLength: 200 },
-  description: { label: '项目描述', placeholder: '添加描述…', maxLength: 50000 },
+  name: { maxLength: 200 },
+  description: { maxLength: 50000 },
 }
 
 export function ProjectTextEditor({ field, value, onSave, onRegisterFlush }: { field: TextField; value: string; onSave: (value: string) => Promise<boolean>; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }) {
+  const t = useTranslations('Projects.textEditor')
   const id = useId()
-  const saveShortcut = useShortcutLabel(['mod', 'Enter'])
-  const options = FIELD_OPTIONS[field]
+  const label = field === 'name' ? t('nameLabel') : t('descriptionLabel')
+  const placeholder = field === 'name' ? t('namePlaceholder') : t('descriptionPlaceholder')
   const [draft, setDraft] = useState(value)
   const [initialContent] = useState(() => readProjectDescription(value))
   const [replacement, setReplacement] = useState<{ content: ReturnType<typeof readProjectDescription>; version: number }>()
@@ -57,23 +58,23 @@ export function ProjectTextEditor({ field, value, onSave, onRegisterFlush }: { f
       try {
         do {
           const next = field === 'description' ? latest.current : latest.current.trim()
-          if (field === 'name' && !next) { setError('项目名称不能为空。'); return false }
-          if (next.length > FIELD_OPTIONS[field].maxLength) { setError('内容超过长度限制，请精简后再保存。'); return false }
-          if (next !== acknowledged.current && !await saveRef.current(next)) { setError(`自动保存失败，输入已保留；点击其他位置或按 ${saveShortcut} 重试。`); return false }
+          if (field === 'name' && !next) { setError(t('nameRequired')); return false }
+          if (next.length > FIELD_OPTIONS[field].maxLength) { setError(t('tooLong')); return false }
+          if (next !== acknowledged.current && !await saveRef.current(next)) { setError(t('autosaveFailed')); return false }
           acknowledged.current = next
           dirty.current = (field === 'description' ? latest.current : latest.current.trim()) !== next
           setHasChanges(dirty.current)
         } while (dirty.current && !composing.current)
         return !dirty.current
       } catch {
-        setError(`自动保存失败，输入已保留；点击其他位置或按 ${saveShortcut} 重试。`)
+        setError(t('autosaveFailed'))
         return false
       } finally { setSaving(false) }
     })()
     flight.current = operation
     void operation.finally(() => { flight.current = null })
     return operation
-  }, [field, saveShortcut])
+  }, [field, t])
 
   useEffect(() => {
     onRegisterFlush(save)
@@ -106,9 +107,9 @@ export function ProjectTextEditor({ field, value, onSave, onRegisterFlush }: { f
     if (event.key === 'Enter' && (field !== 'description' || event.metaKey || event.ctrlKey)) { event.preventDefault(); void save() }
     if (event.key === 'Escape' && field !== 'description' && !flight.current) { event.preventDefault(); event.stopPropagation(); latest.current = acknowledged.current; dirty.current = false; setDraft(acknowledged.current); if (textElement.current) textElement.current.textContent = acknowledged.current; setHasChanges(false); setError('') }
   }}>
-    {field === 'description' ? <IssueEditor layout="description" label={options.label} content={initialContent} replacement={replacement} onChange={content => change(JSON.stringify(content))} /> : <TextContainer className={cn('text-sm leading-relaxed', field === 'name' && 'text-2xl leading-snug font-semibold tracking-tight')}>
-      <span ref={attachText} id={id} contentEditable="plaintext-only" suppressContentEditableWarning role="textbox" aria-label={options.label} aria-multiline="false" aria-required={field === 'name'} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} aria-placeholder={options.placeholder} data-placeholder={options.placeholder} onInput={event => change(event.currentTarget.textContent ?? '')} className="block min-h-8 w-full cursor-text whitespace-pre-wrap break-words outline-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:underline focus-visible:decoration-muted-foreground/50 focus-visible:underline-offset-4" />
+    {field === 'description' ? <IssueEditor layout="description" label={label} content={initialContent} replacement={replacement} onChange={content => change(JSON.stringify(content))} /> : <TextContainer className={cn('text-sm leading-relaxed', field === 'name' && 'text-2xl leading-snug font-semibold tracking-tight')}>
+      <span ref={attachText} id={id} contentEditable="plaintext-only" suppressContentEditableWarning role="textbox" aria-label={label} aria-multiline="false" aria-required={field === 'name'} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} aria-placeholder={placeholder} data-placeholder={placeholder} onInput={event => change(event.currentTarget.textContent ?? '')} className="block min-h-8 w-full cursor-text whitespace-pre-wrap break-words outline-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:underline focus-visible:decoration-muted-foreground/50 focus-visible:underline-offset-4" />
     </TextContainer>}
-    {error ? <FieldError id={`${id}-error`} className="mt-2">{error}</FieldError> : (hasChanges || saving) && <p role="status" className="mt-2 text-xs text-muted-foreground">{saving ? '正在保存…' : '等待自动保存…'}</p>}
+    {error ? <FieldError id={`${id}-error`} className="mt-2">{error}</FieldError> : (hasChanges || saving) && <p role="status" className="mt-2 text-xs text-muted-foreground">{saving ? t('saving') : t('waiting')}</p>}
   </div>
 }

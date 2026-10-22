@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from '@/i18n/navigation'
 import { useSWRConfig } from 'swr'
 import { authClient } from '@/lib/auth-client'
 import { AppShell } from '@/components/app-shell'

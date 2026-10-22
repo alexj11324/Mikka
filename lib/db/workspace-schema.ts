@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, uuid, varchar, primaryKey, unique } from 'drizzle-orm/pg-core'
 
-export const workspaces = pgTable('orvilo_workspaces', {
+export const workspaces = pgTable('mikka_workspaces', {
   id: uuid('id').primaryKey(),
   userId: text('userId').notNull(),
   name: varchar('name', { length: 120 }).notNull(),
@@ -8,7 +8,7 @@ export const workspaces = pgTable('orvilo_workspaces', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const workspaceMembers = pgTable('orvilo_workspace_members', {
+export const workspaceMembers = pgTable('mikka_workspace_members', {
   workspaceId: uuid('workspaceId').notNull(),
   userId: text('userId').notNull(),
   name: text('name').notNull(),
@@ -18,7 +18,7 @@ export const workspaceMembers = pgTable('orvilo_workspace_members', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.workspaceId, table.userId] })])
 
-export const workspaceInvitations = pgTable('orvilo_workspace_invitations', {
+export const workspaceInvitations = pgTable('mikka_workspace_invitations', {
   id: uuid('id').primaryKey(),
   workspaceId: uuid('workspaceId').notNull(),
   userId: text('userId').notNull(),

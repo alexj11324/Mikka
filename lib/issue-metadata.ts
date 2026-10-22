@@ -4,7 +4,7 @@ import type { JSONContent } from '@tiptap/core'
 export const LABEL_COLORS = ['violet', 'blue', 'green', 'yellow', 'red', 'gray'] as const
 export const labelSchema = z.object({ name: z.string().trim().min(1).max(40), color: z.enum(LABEL_COLORS) })
 export const pullRequestSchema = z.object({
-  url: z.url().max(500).refine(value => /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*\/?$/.test(value), '请输入有效的 GitHub PR 链接。'),
+  url: z.url().max(500).refine(value => /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*\/?$/.test(value), 'issueMetadataInvalid'),
   state: z.enum(['open', 'merged', 'closed']),
 })
 export const assigneeSchema = z.object({ kind: z.enum(['member', 'agent']), id: z.string().min(1).max(128), name: z.string().max(200), image: z.string().nullable() })
@@ -29,12 +29,14 @@ export type IssueLabel = z.infer<typeof labelSchema>
 export type IssuePullRequest = z.infer<typeof pullRequestSchema>
 
 export function readIssueMetadata(content: JSONContent): IssueMetadata {
-  const parsed = metadataSchema.safeParse(content.attrs?.orvilo)
+  // `orvilo` is the pre-rename key; drizzle/0005 moves stored issues to `mikka`.
+  const parsed = metadataSchema.safeParse(content.attrs?.mikka ?? content.attrs?.orvilo)
   return parsed.success ? parsed.data : metadataSchema.parse({})
 }
 
 export function withIssueMetadata(content: JSONContent, metadata: IssueMetadata): JSONContent {
-  return { ...content, attrs: { ...content.attrs, orvilo: metadata } }
+  const { orvilo: _legacy, ...attrs } = content.attrs ?? {}
+  return { ...content, attrs: { ...attrs, mikka: metadata } }
 }
 
 export function issueWithMetadata<T extends { content: JSONContent }>(issue: T) {

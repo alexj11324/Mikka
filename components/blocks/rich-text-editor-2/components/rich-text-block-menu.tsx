@@ -1,5 +1,6 @@
 import { NodeSelection, Selection, TextSelection } from "@tiptap/pm/state"
 import type { Editor } from "@tiptap/react"
+import { useTranslations } from "next-intl"
 
 import {
   DropdownMenuGroup,
@@ -24,9 +25,7 @@ import {
   moveBlockUp,
   type BlockTarget,
 } from "./rich-text-block-actions"
-import { RICH_TEXT_OUTLINE_SLASH_ITEM } from "./rich-text-outline-node"
 import { RICH_TEXT_BASIC_SLASH_ITEMS } from "./rich-text-slash-menu"
-import { RICH_TEXT_TABLE_SLASH_ITEM } from "./rich-text-table"
 import { useShortcutLabel } from "./rich-text-toolbar"
 import { RefreshCwIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, Trash2Icon } from "lucide-react"
 
@@ -44,14 +43,6 @@ const TURN_INTO_IDS = new Set([
 
 const TURN_INTO = RICH_TEXT_BASIC_SLASH_ITEMS.filter((item) =>
   TURN_INTO_IDS.has(item.id)
-)
-
-const BLOCK_TITLES = new Map(
-  [
-    ...RICH_TEXT_BASIC_SLASH_ITEMS,
-    RICH_TEXT_TABLE_SLASH_ITEM,
-    RICH_TEXT_OUTLINE_SLASH_ITEM,
-  ].map((item) => [item.id, item.title])
 )
 
 const LIST_KINDS: Record<string, string> = {
@@ -154,6 +145,8 @@ export function RichTextBlockMenuItems({
   menu,
   onDeleteTable,
 }: RichTextBlockMenuItemsProps) {
+  const t = useTranslations('Editor.richText')
+  const blockTitle = (kind: string) => t.has(`slash.${kind}.title` as never) ? t(`slash.${kind}.title` as never) : t('block')
   function runOnBlock(action: Parameters<typeof blockCommand>[0]) {
     editor.chain().focus().command(blockCommand(action, menu.pos)).run()
   }
@@ -182,13 +175,13 @@ export function RichTextBlockMenuItems({
     <>
       <DropdownMenuGroup>
         <DropdownMenuLabel>
-          {BLOCK_TITLES.get(menu.kind) ?? "Block"}
+          {blockTitle(menu.kind)}
         </DropdownMenuLabel>
         {menu.allowed.length ? (
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <RefreshCwIcon aria-hidden="true" />
-              Turn Into
+              {t('turnInto')}
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               <DropdownMenuRadioGroup
@@ -210,7 +203,7 @@ export function RichTextBlockMenuItems({
                     closeOnClick
                   >
                     {item.icon}
-                    {item.title}
+                    {blockTitle(item.id)}
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
@@ -219,7 +212,7 @@ export function RichTextBlockMenuItems({
         ) : null}
         <DropdownMenuItem onClick={() => runOnBlock(duplicateBlock)}>
           <CopyIcon aria-hidden="true" />
-          Duplicate
+          {t('duplicate')}
           <MenuShortcut keys={["mod", "D"]} />
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -227,7 +220,7 @@ export function RichTextBlockMenuItems({
           onClick={() => runOnBlock(moveBlockUp)}
         >
           <ArrowUpIcon aria-hidden="true" />
-          Move Up
+          {t('moveUp')}
           <MenuShortcut keys={["mod", "shift", "↑"]} />
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -235,14 +228,14 @@ export function RichTextBlockMenuItems({
           onClick={() => runOnBlock(moveBlockDown)}
         >
           <ArrowDownIcon aria-hidden="true" />
-          Move Down
+          {t('moveDown')}
           <MenuShortcut keys={["mod", "shift", "↓"]} />
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuItem variant="destructive" onClick={removeBlock}>
         <Trash2Icon aria-hidden="true" />
-        Delete
+        {t('delete')}
       </DropdownMenuItem>
     </>
   )
