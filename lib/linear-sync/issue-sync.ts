@@ -11,6 +11,9 @@ import { hashValue } from './crypto'
 import { linearAccessToken } from './oauth'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers } from '@/lib/issue-numbering'
+import { issueDoneEvent } from '@/lib/coordinator-events'
+import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
+import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { linearCommentSync } from './comment-sync'
 import { encodedIssueDocument, loadIssueDocument, replaceIssueDescription } from './document'
 import { linearDescriptionChanged, shouldApplyLinearSnapshot } from './sync-guards'
@@ -91,7 +94,8 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
   if (remote.labels.length > 12) throw new LinearSyncConflictError('Linear issue has more than 12 labels; Mikka supports up to 12')
   const assignee = await localAssigneeForRemote(team.ownerId, link.issue.id, remote, false)
   const nextPriority = issuePriorityForLinear(remote.priority)
-  return db.transaction(async tx => {
+  let doneEvent = false
+  const saved = await db.transaction(async tx => {
     await tx.execute(sql`select set_config('orvilo.linear_sync_source', 'linear', true)`)
     const [latest] = await tx.select().from(issues).where(and(eq(issues.id, link.issue.id), eq(issues.userId, team.ownerId))).for('update')
     if (!latest) return null
@@ -112,6 +116,11 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
       title: remote.title, content: latestIncoming, status: nextStatus, priority: nextPriority,
       revision: nextRevision, updatedAt: new Date(),
     }).where(eq(issues.id, latest.id)).returning()
+    const completionEvent = saved && issueDoneEvent(latest, saved)
+    if (completionEvent) {
+      await recordCoordinatorEvent(tx, completionEvent)
+      doneEvent = true
+    }
 
     if (descriptionChanged) {
       const [stored] = await tx.select({ state: issueDocuments.state }).from(issueDocuments).where(eq(issueDocuments.issueId, latest.id)).for('update').limit(1)
@@ -128,6 +137,8 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
     await tx.update(linearIssueLinks).set({ appSyncedAt: saved.updatedAt, linearUpdatedAt: new Date(remote.updatedAt), linearDescriptionHash: hashValue(remote.description ?? ''), syncStatus: 'synced', lastError: null, updatedAt: new Date() }).where(eq(linearIssueLinks.id, link.link.id))
     return saved
   })
+  if (doneEvent) await wakeCoordinator(team.ownerId)
+  return saved
 }
 
 export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssueSnapshot) {

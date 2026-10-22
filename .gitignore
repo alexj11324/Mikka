@@ -32,4 +32,10 @@ next-env.d.ts
 # browser test artifacts
 /playwright-report/
 /test-results/
+/playwright-performance-report/
+/performance-results/
 /blob-report/
+
+# Workflow SDK local world
+/.workflow-data/
+/.swc

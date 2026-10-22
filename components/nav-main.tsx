@@ -17,6 +17,7 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 import { ChevronRightIcon, type LucideIcon } from "lucide-react"
+import { Button } from '@/components/ui/button'
 import { useTranslations } from 'next-intl'
 
 export function NavMain({
@@ -71,7 +72,7 @@ export function NavMain({
                   <SidebarMenuSub>
                     {item.items?.map((subItem) => (
                       <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton render={<button type="button" />} onClick={subItem.onClick} isActive={subItem.isActive}>
+                        <SidebarMenuSubButton render={<Button type="button" variant="ghost" size="sm" />} onClick={subItem.onClick} isActive={subItem.isActive}>
                           <span>{subItem.title}</span>
                           <span className="ml-auto tabular-nums text-muted-foreground">{subItem.count}</span>
                         </SidebarMenuSubButton>
