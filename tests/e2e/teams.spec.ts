@@ -132,13 +132,14 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
     const invitePath = inviteUrl.startsWith(BASE_PATH) ? inviteUrl.slice(BASE_PATH.length) || '/' : inviteUrl
   await invitation.getByRole('button', { name: '完成', exact: true }).click()
   const memberContext = await browser.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
-  const runtime = watchRuntime(memberContext)
+  const workspaceId = (await (await page.request.get(app('/api/workspace'))).json()).workspace.id as string
+  const runtime = watchRuntime(memberContext, ['/api/workspace', '/api/teams/directory'].map(path => ({ path: app(`${path}?workspace=${workspaceId}`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' })))
   try {
     const member = await memberContext.newPage()
     await register(member, invitePath, email)
     await member.getByRole('button', { name: '接受邀请并加入', exact: true }).click()
     await expect(member).toHaveURL(/\/settings\/members\?workspace=/)
-    const workspaceId = new URL(member.url()).searchParams.get('workspace')!
+    expect(new URL(member.url()).searchParams.get('workspace')).toBe(workspaceId)
     await member.goto(app('/settings/teams'))
     const row = member.getByRole('row').filter({ hasText: '共享团队' })
     await row.getByRole('button', { name: '共享团队 的操作', exact: true }).click()

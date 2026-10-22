@@ -1,4 +1,4 @@
-import { test, expect, register } from './fixtures'
+import { test, expect, register, app } from './fixtures'
 
 test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立即切走', async ({ page }) => {
   const navigations: string[] = []
@@ -59,15 +59,20 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
   await expect(page.getByRole('textbox', { name: '搜索成员或邀请', exact: true })).toBeVisible()
 })
 
+test.describe('工作区访问拒绝', () => {
+  test.use({ expectedConsoleErrors: ['/api/workspace', '/api/teams/directory'].map(path => ({ path: app(`${path}?workspace=00000000-0000-4000-8000-000000000099`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' })) })
+
 test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', async ({ page }) => {
   await register(page, '/settings/members')
   await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()
-  await page.route('**/api/workspace?workspace=unavailable-workspace', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: '没有查看此工作区的权限。' }) }))
-  await page.evaluate(() => window.history.pushState(null, '', '/settings/members?workspace=unavailable-workspace'))
+  await page.route('**/api/workspace?workspace=00000000-0000-4000-8000-000000000099', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: '没有查看此工作区的权限。' }) }))
+  await page.route('**/api/teams/directory?workspace=00000000-0000-4000-8000-000000000099', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: '没有查看此工作区的权限。' }) }))
+  await page.evaluate(path => window.history.pushState(null, '', path), app('/settings/members?workspace=00000000-0000-4000-8000-000000000099'))
   await expect(page.getByRole('alert').filter({ hasText: '没有查看此工作区的权限。' })).toContainText('没有查看此工作区的权限。')
   await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toHaveCount(0)
   await page.goBack()
   await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()
+})
 })
 
 test('个人设置切换不请求服务端，并保持 URL、历史记录与跨页导航一致', async ({ page }) => {
@@ -77,7 +82,7 @@ test('个人设置切换不请求服务端，并保持 URL、历史记录与跨�
   const serverNavigations: string[] = []
   await page.route('**/settings?**', route => {
     const url = new URL(route.request().url())
-    if (url.pathname === '/settings' && url.searchParams.has('_rsc')) {
+    if (url.pathname === app('/settings') && url.searchParams.has('_rsc')) {
       serverNavigations.push(url.href)
       return route.abort()
     }
