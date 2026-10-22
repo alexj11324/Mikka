@@ -74,6 +74,7 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty";
 import { withBasePath } from "@/lib/base-path";
+import { useActionError } from "@/lib/use-action-error";
 import { SettingsDataState } from "@/components/settings/settings-data-state";
 import { cn } from "@/lib/utils";
 
@@ -112,6 +113,7 @@ export function MembersSettings({
 }) {
   const router = useRouter();
   const t = useTranslations("Members");
+  const translateError = useActionError();
   const commonT = useTranslations("Common");
   const format = useFormatter();
   const locale = useLocale();
@@ -206,7 +208,7 @@ export function MembersSettings({
         ...change,
       });
       if ("error" in result) {
-        setError(result.error);
+        setError(translateError(result.error));
         return;
       }
       setChange(null);
@@ -226,7 +228,7 @@ export function MembersSettings({
     try {
       const result = await revokeWorkspaceInvitation(data.workspace.id, id);
       if ("error" in result) {
-        setError(result.error);
+        setError(translateError(result.error));
         return;
       }
       setNotice(t("invitationRevoked"));

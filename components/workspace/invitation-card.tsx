@@ -9,10 +9,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
 import { authClient } from '@/lib/auth-client'
+import { useActionError } from '@/lib/use-action-error'
 import { withBasePath } from '@/lib/base-path'
 
 export function InvitationCard({ token, email }: { token: string; email: string | null }) {
   const t = useTranslations('Invite')
+  const translateError = useActionError()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const next = `/invite/${token}`
@@ -21,7 +23,7 @@ export function InvitationCard({ token, email }: { token: string; email: string 
     setPending(true); setError('')
     try {
       const result = await acceptWorkspaceInvitation(token)
-      if (!result.ok) { setError(result.error); return }
+      if (!result.ok) { setError(translateError(result.error)); return }
       window.location.assign(withBasePath(`/settings/members?workspace=${result.data.workspaceId}`))
     } catch { setError(t('acceptFailed')) }
     finally { setPending(false) }
