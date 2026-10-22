@@ -2,7 +2,7 @@
 
 import { useRouter } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
-import { AppShell } from '@/components/app-shell'
+import { AppShell, SignOutBoundary } from '@/components/app-shell'
 import { SettingsView } from '@/components/settings/settings-view'
 import { authClient } from '@/lib/auth-client'
 import { useState } from 'react'
@@ -19,12 +19,12 @@ export function MembersPageView({ user, workspaceId, inviteInitially, googleEnab
     try {
       const result = await authClient.signOut()
       if (result.error) throw new Error('sign-out')
-      router.replace('/sign-in')
+      router.replace('/sign-in?login=1')
       router.refresh()
     } catch {
       setError(t('signOutFailed'))
       setSigningOut(false)
     }
   }
-  return <AppShell><SettingsView user={user} googleEnabled={googleEnabled} initialSection="members" workspaceId={workspaceId} inviteInitially={inviteInitially} onBack={() => router.push('/')} onSignOut={signOut} signingOut={signingOut} accountError={error} /></AppShell>
+  return <SignOutBoundary pending={signingOut}><AppShell><SettingsView user={user} googleEnabled={googleEnabled} initialSection="members" workspaceId={workspaceId} inviteInitially={inviteInitially} onBack={() => router.push('/')} onSignOut={signOut} signingOut={signingOut} accountError={error} /></AppShell></SignOutBoundary>
 }
