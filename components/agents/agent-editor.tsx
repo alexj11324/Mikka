@@ -6,7 +6,8 @@ import { useTranslations } from 'next-intl'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldGroup } from '@/components/ui/field'
+import { SettingRow, SettingsFormSection } from '@/components/settings/primitives'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
@@ -64,15 +65,6 @@ function sameDraft(a: Draft, b: Draft): boolean {
 
 function installedOn(device: DeviceView | undefined, harness: SupportedHarness): boolean {
   return Boolean(device?.harnesses.some(info => info.harness === harness && info.installed))
-}
-
-function EditorSectionHeading({ id, title, description }: { id: string; title: string; description: string }) {
-  return (
-    <div className="mb-4 flex min-w-0 flex-col gap-1">
-      <h3 id={id} className="text-sm font-semibold tracking-tight">{title}</h3>
-      <p className="text-xs leading-5 text-muted-foreground">{description}</p>
-    </div>
-  )
 }
 
 /**
@@ -199,42 +191,41 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
   ]
 
   return (
-    <Card className="min-w-0 overflow-hidden border-border/70 bg-transparent shadow-none" role="region" aria-label={agent ? t('editTitle', { name: agent.name }) : t('createTitle')}>
-      <CardHeader className="flex-row items-start gap-4 px-5 py-5 sm:px-6">
-        <IconTile size="default" variant="soft" className="text-project-action" aria-hidden="true"><Icon /></IconTile>
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+    <Card className="min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-transparent py-0 shadow-none ring-0" role="region" aria-label={agent ? t('editTitle', { name: agent.name }) : t('createTitle')}>
+      <CardHeader className="flex items-start gap-3 px-5 py-4 sm:px-6">
+        <IconTile size="sm" variant="soft" className="text-project-action" aria-hidden="true"><Icon /></IconTile>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={builtIn ? 'info-light' : 'outline'} size="sm">{t(`roles.${role}`)}</Badge>
             {!agent && <Badge variant="secondary" size="sm">{t('notSaved')}</Badge>}
           </div>
-          <CardTitle className="truncate text-xl tracking-tight">{agent ? agent.name : t('createTitle')}</CardTitle>
+          <CardTitle className="truncate text-lg tracking-tight">{agent ? agent.name : t('createTitle')}</CardTitle>
           <CardDescription className="text-xs">{builtIn ? t('builtInHint') : t('customHint')}</CardDescription>
         </div>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-0 px-5 pt-0 sm:px-6">
-        <section aria-labelledby="agent-identity-heading" className="py-5">
-          <EditorSectionHeading id="agent-identity-heading" title={t('identitySection')} description={t('identityDescription')} />
-          <FieldGroup>
-            <div className="grid gap-4 sm:grid-cols-2">
+      <CardContent className="flex flex-col gap-0 px-0 py-0">
+        <SettingsFormSection id="agent-identity-heading" title={t('identitySection')} description={t('identityDescription')}>
+          <SettingRow htmlFor="agent-name" title={t('name')} controlLayout="wide">
+            <FieldGroup className="gap-0">
               <Field>
-                <FieldLabel htmlFor="agent-name">{t('name')}</FieldLabel>
                 <Input id="agent-name" value={draft.name} maxLength={60} placeholder={t('namePlaceholder')} onChange={event => patch({ name: event.target.value })} />
               </Field>
+            </FieldGroup>
+          </SettingRow>
+          <SettingRow htmlFor="agent-description" title={t('summary')} controlLayout="wide">
+            <FieldGroup className="gap-0">
               <Field>
-                <FieldLabel htmlFor="agent-description">{t('summary')}</FieldLabel>
                 <Input id="agent-description" value={draft.description} maxLength={200} placeholder={builtIn ? t(`roleSummary.${role}`) : t('summaryPlaceholder')} onChange={event => patch({ description: event.target.value })} />
               </Field>
-            </div>
-          </FieldGroup>
-        </section>
+            </FieldGroup>
+          </SettingRow>
+        </SettingsFormSection>
 
-        <section aria-labelledby="agent-runtime-heading" className="py-5">
-          <EditorSectionHeading id="agent-runtime-heading" title={t('runtime')} description={t('runtimeDescription')} />
-          <FieldGroup>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <SettingsFormSection id="agent-runtime-heading" title={t('runtime')} description={t('runtimeDescription')}>
+          <SettingRow htmlFor="agent-device" title={t('device')} controlLayout="wide">
+            <FieldGroup className="gap-0">
               <Field>
-                <FieldLabel htmlFor="agent-device">{t('device')}</FieldLabel>
                 <Select value={draft.deviceId} items={deviceItems} onValueChange={value => chooseDevice(value ?? AUTO)}>
                   <SelectTrigger id="agent-device" className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -254,8 +245,11 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
                   </SelectContent>
                 </Select>
               </Field>
+            </FieldGroup>
+          </SettingRow>
+          <SettingRow htmlFor="agent-harness" title={t('harness')} controlLayout="wide">
+            <FieldGroup className="gap-0">
               <Field>
-                <FieldLabel htmlFor="agent-harness">{t('harness')}</FieldLabel>
                 <Select value={draft.harness} items={harnessItems} onValueChange={value => chooseHarness(value ?? AUTO)}>
                   <SelectTrigger id="agent-harness" className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -270,8 +264,11 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
                   </SelectContent>
                 </Select>
               </Field>
+            </FieldGroup>
+          </SettingRow>
+          <SettingRow htmlFor="agent-model" title={t('model')} controlLayout="wide">
+            <FieldGroup className="gap-0">
               <Field>
-                <FieldLabel htmlFor="agent-model">{t('model')}</FieldLabel>
                 <Select value={draft.modelChoice} items={modelItems} onValueChange={value => patch({ modelChoice: value ?? AUTO })}>
                   <SelectTrigger id="agent-model" className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -281,54 +278,55 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
                   </SelectContent>
                 </Select>
               </Field>
-            </div>
-            {draft.modelChoice === CUSTOM && (
-              <Field>
-                <FieldLabel htmlFor="agent-custom-model">{t('customModel')}</FieldLabel>
-                <Input id="agent-custom-model" value={draft.customModel} maxLength={120} placeholder={t('customModelPlaceholder')} onChange={event => patch({ customModel: event.target.value })} />
-              </Field>
-            )}
-            <div className={cn('flex items-start gap-3 rounded-lg border px-3.5 py-3', preview.ok ? 'border-success/20 bg-success/5' : 'border-warning/20 bg-warning/5')} role="status">
-              <IconTile size="xs" variant="soft" className={cn(preview.ok ? 'text-success' : 'text-warning')} aria-hidden="true"><Sparkles /></IconTile>
-              <div className="min-w-0 pt-0.5">
-                <p className="text-xs font-semibold">{t('previewLabel')}</p>
-                <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{previewText}</p>
-              </div>
-            </div>
-          </FieldGroup>
-        </section>
+            </FieldGroup>
+          </SettingRow>
+          {draft.modelChoice === CUSTOM && (
+            <SettingRow htmlFor="agent-custom-model" title={t('customModel')} controlLayout="wide">
+              <FieldGroup className="gap-0">
+                <Field>
+                  <Input id="agent-custom-model" value={draft.customModel} maxLength={120} placeholder={t('customModelPlaceholder')} onChange={event => patch({ customModel: event.target.value })} />
+                </Field>
+              </FieldGroup>
+            </SettingRow>
+          )}
+          <SettingRow title={t('previewLabel')} controlLayout="wide">
+            <p className={cn('flex items-start gap-2 text-xs leading-5', preview.ok ? 'text-muted-foreground' : 'text-warning')} role="status">
+              <Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              {previewText}
+            </p>
+          </SettingRow>
+        </SettingsFormSection>
 
-        <section aria-labelledby="agent-instructions-heading" className="py-5">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <EditorSectionHeading id="agent-instructions-heading" title={t('instructionsSection')} description={t('instructionsDescription')} />
-            {builtIn && (
-              <Button size="xs" variant="outline" disabled={pending} onClick={resetPrompt}>
-                <RotateCcw data-icon="inline-start" />
-                {t('resetPrompt')}
-              </Button>
-            )}
-          </div>
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="agent-instructions">{t('instructions')}</FieldLabel>
-              <Textarea
-                id="agent-instructions"
-                value={draft.instructions}
-                maxLength={MAX_AGENT_INSTRUCTIONS_LENGTH}
-                placeholder={t('instructionsPlaceholder')}
-                className="min-h-56 max-h-96 resize-y overflow-y-auto px-4 py-3 font-mono text-xs leading-6"
-                onChange={event => patch({ instructions: event.target.value })}
-              />
-              <FieldDescription className="flex items-center justify-between gap-3">
-                <span>{t('instructionsDescription')}</span>
-                <span className="shrink-0 text-right tabular-nums">{t('instructionsCount', { count: draft.instructions.length, max: MAX_AGENT_INSTRUCTIONS_LENGTH })}</span>
-              </FieldDescription>
-            </Field>
-          </FieldGroup>
-        </section>
+        <SettingsFormSection id="agent-instructions-heading" title={t('instructionsSection')} description={t('instructionsDescription')}>
+          <SettingRow htmlFor="agent-instructions" title={t('instructions')} controlLayout="full">
+            <FieldGroup className="gap-2">
+              <Field>
+                {builtIn && (
+                  <div className="flex justify-end">
+                    <Button size="xs" variant="outline" disabled={pending} onClick={resetPrompt}>
+                      <RotateCcw data-icon="inline-start" />
+                      {t('resetPrompt')}
+                    </Button>
+                  </div>
+                )}
+                <Textarea
+                  id="agent-instructions"
+                  value={draft.instructions}
+                  maxLength={MAX_AGENT_INSTRUCTIONS_LENGTH}
+                  placeholder={t('instructionsPlaceholder')}
+                  className="min-h-56 max-h-96 resize-y overflow-y-auto px-4 py-3 font-mono text-xs leading-6"
+                  onChange={event => patch({ instructions: event.target.value })}
+                />
+                <FieldDescription className="flex items-center justify-end gap-3">
+                  <span className="shrink-0 text-right tabular-nums">{t('instructionsCount', { count: draft.instructions.length, max: MAX_AGENT_INSTRUCTIONS_LENGTH })}</span>
+                </FieldDescription>
+              </Field>
+            </FieldGroup>
+          </SettingRow>
+        </SettingsFormSection>
       </CardContent>
 
-      <CardFooter className="flex-col items-stretch gap-3 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
+      <CardFooter className="flex-col items-stretch gap-3 rounded-none bg-transparent px-5 py-3 sm:flex-row sm:items-center sm:px-6">
         {error && <span role="alert" className="text-sm text-destructive">{error}</span>}
         <div className="flex w-full flex-wrap items-center justify-between gap-2">
           {agent && !builtIn ? (
@@ -339,11 +337,11 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
           ) : <span />}
           <span className="ml-auto flex items-center gap-2">
             {!agent ? (
-              <Button variant="outline" size="sm" className="rounded-full" disabled={pending} onClick={onCancelNew}>{commonT('cancel')}</Button>
+              <Button variant="outline" size="sm" disabled={pending} onClick={onCancelNew}>{commonT('cancel')}</Button>
             ) : dirty && (
-              <Button variant="outline" size="sm" className="rounded-full" disabled={pending} onClick={() => setDraft(initial)}>{t('discard')}</Button>
+              <Button variant="outline" size="sm" disabled={pending} onClick={() => setDraft(initial)}>{t('discard')}</Button>
             )}
-            <Button size="sm" className="rounded-full bg-workspace-accent text-workspace-accent-foreground hover:bg-workspace-accent/90" disabled={pending || !dirty || !draft.name.trim()} onClick={save}>
+            <Button size="sm" disabled={pending || !dirty || !draft.name.trim()} onClick={save}>
               {pending && <Spinner data-icon="inline-start" />}
               {agent ? t('save') : t('create')}
             </Button>

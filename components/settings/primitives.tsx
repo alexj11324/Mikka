@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { FieldLabel } from '@/components/ui/field'
+import { cn } from '@/lib/utils'
 
 /**
  * Settings section: a titled group of rows.
@@ -40,6 +42,32 @@ export function SettingsSection({
 }
 
 /**
+ * A form section that keeps its context on the left and setting rows on the
+ * right at desktop widths, then stacks both parts on smaller screens.
+ */
+export function SettingsFormSection({
+  id,
+  title,
+  description,
+  children,
+}: {
+  id: string
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <section className="grid gap-2 py-4 sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-4" aria-labelledby={id}>
+      <header className="flex min-w-0 flex-col gap-0.5 px-4 sm:px-5">
+        <h3 id={id} className="text-sm font-semibold tracking-tight">{title}</h3>
+        <p className="text-xs leading-5 text-muted-foreground">{description}</p>
+      </header>
+      <div data-settings-rows className="divide-y divide-border">{children}</div>
+    </section>
+  )
+}
+
+/**
  * One setting = one row: title and description on the left, value or control
  * on the right.
  *
@@ -49,19 +77,32 @@ export function SettingsSection({
 export function SettingRow({
   title,
   description,
+  htmlFor,
+  controlLayout = 'standard',
   children,
 }: {
   title: string
   description?: string
+  htmlFor?: string
+  controlLayout?: 'standard' | 'wide' | 'full'
   children?: ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-sm font-medium">{title}</span>
+        {htmlFor ? (
+          <FieldLabel htmlFor={htmlFor}>{title}</FieldLabel>
+        ) : (
+          <span className="text-sm font-medium">{title}</span>
+        )}
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
-      <div className="shrink-0 text-sm">{children}</div>
+      <div className={cn(
+        'w-full min-w-0 text-sm',
+        controlLayout === 'wide' && 'sm:w-1/2',
+        controlLayout === 'full' && 'sm:w-full',
+        controlLayout === 'standard' && 'sm:w-auto sm:shrink-0',
+      )}>{children}</div>
     </div>
   )
 }

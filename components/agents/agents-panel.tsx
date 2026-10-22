@@ -85,48 +85,42 @@ export function AgentsPanel() {
 
   return (
     <section aria-label={t('title')} className="flex w-full flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <FieldGroup className="min-w-0 flex-1 sm:max-w-sm">
-          <Field>
-            <FieldLabel htmlFor="agent-role-selector">{t('roleSelector')}</FieldLabel>
-            <Select value={creating ? 'new' : selected?.id ?? ''} items={roleItems} onValueChange={value => setSelectedId(value === 'new' ? 'new' : value)}>
-              <SelectTrigger id="agent-role-selector" className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {builtIn.length > 0 && (
-                  <SelectGroup>
-                    <SelectLabel>{t('builtInGroup')}</SelectLabel>
-                    {builtIn.map(agent => <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>)}
-                  </SelectGroup>
-                )}
-                {custom.length > 0 && (
-                  <SelectGroup>
-                    <SelectLabel>{t('customGroup')}</SelectLabel>
-                    {custom.map(agent => <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>)}
-                  </SelectGroup>
-                )}
-                {creating && (
-                  <SelectGroup>
-                    <SelectLabel>{t('customGroup')}</SelectLabel>
-                    <SelectItem value="new">{t('createTitle')}</SelectItem>
-                  </SelectGroup>
-                )}
-              </SelectContent>
-            </Select>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <FieldGroup className="min-w-0 flex-1 sm:max-w-xl">
+          <Field orientation="responsive" className="justify-between gap-3">
+            <FieldLabel htmlFor="agent-role-selector" className="@md/field-group:flex-none">{t('roleSelector')}</FieldLabel>
+            <div className="min-w-0 @md/field-group:flex-[0_1_24rem]">
+              <Select value={creating ? 'new' : selected?.id ?? ''} items={roleItems} onValueChange={value => setSelectedId(value === 'new' ? 'new' : value)}>
+                <SelectTrigger id="agent-role-selector" className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {builtIn.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>{t('builtInGroup')}</SelectLabel>
+                      {builtIn.map(agent => <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>)}
+                    </SelectGroup>
+                  )}
+                  {custom.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>{t('customGroup')}</SelectLabel>
+                      {custom.map(agent => <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>)}
+                    </SelectGroup>
+                  )}
+                  {creating && (
+                    <SelectGroup>
+                      <SelectLabel>{t('customGroup')}</SelectLabel>
+                      <SelectItem value="new">{t('createTitle')}</SelectItem>
+                    </SelectGroup>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
           </Field>
         </FieldGroup>
-        <Button
-          size="sm"
-          className="bg-workspace-accent text-workspace-accent-foreground shadow-sm hover:bg-workspace-accent/90"
-          onClick={() => setSelectedId('new')}
-        >
+        <Button size="sm" onClick={() => setSelectedId('new')}>
           <Plus data-icon="inline-start" />
           {t('createTrigger')}
         </Button>
       </div>
-
-      {deviceData && devices.length === 0 && (
-        <p className="border-l-2 border-border py-1 pl-3 text-xs leading-5 text-muted-foreground">{t('noDevicesHint')}</p>
-      )}
 
       {creating || selected ? (
         <AgentEditor
