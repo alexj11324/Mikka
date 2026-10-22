@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { Laptop } from 'lucide-react'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { EffortSlider } from '@/components/motion/effort-slider'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import type { DeviceView } from '@/app/actions/agents'
 import { SUPPORTED_HARNESSES, type SupportedHarness } from '@/lib/db/schema'
@@ -86,7 +86,6 @@ export function RuntimeFields({ devices, runtime, onChange }: { devices: DeviceV
   const models = reportedModels(devices, runtime.deviceId, runtime.harness)
   const model = currentModel(models, runtime.model)
   const levels = model?.efforts ?? []
-  const effortIndex = runtime.effort ? levels.indexOf(runtime.effort) : -1
 
   const pickDevice = (deviceId: string) => {
     const keepHarness = runtime.harness && harnessOptions(devices, deviceId).includes(runtime.harness) ? runtime.harness : null
@@ -115,23 +114,13 @@ export function RuntimeFields({ devices, runtime, onChange }: { devices: DeviceV
       <Picker label={t('model')} value={model?.value ?? runtime.model} placeholder={t('defaultModel')} disabled={!models.length} onChange={pickModel}
         options={models.map(item => ({ value: item.value, label: item.displayName || item.value }))} />
     </SettingRow>
-    <div className="flex flex-col gap-2.5 px-5 py-4">
-      <div className="flex items-baseline gap-1.5 text-sm">
-        <span className="text-muted-foreground">Effort</span>
-        <span className="font-medium">{runtime.effort ? effortLabel(runtime.effort) : levels.length ? t('defaultEffort') : '—'}</span>
-      </div>
-      {levels.length > 0 ? <>
-        <div className="flex justify-between text-xs text-muted-foreground"><span>Faster</span><span>Smarter</span></div>
-        <ToggleGroup aria-label="Effort" spacing={0} className="h-9 w-full overflow-hidden rounded-lg bg-inset" value={runtime.effort ? [runtime.effort] : []}
-          onValueChange={values => onChange({ ...runtime, effort: values[0] ?? null })}>
-          {levels.map((level, index) => <ToggleGroupItem key={level} value={level} aria-label={effortLabel(level)}
-            className={cn('h-9 flex-1 p-0 hover:bg-transparent aria-pressed:bg-transparent', index <= effortIndex && 'bg-hover-2 hover:bg-hover-2 aria-pressed:bg-hover-2', index === effortIndex && 'rounded-r-lg')}>
-            {index === effortIndex
-              ? <span className="size-full rounded-lg border bg-card shadow-sm" aria-hidden="true" />
-              : <span className={cn('h-4 w-0.75 rounded-xs', index < effortIndex ? 'bg-ink-2' : 'bg-border')} aria-hidden="true" />}
-          </ToggleGroupItem>)}
-        </ToggleGroup>
-      </> : <span className="text-xs text-muted-foreground">{models.length ? t('noEffortLevels') : t('effortNeedsModel')}</span>}
+    <div className="px-5 py-4">
+      {levels.length > 0
+        ? <EffortSlider key={model?.value} levels={levels} value={runtime.effort} onChange={effort => onChange({ ...runtime, effort })} formatLabel={effortLabel} placeholder={t('defaultEffort')} />
+        : <div className="flex flex-col gap-2.5">
+            <div className="flex items-baseline gap-1.5 text-sm"><span className="text-muted-foreground">Effort</span><span className="font-medium">—</span></div>
+            <span className="text-xs text-muted-foreground">{models.length ? t('noEffortLevels') : t('effortNeedsModel')}</span>
+          </div>}
     </div>
   </SettingsSection>
 }
