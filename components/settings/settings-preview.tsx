@@ -12,6 +12,7 @@ export function SettingsPreview() {
     <AppShell variant="settings">
         <SettingsView
           user={{ name: t('preview.userName'), email: 'preview@example.com' }}
+          googleEnabled={false}
           onBack={() => router.push('/sign-in')}
           onSignOut={() => router.push('/sign-in')}
           signingOut={false}

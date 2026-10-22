@@ -12,7 +12,7 @@ import { TeamDirectory } from '@/components/teams/team-directory'
 import { MembersSettings } from '@/components/workspace/members-settings'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 
-export function SettingsShell({ user, defaultWorkspaceId, onBack: onBackOverride }: { user: { id: string; name: string; email: string; image?: string | null }; defaultWorkspaceId?: string; onBack?: () => void }) {
+export function SettingsShell({ user, defaultWorkspaceId, googleEnabled = false, onBack: onBackOverride }: { user: { id: string; name: string; email: string; image?: string | null }; defaultWorkspaceId?: string; googleEnabled?: boolean; onBack?: () => void }) {
   const i18nText = useTranslations();
   const pathname = usePathname()
   const params = useSearchParams()
@@ -22,7 +22,7 @@ export function SettingsShell({ user, defaultWorkspaceId, onBack: onBackOverride
   const [error, setError] = useState('')
   const workspaceId = params.get('workspace') ?? defaultWorkspaceId
   const requested = params.get('section')
-  const section: SettingsSection = pathname === '/settings/teams' ? 'teams' : pathname === '/settings/members' ? 'members' : requested === 'profile' || requested === 'workspace' ? requested : 'preferences'
+  const section: SettingsSection = pathname === '/settings/teams' ? 'teams' : pathname === '/settings/members' ? 'members' : requested === 'profile' || requested === 'workspace' || requested === 'integrations' ? requested : 'preferences'
   async function signOut() {
     if (signingOut) return
     setSigningOut(true); setError('')
@@ -33,5 +33,5 @@ export function SettingsShell({ user, defaultWorkspaceId, onBack: onBackOverride
       router.replace('/sign-in?login=1'); router.refresh()
     } catch { setError(i18nText("Workspace.signOutFailed")); setSigningOut(false) }
   }
-  return <AppShell variant="settings"><SettingsView user={user} userKey={user.id} activeSection={section} workspaceId={workspaceId} selectedTeamId={params.get('team') ?? undefined} onBack={() => { if (onBackOverride) { onBackOverride(); return }; const href = params.get('team') ? `/?team=${encodeURIComponent(params.get('team')!)}` : '/'; if (!pushSettingsHistory(href)) router.push(href) }} onSignOut={() => void signOut()} signingOut={signingOut} accountError={error}>{section === 'teams' && <TeamDirectory key={workspaceId ?? 'default'} workspaceId={workspaceId} />}{section === 'members' && <MembersSettings key={`${workspaceId ?? 'default'}-${params.get('invite') ?? ''}`} workspaceId={workspaceId} inviteInitially={params.get('invite') === '1'} embedded />}</SettingsView></AppShell>
+  return <AppShell variant="settings"><SettingsView user={user} userKey={user.id} googleEnabled={googleEnabled} activeSection={section} workspaceId={workspaceId} selectedTeamId={params.get('team') ?? undefined} onBack={() => { if (onBackOverride) { onBackOverride(); return }; const href = params.get('team') ? `/?team=${encodeURIComponent(params.get('team')!)}` : '/'; if (!pushSettingsHistory(href)) router.push(href) }} onSignOut={() => void signOut()} signingOut={signingOut} accountError={error}>{section === 'teams' && <TeamDirectory key={workspaceId ?? 'default'} workspaceId={workspaceId} />}{section === 'members' && <MembersSettings key={`${workspaceId ?? 'default'}-${params.get('invite') ?? ''}`} workspaceId={workspaceId} inviteInitially={params.get('invite') === '1'} embedded />}</SettingsView></AppShell>
 }

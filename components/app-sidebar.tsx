@@ -1,12 +1,13 @@
 'use client'
-import { useTranslations } from 'next-intl'
 
 import * as React from 'react'
 import useSWR from 'swr'
+import { useTranslations } from 'next-intl'
+import { Link } from '@/i18n/navigation'
 import { listTeams } from '@/app/actions/teams'
-import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound, Workflow } from 'lucide-react'
+import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, MonitorSmartphone, Puzzle, Scan, Search, Send, SquarePen, SquareUserRound, Workflow } from 'lucide-react'
 import { WorkspaceMenu } from '@/components/workspace-menu'
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { ShortcutKeys } from '@/components/shortcut-keys'
@@ -68,6 +69,12 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
         </SidebarMenuItem>)}{teamsError && <SidebarMenuItem><SidebarMenuButton onClick={() => void refreshTeams()}>{i18nText("FeatureCopy.c_c401eee8")}</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></CollapsibleContent>
       </SidebarGroup></Collapsible>
     </SidebarContent>
-    <SidebarRail aria-label={i18nText("Nav.sidebarRail")} title={i18nText("Workspace.toggleSidebar")} aria-expanded={isMobile ? openMobile : open} />
+  <SidebarFooter>
+    <SidebarMenu>
+      <SidebarMenuItem><SidebarMenuButton isActive={section === 'plugins'} aria-current={section === 'plugins' ? 'page' : undefined} onClick={() => navigate('plugins')} tooltip={i18nText("Nav.plugins")}><Puzzle /><span>{i18nText("Nav.plugins")}</span></SidebarMenuButton></SidebarMenuItem>
+      <SidebarMenuItem><SidebarMenuButton render={<Link href="/devices" />} tooltip={i18nText("Nav.devices")}><MonitorSmartphone /><span>{i18nText("Nav.devices")}</span></SidebarMenuButton></SidebarMenuItem>
+    </SidebarMenu>
+  </SidebarFooter>
+  <SidebarRail aria-label={i18nText("Nav.sidebarRail")} title={i18nText("Workspace.toggleSidebar")} aria-expanded={isMobile ? openMobile : open} />
   </Sidebar>
 }

@@ -13,8 +13,9 @@ import { SettingsShell } from '@/components/settings/settings-shell'
 import { SettingsDataPreloader } from '@/components/settings/settings-data-preloader'
 import { memberSettingsKey, teamDirectoryKey } from '@/lib/settings-data'
 
-export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers, initialSelected }: {
+export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers, initialSelected, googleEnabled = false }: {
   user: { id: string; name: string; email: string; image?: string | null }
+  googleEnabled?: boolean
   initialSelected?: string | null
   initialIssues?: Awaited<ReturnType<typeof listIssues>>
   initialTeams?: Awaited<ReturnType<typeof loadTeamDirectory>>
@@ -37,7 +38,7 @@ export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers
   return <SWRConfig value={cacheConfig}>
     <SettingsDataPreloader workspaceId={params.get('workspace') ?? initialWorkspaceId} onWorkspaceResolved={setWorkspaceId} />
     {pathname.startsWith('/settings')
-      ? <SettingsShell user={user} defaultWorkspaceId={workspaceId} />
-      : <IssueWorkspace user={user} initialIssues={initialIssues ?? []} initialSelected={initialSelected} />}
+      ? <SettingsShell user={user} defaultWorkspaceId={workspaceId} googleEnabled={googleEnabled} />
+      : <IssueWorkspace user={user} initialIssues={initialIssues ?? []} initialSelected={initialSelected} googleEnabled={googleEnabled} />}
   </SWRConfig>
 }

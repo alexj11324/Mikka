@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from './settings-link'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
-import { Activity, ArrowLeft, ArrowLeftRight, Blocks, Building2, ChartNoAxesCombined, CodeXml, ContactRound, CreditCard, FileText, Flag, Grid2X2, HandHelping, Orbit, PackageCheck, Plus, Search, ShieldCheck, SlidersHorizontal, Smile, Sparkles, SquareUserRound, UserRound, Users } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowLeftRight, Blocks, Building2, ChartNoAxesCombined, CodeXml, ContactRound, CreditCard, FileText, Flag, Grid2X2, HandHelping, Orbit, PackageCheck, Plus, Plug, Search, ShieldCheck, SlidersHorizontal, Smile, Sparkles, SquareUserRound, UserRound, Users } from 'lucide-react'
 import { listTeams } from '@/app/actions/teams'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
@@ -20,6 +20,7 @@ const navigation = [
   { title: 'Personal', items: [
     { title: 'Preferences', section: 'preferences', icon: SlidersHorizontal },
     { title: 'Profile', section: 'profile', icon: UserRound },
+    { title: 'Integrations', section: 'integrations', icon: Plug },
   ] },
   { title: 'Features', items: [
     { title: 'AI & agents', icon: Sparkles },
@@ -88,7 +89,7 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
       return
     }
     const next = destination.pathname.endsWith('/members') ? 'members' : destination.searchParams.get('section')
-    onSectionChange(next === 'profile' || next === 'workspace' || next === 'members' ? next : 'preferences')
+    onSectionChange(next === 'profile' || next === 'workspace' || next === 'members' || next === 'integrations' ? next : 'preferences')
   }
   return <Sidebar variant="sidebar" aria-label={i18nText("FeatureCopy.c_a8c7ae4f")}>
     <SidebarHeader className="px-4 pt-3 pb-2">

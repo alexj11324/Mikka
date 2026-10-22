@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
+import { googleEnabled } from '@/lib/auth'
 import { loadTeamDirectory } from '@/app/actions/teams'
 import { WorkspaceApp } from '@/components/workspace-app'
 import { getTranslations } from 'next-intl/server'
@@ -14,5 +15,5 @@ export default async function TeamsPage({ searchParams }: { searchParams: Promis
   const session = await getSession()
   if (!session?.user) redirect('/sign-in?next=%2Fsettings%2Fteams')
   const initial = await loadTeamDirectory(query.workspace).catch(() => null)
-  return <WorkspaceApp user={session.user} initialTeams={initial ?? undefined} />
+  return <WorkspaceApp user={session.user} initialTeams={initial ?? undefined} googleEnabled={googleEnabled} />
 }

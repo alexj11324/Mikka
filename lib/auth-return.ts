@@ -1,3 +1,5 @@
+export const COMPOSIO_AUTH_CALLBACK_PATH = '/api/integrations/composio/callback'
+
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const internalOrigin = 'https://mikka.invalid'
 
@@ -19,6 +21,7 @@ export function safeAuthReturn(value?: string) {
   if (/^\/invite\/[a-f0-9]{64}$/.test(url.pathname) && !url.search) return url.pathname
   if (url.pathname === '/devices' && !url.search) return '/devices'
   if (url.pathname === '/workspaces/new' && !url.search) return '/workspaces/new'
+  if (url.pathname === COMPOSIO_AUTH_CALLBACK_PATH && !url.search) return COMPOSIO_AUTH_CALLBACK_PATH
 
   if (url.pathname === '/') {
     const issue = url.searchParams.get('issue')
@@ -28,7 +31,7 @@ export function safeAuthReturn(value?: string) {
   if (url.pathname === '/settings') {
     const section = url.searchParams.get('section')
     return hasOnlyQueryKeys(url, ['section', 'workspace']) &&
-      (section === null || ['preferences', 'profile', 'workspace'].includes(section)) &&
+      (section === null || ['preferences', 'profile', 'workspace', 'integrations'].includes(section)) &&
       optionalUuid(url, 'workspace') ? `${url.pathname}${url.search}` : '/'
   }
 
@@ -61,7 +64,7 @@ export function oauthResumePath(query: Record<string, string | string[] | undefi
   if (typeof query.sig !== 'string' || typeof query.client_id !== 'string') return null
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) {
-    if (value === undefined || key === 'sig' || key === 'exp' || key === 'prompt' || key.startsWith('ba_')) continue
+    if (value === undefined || ['sig', 'exp', 'prompt', 'oauth', 'continue', 'next', 'error'].includes(key) || key.startsWith('ba_')) continue
     for (const item of Array.isArray(value) ? value : [value]) params.append(key, item)
   }
   return `/api/auth/oauth2/authorize?${params}`

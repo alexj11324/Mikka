@@ -28,6 +28,8 @@ import { listProjectTeams } from '@/app/actions/team-relations'
 import { ProjectWorkspace } from './project-workspace'
 import { WorkspaceOverview } from './workspace-overview'
 import { SettingsShell } from '@/components/settings/settings-shell'
+import { SettingsView } from '@/components/settings/settings-view'
+import { PluginsSkillsView } from '@/components/plugins/plugins-skills-view'
 import { SECTION_TITLE_KEYS, type WorkspaceSection } from './workspace-navigation'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 import { fetchSettingsData } from '@/lib/settings-data'
@@ -45,13 +47,32 @@ function CreateLoading() {
 const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })
 const CreateIssueDialog = dynamic(() => import('./create-issue-dialog').then(module => module.CreateIssueDialog), { loading: CreateLoading })
 
-export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'projects' }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection }) {
+export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'projects', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations'; googleEnabled?: boolean }) {
   const i18nText = useTranslations();
+  const t = useTranslations('Workspace')
+  const tIssue = useTranslations('Issue')
+  const tPlugins = useTranslations('Plugins')
   const params = useSearchParams()
   const pathname = usePathname()
   const router = useRouter()
   const { data: workspaceContext } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
   const { mutate: clearCache } = useSWRConfig()
+  const sectionTitles: Record<WorkspaceSection, string> = {
+    inbox: i18nText('Overview.sections.inbox'),
+    'my-issues': i18nText('Overview.sections.myIssues'),
+    agent: i18nText('Overview.sections.agent'),
+    coordinator: i18nText('Overview.sections.coordinator'),
+    projects: i18nText('Overview.sections.projects'),
+    views: i18nText('Overview.sections.views'),
+    'team-home': i18nText('Overview.sections.teamHome'),
+    'team-issues': i18nText('Overview.sections.teamIssues'),
+    'team-projects': i18nText('Overview.sections.teamProjects'),
+    'all-issues': i18nText('Overview.sections.allIssues'),
+    plugins: tPlugins('title'),
+  }
+  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
+  const [settingsOpen, setSettingsOpen] = useState(initialSettingsSection === 'integrations')
+  const settingsTarget: { section: 'preferences' | 'integrations'; invite: boolean } = { section: initialSettingsSection ?? 'preferences', invite: false }
   const [boardBusy, setBoardBusy] = useState(false)
   const { data: tasks = [], mutate, error } = useSWR(['issues', user.id], listIssues, { fallbackData: initialIssues, revalidateOnMount: false, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)
@@ -106,6 +127,13 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       setDirty(false)
       await action()
     } finally { leaving.current = false }
+  }
+  function closeSettings() {
+    setSettingsOpen(false)
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has('settings')) return
+    url.searchParams.delete('settings')
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
   }
   function showIssue(id: string | null) {
     setSelected(id); setDraftKey(value => value + 1)
@@ -170,14 +198,15 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     if (task.metadata.favoriteUserIds.includes(user.id)) counts.favorites++
     if (task.metadata.subscriberUserIds.includes(user.id)) counts.following++
   }
-  const viewTitle = view === 'all' ? i18nText("Overview.sections.allIssues") : view === 'mine' ? i18nText("Workspace.mine") : view === 'shared' ? i18nText("Workspace.shared") : view === 'favorites' ? i18nText("Overview.favorites") : view === 'following' ? i18nText("Overview.following") : ISSUE_STATUSES.find(status => status.value === view)?.label ?? i18nText("Overview.sections.allIssues")
-  if (pathname.startsWith('/settings')) return <SettingsShell user={user} defaultWorkspaceId={workspaceContext?.workspace.id} onBack={() => { const href = teamId ? `/?team=${encodeURIComponent(teamId)}` : '/'; if (!pushSettingsHistory(href)) router.push(href) }} />
-  return <AppShell fixed={!selected && !isProjects && ((!isOverview && layout === 'board') || section === 'coordinator' || section === 'agent')}>
+  const viewTitle = view === 'all' ? t('allIssues') : view === 'mine' ? t('mine') : view === 'shared' ? t('shared') : view === 'favorites' ? t('favorites') : view === 'following' ? t('following') : statusLabel(view)
+  if (pathname.startsWith('/settings')) return <SettingsShell user={user} defaultWorkspaceId={workspaceContext?.workspace.id} googleEnabled={googleEnabled} onBack={() => { const href = teamId ? `/?team=${encodeURIComponent(teamId)}` : '/'; if (!pushSettingsHistory(href)) router.push(href) }} />
+  return <AppShell fixed={!settingsOpen && !selected && (!isProjects && ((!isOverview && layout === 'board') || section === 'coordinator' || section === 'agent'))}>
+    {settingsOpen ? <SettingsView initialSection={settingsTarget.section} inviteInitially={settingsTarget.invite} user={user} googleEnabled={googleEnabled} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
     <AppSidebar onBeforeChange={action => { if (!boardBusy && !leaving.current) void leave(action) }} onSettings={(href = '/settings') => { if (!boardBusy && !leaving.current) void leave(() => { if (!pushSettingsHistory(href)) router.push(href) }) }} user={user} section={section} teamId={teamId} onTeamNavigate={(id, next) => { if (boardBusy || leaving.current) return false; void leave(() => { setTeamId(id); setSelected(null); changeSection(next); setProjectId(null); setView('all'); setQuery('') }); return true }} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
-    <AppShellContent hideHeader={!!selected || section === 'agent'} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : workspaceContext?.workspace.name ?? i18nText("Settings.sections.workspace.title")} title={i18nText(SECTION_TITLE_KEYS[section] as never)} actions={<Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
+    <AppShellContent hideHeader={!!selected || section === 'agent'} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : workspaceContext?.workspace.name ?? i18nText("Settings.sections.workspace.title")} title={sectionTitles[section]} actions={section === 'plugins' ? undefined : <Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {error && <p role="alert" className="px-6 py-2 text-xs text-destructive">{i18nText("Workspace.listError")}</p>}
-      {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: filtered.findIndex(task => task.id === selected), total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create('todo')} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { changeSection('team-projects'); setProjectId(id); setSelected(null) }) }} /> : isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : <>
+      {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: filtered.findIndex(task => task.id === selected), total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create('todo')} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { changeSection('team-projects'); setProjectId(id); setSelected(null) }) }} /> : isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsSkillsView googleEnabled={googleEnabled} /> : <> 
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <div className="flex flex-wrap items-center gap-2"><h1 className="text-sm font-semibold">{section === 'my-issues' ? i18nText("Workspace.myCreatedTasks") : viewTitle}</h1><Badge variant="secondary">{filtered.length}</Badge>{section !== 'my-issues' && <NativeSelect aria-label={i18nText("Workspace.filterStatus")} value={view} disabled={boardBusy} onChange={event => navigate(event.target.value as IssueView)}><NativeSelectOption value="all">{i18nText("Projects.allStatuses")}</NativeSelectOption><NativeSelectOption value="favorites">{i18nText("Overview.favorites")}</NativeSelectOption><NativeSelectOption value="following">{i18nText("Overview.following")}</NativeSelectOption>{ISSUE_STATUSES.map(status => <NativeSelectOption key={status.value} value={status.value}>{status.label}</NativeSelectOption>)}</NativeSelect>}</div>
           <div className="flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto"><div className="flex min-w-0 items-center gap-2 sm:w-48"><span className="inline-flex shrink-0 text-muted-foreground"><Search className="size-3.5" aria-hidden="true" /></span><Input aria-label={i18nText("Workspace.search.title")} placeholder={i18nText("Projects.issuePicker.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} disabled={boardBusy} /></div><ToggleGroup aria-label={i18nText("Workspace.taskView")} size="sm" variant="outline" spacing={0} disabled={boardBusy} value={[layout]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') setLayout(next) }}><ToggleGroupItem value="list" aria-label={i18nText("Workspace.listView")}><List /></ToggleGroupItem><ToggleGroupItem value="board" aria-label={i18nText("Workspace.boardView")}><Columns3 /></ToggleGroupItem></ToggleGroup></div>
@@ -185,6 +214,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
         {layout === 'board' ? <IssueBoard issues={filtered} onOpen={open} onCreate={create} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={open} onCreate={() => create()} />}
       </>}
     </AppShellContent>
+    </>}
     {creating && <CreateIssueDialog initialTeamId={(creationProject ? projectTeams.find(link => link.projectId === creationProject && link.isPrimary)?.teamId : section.startsWith('team-') ? teamId : null) ?? ''} initialStatus={createStatus} open={creating} onOpenChange={setCreating} onCreated={id => { void issueCreated(id) }} author={user.name || user.email} />}
     {searchOpen && <IssueSearch open={searchOpen} onOpenChange={setSearchOpen} issues={tasks} onOpen={open} onCreate={() => create()} />}
   </AppShell>
