@@ -14,6 +14,8 @@ import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
 import { issueWithMetadata, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers, ensureIssueNumbers } from '@/lib/issue-numbering'
+import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
+import { issueDoneEvent } from '@/lib/coordinator-events'
 
 type IssueRow = typeof issues.$inferSelect
 type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata> }
@@ -84,6 +86,9 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
           const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, ownerId))).for('update')
           if (!latest) return { error: 'issueNotFound' }
           ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
+          // Moving to done tells the owner's Coordinator.
+          const done = issue && issueDoneEvent(latest, issue)
+          if (done) await recordCoordinatorEvent(tx, done)
         } else {
           const number = await allocateIssueNumbers(tx, userId)
           const metadata = { ...readIssueMetadata({ type: 'doc' }), number }
