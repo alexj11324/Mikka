@@ -51,7 +51,7 @@ async function measureNavigation(page: Page, info: TestInfo, name: string, desti
   }
 }
 
-const members: Destination = { path: '/settings/members', selectors: ['[data-settings-state="ready"]', '[data-slot="sidebar-container"]', 'input[aria-label="搜索成员或邀请"]', 'main table tbody'], text: '回归测试成员' }
+const members: Destination = { path: '/settings/members', selectors: ['[data-settings-state="ready"]', 'input[aria-label="搜索成员或邀请"]', 'main table tbody'], text: '回归测试成员' }
 const teams: Destination = { path: '/settings/teams', selectors: ['[data-settings-state="ready"]', 'input[aria-label="搜索团队"]'], text: '创建第一个团队' }
 const preferences: Destination = { path: '/settings', query: 'section=preferences', selectors: ['main [aria-label="界面主题"]', 'main button[aria-label="浅色"]'] }
 const profile: Destination = { path: '/settings', query: 'section=profile', selectors: ['main section[aria-labelledby="profile-heading"]'], text: '回归测试成员' }

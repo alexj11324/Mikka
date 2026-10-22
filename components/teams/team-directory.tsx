@@ -7,7 +7,7 @@ import { pushSettingsHistory } from '@/lib/settings-navigation'
 import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR, { useSWRConfig } from 'swr'
 import { ArrowDown, ArrowUp, ChevronLeft, Search, SquareUserRound } from 'lucide-react'
-import { changeTeamMember, type loadTeamDirectory } from '@/app/actions/teams'
+import { changeTeamMember, loadTeamDirectory } from '@/app/actions/teams'
 import { fetchTeamDirectory, isSettingsAccessError, settingsReadOptions, teamDirectoryKey } from '@/lib/settings-data'
 import { SettingsDataState } from '@/components/settings/settings-data-state'
 import { Button } from '@/components/ui/button'
@@ -46,8 +46,12 @@ export function TeamDirectory({ workspaceId }: { workspaceId?: string }) {
   function teamHref(teamId: string, page?: 'general' | 'members') { return `${directoryHref}&team=${encodeURIComponent(teamId)}${page ? `&view=${page}` : ''}` }
   function createTeam() { navigate(`${directoryHref}&create=1`) }
   async function saved(teamId: string) {
-    try { await mutate(); void refresh('teams'); navigate(teamHref(teamId)) }
-    catch { setError(i18nText("FeatureCopy.c_9ae338b8")) }
+    try {
+      const directory = await loadTeamDirectory(workspaceId)
+      await mutate(directory, { revalidate: false })
+      void refresh('teams')
+      navigate(teamHref(teamId))
+    } catch { setError(i18nText("FeatureCopy.c_9ae338b8")) }
   }
   async function membership(teamId: string, joined: boolean) {
     if (pending) return
