@@ -121,6 +121,10 @@
     "noAccountShort": "No account yet?",
     "signIn": "Sign in",
     "createAccount": "Create account",
+    "addAccountTitle": "Add an account",
+    "addAccountDescription": "Sign in or create another Mikka account while keeping your current account available to switch back to.",
+    "returnToCurrentAccount": "Cancel and return to current account",
+    "addAccountLabel": "Add an account",
     "signUpLabel": "Create account",
     "signInLabel": "Sign in",
     "tagline": "Tasks and documents, always in sync.",
@@ -963,7 +967,7 @@
       "duplicateSubissues": "Also copy accessible subtasks",
       "deleteTitle": "Delete {id}?",
       "deleteDescription": "The task is removed from lists and boards, but its body, comments, and subtasks are not deleted immediately. You can restore it from the original link within 30 days.",
-      "deleting": "Deleting���",
+      "deleting": "Deleting...",
       "deleteAction": "Delete task"
     },
     "history": {

@@ -190,7 +190,7 @@ export function InviteMembersDialog({
         role,
       });
       if (!result.ok) {
-        setError(result.error);
+        setError(translateError(result.error));
         return;
       }
       setLinks(
