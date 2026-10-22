@@ -14,8 +14,20 @@ test('startup compiles chat, images, history and workspace with read-only HEAD r
       return new Response(null, { status: 401 })
     }, log: () => {},
   })
+  assert.deepEqual(seen, previewWarmupPaths.map(path => `/mikka${path}`))
+  assert.ok(seen.includes('/mikka/api/agent'))
+})
+
+test('startup supports deployments without a base path', async () => {
+  const seen = []
+  await warmPreview('http://localhost:3000', {
+    basePath: '',
+    fetcher: async url => {
+      seen.push(url.pathname)
+      return new Response(null, { status: 401 })
+    }, log: () => {},
+  })
   assert.deepEqual(seen, previewWarmupPaths)
-  assert.ok(seen.includes('/api/agent'))
 })
 
 test('compile failures cannot report preview ready', async () => {
