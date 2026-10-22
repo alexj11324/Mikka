@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register } from './fixtures'
+import { test, expect, register, app } from './fixtures'
 
 async function openAgentSettings(page: Page) {
   const mainUrl = page.url()
@@ -12,7 +12,7 @@ async function openAgentSettings(page: Page) {
   }
   await page.getByRole('button', { name: '账户菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()
-  for (const label of ['成员管理', '邀请成员']) {
+  for (const label of ['成员', '邀请成员']) {
     await expect(page.getByRole('link', { name: label, exact: true })).toBeVisible()
   }
   await page.getByRole('button', { name: '设备', exact: true }).click()
@@ -23,7 +23,7 @@ async function openAgentSettings(page: Page) {
 
 test('设置中的Agent角色、运行环境、新建与删除', async ({ page }) => {
   await register(page)
-  await page.goto('/devices')
+  await page.goto(app('/devices'))
   await expect(page).toHaveURL(url => url.searchParams.get('settings') === 'devices')
   await expect(page.getByRole('heading', { name: '设备', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '返回应用', exact: true }).click()

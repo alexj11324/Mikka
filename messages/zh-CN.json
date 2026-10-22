@@ -1358,7 +1358,7 @@
     }
   },
   "Invite": {
-    "title": "邀请���员",
+    "title": "邀请成员",
     "description": "邀请同事加入{workspace}，可输入邮箱或拖入 CSV 批量导入。",
     "done": "完成",
     "emailLabel": "邮箱地址",
@@ -1392,7 +1392,7 @@
     "imported": "已导入 {count} 个有效邮箱；共 {total} 位待邀请。",
     "importedDuplicates": "已导入 {count} 个有效邮箱，已去重 {duplicates} 个；共 {total} 位待邀请。",
     "errors": {
-      "notCsv": "请选择一个 .csv ��件��",
+      "notCsv": "请选择一个 .csv 文件。",
       "fileTooLarge": "CSV 文件不能超过 1 MB。",
       "readFailed": "文件读取失败，请使用 UTF-8 编码的 CSV 文件。",
       "checkEmails": "请检查邮箱地址。",

@@ -37,6 +37,8 @@ test("中文姓名不参与头像，账号图片优先，加载失败回退邮�
   await page.route(image, route => route.fulfill({ contentType: "image/png", body: "invalid-image" }));
   await page.reload();
   await expect(menu.getByRole("img", { name: label, exact: true })).toHaveText("A");
+  await menu.click();
+  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
   await page.getByRole("link", { name: "邀请成员", exact: true }).click();
   await expect(dialog.getByRole("img", { name: label, exact: true })).toHaveText("A");
 });
