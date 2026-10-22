@@ -237,7 +237,7 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   const integrations = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^Integrations$/ }) })
   await expect(integrations.locator('[data-slot="sidebar-menu-button"]')).toHaveText(['All integrations', 'GitHub'])
   const administration = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^Administration$/ }) })
-  await expect(administration.locator('[data-slot="sidebar-menu-button"]')).toHaveText(['Workspace', 'Teams', 'Members', 'Security', 'API', 'Applications', 'Billing', 'Usage & limits', 'Import & export'])
+  await expect(administration.locator('[data-slot="sidebar-menu-button"]')).toHaveText(['工作区', '团队', '成员', 'Security', 'API', 'Applications', 'Billing', 'Usage & limits', 'Import & export'])
   const features = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^Features$/ }) })
   await expect(features.locator('[data-slot="sidebar-menu-button"]')).toHaveText(['AI & agents', 'Loops', 'Initiatives', 'Documents', 'Customer requests', 'Releases', 'Pulse', 'Asks', 'Emojis'])
   await expect(sidebar.locator('[data-slot="sidebar-menu-sub"]')).toHaveCount(0)
