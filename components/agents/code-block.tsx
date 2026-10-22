@@ -135,13 +135,13 @@ export function CodeBlock({
           ) : (
             <Check className="size-3" />
           )}
-          {streaming ? "Writing" : "Ready"}
+          {streaming ? "正在编写" : "已完成"}
         </span>
         {copyable || onCopy ? (
           <motion.button
             type="button"
-            aria-label={copied ? "Copied" : "Copy code"}
-            title={copied ? "Copied" : "Copy code"}
+            aria-label={copied ? "已复制" : "复制代码"}
+            title={copied ? "已复制" : "复制代码"}
             onClick={handleCopy}
             whileTap={reduce ? undefined : { scale: 0.9 }}
             transition={SPRING_PRESS}
@@ -163,7 +163,7 @@ export function CodeBlock({
         className="scrollbar-hide overflow-auto border-t border-foreground/[0.06] py-2"
         style={{ maxHeight }}
       >
-        <pre className="m-0 min-w-max font-mono text-xs leading-5 text-foreground/85">
+        <pre data-agent-code-pre className="m-0 min-w-max font-mono text-xs leading-5 text-foreground/85">
           <code>
             {lines.map((line, index) => {
               const lineNumber = index + 1;

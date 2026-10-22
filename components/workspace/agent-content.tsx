@@ -3,10 +3,22 @@
 import { useIsStreaming } from '@openuidev/react-lang'
 import { CircleCheck, CircleHelp, Code, ListTodo, LoaderCircle, MessageSquareText, Quote, Sparkles } from 'lucide-react'
 import { StreamingResponse } from '@/components/agents/streaming-response'
+import { AgentMarkdown } from './agent-markdown'
+import { AgentCodeBlock } from './agent-code-block'
 import { TodoList } from '@/components/agents/todo-list'
 import type { AgentComponentRenderers } from '@/lib/agent-ui-catalog'
 
+export const AgentCodeContent: AgentComponentRenderers['BeCodeBlock'] = ({ props }) => {
+  const isStreaming = useIsStreaming()
+  return <AgentCodeBlock {...props} isStreaming={isStreaming} />
+}
+
 const icons = { assistant: Sparkles, reply: MessageSquareText, approve: CircleCheck, question: CircleHelp, progress: LoaderCircle, task: ListTodo, code: Code, source: Quote }
+
+export const AgentTextContent: AgentComponentRenderers['TextContent'] = ({ props }) => {
+  const isStreaming = useIsStreaming()
+  return <AgentMarkdown text={props.text ?? ''} size={props.size} isStreaming={isStreaming} />
+}
 
 export const AgentContent: AgentComponentRenderers['BeResponse'] = ({ props, renderNode }) => {
   const streaming = useIsStreaming()

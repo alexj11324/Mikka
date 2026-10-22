@@ -6,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { getAgentUIIssue, type AgentUIIssue } from '@/lib/agent-ui-status'
 import { agentUILibrary } from './agent-ui-library'
+import { AgentMarkdown } from './agent-markdown'
 
 const finalParser = createParser(agentUILibrary.toJSONSchema(), agentUILibrary.root)
 
@@ -54,7 +55,7 @@ export function AgentGenerativeUI({ response, isStreaming, onAction, showErrors 
     }
   }, [response, isStreaming, showErrors, isOpenUI, reportedErrors])
 
-  if (!isOpenUI) return isStreaming ? null : <p className="whitespace-pre-wrap text-sm leading-relaxed">{response}</p>
+  if (!isOpenUI) return isStreaming ? null : <AgentMarkdown text={response} />
 
   return <GenerationBoundary response={response} showErrors={!isStreaming && showErrors} onRetry={onRetry}>
     <Renderer response={response} library={agentUILibrary} isStreaming={isStreaming} onAction={onAction} onError={handleError} publishObservability={false} />

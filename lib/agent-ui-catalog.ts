@@ -6,6 +6,14 @@ const text = z.string().max(8000)
 const children = z.array(z.any()).max(30)
 
 export const agentComponentCatalog = {
+  TextContent: {
+    description: '正文富文本。text 支持 Markdown 标题、列表、表格、引用、代码块、LaTeX 数学公式和 mermaid 围栏图表。公式用 $$ 包裹，Mermaid 放在 text 字符串内的 mermaid 代码围栏中。不要把整个 OpenUI 输出包进围栏。',
+    props: z.object({ text: z.string(), size: z.enum(['small', 'default', 'large', 'small-heavy', 'large-heavy']).optional() }),
+  },
+  BeCodeBlock: {
+    description: 'beUI CodeBlock 语法高亮代码块，带行号、复制反馈和流式跟随。code 为纯代码字符串；language 为语言名，filename 可选；highlightLines 为需要强调的行号。只展示代码，不执行。Markdown 中的代码围栏也使用同一个 beUI 组件。',
+    props: z.object({ code: z.string().max(50000), language: z.string().max(40).optional(), filename: z.string().max(200).optional(), highlightLines: z.array(z.number().int().min(1)).max(100).optional() }),
+  },
   BeCard: {
     description: 'beUI Card 紧凑内容卡片。用于有标题的建议、说明或内容分组，children 可嵌套已注册组件；description 可选。图文推荐使用 BeImageCard，不用普通内容卡片代替详细正文。',
     props: z.object({ title: z.string().min(1).max(120), children, description: text.optional() }),
@@ -113,7 +121,7 @@ export const agentComponentCatalog = {
     props: z.object({ label: z.enum(['直接提问', '继续细化', '填入提问']), prompt: text, variant: z.enum(['default', 'secondary', 'outline', 'ghost']).optional() }),
   },
   ReuiBadge: {
-    description: '本地 REUI 语义状态徽标，可用不同状态颜色。',
+    description: '本地 REUI 语义状态徽标，可用不��状态颜色。',
     props: z.object({ text, variant: z.enum(['outline', 'secondary', 'primary-light', 'info-light', 'success-light', 'warning-light', 'destructive-light']).optional() }),
   },
   ReuiAlert: {
@@ -136,7 +144,7 @@ export const agentComponentGroups: { name: string; components: AgentComponentNam
   { name: '审批与问题', components: ['BeApproval', 'BeQuestions'], notes: ['Confirmation → ApprovalCard；选择问题复用 ApprovalCard 提问模式。在回答区直接提交并继续对话，不执行工具、不持久保存审批。ToolApproval 已安装但仅供未来真实工具授权流程使用，不开放给模型伪造授权。'] },
   { name: '任务与进度', components: ['BeTodoList', 'BeStat', 'ShadcnProgress'], notes: ['Plan/Task → TodoList；Loader/Shimmer → AgentProgress、ReasoningText、ThinkingShimmer，由宿主根据请求状态控制。建议计划保持待开始；数字只能来自用户输入。'] },
   { name: '图标状态与操作', components: ['AgentIcon', 'BeBadge', 'BeButton', 'BeFollowUps'], notes: ['Lucide 提供图标；beUI AnimatedBadge 提供动态状态图标；Button 提供操作反馈。不得用动态图标伪造执行结果。'] },
-  { name: '本地内容与兼容组件', components: ['BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame'], notes: ['复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock、FileDiff、ToolResult、AgentActivity、Citations、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不自动生成虚构工具记录。'] },
+  { name: '本地内容与兼容组件', components: ['TextContent', 'BeCodeBlock', 'BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame'], notes: ['复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock 用于代码回复；FileDiff、ToolResult、AgentActivity、Citations、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不自动生成虚构工具记录。'] },
 ]
 
 export function createAgentLibrary(renderers: Partial<AgentComponentRenderers> = {}) {
@@ -149,12 +157,11 @@ export function createAgentLibrary(renderers: Partial<AgentComponentRenderers> =
       component: (renderers[name] ?? (() => null)) as ComponentRenderer<z.infer<typeof definition.props>>,
     })
   })
-  const extended = openuiLibrary.extend({ components: { add: components } })
   return createLibrary({
     root: 'Stack',
-    components: Object.values(extended.components),
-    functions: Object.values(extended.functions),
-    actions: Object.values(extended.actions) as DefinedAction[],
+    components: [...Object.values(openuiLibrary.components).filter(component => !names.includes(component.name as AgentComponentName)), ...components],
+    functions: Object.values(openuiLibrary.functions),
+    actions: Object.values(openuiLibrary.actions) as DefinedAction[],
     componentGroups: agentComponentGroups,
   })
 }

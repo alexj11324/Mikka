@@ -17,9 +17,10 @@ type AgentChatNavigation = {
   sessionId: string | null
   onSelect: (id: string) => void
   onReset: () => void
+  onDemo?: () => void
 }
 
-export function AgentChat({ turns, composer, streaming, sessions, sessionId, onSelect, onReset, onSuggestion }: AgentChatNavigation & {
+export function AgentChat({ turns, composer, streaming, sessions, sessionId, onSelect, onReset, onDemo, onSuggestion }: AgentChatNavigation & {
   turns: AgentTurn[]
   composer: ReactNode
   streaming: boolean
@@ -28,7 +29,7 @@ export function AgentChat({ turns, composer, streaming, sessions, sessionId, onS
   const title = sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || '新对话'
 
   return <section aria-label="Agent 对话工作区" className="orvilo-agent flex size-full min-h-0 flex-col">
-    <AgentChatHeader title={title} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} />
+    <AgentChatHeader title={title} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} onDemo={onDemo} />
     {turns.length === 0 ? <AgentWelcome composer={composer} sessions={sessions} onSelect={onSelect} onSuggestion={onSuggestion} /> : <>
       <AgentConversation turns={turns} streaming={streaming} />
       <footer className="shrink-0 px-4 pb-4 pt-2 sm:px-8 sm:pb-6">
@@ -38,7 +39,7 @@ export function AgentChat({ turns, composer, streaming, sessions, sessionId, onS
   </section>
 }
 
-function AgentChatHeader({ title, streaming, sessions, sessionId, onSelect, onReset }: AgentChatNavigation & { title: string; streaming: boolean }) {
+function AgentChatHeader({ title, streaming, sessions, sessionId, onSelect, onReset, onDemo }: AgentChatNavigation & { title: string; streaming: boolean }) {
   const [open, setOpen] = useState(false)
   const [searching, setSearching] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -82,6 +83,7 @@ function AgentChatHeader({ title, streaming, sessions, sessionId, onSelect, onRe
     </Popover>
     <div className="ml-auto flex shrink-0 items-center gap-1">
       {streaming && <span role="status" className="sr-only">正在回复</span>}
+      {onDemo && <Button variant="ghost" size="sm" onClick={onDemo}>组件演示</Button>}
       <Button variant="ghost" size="icon" aria-label="新任务" title="新任务" onClick={onReset}><MessageSquarePlus aria-hidden="true" data-icon="inline-start" /></Button>
       <Button variant="ghost" size="icon" aria-label="搜索" title="搜索历史会话" onClick={() => { setSearching(true); setOpen(true) }}><Search aria-hidden="true" data-icon="inline-start" /></Button>
     </div>

@@ -15,7 +15,14 @@ export type AgentCodeLanguage =
   | "json"
   | "text"
   | "tsx"
-  | "typescript";
+  | "typescript"
+  | "javascript"
+  | "python"
+  | "css"
+  | "html"
+  | "sql"
+  | "yaml"
+  | "markdown";
 
 export interface AgentCodeToken {
   content: string;
@@ -47,7 +54,7 @@ function getAgentCodeHighlighter() {
   if (!agentCodeHighlighter) {
     agentCodeHighlighter = createHighlighter({
       themes: [LIGHT_THEME, DARK_THEME],
-      langs: ["bash", "diff", "json", "tsx", "typescript"],
+      langs: ["bash", "diff", "json", "tsx", "typescript", "javascript", "python", "css", "html", "sql", "yaml", "markdown"],
     });
   }
   return agentCodeHighlighter;

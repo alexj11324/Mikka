@@ -2,7 +2,7 @@
 
 import { Info } from 'lucide-react'
 import { AgentApproval, AgentQuestions, useAgentDecision } from './agent-decision'
-import { AgentContent, AgentStatusIcon, AgentTasks } from './agent-content'
+import { AgentCodeContent, AgentContent, AgentStatusIcon, AgentTasks, AgentTextContent } from './agent-content'
 import { AgentImage } from './agent-image'
 import { AgentFollowUps } from './agent-follow-ups'
 import { AgentImageCard } from './agent-image-card'
@@ -24,6 +24,8 @@ import { Badge as ReuiBadge } from '@/components/reui/badge'
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '@/components/reui/frame'
 
 const renderers = {
+  TextContent: AgentTextContent,
+  BeCodeBlock: AgentCodeContent,
   BeCard: ({ props, renderNode }) => <BeCard size="compact" className="min-w-0">
     <BeCardHeader><BeCardTitle as="h3">{props.title}</BeCardTitle>{props.description && <BeCardDescription>{props.description}</BeCardDescription>}</BeCardHeader>
     <BeCardContent className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</BeCardContent>

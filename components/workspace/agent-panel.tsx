@@ -11,11 +11,15 @@ import { toast } from 'sonner'
 import { useCompletion } from '@ai-sdk/react'
 import { createTheme, ThemeProvider } from '@openuidev/react-ui/ThemeProvider'
 import { AgentComposer } from './agent-composer'
+import dynamic from 'next/dynamic'
+
 import { AgentResponse } from './agent-response'
 import { AgentChat, type AgentChatSession } from './agent-chat'
 import { AgentInteractionContext } from './agent-interaction'
 import { fetchAgentResponse, observeAgentImages } from '@/lib/agent-fetch'
 import { preloadAgentImage } from '@/lib/agent-image-loader'
+
+const AgentDemo = dynamic(() => import('./agent-demo').then(module => module.AgentDemo))
 
 const fetchAgentWithImages: typeof fetch = async (input, options) => {
   const response = await fetchAgentResponse(input, options)
@@ -55,12 +59,14 @@ async function fetchHistory(url: string): Promise<AgentHistory> {
 }
 
 export function AgentPanel({ userId, initialHistory }: { userId: string; initialHistory?: AgentHistory }) {
+  const [demo, setDemo] = useState(false)
   const latest = useSWR<AgentHistory>(['/api/agent/sessions', userId], ([url]: [string, string]) => fetchHistory(url), {
     fallbackData: initialHistory, revalidateOnFocus: false, revalidateOnMount: !initialHistory,
   })
   if (!latest.data) return <AgentHistoryLoading error={latest.error} onRetry={() => { void latest.mutate() }} />
   return <ThemeProvider cssSelector=".orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
-    <AgentSessions userId={userId} initial={latest.data} onSaved={async () => { await latest.mutate() }} />
+    <div hidden={demo} className="h-full min-h-0"><AgentSessions userId={userId} initial={latest.data} onDemo={() => setDemo(true)} onSaved={async () => { await latest.mutate() }} /></div>
+    {demo && <AgentDemo onClose={() => setDemo(false)} />}
   </ThemeProvider>
 }
 
@@ -73,7 +79,7 @@ function AgentHistoryLoading({ error, onRetry }: { error?: Error; onRetry: () =>
 type OpenSession = { key: string; initial?: AgentHistory; sessionId?: string }
 type LiveSession = AgentChatSession & { key: string }
 
-function AgentSessions({ userId, initial, onSaved }: { userId: string; initial: AgentHistory; onSaved: () => Promise<void> }) {
+function AgentSessions({ userId, initial, onSaved, onDemo }: { userId: string; initial: AgentHistory; onSaved: () => Promise<void>; onDemo: () => void }) {
   const [opened, setOpened] = useState<OpenSession[]>([{ key: initial.sessionId ?? 'new', initial }])
   const [activeKey, setActiveKey] = useState(initial.sessionId ?? 'new')
   const [live, setLive] = useState<Record<string, LiveSession>>({})
@@ -95,7 +101,7 @@ function AgentSessions({ userId, initial, onSaved }: { userId: string; initial: 
   }
 
   return opened.map(entry => <div key={entry.key} hidden={entry.key !== activeKey} className="h-full min-h-0">
-    <AgentSessionLoader entry={entry} userId={userId} sessions={history} onSelect={select} onReset={reset} onSaved={onSaved}
+    <AgentSessionLoader entry={entry} userId={userId} sessions={history} onSelect={select} onReset={reset} onSaved={onSaved} onDemo={onDemo}
       onState={session => setLive(current => ({ ...current, [entry.key]: { ...session, key: entry.key } }))} />
   </div>)
 }
@@ -110,11 +116,11 @@ function AgentSessionLoader({ entry, userId, ...props }: Omit<AgentSessionProps,
 
 type DisplayTurn = { id: string; question: string; completion: string; error?: Error; stopped: boolean }
 type AgentSessionProps = {
-  onReset: () => void; onSelect: (id: string) => void; onSaved: () => Promise<void>; initial: AgentHistory; sessions: AgentChatSession[]
+  onReset: () => void; onSelect: (id: string) => void; onSaved: () => Promise<void>; onDemo: () => void; initial: AgentHistory; sessions: AgentChatSession[]
   completionId: string; onState: (session: AgentChatSession) => void
 }
 
-function AgentSession({ onReset, onSelect, onSaved, onState, initial, sessions, completionId }: AgentSessionProps) {
+function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, sessions, completionId }: AgentSessionProps) {
   const restored = initial.turns.at(-1)
   const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ id: completionId, api: '/api/agent', credentials: 'same-origin', fetch: fetchAgentWithImages, initialCompletion: restored?.completion ?? '' })
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -188,6 +194,7 @@ function AgentSession({ onReset, onSelect, onSaved, onState, initial, sessions, 
         sessionId={sessionIdRef.current}
         onSelect={onSelect}
         onReset={onReset}
+        onDemo={onDemo}
         onSuggestion={prompt => { updateDraft(prompt); inputRef.current?.focus() }}
         composer={<AgentComposer ref={inputRef} isEmpty={!question} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} />}
       />

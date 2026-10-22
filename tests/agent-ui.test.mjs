@@ -5,6 +5,33 @@ import { createParser, generateSystemPrompt } from '@openuidev/lang-core'
 import { agentComponentCatalog, agentComponentGroups, createAgentLibrary } from '../lib/agent-ui-catalog.ts'
 import { agentImageQuery, findAgentImage, parseAgentImage } from '../lib/agent-images.ts'
 import { getAgentUIIssue } from '../lib/agent-ui-status.ts'
+import { AGENT_DEMO_CODE, AGENT_DEMO_SECTIONS } from '../lib/agent-demo.ts'
+
+test('综合演示每个分组都可解析，覆盖全部本地回复组件', () => {
+  assert.ok(AGENT_DEMO_CODE.includes('export function summarize'))
+  const source = AGENT_DEMO_SECTIONS.map(section => section.response).join('\n')
+  for (const section of AGENT_DEMO_SECTIONS) {
+    const parsed = createParser(library.toJSONSchema(), library.root).parse(section.response)
+    assert.ok(parsed.root, section.title)
+    assert.deepEqual(parsed.meta.errors, [], section.title)
+    assert.deepEqual(parsed.meta.unresolved, [], section.title)
+  }
+  for (const name of Object.keys(agentComponentCatalog)) assert.match(source, new RegExp(`\\b${name}\\(`), name)
+})
+
+test('beUI 代码块在 OpenUI 和 Markdown 中真正接入，等待状态使用 ReasoningText', async () => {
+  const source = 'root = BeCodeBlock("const demo = true", "typescript", "demo.ts", [1])'
+  const result = createParser(library.toJSONSchema(), library.root).parse(source)
+  assert.ok(result.root)
+  assert.deepEqual(result.meta.errors, [])
+  const markdown = await readFile(new URL('../components/workspace/agent-markdown.tsx', import.meta.url), 'utf8')
+  const response = await readFile(new URL('../components/workspace/agent-response.tsx', import.meta.url), 'utf8')
+  const code = await readFile(new URL('../components/workspace/agent-code-block.tsx', import.meta.url), 'utf8')
+  assert.match(markdown, /<AgentCodeBlock/)
+  assert.match(response, /<ReasoningText/)
+  assert.doesNotMatch(response, /<AgentProgress/)
+  assert.match(code, /from '@\/components\/agents\/code-block'/)
+})
 
 function commonsImage(overrides = {}) {
   return { title: 'File:Victoria Harbour.jpg', index: 1, imageinfo: [{ thumburl: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/photo.jpg', thumbwidth: 960, thumbheight: 540, descriptionurl: 'https://commons.wikimedia.org/wiki/File:Victoria_Harbour.jpg', mime: 'image/jpeg', extmetadata: { Artist: { value: '<a>摄影师</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' } }, ...overrides }] }
@@ -54,7 +81,8 @@ test('图片复用正文入口并共享 SWR 预加载，回复缩略图不懒加
   assert.match(loader, /\/api\/agent\?q=/)
   assert.match(loader, /preload\(agentImageKey\(query\), loadAgentImage\)/)
   assert.match(route, /export \{ GET \} from '\.\/images\/route'/)
-  assert.match(image, /useSWR\(agentImageKey\(query\), loadAgentImage/)
+  assert.match(image, /useSWR\(previewImage \? null : agentImageKey\(query\), loadAgentImage/)
+  assert.match(image, /const image = previewImage \?\? data\?\.image/)
   assert.match(image, /ImageViewerThumbnail loading="eager"/)
   assert.match(panel, /observeAgentImages\(preloadAgentImage\)/)
   assert.match(panel, /fetch: fetchAgentWithImages/)
@@ -70,6 +98,19 @@ test('资料配图和详细回答规则进入模型规范', async () => {
 })
 
 const library = createAgentLibrary()
+
+test('TextContent 统一支持 Markdown、LaTeX 和 Mermaid，保留旧字号契约', async () => {
+  const text = '## 公式与流程\n\n**重点**\n\n$$\nE = mc^2\n$$\n\n```mermaid\nflowchart LR\nA[输入] --> B[输出]\n```'
+  const parser = createParser(library.toJSONSchema(), library.root)
+  const result = parser.parse(`root = TextContent(${JSON.stringify(text)}, "large")`)
+  assert.ok(result.root)
+  assert.deepEqual(result.meta.errors, [])
+  assert.deepEqual(result.meta.unresolved, [])
+  assert.equal(Object.keys(library.components).filter(name => name === 'TextContent').length, 1)
+  assert.equal(agentComponentCatalog.TextContent.props.safeParse({ text, size: 'small-heavy' }).success, true)
+  const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
+  assert.ok(spec.promptOptions.additionalRules.some(rule => /KaTeX LaTeX/.test(rule) && /Mermaid/.test(rule)))
+})
 
 test('相关追问支持具体问题、上下文及内联继续，不再被提示词压制', async () => {
   const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
@@ -121,7 +162,7 @@ test('紧凑推荐卡片可解析且模型规范优先小卡片', async () => {
   const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
   assert.ok(spec.promptOptions.additionalRules.some(rule => rule.includes('BeCardGrid') && rule.includes('不要逐条堆放通栏 BeImage')))
   const image = await readFile(new URL('../components/workspace/agent-image.tsx', import.meta.url), 'utf8')
-  assert.doesNotMatch(image, /正在查找真实配图|不影响正文生成|不使用占位图片/)
+  assert.doesNotMatch(image, /正在查找真实配图|不影响正文生成|不使��占位图片/)
   const card = await readFile(new URL('../components/workspace/agent-image-card.tsx', import.meta.url), 'utf8')
   assert.ok(card.includes("from '@/components/motion/card'"))
   assert.match(card, /size="compact"/)
@@ -234,7 +275,7 @@ test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 
     ['agent-conversation.tsx', 'message-bubble'],
     ['agent-conversation.tsx', 'message'],
     ['agent-response.tsx', 'streaming-response'],
-    ['agent-response.tsx', 'loading-states/agent-progress'],
+    ['agent-response.tsx', 'loading-states/reasoning-text'],
     ['agent-decision.tsx', 'approval-card'],
     ['agent-content.tsx', 'todo-list'],
   ]) {
@@ -247,7 +288,7 @@ test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 
   assert.doesNotMatch(starters, /<Button|function AgentStarters/)
 })
 
-test('Agent 只保留应用外壳，初始输入居中且会话导航收进标题菜单', async () => {
+test('Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单', async () => {
   const source = await readFile(new URL('../components/workspace/agent-chat.tsx', import.meta.url), 'utf8')
   for (const name of ['SidebarTrigger', 'AgentWelcome', 'Popover', 'PopoverTrigger', 'Command', 'CommandItem']) {
     assert.match(source, new RegExp(`<${name}[\\s>]`))
