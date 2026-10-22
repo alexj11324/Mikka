@@ -1,5 +1,5 @@
 import { pruneMessages, type ModelMessage } from 'ai'
-import type { CoordinatorEventKind } from '@/lib/db/schema'
+import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema'
 
 // What the Coordinator's model sees. Everything here depends only on the
 // stored conversation, never on time or on how long the person was away, so
@@ -78,8 +78,9 @@ export const SUMMARY_INSTRUCTIONS = `You are condensing the Coordinator's conver
 If an earlier summary is included, merge it in rather than repeating it. Be brief and concrete; leave out greetings and anything already resolved.`
 
 /** The text the Coordinator receives for one inbox event. */
-export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string | null; runId: string | null; payload: Record<string, unknown> }): string {
+export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string | null; runId: string | null; payload: Record<string, unknown>; tier?: CoordinatorEventTier | null }): string {
   const payload = event.payload
+  const note = event.tier === 'attention' ? 'Triage: this needs the person; tell them.' : event.tier === 'background' ? 'Triage: background; mention it only if it matters to what you are doing.' : null
   switch (event.kind) {
     case 'user_message':
       return String(payload.text ?? '')
@@ -88,9 +89,10 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         `[Event] Run ${event.runId} ended with status ${payload.status} (${payload.stopReason}).`,
         event.issueId ? `Issue: ${event.issueId}.` : null,
         payload.summary ? `The agent's summary: ${payload.summary}` : null,
+        note,
       ].filter(Boolean).join('\n')
     case 'issue_done':
-      return `[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to done.`
+      return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to done.`, note].filter(Boolean).join('\n')
   }
 }
 
@@ -137,7 +139,9 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date })[]
   for (const { position, message, createdAt } of rows) {
     if (message.role === 'user') {
       const text = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
-      items.push({ position, from: text.startsWith('[Event]') ? 'event' : 'person', text, tools: [], createdAt: createdAt.toISOString() })
+      const event = text.startsWith('[Event]')
+      // The triage line is for the Coordinator, not the person.
+      items.push({ position, from: event ? 'event' : 'person', text: event ? text.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') : text, tools: [], createdAt: createdAt.toISOString() })
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
       const text = parts.flatMap(part => part.type === 'text' && part.text.trim() ? [part.text.trim()] : []).join('\n\n')

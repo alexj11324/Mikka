@@ -1,8 +1,8 @@
 import 'server-only'
-import { and, asc, desc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
-import { coordinatorEvents, coordinatorMessages, coordinatorSessions } from '@/lib/db/schema'
+import { coordinatorEvents, coordinatorMessages, coordinatorSessions, type CoordinatorEventTier } from '@/lib/db/schema'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
@@ -22,10 +22,22 @@ async function nextPosition(executor: Executor, userId: string): Promise<number>
   return Number(row?.last ?? 0) + 1
 }
 
+/** Undelivered events that should start a turn: anything not triaged as background. */
+function waking(userId: string) {
+  return and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background')))
+}
+
+/** Whether any undelivered event should start a turn. */
+export async function hasWakingEvents(userId: string): Promise<boolean> {
+  const [row] = await db.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(waking(userId)).limit(1)
+  return Boolean(row)
+}
+
 /**
  * Takes the lease for `holder` (or renews it) and moves undelivered inbox
- * events into the conversation as user messages. `held` is false when another
- * turn holds the lease; that turn will pick the events up.
+ * events into the conversation as user messages. Background events ride along
+ * but do not count: with nothing else waiting, nothing moves. `held` is false
+ * when another turn holds the lease; that turn will pick the events up.
  */
 export async function takeInbox(userId: string, holder: string): Promise<{ held: boolean; added: number }> {
   return db.transaction(async tx => {
@@ -36,6 +48,8 @@ export async function takeInbox(userId: string, holder: string): Promise<{ held:
       .where(and(eq(coordinatorSessions.userId, userId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
       .returning({ userId: coordinatorSessions.userId })
     if (!taken) return { held: false, added: 0 }
+    const [due] = await tx.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(waking(userId)).limit(1)
+    if (!due) return { held: true, added: 0 }
     const events = await tx.select().from(coordinatorEvents)
       .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt)))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
@@ -50,13 +64,22 @@ export async function takeInbox(userId: string, holder: string): Promise<{ held:
   })
 }
 
-/** Lets go of the lease. Returns whether events arrived meanwhile, so the caller can take them. */
+/** Lets go of the lease. Returns whether events that need a turn arrived meanwhile, so the caller can take them. */
 export async function releaseLease(userId: string, holder: string): Promise<boolean> {
   await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, updatedAt: new Date() })
     .where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.leaseHolder, holder)))
-  const [waiting] = await db.select({ id: coordinatorEvents.id }).from(coordinatorEvents)
-    .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt))).limit(1)
-  return Boolean(waiting)
+  return hasWakingEvents(userId)
+}
+
+/** Undelivered events not yet triaged, oldest first. */
+export async function untriagedEvents(userId: string) {
+  return db.select().from(coordinatorEvents)
+    .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier)))
+    .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+}
+
+export async function setEventTier(id: string, tier: CoordinatorEventTier): Promise<void> {
+  await db.update(coordinatorEvents).set({ tier }).where(and(eq(coordinatorEvents.id, id), isNull(coordinatorEvents.tier)))
 }
 
 /** Appends the turn's new messages and renews the lease. */
@@ -134,7 +157,7 @@ export async function chatView(userId: string, limit = 200): Promise<ChatView> {
   const leased = Boolean(session?.leaseUntil && session.leaseUntil.getTime() > Date.now())
   return {
     items: chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending]),
-    working: leased || waiting.length > 0,
+    working: leased || waiting.some(event => event.tier !== 'background'),
     error: session?.lastError ?? null,
   }
 }

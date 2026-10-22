@@ -16,7 +16,7 @@
     "test:i18n": "node --test scripts/check-i18n.test.mjs",
     "i18n:check": "node scripts/check-i18n.mjs",
     "test:ssh-target": "node --import tsx --test lib/ssh-target.test.ts",
-    "test:coordinator-events": "node --import tsx --test lib/coordinator-events.test.ts lib/coordinator/context.test.ts",
+    "test:coordinator-events": "node --import tsx --test lib/coordinator-events.test.ts lib/coordinator/context.test.ts lib/coordinator/triage.test.ts",
     "test:e2e": "playwright test",
     "test:performance": "playwright test tests/e2e/navigation-performance.spec.ts",
     "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
