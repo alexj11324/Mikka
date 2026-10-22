@@ -59,7 +59,7 @@ export const auth = betterAuth({
     prefix: { opaqueAccessToken: 'mka_', refreshToken: 'mkr_' },
   })],
   session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
-  ...(process.env.NODE_ENV === 'development' ? { advanced: {
+  ...(process.env.NODE_ENV === 'development' && authBaseURL?.startsWith('https://') ? { advanced: {
     // Partition preview sessions by top-level site when third-party cookies are blocked.
     defaultCookieAttributes: { sameSite: 'none' as const, secure: true, partitioned: true },
   } } : {}),

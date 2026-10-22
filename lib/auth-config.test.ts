@@ -34,15 +34,21 @@ test('proxy requires both explicit settings and an HTTPS hub origin', () => {
   assert.throws(() => authOAuthProxyOptions({ ...proxyEnv, BETTER_AUTH_OAUTH_PROXY_URL: 'https://*.example.com' }))
 })
 
-test('only explicit hosted CI allows HTTP loopback origins and the proxy hub always requires HTTPS', () => {
+test('development and hosted CI allow only HTTP loopback origins; the proxy hub always requires HTTPS', () => {
   for (const origin of ['http://localhost:3100', 'http://127.0.0.1:3100', 'http://[::1]:3100']) {
     assert.deepEqual(authTrustedOrigins({ CI: 'true', BETTER_AUTH_URL: origin }), [origin])
+    assert.deepEqual(authTrustedOrigins({ NODE_ENV: 'development', BETTER_AUTH_URL: origin }), [origin])
     assert.throws(() => authTrustedOrigins({ BETTER_AUTH_URL: origin }))
+    assert.throws(() => authTrustedOrigins({ NODE_ENV: 'production', BETTER_AUTH_URL: origin }))
     assert.throws(() => authTrustedOrigins({ CI: 'false', BETTER_AUTH_URL: origin }))
     assert.throws(() => authOAuthProxyOptions({ ...proxyEnv, CI: 'true', BETTER_AUTH_OAUTH_PROXY_URL: origin }))
+    assert.throws(() => authOAuthProxyOptions({ ...proxyEnv, NODE_ENV: 'development', BETTER_AUTH_OAUTH_PROXY_URL: origin }))
   }
-  assert.throws(() => authTrustedOrigins({ CI: 'true', BETTER_AUTH_URL: 'http://preview.example.com' }))
-  assert.throws(() => authTrustedOrigins({ CI: 'true', BETTER_AUTH_URL: 'http://localhost.attacker.com' }))
+  for (const mode of [{ CI: 'true' }, { NODE_ENV: 'development' }]) {
+    for (const origin of ['http://preview.example.com', 'http://localhost.attacker.com', 'http://127.0.0.2:3000', 'http://localhost:3000/path']) {
+      assert.throws(() => authTrustedOrigins({ ...mode, BETTER_AUTH_URL: origin }))
+    }
+  }
 })
 
 function previewAuth() {
@@ -71,6 +77,30 @@ test('real Better Auth Preview initiation sends Google to the stable hub callbac
   assert.equal(providerURL.searchParams.get('redirect_uri'), `${hub}/mikka/api/auth/callback/google`)
   assert.ok(providerURL.searchParams.get('state'))
   assert.ok(response.headers.get('set-cookie'))
+})
+
+test('local development can initiate Google login directly or through the fixed hub', async () => {
+  const origin = 'http://localhost:3000'
+  for (const proxy of [false, true]) {
+    const env = { NODE_ENV: 'development', BETTER_AUTH_URL: origin, ...(proxy ? proxyEnv : {}) }
+    const options = authOAuthProxyOptions(env)
+    const auth = betterAuth({
+      baseURL: resolveAppOrigin(env), basePath: '/mikka/api/auth',
+      secret: 'test-only-local-secret-with-sufficient-entropy',
+      trustedOrigins: authTrustedOrigins(env),
+      socialProviders: { google: { clientId: 'test-client', clientSecret: 'test-secret' } },
+      plugins: options ? [oAuthProxy(options)] : [], logger: { disabled: true },
+    })
+    const response = await auth.handler(new Request(`${origin}/mikka/api/auth/sign-in/social`, {
+      method: 'POST', headers: { 'content-type': 'application/json', origin },
+      body: JSON.stringify({ provider: 'google', callbackURL: '/mikka', disableRedirect: true }),
+    }))
+    assert.equal(response.status, 200)
+    const providerURL = new URL((await response.json()).url)
+    assert.equal(providerURL.searchParams.get('redirect_uri'), `${proxy ? hub : origin}/mikka/api/auth/callback/google`)
+    assert.ok(response.headers.get('set-cookie'))
+    assert.doesNotMatch(response.headers.get('set-cookie')!, /;\s*(?:Secure|Partitioned)(?:;|$)/i)
+  }
 })
 
 test('real Better Auth rejects foreign origins and lookalike callback hosts', async () => {
@@ -114,7 +144,7 @@ test('Vercel branch aliases can sign out an authenticated session without trusti
   }
 })
 
-test('changing v0 hosts complete signed proxy login through a hub that trusts only itself', async (t) => {
+test('v0 hosts and local development complete signed proxy login through a hub that trusts only itself', async (t) => {
   const tokenEndpoint = 'https://github.com/login/oauth/access_token'
   const providerRequests: string[] = []
   t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
@@ -138,9 +168,10 @@ test('changing v0 hosts complete signed proxy login through a hub that trusts on
   const hubAuth = cloudAuth({ ...proxyEnv, BETTER_AUTH_URL: hub })
   const hubContext = await hubAuth.$context
   assert.deepEqual([...new Set(hubContext.trustedOrigins)], [hub])
-  for (const origin of ['https://ios-kn1ogl39.v0.build', 'https://ios-next-preview.v0.build']) {
+  const origins = ['https://ios-kn1ogl39.v0.build', 'https://ios-next-preview.v0.build', 'http://localhost:3000', 'http://127.0.0.1:3000']
+  for (const origin of origins) {
     assert.equal(hubContext.isTrustedOrigin(origin), false)
-    const auth = cloudAuth({ ...proxyEnv, V0_RUNTIME_URL: origin })
+    const auth = cloudAuth({ ...proxyEnv, NODE_ENV: 'development', ...(origin.startsWith('http:') ? { BETTER_AUTH_URL: origin } : { V0_RUNTIME_URL: origin }) })
     const initiation = await auth.handler(new Request(`${origin}/mikka/api/auth/sign-in/social`, {
       method: 'POST', headers: { 'content-type': 'application/json', origin },
       body: JSON.stringify({ provider: 'github', callbackURL: '/mikka', disableRedirect: true }),
@@ -171,5 +202,5 @@ test('changing v0 hosts complete signed proxy login through a hub that trusts on
     const session = await auth.handler(new Request(`${origin}/mikka/api/auth/get-session`, { headers: { cookie: sessionCookie } }))
     assert.equal((await session.json()).user.email, 'preview@example.com')
   }
-  assert.equal(providerRequests.filter(url => url === tokenEndpoint).length, 2)
+  assert.equal(providerRequests.filter(url => url === tokenEndpoint).length, origins.length)
 })
