@@ -27,8 +27,6 @@ import { listTeams } from '@/app/actions/teams'
 import { listProjectTeams } from '@/app/actions/team-relations'
 import { ProjectWorkspace } from './project-workspace'
 import { WorkspaceOverview } from './workspace-overview'
-import { SettingsShell } from '@/components/settings/settings-shell'
-import { SettingsView } from '@/components/settings/settings-view'
 import { PluginsSkillsView } from '@/components/plugins/plugins-skills-view'
 import type { WorkspaceSection } from './workspace-navigation'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
@@ -51,6 +49,8 @@ function CreateLoading() {
 }
 const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })
 const CreateIssueDialog = dynamic(() => import('./create-issue-dialog').then(module => module.CreateIssueDialog), { loading: CreateLoading })
+const SettingsShell = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsShell))
+const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView))
 
 export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'projects', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations'; googleEnabled?: boolean }) {
   const i18nText = useTranslations()
