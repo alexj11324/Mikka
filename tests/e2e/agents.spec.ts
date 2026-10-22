@@ -12,7 +12,7 @@ async function openAgentSettings(page: Page) {
   }
   await page.getByRole('button', { name: '账户菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()
-  for (const label of ['成员', '邀请成员']) {
+  for (const label of ['成员管理', '邀请成员']) {
     await expect(page.getByRole('link', { name: label, exact: true })).toBeVisible()
   }
   await page.getByRole('button', { name: '设备', exact: true }).click()
