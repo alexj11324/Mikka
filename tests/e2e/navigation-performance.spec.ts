@@ -72,7 +72,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       }
       if (viewport.width < 768) await page.getByRole('button', { name: '展开或收起侧栏', exact: true }).click()
       await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
-      await measureNavigation(page, info, '工作台进入设置', { path: '/settings', query: 'section=preferences', selectors: preferences.selectors }, () => page.getByRole('menuitem', { name: '设置', exact: true }).click())
+      await measureNavigation(page, info, '工作台进入设置', { path: '/settings', selectors: preferences.selectors }, () => page.getByRole('menuitem', { name: '设置', exact: true }).click())
       const initial = first === '成员' ? members : teams
       const other = first === '成员' ? teams : members
       for (const [name, destination] of [[first, initial], [first === '成员' ? '团队' : '成员', other]] as const) {
