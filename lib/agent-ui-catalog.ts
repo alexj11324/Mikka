@@ -32,6 +32,10 @@ export const agentComponentCatalog = {
     description: 'beUI 弹簧动效快捷提问按钮。label 使用“直接提问”或“继续细化”；action 必须是包含完整上下文、可立即发送的独立问题。点击后直接请求 Agent，不填入或清空底部输入框，不执行工作区操作。需要用户补充信息时使用 BeQuestions，不要展示重复的泛化按钮。“填入提问”仅兼容旧输出，实际显示并执行直接提问。',
     props: z.object({ label: z.enum(['直接提问', '继续细化', '填入提问']), action: text, variant: z.enum(['primary', 'secondary', 'ghost', 'outline']).optional() }),
   },
+  BeFollowUps: {
+    description: '回答末尾的相关追问。items 为 1–3 个有实质帮助的下一步问题，label 直接显示具体问题，prompt 携带必要上下文。只在有价值时提供，不替代当前答案；需要补充关键信息用 BeQuestions。点击直接继续对话，不改变输入草稿。',
+    props: z.object({ items: z.array(z.object({ label: z.string().trim().min(1).max(120), prompt: z.string().trim().min(1).max(4000) })).min(1).max(3).refine(items => new Set(items.map(item => item.label)).size === items.length, '追问不可重复') }),
+  },
   BeBadge: {
     description: 'beUI 动效状态徽标。只展示用户提供的状态或明确标注的建议，不表示执行了工作区操作。',
     props: z.object({ text: z.string().min(1).max(80), status: z.enum(['neutral', 'info', 'success', 'warning', 'danger', 'loading']).optional() }),
@@ -131,7 +135,7 @@ export const agentComponentGroups: { name: string; components: AgentComponentNam
   { name: '消息回复', components: ['BeResponse'], notes: ['AI Elements MessageResponse → beUI StreamingResponse；回复正文可嵌套已注册组件。会话和输入框由宿主控制，不由模型创建。'] },
   { name: '审批与问题', components: ['BeApproval', 'BeQuestions'], notes: ['Confirmation → ApprovalCard；选择问题复用 ApprovalCard 提问模式。在回答区直接提交并继续对话，不执行工具、不持久保存审批。ToolApproval 已安装但仅供未来真实工具授权流程使用，不开放给模型伪造授权。'] },
   { name: '任务与进度', components: ['BeTodoList', 'BeStat', 'ShadcnProgress'], notes: ['Plan/Task → TodoList；Loader/Shimmer → AgentProgress、ReasoningText、ThinkingShimmer，由宿主根据请求状态控制。建议计划保持待开始；数字只能来自用户输入。'] },
-  { name: '图标状态与操作', components: ['AgentIcon', 'BeBadge', 'BeButton'], notes: ['Lucide 提供图标；beUI AnimatedBadge 提供动态状态图标；Button 提供操作反馈。不得用动态图标伪造执行结果。'] },
+  { name: '图标状态与操作', components: ['AgentIcon', 'BeBadge', 'BeButton', 'BeFollowUps'], notes: ['Lucide 提供图标；beUI AnimatedBadge 提供动态状态图标；Button 提供操作反馈。不得用动态图标伪造执行结果。'] },
   { name: '本地内容与兼容组件', components: ['BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame'], notes: ['复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock、FileDiff、ToolResult、AgentActivity、Citations、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不自动生成虚构工具记录。'] },
 ]
 

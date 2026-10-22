@@ -4,6 +4,7 @@ import { Info } from 'lucide-react'
 import { AgentApproval, AgentQuestions, useAgentDecision } from './agent-decision'
 import { AgentContent, AgentStatusIcon, AgentTasks } from './agent-content'
 import { AgentImage } from './agent-image'
+import { AgentFollowUps } from './agent-follow-ups'
 import { AgentImageCard } from './agent-image-card'
 import { Button as BeButton } from '@/components/motion/button/base'
 import { AnimatedBadge } from '@/components/motion/animated-badge'
@@ -48,6 +49,7 @@ const renderers = {
       </p></BeCardContent>
     </BeCard>
   },
+  BeFollowUps: AgentFollowUps,
   BeResponse: AgentContent,
   BeApproval: AgentApproval,
   BeQuestions: AgentQuestions,

@@ -62,7 +62,7 @@ test('图片复用正文入口并共享 SWR 预加载，回复缩略图不懒加
 
 test('资料配图和详细回答规则进入模型规范', async () => {
   const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
-  assert.ok(spec.promptOptions.additionalRules.some(rule => rule.includes('不设简短回答偏好') && rule.includes('不能用一张摘要表')))
+  assert.ok(spec.promptOptions.additionalRules.some(rule => rule.includes('所需深度决定回答') && rule.includes('不能用一张摘要表')))
   assert.ok(spec.promptOptions.additionalRules.some(rule => rule.includes('BeImage') && rule.includes('真实配图')))
   const result = createParser(library.toJSONSchema(), library.root).parse('root = Stack([TextContent("介绍"), BeImage("Hong Kong Victoria Harbour", "维多利亚港资料配图", "现代风光资料图片")])')
   assert.ok(result.root)
@@ -70,6 +70,26 @@ test('资料配图和详细回答规则进入模型规范', async () => {
 })
 
 const library = createAgentLibrary()
+
+test('相关追问支持具体问题、上下文及内联继续，不再被提示词压制', async () => {
+  const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
+  const rules = spec.promptOptions.additionalRules.join('\n')
+  assert.match(rules, /BeFollowUps 展示 1–3 个具体相关追问/)
+  assert.doesNotMatch(rules, /不要添加不必要的续问按钮/)
+  assert.match(rules, /没有实质下一步时不强行添加/)
+  const response = 'root = Stack([TextContent("已给出完整答案"), BeFollowUps([{label: "如何选择天气服务？", prompt: "我的助手需要美国和全球天气，请比较服务覆盖和商用条件。"}])])'
+  const parsed = createParser(library.toJSONSchema(), library.root).parse(response)
+  assert.ok(parsed.root)
+  assert.deepEqual(parsed.meta.errors, [])
+  assert.deepEqual(parsed.meta.unresolved, [])
+  for (const items of [[], Array(4).fill({ label: '问题', prompt: '上下文' }), [{ label: '', prompt: '背景' }], [{ label: '问题', prompt: '' }]]) {
+    assert.equal(agentComponentCatalog.BeFollowUps.props.safeParse({ items }).success, false)
+  }
+  const component = await readFile(new URL('../components/workspace/agent-follow-ups.tsx', import.meta.url), 'utf8')
+  assert.match(component, /useAgentDecision/)
+  assert.match(component, /void send\(prompt\)/)
+  assert.doesNotMatch(component, /setInput|updateDraft|fetch\(/)
+})
 
 test('完整正文和可自动补齐的括号不会误报失败', () => {
   const parser = createParser(library.toJSONSchema(), library.root)
@@ -132,7 +152,8 @@ test('beUI 组件包含在运行时和可序列化规范中', async () => {
     assert.match(prompt, new RegExp(`${name}\\(`))
   }
   assert.match(prompt, /数字只能来自用户输入/)
-  assert.match(prompt, /不保存历史/)
+  assert.match(prompt, /宿主保存历史到数据库/)
+  assert.match(prompt, /每次模型请求不会自动包含历史/)
 })
 
 test('beUI OpenUI Lang 输出可解析且保留旧组件兼容', () => {
@@ -168,7 +189,7 @@ icon = AgentIcon("question", "等待回答")`)
   assert.deepEqual(result.meta.unresolved, [])
 })
 
-test('问题、任务与图标严格限制输入，不能伪造审批结果', () => {
+test('问题、任务与图标严格限制输入，不能��造审批结果', () => {
   const { BeQuestions, BeTodoList, AgentIcon, BeApproval } = agentComponentCatalog
   const valid = { context: '项目建议', questions: [{ id: 'scope', title: '选择范围', allowCustom: true }] }
   assert.equal(BeQuestions.props.safeParse(valid).success, true)
