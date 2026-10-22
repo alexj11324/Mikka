@@ -4,7 +4,7 @@ Verified on 2026-10-22. Organization: Aspectly Labs. Project: Mikka (`89850d6a-f
 
 ## Verified storage
 
-All 89 application/database records were read back and compared to their prepared source values or expanded references. Environment/path counts include repeated names. Seven platform records and ten Worker secret references are stored separately. These counts establish storage, not deployed acceptance.
+All 90 application/database records were read back and compared to their prepared source values or expanded references. Environment/path counts include repeated names. Seven platform records and ten Worker secret references are stored separately. These counts establish storage, not deployed acceptance.
 
 | Environment | Source folder | Records |
 | --- | --- | --- |
@@ -12,6 +12,7 @@ All 89 application/database records were read back and compared to their prepare
 | dev | `/vercel` | 18 |
 | prod | `/neon` | 2 |
 | prod | `/vercel` | 24 |
+| staging | `/auth-hub` | 1 |
 | staging | `/branches/000add0cd5e4/neon` | 2 |
 | staging | `/branches/75af16fa69ea/neon` | 2 |
 | staging | `/branches/9232b5fc98ee/neon` | 2 |
@@ -35,13 +36,17 @@ Neon integration-managed `DATABASE_URL` and `DATABASE_URL_UNPOOLED` are snapshot
 
 | Target | Current state |
 | --- | --- |
-| Vercel Mikka team | Shared organization-level native App Connection `mikka-team-vercel-native-sync` created with explicit team-wide authorization. Development, default Preview, Production and existing Linear branch syncs have succeeded; automatic sync is enabled. Deployment rebuild and application acceptance remain pending. |
+| Vercel Mikka team | Shared organization-level native App Connection `mikka-team-vercel-native-sync` created with explicit team-wide authorization. Development, default Preview, Production existing Linear branch and OAuth hub branch syncs have succeeded; automatic sync is enabled. Deployment rebuild and application acceptance remain pending. |
 | Worker `mikka-linear-sync` | Native sync `mikka-workers-prod` created, automatic sync disabled pending coordinated app cutover. |
 | Worker `mikka-linear-sync-preview` | Native sync `mikka-workers-staging` created, automatic sync disabled pending coordinated app cutover. |
 | Cloudflare Pages | No existing Mikka Pages project; no destination was invented. |
-| Cloud Agent | Workload identity and actual hosted consumption remain unconfigured. The old local MCP credential belongs to the deleted organization. |
+| Cloud workload | GitHub OIDC identity `mikka-github-cloud` configured with 900-second tokens, no organization access and read-only Mikka project membership. Existing CI verifies a single injected credential against its issuer. Hosted execution remains pending. The old local MCP credential belongs to the deleted organization. |
 
 Each Worker source `/cloudflare` contains only `CRON_SECRET`, `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`, `LINEAR_TOKEN_ENCRYPTION_KEY` and `LINEAR_WEBHOOK_SECRET`, referencing the matching environment in `/vercel`. Expanded references were compared to their base values. The existing Linear branch also references the default Preview credentials instead of owning duplicate shared values. Sync options preserve non-secret bindings such as Hyperdrive and prevent secret deletion. No custom dispatch workflow was created.
+
+The development OAuth hub is the fixed branch Preview `https://mikka-git-codex-cloud-preview-secrets-mikka-dev.vercel.app`. Development and staging point their proxy URL there; only that hub branch sets `BETTER_AUTH_URL` to the stable alias. Other previews infer their exact runtime origin. Production retains its existing application origin. Google cloud callbacks were saved; GitHub App settings require account reauthentication. Google credential replacement is pending after its console exposed a secret in an accessibility label.
+
+The OIDC trust pins the current numeric GitHub repository and owner IDs and immutable subject prefix, and accepts only branch refs in that repository. Pull request refs and forks cannot use this identity. Only `oidc-auth` is enabled; no persistent identity client secret was created.
 
 ## Remaining acceptance
 
@@ -49,7 +54,7 @@ Each Worker source `/cloudflare` contains only `CRON_SECRET`, `LINEAR_CLIENT_ID`
 - Switch app and Worker credentials together, verify native sync results and deployed API calls.
 - Deploy the OAuth proxy configuration to its stable cloud hub and trusted previews; verify real Google/GitHub sign-in from changing Preview origins.
 - Check the custom Linear integration callback separately; the Better Auth social proxy does not relay it. The existing Linear application webhook currently points to a retired API host and must be corrected to the verified Mikka receiver.
-- Establish and verify cloud Agent authentication without a Mac service.
-- Run remote CI and deployed Preview acceptance. No local server, build or typecheck was run.
+- Verify the GitHub OIDC cloud job without a Mac service. Other Agent hosts still need their own supported workload authentication.
+- Run remote CI for the final commit and deployed Preview acceptance. Commit `538b6be` passed remote CI, including typecheck, production build and browser regression. No local server, build or typecheck was run.
 
 Official references: [Vercel integration](https://vercel.com/marketplace/infisical), [Worker native sync](https://infisical.com/docs/integrations/secret-syncs/cloudflare-workers), [secret references](https://infisical.com/docs/documentation/platform/secret-reference), [Better Auth OAuth proxy](https://www.better-auth.com/docs/plugins/oauth-proxy).
