@@ -114,13 +114,8 @@ export function RuntimeFields({ devices, runtime, onChange }: { devices: DeviceV
       <Picker label={t('model')} value={model?.value ?? runtime.model} placeholder={t('defaultModel')} disabled={!models.length} onChange={pickModel}
         options={models.map(item => ({ value: item.value, label: item.displayName || item.value }))} />
     </SettingRow>
-    <div className="px-5 py-4">
-      {levels.length > 0
-        ? <EffortSlider key={model?.value} levels={levels} value={runtime.effort} onChange={effort => onChange({ ...runtime, effort })} formatLabel={effortLabel} placeholder={t('defaultEffort')} />
-        : <div className="flex flex-col gap-2.5">
-            <div className="flex items-baseline gap-1.5 text-sm"><span className="text-muted-foreground">Effort</span><span className="font-medium">—</span></div>
-            <span className="text-xs text-muted-foreground">{models.length ? t('noEffortLevels') : t('effortNeedsModel')}</span>
-          </div>}
-    </div>
+    {levels.length > 0
+      ? <EffortSlider key={model?.value} levels={levels} value={runtime.effort} onChange={effort => onChange({ ...runtime, effort })} formatLabel={effortLabel} placeholder={t('defaultEffort')} />
+      : <SettingRow title="Effort" description={models.length ? t('noEffortLevels') : t('effortNeedsModel')} />}
   </SettingsSection>
 }
