@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { request as playwrightRequest, test, expect } from '@playwright/test'
 import { app } from './fixtures'
 
 // 入口兼容性只需 HTTP 请求，不启动账户测试的浏览器或创建用户。
@@ -19,9 +19,16 @@ test('旧预览入口和设置入口均跳转到正式页面', async ({ request 
     expect(`${destination.pathname.replace(/\/$/, '')}${destination.search}`, source).toBe(app(target))
   }
 
-  const settings = await request.get(app('/preview/settings'))
-  const signIn = new URL(settings.url())
-  expect(settings.status()).toBe(200)
-  expect(signIn.pathname).toBe(app('/sign-in'))
-  expect(signIn.searchParams.get('next')).toBe('/settings/members')
+  const anonymousRequest = await playwrightRequest.newContext({
+    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3100',
+  })
+  try {
+    const settings = await anonymousRequest.get(app('/preview/settings'))
+    const signIn = new URL(settings.url())
+    expect(settings.status()).toBe(200)
+    expect(signIn.pathname).toBe(app('/sign-in'))
+    expect(signIn.searchParams.get('next')).toBe('/settings/members')
+  } finally {
+    await anonymousRequest.dispose()
+  }
 })

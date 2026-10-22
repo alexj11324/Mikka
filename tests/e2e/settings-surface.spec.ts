@@ -16,7 +16,7 @@ test('settings row dividers span the grouped card edges', async ({ page }) => {
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()
 
   for (const section of sections) {
-    await page.getByRole('button', { name: section }).click()
+    await page.getByRole('link', { name: section, exact: true }).click()
     await expect(page.getByRole('heading', { level: 1, name: section })).toBeVisible()
 
     const mismatches = await page.evaluate(() => {

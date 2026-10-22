@@ -23,7 +23,6 @@ import {
   revokeWorkspaceInvitation,
   updateWorkspaceMember,
 } from "@/app/actions/workspace";
-import { useActionError } from "@/lib/use-action-error";
 import { InviteMembersDialog } from "@/components/workspace/invite-members-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/reui/badge";
@@ -80,7 +79,17 @@ import { cn } from "@/lib/utils";
 
 async function fetchSettings(url: string): Promise<WorkspaceSettings> {
   const response = await fetch(url);
-  if (!response.ok) throw new Error("Failed to load members.");
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    const message =
+      typeof payload === "object" &&
+      payload !== null &&
+      "error" in payload &&
+      typeof payload.error === "string"
+        ? payload.error
+        : "Failed to load members.";
+    throw new Error(message);
+  }
   return response.json();
 }
 type Change = {
@@ -106,7 +115,6 @@ export function MembersSettings({
   const commonT = useTranslations("Common");
   const format = useFormatter();
   const locale = useLocale();
-  const translateError = useActionError();
   const requestedWorkspaceId = initial?.workspace.id ?? workspaceId;
   const settingsUrl = requestedWorkspaceId
     ? `/api/workspace?workspace=${encodeURIComponent(requestedWorkspaceId)}`
@@ -198,7 +206,7 @@ export function MembersSettings({
         ...change,
       });
       if ("error" in result) {
-        setError(translateError(result.error));
+        setError(result.error);
         return;
       }
       setChange(null);
@@ -218,7 +226,7 @@ export function MembersSettings({
     try {
       const result = await revokeWorkspaceInvitation(data.workspace.id, id);
       if ("error" in result) {
-        setError(translateError(result.error));
+        setError(result.error);
         return;
       }
       setNotice(t("invitationRevoked"));

@@ -64,7 +64,7 @@ test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', as
   await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()
   await page.route('**/api/workspace?workspace=unavailable-workspace', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: '没有查看此工作区的权限。' }) }))
   await page.evaluate(() => window.history.pushState(null, '', '/settings/members?workspace=unavailable-workspace'))
-  await expect(page.getByRole('alert')).toContainText('没有查看此工作区的权限。')
+  await expect(page.getByRole('alert').filter({ hasText: '没有查看此工作区的权限。' })).toContainText('没有查看此工作区的权限。')
   await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toHaveCount(0)
   await page.goBack()
   await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()

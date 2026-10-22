@@ -90,7 +90,7 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await expect(projectDialog).not.toBeVisible()
   await page.getByRole('button', { name: '管理关联团队', exact: true }).click()
   const relation = page.getByRole('dialog', { name: '项目关联团队', exact: true })
-  await relation.getByLabel('ENGINEER · 工程团队', { exact: true }).check()
+  await relation.getByRole('checkbox', { name: 'ENGINEER · 工程团队', exact: true }).check()
   await relation.getByLabel('主责团队', { exact: true }).selectOption({ label: '工程团队' })
   page.once('dialog', dialog => dialog.accept())
   await relation.getByRole('button', { name: '保存团队关联', exact: true }).click()

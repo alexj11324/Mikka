@@ -27,7 +27,7 @@ function appPath(route: AppRoute, locale: string | undefined, basePath: string) 
 export function isLocalSettingsNavigation(current: URL, destination: URL, _workspaceId?: string, basePath = BASE_PATH) {
   // Every supported path renders WorkspaceApp; data requests still enforce session and workspace access.
   const currentRoute = appRoute(current.pathname, basePath)
-  const destinationRoute = appRoute(destination.pathname, basePath)
+  const destinationRoute = appRoute(destination.pathname, basePath) ?? appRoute(destination.pathname, '')
   return current.origin === destination.origin && !!currentRoute && !!destinationRoute &&
     appPaths.has(currentRoute.pathname) && appPaths.has(destinationRoute.pathname)
 }
