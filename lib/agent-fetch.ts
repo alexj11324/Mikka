@@ -26,6 +26,42 @@ export function validateAgentStream() {
   })
 }
 
+export function observeAgentImages(onQuery: (query: string) => void) {
+  const decoder = new TextDecoder()
+  const seen = new Set<string>()
+  let pending = ''
+  let text = ''
+  const patterns = [/\bBeImageCard\s*\(\s*"(?:[^"\\]|\\.)*"\s*,\s*("(?:[^"\\]|\\.)*")/g, /\bBeImage\s*\(\s*("(?:[^"\\]|\\.)*")/g]
+  return new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      controller.enqueue(chunk)
+      if (seen.size >= 6) return
+      pending += decoder.decode(chunk, { stream: true })
+      let end: number
+      while ((end = pending.indexOf('\n')) >= 0) {
+        const line = pending.slice(0, end)
+        pending = pending.slice(end + 1)
+        if (!line.startsWith('data: ') || line.slice(6).trim() === '[DONE]') continue
+        try {
+          const part = JSON.parse(line.slice(6))
+          if (part.type !== 'text-delta' || typeof part.delta !== 'string') continue
+          text += part.delta
+          for (const pattern of patterns) {
+            for (const match of text.matchAll(pattern)) {
+              const query: string = JSON.parse(match[1])
+              if (!seen.has(query) && seen.size < 6) {
+                seen.add(query)
+                onQuery(query)
+              }
+            }
+          }
+          text = text.slice(-16384)
+        } catch { /* Observation must never interrupt the original response stream. */ }
+      }
+    },
+  })
+}
+
 export const fetchAgentResponse: typeof fetch = async (input, options) => {
   const signal = options?.signal
   if (!signal) return fetch(input, options)

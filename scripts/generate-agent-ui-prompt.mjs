@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { openuiPromptOptions } from '@openuidev/react-ui/genui-lib'
+import { generateSystemPrompt } from '@openuidev/lang-core'
 import { agentComponentCatalog, createAgentLibrary } from '../lib/agent-ui-catalog.ts'
 
 const openuiLibrary = createAgentLibrary()
@@ -28,12 +29,15 @@ const promptOptions = {
 }
 const content = `${JSON.stringify({ library: openuiLibrary.toSpec(), promptOptions, localComponents: Object.keys(agentComponentCatalog) }, null, 2)}\n`
 
+const promptOutput = new URL('../lib/agent-system-prompt.json', import.meta.url)
+const promptContent = `${JSON.stringify(generateSystemPrompt(JSON.parse(content)))}\n`
+
 if (process.argv.includes('--check')) {
-  if (await readFile(output, 'utf8') !== content) {
+  if (await readFile(output, 'utf8') !== content || await readFile(promptOutput, 'utf8') !== promptContent) {
     throw new Error('OpenUI 规范与组件目录不一致，请运行 pnpm generate:agent-ui。')
   }
 } else {
-  // The library imports client components; generate prompt data outside Next.js server compilation.
-  await writeFile(output, content)
+  // Compile the prompt here so the request route does not load the OpenUI compiler.
+  await Promise.all([writeFile(output, content), writeFile(promptOutput, promptContent)])
 }
 console.log(`OpenUI 组件目录与提示词已${process.argv.includes('--check') ? '校验' : '生成'}：${Object.keys(openuiLibrary.components).length} 个组件定义。`)

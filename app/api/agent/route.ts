@@ -2,15 +2,15 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createUIMessageStreamResponse, streamText, toUIMessageStream } from 'ai'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
-import { generateSystemPrompt } from '@openuidev/lang-core'
-import agentUISpec from '@/lib/agent-ui.spec.json'
+import systemPrompt from '@/lib/agent-system-prompt.json'
 import { validateAgentStream } from '@/lib/agent-fetch'
 import { persistAgentStream } from '@/lib/agent-history'
 import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
 
-const systemPrompt = generateSystemPrompt(agentUISpec)
-
 export const maxDuration = 300
+
+// Reuse the POST bundle: image lookup must not trigger a second cold route compilation.
+export { GET } from './images/route'
 
 const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional(), turnId: z.uuid().optional(), retry: z.boolean().optional() }).strict()
 const errorHeaders = { 'Cache-Control': 'private, no-store', 'Content-Type': 'text/plain; charset=utf-8' }
@@ -21,6 +21,11 @@ function agentErrorMessage(error: unknown) {
   if (status === 429 || status === 402) return 'OpenCode Go 当前限流或额度不足，请稍后重试并检查订阅额度。'
   if (error instanceof Error && /timeout|abort/i.test(error.name)) return '模型响应超时，已收到的内容已保留，请在此重试。'
   return 'OpenCode Go 连接失败，已有内容已保留，请在此重试。'
+}
+
+export async function HEAD(request: Request) {
+  const session = await auth.api.getSession({ headers: request.headers })
+  return new Response(null, { status: session?.user ? 204 : 401, headers: { 'Cache-Control': 'private, no-store' } })
 }
 
 export async function POST(request: Request) {

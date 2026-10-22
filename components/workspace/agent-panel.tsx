@@ -14,7 +14,16 @@ import { AgentComposer } from './agent-composer'
 import { AgentResponse } from './agent-response'
 import { AgentChat, type AgentChatSession } from './agent-chat'
 import { AgentInteractionContext } from './agent-interaction'
-import { fetchAgentResponse } from '@/lib/agent-fetch'
+import { fetchAgentResponse, observeAgentImages } from '@/lib/agent-fetch'
+import { preloadAgentImage } from '@/lib/agent-image-loader'
+
+const fetchAgentWithImages: typeof fetch = async (input, options) => {
+  const response = await fetchAgentResponse(input, options)
+  if (!response.ok || !response.body || !response.headers.get('content-type')?.includes('text/event-stream')) return response
+  return new Response(response.body.pipeThrough(observeAgentImages(preloadAgentImage)), {
+    status: response.status, statusText: response.statusText, headers: response.headers,
+  })
+}
 
 const agentTheme = createTheme({
   background: 'var(--background)',
@@ -46,6 +55,10 @@ async function fetchHistory(url: string): Promise<AgentHistory> {
 }
 
 export function AgentPanel({ userId, initialHistory }: { userId: string; initialHistory?: AgentHistory }) {
+  useSWR(['/api/agent', userId, 'ready'], async ([url]: [string, string, string]) => {
+    const response = await fetch(url, { method: 'HEAD', credentials: 'same-origin' })
+    return response.ok
+  }, { revalidateOnFocus: false, revalidateIfStale: false, shouldRetryOnError: false })
   const latest = useSWR<AgentHistory>(['/api/agent/sessions', userId], ([url]: [string, string]) => fetchHistory(url), {
     fallbackData: initialHistory, revalidateOnFocus: false, revalidateOnMount: !initialHistory,
   })
@@ -107,7 +120,7 @@ type AgentSessionProps = {
 
 function AgentSession({ onReset, onSelect, onSaved, onState, initial, sessions, completionId }: AgentSessionProps) {
   const restored = initial.turns.at(-1)
-  const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ id: completionId, api: '/api/agent', credentials: 'same-origin', fetch: fetchAgentResponse, initialCompletion: restored?.completion ?? '' })
+  const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ id: completionId, api: '/api/agent', credentials: 'same-origin', fetch: fetchAgentWithImages, initialCompletion: restored?.completion ?? '' })
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const submittingRef = useRef(false)
   const lastRequestRef = useRef<{ prompt: string; failed: boolean } | null>(restored ? { prompt: restored.prompt, failed: restored.status !== 'complete' } : null)
@@ -133,7 +146,7 @@ function AgentSession({ onReset, onSelect, onSaved, onState, initial, sessions, 
     const form = event.formState && Object.keys(event.formState).length > 0 ? `表单内容：${JSON.stringify(event.formState)}` : ''
     const prompt = [event.humanFriendlyMessage, context, form].filter(Boolean).join('\n')
     if (!prompt.trim() || prompt.length > 8000) {
-      toast.error('提问内容为空或过长，请在原组件中调整后重试。')
+      toast.error('提问内容���空或过长，请在原组件中调整后重试。')
       return
     }
     if (!await request(prompt, 'inline')) toast.error('本次提问未完成，请在原组件中重试。')

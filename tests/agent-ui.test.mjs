@@ -35,6 +35,7 @@ test('配图检索通过固定来源查询，并正确处理无结果及上游�
   t.mock.method(globalThis, 'fetch', async url => {
     assert.equal(url.origin, 'https://commons.wikimedia.org')
     assert.equal(url.searchParams.get('gsrnamespace'), '6')
+    assert.equal(url.searchParams.get('iiurlwidth'), '500')
     assert.match(url.searchParams.get('gsrsearch'), /Victoria Harbour/)
     return Response.json({ query: { pages: { 1: commonsImage() } } })
   })
@@ -43,6 +44,20 @@ test('配图检索通过固定来源查询，并正确处理无结果及上游�
   assert.equal(await findAgentImage('Victoria Harbour'), null)
   globalThis.fetch.mock.mockImplementation(async () => new Response(null, { status: 503 }))
   await assert.rejects(findAgentImage('Victoria Harbour'), /暂时不可用/)
+})
+
+test('图片复用正文入口并共享 SWR 预加载，回复缩略图不懒加载', async () => {
+  const loader = await readFile(new URL('../lib/agent-image-loader.ts', import.meta.url), 'utf8')
+  const route = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
+  const image = await readFile(new URL('../components/workspace/agent-image.tsx', import.meta.url), 'utf8')
+  const panel = await readFile(new URL('../components/workspace/agent-panel.tsx', import.meta.url), 'utf8')
+  assert.match(loader, /\/api\/agent\?q=/)
+  assert.match(loader, /preload\(agentImageKey\(query\), loadAgentImage\)/)
+  assert.match(route, /export \{ GET \} from '\.\/images\/route'/)
+  assert.match(image, /useSWR\(agentImageKey\(query\), loadAgentImage/)
+  assert.match(image, /ImageViewerThumbnail loading="eager"/)
+  assert.match(panel, /observeAgentImages\(preloadAgentImage\)/)
+  assert.match(panel, /fetch: fetchAgentWithImages/)
 })
 
 test('资料配图和详细回答规则进入模型规范', async () => {
@@ -106,6 +121,11 @@ test('beUI 组件包含在运行时和可序列化规范中', async () => {
   assert.deepEqual(spec.library, JSON.parse(JSON.stringify(library.toSpec())))
   assert.deepEqual(spec.localComponents, Object.keys(agentComponentCatalog))
   const prompt = generateSystemPrompt(spec)
+  const compiled = JSON.parse(await readFile(new URL('../lib/agent-system-prompt.json', import.meta.url), 'utf8'))
+  assert.equal(compiled, prompt)
+  const route = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /import systemPrompt from '@\/lib\/agent-system-prompt.json'/)
+  assert.doesNotMatch(route, /from '@openuidev\//)
   for (const name of Object.keys(agentComponentCatalog)) {
     assert.ok(library.components[name])
     assert.ok(spec.library.schema.$defs[name])

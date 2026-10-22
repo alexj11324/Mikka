@@ -1,10 +1,47 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fetchAgentResponse, validateAgentStream } from '../lib/agent-fetch.ts'
+import { fetchAgentResponse, observeAgentImages, validateAgentStream } from '../lib/agent-fetch.ts'
 
 async function checkStream(parts) {
   return Array.fromAsync(ReadableStream.from(parts).pipeThrough(validateAgentStream()))
 }
+
+test('配图关键词闭合即预加载，不等待卡片介绍、标签或回复完成', async () => {
+  const queries = []
+  const encoder = new TextEncoder()
+  const transform = observeAgentImages(query => queries.push(query))
+  const writer = transform.writable.getWriter()
+  const reader = transform.readable.getReader()
+  const source = 'card = BeImageCard("故宫", "Forbidden City Beijing"'
+  const event = `data: ${JSON.stringify({ type: 'text-delta', delta: source })}\n\n`
+  const bytes = encoder.encode(event)
+  for (const chunk of [bytes.slice(0, 37), bytes.slice(37)]) {
+    const writing = writer.write(chunk)
+    assert.deepEqual((await reader.read()).value, chunk)
+    await writing
+  }
+  assert.deepEqual(queries, ['Forbidden City Beijing'])
+  const repeated = encoder.encode(`data: ${JSON.stringify({ type: 'text-delta', delta: ')\nphoto = BeImage("Forbidden City Beijing", "故宫")' })}\n\n`)
+  const writing = writer.write(repeated)
+  await reader.read()
+  await writing
+  assert.equal(queries.length, 1)
+  await writer.close()
+  assert.equal((await reader.read()).done, true)
+})
+
+test('图片观察不预加载推理，不吞正文，并限制为最多六张不同配图', async () => {
+  const queries = []
+  const events = [
+    { type: 'reasoning-delta', delta: 'BeImage("not public", "推理")' },
+    { type: 'text-delta', delta: Array.from({ length: 8 }, (_, index) => `photo${index} = BeImage("image ${index}", "配图")`).join('\n') },
+  ]
+  const body = events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('') + 'data: [DONE]\n\n'
+  const input = new TextEncoder().encode(body)
+  const chunks = await Array.fromAsync(ReadableStream.from([input]).pipeThrough(observeAgentImages(query => queries.push(query))))
+  assert.deepEqual(chunks, [input])
+  assert.deepEqual(queries, ['image 0', 'image 1', 'image 2', 'image 3', 'image 4', 'image 5'])
+})
 
 test('正常结束保留全部正文，不人为截断长回复', async () => {
   const parts = [{ type: 'text-delta', id: 'answer', delta: '详细正文'.repeat(10000) }, { type: 'finish', finishReason: 'stop' }]

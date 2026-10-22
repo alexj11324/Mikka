@@ -14,6 +14,7 @@ const nextConfig = {
     return config
   },
   transpilePackages: ['@mikka/protocol'],
+  serverExternalPackages: ['ai', '@ai-sdk/openai-compatible', 'better-auth', 'drizzle-orm'],
   async headers() {
     return [{ source: '/(.*)', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },

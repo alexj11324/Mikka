@@ -11,9 +11,10 @@ export class AgentStoreError extends Error {
 export async function beginAgentTurn(userId: string, sessionId: string, turnId: string, prompt: string, retry = false) {
   const attemptId = crypto.randomUUID()
   return db.transaction(async tx => {
-    await tx.insert(agentSessions).values({ id: sessionId, userId, title: prompt.slice(0, 200) }).onConflictDoNothing()
-    const [session] = await tx.select({ id: agentSessions.id }).from(agentSessions)
-      .where(and(eq(agentSessions.id, sessionId), eq(agentSessions.userId, userId))).for('update')
+    // The scoped upsert also locks the session until commit, serializing concurrent turns.
+    const [session] = await tx.insert(agentSessions).values({ id: sessionId, userId, title: prompt.slice(0, 200) })
+      .onConflictDoUpdate({ target: agentSessions.id, set: { updatedAt: new Date() }, setWhere: eq(agentSessions.userId, userId) })
+      .returning({ id: agentSessions.id })
     if (!session) throw new AgentStoreError('找不到此会话。', 404)
     const [active] = await tx.select({ id: agentTurns.id }).from(agentTurns).where(and(
       eq(agentTurns.sessionId, sessionId), eq(agentTurns.userId, userId), eq(agentTurns.status, 'pending'),
@@ -35,7 +36,6 @@ export async function beginAgentTurn(userId: string, sessionId: string, turnId: 
       const inserted = await tx.insert(agentTurns).values({ id: turnId, sessionId, userId, prompt, attemptId }).onConflictDoNothing().returning({ id: agentTurns.id })
       if (!inserted.length) throw new AgentStoreError('消息标识无效，请新建一轮提问。', 409)
     }
-    await tx.update(agentSessions).set({ updatedAt: new Date() }).where(and(eq(agentSessions.id, sessionId), eq(agentSessions.userId, userId)))
     const history = await tx.select({ prompt: agentTurns.prompt, completion: agentTurns.completion }).from(agentTurns)
       .where(and(eq(agentTurns.sessionId, sessionId), eq(agentTurns.userId, userId), eq(agentTurns.status, 'complete'), ne(agentTurns.id, turnId)))
       .orderBy(desc(agentTurns.createdAt), desc(agentTurns.id)).limit(12)

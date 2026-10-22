@@ -59,7 +59,7 @@ export async function findAgentImage(query: string, signal?: AbortSignal) {
   url.search = new URLSearchParams({
     action: 'query', format: 'json', generator: 'search', gsrsearch: `${agentImageQuery.parse(query)} filetype:bitmap`,
     gsrnamespace: '6', gsrlimit: '3', prop: 'imageinfo', iiprop: 'url|mime|extmetadata',
-    iiextmetadatafilter: 'Artist|LicenseShortName', iiurlwidth: '960',
+    iiextmetadatafilter: 'Artist|LicenseShortName', iiurlwidth: '500',
   }).toString()
   const response = await fetch(url, {
     headers: { 'User-Agent': 'Orvilo-UI-Agent/1.0 (Wikimedia Commons image lookup)' },

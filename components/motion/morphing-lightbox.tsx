@@ -232,6 +232,7 @@ export interface ImageViewerThumbnailProps
   extends Omit<HTMLMotionProps<"button">, "children"> {
   imageId: string;
   imageClassName?: string;
+  loading?: 'eager' | 'lazy';
   children?: ReactNode;
 }
 
@@ -240,6 +241,7 @@ export function ImageViewerThumbnail({
   imageId,
   className,
   imageClassName,
+  loading = 'lazy',
   children,
   onClick,
   disabled,
@@ -277,7 +279,7 @@ export function ImageViewerThumbnail({
         alt={image.alt}
         width={image.width}
         height={image.height}
-        loading="lazy"
+        loading={loading}
         draggable={false}
         transition={SPRING_LAYOUT}
         className={cn("block h-auto w-full", imageClassName)}
