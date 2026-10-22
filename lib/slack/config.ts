@@ -14,7 +14,7 @@ const configSchema = z.object({
   }).pipe(z.record(z.string().regex(/^U[A-Z0-9]+$/), z.string().min(1))),
 })
 
-export function slackConfig(env: NodeJS.ProcessEnv) {
+export function slackConfig(env: Record<string, string | undefined>) {
   const parsed = configSchema.safeParse(env)
   return parsed.success ? parsed.data : null
 }

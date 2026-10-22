@@ -33,7 +33,7 @@ function createBot() {
       team_id: raw.team_id ?? raw.team,
       event: { type: 'app_mention', user: message.author.userId, text: message.text },
     })
-    if (!userId || message.author.isBot || message.author.isMe) return
+    if (!userId || message.author.isBot === true || message.author.isMe) return
     await start(slackTurn, [userId, thread.id, message.text.slice(0, 10_000)])
   })
   return chat
