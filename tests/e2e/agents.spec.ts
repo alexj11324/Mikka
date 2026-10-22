@@ -30,7 +30,8 @@ test('设置中的Agent角色、运行环境、新建与删除', async ({ page }
   await expect(page).not.toHaveURL(/settings=devices/)
   await openAgentSettings(page)
   const panel = page.getByRole('region', { name: 'Agent 角色', exact: true })
-  await expect(panel.getByRole('heading', { name: 'Agent 角色', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Agent 管理', exact: true })).toBeVisible()
+  await expect(panel).toBeVisible()
   for (const name of ['Coordinator', 'Worker', 'Reviewer']) {
     await expect(panel.getByRole('button', { name: new RegExp(`^${name}`) })).toBeVisible()
   }
