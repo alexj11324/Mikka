@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { and, eq, inArray } from 'drizzle-orm'
 import { runStateForStop } from '@mikka/protocol/daemon'
 import { runCompleteRequest, reachesReview } from '@mikka/protocol/run'
@@ -7,6 +7,7 @@ import { agentRuns, devices, issues, type RunStatus } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
+import { wakeCoordinator } from '@/lib/coordinator/wake'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,7 +49,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATUSES])))
     .returning({ id: agentRuns.id })
   // Only the completion that ended the run tells the Coordinator.
-  if (ended.length) await recordCoordinatorEvent(db, runFinishedEvent({ ...run, status, stopReason, report }))
+  if (ended.length) {
+    await recordCoordinatorEvent(db, runFinishedEvent({ ...run, status, stopReason, report }))
+    after(() => wakeCoordinator(run.userId))
+  }
   if (run.issueId && reachesReview(stopReason, report)) {
     await db.update(issues).set({ status: 'review', updatedAt: new Date() }).where(eq(issues.id, run.issueId))
   }

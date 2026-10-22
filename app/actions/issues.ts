@@ -16,6 +16,8 @@ import { issueWithMetadata, readIssueMetadata, withIssueMetadata } from '@/lib/i
 import { allocateIssueNumbers, ensureIssueNumbers } from '@/lib/issue-numbering'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { issueDoneEvent } from '@/lib/coordinator-events'
+import { wakeCoordinator } from '@/lib/coordinator/wake'
+import { after } from 'next/server'
 
 type IssueRow = typeof issues.$inferSelect
 type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata> }
@@ -79,8 +81,9 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
     }
     const ownerId = input.id ? (await requireIssueAccess(id)).issue.userId : userId
     if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: 'issueRevisionInvalid' }
+    let doneEvent = false
     try {
-      return await db.transaction(async tx => {
+      const result = await db.transaction(async tx => {
         let issue
         if (input.id) {
           const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, ownerId))).for('update')
@@ -88,7 +91,10 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
           ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
           // Moving to done tells the owner's Coordinator.
           const done = issue && issueDoneEvent(latest, issue)
-          if (done) await recordCoordinatorEvent(tx, done)
+          if (done) {
+            await recordCoordinatorEvent(tx, done)
+            doneEvent = true
+          }
         } else {
           const number = await allocateIssueNumbers(tx, userId)
           const metadata = { ...readIssueMetadata({ type: 'doc' }), number }
@@ -98,6 +104,8 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
         return { issue: issueWithMetadata(issue) }
       })
+      if (doneEvent && 'issue' in result) after(() => wakeCoordinator(ownerId))
+      return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
       console.error('Failed to save issue', error instanceof Error ? error.message : 'database error')

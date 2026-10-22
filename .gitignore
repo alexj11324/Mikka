@@ -35,3 +35,7 @@ next-env.d.ts
 /playwright-performance-report/
 /performance-results/
 /blob-report/
+
+# Workflow SDK local world
+/.workflow-data/
+/.swc
