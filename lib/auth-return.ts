@@ -20,6 +20,7 @@ export function safeAuthReturn(value?: string) {
   if (url.origin !== internalOrigin || url.hash) return '/'
   if (/^\/invite\/[a-f0-9]{64}$/.test(url.pathname) && !url.search) return url.pathname
   if (url.pathname === '/devices' && !url.search) return '/devices'
+  if (/^\/w\/[a-z0-9]([a-z0-9-]{1,62}[a-z0-9])$/.test(url.pathname) && !url.search) return url.pathname
   if (url.pathname === '/workspaces/new' && !url.search) return '/workspaces/new'
   if (url.pathname === COMPOSIO_AUTH_CALLBACK_PATH && !url.search) return COMPOSIO_AUTH_CALLBACK_PATH
 
