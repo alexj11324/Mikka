@@ -1,7 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { useAgentCopy } from '@/hooks/use-agent-copy'
-import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 // beui.dev/components/motion/image-viewer
 
 import { ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react";

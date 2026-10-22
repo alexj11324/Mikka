@@ -239,7 +239,7 @@ test('生成期间可新建和切换任务，独立保留草稿、回复与停�
   await page.evaluate(() => Reflect.get(window, 'concurrentAgentTest').finish(1))
   await panel.getByRole('button', { name: /^切换会话：/ }).click()
   await page.getByRole('option', { name: /第二并发任务/ }).click()
-  await expect(panel.getByText('���二并发任务的独立回复', { exact: true })).toBeVisible()
+  await expect(panel.getByText('第二并发任务的独立回复', { exact: true })).toBeVisible()
   await expect(input).toHaveValue('')
   await expect(panel.getByRole('button', { name: '停止生成', exact: true })).toHaveCount(0)
   await panel.getByRole('button', { name: /^切换会话：/ }).click()
@@ -250,7 +250,7 @@ test('生成期间可新建和切换任务，独立保留草稿、回复与停�
   await expect(panel.getByRole('alert')).toHaveCount(0)
 })
 
-test('标题下拉切换历史，右侧图标搜索和新建，桌面与手机均���占侧栏空间', async ({ page }) => {
+test('标题下拉切换历史，右侧图标搜索和新建，桌面与手机均不占侧栏空间', async ({ page }) => {
   await register(page)
   await page.getByRole('button', { name: 'Agent', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区', exact: true })
@@ -268,7 +268,7 @@ test('标题下拉切换历史，右侧图标搜索和新建，桌面与手机�
     status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' },
     body: openUIStream(`root = TextContent(${JSON.stringify(`${route.request().postDataJSON().prompt}的回复`)})`),
   }))
-  for (const title of ['香港景点', '��目计划']) {
+  for (const title of ['香港景点', '项目计划']) {
     await input.fill(title)
     await panel.getByRole('button', { name: '发送消息' }).click()
     await expect(panel.getByText(`${title}的回复`, { exact: true })).toBeVisible()
@@ -389,7 +389,7 @@ icon = AgentIcon("question", "等待你的意见")`) })
   expect(submissions).toHaveLength(2)
   expect(submissions[1].prompt).toContain('项目是 Orvilo')
   expect(submissions[1].prompt).toContain('同意这个建议方案')
-  await expect(panel.getByRole('button', { name: '同意并继��', exact: true })).toHaveCount(0)
+  await expect(panel.getByRole('button', { name: '同意并继续', exact: true })).toHaveCount(0)
   await panel.getByRole('radio', { name: '精简首版' }).check()
   await panel.getByRole('button', { name: '下一题', exact: true }).click()
   await expect(panel.getByRole('heading', { name: '需要哪些检查？', exact: true })).toBeVisible()
@@ -529,7 +529,7 @@ test('真实配图异步展示来源，支持放大缩放和 Escape 关闭，失
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   await page.route('**/api/agent', route => route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream('root = Stack([TextContent("正文不等待配图加载。"), BeImage("Hong Kong Victoria Harbour", "维多利亚港资料配图", "维多利亚港现代风光")])') }))
   const imageUrl = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a4/Hong_Kong_Harbour_Night_2019-06-11.jpg/960px-Hong_Kong_Harbour_Night_2019-06-11.jpg'
-  await page.route('**/api/agent/images?*', route => route.fulfill({ json: { image: { src: imageUrl, width: 960, height: 454, title: 'Hong Kong Harbour Night 2019-06-11.jpg', source: 'https://commons.wikimedia.org/wiki/File:Hong_Kong_Harbour_Night_2019-06-11.jpg', author: 'Benh LIEU SONG', license: 'CC BY-SA 4.0' } } }))
+  await page.route('**/api/agent?q=*', route => route.fulfill({ json: { image: { src: imageUrl, width: 960, height: 454, title: 'Hong Kong Harbour Night 2019-06-11.jpg', source: 'https://commons.wikimedia.org/wiki/File:Hong_Kong_Harbour_Night_2019-06-11.jpg', author: 'Benh LIEU SONG', license: 'CC BY-SA 4.0' } } }))
   await input.fill('介绍维多利亚港并配图')
   await panel.getByRole('button', { name: '发送消息' }).click()
   await expect(panel.getByText('正文不等待配图加载。', { exact: true })).toBeVisible()
@@ -546,7 +546,7 @@ test('真实配图异步展示来源，支持放大缩放和 Escape 关闭，失
   await expect(thumbnail).toBeFocused()
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  await page.route('**/api/agent/images?*', route => route.fulfill({ json: { image: null } }))
+  await page.route('**/api/agent?q=*', route => route.fulfill({ json: { image: null } }))
   await page.route('**/api/agent', route => route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream('root = Stack([TextContent("没有配图仍显示完整正文。"), BeImage("Missing photo query", "暂无配图")])') }))
   await input.fill('没有检索结果的配图')
   await panel.getByRole('button', { name: '发送消息' }).click()
@@ -563,7 +563,7 @@ test('紧凑图文卡片使用 beUI Card、来源可展开、无冗余等待文�
   const imageReady = new Promise<void>(resolve => { releaseImage = resolve })
   const imageUrl = 'https://upload.wikimedia.org/wikipedia/commons/a/ab/hong-kong.jpg'
   await page.route(imageUrl, route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><rect width="960" height="540" fill="#ddd"/></svg>' }))
-  await page.route('**/api/agent/images?*', async route => {
+  await page.route('**/api/agent?q=*', async route => {
     await imageReady
     await route.fulfill({ json: { image: { src: imageUrl, width: 960, height: 540, title: 'Hong Kong', source: 'https://commons.wikimedia.org/wiki/File:Hong_Kong.jpg', author: '摄影师', license: 'CC BY-SA 4.0' } } })
   })
@@ -646,7 +646,8 @@ test('代码块按需高亮，正文和复制功能保持可用', async ({ page 
   const block = panel.locator('.agent-code-block')
   await expect(block).toContainText(code)
   const keyword = block.locator('code span').filter({ hasText: /^const$/ })
-  await expect(keyword).toHaveAttribute('style', /color:/)
+  await expect(keyword).toHaveAttribute('style', /--agent-code-light:.*--agent-code-dark:/)
+  await expect.poll(() => keyword.evaluate(element => getComputedStyle(element).color)).not.toBe('rgba(0, 0, 0, 0)')
   await panel.getByRole('button', { name: '复制代码', exact: true }).click()
   await expect(panel.getByRole('button', { name: '已复制', exact: true })).toBeVisible()
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(code)

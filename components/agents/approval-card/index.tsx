@@ -1,6 +1,5 @@
 "use client";
 import { useAgentCopy } from '@/hooks/use-agent-copy'
-import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 // beui.dev/components/agents/chat-app
 
 import {

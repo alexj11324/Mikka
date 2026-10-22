@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { useAgentCopy } from '@/hooks/use-agent-copy'
-import { defaultAgentCopy as agentCopy, type AgentCopy } from '@/lib/agent-copy'
+import type { AgentCopy } from '@/lib/agent-copy'
 // beui.dev/components/agents/chat-app
 
 import { ChevronDown, ListTodo } from "lucide-react";
@@ -290,7 +290,7 @@ const title = titleProp ?? agentCopy.taskPlan
           )}
         >
           <span className="sr-only">
-            {agentCopy.completed}{completed} {agentCopy.of2}{items.length} {agentCopy.tasks}</span>
+            {agentCopy.completed}{' '}{completed} {agentCopy.of2}{' '}{items.length} {agentCopy.tasks}</span>
           <span aria-hidden="true" className="inline-flex">
             <ActionSwapRollText value={String(completed)}>
               {completed}

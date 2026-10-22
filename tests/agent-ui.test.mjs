@@ -381,7 +381,7 @@ test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 
     assert.doesNotMatch(source, /from ['"][^'"]*(?:ai-elements|@ai-sdk\/elements|\/ui\/(?:message|message-scroller|bubble|input-group))/)
   }
   const starters = await readFile(new URL('../components/workspace/agent-starters.tsx', import.meta.url), 'utf8')
-  assert.match(starters, /export const agentStarters/)
+  assert.match(starters, /export const getAgentStarters/)
   assert.doesNotMatch(starters, /<Button|function AgentStarters/)
 })
 
@@ -392,12 +392,12 @@ test('Agent 只保留应用外壳，初始输入居中��会话导航收进�
   }
   assert.doesNotMatch(source, /<AnimatedSidebar[\s>]|<AnimatedSidebarTrigger|<AISidebar/)
   assert.match(source, /aria-label=\{\(agentCopy\.switchConversation\s*\+\s*\(title\)\)\}/)
-  for (const label of ['新任务', '搜索']) assert.ok(source.includes(`size="icon" aria-label="${label}"`))
+  for (const key of ['newTask', 'search']) assert.ok(source.includes(`size="icon" aria-label={agentCopy.${key}}`))
   assert.doesNotMatch(source, /ChatApp|AnimatedSidebarInset/)
   assert.match(source, /turns\.length === 0 \? <AgentWelcome/)
   const welcome = await readFile(new URL('../components/workspace/agent-welcome.tsx', import.meta.url), 'utf8')
   assert.match(welcome, /min-h-full[^"]*justify-center/)
-  assert.match(welcome, /\{composer\}[\s\S]*aria-label="推荐建议"/)
+  assert.match(welcome, /\{composer\}[\s\S]*aria-label=\{agentCopy\.suggestions\}/)
   assert.match(welcome, /onSuggestion\(starter\.prompt\)/)
   const shell = await readFile(new URL('../components/workspace/issue-workspace.tsx', import.meta.url), 'utf8')
   assert.ok(shell.includes("hideHeader={!!selected || section === 'agent'}"))
