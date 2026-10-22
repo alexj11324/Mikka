@@ -34,7 +34,7 @@ export async function coordinatorTurn(userId: string) {
       await steps.appendMessages(userId, holder, result.response.messages)
     } catch (error) {
       // The messages stay in the conversation; the next wake answers them.
-      await steps.releaseLease(userId, holder)
+      await steps.failTurn(userId, holder, error instanceof Error ? error.message : String(error))
       throw error
     }
   }

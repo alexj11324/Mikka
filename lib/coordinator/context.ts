@@ -117,3 +117,39 @@ export function instructionsWithMemory(instructions: string, memory: string): st
   if (!memory) return instructions
   return `${instructions}\n\n## What the person asked you to remember\n${memory}`
 }
+
+/** One entry in the chat the person sees. */
+export interface ChatItem {
+  position: number
+  from: 'person' | 'coordinator' | 'event'
+  text: string
+  /** Tools the Coordinator used for this reply, in order. */
+  tools: string[]
+  createdAt: string
+}
+
+/**
+ * The conversation as the person sees it: their messages, Mikka's events, and
+ * one entry per Coordinator reply, with the tools it called folded in.
+ */
+export function chatItems(rows: readonly (StoredMessage & { createdAt: Date })[]): ChatItem[] {
+  const items: ChatItem[] = []
+  for (const { position, message, createdAt } of rows) {
+    if (message.role === 'user') {
+      const text = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
+      items.push({ position, from: text.startsWith('[Event]') ? 'event' : 'person', text, tools: [], createdAt: createdAt.toISOString() })
+    } else if (message.role === 'assistant') {
+      const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
+      const text = parts.flatMap(part => part.type === 'text' && part.text.trim() ? [part.text.trim()] : []).join('\n\n')
+      const tools = parts.flatMap(part => part.type === 'tool-call' ? [part.toolName] : [])
+      const last = items.at(-1)
+      if (last?.from === 'coordinator') {
+        last.text = [last.text, text].filter(Boolean).join('\n\n')
+        last.tools.push(...tools)
+      } else if (text || tools.length) {
+        items.push({ position, from: 'coordinator', text, tools, createdAt: createdAt.toISOString() })
+      }
+    }
+  }
+  return items
+}

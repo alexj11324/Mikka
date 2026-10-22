@@ -151,7 +151,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null }: 
     if (task.metadata.subscriberUserIds.includes(user.id)) counts.following++
   }
   const viewTitle = view === 'all' ? t('allIssues') : view === 'mine' ? t('mine') : view === 'shared' ? t('shared') : view === 'favorites' ? t('favorites') : view === 'following' ? t('following') : statusLabel(view)
-  return <AppShell fixed={!settingsOpen && !selected && !isProjects && !isOverview && layout === 'board'}>
+  return <AppShell fixed={!settingsOpen && !selected && ((!isProjects && !isOverview && layout === 'board') || section === 'agent')}>
     {settingsOpen ? <SettingsView user={user} onBack={() => setSettingsOpen(false)} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
     <AppSidebar onSettings={() => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsOpen(true) }) }} user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
     <AppShellContent hideHeader={!!selected} parent={WORKSPACE_NAME} title={sectionTitles[section]} actions={<Button variant="ghost" size="icon-sm" aria-label={t('openSearch')} disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>

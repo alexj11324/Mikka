@@ -38,6 +38,11 @@ export async function releaseLease(userId: string, holder: string) {
   return store.releaseLease(userId, holder)
 }
 
+export async function failTurn(userId: string, holder: string, error: string) {
+  'use step'
+  await store.failTurn(userId, holder, error)
+}
+
 export async function appendMessages(userId: string, holder: string, messages: ModelMessage[]) {
   'use step'
   await store.appendMessages(userId, holder, messages)

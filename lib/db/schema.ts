@@ -150,6 +150,9 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   summary: text('summary'),
   summaryThrough: integer('summaryThrough').notNull().default(0),
   memory: text('memory').notNull().default(''),
+  /** Why the last turn failed; cleared when a turn answers. */
+  lastError: text('lastError'),
+  lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
