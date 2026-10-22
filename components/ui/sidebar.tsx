@@ -90,8 +90,10 @@ function SidebarProvider({
 
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
-  }, [isMobile, setOpen, setOpenMobile])
+    // A replayed hydration click can precede useIsMobile's first effect.
+    const mobile = window.matchMedia("(max-width: 767px)").matches
+    return mobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
+  }, [setOpen, setOpenMobile])
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
