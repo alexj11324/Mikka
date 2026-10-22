@@ -6,13 +6,14 @@ import { ArrowUpRight, Globe } from "lucide-react"
 import { cn } from "cn"
 
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import { sourceChipClassName } from "@/components/ui/streaming-text"
 
 /** A source cited inline in text: a small chip that previews the source on hover. */
 function InlineCitation({ ...props }: PreviewCardPrimitive.Root.Props) {
   return <HoverCard data-slot="inline-citation" {...props} />
 }
 
-/** The chip. A button by default; pass `render={<a href=… />}` for a web page. */
+/** The chip, styled like the streaming-text SourceChip. A button by default; pass `render={<a href=… />}` for a web page. */
 function InlineCitationTrigger({
   className,
   delay = 200,
@@ -26,10 +27,7 @@ function InlineCitationTrigger({
       render={render}
       delay={delay}
       closeDelay={closeDelay}
-      className={cn(
-        "mx-0.5 inline-flex h-5 max-w-56 cursor-pointer items-center gap-1 rounded-md border border-border bg-muted/50 px-1.5 align-text-bottom text-xs font-medium text-muted-foreground no-underline outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-popup-open:bg-muted data-popup-open:text-foreground [&_img]:size-3.5 [&_img]:shrink-0 [&_img]:rounded-xs [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-3",
-        className
-      )}
+      className={cn(sourceChipClassName, className)}
       {...props}
     />
   )

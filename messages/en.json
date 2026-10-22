@@ -1469,7 +1469,8 @@
         "stopped": "Stopped",
         "failed": "Failed",
         "cancelled": "Cancelled"
-      }
+      },
+      "sources": "{count, plural, one {# source} other {# sources}}"
     }
   }
 }
