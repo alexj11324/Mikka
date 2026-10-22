@@ -36,7 +36,7 @@
     "priority": {
       "urgent": "Urgent",
       "high": "High",
-      "normal": "Normal",
+      "normal": "Medium",
       "low": "Low"
     },
     "create": {
@@ -220,6 +220,7 @@
       "unset": "Not set",
       "addToProject": "Add to project",
       "editLabelAria": "Edit label: {name}",
+      "assignee": "Assignee",
       "labels": "Labels",
       "project": "Project",
       "pullRequests": "Linked PRs",
@@ -244,6 +245,10 @@
       "inviteDescription": "Add a member by their registered email and assign this task to them.",
       "pullRequestsDescription": "Link real GitHub PRs. You maintain their state; it does not sync from GitHub automatically.",
       "defaultDescription": "Changes are saved to this task and reflected on the board and detail view.",
+      "labelsDescription": "Choose labels for this task, or create a new one if you need a name that is not listed yet.",
+      "existingLabels": "Existing labels",
+      "noLabelsYet": "No labels yet. Create one below and you can reuse it on other tasks.",
+      "createLabel": "Create a label",
       "selectExistingProject": "Choose an existing project. Create new projects on the projects page first.",
       "projectLinkFailed": "Could not link the project.",
       "projectLinkFailedRetry": "Could not link the project. Please try again.",
@@ -277,7 +282,8 @@
       "searchPlaceholder": "Search by title or task ID…",
       "searchAria": "Search related tasks",
       "loadFailed": "Could not load tasks",
-      "noTasks": "No tasks to choose from",
+      "noTasks": "No other tasks from this owner are available.",
+      "noTasksSameOwner": "Tasks owned by someone else cannot be linked here.",
       "loading": "Loading tasks…",
       "group": "Available tasks",
       "reload": "Reload tasks",
@@ -740,7 +746,14 @@
       "commentLabel": "Comment",
       "commentPlaceholder": "Leave a comment…",
       "shortcut": "⌘ / Ctrl + Enter to send",
-      "sendComment": "Send comment"
+      "sendComment": "Send comment",
+      "changedStatus": "Changed status to {status}",
+      "changedPriority": "Changed priority to {priority}",
+      "changedTitle": "Renamed the task to {title}",
+      "assigned": "Assigned to {name}",
+      "unassigned": "Cleared the assignee",
+      "addedSubtask": "Added subtask {title}",
+      "unknownAssignee": "someone"
     },
     "detail": {
       "readFailed": "Could not load this task. Please try again.",
@@ -954,6 +967,8 @@
     "childCreated": "Subtask created",
     "duplicateCreated": "Task copy created",
     "taskUpdated": "Task updated",
+    "favorited": "Added to favorites",
+    "unfavorited": "Removed from favorites",
     "menu": {
       "setStatus": "Set status",
       "setPriority": "Set priority",
@@ -1201,7 +1216,7 @@
       "none": "No priority",
       "urgent": "Urgent",
       "high": "High",
-      "normal": "Normal",
+      "normal": "Medium",
       "low": "Low"
     },
     "color": {
@@ -1661,7 +1676,7 @@
     "c_f4e5f570": "General settings",
     "c_2c441a6c": "Could not save the assignment. Refresh and try again.",
     "c_95310b50": "Assigned team",
-    "c_53d4919c": "Teams in this workspace",
+    "c_53d4919c": "Team",
     "c_efbc2a6b": "The connected database is in this region. Other regions are not supported yet.",
     "c_5de26dc0": "Member management · Mikka",
     "c_53748f61": "Member settings",
@@ -1682,7 +1697,7 @@
     "c_929d5670": "New team",
     "c_d663b332": "No lead team",
     "c_46147716": "No team linked · Private project",
-    "c_2114e0a1": "No team · Private / explicit collaborators",
+    "c_2114e0a1": "No team",
     "c_a0860f69": "No team · Private task",
     "c_479e026f": "No team · Private project",
     "c_c9988ff5": "Could not add the account. Please try again.",
@@ -1699,7 +1714,7 @@
     "c_a2a50802": "You can be signed in to at most five accounts. Sign out of an unused account first.",
     "c_cbec930e": "Projects without a linked team are visible only to their creator.",
     "c_8dabc5fb": "Not a member",
-    "c_c5bc7195": "Not a member of this team; only its creator and authorized collaborators can access it.",
+    "c_c5bc7195": "This task is private. Only its creator and the people they add can open it.",
     "c_c6492461": "View all tasks ·",
     "c_30108106": "View all teams",
     "c_4090a5db": "View all projects",

@@ -2,22 +2,23 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import useSWR from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import type { JSONContent } from '@tiptap/react'
-import { ArrowLeft, History } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { IssueDetailHeader, type IssueDetailNavigation } from './issue-detail-header'
 import { IssueDetailActions, type IssueActionRequest } from './issue-detail-actions'
 import { IssueDescriptionHistory } from './issue-description-history'
 import { IssueRelations } from './issue-relations'
 import type { MetadataRequest } from './issue-metadata-controls'
 import { toast } from 'sonner'
-import { getDeletedIssue, setIssueDeleted } from '@/app/actions/issue-operations'
+import { getDeletedIssue, listIssueConnections, setIssueDeleted } from '@/app/actions/issue-operations'
 import { getIssue, saveIssue, listIssueVersions } from '@/app/actions/issues'
 import { IssueEditor, createDocumentSeed } from './issue-editor'
 import { DocumentSync } from '@/lib/document-sync'
 import { useActionError } from '@/lib/use-action-error'
 import { IssueMembers } from './issue-members'
 import { IssueDetailProperties } from './issue-detail-properties'
+import { IssueActivityFeed } from './issue-activity-feed'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -26,7 +27,7 @@ import { Textarea } from '@/components/ui/textarea'
 
 type Issue = Awaited<ReturnType<typeof getIssue>>
 type WorkspaceUser = { id: string; name: string; email: string }
-type DetailProps = { navigation: IssueDetailNavigation; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onDeleted: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
+type DetailProps = { navigation: IssueDetailNavigation; workspaceName: string; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onDeleted: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
 
 function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () => void; onClose: () => void }) {
   const t = useTranslations('IssueDetail')
@@ -46,15 +47,12 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
   return <TaskForm key={id} initial={data} {...props} />
 }
 
-function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegisterFlush, navigation, onOpen }: DetailProps & { initial: Issue }) {
+function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegisterFlush, navigation, onOpen, workspaceName }: DetailProps & { initial: Issue }) {
   const t = useTranslations('Workspace.detail')
   const tDetail = useTranslations('IssueDetail')
-  const tIssue = useTranslations('Issue')
-  const format = useFormatter()
   const actionError = useActionError()
   const saveMessages = useRef({ t, actionError })
   saveMessages.current = { t, actionError }
-  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const [saved, setSaved] = useState(initial)
   const [sync] = useState(() => new DocumentSync(initial.id, createDocumentSeed(initial.content)))
   const syncState = useSyncExternalStore(sync.subscribe, sync.getSnapshot, sync.getSnapshot)
@@ -77,6 +75,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
   const acknowledged = useRef(0)
   const composing = useRef(false)
   const [editSequence, setEditSequence] = useState(0)
+  const [metadataSaving, setMetadataSaving] = useState(false)
   const [error, setError] = useState('')
   const [history, setHistory] = useState(false)
   const [members, setMembers] = useState(false)
@@ -86,7 +85,8 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
   const restoration = useRef<{ resolve: (success: boolean) => void } | null>(null)
   const [replacement, setReplacement] = useState<{ content: JSONContent; version: number }>()
   const { data: versions, error: historyError, mutate: refreshVersions } = useSWR(['versions', saved.id], () => listIssueVersions(saved.id), { revalidateOnFocus: false })
-  const hasUnsavedChanges = dirty || syncState.pending
+  const { data: connections } = useSWR(['issue-connections', saved.id], () => listIssueConnections(saved.id))
+  const hasUnsavedChanges = dirty
   useEffect(() => { onDirty(hasUnsavedChanges || pending) }, [hasUnsavedChanges, pending, onDirty])
   useEffect(() => {
     if (!hasUnsavedChanges) return
@@ -108,14 +108,18 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
     if (flight.current) return flight.current
     if (composing.current) return Promise.resolve(false)
     const operation = (async () => {
-      setPending(true)
+      const mustPersist = () => draft.current.generation !== acknowledged.current
+      if (!mustPersist() && !sync.getSnapshot().pending) return true
+      if (mustPersist()) setPending(true)
       setError('')
       try {
         do {
           const snapshot = { ...draft.current }
           if (!snapshot.title.trim()) { setError(saveMessages.current.t('titleRequired')); return false }
-          if (!sync.getSnapshot().ready) { setError(saveMessages.current.t('documentNotConnected')); return false }
-          await sync.flush(initial.id)
+          const yjs = sync.getSnapshot()
+          const bodyDirty = JSON.stringify(snapshot.content) !== JSON.stringify(savedRef.current.content)
+          if ((yjs.pending || bodyDirty) && yjs.ready) await sync.flush(initial.id)
+          else if (bodyDirty && !yjs.ready) { setError(saveMessages.current.t('documentNotConnected')); return false }
           if (snapshot.generation !== acknowledged.current) {
             const result = await saveIssue({ id: initial.id, revision: savedRef.current.revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, priority: snapshot.priority })
             if (!('issue' in result) || !result.issue) { setError(saveMessages.current.actionError(result.error ?? 'issueSaveFailed')); return false }
@@ -158,6 +162,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
     })
   }
   function descriptionChanged(value: JSONContent) {
+    if (JSON.stringify(value) === JSON.stringify(draft.current.content)) return
     changed({ content: value })
   }
   function replacementApplied(applied: boolean) {
@@ -169,25 +174,26 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
   }
   function requestAction(kind: IssueActionRequest['kind']) { setActionRequest(value => ({ kind, sequence: (value?.sequence ?? 0) + 1 })) }
   function requestProperty(target: MetadataRequest['target']) { setPropertyRequest(value => ({ target, sequence: (value?.sequence ?? 0) + 1 })) }
-  const activity = <div className="flex flex-col gap-4 text-xs text-muted-foreground">
-    {historyError ? <Button variant="ghost" size="sm" type="button" onClick={() => { void refreshVersions() }}>{t('activityFailed')}</Button> : (versions ?? []).slice(0, 3).reverse().map(version => <div key={version.id} className="flex items-start gap-3"><History className="mt-0.5 size-3.5 shrink-0" /><div className="flex flex-wrap items-center gap-2"><span>{version.revision === 1 ? t('createdTask') : t('savedVersion', { revision: version.revision })}</span><span>{statusLabel(version.status)}</span><time dateTime={new Date(version.createdAt).toISOString()}>{format.dateTime(new Date(version.createdAt), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time></div></div>)}
-  </div>
+  const subtasks = (connections ?? []).filter(row => row.metadata.parentId === saved.id).map(row => ({ id: row.id, title: row.title, createdAt: row.createdAt }))
+  const activity = historyError
+    ? <Button variant="ghost" size="sm" type="button" onClick={() => { void refreshVersions() }}>{t('activityFailed')}</Button>
+    : <IssueActivityFeed versions={versions ?? []} children={subtasks} />
 
   return <div className="flex min-w-0 flex-1 flex-col">
-    <IssueDetailHeader number={saved.metadata.number} title={title} saveLabel={error ? t('saveFailed') : pending ? t('saving') : syncState.error ? t('syncFailed') : !syncState.ready ? tDetail('connecting') : syncState.pending || syncState.syncing ? t('syncing') : dirty ? t('waitingAutosave') : t('autosaved')} saved={syncState.ready && !error && !pending && !syncState.error && !syncState.pending && !syncState.syncing && !dirty} pending={pending} navigation={navigation} onClose={onClose} actions={<IssueDetailActions task={saved} userId={user.id} disabled={pending || !syncState.ready} documentTools={documentTools} request={actionRequest} getCurrent={getCurrent} onSaved={adopt} onOpen={onOpen} onDeleted={onDeleted} onHistory={() => { void save().then(success => { if (success) { void refreshVersions(); setHistory(true) } }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)} onProperty={requestProperty} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} />} />
-    <div className="mx-auto flex w-full min-w-0 max-w-screen-2xl flex-1 flex-col gap-2 lg:flex-row lg:gap-12 lg:px-10 lg:py-14 xl:gap-16 xl:px-16">
-      <div className="min-w-0 flex-1 px-5 pt-8 pb-6 sm:px-10 sm:pt-12 lg:px-0 lg:py-0">
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
+    <IssueDetailHeader workspaceName={workspaceName} number={saved.metadata.number} title={title} saveLabel={error ? t('saveFailed') : syncState.error ? t('syncFailed') : pending || metadataSaving ? t('saving') : t('autosaved')} saved={!error && !syncState.error && !pending && !metadataSaving} pending={false} navigation={navigation} onClose={onClose} actions={<IssueDetailActions task={saved} userId={user.id} disabled={false} documentTools={documentTools} request={actionRequest} getCurrent={getCurrent} onSaved={adopt} onOpen={onOpen} onDeleted={onDeleted} onHistory={() => { void save().then(success => { if (success) { void refreshVersions(); setHistory(true) } }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)} onProperty={requestProperty} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} />} />
+    <div className="mx-auto grid w-full min-w-0 max-w-6xl flex-1 grid-cols-1 gap-6 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-10 lg:px-8 lg:py-10">
+      <div className="order-2 min-w-0 lg:order-1">
+        <div className="flex w-full flex-col gap-8">
           {error && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="text-sm text-destructive">{error}</p><Button variant="outline" size="sm" disabled={pending} onClick={() => { void save() }}>{t('retryAutosave')}</Button></div>}
           <div className="flex min-w-0 flex-col gap-7">
             <FieldGroup><Field><FieldLabel htmlFor="task-title" className="sr-only">{t('titleLabel')}</FieldLabel><Textarea id="task-title" aria-label={t('titleLabel')} rows={1} placeholder={t('titleLabel')} value={title} onChange={event => changed({ title: event.target.value })} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; setEditSequence(value => value + 1) }} onBlur={() => { if (title.trim() && title !== saved.title) void save() }} maxLength={200} className="field-sizing-content min-h-10 w-full resize-none rounded-sm border-none bg-transparent px-0 py-0 text-2xl leading-snug font-semibold tracking-tight shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring md:text-3xl dark:bg-transparent" onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }} /></Field></FieldGroup>
             {documentTools && <div><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />{t('backToSimple')}</Button></div>}
-    {syncState.ready ? <IssueEditor persisted content={content} layout={documentTools ? 'document' : 'issue'} activity={activity} afterDescription={<IssueRelations mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={pending} />} sharedDoc={sync.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={syncState.error ? t('syncFailedLabel') : syncState.pending || syncState.syncing ? t('syncingLabel') : t('syncedLabel')} onChange={descriptionChanged} /> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}
+    {syncState.ready ? <IssueEditor persisted content={content} layout={documentTools ? 'document' : 'issue'} activity={activity} afterDescription={<IssueRelations mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} />} sharedDoc={sync.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}
           </div>
           {syncState.error && <p role="alert" className="text-xs text-destructive">{t('syncRetryNotice')}</p>}
         </div>
       </div>
-      <IssueDetailProperties task={saved} onMetadataSaved={adopt} metadataDisabled={pending || dirty || syncState.pending || !syncState.ready} onMetadataBusy={setPending} status={status} priority={priority} pending={pending || !syncState.ready} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} request={propertyRequest} onDate={() => requestAction('dueDate')} onEstimate={() => requestAction('estimate')} relations={<IssueRelations mode="sidebar" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={pending} />} />
+      <IssueDetailProperties task={saved} onMetadataSaved={adopt} metadataDisabled={false} onMetadataBusy={setMetadataSaving} status={status} priority={priority} pending={false} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} request={propertyRequest} onDate={() => requestAction('dueDate')} onEstimate={() => requestAction('estimate')} relations={<IssueRelations mode="sidebar" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} />} />
     </div>
     <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{t('membersTitle')}</DialogTitle><DialogDescription>{tDetail('membersDialogDescription')}</DialogDescription></DialogHeader><IssueMembers id={saved.id} onChanged={async () => { adopt(await getIssue(saved.id)) }} /></DialogContent></Dialog>
     <IssueDescriptionHistory open={history} onOpenChange={setHistory} number={saved.metadata.number} title={title} currentContent={content} versions={versions} loadingError={!!historyError} onRetry={() => { void refreshVersions() }} onRestore={restore} />

@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import { useTranslations } from "next-intl"
 import { IssueActivity } from './issue-activity'
 import { useEditor, getSchema, type JSONContent } from "@tiptap/react"
+import { TextSelection } from "@tiptap/pm/state"
 import { Collaboration } from "@tiptap/extension-collaboration"
+import { ySyncPluginKey } from "@tiptap/y-tiptap"
 import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap"
 import * as Y from "yjs"
 import { Check, FileText, MessageSquare, X } from "lucide-react"
@@ -82,9 +84,19 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
     extensions,
     content: sharedDoc ? undefined : content ?? EMPTY_DOCUMENT,
     immediatelyRender: false,
-    editorProps: { attributes: { role: "textbox", "aria-label": label, "aria-multiline": "true" } },
+    editorProps: {
+      attributes: { role: "textbox", "aria-label": label, "aria-multiline": "true" },
+      handleKeyDown: (view, event) => {
+        if (event.key !== "End" || event.shiftKey || event.altKey || !(event.ctrlKey || event.metaKey) || !view.editable) return false
+        event.preventDefault()
+        view.dispatch(view.state.tr.setSelection(TextSelection.atEnd(view.state.doc)).scrollIntoView())
+        return true
+      },
+    },
     onUpdate: ({ editor: current, transaction }) => {
-      if (transaction.docChanged) changeRef.current(current.getJSON())
+      if (!transaction.docChanged || !current.isFocused) return
+      if (transaction.getMeta(ySyncPluginKey)?.isChangeOrigin) return
+      changeRef.current(current.getJSON())
     },
   })
   useEffect(() => {
@@ -111,12 +123,19 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
     editor.storage.richTextChanges.tracking = mode === "suggesting"
     editor.setEditable(editable)
   }, [editor, mode, editable])
-  useEffect(() => { if (editor && !editor.isDestroyed) repaintComments(editor) }, [editor, threads])
   useEffect(() => {
-    const observer = () => { if (editor && !editor.isDestroyed) repaintComments(editor) }
-    threadDoc.on('update', observer)
-    return () => { threadDoc.off('update', observer) }
-  }, [threadDoc, editor])
+    if (!editor) return
+    let cancelled = false
+    const paint = () => {
+      queueMicrotask(() => {
+        if (cancelled || editor.isDestroyed) return
+        repaintComments(editor)
+      })
+    }
+    threadDoc.on('update', paint)
+    paint()
+    return () => { cancelled = true; threadDoc.off('update', paint) }
+  }, [threadDoc, editor, threads])
 
   function openLink() {
     if (!editor?.isEditable) return
@@ -152,7 +171,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
           {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
         </div>
       </div>
-      {layout === 'issue' && !compact && <><div className="flex flex-wrap items-center justify-between gap-2 pb-7">
+      {layout === 'issue' && !compact && <><div className="flex flex-wrap items-center justify-between gap-2 pb-2">
         <span className="text-xs text-muted-foreground">{t('hint')}</span>
         <Button variant="ghost" size="xs" onClick={() => setPanel(panel === 'comments' ? '' : 'comments')} aria-expanded={panel === 'comments'}><MessageSquare data-icon="inline-start" />{t('selectionComment')}</Button>
       </div>

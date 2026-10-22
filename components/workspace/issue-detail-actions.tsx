@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { ArrowUpRight, Bell, BellOff, Box, Calendar, Check, Circle, Copy, FileText, Flag, GitBranch, History, Link2, ListPlus, MoreHorizontal, Plus, Signal, Star, Tag, Trash2, Users, X } from 'lucide-react'
@@ -67,7 +67,7 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
     setError(''); setDialog(kind)
     setValue(kind === 'dueDate' ? task.metadata.dueDate ?? '' : kind === 'estimate' ? task.metadata.estimate?.toString() ?? '' : kind === 'duplicate' ? t('defaultDuplicateTitle', { title: task.title.slice(0, 195) }) : '')
   }
-  async function run(operation: (issue: Issue) => Promise<OperationResult>, mode: 'current' | 'child' | 'duplicate' | 'delete' = 'current') {
+  async function run(operation: (issue: Issue) => Promise<OperationResult>, mode: 'current' | 'child' | 'duplicate' | 'delete' | 'favorite' | 'unfavorite' = 'current') {
     if (busy.current || disabled) return false
     busy.current = true; setPending(true); setError('')
     try {
@@ -81,7 +81,7 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       if (mode === 'delete') {
         onDeleted()
         toast.success(t('taskDeleted'), { description: t('taskDeletedDescription'), action: { label: t('undo'), onClick: () => { void setIssueDeleted({ id: task.id, restore: true }).then(async response => { if (response.error) toast.error(actionError(response.error)); else { await mutate('issues'); onOpen(task.id) } }).catch(() => toast.error(t('restoreViaLinkFailed'))) } } })
-      } else toast.success(mode === 'child' ? t('childCreated') : mode === 'duplicate' ? t('duplicateCreated') : t('taskUpdated'))
+      } else toast.success(mode === 'child' ? t('childCreated') : mode === 'duplicate' ? t('duplicateCreated') : mode === 'favorite' ? t('favorited') : mode === 'unfavorite' ? t('unfavorited') : t('taskUpdated'))
       return true
     } catch (error) { const message = error instanceof Error ? error.message : t('operationFailed'); setError(message); toast.error(message); return false }
     finally { busy.current = false; setPending(false) }
@@ -94,11 +94,19 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       await navigator.clipboard.writeText(text); toast.success(t('copySuccess'))
     } catch { toast.error(t('copyFailed')) }
   }
-  const favorite = task.metadata.favoriteUserIds.includes(userId)
+  const [favoriteOverride, setFavoriteOverride] = useState<boolean | null>(null)
+  useEffect(() => { setFavoriteOverride(null) }, [task.revision])
+  const favorite = favoriteOverride ?? task.metadata.favoriteUserIds.includes(userId)
+  async function toggleFavorite() {
+    const next = !favorite
+    setFavoriteOverride(next)
+    const ok = await run(() => toggleIssuePreference({ id: task.id, kind: 'favorite' }), next ? 'favorite' : 'unfavorite')
+    if (!ok) setFavoriteOverride(null)
+  }
   const subscribed = task.metadata.subscriberUserIds.includes(userId)
   const unavailable = disabled || pending
   return <>
-    <Button variant="ghost" size="icon-sm" aria-label={favorite ? tMenu('unfavorite') : tMenu('favorite')} aria-pressed={favorite} disabled={unavailable} onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'favorite' })) }}><Star data-icon="inline-start" fill={favorite ? 'currentColor' : 'none'} /></Button>
+    <Button variant="ghost" size="icon-sm" aria-label={favorite ? tMenu('unfavorite') : tMenu('favorite')} aria-pressed={favorite} disabled={unavailable} onClick={() => { void toggleFavorite() }}><Star data-icon="inline-start" fill={favorite ? 'currentColor' : 'none'} /></Button>
     <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={tWorkspaceDetail('moreActions')} disabled={unavailable} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end" className="max-h-[min(80svh,720px)] w-64 overflow-y-auto">
       <DropdownMenuGroup>
         <DropdownMenuSub><DropdownMenuSubTrigger><Circle />{tMenu('setStatus')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{statusOptions.map(status => <DropdownMenuItem key={status.value} onClick={() => onStatus(status.value)}><status.icon /><span className="flex-1">{status.label}</span>{task.status === status.value && <Check />}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
@@ -122,7 +130,7 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
         <DropdownMenuSub><DropdownMenuSubTrigger><Copy />{tMenu('copy')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{copyItems.map(item => <DropdownMenuItem key={item.kind} onClick={() => { void copy(item.kind) }}>{item.label}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
         <DropdownMenuItem onClick={() => { const url = new URL(window.location.href); url.search = ''; url.searchParams.set('issue', task.id); window.open(url.href, '_blank', 'noopener,noreferrer') }}><ArrowUpRight />{tMenu('openNewTab')}</DropdownMenuItem>
         <DropdownMenuItem onClick={() => openDialog('duplicate')}><Copy />{tMenu('createDuplicate')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'favorite' })) }}><Star />{favorite ? tMenu('removeFavorite') : tMenu('addFavorite')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { void toggleFavorite() }}><Star />{favorite ? tMenu('removeFavorite') : tMenu('addFavorite')}</DropdownMenuItem>
         <DropdownMenuItem onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe' })) }}>{subscribed ? <BellOff /> : <Bell />}{subscribed ? tMenu('unsubscribe') : tMenu('subscribe')}</DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />

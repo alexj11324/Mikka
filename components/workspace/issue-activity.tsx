@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowUp, Check, MessageSquare, X } from 'lucide-react'
 import type { CommentAnchor, ThreadRecord } from '@/components/blocks/rich-text-editor-4/components/rich-text-comments'
@@ -26,6 +26,7 @@ export function IssueActivity({ author, threads, anchors, events, onComment, onR
   const [body, setBody] = useState('')
   const [replyTo, setReplyTo] = useState<string | null>(null)
   const [reply, setReply] = useState('')
+  const pressed = useRef<'reply' | 'resolve' | null>(null)
   function submit() {
     if (!body.trim()) return
     onComment(body.trim())
@@ -40,7 +41,10 @@ export function IssueActivity({ author, threads, anchors, events, onComment, onR
         <div className="flex flex-wrap items-center gap-2 text-xs"><span className="font-medium">{thread.author}</span><time className="text-muted-foreground" dateTime={thread.createdAt}>{format.dateTime(new Date(thread.createdAt), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>{thread.resolved && <Badge variant="outline">{t('resolved')}</Badge>}</div>
         {!thread.id.startsWith('discussion-') && <div className="border-l-2 pl-3"><Button type="button" variant="ghost" size="xs" className="w-full justify-start pl-0" onClick={() => onSelect(thread.id)}><span className="min-w-0 truncate text-muted-foreground">{anchors.find(anchor => anchor.id === thread.id)?.excerpt ?? t('anchorRemoved')}</span></Button></div>}
         {thread.messages.map((message, index) => <div key={message.id} className="flex flex-col gap-1">{index > 0 && <p className="text-xs font-medium">{message.author}</p>}<p className="whitespace-pre-wrap break-words text-sm leading-7">{message.body}</p></div>)}
-        <div className="flex gap-1"><Button variant="ghost" size="xs" onClick={() => { setReplyTo(thread.id); setReply('') }}><MessageSquare data-icon="inline-start" />{t('reply')}</Button><Button variant="ghost" size="xs" onClick={() => onResolve(thread.id, !thread.resolved)}><Check data-icon="inline-start" />{thread.resolved ? t('reopen') : t('resolve')}</Button></div>
+        <div className="flex gap-1">
+          <Button type="button" variant="ghost" size="xs" onPointerDown={event => { pressed.current = 'reply'; event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault(); event.stopPropagation() }} onPointerUp={event => { if (pressed.current !== 'reply') return; pressed.current = null; event.preventDefault(); event.stopPropagation(); setReplyTo(thread.id); setReply('') }} onClick={event => { event.preventDefault(); event.stopPropagation(); if (event.detail !== 0) return; setReplyTo(thread.id); setReply('') }}><MessageSquare data-icon="inline-start" />{t('reply')}</Button>
+          <Button type="button" variant="ghost" size="xs" onPointerDown={event => { pressed.current = 'resolve'; event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault(); event.stopPropagation() }} onPointerUp={event => { if (pressed.current !== 'resolve') return; pressed.current = null; event.preventDefault(); event.stopPropagation(); if (replyTo === thread.id) { setReplyTo(null); setReply('') }; onResolve(thread.id, !thread.resolved) }} onClick={event => { event.preventDefault(); event.stopPropagation(); if (event.detail !== 0) return; if (replyTo === thread.id) { setReplyTo(null); setReply('') }; onResolve(thread.id, !thread.resolved) }}><Check data-icon="inline-start" />{thread.resolved ? t('reopen') : t('resolve')}</Button>
+        </div>
         {replyTo === thread.id && <form className="flex flex-col gap-2" onSubmit={event => { event.preventDefault(); if (reply.trim()) { onReply(thread.id, reply.trim()); setReplyTo(null); setReply('') } }}><FieldGroup><Field><FieldLabel htmlFor={`reply-${thread.id}`} className="sr-only">{t('replyLabel')}</FieldLabel><Textarea id={`reply-${thread.id}`} value={reply} onChange={event => setReply(event.target.value)} maxLength={2000} placeholder={t('replyPlaceholder')} /></Field></FieldGroup><div className="flex justify-end gap-2"><Button type="button" variant="ghost" size="sm" onClick={() => setReplyTo(null)}><X data-icon="inline-start" />{tCommon('cancel')}</Button><Button size="sm" type="submit" disabled={!reply.trim()}>{t('sendReply')}</Button></div></form>}
       </div>
     </article>)}

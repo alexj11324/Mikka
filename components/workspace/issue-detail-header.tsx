@@ -8,12 +8,12 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbS
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { WORKSPACE_NAME, issueIdentifier } from './issue-properties'
+import { issueIdentifier } from './issue-properties'
 
 export type IssueDetailNavigation = { index: number; total: number; onOpen: (offset: -1 | 1) => void }
 
-export function IssueDetailHeader({ number, title, saveLabel, saved, pending, navigation, actions, onClose }: {
-  number: number | undefined; title: string; saveLabel: string; saved: boolean; pending: boolean
+export function IssueDetailHeader({ workspaceName, number, title, saveLabel, saved, pending, navigation, actions, onClose }: {
+  workspaceName: string; number: number | undefined; title: string; saveLabel: string; saved: boolean; pending: boolean
   navigation: IssueDetailNavigation; actions: ReactNode
   onClose: () => void
 }) {
@@ -25,7 +25,7 @@ export function IssueDetailHeader({ number, title, saveLabel, saved, pending, na
       <SidebarTrigger className="-ml-1" aria-label={t('toggleSidebar')} />
       <Separator orientation="vertical" className="mr-1 data-vertical:h-4 data-vertical:self-auto" />
       <Breadcrumb aria-label={t('breadcrumb')} className="min-w-0"><BreadcrumbList className="flex-nowrap gap-2 sm:gap-2">
-        <BreadcrumbItem className="hidden shrink-0 md:inline-flex"><span>{WORKSPACE_NAME}</span></BreadcrumbItem>
+        <BreadcrumbItem className="hidden shrink-0 md:inline-flex"><span className="max-w-40 truncate" title={workspaceName}>{workspaceName}</span></BreadcrumbItem>
         <BreadcrumbSeparator className="hidden md:block" />
         <BreadcrumbItem className="hidden shrink-0 sm:inline-flex"><Button variant="ghost" size="xs" disabled={pending} onClick={onClose}>{tDetail('breadcrumbTask')}</Button></BreadcrumbItem>
         <BreadcrumbSeparator className="hidden sm:block" />

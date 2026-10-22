@@ -1,6 +1,6 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
+import { and, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
@@ -25,7 +25,7 @@ export async function getIssuePropertyOptions(id: string) {
   const [owner] = await db.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, issue.userId))
   const members = await db.select({ id: users.id, name: users.name, image: users.image }).from(issueMembers).innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId)))
   const availableAgents = await db.select({ id: agents.id, name: agents.name, harness: agents.harness }).from(agents).where(eq(agents.userId, issue.userId))
-  const ownedIssues = await db.select({ content: issues.content }).from(issues).where(eq(issues.userId, user.id))
+  const ownedIssues = await db.select({ content: issues.content }).from(issues).where(user.id === issue.userId ? eq(issues.userId, issue.userId) : or(eq(issues.userId, user.id), eq(issues.userId, issue.userId)))
   const metadata = ownedIssues.map(row => readIssueMetadata(row.content))
   const projectRecords = await listProjects()
   return {
