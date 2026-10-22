@@ -2,7 +2,7 @@
 // beui.dev/components/agents/loading-states
 
 import { motion, useReducedMotion } from "motion/react";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { EASE_IN_OUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,31 @@ function formatElapsed(totalSeconds: number) {
   return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
+const ProgressGrid = memo(function ProgressGrid({ reduce }: { reduce: boolean }) {
+  // The elapsed timer changes every 100ms; its updates must not recreate the
+  // nine animated cells or restart their staggered animation timelines.
+  return (
+    <span aria-hidden="true" className="grid size-5 shrink-0 grid-cols-3 gap-[2px]">
+      {GRID_CELLS.map(({ id, delay }) => (
+        <motion.span
+          key={id}
+          className="rounded-[1px] bg-current"
+          animate={
+            reduce
+              ? { opacity: 0.65 }
+              : { opacity: [0.28, 1, 0.28], scale: [0.72, 1, 0.72] }
+          }
+          transition={
+            reduce
+              ? { duration: 0 }
+              : { duration: 1.55, ease: EASE_IN_OUT, repeat: Infinity, delay }
+          }
+        />
+      ))}
+    </span>
+  );
+});
+
 export function AgentProgress({
   label = "正在生成回复",
   elapsedSeconds,
@@ -69,31 +94,7 @@ export function AgentProgress({
         className,
       )}
     >
-      <span
-        aria-hidden="true"
-        className="grid size-5 shrink-0 grid-cols-3 gap-[2px]"
-      >
-        {GRID_CELLS.map(({ id, delay }) => (
-          <motion.span
-            key={id}
-            className="rounded-[1px] bg-current"
-            animate={
-              reduce
-                ? { opacity: [0.35, 0.8, 0.35] }
-                : {
-                    opacity: [0.28, 1, 0.28],
-                    scale: [0.72, 1, 0.72],
-                  }
-            }
-            transition={{
-              duration: 1.55,
-              ease: EASE_IN_OUT,
-              repeat: Infinity,
-              delay,
-            }}
-          />
-        ))}
-      </span>
+      <ProgressGrid reduce={reduce} />
       <span className="font-sans font-medium">{label}</span>
       <span
         aria-hidden="true"
