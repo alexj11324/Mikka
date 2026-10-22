@@ -31,12 +31,11 @@ async function measureNavigation(page: Page, info: TestInfo, name: string, desti
       requestAnimationFrame(check)
     }, { once: true, capture: true })
   }, { ...destination, basePath: BASE_PATH })
-  const requests: { url: string; ms: number }[] = []
+  const requests: { url: string; status: number; ms: number }[] = []
+  const started = Date.now()
   const record = (response: import('@playwright/test').Response) => {
-    const request = response.request()
     if (new URL(response.url()).origin !== new URL(page.url()).origin) return
-    const timing = request.timing()
-    requests.push({ url: new URL(response.url()).pathname, ms: timing.responseEnd })
+    requests.push({ url: new URL(response.url()).pathname, status: response.status(), ms: Date.now() - started })
   }
   page.on('response', record)
   try {
@@ -61,7 +60,6 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
   for (const first of ['成员', '团队'] as const) {
     test(`首访${first}、设置互切与缓存返回均不超过 1 秒 (${viewport.width}px)`, { tag: '@performance' }, async ({ page }, info) => {
       await page.setViewportSize(viewport)
-      // 不等待预取、networkidle 或固定休眠；注册后即可按用户路径点击。
       await register(page)
       async function sidebarLink(name: string) {
         if (viewport.width < 768) {
@@ -74,7 +72,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       }
       if (viewport.width < 768) await page.getByRole('button', { name: '展开或收起侧栏', exact: true }).click()
       await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
-      await measureNavigation(page, info, '工作台进入设置', { path: '/settings', selectors: preferences.selectors }, () => page.getByRole('menuitem', { name: '设置', exact: true }).click())
+      await measureNavigation(page, info, '工作台进入设置', { path: '/settings', query: 'section=preferences', selectors: preferences.selectors }, () => page.getByRole('menuitem', { name: '设置', exact: true }).click())
       const initial = first === '成员' ? members : teams
       const other = first === '成员' ? teams : members
       for (const [name, destination] of [[first, initial], [first === '成员' ? '团队' : '成员', other]] as const) {
@@ -100,7 +98,6 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       await page.getByRole('button', { name: '团队设置', exact: true }).click()
       await expect(options).toBeVisible()
       await measureNavigation(page, info, '团队成员', { path: '/settings/teams', query: 'view=members', selectors: ['section[aria-label="性能门禁团队 · 团队成员"] table tbody'], text: '回归测试成员' }, () => options.getByRole('link', { name: '成员', exact: true }).click())
-      // 真实输入验证内容已水合、可操作，而不是仅服务器 HTML 可见。
       const memberLink = await sidebarLink('成员')
       await measureNavigation(page, info, '成员可操作', members, () => memberLink.click())
       await page.getByRole('textbox', { name: '搜索成员或邀请', exact: true }).fill('不匹配的搜索词')

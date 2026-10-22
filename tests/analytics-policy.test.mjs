@@ -49,6 +49,6 @@ test('all upcoming features fail closed, even if the remote switch is accidental
       assert.equal(featureAvailability(feature, remote).enabled, false)
       assert.equal(featureAvailability(feature, remote).key, definition.key)
     }
-    assert.match(featureAvailability(feature, true).reason, /尚未实现/)
+    assert.equal(featureAvailability(feature, true).reason, 'FeatureCopy.c_7a3f5896')
   }
 })

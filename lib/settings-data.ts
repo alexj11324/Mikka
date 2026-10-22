@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server'
 import type { listTeamMembers, loadTeamDirectory } from '@/app/actions/teams'
+import { withBasePath } from '@/lib/base-path'
 
 export const settingsReadOptions = { revalidateIfStale: false, shouldRetryOnError: false } as const
 export const memberSettingsKey = (workspaceId?: string) => workspaceId ? `/api/workspace?workspace=${encodeURIComponent(workspaceId)}` : '/api/workspace'
@@ -14,7 +15,7 @@ export class SettingsReadError extends Error {
 
 export async function fetchSettingsData<T>(url: string): Promise<T> {
   const i18nText = await getTranslations();
-  const response = await fetch(url, { cache: 'no-store' })
+  const response = await fetch(withBasePath(url), { cache: 'no-store' })
   if (!response.ok) {
     const body = await response.json().catch(() => null)
     throw new SettingsReadError(body?.error ?? i18nText("FeatureCopy.c_af7a3f0c"), response.status)
