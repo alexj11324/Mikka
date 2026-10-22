@@ -85,6 +85,12 @@ test('page requests never wait for unrelated AI routes or readiness marker files
   assert.match(proxy, /return localize\(request\)/)
 })
 
+test('preview bootstrap script is inside head to avoid hydration failure', async () => {
+  const layout = await readFile(new URL('../app/[locale]/layout.tsx', import.meta.url), 'utf8')
+  assert.match(layout, /<head>[\s\S]*?<Script id="disable-openui-devtools" strategy="beforeInteractive">[\s\S]*?<\/head>\s*<body/)
+  assert.doesNotMatch(layout, /<html[^>]*>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?\{process\.env/)
+})
+
 test('startup keeps Next readiness output intact and makes precompilation opt-in', async () => {
   const script = await readFile(new URL('../scripts/dev-preview.mjs', import.meta.url), 'utf8')
   assert.match(script, /process\.env\.PREVIEW_WARMUP !== '1'/)
