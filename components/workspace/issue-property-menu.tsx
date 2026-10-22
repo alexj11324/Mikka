@@ -21,17 +21,26 @@ export function IssuePropertyMenu({ label, value, options, disabled, onChange }:
   onChange: (value: string) => void
 }) {
   const t = useTranslations('Common')
+  const i18nText = useTranslations()
   const option = options.find(item => item.value === value)
+  const optionLabel = (item: typeof options[number]) => {
+    const statusKey = `Issue.status.${item.value}`
+    if (i18nText.has(statusKey as never)) return i18nText(statusKey as never)
+    const priorityKey = `Issue.priority.${item.value}`
+    if (i18nText.has(priorityKey as never)) return i18nText(priorityKey as never)
+    return item.label
+  }
+  const valueLabel = option ? optionLabel(option) : value
   return <DropdownMenu>
-    <DropdownMenuTrigger render={<BadgeButton disabled={disabled} variant="outline" size="xl" className={cn('cursor-pointer px-2 py-0.5 hover:brightness-95', statusTones[option?.tone ?? 'neutral'])} aria-label={t('propertyValue', { label, value: option?.label ?? value })} />}>
-      {option?.label ?? value}
+    <DropdownMenuTrigger render={<BadgeButton disabled={disabled} variant="outline" size="xl" className={cn('cursor-pointer px-2 py-0.5 hover:brightness-95', statusTones[option?.tone ?? 'neutral'])} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
+      {valueLabel}
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start" className="w-48">
       <DropdownMenuGroup>
         <DropdownMenuLabel>{label}</DropdownMenuLabel>
         {options.map(item => <DropdownMenuItem key={item.value} onClick={() => { if (item.value !== value) onChange(item.value) }}>
           <span aria-hidden="true" className={cn('size-2.5 shrink-0 rounded-full', statusDots[item.tone ?? 'neutral'])} />
-          <span className="flex-1">{item.label}</span>
+          <span className="flex-1">{optionLabel(item)}</span>
           {item.value === value && <Check aria-label={t('selected')} />}
         </DropdownMenuItem>)}
       </DropdownMenuGroup>

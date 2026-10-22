@@ -1,4 +1,7 @@
 import { betterAuth } from 'better-auth'
+import { createAuthMiddleware } from 'better-auth/api'
+import { multiSession } from 'better-auth/plugins'
+import { nextCookies } from 'better-auth/next-js'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { oAuthProxy } from 'better-auth/plugins'
 import { pool } from '@/lib/db'
@@ -11,6 +14,11 @@ export const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env
 export const authBaseURL = appOrigin
 const proxyOptions = authOAuthProxyOptions(process.env)
 export const oauthCallbackBaseURL = proxyOptions?.productionURL ?? authBaseURL
+
+export type DeviceSessionSummary = {
+  session: { token: string }
+  user: { id: string; email: string }
+}
 
 export const auth = betterAuth({
   appName: 'Mikka',
@@ -40,24 +48,45 @@ export const auth = betterAuth({
   // Its routes sit under the app's base path (app/api/auth → /mikka/api/auth).
   basePath: withBasePath('/api/auth'),
   emailAndPassword: { enabled: true, autoSignIn: true },
-  trustedOrigins: authTrustedOrigins(process.env),
+  trustedOrigins: [
+    ...authTrustedOrigins(process.env),
+    ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : []),
+  ],
   // Makes the app an OAuth 2.1 server so agents (Claude Code, Codex…) can sign
   // in to the MCP server at /api/mcp as the person. Clients register
   // themselves (RFC 7591) and use PKCE; access tokens are opaque and hashed in
   // the database, and lib/mcp/auth.ts checks them.
-  plugins: [...(proxyOptions ? [oAuthProxy(proxyOptions)] : []), oauthProvider({
-    loginPage: withBasePath('/sign-in'),
-    consentPage: withBasePath('/oauth/consent'),
-    scopes: [MCP_SCOPE, 'offline_access'],
-    allowDynamicClientRegistration: true,
-    allowUnauthenticatedClientRegistration: true,
-    clientRegistrationDefaultScopes: [MCP_SCOPE, 'offline_access'],
-    clientRegistrationAllowedScopes: [MCP_SCOPE, 'offline_access'],
-    ...(mcpResourceURL ? { resources: [mcpResourceURL], clientRegistrationDefaultResources: [mcpResourceURL] } : {}),
-    grantTypes: ['authorization_code', 'refresh_token'],
-    disableJwtPlugin: true,
-    prefix: { opaqueAccessToken: 'mka_', refreshToken: 'mkr_' },
-  })],
+  plugins: [
+    ...(proxyOptions ? [oAuthProxy(proxyOptions)] : []),
+    multiSession(),
+    oauthProvider({
+      loginPage: withBasePath('/sign-in'),
+      consentPage: withBasePath('/oauth/consent'),
+      scopes: [MCP_SCOPE, 'offline_access'],
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+      clientRegistrationDefaultScopes: [MCP_SCOPE, 'offline_access'],
+      clientRegistrationAllowedScopes: [MCP_SCOPE, 'offline_access'],
+      ...(mcpResourceURL ? { resources: [mcpResourceURL], clientRegistrationDefaultResources: [mcpResourceURL] } : {}),
+      grantTypes: ['authorization_code', 'refresh_token'],
+      disableJwtPlugin: true,
+      prefix: { opaqueAccessToken: 'mka_', refreshToken: 'mkr_' },
+    }),
+    nextCookies(),
+  ],
+  hooks: {
+    after: createAuthMiddleware(async ctx => {
+      // Preserve sessions issued before multi-session was enabled when adding the first extra account.
+      if (ctx.path !== '/get-session' || !ctx.request || ctx.headers?.get('cookie')?.includes('_multi-')) return
+      const active = ctx.context.session
+      if (!active || active.session.expiresAt <= new Date()) return
+      const cookie = ctx.context.authCookies.sessionToken
+      await ctx.setSignedCookie(`${cookie.name}_multi-${active.session.token.toLowerCase()}`, active.session.token, ctx.context.secret, {
+        ...cookie.attributes,
+        maxAge: Math.max(0, Math.floor((active.session.expiresAt.getTime() - Date.now()) / 1000)),
+      })
+    }),
+  },
   session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
   ...(process.env.NODE_ENV === 'development' ? { advanced: {
     // Partition preview sessions by top-level site when third-party cookies are blocked.

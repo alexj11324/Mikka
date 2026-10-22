@@ -1,7 +1,9 @@
+import { getTranslations } from 'next-intl/server'
 import { createHmac } from 'node:crypto'
 import { auth, authBaseURL } from '@/lib/auth'
 
 export async function POST(request: Request) {
+  const i18nText = await getTranslations();
   if (process.env.NODE_ENV !== 'development') return new Response(null, { status: 404 })
 
   const origin = request.headers.get('origin')
@@ -27,7 +29,7 @@ export async function POST(request: Request) {
     for (const cookie of response.headers.getSetCookie()) headers.append('Set-Cookie', cookie)
     return new Response(null, { status: 204, headers })
   } catch {
-    console.error('开发测试账号登录失败。')
+    console.error(i18nText("FeatureCopy.c_2c441a6c"))
     return new Response(null, { status: 503 })
   }
 }

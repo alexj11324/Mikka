@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import type { ComponentProps, ReactNode, Ref } from "react";
-import { EASE_OUT } from "@/lib/ease";
+import { EASE_OUT, MOTION_DURATION } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 
 /** Presentation only: the unanimated parent owns measurement and positioning. */
@@ -30,9 +30,9 @@ export function TooltipSurface({
       initial={closed}
       animate={{
         ...(ready ? { opacity: 1, scale: 1 } : closed),
-        transition: { duration: 0.18, ease: EASE_OUT },
+        transition: { duration: MOTION_DURATION.tooltipEnter, ease: EASE_OUT },
       }}
-      exit={{ ...closed, transition: { duration: 0.12, ease: EASE_OUT } }}
+      exit={{ ...closed, transition: { duration: MOTION_DURATION.tooltipExit, ease: EASE_OUT } }}
       style={{ transformOrigin: "var(--tooltip-origin, center)", ...style }}
       className={cn(
         "block whitespace-nowrap rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground shadow-lg",

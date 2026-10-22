@@ -6,6 +6,7 @@ import { useRouter } from '@/i18n/navigation'
 import { Laptop, RefreshCw, Sparkles, Terminal } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { authClient } from '@/lib/auth-client'
+import { SignOutBoundary } from '@/components/app-shell'
 import { listDevices, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
@@ -136,21 +137,27 @@ export function DevicesWorkspace({ user, localHostname, initialDevices }: {
   initialDevices: DeviceView[]
 }) {
   const t = useTranslations('Devices')
+  const tAccount = useTranslations('Workspace')
   const router = useRouter()
   const { data: devices = [], mutate, error } = useSWR('devices', listDevices, { fallbackData: initialDevices, refreshInterval: 5000 })
   const [signingOut, setSigningOut] = useState(false)
+  const [accountError, setAccountError] = useState('')
 
   async function signOut() {
+    if (signingOut) return
     setSigningOut(true)
-    const result = await authClient.signOut()
-    if (result.error) { setSigningOut(false); return }
-    router.replace('/sign-in'); router.refresh()
+    setAccountError('')
+    try {
+      const result = await authClient.signOut()
+      if (result.error) throw new Error('sign out failed')
+      router.replace('/sign-in?login=1'); router.refresh()
+    } catch { setAccountError(tAccount('signOutFailed')); setSigningOut(false) }
   }
 
   const online = devices.filter(device => device.online).length
 
   return (
-    <TooltipProvider>
+    <SignOutBoundary pending={signingOut}><TooltipProvider>
       <SidebarProvider>
         <DevicesSidebar user={user} onSignOut={signOut} signingOut={signingOut} />
         <SidebarInset className="min-w-0">
@@ -168,6 +175,7 @@ export function DevicesWorkspace({ user, localHostname, initialDevices }: {
             </div>
           </header>
           <div className="flex flex-col gap-6 px-4 py-6 sm:px-6">
+            {accountError && <p role="alert" className="text-sm text-destructive">{accountError}</p>}
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex flex-col gap-0.5">
                 <h1 className="text-sm font-semibold tracking-tight">{t('title')}</h1>
@@ -206,6 +214,6 @@ export function DevicesWorkspace({ user, localHostname, initialDevices }: {
           </div>
         </SidebarInset>
       </SidebarProvider>
-    </TooltipProvider>
+    </TooltipProvider></SignOutBoundary>
   )
 }

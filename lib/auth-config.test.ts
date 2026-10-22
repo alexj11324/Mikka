@@ -34,8 +34,9 @@ test('proxy requires both explicit settings and an HTTPS hub origin', () => {
   assert.throws(() => authOAuthProxyOptions({ ...proxyEnv, BETTER_AUTH_OAUTH_PROXY_URL: 'https://*.example.com' }))
 })
 
-test('only explicit hosted CI allows HTTP loopback origins and the proxy hub always requires HTTPS', () => {
+test('development and explicit hosted CI allow HTTP loopback origins while the proxy hub always requires HTTPS', () => {
   for (const origin of ['http://localhost:3100', 'http://127.0.0.1:3100', 'http://[::1]:3100']) {
+    assert.deepEqual(authTrustedOrigins({ NODE_ENV: 'development', BETTER_AUTH_URL: origin }), [origin])
     assert.deepEqual(authTrustedOrigins({ CI: 'true', BETTER_AUTH_URL: origin }), [origin])
     assert.throws(() => authTrustedOrigins({ BETTER_AUTH_URL: origin }))
     assert.throws(() => authTrustedOrigins({ CI: 'false', BETTER_AUTH_URL: origin }))
@@ -85,6 +86,32 @@ test('real Better Auth rejects foreign origins and lookalike callback hosts', as
       body: JSON.stringify({ provider: 'google', callbackURL: origin, disableRedirect: true }),
     }))
     assert.equal(response.status, 403)
+  }
+})
+
+test('Vercel branch aliases can sign out an authenticated session without trusting other deployments', async () => {
+  const deployment = 'https://mikka-unique-deployment-mikka-dev.vercel.app'
+  const branch = 'https://mikka-git-codex-cloud-preview-secrets-mikka-dev.vercel.app'
+  const env = { VERCEL_ENV: 'preview', VERCEL_URL: new URL(deployment).host, VERCEL_BRANCH_URL: new URL(branch).host }
+  assert.equal(resolveAppOrigin(env), deployment)
+  const auth = betterAuth({
+    baseURL: resolveAppOrigin(env), basePath: '/mikka/api/auth',
+    secret: 'test-only-branch-alias-secret-with-sufficient-entropy',
+    emailAndPassword: { enabled: true }, trustedOrigins: authTrustedOrigins(env), logger: { disabled: true },
+  })
+  const signedIn = await auth.api.signUpEmail({
+    body: { name: 'Preview User', email: 'alias@example.com', password: 'test-only-preview-password' }, asResponse: true,
+  })
+  assert.equal(signedIn.status, 200)
+  const cookie = signedIn.headers.getSetCookie().map(value => value.split(';')[0]).join('; ')
+  const session = await auth.handler(new Request(`${branch}/mikka/api/auth/get-session`, { headers: { cookie } }))
+  assert.equal((await session.json()).user.email, 'alias@example.com')
+  for (const origin of ['https://unrelated.vercel.app', branch]) {
+    const signedOut = await auth.handler(new Request(`${branch}/mikka/api/auth/sign-out`, {
+      method: 'POST', headers: { origin, cookie, 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' }, body: '{}',
+    }))
+    assert.equal(signedOut.status, origin === branch ? 200 : 403)
+    if (origin === branch) assert.deepEqual(await signedOut.json(), { success: true })
   }
 })
 

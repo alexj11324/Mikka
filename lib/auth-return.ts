@@ -1,12 +1,55 @@
 export const COMPOSIO_AUTH_CALLBACK_PATH = '/api/integrations/composio/callback'
 
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const internalOrigin = 'https://mikka.invalid'
+
+function hasOnlyQueryKeys(url: URL, allowed: readonly string[]) {
+  const entries = [...url.searchParams.entries()]
+  return entries.every(([key]) => allowed.includes(key)) && new Set(entries.map(([key]) => key)).size === entries.length
+}
+
+function optionalUuid(url: URL, key: string) {
+  const value = url.searchParams.get(key)
+  return value === null || uuidPattern.test(value)
+}
+
 export function safeAuthReturn(value?: string) {
-  if (!value) return '/'
-  if (/^\/invite\/[a-f0-9]{64}$/.test(value)) return value
-  if (value === '/settings/members' || value === '/devices' || value === COMPOSIO_AUTH_CALLBACK_PATH) return value
-  // A deep link to one issue is the only query form accepted, so `next`
-  // cannot be used as an open redirect.
-  if (/^\/\?issue=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) return value
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/'
+
+  const url = new URL(value, internalOrigin)
+  if (url.origin !== internalOrigin || url.hash) return '/'
+  if (/^\/invite\/[a-f0-9]{64}$/.test(url.pathname) && !url.search) return url.pathname
+  if (url.pathname === '/devices' && !url.search) return '/devices'
+  if (url.pathname === '/workspaces/new' && !url.search) return '/workspaces/new'
+  if (url.pathname === COMPOSIO_AUTH_CALLBACK_PATH && !url.search) return COMPOSIO_AUTH_CALLBACK_PATH
+
+  if (url.pathname === '/') {
+    const issue = url.searchParams.get('issue')
+    return hasOnlyQueryKeys(url, ['issue']) && issue && uuidPattern.test(issue) ? `/?issue=${issue}` : value === '/' ? '/' : '/'
+  }
+
+  if (url.pathname === '/settings') {
+    const section = url.searchParams.get('section')
+    return hasOnlyQueryKeys(url, ['section', 'workspace']) &&
+      (section === null || ['preferences', 'profile', 'workspace', 'integrations'].includes(section)) &&
+      optionalUuid(url, 'workspace') ? `${url.pathname}${url.search}` : '/'
+  }
+
+  if (url.pathname === '/settings/teams') {
+    const create = url.searchParams.get('create')
+    const view = url.searchParams.get('view')
+    return hasOnlyQueryKeys(url, ['workspace', 'team', 'create', 'view']) &&
+      optionalUuid(url, 'workspace') && optionalUuid(url, 'team') &&
+      (create === null || create === '1') &&
+      (view === null || ['general', 'members'].includes(view)) ? `${url.pathname}${url.search}` : '/'
+  }
+
+  if (url.pathname === '/settings/members') {
+    const invite = url.searchParams.get('invite')
+    return hasOnlyQueryKeys(url, ['workspace', 'invite']) && optionalUuid(url, 'workspace') &&
+      (invite === null || invite === '1') ? `${url.pathname}${url.search}` : '/'
+  }
+
   return '/'
 }
 

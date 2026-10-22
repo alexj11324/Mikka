@@ -1,0 +1,132 @@
+import { randomBytes, randomUUID } from 'node:crypto'
+import type { Page } from '@playwright/test'
+import { test, expect, register, browserClientHeaders, watchRuntime, app } from './fixtures'
+
+async function openSwitcher(page: Page) {
+  await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '切换工作区', exact: true }).hover()
+  const switcher = page.getByRole('menu', { name: '切换工作区', exact: true })
+  await expect(switcher.getByRole('menuitem', { name: '创建工作区', exact: true })).toBeVisible()
+  await expect(switcher.getByRole('menuitem', { name: '创建或加入工作区', exact: true })).toHaveCount(0)
+  return switcher
+}
+
+async function openWorkspacePage(page: Page) {
+  const switcher = await openSwitcher(page)
+  await switcher.getByRole('menuitem', { name: '创建工作区', exact: true }).click()
+  await expect(page).toHaveURL(/\/workspaces\/new$/)
+  await expect(page.getByRole('heading', { name: '创建新的工作区', exact: true })).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  return page.getByRole('main')
+}
+
+async function selectedWorkspace(page: Page) {
+  const response = await page.request.get(app('/api/workspace/switcher'))
+  expect(response.ok()).toBeTruthy()
+  const data = await response.json()
+  return data.workspace as { id: string; name: string }
+}
+
+test('菜单与参考一致，创建持久工作区、切换并同步成员上下文', async ({ page }) => {
+  const account = await register(page)
+  const original = await selectedWorkspace(page)
+  const form = await openWorkspacePage(page)
+  const name = `菜单回归-${randomUUID().slice(0, 8)}`
+  const slug = `workspace-${randomUUID().slice(0, 8)}`
+  await form.getByLabel('工作区名称', { exact: true }).fill(name)
+  await form.getByLabel('工作区网址', { exact: true }).fill(slug)
+  await expect(form.getByLabel('工作区数据区域', { exact: true })).toHaveValue('美国（俄亥俄州）')
+  await form.getByRole('button', { name: '创建工作区', exact: true }).click()
+  await expect(page).toHaveURL(url => url.pathname === app('/'))
+  await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText(name)
+  const created = await selectedWorkspace(page)
+  expect(created.id).not.toBe(original.id)
+  await page.reload()
+  await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText(name)
+  const switcher = await openSwitcher(page)
+  await expect(switcher).toContainText(account.email)
+  await expect(switcher.getByRole('group', { name: '账户', exact: true })).toBeVisible()
+  await expect(switcher.getByRole('menuitem', { name, exact: true })).toHaveAttribute('aria-current', 'true')
+  await expect(switcher.getByRole('menuitem', { name: '添加账户', exact: true })).toBeVisible()
+  await expect(switcher.getByRole('menuitem', { name: /个人资料|偏好设置|切换明暗主题/ })).toHaveCount(0)
+  await switcher.getByRole('menuitem', { name: original.name, exact: true }).click()
+  await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText(original.name)
+  expect((await selectedWorkspace(page)).id).toBe(original.id)
+  await page.goto(app(`/w/${slug}`))
+  await expect(page).toHaveURL(url => url.pathname === app('/'))
+  await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText(name)
+  expect((await selectedWorkspace(page)).id).toBe(created.id)
+  await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '邀请和管理成员', exact: true }).click()
+  const members = await page.request.get(app('/api/workspace'))
+  expect((await members.json()).workspace.id).toBe(created.id)
+})
+
+test('添加账户保留旧会话，可切回两个账户，退出后撤销全部设备会话', async ({ page, context }) => {
+  const first = await register(page)
+  const original = await selectedWorkspace(page)
+  await context.clearCookies({ name: /_multi-/ })
+  const switcher = await openSwitcher(page)
+  await switcher.getByRole('menuitem', { name: '添加账户', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '添加账户', exact: true })).toBeVisible()
+  await page.getByRole('link', { name: '取消，返回当前账户', exact: true }).click()
+  await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeVisible()
+  expect((await selectedWorkspace(page)).id).toBe(original.id)
+  await (await openSwitcher(page)).getByRole('menuitem', { name: '添加账户', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '添加账户', exact: true })).toBeVisible()
+  await page.getByRole('link', { name: '创建账号', exact: true }).last().click()
+  await expect(page).toHaveURL(/addAccount=1/)
+  const email = `second-${randomUUID()}@example.com`
+  await page.getByLabel('称呼', { exact: true }).fill('第二个验证账户')
+  await page.getByLabel('邮箱', { exact: true }).fill(email)
+  await page.getByLabel('密码', { exact: true }).fill(randomBytes(32).toString('base64url'))
+  await page.getByRole('button', { name: '创建账号并进入', exact: true }).click()
+  await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText('第二个验证账户的工作区')
+  await page.reload()
+  const accounts = await openSwitcher(page)
+  await expect(accounts).toContainText(first.email)
+  await expect(accounts).toContainText(email)
+  const multiCookies = (await context.cookies()).filter(cookie => cookie.name.includes('_multi-'))
+  expect(multiCookies).toHaveLength(2)
+  expect(multiCookies.every(cookie => cookie.httpOnly)).toBe(true)
+  await accounts.getByRole('menuitem', { name: original.name, exact: true }).click()
+  await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText(original.name)
+  await (await openSwitcher(page)).getByRole('menuitem', { name: '第二个验证账户的工作区', exact: true }).click()
+  await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText('第二个验证账户的工作区')
+  await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
+  await expect(page).toHaveURL(/\/sign-in/)
+  expect((await context.cookies()).filter(cookie => cookie.name.includes('_multi-'))).toHaveLength(0)
+  await page.goto(app('/settings/members'))
+  await expect(page).toHaveURL(/\/sign-in/)
+})
+
+test('仅从专属邀请页面加入工作区，菜单不再提供手动加入', async ({ page, browser, baseURL }) => {
+  await register(page, '/settings/members')
+  const original = await selectedWorkspace(page)
+  await page.getByRole('button', { name: '邀请成员', exact: true }).click()
+  const invitation = page.getByRole('dialog', { name: '邀请成员', exact: true })
+  const email = `join-menu-${randomUUID()}@example.com`
+  await invitation.getByLabel('邮箱地址', { exact: true }).fill(email)
+  await invitation.getByRole('button', { name: '创建邀请链接', exact: true }).click()
+  const link = await invitation.getByLabel(`${email} 的邀请链接`, { exact: true }).inputValue()
+  const memberContext = await browser.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
+  const failures = watchRuntime(memberContext)
+  try {
+    const member = await memberContext.newPage()
+    await register(member, '/', email)
+    const own = await selectedWorkspace(member)
+    const switcher = await openSwitcher(member)
+    await expect(switcher.getByRole('menuitem', { name: /加入工作区/ })).toHaveCount(0)
+    await member.goto(link)
+    await member.getByRole('button', { name: '接受邀请并加入', exact: true }).click()
+    await expect(member).toHaveURL(/\/settings\/members\?workspace=/)
+    await expect.poll(async () => (await selectedWorkspace(member)).id).toBe(original.id)
+    expect(original.id).not.toBe(own.id)
+    await member.reload()
+    expect((await selectedWorkspace(member)).id).toBe(original.id)
+    await page.reload()
+    await expect(page.getByRole('row').filter({ hasText: email })).toBeVisible()
+  } finally { await memberContext.close() }
+  expect(failures).toEqual([])
+})

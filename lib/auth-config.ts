@@ -20,10 +20,11 @@ export function authTrustedOrigins(env: AuthEnvironment) {
   return [...new Set([
     resolveAppOrigin(env),
     env.VERCEL_URL ? `https://${env.VERCEL_URL}` : undefined,
+    env.VERCEL_BRANCH_URL ? `https://${env.VERCEL_BRANCH_URL}` : undefined,
     env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined,
     env.V0_RUNTIME_URL, env.V0_DEV_APP_URL, env.V0_BUILD_URL, env.V0_SANDBOX_URL, env.CF_PAGES_URL,
     ...(env.AUTH_TRUSTED_ORIGINS ?? '').split(',').map(value => value.trim()),
-  ].filter((value): value is string => Boolean(value)).map(value => httpsOrigin(value, env.CI === 'true')))]
+  ].filter((value): value is string => Boolean(value)).map(value => httpsOrigin(value, env.CI === 'true' || env.NODE_ENV === 'development')))]
 }
 
 export function authOAuthProxyOptions(env: AuthEnvironment) {

@@ -29,6 +29,7 @@ import { SharedLayoutBg } from "@/components/motion/shared-layout-bg";
 import {
   EASE_DRAWER,
   EASE_OUT,
+  MOTION_DURATION,
   SPRING_LAYOUT,
   SPRING_PRESS,
 } from "@/lib/ease";
@@ -43,7 +44,7 @@ const MOBILE_QUERY = "(max-width: 767px)";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
 const PANEL_TRANSITION = {
-  duration: 0.36,
+  duration: MOTION_DURATION.drawer,
   ease: EASE_DRAWER,
 } as const;
 
