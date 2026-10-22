@@ -1,5 +1,5 @@
 import type { Page, TestInfo } from '@playwright/test'
-import { test, expect, register } from './fixtures'
+import { test, expect, register, BASE_PATH } from './fixtures'
 
 const budgetMs = 1000
 
@@ -8,7 +8,7 @@ type NavigationSample = { start: number | null; complete: number | null; pathnam
 declare global { interface Window { __navigationSample?: NavigationSample } }
 
 async function measureNavigation(page: Page, info: TestInfo, name: string, destination: Destination, navigate: () => Promise<unknown>) {
-  await page.evaluate(({ path, selectors, text, query }) => {
+  await page.evaluate(({ path, selectors, text, query, basePath }) => {
     const sample: NavigationSample = { start: null, complete: null, pathname: path }
     window.__navigationSample = sample
     document.addEventListener('click', () => {
@@ -16,7 +16,10 @@ async function measureNavigation(page: Page, info: TestInfo, name: string, desti
       let readyFrames = 0
       function check() {
         const elements = selectors.map(selector => document.querySelector<HTMLElement>(selector))
-        const ready = location.pathname === path && (!query || location.search.includes(query)) &&
+        const currentPath = basePath && (location.pathname === basePath || location.pathname.startsWith(`${basePath}/`))
+          ? location.pathname.slice(basePath.length) || '/'
+          : location.pathname
+        const ready = currentPath === path && (!query || location.search.includes(query)) &&
           elements.every(element => element && element.getBoundingClientRect().height > 0 && !element.matches(':disabled')) &&
           (!text || elements.some(element => element?.textContent?.includes(text))) &&
           !document.querySelector('[data-settings-state="loading"], [data-settings-state="error"]')
@@ -26,7 +29,7 @@ async function measureNavigation(page: Page, info: TestInfo, name: string, desti
       }
       requestAnimationFrame(check)
     }, { once: true, capture: true })
-  }, destination)
+  }, { ...destination, basePath: BASE_PATH })
   const requests: { url: string; ms: number }[] = []
   const record = (response: import('@playwright/test').Response) => {
     const request = response.request()
