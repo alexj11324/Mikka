@@ -157,11 +157,13 @@ jobs:
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
       - run: pnpm build
+        id: build
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
         run: pnpm test:performance --output=performance-results
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
       - name: Browser functionality regression
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: pnpm test:e2e --grep-invert @performance
       - name: Upload browser failure evidence
         if: always()
