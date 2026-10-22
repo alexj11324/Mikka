@@ -1,9 +1,10 @@
 import 'server-only'
-import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
 import { agentRuns, agents, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, type CoordinatorEventTier } from '@/lib/db/schema'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
+import { eventsForInbox } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 
@@ -24,9 +25,9 @@ async function nextPosition(executor: Executor, userId: string): Promise<number>
   return Number(row?.last ?? 0) + 1
 }
 
-/** Undelivered events that should start a turn: anything not triaged as background. */
+/** Undelivered events that should start a turn; issue_done is background even before triage. */
 function waking(userId: string) {
-  return and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background')))
+  return and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), ne(coordinatorEvents.kind, 'issue_done'), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background')))
 }
 
 /** Whether any undelivered event should start a turn. */
@@ -50,11 +51,14 @@ export async function takeInbox(userId: string, holder: string): Promise<{ held:
       .where(and(eq(coordinatorSessions.userId, userId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
       .returning({ userId: coordinatorSessions.userId })
     if (!taken) return { held: false, added: 0 }
-    const [due] = await tx.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(waking(userId)).limit(1)
-    if (!due) return { held: true, added: 0 }
-    const events = await tx.select().from(coordinatorEvents)
-      .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt)))
+    const due = await tx.select().from(coordinatorEvents).where(waking(userId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+    if (!due.length) return { held: true, added: 0 }
+    const backgroundLimit = INBOX_BATCH - due.length
+    const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
+      .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
+      .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
+    const events = eventsForInbox(due, background, INBOX_BATCH)
     if (!events.length) return { held: true, added: 0 }
     const first = await nextPosition(tx, userId)
     await tx.insert(coordinatorMessages).values(events.map((event, index) => ({

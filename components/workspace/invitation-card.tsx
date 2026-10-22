@@ -23,8 +23,8 @@ export function InvitationCard({ token, email }: { token: string; email: string 
     setPending(true); setError('')
     try {
       const result = await acceptWorkspaceInvitation(token)
-      if (!('workspaceId' in result)) { setError(translateError(result.error)); return }
-      window.location.assign(withBasePath(`/settings/members?workspace=${result.workspaceId}`))
+      if (!result.ok) { setError(translateError(result.error)); return }
+      window.location.assign(withBasePath(`/settings/members?workspace=${result.data.workspaceId}`))
     } catch { setError(t('acceptFailed')) }
     finally { setPending(false) }
   }

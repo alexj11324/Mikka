@@ -8,6 +8,7 @@ import { agents, issues, issueMembers, issueVersions, users } from '@/lib/db/sch
 import { requireIssueAccess } from '@/lib/issue-access'
 import { listProjects } from '@/app/actions/projects'
 import { assigneeSchema, issueWithMetadata, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 
 const patchSchema = z.object({
   assignee: assigneeSchema.pick({ kind: true, id: true }).nullable().optional(),
@@ -44,7 +45,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
     if (!parsed.success) return { error: 'issueMetadataInvalid' }
     const { issue, user } = await requireIssueAccess(parsed.data.id)
     try {
-      return await db.transaction(async tx => {
+      const result = await db.transaction(async tx => {
         const [latest] = await tx.select().from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
         if (!latest || latest.revision !== parsed.data.revision) return { error: 'issueOutdated' }
         if (user.id !== issue.userId) {
@@ -84,6 +85,8 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
         return { issue: issueWithMetadata(saved) }
       })
+      if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
+      return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
       return { error: 'issueMetadataSaveFailed' }

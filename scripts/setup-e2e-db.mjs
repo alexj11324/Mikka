@@ -6,6 +6,7 @@ import { getTableConfig, PgDialect, PgTable } from 'drizzle-orm/pg-core'
 import * as issueSchema from '../lib/db/schema.ts'
 import * as workspaceSchema from '../lib/db/workspace-schema.ts'
 import * as projectSchema from '../lib/db/project-schema.ts'
+import * as teamSchema from '../lib/db/team-schema.ts'
 
 const connectionString = process.env.E2E_DATABASE_URL
 if (!connectionString) throw new Error('必须设置独立的 E2E_DATABASE_URL，禁止回退到业务数据库。')
@@ -39,7 +40,8 @@ function defaultValue(value, dataType) {
 }
 
 try {
-  for (const table of [...Object.values(issueSchema), ...Object.values(workspaceSchema), ...Object.values(projectSchema)].filter(value => is(value, PgTable))) {
+  const tables = [...Object.values(issueSchema), ...Object.values(workspaceSchema), ...Object.values(projectSchema), ...Object.values(teamSchema)]
+  for (const table of tables.filter(value => is(value, PgTable))) {
     const config = getTableConfig(table)
     if (config.name === 'user') continue
     const columns = config.columns.map(column => [

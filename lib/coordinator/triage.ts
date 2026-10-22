@@ -53,3 +53,9 @@ export function tierFromDecision(needsPerson: number, kind: CoordinatorEventKind
   if (needsPerson >= ATTENTION_THRESHOLD) return 'attention'
   return kind === 'run_report' ? 'background' : 'result'
 }
+
+/** Keeps waking events in the next batch while showing selected events chronologically. */
+export function eventsForInbox<T extends { createdAt: Date }>(waking: readonly T[], background: readonly T[], limit: number): T[] {
+  return [...waking.slice(0, limit), ...background.slice(0, Math.max(0, limit - waking.length))]
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+}

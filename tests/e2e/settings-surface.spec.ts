@@ -12,11 +12,11 @@ const sections = ['偏好设置', '个人资料', '工作区']
 test('settings row dividers span the grouped card edges', async ({ page }) => {
   // /preview/settings redirects outside development, so open the real view.
   await register(page)
-  await page.getByRole('button', { name: '账户菜单', exact: true }).click()
+  await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()
 
   for (const section of sections) {
-    await page.getByRole('button', { name: section }).click()
+    await page.getByRole('link', { name: section, exact: true }).click()
     await expect(page.getByRole('heading', { level: 1, name: section })).toBeVisible()
 
     const mismatches = await page.evaluate(() => {

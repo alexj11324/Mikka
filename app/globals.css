@@ -90,6 +90,15 @@
 }
 
 :root {
+--settings-background: oklch(0.98 0.002 286);
+--settings-foreground: oklch(0.25 0 0);
+--settings-card: oklch(1 0 0);
+--settings-sidebar: oklch(0.95 0.002 286);
+--settings-sidebar-foreground: oklch(0.44 0 0);
+--settings-sidebar-accent: oklch(0.905 0.002 286);
+--settings-border: oklch(0.905 0 0);
+--settings-input: oklch(0.89 0 0);
+--settings-muted-foreground: oklch(0.51 0 0);
   --diagram-surface: color-mix(in oklch, var(--label-blue) 6%, var(--card));
   --diagram-border: color-mix(in oklch, var(--label-blue) 30%, var(--border));
   --diagram-line: color-mix(in oklch, var(--label-blue) 30%, var(--muted-foreground));
@@ -107,10 +116,10 @@
   --ink-3: color-mix(in oklch, var(--muted-foreground) 65%, var(--background));
   --line: var(--border);
   --line-strong: color-mix(in oklch, var(--border) 80%, var(--foreground));
-  --project-action: oklch(0.56 0.17 277);
-  --project-action-foreground: oklch(0.985 0 0);
-  --label-violet: var(--color-violet-600);
-  --label-blue: var(--color-blue-600);
+--project-action: oklch(0.56 0.17 277);
+--project-action-foreground: oklch(0.985 0 0);
+--label-violet: var(--color-violet-600);
+--label-blue: var(--color-blue-600);
   --background: oklch(1 0 0);
 --foreground: oklch(0.145 0 0);
 --card: oklch(1 0 0);
@@ -155,6 +164,15 @@
 }
 
 .dark {
+--settings-background: oklch(0.17 0 0);
+--settings-foreground: oklch(0.94 0 0);
+--settings-card: oklch(0.205 0 0);
+--settings-sidebar: oklch(0.145 0 0);
+--settings-sidebar-foreground: oklch(0.78 0 0);
+--settings-sidebar-accent: oklch(0.25 0 0);
+--settings-border: oklch(0.31 0 0);
+--settings-input: oklch(0.34 0 0);
+--settings-muted-foreground: oklch(0.71 0 0);
 --label-violet: var(--color-violet-400);
 --label-blue: var(--color-blue-400);
   --background: oklch(0.145 0 0);

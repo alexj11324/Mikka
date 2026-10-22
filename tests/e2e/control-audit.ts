@@ -55,14 +55,16 @@ export async function clickWithEffect(page: Page, control: Locator) {
 // generates (`_r_2a_`): they depend on render order and change after a reload.
 export async function inspectControl(control: Locator, page: Page) {
   return control.evaluate((element, currentURL) => {
-    const label = element.getAttribute('aria-label') || element.getAttribute('title') || element.textContent?.trim().replace(/\s+/g, ' ') || element.outerHTML.replace(/\s[\w-]+="[^"]*_r_[\w]+_[^"]*"/g, '').slice(0, 160)
+    const labelledBy = element.getAttribute('aria-labelledby')?.split(/\s+/).map(id => document.getElementById(id)?.textContent?.trim() ?? '').filter(Boolean).join(' ')
+    const associatedLabel = element.id ? Array.from(document.querySelectorAll<HTMLLabelElement>('label[for]')).find(label => label.htmlFor === element.id)?.textContent?.trim() : ''
+    const label = element.getAttribute('aria-label') || element.getAttribute('title') || labelledBy || associatedLabel || element.closest('label')?.textContent?.trim().replace(/\s+/g, ' ') || element.textContent?.trim().replace(/\s+/g, ' ') || element.outerHTML.replace(/\s[\w-]+="[^"]*_r_[\w]+_[^"]*"/g, '').slice(0, 160)
     let skip = ''
     if (element.closest('[inert], [aria-hidden="true"]')) skip = '浮层下的不可交互背景'
     else if (element.matches(':disabled, [aria-disabled="true"]')) skip = '禁用态，不可执行'
     else if (element.matches('[aria-selected="true"], [aria-current]:not([aria-current="false"]), [data-active]:not([data-active="false"])') || element.querySelector('[aria-label="已选中"]')) skip = '当前已选项，允许幂等'
     else if (element.getAttribute('aria-pressed') === 'true' && element.closest('[data-slot="toggle-group"]')) skip = '当前视图，允许幂等'
     else if (element.matches('button[type="submit"], input[type="submit"]')) skip = '提交由 workspace.spec.ts 和 members.spec.ts 业务断言覆盖'
-    else if (label === '退出登录') skip = '退出由 workspace.spec.ts 覆盖，避免撤销后续测试会话'
+    else if (label === '退出登录') skip = '退出由 workspace.spec.ts 覆盖，避免撤销��续测试会话'
     const href = element.getAttribute('href')
     if (!skip && href !== null && ['', '#'].includes(href.trim())) throw new Error(`占位链接不可点击：${label}`)
     if (!skip && href) {

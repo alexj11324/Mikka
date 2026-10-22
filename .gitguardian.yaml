@@ -1,0 +1,6 @@
+version: 2
+secret:
+  ignored_matches:
+    - name: Public PostHog project ingestion identifier
+      match: b274b9d626b41b3981c63509299d50d923454fbe1fc75d7e5135f1c412050e6c
+  show_secrets: false
