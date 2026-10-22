@@ -10,7 +10,7 @@
     "build": "pnpm generate:agent-ui && pnpm lint && pnpm migrate && next build",
     "migrate": "node scripts/migrate.mjs",
     "dev": "node scripts/dev-preview.mjs",
-    "test:preview": "node --test tests/preview-ready.test.mjs",
+    "test:preview": "node --import tsx --test tests/preview-ready.test.mjs tests/workspace-loading.test.mjs",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "lint": "pnpm lint:code && pnpm lint:ui",
     "lint:code": "oxlint --deny-warnings",

@@ -36,11 +36,11 @@ test('演示公式覆盖行内、对齐、矩阵及长公式，且不输出解�
   assert.doesNotMatch(markup, /katex-error|language-math|\$\$/)
 })
 
-test('Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀', async () => {
+test('仅 Agent 直达链接在 hydration 前预下载且保留动态分块；演示图片包含部署前缀', async () => {
   const workspace = await readFile(new URL('../components/workspace/issue-workspace.tsx', import.meta.url), 'utf8')
   const overview = await readFile(new URL('../components/workspace/workspace-overview.tsx', import.meta.url), 'utf8')
   const demo = await readFile(new URL('../components/workspace/agent-demo.tsx', import.meta.url), 'utf8')
-  assert.match(workspace, /if \(typeof window !== 'undefined'\) void import\('\.\/agent-panel'\)/)
+  assert.match(workspace, /if \(typeof window !== 'undefined' && new URLSearchParams\(window.location.search\).get\('section'\) === 'agent'\) void import\('\.\/agent-panel'\)/)
   assert.match(overview, /dynamic\(\(\) => import\('\.\/agent-panel'\)/)
   assert.match(demo, /src: withBasePath\('\/placeholder\.svg/)
   const tools = await readFile(new URL('../components/workspace/agent-demo-tools.tsx', import.meta.url), 'utf8')

@@ -14,7 +14,7 @@ test('startup compiles chat, images, history and workspace with read-only HEAD r
   const seen = []
   await warmPreview('http://127.0.0.1:3100', {
     fetcher: async (url, options) => {
-      seen.push(url.pathname)
+      seen.push(url.pathname + url.search)
       assert.equal(url.port, '3100')
       assert.equal(options.method, 'HEAD')
       assert.equal(options.redirect, 'manual')
@@ -24,6 +24,8 @@ test('startup compiles chat, images, history and workspace with read-only HEAD r
   assert.deepEqual(seen, previewWarmupPaths.map(path => path === '/' ? '/mikka' : `/mikka${path}`))
   assert.ok(seen.includes('/mikka'))
   assert.ok(seen.includes('/mikka/api/agent'))
+  assert.ok(seen.includes('/mikka/api/workspace/lists?kind=issues'))
+  assert.ok(seen.includes('/mikka/api/workspace/lists?kind=projects'))
 })
 
 test('startup begins every warmup without waiting for other routes', async () => {
@@ -45,7 +47,7 @@ test('startup supports deployments without a base path', async () => {
   await warmPreview('http://localhost:3000', {
     basePath: '',
     fetcher: async url => {
-      seen.push(url.pathname)
+      seen.push(url.pathname + url.search)
       return new Response(null, { status: 401 })
     }, log: () => {},
   })

@@ -9,14 +9,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useTranslations } from 'next-intl'
 import { Columns3, List, Search } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { IssueBoard } from './issue-board'
 import { AppSidebar } from '@/components/app-sidebar'
-import { SettingsView } from '@/components/settings/settings-view'
 import { AppShell, AppShellContent } from '@/components/app-shell'
 import { IssueList } from './issue-list'
-import { IssueSearch } from './issue-search'
 import { ISSUE_STATUSES, WORKSPACE_NAME, issueIdentifier, type IssueStatus, type IssueView } from './issue-properties'
-import { listIssues } from '@/app/actions/issues'
+import type { listIssues } from '@/app/actions/issues'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -25,13 +22,12 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { listProjects, setProjectIssues } from '@/app/actions/projects'
 import { ProjectWorkspace } from './project-workspace'
 import { WorkspaceOverview } from './workspace-overview'
-import { PluginsSkillsView } from '@/components/plugins/plugins-skills-view'
 import type { WorkspaceSection } from './workspace-navigation'
 import type { AgentHistory } from '@/lib/agent-history'
-import { useAgentHistory } from '@/hooks/use-agent-history'
+import { fetchWorkspaceIssues, fetchWorkspaceProjects } from '@/lib/workspace-lists'
 
-// Start the chunk download during module evaluation, before hydration and its effects.
-if (typeof window !== 'undefined') void import('./agent-panel').catch(() => {})
+// Direct Agent links can preload without competing with project and task navigation.
+if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('section') === 'agent') void import('./agent-panel').catch(() => {})
 
 function DetailLoading() {
   const t = useTranslations('Workspace')
@@ -41,12 +37,15 @@ function CreateLoading() {
   const t = useTranslations('Workspace')
   return <p role="status" className="p-6 text-sm text-muted-foreground">{t('loadingCreate')}</p>
 }
+const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: DetailLoading })
+const PluginsSkillsView = dynamic(() => import('@/components/plugins/plugins-skills-view').then(module => module.PluginsSkillsView), { loading: DetailLoading })
+const IssueBoard = dynamic(() => import('./issue-board').then(module => module.IssueBoard), { loading: DetailLoading })
+const IssueSearch = dynamic(() => import('./issue-search').then(module => module.IssueSearch), { loading: DetailLoading })
 const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })
 const CreateIssueDialog = dynamic(() => import('./create-issue-dialog').then(module => module.CreateIssueDialog), { loading: CreateLoading })
 
 export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'projects', initialSettingsSection, googleEnabled }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations'; googleEnabled: boolean }) {
   const { data: workspaceData } = useWorkspace(user.email)
-  useAgentHistory(user.id, initialAgentHistory)
   const t = useTranslations('Workspace')
   const tIssue = useTranslations('Issue')
   const tNav = useTranslations('Nav')
@@ -69,8 +68,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const [settingsOpen, setSettingsOpen] = useState(initialSettingsSection === 'integrations')
   const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members' | 'integrations'; invite: boolean }>({ section: initialSettingsSection ?? 'preferences', invite: false })
   const [boardBusy, setBoardBusy] = useState(false)
-  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], listIssues, { fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
-  const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)
+  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], fetchWorkspaceIssues, { fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
+  const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], fetchWorkspaceProjects)
   const [section, setSection] = useState<WorkspaceSection>(initialSection)
   function changeSection(next: WorkspaceSection) {
     setSection(next)
@@ -170,12 +169,12 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   function navigate(next: IssueView) {
     if (boardBusy || leaving.current) return false
-    void leave(() => { setSelected(null); if (['inbox', 'agent', 'coordinator', 'views', 'team-home'].includes(section)) changeSection('team-issues'); setView(next); setQuery(''); setDraftKey(value => value + 1) })
+    void leave(() => { if (layout === 'board') void import('./issue-board').catch(() => {}); setSelected(null); if (['inbox', 'agent', 'coordinator', 'views', 'team-home'].includes(section)) changeSection('team-issues'); setView(next); setQuery(''); setDraftKey(value => value + 1) })
     return true
   }
   function navigateSection(next: WorkspaceSection) {
     if (boardBusy || leaving.current) return false
-    void leave(() => { setSelected(null); changeSection(next); setProjectId(null); setView(next === 'my-issues' ? 'mine' : 'all'); setQuery(''); setDraftKey(value => value + 1) })
+    void leave(() => { if (layout === 'board' && ['my-issues', 'team-issues', 'all-issues'].includes(next)) void import('./issue-board').catch(() => {}); setSelected(null); changeSection(next); setProjectId(null); setView(next === 'my-issues' ? 'mine' : 'all'); setQuery(''); setDraftKey(value => value + 1) })
     return true
   }
   const isProjects = section === 'projects' || section === 'team-projects'

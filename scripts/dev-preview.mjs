@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { stripVTControlCharacters } from 'node:util'
 import { basePath as appBasePath } from '../lib/base-path-config.mjs'
 
-export const previewWarmupPaths = ['/', '/api/agent', '/api/agent/sessions', '/api/workspace']
+export const previewWarmupPaths = ['/', '/api/agent', '/api/agent/sessions', '/api/workspace', '/api/workspace/lists?kind=issues', '/api/workspace/lists?kind=projects']
 
 export function isPreviewWarmupEnabled(env = process.env) {
   return env.PREVIEW_WARMUP !== '0'
