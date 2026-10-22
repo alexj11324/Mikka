@@ -8,36 +8,36 @@ This repository is linked to a [v0](https://v0.app) project. You can continue de
 
 [Continue working on v0 →](https://v0.app/chat/projects/prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH)
 
-## Getting Started
+## Cloud Preview development
 
-First, run the development server:
+Develop and test on cloud Preview deployments. Vercel previews, v0 previews and Cloudflare-hosted previews use their own HTTPS origin and an isolated Preview database. Set `BETTER_AUTH_URL` to the current origin without `/mikka`; if omitted, Vercel Preview prefers its deployment URL, and v0/Cloudflare Pages use their supplied preview URL. Vercel Preview uses the Neon integration's branch-specific `DATABASE_URL` ahead of global `MIKKA_DATABASE_URL` or `ORVILO_DATABASE_URL` overrides. Other environments retain their existing database selection.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
+### Google and GitHub login
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Use Better Auth's built-in OAuth proxy so changing Preview URLs do not require changing provider registrations. Set `BETTER_AUTH_OAUTH_PROXY_URL` to the stable callback hub origin on both the hub and participating previews. Set the same dedicated `BETTER_AUTH_OAUTH_PROXY_SECRET` on those deployments, alongside matching Google/GitHub client credentials. Keep `BETTER_AUTH_SECRET` separate for each environment. The proxy exchanges the provider code on the hub and completes login against the originating Preview database; it does not create the Preview user or session in the hub database.
 
-### Google login and Composio
-
-The app is served at `/mikka`. Use separate Google Cloud projects and OAuth clients for development and production. Register only the local callback on the development client and only the production callback on the production client:
+Register these exact provider callbacks when the hub is `https://app.aspectlylabs.com`:
 
 ```text
-http://localhost:3000/mikka/api/auth/callback/google
 https://app.aspectlylabs.com/mikka/api/auth/callback/google
+https://app.aspectlylabs.com/mikka/api/auth/callback/github
 ```
 
-Google login requests only `openid`, `email`, and `profile`. Set `BETTER_AUTH_URL` to the origin (`http://localhost:3000` locally and `https://app.aspectlylabs.com` in Production); Better Auth adds `/mikka/api/auth`. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` separately for each environment. Keep provider credentials in a secret manager or inject them into the local process; do not persist them in `.env.local`. Google branding verification requires a public Mikka homepage with a service description and links to privacy and terms pages on a verified domain; those pages are not in this repository yet. Existing email/password users can sign in with their password and link Google under Settings → Integrations; Mikka keeps Better Auth's verified-email account-linking check enabled.
+Use the corresponding exact callback paths if the hub changes. The proxy URL is an origin, without `/mikka` or `/api/auth`. Install the same application configuration on the hub and previews; setting both proxy variables enables the plugin. A missing proxy variable leaves direct provider callbacks enabled. Provider credentials and secrets belong in Infisical and the hosting environments, never in committed files or `.env.local`.
 
-Notion and Slack connections use Composio-managed OAuth and the signed-in Mikka user ID. Set `COMPOSIO_API_KEY` on the server and configure Composio's callback verifier to `https://app.aspectlylabs.com/mikka/api/integrations/composio/callback`. Set the same URL in `COMPOSIO_CALLBACK_VERIFIER_URL`; Mikka only starts connection flows when the values match. Composio keeps the connection pending until the signed-in Mikka user completes it. Local connection testing requires an HTTPS tunnel and a Composio project configured for that tunnel.
+Actual `VERCEL_URL`, `VERCEL_PROJECT_PRODUCTION_URL`, `V0_RUNTIME_URL`, `V0_DEV_APP_URL`, `V0_BUILD_URL`, `V0_SANDBOX_URL` and `CF_PAGES_URL` origins are trusted in every runtime mode. A changing v0 origin such as `https://ios-kn1ogl39.v0.build` therefore trusts only its configured exact origin automatically. No central preview registry, provider callback update or `*.v0.build` wildcard is needed: the installed OAuth proxy authenticates the encrypted authorization-state package using the dedicated shared proxy secret, then returns the encrypted provider profile to the issuing Preview's origin-bound completion URL. The Preview restores its own OAuth state and creates its own session. The hub can trust only itself; it does not need every changing Preview origin in its allowlist. Deployments receiving the shared proxy secret are trusted participants.
 
-Composio outbound event delivery uses a webhook subscription. Configure the subscription URL as `https://app.aspectlylabs.com/mikka/api/webhooks/composio`, select the event types the app should receive, and save the subscription signing secret as `COMPOSIO_WEBHOOK_SECRET` on the server. The receiver verifies and acknowledges events; app-specific event actions still need to be selected. Local webhook testing needs a public HTTPS tunnel and a subscription pointed at that tunnel.
+Use `AUTH_TRUSTED_ORIGINS` only for additional project-controlled HTTPS origins or project-scoped hostname patterns needed by direct auth requests. Never trust shared hosting domains such as `*.vercel.app`, `*.v0.build`, `*.pages.dev` or `*.workers.dev`. Workers deployments without `CF_PAGES_URL` must set their exact `BETTER_AUTH_URL` and any additional controlled origins. Invalid non-HTTPS origins, credentials or URL paths fail configuration validation.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Validate login from each deployed Preview: the provider authorization URL must name the stable hub callback, then return to the originating Preview and create its own session. Confirm a foreign origin cannot initiate a trusted callback. Unit tests validate configuration and real Better Auth request handling without starting a local server; provider login and cloud database acceptance still require deployed testing.
+
+Google login requests only `openid`, `email`, and `profile`. Google branding verification requires a public Mikka homepage with a service description and links to privacy and terms pages on a verified domain; those pages are not in this repository yet. Existing email/password users can sign in with their password and link Google under Settings → Integrations; Mikka keeps Better Auth's verified-email account-linking check enabled.
+
+### Composio
+
+Notion and Slack connections use Composio-managed OAuth and the signed-in Mikka user ID. Set `COMPOSIO_API_KEY` on the server. Configure Composio's callback verifier for the intended cloud deployment's `/mikka/api/integrations/composio/callback`, and set that exact URL in `COMPOSIO_CALLBACK_VERIFIER_URL`. Mikka only starts connection flows when those values match, and Composio keeps the connection pending until the signed-in Mikka user completes it. The social-login proxy does not relay Composio or Linear OAuth callbacks.
+
+Composio outbound event delivery uses a webhook subscription. Configure its URL as the intended cloud deployment's `/mikka/api/webhooks/composio`, select event types, and save the signing secret as `COMPOSIO_WEBHOOK_SECRET`. The receiver verifies and acknowledges events; app-specific event actions still need to be selected.
 
 ## Learn More
 
