@@ -46,6 +46,33 @@ test('取消请求保存已生成片段且取消上游', async () => {
   assert.deepEqual(saves, [{ completion: '测试回复', status: 'stopped', error: null }])
 })
 
+test('数据库检查点缓慢时正文继续返回，完成前仍等待保存', async t => {
+  let now = 0
+  t.mock.method(Date, 'now', () => now)
+  let release
+  const pending = new Promise(resolve => { release = resolve })
+  const saves = []
+  const reader = persistAgentStream(source([text, { ...text, delta: '第二段' }, { type: 'finish' }]), async checkpoint => {
+    saves.push(checkpoint)
+    if (checkpoint.status === 'pending') await pending
+  }).getReader()
+  now = 4000
+  try {
+    assert.deepEqual((await reader.read()).value, text)
+    assert.equal((await reader.read()).value.delta, '第二段')
+    const finished = reader.read()
+    assert.equal(saves.some(value => value.status === 'complete'), false)
+    release()
+    assert.equal((await finished).value.type, 'finish')
+    assert.equal((await reader.read()).done, true)
+    assert.equal(saves.at(-1).completion, '测试回复第二段')
+    assert.equal(saves.at(-1).status, 'complete')
+  } finally {
+    release()
+    await reader.cancel()
+  }
+})
+
 test('保存失败必须向客户端报告错误', async () => {
   const parts = await collect(persistAgentStream(source([text, { type: 'finish' }]), async () => { throw new Error('database unavailable') }))
   assert.equal(parts.at(-1).type, 'error')

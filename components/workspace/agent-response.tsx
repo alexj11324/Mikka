@@ -20,7 +20,7 @@ export function AgentResponse({ completion, error, isLoading, stopped = false, o
       <MessageHeader>Agent</MessageHeader>
       <Bubble variant="ghost" className="w-full min-w-0">
         <BubbleContent className="flex w-full min-w-0 flex-col gap-4">
-          {isLoading && <AgentProgress label={completion ? '正在继续生成回复' : '正在思考并准备正文，可随时停止'} />}
+          {isLoading && <AgentProgress label={completion ? '正在继续生成回复' : 'thinking'} />}
           {completion && <StreamingResponse status={error ? 'error' : isLoading ? 'streaming' : 'complete'} announce={false} showActions={false}>
             <div className="w-full min-w-0 overflow-x-auto break-words"><AgentGenerativeUI response={completion} isStreaming={isLoading} onAction={onAction} showErrors={!error && !stopped} onRetry={onRetry} /></div>
           </StreamingResponse>}

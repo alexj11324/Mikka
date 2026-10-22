@@ -13,6 +13,8 @@ export function persistAgentStream(stream: ReadableStream<UIMessageChunk>, save:
   let cancelled = false
   let lastSaved = Date.now()
   let queue = Promise.resolve()
+  let saving = false
+  let persistenceError: unknown
 
   function checkpoint(status: AgentCheckpoint['status']) {
     if (finalized) return queue
@@ -25,6 +27,7 @@ export function persistAgentStream(stream: ReadableStream<UIMessageChunk>, save:
   return new ReadableStream<UIMessageChunk>({
     async pull(controller) {
       try {
+        if (persistenceError) throw persistenceError
         const { value, done } = await reader.read()
         if (cancelled) return
         if (done) {
@@ -37,9 +40,11 @@ export function persistAgentStream(stream: ReadableStream<UIMessageChunk>, save:
         }
         if (value.type === 'text-delta') {
           completion += value.delta
-          if (Date.now() - lastSaved > 3000) {
-            await checkpoint('pending')
+          if (!saving && Date.now() - lastSaved > 3000) {
+            saving = true
             lastSaved = Date.now()
+            // Persist in order without holding model chunks behind database latency.
+            void checkpoint('pending').catch(error => { persistenceError = error }).finally(() => { saving = false })
           }
         }
         if (value.type === 'error') failure = value.errorText
