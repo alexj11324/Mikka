@@ -6,6 +6,7 @@ import { currentUser } from '@/lib/acting-user'
 import { db } from '@/lib/db'
 import { issues, issueMembers } from '@/lib/db/schema'
 import { issueTeamAccess } from '@/lib/issue-team-access'
+import { isIssueTeamAccessAllowed } from '@/lib/issue-team-access-policy'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 
 export async function requireUser() {
@@ -24,7 +25,7 @@ export async function requireIssueAccess(id: string, includeDeleted = false) {
 async function findIssueForUser(userId: string, id: string, includeDeleted: boolean) {
   if (!z.uuid().safeParse(id).success) return null
   const access = await issueTeamAccess(id, userId)
-  if (access.linked && !access.allowed) return null
+  if (!isIssueTeamAccessAllowed(access)) return null
   const [row] = await db.select({ issue: issues }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(eq(issues.id, id), access.allowed ? undefined : or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)))).limit(1)
