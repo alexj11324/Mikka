@@ -6,14 +6,13 @@ import type { listIssues } from '@/app/actions/issues'
 import { IssueList } from './issue-list'
 import dynamic from 'next/dynamic'
 import { WorkspaceContentLoading } from './workspace-loading'
-import { loadAgentPanel } from './chat-preload'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
 import { ISSUE_STATUSES, WORKSPACE_NAME, type IssueView } from './issue-properties'
 import type { WorkspaceSection } from './workspace-navigation'
 import type { AgentHistory } from '@/lib/agent-history'
 
-const AgentPanel = dynamic(() => loadAgentPanel().then(module => module.AgentPanel), { loading: WorkspaceContentLoading })
+const AgentPanel = dynamic(() => import('./agent-panel').then(module => module.AgentPanel), { loading: WorkspaceContentLoading })
 const CoordinatorChat = dynamic(() => import('@/components/coordinator/coordinator-chat').then(module => module.CoordinatorChat), { loading: WorkspaceContentLoading })
 
 export function WorkspaceOverview({ section, counts, projectCount, onView, onProjects, tasks, userId, onOpen, initialAgentHistory }: { section: WorkspaceSection; counts: Record<IssueView, number>; projectCount: number; onView: (view: IssueView) => void; onProjects: () => void; tasks: Awaited<ReturnType<typeof listIssues>>; userId: string; onOpen: (id: string) => void; initialAgentHistory?: AgentHistory }) {
