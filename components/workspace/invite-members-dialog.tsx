@@ -41,7 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { withBasePath } from '@/lib/base-path'
+import { withBasePath } from "@/lib/base-path";
 
 export function InviteMembersDialog({
   workspaceId,

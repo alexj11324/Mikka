@@ -15,7 +15,8 @@ test('旧预览入口和设置入口均跳转到正式页面', async ({ request 
     expect(response.status(), source).toBe(307)
     const destination = new URL(response.headers().location, response.url())
     expect(destination.origin, source).toBe(new URL(response.url()).origin)
-    expect(`${destination.pathname}${destination.search}`, source).toBe(app(target))
+    // Next writes redirect('/') under a base path as /mikka/, which then settles on /mikka.
+    expect(`${destination.pathname.replace(/\/$/, '')}${destination.search}`, source).toBe(app(target))
   }
 
   const settings = await request.get(app('/preview/settings'))
