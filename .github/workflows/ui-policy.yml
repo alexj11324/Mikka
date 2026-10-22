@@ -85,6 +85,7 @@ jobs:
       - run: pnpm test:coordinator-events
       - run: pnpm test:auth-composio
       - run: pnpm test:integrations
+      - run: pnpm test:slack
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:issues
