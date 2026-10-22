@@ -27,3 +27,19 @@ test('splitCitations reads a bare id as a citation of either kind', () => {
 test('citedIds looks bare ids up as both issues and runs', () => {
   assert.deepEqual(citedIds([`[[issue:${ISSUE}]] and ${RUN}`, `[[run:${RUN}]]`]), { issueIds: [ISSUE, RUN], runIds: [RUN] })
 })
+
+test('splitCitations reads Markdown links and bare URLs as web sources', () => {
+  assert.deepEqual(splitCitations('PR 在 [Mikka#28](https://github.com/alexj11324/Mikka/pull/28)，文档见 https://stencil.so/tern。'), [
+    { type: 'text', text: 'PR 在 ' },
+    { type: 'link', url: 'https://github.com/alexj11324/Mikka/pull/28', label: 'Mikka#28', raw: '[Mikka#28](https://github.com/alexj11324/Mikka/pull/28)' },
+    { type: 'text', text: '，文档见 ' },
+    { type: 'link', url: 'https://stencil.so/tern', label: null, raw: 'https://stencil.so/tern' },
+    { type: 'text', text: '。' },
+  ])
+  assert.deepEqual(splitCitations(`see https://example.com/runs/${RUN}.`), [
+    { type: 'text', text: 'see ' },
+    { type: 'link', url: `https://example.com/runs/${RUN}`, label: null, raw: `https://example.com/runs/${RUN}` },
+    { type: 'text', text: '.' },
+  ])
+  assert.deepEqual(citedIds([`https://example.com/runs/${RUN}`]), { issueIds: [], runIds: [] })
+})
