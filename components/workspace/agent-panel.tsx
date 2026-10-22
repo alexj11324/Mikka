@@ -55,10 +55,6 @@ async function fetchHistory(url: string): Promise<AgentHistory> {
 }
 
 export function AgentPanel({ userId, initialHistory }: { userId: string; initialHistory?: AgentHistory }) {
-  useSWR(['/api/agent', userId, 'ready'], async ([url]: [string, string, string]) => {
-    const response = await fetch(url, { method: 'HEAD', credentials: 'same-origin' })
-    return response.ok
-  }, { revalidateOnFocus: false, revalidateIfStale: false, shouldRetryOnError: false })
   const latest = useSWR<AgentHistory>(['/api/agent/sessions', userId], ([url]: [string, string]) => fetchHistory(url), {
     fallbackData: initialHistory, revalidateOnFocus: false, revalidateOnMount: !initialHistory,
   })

@@ -13,6 +13,10 @@ const nextConfig = {
     config.resolve.alias['react-syntax-highlighter$'] = new URL('./components/workspace/agent-syntax-highlighter.tsx', import.meta.url).pathname
     return config
   },
+  onDemandEntries: {
+    maxInactiveAge: 60 * 60 * 1000,
+    pagesBufferLength: 8,
+  },
   transpilePackages: ['@mikka/protocol'],
   serverExternalPackages: ['ai', '@ai-sdk/openai-compatible', 'better-auth', 'drizzle-orm'],
   async headers() {
