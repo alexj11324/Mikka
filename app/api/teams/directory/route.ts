@@ -14,6 +14,6 @@ export async function GET(request: Request) {
     const directory = await loadTeamDirectory(workspaceId)
     return NextResponse.json(directory, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
-    return NextResponse.json({ error: error instanceof WorkspaceError ? error.message : i18nText("FeatureCopy.c_d7d814ec") }, { status: error instanceof WorkspaceError ? 403 : 500, headers: { 'Cache-Control': 'private, no-store' } })
+    return NextResponse.json({ error: error instanceof WorkspaceError ? (i18nText.has(`Errors.${error.code}` as never) ? i18nText(`Errors.${error.code}` as never) : error.message) : i18nText("FeatureCopy.c_d7d814ec") }, { status: error instanceof WorkspaceError ? 403 : 500, headers: { 'Cache-Control': 'private, no-store' } })
   }
 }

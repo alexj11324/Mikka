@@ -17,7 +17,7 @@ async function createTask(page: Page, title: string, team?: string) {
   await page.getByRole('button', { name: '新建任务', exact: true }).first().click()
   const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
   await dialog.getByLabel('任务标题', { exact: true }).fill(title)
-  if (team) await dialog.getByLabel('归属团队', { exact: true }).selectOption({ label: team })
+  await dialog.getByLabel('归属团队', { exact: true }).selectOption(team ? { label: team } : '')
   await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
   await expect(dialog).not.toBeVisible()
 }
@@ -165,7 +165,7 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
     await showAllTasks(member)
     await expect(member.getByText(publicTitle, { exact: true })).toHaveCount(0)
     await member.goto(app(`/settings/teams?workspace=${workspaceId}`))
-    await expect(member.getByText('无法访问团队目录', { exact: true })).toBeVisible()
+    await expect(member.getByRole('alert')).toContainText('成员资格已被停用')
   } finally {
     await memberContext.close()
     expect(runtime).toEqual([])

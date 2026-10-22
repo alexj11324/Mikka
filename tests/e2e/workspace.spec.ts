@@ -18,7 +18,9 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
   const sidebar = page.locator('[data-slot="sidebar"][data-mobile="true"]')
   const toggle = page.getByRole('button', { name: '展开或收起侧栏', exact: true })
   async function openSidebar() {
-    if (!await switcher.isVisible()) await toggle.click()
+    await expect(sidebar).not.toBeVisible()
+    await toggle.click()
+    await expect(sidebar).toBeVisible()
   }
   async function settings() {
     await openSidebar()
@@ -86,7 +88,7 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await page.getByRole('option').filter({ hasText: title }).click()
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
   await expect(page.getByRole('button', { name: '账户菜单', exact: true })).toHaveCount(0)
-  await expect(page.locator('[data-slot="sidebar-footer"]')).toHaveCount(0)
+  await expect(page.locator('[data-slot="sidebar-footer"]').getByRole('link')).toHaveAttribute('href', app('/devices'))
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '切换工作区', exact: true }).hover()
   const switcher = page.getByRole('menu', { name: '切换工作区', exact: true })

@@ -14,6 +14,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tea
   try {
     return NextResponse.json(await listTeamMembers(teamId), { headers })
   } catch (error) {
-    return NextResponse.json({ error: error instanceof WorkspaceError ? error.message : i18nText("FeatureCopy.c_411f8090") }, { status: error instanceof WorkspaceError ? 403 : 500, headers })
+    return NextResponse.json({ error: error instanceof WorkspaceError ? (i18nText.has(`Errors.${error.code}` as never) ? i18nText(`Errors.${error.code}` as never) : error.message) : i18nText("FeatureCopy.c_411f8090") }, { status: error instanceof WorkspaceError ? 403 : 500, headers })
   }
 }
