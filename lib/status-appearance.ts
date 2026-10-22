@@ -20,10 +20,10 @@ export const statusDots: Record<StatusTone, string> = {
 
 export function statusTone(value: string): StatusTone {
   switch (value) {
-    case 'doing': case 'started': case 'paused': case 'atRisk': case 'urgent': case 'normal': return 'warning'
+    case 'doing': case 'started': case 'paused': case 'atRisk': case 'normal': return 'warning'
     case 'review': return 'info'
     case 'done': case 'completed': case 'onTrack': case 'low': case 'open': return 'success'
-    case 'canceled': case 'offTrack': case 'closed': return 'destructive'
+    case 'urgent': case 'canceled': case 'offTrack': case 'closed': return 'destructive'
     case 'high': case 'merged': return 'focus'
     default: return 'neutral'
   }

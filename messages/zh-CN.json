@@ -35,9 +35,9 @@
     },
     "priority": {
       "urgent": "紧急",
-      "high": "高优先级",
-      "normal": "普通优先级",
-      "low": "低优先级"
+      "high": "高",
+      "normal": "中",
+      "low": "低"
     },
     "create": {
       "title": "新建任务",
@@ -326,7 +326,7 @@
     "unsavedDraft": "未保存草稿",
     "editorLabel": "任务描述编辑器",
     "placeholderCompact": "添加描述…",
-    "placeholderFull": "描述背景与验收标准，输入 / 插入内容…",
+    "placeholderFull": "��述背景与验收标准，输入 / 插入内容…",
     "selectionRequired": "请先选中一段尚未评论的正文。",
     "hint": "输入 / 插入内容，选中文字设置格式",
     "selectionComment": "选区评论",
@@ -442,7 +442,7 @@
       "annotate": "标注",
       "history": "历史",
       "undo": "撤销",
-      "redo": "重做",
+      "redo": "���做",
       "blockType": {
         "paragraph": "文本",
         "heading1": "标题 1",
@@ -726,7 +726,7 @@
       "syncFailedLabel": "同步失败",
       "syncingLabel": "正在同步",
       "syncedLabel": "已同步",
-      "retrySync": "重试文档同步",
+      "retrySync": "重试文���同步",
       "syncRetryNotice": "同步失败，正在重试。请保留本页，避免丢失尚未同步的修改。",
       "membersTitle": "协作成员",
       "membersDescription": "管理此任务的访问与编辑权限。",
@@ -924,7 +924,7 @@
       "copyTitle": "复制编号与标题",
       "copyMarkdown": "复制 Markdown 链接",
       "copyBranch": "复制 Git 分支名称",
-      "openNewTab": "在新标签页中打开",
+      "openNewTab": "在新���签页中打开",
       "createDuplicate": "创建任务副本…",
       "favorite": "收藏任务",
       "unfavorite": "取消收藏任务",
@@ -1000,7 +1000,7 @@
     "removed": "已移除 {name} 的访问权限。",
     "successTitle": "操作成功",
     "searchMembers": "搜索成员",
-    "searchPlaceholder": "搜索姓名或邮箱",
+    "searchPlaceholder": "搜索姓��或邮箱",
     "memberList": "任务成员",
     "you": "你",
     "owner": "所有者",
@@ -1150,9 +1150,9 @@
     "priority": {
       "none": "无优先级",
       "urgent": "紧急",
-      "high": "高优先级",
-      "normal": "普通优先级",
-      "low": "低优先级"
+      "high": "高",
+      "normal": "中",
+      "low": "低"
     },
     "color": {
       "green": "绿色",
@@ -1387,7 +1387,7 @@
     "errors": {
       "notCsv": "请选择一个 .csv 文件。",
       "fileTooLarge": "CSV 文件不能超过 1 MB。",
-      "readFailed": "文件读取失败，请使用 UTF-8 编码的 CSV 文件。",
+      "readFailed": "文件���取失败，请使用 UTF-8 编码的 CSV 文件。",
       "checkEmails": "请检查邮箱地址。",
       "createFailed": "邀请未完成，请稍后重试。",
       "emailRequired": "请至少填写一个邮箱地址。",

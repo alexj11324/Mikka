@@ -10,6 +10,10 @@ test('任务和项目共用状态语义色', () => {
   assert.equal(statusTone('done'), 'success')
   assert.equal(statusTone('canceled'), 'destructive')
   assert.equal(statusTone('unknown'), 'neutral')
+  assert.equal(statusTone('urgent'), 'destructive')
+  assert.equal(statusDots[statusTone('onTrack')], 'bg-success')
+  assert.equal(statusDots[statusTone('atRisk')], 'bg-warning')
+  assert.equal(statusDots[statusTone('offTrack')], 'bg-destructive')
 })
 
 test('所有任务状态及优先级具有浅底、描边、文字及圆点样式', () => {
