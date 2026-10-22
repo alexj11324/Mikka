@@ -81,9 +81,12 @@ jobs:
       - run: pnpm test:i18n
       - run: pnpm i18n:check
       - run: pnpm test:ssh-target
+      - run: pnpm test:linear-sync
+      - run: pnpm test:coordinator-events
       - run: pnpm test:auth-composio
       - run: pnpm test:integrations
       - run: pnpm test:csv
+      - run: pnpm test:settings
       - run: pnpm test:issues
       - name: Audit business UI composition
         run: pnpm --silent lint:ui --json > ui-audit.json
@@ -117,7 +120,7 @@ jobs:
     name: Production build and browser interactions
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17
@@ -153,12 +156,16 @@ jobs:
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:setup
+      - name: Verify legacy workspace migration and idempotency
+        run: node --test tests/workspace-migration.test.mjs
       - run: pnpm build
+        id: build
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
         run: pnpm test:performance --output=performance-results
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
       - name: Browser functionality regression
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: pnpm test:e2e --grep-invert @performance
       - name: Upload browser failure evidence
         if: always()

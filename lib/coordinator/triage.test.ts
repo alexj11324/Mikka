@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { chatItems, eventPrompt } from './context'
-import { ATTENTION_THRESHOLD, ruleTier, tierFromDecision, triageQuestions, triageState } from './triage'
+import { ATTENTION_THRESHOLD, eventsForInbox, ruleTier, tierFromDecision, triageQuestions, triageState } from './triage'
 
 const run = (payload: Record<string, unknown>) => ({ kind: 'run_finished' as const, payload: { stopReason: 'submitted', ...payload } })
 
@@ -32,6 +32,16 @@ test('the tier reaches the Coordinator but not the chat', () => {
   const [item] = chatItems([{ position: 1, createdAt: new Date(), message: { role: 'user', content: text } }])
   assert.equal(item.text, '[Event] Run r1 ended with status failed (error).')
   assert.doesNotMatch(eventPrompt({ kind: 'issue_done', issueId: 'i1', runId: null, payload: { title: 'Login', previousStatus: 'review' }, tier: 'result' }), /Triage/)
+})
+
+test('a waking message reaches a batch ahead of an older background backlog', () => {
+  const background = Array.from({ length: 500 }, (_, index) => ({ id: `done-${index}`, createdAt: new Date(index) }))
+  const message = { id: 'message', createdAt: new Date(500) }
+  const batch = eventsForInbox([message], background, 50)
+
+  assert.equal(batch.length, 50)
+  assert.ok(batch.includes(message))
+  assert.deepEqual(batch, [...batch].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()))
 })
 
 test('worker events: questions and blocks need the person, reports go to the model', () => {

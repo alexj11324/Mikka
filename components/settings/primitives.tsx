@@ -58,7 +58,7 @@ export function SettingRow({
   return (
     <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-sm font-medium">{title}</span>
+        <span className="text-sm leading-snug font-medium text-foreground">{title}</span>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
       <div className="shrink-0 text-sm">{children}</div>

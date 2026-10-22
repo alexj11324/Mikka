@@ -189,12 +189,12 @@ export function InviteMembersDialog({
         emails: recipients,
         role,
       });
-      if (!Array.isArray(result)) {
+      if (!result.ok) {
         setError(translateError(result.error));
         return;
       }
       setLinks(
-        result.map((link) => ({
+        result.data.map((link) => ({
           email: link.email,
           url: new URL(withBasePath(link.path), window.location.origin).href,
         })),

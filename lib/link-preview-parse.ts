@@ -70,4 +70,3 @@ export function parsePreview(html: string, pageUrl: string): Omit<LinkPreview, '
     icon: absolute(icon) ?? absolute('/favicon.ico'),
   }
 }
-

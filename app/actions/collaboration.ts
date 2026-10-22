@@ -11,33 +11,40 @@ import { db } from '@/lib/db'
 import { issues, issueDocuments, issueMembers, issueVersions, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
+import { bindCommentAuthorship, snapshotCommentAuthorship } from '@/lib/linear-sync/comment-authorship'
 
 const encodedState = z.string().max(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/)
 const syncSchema = z.object({ id: z.uuid(), vector: encodedState.optional(), update: encodedState.optional(), seed: encodedState.optional() })
 export async function exchangeDocument(input: z.infer<typeof syncSchema>) {
   const parsed = syncSchema.parse(input)
-  const { issue } = await requireIssueAccess(parsed.id)
-  return db.transaction(async tx => {
+  const { issue, user } = await requireIssueAccess(parsed.id)
+  const result = await db.transaction(async tx => {
     const [locked] = await tx.select({ id: issues.id, content: issues.content }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
     if (!locked) throw new Error('issue not found')
     const [stored] = await tx.select().from(issueDocuments).where(and(eq(issueDocuments.issueId, issue.id), eq(issueDocuments.userId, issue.userId))).limit(1)
     const doc = new Y.Doc()
     try {
       if (stored) Y.applyUpdate(doc, Buffer.from(stored.state, 'base64'))
-      else if (parsed.seed) Y.applyUpdate(doc, Buffer.from(parsed.seed, 'base64'))
-      else throw new Error('document not initialized')
+      const commentAuthors = snapshotCommentAuthorship(doc)
+      if (!stored && parsed.seed) Y.applyUpdate(doc, Buffer.from(parsed.seed, 'base64'))
+      else if (!stored) throw new Error('document not initialized')
       if (parsed.update) Y.applyUpdate(doc, Buffer.from(parsed.update, 'base64'))
+      bindCommentAuthorship(doc, commentAuthors, { id: user.id, name: user.name || user.email })
       const state = Buffer.from(Y.encodeStateAsUpdate(doc)).toString('base64')
       if (state.length > 1_400_000) throw new Error('document exceeds 1 MB')
       const content = withIssueMetadata(yXmlFragmentToProsemirrorJSON(doc.getXmlFragment('default')) as JSONContent, readIssueMetadata(locked.content))
       if (JSON.stringify(content).length > 250000) throw new Error('content exceeds size limit')
-      if (!stored || state !== stored.state) {
+      const changed = !stored || state !== stored.state
+      if (changed) {
         await tx.insert(issueDocuments).values({ issueId: issue.id, userId: issue.userId, state }).onConflictDoUpdate({ target: issueDocuments.issueId, set: { state, updatedAt: new Date() } })
         await tx.update(issues).set({ content, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId)))
       }
-      return { update: Buffer.from(Y.encodeStateAsUpdate(doc, parsed.vector ? Buffer.from(parsed.vector, 'base64') : undefined)).toString('base64') }
+      return { changed, update: Buffer.from(Y.encodeStateAsUpdate(doc, parsed.vector ? Buffer.from(parsed.vector, 'base64') : undefined)).toString('base64') }
     } finally { doc.destroy() }
   })
+  if (result.changed) dispatchLinearIssueSync(issue.id)
+  return { update: result.update }
 }
 export async function listMembers(id: string) {
   const { issue, user } = await requireIssueAccess(id)
@@ -67,7 +74,7 @@ export async function removeMember(id: string, memberId: string): Promise<Action
     if (issue.userId !== user.id) return { error: 'memberOwnerOnly' }
     const parsed = z.string().min(1).max(128).safeParse(memberId)
     if (!parsed.success) return { error: 'validationGeneric' }
-    await db.transaction(async tx => {
+    const clearedAssignee = await db.transaction(async tx => {
       const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, user.id))).for('update')
       if (!latest) throw new ActionFailureError('issueNotFound')
       await tx.delete(issueMembers).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, user.id), eq(issueMembers.memberId, parsed.data)))
@@ -75,8 +82,11 @@ export async function removeMember(id: string, memberId: string): Promise<Action
       if (metadata.assignee?.kind === 'member' && metadata.assignee.id === parsed.data) {
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, assignee: null }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, user.id))).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: user.id, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
+        return true
       }
+      return false
     })
+    if (clearedAssignee) dispatchLinearIssueSync(id)
     return { success: true }
   })
 }
