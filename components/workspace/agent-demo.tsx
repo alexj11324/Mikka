@@ -12,8 +12,9 @@ import { AgentGenerativeUI } from './agent-generative-ui'
 import { AgentInteractionContext } from './agent-interaction'
 import { AgentImagePreviewContext } from './agent-image'
 import { AgentDemoTools } from './agent-demo-tools'
+import { withBasePath } from '@/lib/base-path'
 
-const previewImage = { src: '/placeholder.svg?height=360&width=640', width: 640, height: 360, source: 'demo-placeholder', title: '本地演示占位图', author: '', license: '演示专用' }
+const previewImage = { src: withBasePath('/placeholder.svg?height=360&width=640'), width: 640, height: 360, source: 'demo-placeholder', title: '本地演示占位图', author: '', license: '演示专用' }
 
 export function AgentDemo({ onClose }: { onClose: () => void }) {
   const [run, setRun] = useState(0)

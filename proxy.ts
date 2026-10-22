@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { routing } from './i18n/routing'
 
 const localize = createMiddleware(routing)
+
 export default function proxy(request: NextRequest) {
   if (process.env.NODE_ENV === 'production') {
     const localePrefix = request.nextUrl.pathname.match(/^\/(en|zh-CN)(?=\/)/)?.[0] ?? ''
