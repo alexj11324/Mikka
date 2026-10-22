@@ -12,7 +12,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IssueBoard } from './issue-board'
 import { AppSidebar } from '@/components/app-sidebar'
 import { SettingsView } from '@/components/settings/settings-view'
-import { AppShell, AppShellContent } from '@/components/app-shell'
+import { AppShell, AppShellContent, SignOutBoundary } from '@/components/app-shell'
 import { IssueList } from './issue-list'
 import { IssueSearch } from './issue-search'
 import { ISSUE_STATUSES, WORKSPACE_NAME, issueIdentifier, type IssueStatus, type IssueView } from './issue-properties'
@@ -95,7 +95,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const [searchOpen, setSearchOpen] = useState(false)
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
-      if (event.isComposing || event.keyCode === 229 || boardBusy || settingsOpen) return
+      if (event.isComposing || event.keyCode === 229 || boardBusy || settingsOpen || leaving.current) return
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         if (document.querySelector('[role="dialog"][data-open]') && !searchOpen) return
         event.preventDefault(); setSearchOpen(value => !value)
@@ -189,7 +189,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     if (task.metadata.subscriberUserIds.includes(user.id)) counts.following++
   }
   const viewTitle = view === 'all' ? t('allIssues') : view === 'mine' ? t('mine') : view === 'shared' ? t('shared') : view === 'favorites' ? t('favorites') : view === 'following' ? t('following') : statusLabel(view)
-  return <AppShell fixed={!settingsOpen && !selected && (section === 'agent' || section === 'coordinator' || (!isProjects && !isOverview && layout === 'board'))}>
+  return <SignOutBoundary pending={signingOut}><AppShell fixed={!settingsOpen && !selected && (section === 'agent' || section === 'coordinator' || (!isProjects && !isOverview && layout === 'board'))}>
     {settingsOpen ? <SettingsView initialSection={settingsTarget.section} inviteInitially={settingsTarget.invite} user={user} googleEnabled={googleEnabled} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
     <AppSidebar onWorkspaceChange={async () => { if (boardBusy || leaving.current) return false; let allowed = false; await leave(() => { setSelected(null); setProjectId(null); setQuery(''); allowed = true }); return allowed }} onSettings={(section = 'preferences', invite = false) => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsTarget({ section, invite }); setSettingsOpen(true) }) }} user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
     <AppShellContent hideHeader={!!selected || section === 'agent'} parent={workspaceData?.workspace.name ?? tNav('workspace')} title={sectionTitles[section]} actions={section === 'plugins' ? undefined : <Button variant="ghost" size="icon-sm" aria-label={t('openSearch')} disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
@@ -206,5 +206,5 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     </>}
     {creating && <CreateIssueDialog initialStatus={createStatus} open={creating} onOpenChange={setCreating} onCreated={id => { void issueCreated(id) }} author={user.name || user.email} />}
     {searchOpen && <IssueSearch open={searchOpen} onOpenChange={setSearchOpen} issues={tasks} onOpen={open} onCreate={() => create()} />}
-  </AppShell>
+  </AppShell></SignOutBoundary>
 }

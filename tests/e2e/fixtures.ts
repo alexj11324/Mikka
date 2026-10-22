@@ -10,12 +10,18 @@ export function app(path: string) {
   return `${BASE_PATH}${path}`
 }
 
-export function watchRuntime(context: BrowserContext) {
+type ExpectedConsoleError = { path: string; message: string }
+
+export function watchRuntime(context: BrowserContext, expectedConsoleErrors: ExpectedConsoleError[] = []) {
   const failures: string[] = []
+  const expected = [...expectedConsoleErrors]
   context.on('page', page => {
     page.on('pageerror', error => failures.push(error.stack ?? error.message))
     page.on('console', message => {
-      if (message.type() === 'error') failures.push(`console.error: ${message.text()}`)
+      if (message.type() !== 'error') return
+      const index = expected.findIndex(error => message.text() === error.message && message.location().url === `${new URL(page.url()).origin}${error.path}`)
+      if (index >= 0) expected.splice(index, 1)
+      else failures.push(`console.error: ${message.text()}`)
     })
     page.on('response', response => {
       if (response.status() >= 500 && new URL(response.url()).origin === new URL(page.url()).origin) {
@@ -31,12 +37,13 @@ export function browserClientHeaders() {
   return { 'x-forwarded-for': `198.18.${randomInt(256)}.${randomInt(1, 255)}` }
 }
 
-export const test = base.extend<{ runtimeGuard: void }>({
+export const test = base.extend<{ runtimeGuard: void; expectedConsoleErrors: ExpectedConsoleError[] }>({
+  expectedConsoleErrors: [[], { option: true }],
   extraHTTPHeaders: async ({ extraHTTPHeaders }, use) => {
     await use({ ...extraHTTPHeaders, ...browserClientHeaders() })
   },
-  runtimeGuard: [async ({ context }, use, testInfo) => {
-    const failures = watchRuntime(context)
+  runtimeGuard: [async ({ context, expectedConsoleErrors }, use, testInfo) => {
+    const failures = watchRuntime(context, expectedConsoleErrors)
     await use()
     if (failures.length) await testInfo.attach('runtime-errors', { body: failures.join('\n\n'), contentType: 'text/plain' })
     expect(failures, '页面异常、console.error 或服务端 5xx 不得被忽略').toEqual([])
