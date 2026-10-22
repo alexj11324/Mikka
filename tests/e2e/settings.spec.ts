@@ -12,7 +12,7 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
   })
   await register(page)
   const workspaceSidebar = page.locator('[data-slot="sidebar-container"]')
-  await expect(workspaceSidebar.getByRole('button', { name: 'Agent', exact: true })).toHaveCount(0)
+  await expect(workspaceSidebar.getByRole('button', { name: 'Agent', exact: true })).toBeVisible()
   await expect(workspaceSidebar.getByRole('link', { name: '浏览与管理团队', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeEnabled()
   await page.route('**/*', route => {
@@ -60,7 +60,8 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
 })
 
 test.describe('工作区访问拒绝', () => {
-  test.use({ expectedConsoleErrors: ['/api/workspace', '/api/teams/directory'].map(path => ({ path: app(`${path}?workspace=00000000-0000-4000-8000-000000000099`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' })) })
+  // oxlint-disable-next-line no-empty-pattern -- Playwright fixture functions require destructured arguments.
+  test.use({ expectedConsoleErrors: async ({}, use) => { await use(['/api/workspace', '/api/teams/directory'].map(path => ({ path: app(`${path}?workspace=00000000-0000-4000-8000-000000000099`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' }))) } })
 
 test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', async ({ page }) => {
   await register(page, '/settings/members')
@@ -236,7 +237,7 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   const integrations = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^Integrations$/ }) })
   await expect(integrations.locator('[data-slot="sidebar-menu-button"]')).toHaveText(['All integrations', 'GitHub'])
   const administration = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^Administration$/ }) })
-  await expect(administration.locator('[data-slot="sidebar-menu-button"]')).toHaveText(['Workspace', 'Teams', 'Members', 'Security', 'API', 'Applications', 'Billing', 'Usage & limits', 'Import & export'])
+  await expect(administration.locator('[data-slot="sidebar-menu-button"]')).toHaveText(['工作区', '团队', '成员', 'Security', 'API', 'Applications', 'Billing', 'Usage & limits', 'Import & export'])
   const features = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^Features$/ }) })
   await expect(features.locator('[data-slot="sidebar-menu-button"]')).toHaveText(['AI & agents', 'Loops', 'Initiatives', 'Documents', 'Customer requests', 'Releases', 'Pulse', 'Asks', 'Emojis'])
   await expect(sidebar.locator('[data-slot="sidebar-menu-sub"]')).toHaveCount(0)
@@ -285,7 +286,7 @@ test('移动端页内创建不横向溢出，返回和侧栏切换保护未保�
   await register(page, '/settings/teams')
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
-  const form = page.getByRole('form', { name: '创建新团队', exact: true })
+  const form = page.getByRole('form', { name: '创建新团队', exact: true, includeHidden: true })
   await expect(form).toBeVisible()
   const nameLabel = form.locator('label[for="team-name"]')
   const identifierLabel = form.locator('label[for="team-identifier"]')

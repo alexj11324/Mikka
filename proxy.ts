@@ -5,6 +5,7 @@ import { routing } from './i18n/routing'
 const localize = createMiddleware(routing)
 
 export default function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith('/w/')) return NextResponse.next()
   if (process.env.NODE_ENV === 'production') {
     const localePrefix = request.nextUrl.pathname.match(/^\/(en|zh-CN)(?=\/)/)?.[0] ?? ''
     const pathname = request.nextUrl.pathname.slice(localePrefix.length)
