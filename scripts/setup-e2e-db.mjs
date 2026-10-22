@@ -1,7 +1,7 @@
 import { Pool } from 'pg'
 import { getMigrations } from 'better-auth/db/migration'
 import { SQL, sql } from 'drizzle-orm'
-import { getTableConfig, PgDialect } from 'drizzle-orm/pg-core'
+import { getTableConfig, PgDialect, PgTable } from 'drizzle-orm/pg-core'
 import * as issueSchema from '../lib/db/schema.ts'
 import * as workspaceSchema from '../lib/db/workspace-schema.ts'
 import * as projectSchema from '../lib/db/project-schema.ts'
@@ -38,7 +38,8 @@ function defaultValue(value, dataType) {
 }
 
 try {
-  for (const table of [...Object.values(issueSchema), ...Object.values(workspaceSchema), ...Object.values(projectSchema), ...Object.values(teamSchema)]) {
+  const tables = [...Object.values(issueSchema), ...Object.values(workspaceSchema), ...Object.values(projectSchema), ...Object.values(teamSchema)]
+  for (const table of tables.filter(value => value instanceof PgTable)) {
     const config = getTableConfig(table)
     if (config.name === 'user') continue
     const columns = config.columns.map(column => [
