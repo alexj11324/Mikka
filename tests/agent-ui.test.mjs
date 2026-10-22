@@ -39,6 +39,17 @@ test('beUI 代码块在 OpenUI 和 Markdown 中真正接入，等待状态使用
   assert.match(code, /from '@\/components\/agents\/code-block'/)
 })
 
+test('普通聊天正文不加载公式引擎，含公式时复用完整 Markdown 渲染', async () => {
+  const markdown = await readFile(new URL('../components/workspace/agent-markdown.tsx', import.meta.url), 'utf8')
+  const math = await readFile(new URL('../components/workspace/agent-math-markdown.tsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(markdown, /from '(?:remark-math|rehype-katex)'|import 'katex\//)
+  assert.match(markdown, /dynamic\(\(\) => import\('\.\/agent-math-markdown'\)/)
+  assert.match(markdown, /props\.text\.includes\('\$'\)/)
+  assert.match(math, /<AgentMarkdownContent/)
+  assert.match(math, /trust: false/)
+  assert.match(math, /katex\/dist\/katex.min.css/)
+})
+
 function commonsImage(overrides = {}) {
   return { title: 'File:Victoria Harbour.jpg', index: 1, imageinfo: [{ thumburl: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/photo.jpg', thumbwidth: 960, thumbheight: 540, descriptionurl: 'https://commons.wikimedia.org/wiki/File:Victoria_Harbour.jpg', mime: 'image/jpeg', extmetadata: { Artist: { value: '<a>摄影师</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' } }, ...overrides }] }
 }
