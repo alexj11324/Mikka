@@ -10,6 +10,8 @@ import { db } from '@/lib/db'
 import { issueMembers, issues, telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { issueTeamAccess } from '@/lib/issue-team-access'
+import { isIssueTeamAccessAllowed } from '@/lib/issue-team-access-policy'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { parseTelegramCommand } from './commands'
 import { isPostgresUniqueViolation } from './unique-violation'
@@ -122,7 +124,12 @@ async function findAccessibleIssues(tx: Transaction, userId: string, match?: { i
     ))
     .orderBy(desc(issues.updatedAt))
     .limit(match ? 3 : 10)
-  return rows.map(row => row.issue).filter(issue => !readIssueMetadata(issue.content).deletedAt)
+  const accessible = await Promise.all(rows.map(async ({ issue }) =>
+    isIssueTeamAccessAllowed(await issueTeamAccess(issue.id, userId)) ? issue : null,
+  ))
+  return accessible.filter((issue): issue is typeof issues.$inferSelect =>
+    issue !== null && !readIssueMetadata(issue.content).deletedAt,
+  )
 }
 
 async function handleCommand(tx: Transaction, conversation: typeof telegramConversations.$inferSelect, userId: string, command: { name: string; args: string }, t: Translator): Promise<string | { reply: string; issueId: string }> {
