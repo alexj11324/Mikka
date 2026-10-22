@@ -1,5 +1,8 @@
 'use client'
 
+import { useAgentCopy } from '@/hooks/use-agent-copy'
+import type { AgentCopy } from '@/lib/agent-copy'
+import { useLocale } from 'next-intl'
 import { useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, FileText, LoaderCircle, MessageSquarePlus, Search } from 'lucide-react'
 import { SidebarTrigger } from '@/components/ui/sidebar'
@@ -26,9 +29,11 @@ export function AgentChat({ turns, composer, streaming, sessions, sessionId, onS
   streaming: boolean
   onSuggestion: (prompt: string) => void
 }) {
-  const title = sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || '新对话'
+  const agentCopy = useAgentCopy()
 
-  return <section aria-label="Agent 对话工作区" className="orvilo-agent flex size-full min-h-0 flex-col">
+  const title = sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || agentCopy.newConversation
+
+  return <section aria-label={agentCopy.agentConversationWorkspace} className="orvilo-agent flex size-full min-h-0 flex-col">
     <AgentChatHeader title={title} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} onDemo={onDemo} />
     {turns.length === 0 ? <AgentWelcome composer={composer} sessions={sessions} onSelect={onSelect} onSuggestion={onSuggestion} /> : <>
       <AgentConversation turns={turns} streaming={streaming} />
@@ -40,14 +45,17 @@ export function AgentChat({ turns, composer, streaming, sessions, sessionId, onS
 }
 
 function AgentChatHeader({ title, streaming, sessions, sessionId, onSelect, onReset, onDemo }: AgentChatNavigation & { title: string; streaming: boolean }) {
+  const agentCopy = useAgentCopy()
+
+  const locale = useLocale()
   const [open, setOpen] = useState(false)
   const [searching, setSearching] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const today = new Date().setHours(0, 0, 0, 0)
   const groups = [
-    { label: '今天', sessions: sessions.filter(session => Date.parse(session.updatedAt) >= today) },
-    { label: '最近 7 天', sessions: sessions.filter(session => Date.parse(session.updatedAt) < today && Date.parse(session.updatedAt) >= today - 6 * 86400000) },
-    { label: '更早', sessions: sessions.filter(session => Date.parse(session.updatedAt) < today - 6 * 86400000) },
+    { label: agentCopy.today, sessions: sessions.filter(session => Date.parse(session.updatedAt) >= today) },
+    { label: agentCopy.last7Days, sessions: sessions.filter(session => Date.parse(session.updatedAt) < today && Date.parse(session.updatedAt) >= today - 6 * 86400000) },
+    { label: agentCopy.earlier, sessions: sessions.filter(session => Date.parse(session.updatedAt) < today - 6 * 86400000) },
   ]
 
   function navigate(id: string) {
@@ -57,24 +65,24 @@ function AgentChatHeader({ title, streaming, sessions, sessionId, onSelect, onRe
   }
 
   return <header className="flex h-12 shrink-0 items-center gap-2 px-4">
-    <SidebarTrigger aria-label="展开或收起侧边栏" />
+    <SidebarTrigger aria-label={agentCopy.toggleSidebar} />
     <Popover open={open} onOpenChange={value => { setOpen(value); if (!value) setSearching(false) }}>
       <h1 className="min-w-0">
-        <PopoverTrigger render={<Button variant="ghost" className="max-w-full justify-start" aria-label={`切换会话：${title}`} />}>
+        <PopoverTrigger render={<Button variant="ghost" className="max-w-full justify-start" aria-label={(agentCopy.switchConversation + (title))} />}>
           <span className="truncate">{title}</span>
           <ChevronDown aria-hidden="true" data-icon="inline-end" />
         </PopoverTrigger>
       </h1>
-      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-0" aria-label={searching ? '搜索历史会话' : '切换历史会话'} initialFocus={searching ? searchRef : undefined}>
-        <Command label={searching ? '搜索历史会话' : '历史会话'} shouldFilter={searching} tabIndex={0}>
-          {searching && <CommandInput ref={searchRef} aria-label="搜索历史会话" placeholder="搜索历史会话…" />}
-          <CommandList label="历史会话" className="max-h-80">
-            <CommandEmpty>{sessions.length ? '未找到相关会话' : '暂无历史会话'}</CommandEmpty>
+      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-0" aria-label={searching ? agentCopy.searchConversations : agentCopy.switchConversation2} initialFocus={searching ? searchRef : undefined}>
+        <Command label={searching ? agentCopy.searchConversations : agentCopy.conversationHistory} shouldFilter={searching} tabIndex={0}>
+          {searching && <CommandInput ref={searchRef} aria-label={agentCopy.searchConversations} placeholder={agentCopy.searchConversations2} />}
+          <CommandList label={agentCopy.conversationHistory} className="max-h-80">
+            <CommandEmpty>{sessions.length ? agentCopy.noMatchingConversations : agentCopy.noConversationsYet}</CommandEmpty>
             {groups.filter(group => group.sessions.length > 0).map(group => <CommandGroup key={group.label} heading={group.label}>
               {group.sessions.map(session => <CommandItem key={session.id} value={session.id} keywords={[session.title]} data-checked={session.id === sessionId} onSelect={() => navigate(session.id)} className="gap-2 py-2">
-                {session.running ? <LoaderCircle aria-label="正在回复" className="animate-spin" /> : <FileText aria-hidden="true" />}
+                {session.running ? <LoaderCircle aria-label={agentCopy.responding} className="animate-spin" /> : <FileText aria-hidden="true" />}
                 <span className="min-w-0 flex-1 truncate">{session.title}</span>
-                <time dateTime={session.updatedAt} title={new Date(session.updatedAt).toLocaleString('zh-CN')} className="shrink-0 text-xs text-muted-foreground">{relativeDate(session.updatedAt)}</time>
+                <time dateTime={session.updatedAt} title={new Date(session.updatedAt).toLocaleString(locale)} className="shrink-0 text-xs text-muted-foreground">{relativeDate(session.updatedAt, locale, agentCopy)}</time>
               </CommandItem>)}
             </CommandGroup>)}
           </CommandList>
@@ -82,18 +90,18 @@ function AgentChatHeader({ title, streaming, sessions, sessionId, onSelect, onRe
       </PopoverContent>
     </Popover>
     <div className="ml-auto flex shrink-0 items-center gap-1">
-      {streaming && <span role="status" className="sr-only">正在回复</span>}
-      {onDemo && <Button variant="ghost" size="sm" onClick={onDemo}>组件演示</Button>}
-      <Button variant="ghost" size="icon" aria-label="新任务" title="新任务" onClick={onReset}><MessageSquarePlus aria-hidden="true" data-icon="inline-start" /></Button>
-      <Button variant="ghost" size="icon" aria-label="搜索" title="搜索历史会话" onClick={() => { setSearching(true); setOpen(true) }}><Search aria-hidden="true" data-icon="inline-start" /></Button>
+      {streaming && <span role="status" className="sr-only">{agentCopy.responding}</span>}
+      {onDemo && <Button variant="ghost" size="sm" onClick={onDemo}>{agentCopy.componentDemo}</Button>}
+      <Button variant="ghost" size="icon" aria-label={agentCopy.newTask} title={agentCopy.newTask} onClick={onReset}><MessageSquarePlus aria-hidden="true" data-icon="inline-start" /></Button>
+      <Button variant="ghost" size="icon" aria-label={agentCopy.search} title={agentCopy.searchConversations} onClick={() => { setSearching(true); setOpen(true) }}><Search aria-hidden="true" data-icon="inline-start" /></Button>
     </div>
   </header>
 }
 
-function relativeDate(date: string) {
+function relativeDate(date: string, locale: string, agentCopy: AgentCopy) {
   const days = Math.max(0, Math.floor((Date.now() - Date.parse(date)) / 86400000))
-  if (days === 0) return '今天'
-  if (days < 7) return `${days}天前`
-  if (days < 30) return `${Math.floor(days / 7)}周前`
-  return new Date(date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
+  if (days === 0) return agentCopy.today
+  if (days < 7) return ((days) + agentCopy.daysAgo)
+  if (days < 30) return ((Math.floor(days / 7)) + agentCopy.weeksAgo)
+  return new Date(date).toLocaleDateString(locale, { month: 'numeric', day: 'numeric' })
 }

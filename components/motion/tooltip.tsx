@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { AnimatePresence } from "motion/react";
 import {
   type ComponentProps,
@@ -516,7 +517,7 @@ export function TooltipTrigger({ asChild = false, children, ref, onClick, ...pro
   }
 
   return (
-    <button
+    <Button variant="ghost" size="sm"
       type="button"
       data-state={open ? "open" : "closed"}
       onClick={onClick}
@@ -525,7 +526,7 @@ export function TooltipTrigger({ asChild = false, children, ref, onClick, ...pro
       {...aria}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 

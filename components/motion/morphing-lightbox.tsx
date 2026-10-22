@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { useAgentCopy } from '@/hooks/use-agent-copy'
+import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 // beui.dev/components/motion/image-viewer
 
 import { ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react";
@@ -139,12 +142,15 @@ export function ImageViewer({
   value: controlledValue,
   defaultValue = null,
   onValueChange,
-  label = "图片查看器",
+  label: labelProp,
   className,
   thumbnailClassName,
   renderCaption,
   children,
 }: ImageViewerProps) {
+const agentCopy = useAgentCopy()
+const label = labelProp ?? agentCopy.imageViewer
+
   const [internalValue, setInternalValue] = useState(defaultValue);
   const value = controlledValue === undefined ? internalValue : controlledValue;
   const index = images.findIndex((image) => image.id === value);
@@ -247,6 +253,8 @@ export function ImageViewerThumbnail({
   disabled,
   ...props
 }: ImageViewerThumbnailProps) {
+  const agentCopy = useAgentCopy()
+
   const { images, value, groupId, reduce, select } = useViewerContext(
     "ImageViewerThumbnail",
   );
@@ -256,7 +264,7 @@ export function ImageViewerThumbnail({
   return (
     <motion.button
       type="button"
-      aria-label={`放大查看：${image.alt}`}
+      aria-label={(agentCopy.enlarge + (image.alt))}
       whileTap={reduce ? undefined : { scale: 0.98 }}
       transition={SPRING_PRESS}
       {...props}
@@ -336,6 +344,8 @@ function ViewerButton({
   onClick,
   ...props
 }: ViewerButtonProps & { action: "close" | "previous" | "next" }) {
+  const agentCopy = useAgentCopy()
+
   const { index, images, select, move } = useViewerContext(
     "ImageViewer controls",
   );
@@ -348,14 +358,14 @@ function ViewerButton({
   const Icon =
     action === "close" ? X : action === "previous" ? ChevronLeft : ChevronRight;
   return (
-    <button
+    <Button variant="ghost" size="sm"
       type="button"
       aria-label={
         action === "close"
-          ? "关闭图片查看器"
+          ? agentCopy.closeImageViewer
           : action === "previous"
-            ? "上一张图片"
-            : "下一张图片"
+            ? agentCopy.previousImage
+            : agentCopy.nextImage
       }
       {...props}
       disabled={disabled || unavailable}
@@ -369,7 +379,7 @@ function ViewerButton({
       className={cn(controlClass, className)}
     >
       {children ?? <Icon size={18} aria-hidden="true" />}
-    </button>
+    </Button>
   );
 }
 export function ImageViewerClose(props: ViewerButtonProps) {
@@ -551,6 +561,8 @@ function LightboxFrame({
   reduce: boolean;
   onSwipe: (direction: -1 | 1) => void;
 }) {
+  const agentCopy = useAgentCopy()
+
   const [zoom, setZoom] = useState(false);
   const [failed, setFailed] = useState(false);
   const session = `${image.id}-${image.src}`;
@@ -708,14 +720,13 @@ function LightboxFrame({
               role="status"
               className="absolute inset-0 flex items-center justify-center bg-neutral-900 p-4 text-center text-sm text-white"
             >
-              图片暂时无法加载，请关闭后重试。
-            </p>
+              {agentCopy.unableToLoadThisImageCloseAnd}</p>
           )}
         </motion.div>
       </div>
-      <button
+      <Button variant="ghost" size="sm"
         type="button"
-        aria-label={zoom ? "缩小图片" : "放大图片"}
+        aria-label={zoom ? agentCopy.zoomOut : agentCopy.zoomIn}
         aria-pressed={zoom}
         aria-describedby={panHelp}
         onKeyDown={(event) => {
@@ -746,10 +757,9 @@ function LightboxFrame({
         ) : (
           <Plus size={18} aria-hidden="true" />
         )}
-      </button>
+      </Button>
       <span id={panHelp} className="sr-only">
-        放大后可拖动图片移动；也可聚焦此按钮，使用方向键移动图片。
-      </span>
+        {agentCopy.dragToPanWhenZoomedInOr}</span>
     </div>
   );
 }

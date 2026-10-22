@@ -2,12 +2,13 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { isAcceptanceEnabled } from '@/lib/acceptance'
+import { withBasePath } from '@/lib/base-path'
 
 export const dynamic = 'force-dynamic'
 
 function redirectWithinPreview(path: '/' | '/?acceptance=1' | '/acceptance') {
   // NextRequest.url can contain the internal 0.0.0.0 origin behind the preview proxy.
-  return new NextResponse(null, { status: 307, headers: { Location: path, 'Cache-Control': 'no-store' } })
+  return new NextResponse(null, { status: 307, headers: { Location: withBasePath(path), 'Cache-Control': 'no-store' } })
 }
 
 export async function GET(request: NextRequest) {

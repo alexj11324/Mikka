@@ -1,5 +1,7 @@
 'use client'
 
+import { useAgentCopy } from '@/hooks/use-agent-copy'
+import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { Component, useCallback, useMemo, useState, type ReactNode } from 'react'
 import { createParser, Renderer, type ActionEvent, type OpenUIError } from '@openuidev/react-lang'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -12,9 +14,11 @@ import { AgentMarkdown } from './agent-markdown'
 const finalParser = createParser(agentUILibrary.toJSONSchema(), agentUILibrary.root)
 
 function GenerationError({ issue, onRetry }: { issue: AgentUIIssue; onRetry?: () => void }) {
+  const agentCopy = useAgentCopy()
+
   return <Alert variant="destructive">
     <AlertTitle>{issue.title}</AlertTitle>
-    <AlertDescription>{issue.message}{onRetry && <Button type="button" variant="outline" size="sm" onClick={onRetry}>重试此回复</Button>}</AlertDescription>
+    <AlertDescription>{issue.message}{onRetry && <Button type="button" variant="outline" size="sm" onClick={onRetry}>{agentCopy.retryThisResponse}</Button>}</AlertDescription>
   </Alert>
 }
 
@@ -31,7 +35,7 @@ class GenerationBoundary extends Component<BoundaryProps, { failed: boolean; res
 
   render() {
     if (!this.state.failed) return this.props.children
-    return this.props.showErrors ? <GenerationError issue={{ title: '回复显示出错', message: '这条回复中的卡片或表格在显示时发生错误。请重试此回复。' }} onRetry={this.props.onRetry} /> : null
+    return this.props.showErrors ? <GenerationError issue={{ title: agentCopy.unableToDisplayResponse, message: agentCopy.aCardOrTableInThisResponse }} onRetry={this.props.onRetry} /> : null
   }
 }
 

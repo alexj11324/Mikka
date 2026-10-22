@@ -8,13 +8,12 @@ import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import {
-  agents, agentRuns, deviceRepos, deviceTokens, devices, runChunks, runMessages,
+  agents, agentRuns, deviceRepos, deviceTokens, devices,
   SUPPORTED_HARNESSES, type SupportedHarness,
 } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/device-link'
 import { listSshHosts } from '@/lib/ssh'
-import { requireIssueAccess } from '@/lib/issue-access'
-import { tiptapToText } from '@/lib/tiptap-text'
+import { addRunMessage, queueRun, readRun, requestRunStop, runViewColumns, type RunDetail, type RunView } from '@/lib/agent-runs'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
 async function getUserId(): Promise<string> {
@@ -54,21 +53,7 @@ export interface AgentView {
   deviceName: string | null
 }
 
-export interface RunView {
-  id: string
-  issueId: string | null
-  agentId: string
-  agentName: string
-  harness: SupportedHarness
-  status: string
-  kind: string
-  stopReason: string | null
-  error: string | null
-  report: Record<string, unknown> | null
-  createdAt: Date
-  startedAt: Date | null
-  finishedAt: Date | null
-}
+export type { RunDetail, RunView } from '@/lib/agent-runs'
 
 /** Every device this person owns, with the repos agents may work in. */
 export async function listDevices(): Promise<DeviceView[]> {
@@ -231,95 +216,31 @@ async function ownedDeviceWithHarness(deviceId: string, harness: SupportedHarnes
   return device.harnesses.some(info => info.harness === harness && info.installed) ? device : null
 }
 
-/**
- * Queues one run of one agent against one issue. The daemon picks it up on its
- * next poll, claims it, and reports back through `/v1/runs/:runId/complete`.
- */
+/** Queues one run of one agent against one issue. */
 export async function startRun(input: { issueId: string; agentId: string; deviceRepoId: string }): Promise<{ runId: string }> {
-  const userId = await getUserId()
-  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), deviceRepoId: z.uuid() }).safeParse(input)
-  if (!parsed.success) throw new ActionFailureError('runInvalid')
-  const { issue } = await requireIssueAccess(parsed.data.issueId)
-  const [agent] = await db.select().from(agents)
-    .where(and(eq(agents.id, parsed.data.agentId), eq(agents.userId, userId))).limit(1)
-  if (!agent?.deviceId) throw new ActionFailureError('agentNoDevice')
-  const [repo] = await db.select().from(deviceRepos)
-    .where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.deviceId, agent.deviceId), eq(deviceRepos.userId, userId))).limit(1)
-  if (!repo) throw new ActionFailureError('agentRepoMissing')
-  const runId = crypto.randomUUID()
-  await db.insert(agentRuns).values({
-    id: runId, userId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
-    prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions),
-  })
-  return { runId }
-}
-
-/** The brief the agent starts from: the issue, then the agent's own role. */
-function runPrompt(title: string, body: string, instructions: string): string {
-  const parts = [`# ${title}`]
-  if (body) parts.push(body)
-  parts.push('---', 'Work in the repository checked out for this run. When you are done, hand in your work with a short summary of what changed.')
-  if (instructions) parts.push('## Your standing instructions', instructions)
-  return parts.join('\n\n').slice(0, 100_000)
+  return queueRun(await getUserId(), input)
 }
 
 export async function listRuns(issueId: string): Promise<RunView[]> {
   const userId = await getUserId()
   const parsed = z.uuid().safeParse(issueId)
   if (!parsed.success) return []
-  const rows = await db.select({
-    id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: agents.name,
-    harness: agents.harness, status: agentRuns.status, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
-    error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,
-    startedAt: agentRuns.startedAt, finishedAt: agentRuns.finishedAt,
-  }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
+  const rows = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
     .where(and(eq(agentRuns.issueId, parsed.data), eq(agentRuns.userId, userId)))
     .orderBy(desc(agentRuns.createdAt)).limit(20)
   return rows
 }
 
-export interface RunDetail {
-  run: RunView
-  chunks: Record<string, unknown>[]
-  messages: { id: string; text: string; createdAt: Date }[]
-}
-
 export async function getRun(runId: string): Promise<RunDetail | null> {
-  const userId = await getUserId()
-  const parsed = z.uuid().safeParse(runId)
-  if (!parsed.success) return null
-  const [run] = await db.select({
-    id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: agents.name,
-    harness: agents.harness, status: agentRuns.status, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
-    error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,
-    startedAt: agentRuns.startedAt, finishedAt: agentRuns.finishedAt,
-  }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.id, parsed.data), eq(agentRuns.userId, userId))).limit(1)
-  if (!run) return null
-  const chunks = await db.select({ chunk: runChunks.chunk }).from(runChunks)
-    .where(eq(runChunks.runId, run.id)).orderBy(asc(runChunks.seq))
-  const messages = await db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt })
-    .from(runMessages).where(eq(runMessages.runId, run.id)).orderBy(asc(runMessages.createdAt))
-  return { run, chunks: chunks.map(row => row.chunk), messages }
+  return readRun(await getUserId(), runId)
 }
 
 /** A message a person sends the running agent; the daemon delivers it. */
 export async function sendRunMessage(input: { runId: string; text: string }): Promise<void> {
-  const userId = await getUserId()
-  const parsed = z.object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) }).safeParse(input)
-  if (!parsed.success) throw new ActionFailureError('messageRequired')
-  const [run] = await db.select({ id: agentRuns.id }).from(agentRuns)
-    .where(and(eq(agentRuns.id, parsed.data.runId), eq(agentRuns.userId, userId))).limit(1)
-  if (!run) throw new ActionFailureError('runNotFound')
-  await db.insert(runMessages).values({ id: crypto.randomUUID(), runId: run.id, userId, text: parsed.data.text })
+  await addRunMessage(await getUserId(), input)
 }
 
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
 export async function stopRun(runId: string): Promise<void> {
-  const userId = await getUserId()
-  const parsed = z.uuid().safeParse(runId)
-  if (!parsed.success) throw new ActionFailureError('runNotFound')
-  await db.update(agentRuns).set({ stopRequestedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(agentRuns.id, parsed.data), eq(agentRuns.userId, userId)))
+  await requestRunStop(await getUserId(), runId)
 }

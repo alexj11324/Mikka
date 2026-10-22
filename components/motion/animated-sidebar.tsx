@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { ChevronRight } from "lucide-react";
 import {
   AnimatePresence,
@@ -599,7 +600,7 @@ export const AnimatedSidebarTrigger = forwardRef<
   const expanded = context.isMobile ? context.openMobile : context.open;
 
   return (
-    <button
+    <Button variant="ghost" size="sm"
       {...props}
       ref={(node) => {
         context.triggerRef.current = node;
@@ -637,7 +638,7 @@ export const AnimatedSidebarClose = forwardRef<
   const context = useAnimatedSidebar();
 
   return (
-    <button
+    <Button variant="ghost" size="sm"
       {...props}
       ref={forwardedRef}
       type={type}
@@ -671,7 +672,7 @@ export const AnimatedSidebarRail = forwardRef<
   const panel = useAnimatedSidebarPanel();
 
   return (
-    <button
+    <Button variant="ghost" size="sm"
       {...props}
       ref={forwardedRef}
       type={type}

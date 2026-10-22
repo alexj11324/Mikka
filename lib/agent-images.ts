@@ -1,3 +1,4 @@
+import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { z } from 'zod'
 
 export const agentImageQuery = z.string().trim().min(2).max(160).refine(value => !/[\r\n<>]/.test(value) && !/https?:\/\//i.test(value))
@@ -66,6 +67,6 @@ export async function findAgentImage(query: string, signal?: AbortSignal) {
     next: { revalidate: 86400 },
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(8000)]) : AbortSignal.timeout(8000),
   })
-  if (!response.ok) throw new Error('图片来源暂时不可用，请稍后重试。')
+  if (!response.ok) throw new Error(agentCopy.imageSourcesAreTemporarilyUnavailablePleaseTry)
   return parseAgentImage(await response.json())
 }

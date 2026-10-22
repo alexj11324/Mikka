@@ -1,3 +1,4 @@
+import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import type { UIMessageChunk } from 'ai'
 
 export function validateAgentStream() {
@@ -13,15 +14,15 @@ export function validateAgentStream() {
         finished = true
         if (!failed && (part.finishReason === 'length' || !hasText)) {
           controller.enqueue({ type: 'error', errorText: part.finishReason === 'length'
-            ? '模型达到单次回复的输出上限，最后一部分被截断。已收到的内容已保留，请重试此回复。'
-            : '模型未返回正文，请在此重试。' })
+            ? agentCopy.theModelReachedItsOutputLimitAnd
+            : agentCopy.theModelReturnedNoResponseContentPlease })
           failed = true
         }
       }
       controller.enqueue(part)
     },
     flush(controller) {
-      if (!finished && !failed) controller.enqueue({ type: 'error', errorText: '回复连接提前结束，已有内容已保留，请在此重试。' })
+      if (!finished && !failed) controller.enqueue({ type: 'error', errorText: agentCopy.theResponseEndedEarlyReceivedContentIs })
     },
   })
 }
@@ -69,7 +70,7 @@ export const fetchAgentResponse: typeof fetch = async (input, options) => {
 
   let handleAbort: () => void = () => {}
   const aborted = new Promise<never>((_, reject) => {
-    handleAbort = () => reject(signal.reason ?? new DOMException('请求已停止', 'AbortError'))
+    handleAbort = () => reject(signal.reason ?? new DOMException(agentCopy.requestStopped, 'AbortError'))
     signal.addEventListener('abort', handleAbort, { once: true })
   })
 

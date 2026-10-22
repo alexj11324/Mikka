@@ -1,5 +1,6 @@
 'use client'
 
+import { useAgentCopy } from '@/hooks/use-agent-copy'
 import type { ActionEvent } from '@openuidev/react-lang'
 import { Bot } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -12,19 +13,21 @@ import { StreamingResponse } from '@/components/agents/streaming-response'
 import { AgentGenerativeUI } from './agent-generative-ui'
 
 export function AgentResponse({ completion, error, isLoading, stopped = false, onAction, onRetry }: { completion: string; error?: Error; isLoading: boolean; stopped?: boolean; onAction: (event: ActionEvent) => void; onRetry?: () => void }) {
+  const agentCopy = useAgentCopy()
+
   if (!completion && !error && !isLoading) return null
 
-  return <Message from="assistant" aria-label="Agent 回复" animateIn={isLoading}>
+  return <Message from="assistant" aria-label={agentCopy.agentResponse} animateIn={isLoading}>
     <MessageAvatar><Bot aria-hidden="true" /></MessageAvatar>
     <MessageContent className="gap-3">
       <MessageHeader>Agent</MessageHeader>
       <Bubble variant="ghost" className="w-full min-w-0">
         <BubbleContent className="flex w-full min-w-0 flex-col gap-4">
-          {isLoading && <ReasoningText variant="cascade" phrases={completion ? ['正在继续生成回复', '正在整理回复内容'] : ['正在准备回复', '正在等待回复']} />}
+          {isLoading && <ReasoningText variant="cascade" phrases={completion ? [agentCopy.continuingTheResponse, agentCopy.organizingResponseContent] : [agentCopy.preparingAResponse, agentCopy.waitingForAResponse]} />}
           {completion && <StreamingResponse status={error ? 'error' : isLoading ? 'streaming' : 'complete'} announce={false} showActions={false}>
             <div className="w-full min-w-0 overflow-x-auto break-words"><AgentGenerativeUI response={completion} isStreaming={isLoading} onAction={onAction} showErrors={!error && !stopped} onRetry={onRetry} /></div>
           </StreamingResponse>}
-          {error && <Alert variant="destructive"><AlertDescription>{error.message || '请求失败，请稍后重试。'} 你的输入已保留。{onRetry && <Button type="button" variant="outline" size="sm" disabled={isLoading} onClick={onRetry}>重试此回复</Button>}</AlertDescription></Alert>}
+          {error && <Alert variant="destructive"><AlertDescription>{error.message || agentCopy.requestFailedPleaseTryAgain} {agentCopy.yourInputHasBeenPreserved}{onRetry && <Button type="button" variant="outline" size="sm" disabled={isLoading} onClick={onRetry}>{agentCopy.retryThisResponse}</Button>}</AlertDescription></Alert>}
         </BubbleContent>
       </Bubble>
     </MessageContent>

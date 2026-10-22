@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 // beui.dev/components/agents/chat-app
 
 import {
@@ -194,7 +195,7 @@ export function ToolApproval({
           ) : null}
 
           {parameters.length ? (
-            <button
+            <Button variant="ghost" size="sm"
               type="button"
               aria-expanded={currentOpen}
               aria-controls={detailsId}
@@ -209,7 +210,7 @@ export function ToolApproval({
               >
                 <ChevronDown className="size-3.5" />
               </motion.span>
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -262,13 +263,13 @@ export function ToolApproval({
                 Always allow
               </motion.button>
             ) : null}
-            <button
+            <Button variant="ghost" size="sm"
               type="button"
               onClick={onDeny}
               className="rounded-xl px-3 py-1.5 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               Deny
-            </button>
+            </Button>
           </motion.div>
         ) : null}
       </AnimatePresence>

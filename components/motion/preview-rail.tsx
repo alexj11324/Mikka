@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   type MouseEvent,
@@ -270,7 +271,7 @@ export function PreviewRail({
               {itemContent}
             </a>
           ) : (
-            <button
+            <Button variant="ghost" size="sm"
               key={item.id}
               data-slot="preview-rail-item"
               type="button"
@@ -286,7 +287,7 @@ export function PreviewRail({
               className={sharedClassName}
             >
               {itemContent}
-            </button>
+            </Button>
           );
         })}
       </nav>

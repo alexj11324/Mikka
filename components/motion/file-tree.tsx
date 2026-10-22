@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 // beui.dev/components/motion/file-tree
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -341,7 +342,7 @@ export function FileTree({
               }}
               transition={reduce ? { duration: 0 } : SPRING_LAYOUT}
             >
-              <button
+              <Button variant="ghost" size="sm"
                 ref={(node) => {
                   if (node) rowRefs.current.set(row.item.value, node);
                   else rowRefs.current.delete(row.item.value);
@@ -421,7 +422,7 @@ export function FileTree({
                 >
                   {row.item.name}
                 </span>
-              </button>
+              </Button>
             </motion.div>
           );
         })}

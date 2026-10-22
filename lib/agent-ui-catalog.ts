@@ -1,3 +1,4 @@
+// i18n-ignore-file: Model protocol descriptions and validated action literals are not interface copy.
 import { createLibrary, defineComponent, type ComponentRenderer, type DefinedAction } from '@openuidev/react-lang'
 import { openuiLibrary } from '@openuidev/react-ui/genui-lib'
 import { z } from 'zod/v4'
@@ -76,7 +77,7 @@ export const agentComponentCatalog = {
     }),
   },
   BeTodoList: {
-    description: '对应 AI Elements Plan/Task 的 beUI TodoList。source=suggestion 为建议计划，所有项目强制显示待开始，不代表执行；source=user 仅展示用户本次明确提供的真实状态和进度。不能编造工具执行进度。',
+    description: '对应 AI Elements Plan/Task 的 beUI TodoList。source=suggestion 为建议计划，所有项目强制显示���开始，不代表执行；source=user 仅展示用户本次明确提供的真实状态和进度。不能编造工具执行进度。',
     props: z.object({
       title: z.string().min(1).max(120),
       items: z.array(z.object({ id: z.string().min(1).max(80), title: z.string().min(1).max(200), status: z.enum(['pending', 'in-progress', 'completed', 'cancelled']).optional(), progress: z.number().min(0).max(100).optional(), detail: z.string().max(300).optional() })).min(1).max(20)

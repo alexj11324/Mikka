@@ -1,5 +1,6 @@
 'use client'
 
+import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useIsStreaming } from '@openuidev/react-lang'
 import { CircleCheck, CircleHelp, Code, ListTodo, LoaderCircle, MessageSquareText, Quote, Sparkles } from 'lucide-react'
 import { StreamingResponse } from '@/components/agents/streaming-response'
@@ -28,10 +29,12 @@ export const AgentContent: AgentComponentRenderers['BeResponse'] = ({ props, ren
 }
 
 export const AgentTasks: AgentComponentRenderers['BeTodoList'] = ({ props }) => {
+  const agentCopy = useAgentCopy()
+
   const suggested = props.source !== 'user'
   const items = (props.items ?? []).map(item => suggested ? { id: item.id, title: item.title, status: 'pending' as const, detail: item.detail } : item)
   return <div className="flex min-w-0 flex-col gap-2">
-    <p className="text-xs text-muted-foreground">{suggested ? '建议计划，尚未执行或保存。' : '仅展示本次提问中用户提供的任务状态。'}</p>
+    <p className="text-xs text-muted-foreground">{suggested ? agentCopy.suggestedPlanNotExecutedOrSaved : agentCopy.onlyShowsTaskStatusProvidedByThe}</p>
     <TodoList title={props.title} items={items} collapseOnComplete={false} />
   </div>
 }

@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 // beui.dev/components/blocks/file-upload
 
 import {
@@ -323,7 +324,7 @@ function FileUploadRow({
             <div className="flex shrink-0 items-center gap-1">
               <StatusIcon status={status} reduce={reduce} />
               {status === "error" ? (
-                <button
+                <Button variant="ghost" size="sm"
                   type="button"
                   onClick={() => onRetry(item)}
                   aria-label={`Retry ${item.name}`}
@@ -333,9 +334,9 @@ function FileUploadRow({
                   )}
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               ) : null}
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => onRemove(item)}
                 aria-label={`Remove ${item.name}`}
@@ -345,7 +346,7 @@ function FileUploadRow({
                 )}
               >
                 <X className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -495,7 +496,7 @@ export function FileUpload({
         }}
       />
 
-      <button
+      <Button variant="ghost" size="sm"
         type="button"
         disabled={disabled || maxReached}
         data-dragging={dragging}
@@ -587,7 +588,7 @@ export function FileUpload({
         >
           {browseLabel}
         </span>
-      </button>
+      </Button>
 
       <ul className={cn("space-y-2", classNames?.queue)}>
         <AnimatePresence initial={false}>

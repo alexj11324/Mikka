@@ -1,5 +1,6 @@
 'use client'
 
+import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { Children, isValidElement, memo, type ComponentProps, type ReactNode } from 'react'
 import { AgentCodeBlock } from './agent-code-block'
 import dynamic from 'next/dynamic'
@@ -13,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 const MermaidDiagram = dynamic(() => import('./agent-mermaid').then(module => module.AgentMermaid), {
   ssr: false,
-  loading: () => <p role="status" className="text-sm text-muted-foreground">正在加载图表…</p>,
+  loading: () => { const agentCopy = useAgentCopy(); return (<p role="status" className="text-sm text-muted-foreground">{agentCopy.loadingDiagram}</p>) },
 })
 
 const remarkPlugins = [remarkGfm, remarkMath]
@@ -26,6 +27,8 @@ export const AgentMarkdown = memo(function AgentMarkdown({ text, isStreaming = f
   isStreaming?: boolean
   size?: 'small' | 'default' | 'large' | 'small-heavy' | 'large-heavy'
 }) {
+  const agentCopy = useAgentCopy()
+
   return <div data-agent-markdown className={cn('agent-markdown flex min-w-0 max-w-full flex-col gap-3 break-words text-sm leading-7 [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden', {
     'text-xs': size === 'small' || size === 'small-heavy',
     'text-base': size === 'large' || size === 'large-heavy',
@@ -42,7 +45,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({ text, isStreaming = f
       ol: ({ node: _node, ...props }) => <ol {...props} className="flex list-decimal flex-col gap-1 ps-6" />,
       blockquote: ({ node: _node, ...props }) => <blockquote {...props} className="rounded-lg bg-muted px-4 py-3 text-muted-foreground" />,
       a: ({ node: _node, href, ...props }) => <a {...props} href={href} className="text-primary underline underline-offset-4" target="_blank" rel="noopener noreferrer" />,
-      img: ({ alt }) => <span className="text-muted-foreground">{alt || '图片'}（图片请使用资料配图组件）</span>,
+      img: ({ alt }) => <span className="text-muted-foreground">{alt || agentCopy.image}{agentCopy.useTheIllustrationComponentForImages}</span>,
       pre: ({ children }) => {
         const child = Children.toArray(children).find(child => isValidElement<{ className?: string; children?: ReactNode }>(child))
         if (!isValidElement<{ className?: string; children?: ReactNode }>(child)) return null
@@ -53,7 +56,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({ text, isStreaming = f
           : <AgentCodeBlock code={source} language={language} isStreaming={isStreaming} />}</div>
       },
       code: ({ node: _node, ...props }) => <code {...props} className="rounded bg-muted px-1 py-0.5 font-mono text-xs" />,
-      table: ({ node: _node, ...props }) => <div tabIndex={0} role="region" aria-label="Markdown 表格"><Table {...props} /></div>,
+      table: ({ node: _node, ...props }) => <div tabIndex={0} role="region" aria-label={agentCopy.markdownTable}><Table {...props} /></div>,
       thead: ({ node: _node, ...props }) => <TableHeader {...props} />,
       tbody: ({ node: _node, ...props }) => <TableBody {...props} />,
       tr: ({ node: _node, ...props }) => <TableRow {...props} />,

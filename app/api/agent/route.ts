@@ -1,3 +1,4 @@
+import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createUIMessageStreamResponse, isStepCount, streamText, toUIMessageStream } from 'ai'
 import { agentWebInstructions, createAgentWebTools } from '@/lib/agent-web-tools'
@@ -18,10 +19,10 @@ const errorHeaders = { 'Cache-Control': 'private, no-store', 'Content-Type': 'te
 
 function agentErrorMessage(error: unknown) {
   const status = typeof error === 'object' && error !== null && 'statusCode' in error ? error.statusCode : undefined
-  if (status === 401 || status === 403) return 'OpenCode Go 身份验证或模型权限检查失败，请检查服务端配置。'
-  if (status === 429 || status === 402) return 'OpenCode Go 当前限流或额度不足，请稍后重试并检查订阅额度。'
-  if (error instanceof Error && /timeout|abort/i.test(error.name)) return '模型响应超时，已收到的内容已保留，请在此重试。'
-  return 'OpenCode Go 连接失败，已有内容已保留，请在此重试。'
+  if (status === 401 || status === 403) return agentCopy.opencodeGoAuthenticationOrModelAccessFailed
+  if (status === 429 || status === 402) return agentCopy.opencodeGoIsRateLimitedOrOut
+  if (error instanceof Error && /timeout|abort/i.test(error.name)) return agentCopy.theModelTimedOutReceivedContentIs
+  return agentCopy.opencodeGoConnectionFailedReceivedContentIs
 }
 
 export async function HEAD(request: Request) {
@@ -31,20 +32,20 @@ export async function HEAD(request: Request) {
 
 export async function POST(request: Request) {
   if (request.headers.get('sec-fetch-site') === 'cross-site') {
-    return new Response('不允许跨站调用。', { status: 403, headers: errorHeaders })
+    return new Response(agentCopy.crosssiteRequestsAreNotAllowed, { status: 403, headers: errorHeaders })
   }
   const startedAt = performance.now()
   const session = await auth.api.getSession({ headers: request.headers })
   const authenticatedAt = performance.now()
-  if (!session?.user) return new Response('请先登录后再使用 Agent。', { status: 401, headers: errorHeaders })
+  if (!session?.user) return new Response(agentCopy.signInBeforeUsingAgent, { status: 401, headers: errorHeaders })
   if (!request.headers.get('content-type')?.startsWith('application/json')) {
-    return new Response('请发送 JSON 格式的请求。', { status: 415, headers: errorHeaders })
+    return new Response(agentCopy.sendAJSONRequest, { status: 415, headers: errorHeaders })
   }
   if (Number(request.headers.get('content-length')) > 40000) {
-    return new Response('请求内容过长。', { status: 413, headers: errorHeaders })
+    return new Response(agentCopy.theRequestIsTooLong, { status: 413, headers: errorHeaders })
   }
   const reader = request.body?.getReader()
-  if (!reader) return new Response('请输入问题。', { status: 400, headers: errorHeaders })
+  if (!reader) return new Response(agentCopy.enterAQuestion, { status: 400, headers: errorHeaders })
   let size = 0
   const decoder = new TextDecoder()
   let body = ''
@@ -55,23 +56,23 @@ export async function POST(request: Request) {
       size += value.byteLength
       if (size > 40000) {
         await reader.cancel()
-        return new Response('请求内容过长。', { status: 413, headers: errorHeaders })
+        return new Response(agentCopy.theRequestIsTooLong, { status: 413, headers: errorHeaders })
       }
       body += decoder.decode(value, { stream: true })
     }
     body += decoder.decode()
   } catch {
-    return new Response('无法读取请求，请重试。', { status: 400, headers: errorHeaders })
+    return new Response(agentCopy.unableToReadTheRequestPleaseRetry, { status: 400, headers: errorHeaders })
   } finally {
     reader.releaseLock()
   }
   const parsed = promptSchema.safeParse((() => {
     try { return JSON.parse(body) } catch { return null }
   })())
-  if (!parsed.success) return new Response('请输入 1–8000 字的问题。', { status: 400, headers: errorHeaders })
+  if (!parsed.success) return new Response(agentCopy.enterAQuestionBetween1And8000, { status: 400, headers: errorHeaders })
 
   const apiKey = process.env.OPENCODE_API_KEY
-  if (!apiKey) return new Response('服务端尚未配置 OPENCODE_API_KEY，请添加环境变量后重试。', { status: 503, headers: errorHeaders })
+  if (!apiKey) return new Response(agentCopy.opencodeapikeyIsNotConfiguredOnTheServer, { status: 503, headers: errorHeaders })
 
   const sessionId = parsed.data.sessionId ?? crypto.randomUUID()
   const turnId = parsed.data.turnId ?? crypto.randomUUID()
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
   try {
     turn = await beginAgentTurn(session.user.id, sessionId, turnId, parsed.data.prompt, parsed.data.retry)
   } catch (error) {
-    return new Response(error instanceof AgentStoreError ? error.message : '无法保存本次提问，请稍后重试。', {
+    return new Response(error instanceof AgentStoreError ? error.message : agentCopy.unableToSaveThisQuestionPleaseTry, {
       status: error instanceof AgentStoreError ? error.status : 503, headers: errorHeaders,
     })
   }

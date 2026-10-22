@@ -1,4 +1,6 @@
 "use client";
+import { useAgentCopy } from '@/hooks/use-agent-copy'
+import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 // beui.dev/components/agents/loading-states
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -14,10 +16,10 @@ import {
 import { cn } from "@/lib/utils";
 
 const DEFAULT_PHRASES = [
-  "正在准备回复",
-  "正在等待回复",
-  "回复生成中",
-  "请稍候",
+  agentCopy.preparingAResponse,
+  agentCopy.waitingForAResponse,
+  agentCopy.generatingResponse,
+  agentCopy.pleaseWait,
 ];
 
 const CASCADE_STAGGER = 0.025;
@@ -165,6 +167,8 @@ export function ReasoningText({
   indicator,
   className,
 }: ReasoningTextProps) {
+  const agentCopy = useAgentCopy()
+
   const reduce = useReducedMotion() ?? false;
   const [index, setIndex] = useState(0);
   const statusId = useId();
@@ -203,7 +207,7 @@ export function ReasoningText({
               variant="ascii-line"
               size={14}
               speed={0.8}
-              label="回复生成中"
+              label={agentCopy.generatingResponse}
             />
           )}
         </span>

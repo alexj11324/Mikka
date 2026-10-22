@@ -380,7 +380,7 @@
       },
       "BeTodoList": {
         "signature": "BeTodoList(title: string, items: {id: string, title: string, status?: \"pending\" | \"in-progress\" | \"completed\" | \"cancelled\", progress?: number, detail?: string}[], source?: \"suggestion\" | \"user\")",
-        "description": "对应 AI Elements Plan/Task 的 beUI TodoList。source=suggestion 为建议计划，所有项目强制显示待开始，不代表执行；source=user 仅展示用户本次明确提供的真实状态和进度。不能编造工具执行进度。"
+        "description": "对应 AI Elements Plan/Task 的 beUI TodoList。source=suggestion 为建议计划，所有项目强制显示���开始，不代表执行；source=user 仅展示用户本次明确提供的真实状态和进度。不能编造工具执行进度。"
       },
       "AgentIcon": {
         "signature": "AgentIcon(name: \"assistant\" | \"reply\" | \"approve\" | \"question\" | \"progress\" | \"task\" | \"code\" | \"source\", label: string)",
@@ -4960,7 +4960,7 @@
             "items"
           ],
           "additionalProperties": false,
-          "description": "对应 AI Elements Plan/Task 的 beUI TodoList。source=suggestion 为建议计划，所有项目强制显示待开始，不代表执行；source=user 仅展示用户本次明确提供的真实状态和进度。不能编造工具执行进度。"
+          "description": "对应 AI Elements Plan/Task 的 beUI TodoList。source=suggestion 为建议计划，所有项目强制显示���开始，不代表执行；source=user 仅展示用户本次明确提供的真实状态和进度。不能编造工具执行进度。"
         },
         "AgentIcon": {
           "type": "object",

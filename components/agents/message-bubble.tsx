@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 // beui.dev/components/agents/chat-app
 
 import { ChevronDown } from "lucide-react";
@@ -346,7 +347,7 @@ export function MessageBubbleCollapsible({
       >
         {children}
       </div>
-      <button
+      <Button variant="ghost" size="sm"
         type="button"
         aria-expanded={currentOpen}
         aria-controls={contentId}
@@ -364,7 +365,7 @@ export function MessageBubbleCollapsible({
         >
           <ChevronDown className="size-3.5" />
         </motion.span>
-      </button>
+      </Button>
     </div>
   );
 }

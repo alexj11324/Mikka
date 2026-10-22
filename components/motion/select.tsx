@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { Check, ChevronDown } from "lucide-react";
 import {
   animate,
@@ -500,7 +501,7 @@ export function SelectItem({
 
   return (
     <motion.div variants={ctx.reduce ? undefined : ITEM_VARIANTS}>
-      <button
+      <Button variant="ghost" size="sm"
         type="button"
         role="option"
         aria-selected={selected}
@@ -520,7 +521,7 @@ export function SelectItem({
       >
         {children}
         {selected ? <Check className="h-3.5 w-3.5 shrink-0" /> : null}
-      </button>
+      </Button>
     </motion.div>
   );
 }

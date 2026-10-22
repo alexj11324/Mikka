@@ -93,6 +93,7 @@ export function MembersSettings({
   const format = useFormatter();
   const locale = useLocale();
   const translateError = useActionError();
+
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [ascending, setAscending] = useState(true);

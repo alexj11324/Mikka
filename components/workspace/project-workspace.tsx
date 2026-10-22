@@ -1,5 +1,6 @@
 'use client'
 
+import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useState } from 'react'
 import { ArrowDownAZ, ArrowUpAZ, Box, Plus } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
@@ -18,10 +19,10 @@ import { useProjectUpdate } from './use-project-update'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 const ProjectForm = dynamic(() => import('./project-form').then(module => module.ProjectForm), {
-  loading: () => <p role="status" className="p-6 text-sm text-muted-foreground">正在加载项目表单…</p>,
+  loading: () => { const agentCopy = useAgentCopy(); return (<p role="status" className="p-6 text-sm text-muted-foreground">{agentCopy.loadingProjectForm}</p>) },
 })
 const ProjectDetail = dynamic(() => import('./project-detail').then(module => module.ProjectDetail), {
-  loading: () => <div role="status" aria-label="正在加载项目详情" className="flex flex-col gap-6 p-6"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>,
+  loading: () => { const agentCopy = useAgentCopy(); return (<div role="status" aria-label={agentCopy.loadingProjectDetails} className="flex flex-col gap-6 p-6"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>) },
 })
 
 export function ProjectWorkspace({ projects, loading, error, projectId, team, issues, userName, onSelect, onOpenTeam, onOpenIssue, onCreateIssue, onUpdated }: {

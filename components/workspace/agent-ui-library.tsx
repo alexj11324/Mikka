@@ -1,5 +1,7 @@
 'use client'
 
+import { useAgentCopy } from '@/hooks/use-agent-copy'
+import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { Info } from 'lucide-react'
 import { AgentApproval, AgentQuestions, useAgentDecision } from './agent-decision'
 import { AgentCodeContent, AgentContent, AgentStatusIcon, AgentTasks, AgentTextContent } from './agent-content'
@@ -30,13 +32,15 @@ const renderers = {
     <BeCardHeader><BeCardTitle as="h3">{props.title}</BeCardTitle>{props.description && <BeCardDescription>{props.description}</BeCardDescription>}</BeCardHeader>
     <BeCardContent className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</BeCardContent>
   </BeCard>,
-  BeCardGrid: ({ props, renderNode }) => <div className="@container/agent-cards w-full min-w-0"><div role="group" aria-label="图文推荐卡片" className="grid min-w-0 grid-cols-1 items-stretch gap-4 @min-[26rem]/agent-cards:grid-cols-2 @min-[44rem]/agent-cards:grid-cols-3">{renderNode(props.children)}</div></div>,
+  BeCardGrid: ({ props, renderNode }) => <div className="@container/agent-cards w-full min-w-0"><div role="group" aria-label={agentCopy.illustratedRecommendationCards} className="grid min-w-0 grid-cols-1 items-stretch gap-4 @min-[26rem]/agent-cards:grid-cols-2 @min-[44rem]/agent-cards:grid-cols-3">{renderNode(props.children)}</div></div>,
   BeImageCard: ({ props }) => <AgentImageCard {...props} />,
   BeImage: ({ props }) => <AgentImage {...props} />,
   BeButton: function BePromptButton({ props }) {
+  const agentCopy = useAgentCopy()
+
     const { send, sent, error, status } = useAgentDecision()
     return <div className="flex min-w-0 flex-col gap-2">
-      <BeButton type="button" variant={props.variant} size="sm" disabled={status !== 'pending'} onClick={() => { void send(props.action) }}>{sent ? '已提问' : props.label === '填入提问' ? '直接提问' : props.label}</BeButton>
+      <BeButton type="button" variant={props.variant} size="sm" disabled={status !== 'pending'} onClick={() => { void send(props.action) }}>{sent ? agentCopy.asked : props.label === agentCopy.fillQuestion ? agentCopy.askNow : props.label}</BeButton>
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
     </div>
   },
@@ -76,9 +80,11 @@ const renderers = {
     <TableBody>{(props.rows ?? []).map((row, index) => <TableRow key={index}>{(row ?? []).map((cell, cellIndex) => <TableCell key={cellIndex}>{cell}</TableCell>)}</TableRow>)}</TableBody>
   </Table>,
   ShadcnButton: function PromptButton({ props }) {
+  const agentCopy = useAgentCopy()
+
     const { send, sent, error, status } = useAgentDecision()
     return <div className="flex min-w-0 flex-col gap-2">
-      <Button type="button" variant={props.variant} disabled={status !== 'pending'} onClick={() => { void send(props.prompt) }}>{sent ? '已提问' : props.label === '填入提问' ? '直接提问' : props.label}</Button>
+      <Button type="button" variant={props.variant} disabled={status !== 'pending'} onClick={() => { void send(props.prompt) }}>{sent ? agentCopy.asked : props.label === agentCopy.fillQuestion ? agentCopy.askNow : props.label}</Button>
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
     </div>
   },

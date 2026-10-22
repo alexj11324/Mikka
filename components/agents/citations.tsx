@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { BookOpenText, ChevronDown, ExternalLink, Globe2 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
@@ -268,7 +269,7 @@ export function Citations({
 
   return (
     <div className={cn("w-full text-sm", className)}>
-      <button
+      <Button variant="ghost" size="sm"
         type="button"
         aria-expanded={currentOpen}
         aria-controls={contentId}
@@ -288,7 +289,7 @@ export function Citations({
         >
           <ChevronDown className="size-3.5" />
         </motion.span>
-      </button>
+      </Button>
 
       <AgentDisclosure
         id={contentId}

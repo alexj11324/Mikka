@@ -49,6 +49,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     inbox: tOverview('sections.inbox'),
     'my-issues': tOverview('sections.myIssues'),
     agent: tOverview('sections.agent'),
+    coordinator: tOverview('sections.coordinator'),
     projects: tOverview('sections.projects'),
     views: tOverview('sections.views'),
     'team-home': tOverview('sections.teamHome'),
@@ -154,7 +155,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   function navigate(next: IssueView) {
     if (boardBusy || leaving.current) return false
-    void leave(() => { setSelected(null); if (['inbox', 'agent', 'views', 'team-home'].includes(section)) changeSection('team-issues'); setView(next); setQuery(''); setDraftKey(value => value + 1) })
+    void leave(() => { setSelected(null); if (['inbox', 'agent', 'coordinator', 'views', 'team-home'].includes(section)) changeSection('team-issues'); setView(next); setQuery(''); setDraftKey(value => value + 1) })
     return true
   }
   function navigateSection(next: WorkspaceSection) {
@@ -163,7 +164,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     return true
   }
   const isProjects = section === 'projects' || section === 'team-projects'
-  const isOverview = ['inbox', 'agent', 'views', 'team-home'].includes(section)
+  const isOverview = ['inbox', 'agent', 'coordinator', 'views', 'team-home'].includes(section)
   const filtered = tasks.filter(task => (view === 'all' || (view === 'mine' ? task.ownerId === user.id : view === 'shared' ? task.ownerId !== user.id : view === 'favorites' ? task.metadata.favoriteUserIds.includes(user.id) : view === 'following' ? task.metadata.subscriberUserIds.includes(user.id) : task.status === view)) && `${issueIdentifier(task.metadata.number, tIssue('unassignedNumber'))} ${task.title}`.toLowerCase().includes(query.trim().toLowerCase()))
   const counts: Record<IssueView, number> = { all: tasks.length, mine: 0, shared: 0, favorites: 0, following: 0, backlog: 0, todo: 0, doing: 0, review: 0, done: 0, canceled: 0, duplicate: 0 }
   for (const task of tasks) {
@@ -173,7 +174,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     if (task.metadata.subscriberUserIds.includes(user.id)) counts.following++
   }
   const viewTitle = view === 'all' ? t('allIssues') : view === 'mine' ? t('mine') : view === 'shared' ? t('shared') : view === 'favorites' ? t('favorites') : view === 'following' ? t('following') : statusLabel(view)
-  return <AppShell fixed={!settingsOpen && !selected && (section === 'agent' || (!isProjects && !isOverview && layout === 'board'))}>
+  return <AppShell fixed={!settingsOpen && !selected && (section === 'agent' || section === 'coordinator' || (!isProjects && !isOverview && layout === 'board'))}>
     {settingsOpen ? <SettingsView initialSection={settingsTarget.section} inviteInitially={settingsTarget.invite} user={user} onBack={() => setSettingsOpen(false)} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
     <AppSidebar onWorkspaceChange={async () => { if (boardBusy || leaving.current) return false; let allowed = false; await leave(() => { setSelected(null); setProjectId(null); setQuery(''); allowed = true }); return allowed }} onSettings={(section = 'preferences', invite = false) => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsTarget({ section, invite }); setSettingsOpen(true) }) }} user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
     <AppShellContent hideHeader={!!selected || section === 'agent'} parent={workspaceData?.workspace.name ?? tNav('workspace')} title={sectionTitles[section]} actions={<Button variant="ghost" size="icon-sm" aria-label={t('openSearch')} disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>

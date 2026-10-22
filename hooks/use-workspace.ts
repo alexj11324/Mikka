@@ -1,10 +1,11 @@
 'use client'
 
 import useSWR from 'swr'
+import { withBasePath } from '@/lib/base-path'
 import type { WorkspaceSettings } from '@/lib/workspace-access'
 
 async function fetchWorkspace([url]: readonly [string, string]): Promise<WorkspaceSettings> {
-  const response = await fetch(url)
+  const response = await fetch(withBasePath(url))
   if (!response.ok) throw new Error('无法读取工作区，请确认访问权限后重试。')
   return response.json()
 }

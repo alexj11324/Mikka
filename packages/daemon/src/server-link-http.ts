@@ -85,6 +85,12 @@ interface CallOptions<T> {
   signal?: AbortSignal
 }
 
+// The server may live under a path (https://app.aspectlylabs.com/mikka), which
+// new URL("/v1/...", base) would drop, so paths are appended to the base.
+export function serverUrl(base: string, path: string): URL {
+  return new URL(`${base.replace(/\/+$/, "")}${path}`)
+}
+
 export class HttpServerLink implements ServerLink {
   /** Device session, set by `registerDevice`. */
   private credential: string | null = null
@@ -106,7 +112,7 @@ export class HttpServerLink implements ServerLink {
     }: { timeoutMs?: number; signal?: AbortSignal } = {}
   ): Promise<Response> {
     try {
-      return await this.fetchImpl(new URL(path, this.baseUrl), {
+      return await this.fetchImpl(serverUrl(this.baseUrl, path), {
         method,
         headers: {
           "content-type": "application/json",

@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 // beui.dev/components/agents/chat-app
 
 import { ChevronDown } from "lucide-react";
@@ -210,7 +211,7 @@ export function AgentActivity({
             : <ThinkingShimmer>{liveLabel}</ThinkingShimmer>}
         </div>
       ) : (
-        <button
+        <Button variant="ghost" size="sm"
           id={triggerId}
           type="button"
           aria-expanded={expanded}
@@ -231,7 +232,7 @@ export function AgentActivity({
           >
             <ChevronDown className="size-3.5" />
           </motion.span>
-        </button>
+        </Button>
       )}
 
       <AgentDisclosure

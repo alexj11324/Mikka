@@ -57,7 +57,7 @@ const groupRules = new Map([
 ])
 const overlays = /^(?:Dialog|AlertDialog|Sheet|Drawer|DropdownMenu|ContextMenu|Menubar|Popover|Tooltip|HoverCard).*(?:Content|Overlay)$/
 
-function checkUtility(token, policy, report) {
+function checkUtility(token, policy, report, options = {}) {
   const base = utilityBase(token)
   const arbitraryTextColor = /^text-(?:\[(?:color:|#|(?:rgb|rgba|hsl|hsla|hwb|lab|lch|oklab|oklch|color|color-mix)\(|(?:Canvas|CanvasText|LinkText|VisitedText|ActiveText|ButtonFace|ButtonText|ButtonBorder|Field|FieldText|Highlight|HighlightText|SelectedItem|SelectedItemText|Mark|MarkText|GrayText|AccentColor|AccentColorText|transparent|currentColor)\])|\(color:)/i.test(base)
   if ((/^text-(?:\[|\()/.test(base) && !arbitraryTextColor) || /^(?:font|leading|tracking)-(?:\[|\()/.test(base) || /^\[(?:font|line-height|letter-spacing)/.test(base)) {
@@ -73,16 +73,20 @@ function checkUtility(token, policy, report) {
   }
   // 用户偏好无分割线：全宽水平长线一律用留白 / 背景分组替代。
   // 竖线（border-l/r、orientation="vertical"）不在此列；0 宽与 transparent 不构成可见线。
-  const horizontalBorder = base.match(/^border-([tby])(?:-(.+))?$/)
-  if (horizontalBorder && !['0', '0px', '[0px]', 'transparent', '[transparent]'].includes(horizontalBorder[2])) report('style/no-horizontal-rule', `禁止全宽水平长线 ${token}；用间距或背景分组。`)
-  const divide = base.match(/^divide-y(?:-(.+))?$/)
-  if (divide && !['0', 'reverse'].includes(divide[1])) report('style/no-horizontal-rule', `禁止全宽水平长线 ${token}；用间距或背景分组。`)
+  // 设置页按 Comma 的分组卡片采用 0.5px 行分隔线；其余界面保持无分割线。
+  if (!options.allowHorizontalRule) {
+    const horizontalBorder = base.match(/^border-([tby])(?:-(.+))?$/)
+    if (horizontalBorder && !['0', '0px', '[0px]', 'transparent', '[transparent]'].includes(horizontalBorder[2])) report('style/no-horizontal-rule', `禁止全宽水平长线 ${token}；用间距或背景分组。`)
+    const divide = base.match(/^divide-y(?:-(.+))?$/)
+    if (divide && !['0', 'reverse'].includes(divide[1])) report('style/no-horizontal-rule', `禁止全宽水平长线 ${token}；用间距或背景分组。`)
+  }
   if (palette.test(base) || arbitraryTextColor || /^(?:bg|border|ring|fill|stroke|outline)-(?:\[|\()/.test(base)) report('style/semantic-colors', `颜色必须使用语义 token：${token}。`)
   if (/^space-[xy]-/.test(base)) report('style/gap', `使用 flex/grid + gap，不使用 ${token}。`)
   if (/(?:^|:)dark:/.test(token) && /^(?:bg|text|border|ring|fill|stroke|outline)-/.test(base) && !base.endsWith('-transparent')) report('style/no-dark-color-override', `用语义 token 处理明暗主题，不单独覆盖 ${token}。`)
 }
 
 export function auditSource(file, text, policy) {
+  const allowHorizontalRule = file.startsWith('components/settings/')
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), variables = new Map(), seen = new Set()
   const add = (node, rule, message) => {
@@ -162,6 +166,10 @@ export function auditSource(file, text, policy) {
     if (!node) return ''
     const raw = node.tagName?.getText(source) ?? ''
     const entry = imports.get(raw)
+    if (entry?.from === '@/components/ui/settings-layout') {
+      if (entry.name === 'SettingsRow') return 'Field'
+      if (entry.name === 'SettingsGroup') return 'FieldGroup'
+    }
     return entry && (entry.from.startsWith('@/components/') || entry.from.startsWith('.')) ? entry.name === 'default' ? raw : entry.name : raw
   }
   const opening = node => ts.isJsxElement(node) ? node.openingElement : ts.isJsxSelfClosingElement(node) ? node : null
@@ -179,8 +187,9 @@ export function auditSource(file, text, policy) {
     return found
   }
   function visit(node) {
-    if (ts.isStringLiteralLike(node)) {
-      for (const token of splitUtilities(node.text)) if (/^(?:text-|font-|leading-|tracking-|bg-|border-|divide-|ring-|outline-|fill-|stroke-|space-[xy]-|\[(?:font|line-height|letter-spacing))/.test(utilityBase(token))) checkUtility(token, policy, (rule, message) => add(node, rule, message))
+    const cssAssertionProperty = /\.spec\.[jt]sx?$/.test(file) && !!node.parent && ts.isCallExpression(node.parent) && ts.isPropertyAccessExpression(node.parent.expression) && node.parent.expression.name.text === 'toHaveCSS' && node.parent.arguments[0] === node
+    if (ts.isStringLiteralLike(node) && !cssAssertionProperty) {
+      for (const token of splitUtilities(node.text)) if (/^(?:text-|font-|leading-|tracking-|bg-|border-|divide-|ring-|outline-|fill-|stroke-|space-[xy]-|\[(?:font|line-height|letter-spacing))/.test(utilityBase(token))) checkUtility(token, policy, (rule, message) => add(node, rule, message), { allowHorizontalRule })
     }
     if (ts.isPropertyAssignment(node) && /^(?:fontSize|fontFamily|fontWeight|lineHeight|letterSpacing|fontVariant|fontStyle)$/.test(node.name.getText(source).replaceAll(/['"]/g, ''))) add(node, 'typography/no-inline-values', '排版只能通过预设档位；不允许 style/配置对象手写字体值。')
     if (ts.isCallExpression(node)) {
@@ -218,6 +227,7 @@ export function auditSource(file, text, policy) {
           const tokens = splitUtilities(value)
           if (tokens.includes('overflow-hidden') && tokens.includes('text-ellipsis') && tokens.includes('whitespace-nowrap')) add(classAttr, 'style/truncate', '使用 truncate 简写。')
           const bases = tokens.map(utilityBase)
+          if (['FieldLabel', 'FieldTitle'].includes(name) && bases.some(base => base === 'font-normal' || /^text-(?:muted-foreground|secondary-foreground)(?:\/|$)/.test(base))) add(classAttr, 'forms/label-hierarchy', '字段主标题使用 FieldLabel / FieldTitle 默认的 foreground + medium；辅助说明使用 FieldDescription，不降低标题层级。')
           const drawnRule = bases.some(base => /^h-(?:px|0\.5)$/.test(base)) && bases.some(base => /^bg-(?!transparent|none$|clip-|origin-|cover|contain|center|left|right|top|bottom|repeat|no-repeat|fixed|local|scroll|auto|blend-)/.test(base))
           if (drawnRule) add(classAttr, 'style/no-horizontal-rule', '禁止用 h-px/0.5 + bg-* 手画水平细线；用间距或背景分组。')
           for (const token of tokens) {
@@ -248,6 +258,17 @@ export function auditSource(file, text, policy) {
       }
       if (name === 'Button' && (attr(node, 'isLoading') || attr(node, 'isPending'))) add(node, 'composition/button-loading', 'Button 使用 Spinner + disabled，不存在 isLoading/isPending。')
       if (['Input', 'Textarea'].includes(name) && parents.includes('InputGroup')) add(node, 'forms/input-group', 'InputGroup 内使用 InputGroupInput/InputGroupTextarea。')
+      if (name === 'FieldContent' && ts.isJsxElement(node.parent)) {
+        const children = node.parent.children.map(opening).filter(Boolean)
+        const hiddenLabel = children.some(child => {
+          if (canonical(child) !== 'FieldLabel') return false
+          const initializer = attr(child, 'className')?.initializer
+          const expression = initializer && (ts.isJsxExpression(initializer) ? initializer.expression : initializer)
+          return resolve(expression).strings.some(value => splitUtilities(value).map(utilityBase).includes('sr-only'))
+        })
+        const replacementText = children.some(child => ['span', 'div', 'p'].includes(canonical(child)) && ts.isJsxElement(child.parent) && child.parent.children.some(content => ts.isJsxText(content) && content.text.trim()))
+        if (hiddenLabel && replacementText) add(node, 'forms/visible-label', '不要隐藏 FieldLabel 后手写可见字段标题；直接显示 FieldLabel，说明文字使用 FieldDescription。')
+      }
       if (['Input', 'Textarea', 'Checkbox', 'Switch', 'NativeSelect'].includes(name) && parents.includes('form') && !parents.includes('Field')) add(node, 'forms/field', '表单控件使用 FieldGroup + Field，不手写字段容器。')
       if (name === 'Field' && !parents.includes('FieldGroup')) add(node, 'forms/field-group', 'Field 必须在 FieldGroup 中组合。')
       if (name === 'Field' && attr(node, 'data-invalid') && !containsInvalidControl(node, source)) add(node, 'forms/invalid-state', 'Field data-invalid 需配合控件 aria-invalid。')

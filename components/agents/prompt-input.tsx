@@ -1,4 +1,5 @@
 "use client";
+import { useAgentCopy } from '@/hooks/use-agent-copy'
 // beui.dev/components/agents/chat-app
 
 import { ArrowUp, Plus, Square } from "lucide-react";
@@ -88,11 +89,15 @@ export function PromptInput({
   leadingAction,
   className,
   disabled,
-  placeholder = "描述你想完成的事…",
-  "aria-label": ariaLabel = "向 Agent 提问",
+  placeholder: placeholderProp,
+  "aria-label": ariaLabelProp,
   onKeyDown,
   ...textareaProps
 }: PromptInputProps) {
+  const agentCopy = useAgentCopy()
+  const placeholder = placeholderProp ?? agentCopy.describeWhatYouWantToAccomplish
+  const ariaLabel = ariaLabelProp ?? agentCopy.askAgent
+
   const reduce = useReducedMotion() ?? false;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const measurementRef = useRef<HTMLDivElement>(null);
@@ -220,7 +225,7 @@ export function PromptInput({
                 variant="ghost"
                 size="icon"
                 disabled={disabled || loading}
-                aria-label="添加到提问"
+                aria-label={agentCopy.addToQuestion}
                 className="size-8 rounded-full"
               >
                 <motion.span
@@ -241,7 +246,7 @@ export function PromptInput({
               className="w-56 p-1.5"
             >
               {actions.map((action) => (
-                <button
+                <Button variant="ghost" size="sm"
                   key={action.value}
                   type="button"
                   disabled={action.disabled}
@@ -266,7 +271,7 @@ export function PromptInput({
                       </span>
                     ) : null}
                   </span>
-                </button>
+                </Button>
               ))}
             </MorphPopoverContent>
           </MorphPopover>
@@ -287,7 +292,7 @@ export function PromptInput({
                   </span>
                 ) : null}
                 <span className="truncate text-muted-foreground">
-                  {currentModel?.label ?? "选择模型"}
+                  {currentModel?.label ?? agentCopy.chooseModel}
                 </span>
               </span>
             </SelectTrigger>
@@ -319,7 +324,7 @@ export function PromptInput({
           type={loading ? "button" : "submit"}
           size="icon"
           disabled={loading ? !onStop : !canSubmit}
-          aria-label={loading ? "停止生成" : "发送消息"}
+          aria-label={loading ? agentCopy.stopGenerating : agentCopy.sendMessage}
           onClick={loading ? event => {
             // Stopping can synchronously turn this button into a submit button before the click default runs.
             event.preventDefault();

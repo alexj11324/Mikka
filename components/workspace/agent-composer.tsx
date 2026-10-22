@@ -1,8 +1,9 @@
 'use client'
 
+import { useAgentCopy } from '@/hooks/use-agent-copy'
 import type { Ref } from 'react'
 import { PromptInput } from '@/components/agents/prompt-input'
-import { agentStarters } from './agent-starters'
+import { getAgentStarters } from './agent-starters'
 
 export function AgentComposer({ ref, draft, onChange, onSubmit, isLoading, onStop, isEmpty = false }: {
   ref: Ref<HTMLTextAreaElement>
@@ -13,10 +14,13 @@ export function AgentComposer({ ref, draft, onChange, onSubmit, isLoading, onSto
   isLoading: boolean
   onStop: () => void
 }) {
+  const agentCopy = useAgentCopy()
+  const agentStarters = getAgentStarters(agentCopy)
+
   return <PromptInput
     ref={ref}
-    aria-label="向 Agent 提问"
-    placeholder={isEmpty ? '向 Agent 提问…' : '输入消息…'}
+    aria-label={agentCopy.askAgent}
+    placeholder={isEmpty ? agentCopy.askAgent2 : agentCopy.enterAMessage}
     minRows={isEmpty ? 2 : 1}
     maxRows={4}
     models={[{ value: 'deepseek-v4.1-flash', label: 'DS 4.1 Flash' }]}

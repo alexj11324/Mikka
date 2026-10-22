@@ -1,4 +1,6 @@
 "use client";
+import { useAgentCopy } from '@/hooks/use-agent-copy'
+import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 // beui.dev/components/motion/loader
 
 import { motion, useReducedMotion } from "motion/react";
@@ -56,9 +58,12 @@ export function Loader({
   variant = "spinner",
   size = 32,
   speed = 1,
-  label = "加载中",
+  label: labelProp,
   className,
 }: LoaderProps) {
+const agentCopy = useAgentCopy()
+const label = labelProp ?? agentCopy.loading
+
   const reduce = useReducedMotion() ?? false;
 
   return (
@@ -235,6 +240,8 @@ const MORPH_ROT = [0, 0, 72, 72, 144, 144, 216, 216, 288, 288, 360];
 const MORPH_SCALE = [1, 1, 0.88, 0.88, 1, 1, 0.88, 0.88, 1, 1, 1];
 
 function Morph({ size, speed, reduce }: PartProps) {
+  const agentCopy = useAgentCopy()
+
   return (
     <motion.svg
       width={size}
@@ -252,7 +259,7 @@ function Morph({ size, speed, reduce }: PartProps) {
           : { duration: speed * 5, ease: EASE_IN_OUT, repeat: Infinity }
       }
     >
-      <title>加载中</title>
+      <title>{agentCopy.loading}</title>
       <motion.path
         fill="currentColor"
         d={MORPH_PATHS[0]}
@@ -306,7 +313,7 @@ function Comet({ size, speed, reduce }: PartProps) {
   );
 }
 
-const SCRAMBLE_TARGET = "加载中";
+const SCRAMBLE_TARGET = agentCopy.loading;
 const SCRAMBLE_GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>/*#@";
 
 function Scramble({ size, speed, reduce }: PartProps) {
@@ -349,10 +356,12 @@ function Scramble({ size, speed, reduce }: PartProps) {
 }
 
 function Metaballs({ size, speed, reduce }: PartProps) {
+  const agentCopy = useAgentCopy()
+
   const id = useId().replace(/:/g, "");
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" role="img">
-      <title>加载中</title>
+      <title>{agentCopy.loading}</title>
       <defs>
         <filter id={id}>
           <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b" />

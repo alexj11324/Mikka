@@ -1,5 +1,6 @@
 'use client'
 
+import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useRef, useState } from 'react'
 import { useIsStreaming } from '@openuidev/react-lang'
 import { ApprovalCard, type ApprovalCardStatus } from '@/components/agents/approval-card'
@@ -8,6 +9,8 @@ import { useAgentInteraction } from './agent-interaction'
 import { type AgentComponentRenderers } from '@/lib/agent-ui-catalog'
 
 export function useAgentDecision() {
+  const agentCopy = useAgentCopy()
+
   const { busy, continueFromAnswer } = useAgentInteraction()
   const streaming = useIsStreaming()
   const locked = useRef(false)
@@ -18,7 +21,7 @@ export function useAgentDecision() {
   async function send(prompt: string) {
     if (busy || streaming || locked.current || sent) return
     if (!prompt.trim() || prompt.length > 8000) {
-      setError('提问内容为空或过长，请调整后在此重新提交。')
+      setError(agentCopy.theQuestionIsEmptyOrTooLong2)
       return
     }
     locked.current = true
@@ -26,9 +29,9 @@ export function useAgentDecision() {
     setError('')
     try {
       if (await continueFromAnswer(prompt)) setSent(true)
-      else setError('本次继续未完成，选择和回答已保留，可以在此重试。')
+      else setError(agentCopy.unableToContinueYourChoicesAndAnswers)
     } catch {
-      setError('提交失败，选择和回答已保留，请在此重试。')
+      setError(agentCopy.submissionFailedYourChoicesAndAnswersAre)
     } finally {
       locked.current = false
       setPending(false)
@@ -39,43 +42,47 @@ export function useAgentDecision() {
 }
 
 export const AgentApproval: AgentComponentRenderers['BeApproval'] = ({ props }) => {
+  const agentCopy = useAgentCopy()
+
   const { send, sent, error, status } = useAgentDecision()
   const [decision, setDecision] = useState('')
 
   function choose(value: string) {
     setDecision(value)
-    void send(`任务背景：${props.context}\n待确认建议：${props.title}\n方案说明：${props.description}\n我的意见：${value}。请据此继续提供建议，不要执行工作区操作。`)
+    void send((agentCopy.taskContext + (props.context) + agentCopy.proposal + (props.title) + agentCopy.description + (props.description) + agentCopy.myDecision + (value) + agentCopy.ContinueAdvisingBasedOnThisWithout))
   }
 
   return <div className="flex min-w-0 flex-col gap-2">
     <ApprovalCard
       title={props.title}
-      description={<>{props.description}<span className="mt-2 block">在此选择后直接继续对话，不会授权工具或执行工作区操作。</span></>}
+      description={<>{props.description}<span className="mt-2 block">{agentCopy.chooseHereToContinueThisDoesNot}</span></>}
       status={sent ? 'answered' : status}
-      approveLabel="同意并继续"
-      onApprove={() => choose('同意这个建议方案')}
-      onReject={() => choose('不同意这个建议方案')}
-      onRequestChanges={() => choose('请修改这个建议方案')}
-      result={`${decision}，已提交给 Agent；未执行工作区操作。`}
+      approveLabel={agentCopy.approveAndContinue}
+      onApprove={() => choose(agentCopy.iApproveThisProposal)}
+      onReject={() => choose(agentCopy.iRejectThisProposal)}
+      onRequestChanges={() => choose(agentCopy.pleaseReviseThisProposal)}
+      result={((decision) + agentCopy.SubmittedToAgentNoWorkspaceOperations)}
     />
     {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
   </div>
 }
 
 export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }) => {
+  const agentCopy = useAgentCopy()
+
   const { send, sent, error, status } = useAgentDecision()
   const [summary, setSummary] = useState('')
-  const questions = (props.questions ?? []).map(question => ({ ...question, autoAdvance: false, customPlaceholder: '补充其他回答…' }))
+  const questions = (props.questions ?? []).map(question => ({ ...question, autoAdvance: false, customPlaceholder: agentCopy.addAnotherAnswer }))
 
   if (questions.length === 0) return null
 
   return <div className="flex min-w-0 flex-col gap-2">
-    <p className="text-xs text-muted-foreground">直接在此回答，提交后 Agent 会根据你的选择继续。</p>
+    <p className="text-xs text-muted-foreground">{agentCopy.answerHereAgentWillContinueBasedOn}</p>
     <ApprovalCard
       questions={questions}
       status={sent ? 'answered' : status}
-      submitLabel="提交回答并继续"
-      result={`回答已提交给 Agent。${summary}`}
+      submitLabel={agentCopy.submitAnswersAndContinue}
+      result={(agentCopy.answersSubmittedToAgent + (summary))}
       onSubmit={answers => {
         const response = questions.map(question => {
           const answer = answers[question.id]
@@ -83,7 +90,7 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
           return `${question.title}：${[...selected, answer?.custom?.trim()].filter(Boolean).join('；')}`
         }).join('\n')
         setSummary(response)
-        void send(`任务背景：${props.context}\n我的回答：\n${response}\n请根据以上信息继续提供建议，不要执行工作区操作。`)
+        void send((agentCopy.taskContext + (props.context) + agentCopy.myAnswers + (response) + agentCopy.continueAdvisingBasedOnThisInformationWithout))
       }}
     />
     {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}

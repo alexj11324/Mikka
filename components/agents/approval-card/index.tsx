@@ -1,4 +1,6 @@
 "use client";
+import { useAgentCopy } from '@/hooks/use-agent-copy'
+import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 // beui.dev/components/agents/chat-app
 
 import {
@@ -39,13 +41,14 @@ export type {
 
 const EMPTY_ANSWER: ApprovalCardAnswer = { selected: [], custom: "" };
 
-function getStatusLabel(status: ApprovalCardStatus) {
-  if (status === "submitting") return "正在继续";
-  if (status === "approved") return "已同意";
-  if (status === "rejected") return "已拒绝";
-  if (status === "changes-requested") return "需要修改";
-  if (status === "answered") return "已填写意见";
-  return "等待你的选择";
+function useStatusLabel(status: ApprovalCardStatus) {
+  const agentCopy = useAgentCopy()
+  if (status === "submitting") return agentCopy.continuing;
+  if (status === "approved") return agentCopy.approved;
+  if (status === "rejected") return agentCopy.rejected;
+  if (status === "changes-requested") return agentCopy.changesRequested;
+  if (status === "answered") return agentCopy.feedbackProvided;
+  return agentCopy.awaitingYourChoice;
 }
 
 function getStatusClass(status: ApprovalCardStatus) {
@@ -89,6 +92,8 @@ function QuestionOptions({
   onChange: (answer: ApprovalCardAnswer) => void;
   onSingleSelect?: () => void;
 }) {
+  const agentCopy = useAgentCopy()
+
   const custom = answer.custom ?? "";
 
   return (
@@ -140,10 +145,10 @@ function QuestionOptions({
 
       {question.allowCustom ? (
         <Input
-          aria-label={`${question.title}：补充回答`}
+          aria-label={((question.title) + agentCopy.AdditionalAnswer)}
           value={custom}
           disabled={disabled}
-          placeholder={question.customPlaceholder ?? "补充其他回答…"}
+          placeholder={question.customPlaceholder ?? agentCopy.addAnotherAnswer}
           onChange={(value) =>
             onChange({
               selected: question.multiple ? answer.selected : [],
@@ -163,11 +168,12 @@ function QuestionOptions({
 }
 
 function ProgressDots({ current, ids }: { current: number; ids: string[] }) {
+  const agentCopy = useAgentCopy()
+
   return (
     <span className="flex gap-1.5">
       <span className="sr-only">
-        第 {current + 1} 题，共 {ids.length} 题
-      </span>
+        {agentCopy.question}{current + 1} {agentCopy.of}{ids.length} {agentCopy.questions}</span>
       {ids.map((id, index) => (
         <motion.span
           key={id}
@@ -189,7 +195,7 @@ function ProgressDots({ current, ids }: { current: number; ids: string[] }) {
 }
 
 export function ApprovalCard({
-  title = "请确认建议方案",
+  title: titleProp,
   description,
   children,
   questions = [],
@@ -205,11 +211,17 @@ export function ApprovalCard({
   onReject,
   onRequestChanges,
   onDismiss,
-  approveLabel = "同意",
-  submitLabel = "填写回答",
+  approveLabel: approveLabelProp,
+  submitLabel: submitLabelProp,
   result,
   className,
 }: ApprovalCardProps) {
+  const agentCopy = useAgentCopy()
+const title = titleProp ?? agentCopy.reviewThisProposal
+const approveLabel = approveLabelProp ?? agentCopy.approve
+const submitLabel = submitLabelProp ?? agentCopy.answer
+
+
   const reduce = useReducedMotion() ?? false;
   const [internalAnswers, setInternalAnswers] =
     useState<ApprovalCardAnswers>(defaultAnswers);
@@ -231,7 +243,7 @@ export function ApprovalCard({
     : EMPTY_ANSWER;
   const displayTitle = question?.title ?? title;
   const titleKey = question?.id ?? "approval";
-  const statusLabel = getStatusLabel(status);
+  const statusLabel = useStatusLabel(status);
 
   const clearAutoAdvance = useCallback(() => {
     if (autoAdvanceTimer.current === undefined) return;
@@ -341,14 +353,14 @@ export function ApprovalCard({
               </span>
             )}
             {onDismiss ? (
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
-                aria-label="关闭"
+                aria-label={agentCopy.close}
                 onClick={onDismiss}
                 className="grid size-5 shrink-0 place-items-center rounded-full text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <X className="size-4" />
-              </button>
+              </Button>
             ) : null}
           </div>
 
@@ -394,7 +406,7 @@ export function ApprovalCard({
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label="上一题"
+                      aria-label={agentCopy.previousQuestion}
                       disabled={busy || currentStep === 0}
                       onClick={() => setStep(currentStep - 1)}
                       className="rounded-full"
@@ -411,8 +423,8 @@ export function ApprovalCard({
                   size={currentStep === questions.length - 1 ? "sm" : "icon"}
                   aria-label={
                     currentStep === questions.length - 1
-                      ? typeof submitLabel === "string" ? submitLabel : "填写回答"
-                      : "下一题"
+                      ? typeof submitLabel === "string" ? submitLabel : agentCopy.answer
+                      : agentCopy.nextQuestion
                   }
                   disabled={busy || !isAnswered(currentAnswer) || (currentStep === questions.length - 1 && questions.some(item => !isAnswered(currentAnswers[item.id] ?? EMPTY_ANSWER)))}
                   onClick={continueQuestion}
@@ -448,8 +460,7 @@ export function ApprovalCard({
                     onClick={onRequestChanges}
                     className="rounded-full"
                   >
-                    修改方案
-                  </Button>
+                    {agentCopy.requestChanges}</Button>
                 ) : null}
                 {onReject ? (
                   <Button
@@ -459,8 +470,7 @@ export function ApprovalCard({
                     onClick={onReject}
                     className="rounded-full text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400"
                   >
-                    不同意
-                  </Button>
+                    {agentCopy.reject}</Button>
                 ) : null}
               </div>
             )}

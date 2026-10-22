@@ -1,3 +1,4 @@
 'use client'
 import { createAuthClient } from 'better-auth/react'
-export const authClient = createAuthClient()
+import { withBasePath } from '@/lib/base-path'
+export const authClient = createAuthClient({ basePath: withBasePath('/api/auth') })

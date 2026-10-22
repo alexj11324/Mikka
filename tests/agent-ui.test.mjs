@@ -391,7 +391,7 @@ test('Agent 只保留应用外壳，初始输入居中��会话导航收进�
     assert.match(source, new RegExp(`<${name}[\\s>]`))
   }
   assert.doesNotMatch(source, /<AnimatedSidebar[\s>]|<AnimatedSidebarTrigger|<AISidebar/)
-  assert.match(source, /aria-label=\{`切换会话：\$\{title\}`\}/)
+  assert.match(source, /aria-label=\{\(agentCopy\.switchConversation\s*\+\s*\(title\)\)\}/)
   for (const label of ['新任务', '搜索']) assert.ok(source.includes(`size="icon" aria-label="${label}"`))
   assert.doesNotMatch(source, /ChatApp|AnimatedSidebarInset/)
   assert.match(source, /turns\.length === 0 \? <AgentWelcome/)

@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 // beui.dev/components/agents/chat-app
 
 import {
@@ -313,14 +314,14 @@ function ResourceMenuAction({
   children: ReactNode;
 }) {
   return (
-    <button
+    <Button variant="ghost" size="sm"
       type="button"
       onClick={onSelect}
       className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs text-foreground outline-none transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
     >
       <Icon aria-hidden="true" className="size-3.5 shrink-0" />
       <span className="min-w-0 truncate">{children}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -544,7 +545,7 @@ function ResourceRow({
           onOpenChange={onMenuOpenChange}
         >
           <MorphPopoverTrigger>
-            <button
+            <Button variant="ghost" size="sm"
               type="button"
               draggable={false}
               tabIndex={-1}
@@ -558,7 +559,7 @@ function ResourceRow({
               )}
             >
               <MoreHorizontal aria-hidden="true" className="size-4" />
-            </button>
+            </Button>
           </MorphPopoverTrigger>
           <MorphPopoverContent
             side="bottom"

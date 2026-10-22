@@ -1,4 +1,5 @@
 "use client";
+import { useAgentCopy } from '@/hooks/use-agent-copy'
 // beui.dev/components/agents/chat-app
 
 import { Check, Copy, FileCode2, LoaderCircle } from "lucide-react";
@@ -49,6 +50,8 @@ export function CodeBlock({
   onCopy,
   className,
 }: CodeBlockProps) {
+  const agentCopy = useAgentCopy()
+
   const reduce = useReducedMotion() ?? false;
   const viewportRef = useRef<HTMLDivElement>(null);
   const copyTimer = useRef<number | undefined>(undefined);
@@ -135,13 +138,13 @@ export function CodeBlock({
           ) : (
             <Check className="size-3" />
           )}
-          {streaming ? "正在编写" : "已完成"}
+          {streaming ? agentCopy.writing : agentCopy.completed}
         </span>
         {copyable || onCopy ? (
           <motion.button
             type="button"
-            aria-label={copied ? "已复制" : "复制代码"}
-            title={copied ? "已复制" : "复制代码"}
+            aria-label={copied ? agentCopy.copied : agentCopy.copyCode}
+            title={copied ? agentCopy.copied : agentCopy.copyCode}
             onClick={handleCopy}
             whileTap={reduce ? undefined : { scale: 0.9 }}
             transition={SPRING_PRESS}

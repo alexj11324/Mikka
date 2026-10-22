@@ -1,5 +1,6 @@
 'use client'
 
+import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useState } from 'react'
 import { Check, ChevronDown, Plus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,6 +14,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
 export function WorkspaceSwitcher({ userKey, canLeave }: { userKey: string; canLeave: () => Promise<boolean> }) {
+  const agentCopy = useAgentCopy()
+
   const { data, error: loadError, mutate } = useWorkspace(userKey)
   const { setOpenMobile } = useSidebar()
   const [creating, setCreating] = useState(false)
@@ -28,7 +31,7 @@ export function WorkspaceSwitcher({ userKey, canLeave }: { userKey: string; canL
       if (!result.ok) throw new Error(result.error)
       await mutate()
       setOpenMobile(false)
-    } catch (cause) { toast.error(cause instanceof Error ? cause.message : '切换失败，请重试。') }
+    } catch (cause) { toast.error(cause instanceof Error ? cause.message : agentCopy.unableToSwitchPleaseTryAgain) }
     finally { setBusy(false) }
   }
 
@@ -41,35 +44,35 @@ export function WorkspaceSwitcher({ userKey, canLeave }: { userKey: string; canL
       if (!result.ok) throw new Error(result.error)
       await mutate()
       setCreating(false); setName(''); setOpenMobile(false)
-      toast.success('工作区已创建，已自动进入。')
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '创建失败，请重试。') }
+      toast.success(agentCopy.workspaceCreatedAndOpened)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : agentCopy.unableToCreateWorkspacePleaseTryAgain) }
     finally { setBusy(false) }
   }
 
   return <>
     <DropdownMenu>
-      <DropdownMenuTrigger disabled={busy} render={<SidebarMenuButton aria-label="工作区菜单" className="min-h-11" />}>
+      <DropdownMenuTrigger disabled={busy} render={<SidebarMenuButton aria-label={agentCopy.workspaceMenu} className="min-h-11" />}>
         <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">{data?.workspace.name.slice(0, 1).toUpperCase() || 'O'}</span>
-        <span className="min-w-0 flex-1 truncate font-semibold">{busy ? '正在切换…' : data?.workspace.name || (loadError ? '工作区加载失败' : '正在加载工作区…')}</span><ChevronDown />
+        <span className="min-w-0 flex-1 truncate font-semibold">{busy ? agentCopy.switching : data?.workspace.name || (loadError ? agentCopy.workspaceFailedToLoad : agentCopy.loadingWorkspace)}</span><ChevronDown />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-2rem)]">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>切换工作区</DropdownMenuLabel>
+          <DropdownMenuLabel>{agentCopy.switchWorkspace}</DropdownMenuLabel>
           {data?.choices.map(workspace => <DropdownMenuItem className="min-h-11" key={workspace.id} onClick={() => void select(workspace.id)} aria-current={workspace.id === data.workspace.id ? 'true' : undefined}>
             <span className="min-w-0 flex-1 truncate">{workspace.name}</span>{workspace.id === data.workspace.id && <Check />}
           </DropdownMenuItem>)}
-          {loadError && <DropdownMenuItem className="min-h-11" onClick={() => void mutate()}>重新加载工作区</DropdownMenuItem>}
+          {loadError && <DropdownMenuItem className="min-h-11" onClick={() => void mutate()}>{agentCopy.reloadWorkspace}</DropdownMenuItem>}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuGroup><DropdownMenuItem className="min-h-11" onClick={() => { setError(''); setCreating(true) }}><Plus />新建工作区</DropdownMenuItem></DropdownMenuGroup>
+        <DropdownMenuGroup><DropdownMenuItem className="min-h-11" onClick={() => { setError(''); setCreating(true) }}><Plus />{agentCopy.newWorkspace}</DropdownMenuItem></DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
     <Dialog open={creating} onOpenChange={open => { if (!busy) setCreating(open) }}>
-      <DialogContent><DialogHeader><DialogTitle>新建工作区</DialogTitle><DialogDescription>创建后自动进入，你将成为工作区管理员。</DialogDescription></DialogHeader>
+      <DialogContent><DialogHeader><DialogTitle>{agentCopy.newWorkspace}</DialogTitle><DialogDescription>{agentCopy.theNewWorkspaceOpensAutomaticallyYouWill}</DialogDescription></DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-5">
-          <FieldGroup><Field data-invalid={!!error || undefined}><FieldLabel htmlFor="new-workspace-name">工作区名称</FieldLabel><Input id="new-workspace-name" autoFocus required maxLength={120} placeholder="例如：产品团队" value={name} disabled={busy} aria-invalid={!!error} onChange={event => setName(event.target.value)} /></Field></FieldGroup>
+          <FieldGroup><Field data-invalid={!!error || undefined}><FieldLabel htmlFor="new-workspace-name">{agentCopy.workspaceName}</FieldLabel><Input id="new-workspace-name" autoFocus required maxLength={120} placeholder={agentCopy.forExampleProductTeam} value={name} disabled={busy} aria-invalid={!!error} onChange={event => setName(event.target.value)} /></Field></FieldGroup>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-          <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setCreating(false)}>取消</Button><Button type="submit" disabled={busy || !name.trim()}>{busy ? '正在创建…' : '创建工作区'}</Button></DialogFooter>
+          <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setCreating(false)}>{agentCopy.cancel}</Button><Button type="submit" disabled={busy || !name.trim()}>{busy ? agentCopy.creating : agentCopy.createWorkspace}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

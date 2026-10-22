@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 // beui.dev/components/agents/chat-app
 
 import {
@@ -163,7 +164,7 @@ export function FileDiff({
       aria-busy={streaming}
       className={cn("w-full text-sm", className)}
     >
-      <button
+      <Button variant="ghost" size="sm"
         id={triggerId}
         type="button"
         aria-expanded={currentOpen}
@@ -200,7 +201,7 @@ export function FileDiff({
         >
           <ChevronDown className="size-3.5" />
         </motion.span>
-      </button>
+      </Button>
 
       <AgentDisclosure
         id={contentId}

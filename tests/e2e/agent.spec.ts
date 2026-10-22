@@ -1,31 +1,31 @@
 import { test as apiTest } from '@playwright/test'
-import { test, expect, register } from './fixtures'
+import { test, expect, register, app } from './fixtures'
 
 apiTest('开发预览验收入口不跳转到内部主机', async ({ request, baseURL }) => {
-  const response = await request.get('/api/acceptance', { maxRedirects: 0 })
+  const response = await request.get(app('/api/acceptance'), { maxRedirects: 0 })
   test.skip(response.status() === 404, '生产环境不提供开发验收入口')
   expect(response.status()).toBe(307)
-  expect(response.headers()['location']).toBe('/?acceptance=1')
+  expect(response.headers()['location']).toBe(app('/?acceptance=1'))
   expect(response.headers()['cache-control']).toBe('no-store')
   expect(new URL(response.headers()['location'], baseURL).origin).toBe(new URL(baseURL!).origin)
 })
 
 apiTest('Agent 接口拒绝未登录请求与跨站请求', async ({ request }) => {
-  const unauthenticated = await request.post('/api/agent', { data: { prompt: '你好' } })
+  const unauthenticated = await request.post(app('/api/agent'), { data: { prompt: '你好' } })
   expect(unauthenticated.status()).toBe(401)
-  const crossSite = await request.post('/api/agent', { headers: { 'sec-fetch-site': 'cross-site' }, data: { prompt: '你好' } })
+  const crossSite = await request.post(app('/api/agent'), { headers: { 'sec-fetch-site': 'cross-site' }, data: { prompt: '你好' } })
   expect(crossSite.status()).toBe(403)
 })
 
 test('Agent 接口验证输入且不接受客户端密钥', async ({ page }) => {
   await register(page)
   for (const data of [{ prompt: '' }, { prompt: 'a'.repeat(8001) }, { prompt: '你好', apiKey: 'client-key' }, { prompt: '你好', sessionId: 'invalid-session' }]) {
-    const response = await page.request.post('/api/agent', { data })
+    const response = await page.request.post(app('/api/agent'), { data })
     expect(response.status()).toBe(400)
   }
-  const malformed = await page.request.post('/api/agent', { headers: { 'Content-Type': 'application/json' }, data: '{' })
+  const malformed = await page.request.post(app('/api/agent'), { headers: { 'Content-Type': 'application/json' }, data: '{' })
   expect(malformed.status()).toBe(400)
-  const oversized = await page.request.post('/api/agent', { data: { prompt: 'a'.repeat(40001) } })
+  const oversized = await page.request.post(app('/api/agent'), { data: { prompt: 'a'.repeat(40001) } })
   expect(oversized.status()).toBe(413)
 })
 
@@ -239,7 +239,7 @@ test('生成期间可新建和切换任务，独立保留草稿、回复与停�
   await page.evaluate(() => Reflect.get(window, 'concurrentAgentTest').finish(1))
   await panel.getByRole('button', { name: /^切换会话：/ }).click()
   await page.getByRole('option', { name: /第二并发任务/ }).click()
-  await expect(panel.getByText('第二并发任务的独立回复', { exact: true })).toBeVisible()
+  await expect(panel.getByText('���二并发任务的独立回复', { exact: true })).toBeVisible()
   await expect(input).toHaveValue('')
   await expect(panel.getByRole('button', { name: '停止生成', exact: true })).toHaveCount(0)
   await panel.getByRole('button', { name: /^切换会话：/ }).click()
@@ -268,7 +268,7 @@ test('标题下拉切换历史，右侧图标搜索和新建，桌面与手机�
     status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' },
     body: openUIStream(`root = TextContent(${JSON.stringify(`${route.request().postDataJSON().prompt}的回复`)})`),
   }))
-  for (const title of ['香港景点', '项目计划']) {
+  for (const title of ['香港景点', '��目计划']) {
     await input.fill(title)
     await panel.getByRole('button', { name: '发送消息' }).click()
     await expect(panel.getByText(`${title}的回复`, { exact: true })).toBeVisible()
@@ -643,12 +643,12 @@ test('代码块按需高亮，正文和复制功能保持可用', async ({ page 
   await panel.getByRole('textbox', { name: '向 Agent 提问' }).fill('给出 JavaScript 代码示例')
   await panel.getByRole('button', { name: '发送消息' }).click()
   await expect(panel.getByText('代码示例：', { exact: true })).toBeVisible()
-  const block = panel.locator('.openui-code-block-syntax-highlighter')
+  const block = panel.locator('.agent-code-block')
   await expect(block).toContainText(code)
   const keyword = block.locator('code span').filter({ hasText: /^const$/ })
   await expect(keyword).toHaveAttribute('style', /color:/)
-  await panel.getByRole('button', { name: 'Copy code', exact: true }).click()
-  await expect(panel.getByRole('button', { name: 'Copied to clipboard', exact: true })).toBeVisible()
+  await panel.getByRole('button', { name: '复制代码', exact: true }).click()
+  await expect(panel.getByRole('button', { name: '已复制', exact: true })).toBeVisible()
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(code)
   await expect(panel.getByRole('alert')).toHaveCount(0)
 })

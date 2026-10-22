@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 // beui.dev/components/agents/chat-app
 
 import {
@@ -221,7 +222,7 @@ export function StreamingResponse({
                 </>
               ) : null}
               {hasSources ? (
-                <button
+                <Button variant="ghost" size="sm"
                   type="button"
                   aria-expanded={currentSourcesOpen}
                   aria-controls={sourcesContentId}
@@ -240,7 +241,7 @@ export function StreamingResponse({
                   >
                     <ChevronDown className="size-3" />
                   </motion.span>
-                </button>
+                </Button>
               ) : null}
             </div>
 

@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 // beui.dev/components/agents/chat-app
 
 import {
@@ -249,7 +250,7 @@ export function ToolResult({
       aria-busy={running}
       className={cn("w-full text-sm", className)}
     >
-      <button
+      <Button variant="ghost" size="sm"
         id={triggerId}
         type="button"
         aria-expanded={currentOpen}
@@ -299,7 +300,7 @@ export function ToolResult({
         >
           <ChevronDown className="size-3.5" />
         </motion.span>
-      </button>
+      </Button>
 
       <AgentDisclosure
         id={contentId}

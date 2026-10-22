@@ -1,3 +1,4 @@
+import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import type { UIMessageChunk } from 'ai'
 
 export type SavedAgentSession = { id: string; title: string; updatedAt: string }
@@ -32,7 +33,7 @@ export function persistAgentStream(stream: ReadableStream<UIMessageChunk>, save:
         if (cancelled) return
         if (done) {
           if (!finalized) {
-            failure ??= '回复连接提前结束，已有内容已保存，请重试。'
+            failure ??= agentCopy.theResponseEndedEarlySavedContentIs
             await checkpoint(signal?.aborted ? 'stopped' : 'failed')
           }
           controller.close()
@@ -53,7 +54,7 @@ export function persistAgentStream(stream: ReadableStream<UIMessageChunk>, save:
         if (!cancelled) controller.enqueue(value)
       } catch {
         if (cancelled) return
-        failure ??= '回复或保存连接中断，请刷新后查看已保存内容。'
+        failure ??= agentCopy.theConnectionWasInterruptedRefreshToSee
         try { await checkpoint(signal?.aborted ? 'stopped' : 'failed') } catch { /* The stream reports the persistence failure below; never report a successful save. */ }
         controller.enqueue({ type: 'error', errorText: failure })
         controller.close()

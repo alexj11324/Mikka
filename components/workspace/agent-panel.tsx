@@ -1,5 +1,7 @@
 'use client'
 
+import { useAgentCopy } from '@/hooks/use-agent-copy'
+import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import '@openuidev/react-ui/layered/styles/index.css'
 import { useRef, useState } from 'react'
 import useSWR from 'swr'
@@ -18,6 +20,7 @@ import { AgentChat, type AgentChatSession } from './agent-chat'
 import { AgentInteractionContext } from './agent-interaction'
 import { fetchAgentResponse, observeAgentImages } from '@/lib/agent-fetch'
 import { preloadAgentImage } from '@/lib/agent-image-loader'
+import { withBasePath } from '@/lib/base-path'
 
 const AgentDemo = dynamic(() => import('./agent-demo').then(module => module.AgentDemo))
 
@@ -52,9 +55,9 @@ const agentTheme = createTheme({
 })
 
 async function fetchHistory(url: string): Promise<AgentHistory> {
-  const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin' })
+  const response = await fetch(withBasePath(url), { cache: 'no-store', credentials: 'same-origin' })
   const body = await response.json()
-  if (!response.ok) throw new Error(body.error ?? '无法恢复聊天历史。')
+  if (!response.ok) throw new Error(body.error ?? agentCopy.unableToRestoreChatHistory)
   return body
 }
 
@@ -71,8 +74,10 @@ export function AgentPanel({ userId, initialHistory }: { userId: string; initial
 }
 
 function AgentHistoryLoading({ error, onRetry }: { error?: Error; onRetry: () => void }) {
-  return <section aria-label="Agent 对话工作区" aria-busy={!error} className="flex h-[calc(100svh-4rem)] flex-col gap-4 p-4">
-    {error ? <><p role="alert">聊天记录加载失败。</p><Button variant="outline" onClick={onRetry}>重试</Button></> : <><Skeleton className="h-14 w-full" /><Skeleton className="h-20 w-2/3" /><Skeleton className="mt-auto h-24 w-full" /></>}
+  const agentCopy = useAgentCopy()
+
+  return <section aria-label={agentCopy.agentConversationWorkspace} aria-busy={!error} className="flex h-[calc(100svh-4rem)] flex-col gap-4 p-4">
+    {error ? <><p role="alert">{agentCopy.chatHistoryFailedToLoad}</p><Button variant="outline" onClick={onRetry}>{agentCopy.retry}</Button></> : <><Skeleton className="h-14 w-full" /><Skeleton className="h-20 w-2/3" /><Skeleton className="mt-auto h-24 w-full" /></>}
   </section>
 }
 
@@ -121,8 +126,10 @@ type AgentSessionProps = {
 }
 
 function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, sessions, completionId }: AgentSessionProps) {
+  const agentCopy = useAgentCopy()
+
   const restored = initial.turns.at(-1)
-  const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ id: completionId, api: '/api/agent', credentials: 'same-origin', fetch: fetchAgentWithImages, initialCompletion: restored?.completion ?? '' })
+  const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ id: completionId, api: withBasePath('/api/agent'), credentials: 'same-origin', fetch: fetchAgentWithImages, initialCompletion: restored?.completion ?? '' })
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const submittingRef = useRef(false)
   const lastRequestRef = useRef<{ prompt: string; failed: boolean } | null>(restored ? { prompt: restored.prompt, failed: restored.status !== 'complete' } : null)
@@ -132,7 +139,7 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
   const [question, setQuestion] = useState(restored?.prompt ?? '')
   const [stopped, setStopped] = useState(restored?.status === 'stopped' || restored?.status === 'pending')
   const [restoredError, setRestoredError] = useState<Error | undefined>(() => restored && restored.status !== 'complete'
-    ? new Error(restored.error ?? '上次回复未完成，已恢复保存的内容；若仍在生成，请稍后重试。') : undefined)
+    ? new Error(restored.error ?? agentCopy.thePreviousResponseDidNotFinishSaved) : undefined)
   const [previousTurns, setPreviousTurns] = useState<DisplayTurn[]>(() => initial.turns.slice(0, -1).map(turn => ({
     id: turn.id, question: turn.prompt, completion: turn.completion, error: turn.error ? new Error(turn.error) : undefined,
     stopped: turn.status === 'stopped' || turn.status === 'pending',
@@ -141,17 +148,17 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
   async function handleUIAction(event: ActionEvent) {
     if (isLoading || submittingRef.current) return
     if (event.type !== 'continue_conversation') {
-      toast.info('当前界面只支持直接继续对话，不会打开外部链接或修改工作区。')
+      toast.info(agentCopy.thisInterfaceOnlyContinuesTheConversationIt)
       return
     }
     const context = typeof event.params.context === 'string' ? event.params.context : ''
-    const form = event.formState && Object.keys(event.formState).length > 0 ? `表单内容：${JSON.stringify(event.formState)}` : ''
+    const form = event.formState && Object.keys(event.formState).length > 0 ? (agentCopy.formContent + (JSON.stringify(event.formState))) : ''
     const prompt = [event.humanFriendlyMessage, context, form].filter(Boolean).join('\n')
     if (!prompt.trim() || prompt.length > 8000) {
-      toast.error('提问内容���空或过长，请在原组件中调整后重试。')
+      toast.error(agentCopy.theQuestionIsEmptyOrTooLong)
       return
     }
-    if (!await request(prompt, 'inline')) toast.error('本次提问未完成，请在原组件中重试。')
+    if (!await request(prompt, 'inline')) toast.error(agentCopy.theQuestionDidNotFinishRetryIn)
   }
 
   async function request(prompt: string, source: 'composer' | 'inline' = 'composer') {
@@ -179,7 +186,7 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
     } finally {
       submittingRef.current = false
       if (sessionIdRef.current && titleRef.current) onState({ id: sessionIdRef.current, title: titleRef.current, updatedAt: new Date().toISOString(), running: false })
-      void onSaved().catch(() => toast.error('暂时无法刷新会话列表，请刷新页面重试。'))
+      void onSaved().catch(() => toast.error(agentCopy.unableToRefreshConversationsPleaseReloadThe))
     }
   }
 

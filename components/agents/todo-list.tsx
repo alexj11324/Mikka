@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { useAgentCopy } from '@/hooks/use-agent-copy'
+import { defaultAgentCopy as agentCopy, type AgentCopy } from '@/lib/agent-copy'
 // beui.dev/components/agents/chat-app
 
 import { ChevronDown, ListTodo } from "lucide-react";
@@ -46,11 +49,11 @@ export interface TodoListProps {
   className?: string;
 }
 
-function statusLabel(status: TodoItemStatus) {
-  if (status === "in-progress") return "进行中";
-  if (status === "completed") return "已完成";
-  if (status === "cancelled") return "已取消";
-  return "待开始";
+function statusLabel(status: TodoItemStatus, agentCopy: AgentCopy) {
+  if (status === "in-progress") return agentCopy.inProgress;
+  if (status === "completed") return agentCopy.completed;
+  if (status === "cancelled") return agentCopy.cancelled;
+  return agentCopy.notStarted;
 }
 
 function TodoHeaderIcon({ complete }: { complete: boolean }) {
@@ -200,7 +203,7 @@ function TodoStatusIcon({
 
 export function TodoList({
   items,
-  title = "任务计划",
+  title: titleProp,
   open,
   defaultOpen = true,
   onOpenChange,
@@ -208,6 +211,10 @@ export function TodoList({
   maxHeight = 248,
   className,
 }: TodoListProps) {
+  const agentCopy = useAgentCopy()
+const title = titleProp ?? agentCopy.taskPlan
+
+
   const reduce = useReducedMotion() ?? false;
   const baseId = useId();
   const triggerId = `${baseId}-trigger`;
@@ -258,13 +265,13 @@ export function TodoList({
 
   return (
     <section
-      aria-label="Agent 任务列表"
+      aria-label={agentCopy.agentTaskList}
       className={cn(
         "w-full overflow-hidden rounded-2xl border border-border/70",
         className,
       )}
     >
-      <button
+      <Button variant="ghost" size="sm"
         id={triggerId}
         type="button"
         aria-expanded={currentOpen}
@@ -283,8 +290,7 @@ export function TodoList({
           )}
         >
           <span className="sr-only">
-            已完成 {completed} 项，共 {items.length} 项任务
-          </span>
+            {agentCopy.completed}{completed} {agentCopy.of2}{items.length} {agentCopy.tasks}</span>
           <span aria-hidden="true" className="inline-flex">
             <ActionSwapRollText value={String(completed)}>
               {completed}
@@ -301,7 +307,7 @@ export function TodoList({
         >
           <ChevronDown className="size-3.5" />
         </motion.span>
-      </button>
+      </Button>
 
       <AgentDisclosure
         id={contentId}
@@ -338,7 +344,7 @@ export function TodoList({
                     className="flex min-h-9 items-center gap-2.5 rounded-xl px-1.5 py-1"
                   >
                     <TodoStatusIcon status={status} progress={item.progress} />
-                    <span className="sr-only">{statusLabel(status)}: </span>
+                    <span className="sr-only">{statusLabel(status, agentCopy)}: </span>
                     <span
                       className={cn(
                         "min-w-0 flex-1 truncate text-sm leading-5",
@@ -378,8 +384,7 @@ export function TodoList({
             </ol>
           ) : (
             <p className="px-1.5 py-2 text-sm text-muted-foreground">
-              暂无任务
-            </p>
+              {agentCopy.noTasksYet}</p>
           )}
         </div>
       </AgentDisclosure>

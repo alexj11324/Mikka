@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import type { Page, TestInfo } from '@playwright/test'
-import { test, expect, register } from './fixtures'
+import { test, expect, register, app } from './fixtures'
 
 const budget = 1000
 
@@ -27,7 +27,7 @@ async function seedHistory(page: Page, email: string) {
   } finally {
     await pool.end()
   }
-  const history = await page.request.get(`/api/agent/sessions?sessionId=${current}`)
+  const history = await page.request.get(app(`/api/agent/sessions?sessionId=${current}`))
   expect(history.status()).toBe(200)
   expect((await history.json()).turns).toHaveLength(3)
   return { current, older }
@@ -66,7 +66,7 @@ test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 �
   await page.reload()
   const historyRequests: string[] = []
   page.on('request', request => {
-    if (new URL(request.url()).pathname === '/api/agent/sessions') historyRequests.push(request.url())
+    if (new URL(request.url()).pathname === app('/api/agent/sessions')) historyRequests.push(request.url())
   })
 
   const firstStart = await page.evaluate(() => performance.now())
@@ -101,7 +101,7 @@ test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 �
   const resetStart = await page.evaluate(() => performance.now())
   await panel.getByRole('button', { name: '新任务', exact: true }).click()
   panel = await assertInteractiveWithinBudget(page, info, '新任务', resetStart)
-  await expect(panel.getByText('今天想完成什么？', { exact: true })).toBeVisible()
+  await expect(panel.getByRole('region', { name: '推荐建议', exact: true })).toBeVisible()
   await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
   expect(historyRequests).toHaveLength(1)
   await expect(panel.getByText(/发送消息后|对话按账号保存|账号会话/)).toHaveCount(0)
@@ -110,23 +110,23 @@ test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 �
 test('历史读取保持账号隔离，并正确处理空会话与无效会话', async ({ page, browser }) => {
   const { email } = await register(page)
   const { current } = await seedHistory(page, email)
-  const missing = await page.request.get(`/api/agent/sessions?sessionId=${randomUUID()}`)
+  const missing = await page.request.get(app(`/api/agent/sessions?sessionId=${randomUUID()}`))
   expect(missing.status()).toBe(404)
-  const fresh = await page.request.get('/api/agent/sessions?new=1')
+  const fresh = await page.request.get(app('/api/agent/sessions?new=1'))
   expect(fresh.status()).toBe(200)
   expect(await fresh.json()).toMatchObject({ sessionId: null, turns: [] })
   const context = await browser.newContext()
   try {
     const otherPage = await context.newPage()
-    const unauthenticated = await otherPage.request.get(`/api/agent/sessions?sessionId=${current}`)
+    const unauthenticated = await otherPage.request.get(app(`/api/agent/sessions?sessionId=${current}`))
     expect(unauthenticated.status()).toBe(401)
     await register(otherPage)
-    const forbidden = await otherPage.request.get(`/api/agent/sessions?sessionId=${current}`)
+    const forbidden = await otherPage.request.get(app(`/api/agent/sessions?sessionId=${current}`))
     expect(forbidden.status()).toBe(404)
-    const empty = await otherPage.request.get('/api/agent/sessions')
+    const empty = await otherPage.request.get(app('/api/agent/sessions'))
     expect(await empty.json()).toEqual({ sessions: [], sessionId: null, turns: [] })
     await otherPage.getByRole('button', { name: 'Agent', exact: true }).click()
-    await expect(otherPage.getByText('今天想完成什么？', { exact: true })).toBeVisible()
+    await expect(otherPage.getByRole('region', { name: '推荐建议', exact: true })).toBeVisible()
     await expect(otherPage.getByText('第三轮性能验收的已保存正文', { exact: true })).toHaveCount(0)
   } finally {
     await context.close()
