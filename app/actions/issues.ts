@@ -14,8 +14,9 @@ import { requireIssueAccess } from '@/lib/issue-access'
 import { issueChecklist } from '@/lib/issue-checklist'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
-import { issueWithMetadata, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
-import { allocateIssueNumbers, ensureIssueNumbers } from '@/lib/issue-numbering'
+import { issueWithMetadata, readIssueMetadata } from '@/lib/issue-metadata'
+import { ensureIssueNumbers } from '@/lib/issue-numbering'
+import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { issueDoneEvent } from '@/lib/coordinator-events'
@@ -81,33 +82,29 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
     const userId = await getUserId()
     const parsed = inputSchema.safeParse(input)
     if (!parsed.success) return { error: validationCode(parsed.error) }
-    let id: string
+    let id: string | undefined
     if (input.id) {
       const parsedId = z.uuid().safeParse(input.id)
       if (!parsedId.success) return { error: 'issueNotFound' }
       id = parsedId.data
-    } else {
-      id = crypto.randomUUID()
     }
-    const ownerId = input.id ? (await requireIssueAccess(id)).issue.userId : userId
+    const ownerId = id ? (await requireIssueAccess(id)).issue.userId : userId
     if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: 'issueRevisionInvalid' }
     let doneEvent = false
     try {
       const result = await db.transaction(async tx => {
+        if (!id) {
+          const issue = await createIssueForUserInTransaction(tx, userId, parsed.data)
+          return issue ? { issue } : { error: 'issueCreateFailed' }
+        }
         let issue
-        if (input.id) {
-          const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, ownerId))).for('update')
-          if (!latest) return { error: 'issueNotFound' }
-          ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
-          const done = issue && issueDoneEvent(latest, issue)
-          if (done) {
-            await recordCoordinatorEvent(tx, done)
-            doneEvent = true
-          }
-        } else {
-          const number = await allocateIssueNumbers(tx, userId)
-          const metadata = { ...readIssueMetadata({ type: 'doc' }), number }
-          ;[issue] = await tx.insert(issues).values({ ...parsed.data, content: withIssueMetadata(parsed.data.content, metadata), id, userId, revision: 1 }).returning()
+        const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, ownerId))).for('update')
+        if (!latest) return { error: 'issueNotFound' }
+        ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
+        const done = issue && issueDoneEvent(latest, issue)
+        if (done) {
+          await recordCoordinatorEvent(tx, done)
+          doneEvent = true
         }
         if (!issue) return { error: 'issueStale' }
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
