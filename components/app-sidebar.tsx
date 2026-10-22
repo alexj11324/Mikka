@@ -32,7 +32,7 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
       <div className="flex items-center gap-1">
         <SidebarMenu className="min-w-0 flex-1"><SidebarMenuItem>
           <DropdownMenu><DropdownMenuTrigger render={<SidebarMenuButton aria-label={t('workspaceMenu')} className="h-10" />}>
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">O</span><span className="flex-1 font-semibold">{WORKSPACE_NAME}</span><ChevronDown />
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">M</span><span className="flex-1 font-semibold">{WORKSPACE_NAME}</span><ChevronDown />
           </DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup><DropdownMenuItem onClick={() => navigate('projects')}><Box />{t('workspaceProjects')}</DropdownMenuItem><DropdownMenuItem onClick={() => navigate('team-home')}><SquareUserRound />{t('teamHome')}</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
         </SidebarMenuItem></SidebarMenu>
         <Button variant="ghost" size="icon-sm" aria-label={t('search')} title={t('searchTooltip')} onClick={() => { setOpenMobile(false); onSearch() }}><Search data-icon="inline-start" /></Button>

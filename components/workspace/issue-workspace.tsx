@@ -8,7 +8,7 @@ import { Columns3, List, Search } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IssueBoard } from './issue-board'
 import { AppSidebar } from '@/components/app-sidebar'
-import { SettingsView, type SettingsSection } from '@/components/settings/settings-view'
+import { SettingsView, type SettingsSectionId } from '@/components/settings/settings-view'
 import { AppShell, AppShellContent } from '@/components/app-shell'
 import { CreateIssueDialog } from './create-issue-dialog'
 import { IssueList } from './issue-list'
@@ -26,7 +26,7 @@ import { ProjectWorkspace } from './project-workspace'
 import { WorkspaceOverview } from './workspace-overview'
 import type { WorkspaceSection } from './workspace-navigation'
 
-export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialSettingsSection }: { initialSelected?: string | null; initialSettingsSection?: SettingsSection; user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
+export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialSettingsSection }: { initialSelected?: string | null; initialSettingsSection?: SettingsSectionId; user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>> }) {
   const t = useTranslations('Workspace')
   const tIssue = useTranslations('Issue')
   const tNav = useTranslations('Nav')

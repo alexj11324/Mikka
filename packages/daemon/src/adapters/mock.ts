@@ -8,7 +8,7 @@
 //   { "t": <ms offset>, "hang": true }
 //   { "t": <ms offset>, "exit": { "outcome": "failed", "stopReason": "blocked", "error": "...", "report": { ... } } }
 //
-// `submit` stands for the agent's explicit hand-in (`orvilo_submit` in real
+// `submit` stands for the agent's explicit hand-in (`mikka_submit` in real
 // harnesses) and carries its part of the handoff report. A session that
 // exits "succeeded" without one ends as `turn_ended`, not as success.
 // `hang` stops making progress until the session is cancelled (watchdog

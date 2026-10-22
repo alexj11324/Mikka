@@ -16,7 +16,7 @@ afterEach(() => {
 
 describe("daemon log", () => {
   it("redacts credential fields before they reach the log file", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "orvilo-log-"))
+    const dir = mkdtempSync(join(tmpdir(), "mikka-log-"))
     dirs.push(dir)
     const secret = "sk-ant-api03-logredactionvalue"
     const log = createLogger({ dir, level: "info" })

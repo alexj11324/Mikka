@@ -183,7 +183,7 @@ export function AgentsPanel() {
             </section>
 
             {deviceData && devices.length === 0 && (
-              <p className="rounded-lg bg-muted/60 px-3 py-2.5 text-xs leading-5 text-muted-foreground">{t('noDevicesHint')}</p>
+              <p className="border-l-2 border-border pl-3 py-1 text-xs leading-5 text-muted-foreground">{t('noDevicesHint')}</p>
             )}
           </CardContent>
         </Card>

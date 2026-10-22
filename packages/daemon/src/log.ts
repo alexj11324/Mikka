@@ -29,7 +29,7 @@ export function createLogger(options: LoggerOptions = {}): Logger {
     streams.push({ stream: file })
   }
   if (options.stdout) streams.push({ stream: process.stdout })
-  const level = options.level ?? process.env.ORVILO_LOG_LEVEL ?? "info"
+  const level = options.level ?? process.env.MIKKA_LOG_LEVEL ?? "info"
   // Defense in depth: quota code never logs credentials, and neither does
   // anything else that accidentally binds one of these keys (ADR 0027).
   const redact = {

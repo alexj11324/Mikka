@@ -1,5 +1,5 @@
 {
-  "extends": "@orvilo/config/tsconfig.base.json",
+  "extends": "@mikka/config/tsconfig.base.json",
   "compilerOptions": {
     "types": ["node"]
   },

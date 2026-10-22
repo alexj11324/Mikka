@@ -14,7 +14,7 @@ import { join } from "node:path"
 
 import { afterEach, describe, expect, it } from "vitest"
 
-import type { HarnessInfo } from "@orvilo/protocol"
+import type { HarnessInfo } from "@mikka/protocol"
 
 import { InvalidIdError } from "../src/errors"
 import { acquireLock, DaemonAlreadyRunningError } from "../src/lock"

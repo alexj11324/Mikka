@@ -1,7 +1,7 @@
 // Login contract shared by apps/server and apps/desktop (ADR 0007). The
 // desktop flow itself (system browser, PKCE, one-time code, deep link,
 // encrypted session storage) is Better Auth's Electron plugin
-// (@better-auth/electron); this file only holds what Orvilo adds around it.
+// (@better-auth/electron); this file only holds what Mikka adds around it.
 import { z } from "zod"
 
 export const AUTH_PROVIDERS = ["github", "google"] as const
@@ -9,24 +9,24 @@ export const authProvider = z.enum(AUTH_PROVIDERS)
 export type AuthProvider = z.infer<typeof authProvider>
 
 /** Deep-link scheme per desktop flavor; the server allow-lists them. */
-export const DESKTOP_SCHEMES = ["orvilo", "orvilo-dev"] as const
+export const DESKTOP_SCHEMES = ["mikka", "mikka-dev"] as const
 export const desktopScheme = z.enum(DESKTOP_SCHEMES)
 export type DesktopScheme = z.infer<typeof desktopScheme>
 
 /**
  * Deep-link scheme of the phone app (`apps/mobile/app.json`'s `scheme`). The
  * phone has one scheme and no dev flavor: a development build deep-links back
- * through `orvilo://` too, and Expo Go — development only — owns `exp://`
+ * through `mikka://` too, and Expo Go — development only — owns `exp://`
  * instead (ADR 0032).
  */
-export const MOBILE_SCHEME = "orvilo"
+export const MOBILE_SCHEME = "mikka"
 /** Expo Go's scheme; the server trusts it in development only. */
 export const EXPO_GO_SCHEME = "exp"
 
 /**
- * Origins the server trusts for the phone. `orvilo://` carries no authority
+ * Origins the server trusts for the phone. `mikka://` carries no authority
  * and no path, so it matches whatever host and path the app deep-links back
- * to (`orvilo://<metro host>/`, or `orvilo://` in a release build).
+ * to (`mikka://<metro host>/`, or `mikka://` in a release build).
  */
 export function mobileTrustedOrigins(options: { isDev: boolean }): string[] {
   return [
@@ -74,12 +74,12 @@ export function sessionTokenFromCookie(
 export const AUTH_BASE_PATH = "/api/auth"
 
 /** `clientID` shared by the server and desktop Electron plugins. */
-export const ELECTRON_CLIENT_ID = "orvilo-desktop"
+export const ELECTRON_CLIENT_ID = "mikka-desktop"
 /** OAuth client id the daemon sends to the device-authorization plugin. */
-export const DAEMON_CLIENT_ID = "orvilo-daemon"
+export const DAEMON_CLIENT_ID = "mikka-daemon"
 /**
  * Deep-link host of the desktop screen that approves a daemon's device code:
- * `orvilo[-dev]://device?user_code=ABCD-EFGH` (the device-authorization
+ * `mikka[-dev]://device?user_code=ABCD-EFGH` (the device-authorization
  * plugin's verification_uri_complete).
  */
 export const DEVICE_APPROVAL_DEEP_LINK_HOST = "device"
@@ -156,7 +156,7 @@ export type ActiveSession = z.infer<typeof activeSession>
 
 export const activeSessions = z.object({ sessions: z.array(activeSession) })
 
-/** A machine whose daemon signed in with `orvilo daemon login`. */
+/** A machine whose daemon signed in with `mikka daemon login`. */
 export const authorizedDevice = z.object({
   id: z.uuid(),
   name: z.string(),
@@ -207,8 +207,8 @@ export const accessToken = z.object({
 })
 export type AccessToken = z.infer<typeof accessToken>
 
-/** Claims Orvilo adds to Better Auth JWTs. */
-export interface OrviloJwtClaims {
+/** Claims Mikka adds to Better Auth JWTs. */
+export interface MikkaJwtClaims {
   sub: string
   /** The Better Auth session the token was minted from (settings: "this session"). */
   sid?: string

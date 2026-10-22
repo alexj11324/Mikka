@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
-import { deviceHeartbeatSchema } from '@orvilo/protocol/device'
+import { deviceHeartbeatSchema } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { devices } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'

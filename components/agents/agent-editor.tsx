@@ -69,7 +69,7 @@ function installedOn(device: DeviceView | undefined, harness: SupportedHarness):
 function EditorSectionHeading({ id, index, title, description }: { id: string; index: string; title: string; description: string }) {
   return (
     <div className="mb-4 flex items-start gap-3">
-      <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold tabular-nums text-muted-foreground">{index}</span>
+      <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-border/70 text-xs font-semibold tabular-nums text-muted-foreground">{index}</span>
       <div className="flex min-w-0 flex-col gap-0.5">
         <h3 id={id} className="text-sm font-semibold">{title}</h3>
         <p className="text-xs leading-5 text-muted-foreground">{description}</p>
@@ -205,7 +205,7 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
 
   return (
     <Card className="min-w-0" role="region" aria-label={agent ? t('editTitle', { name: agent.name }) : t('createTitle')}>
-      <CardHeader className="flex-row items-start gap-4 rounded-xl bg-muted/30">
+      <CardHeader className="flex-row items-start gap-4">
         <IconTile size="default" variant="soft" className="text-project-action" aria-hidden="true"><Icon /></IconTile>
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
@@ -234,7 +234,7 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
           </FieldGroup>
         </section>
 
-        <section aria-labelledby="agent-runtime-heading" className="rounded-2xl bg-muted/30 p-4 sm:p-5">
+        <section aria-labelledby="agent-runtime-heading" className="pt-1">
           <EditorSectionHeading id="agent-runtime-heading" index="02" title={t('runtime')} description={t('runtimeDescription')} />
           <FieldGroup>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -303,7 +303,7 @@ export function AgentEditor({ agent, devices, onSaved, onDeleted, onCancelNew }:
           </FieldGroup>
         </section>
 
-        <section aria-labelledby="agent-instructions-heading" className="rounded-2xl bg-muted/30 p-4 sm:p-5">
+        <section aria-labelledby="agent-instructions-heading" className="pt-1">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
             <EditorSectionHeading id="agent-instructions-heading" index="03" title={t('instructionsSection')} description={t('instructionsDescription')} />
             {builtIn && (

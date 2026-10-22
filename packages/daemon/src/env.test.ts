@@ -15,7 +15,7 @@ const PLANTED = {
   GITHUB_TOKEN: "ghp_planted",
   GH_TOKEN: "gho_planted",
   NPM_TOKEN: "npm_planted",
-  ORVILO_DEVICE_TOKEN: "planted",
+  MIKKA_DEVICE_TOKEN: "planted",
   DATABASE_URL: "postgres://planted",
   SOME_SERVICE_TOKEN: "planted",
   NODE_OPTIONS: "--require /planted.js",
@@ -37,7 +37,7 @@ describe("buildChildEnv", () => {
       PATH: "/usr/bin:/bin",
       HOME: "/home/me",
       LANG: "en_US.UTF-8",
-      ORVILO_RUN_ID: "run-1",
+      MIKKA_RUN_ID: "run-1",
     })
   })
 

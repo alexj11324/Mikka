@@ -37,7 +37,7 @@ const FETCH_GIT = [
 ]
 
 export function runBranch(runId: string) {
-  return `orvilo/run-${assertSafeId("run id", runId)}`
+  return `mikka/run-${assertSafeId("run id", runId)}`
 }
 
 /** `child` is `parent` or below it (both already resolved). */
@@ -104,7 +104,7 @@ export class WorktreeManager {
     runId: string
   ): Promise<string> {
     await assertBranchName(branch)
-    const ref = `refs/orvilo/fetch/${assertSafeId("run id", runId)}`
+    const ref = `refs/mikka/fetch/${assertSafeId("run id", runId)}`
     const git = (args: string[], timeout?: number) =>
       execa("git", [...FETCH_GIT, ...args], {
         cwd: repoPath,
@@ -279,7 +279,7 @@ export class WorktreeManager {
         "--count",
         `refs/heads/${branch}`,
         "--not",
-        "--exclude=orvilo/run-*",
+        "--exclude=mikka/run-*",
         "--branches",
         "--remotes",
       ])
@@ -293,7 +293,7 @@ export class WorktreeManager {
   }
 
   /**
-   * The repo's local `orvilo/run-*` branches with the worktree each is
+   * The repo's local `mikka/run-*` branches with the worktree each is
    * checked out in (null: none). A branch checked out in the repo itself or
    * outside the daemon's worktree root is left out.
    */
@@ -303,7 +303,7 @@ export class WorktreeManager {
     const out = await simpleGit(repoPath).raw([
       "branch",
       "--list",
-      "orvilo/run-*",
+      "mikka/run-*",
       "--format=%(refname:short)\t%(worktreepath)",
     ])
     const root = resolve(this.root)
@@ -311,8 +311,8 @@ export class WorktreeManager {
     const branches: { runId: string; worktree: string | null }[] = []
     for (const line of out.split("\n")) {
       const [name, where = ""] = line.split("\t")
-      const runId = name?.startsWith("orvilo/run-")
-        ? name.slice("orvilo/run-".length)
+      const runId = name?.startsWith("mikka/run-")
+        ? name.slice("mikka/run-".length)
         : ""
       if (!runId) continue
       const worktree = where.trim() ? resolve(where.trim()) : null

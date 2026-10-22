@@ -13,7 +13,7 @@ import {
   type DaemonRpcMethod,
   type DaemonRpcResult,
   type HelloResult,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 import {
   createMessageConnection,
   ErrorCodes,

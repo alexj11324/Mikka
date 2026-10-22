@@ -41,6 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { withBasePath } from "@/lib/base-path";
 
 export function InviteMembersDialog({
   workspaceId,
@@ -195,7 +196,7 @@ export function InviteMembersDialog({
       setLinks(
         result.map((link) => ({
           email: link.email,
-          url: new URL(link.path, window.location.origin).href,
+          url: new URL(withBasePath(link.path), window.location.origin).href,
         })),
       );
       try {

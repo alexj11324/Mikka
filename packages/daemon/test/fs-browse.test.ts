@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest"
 import { browseFolder } from "../src/fs-browse"
 
 describe("browseFolder", () => {
-  const root = mkdtempSync(join(tmpdir(), "orvilo-fs-"))
+  const root = mkdtempSync(join(tmpdir(), "mikka-fs-"))
   const repo = join(root, "app")
   mkdirSync(join(repo, "src"), { recursive: true })
   mkdirSync(join(root, "plain"))

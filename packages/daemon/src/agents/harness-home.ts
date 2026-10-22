@@ -34,11 +34,11 @@ export interface CodexHome {
   authFile: string | null
 }
 
-/** Settings every Orvilo Codex run starts from; nothing from the user's config. */
+/** Settings every Mikka Codex run starts from; nothing from the user's config. */
 export const CODEX_CONFIG = [
-  "# Written by Orvilo for agent runs. Edits are overwritten.",
+  "# Written by Mikka for agent runs. Edits are overwritten.",
   'approval_policy = "never"',
-  // Orvilo's sandbox is the boundary; Codex's own Seatbelt cannot nest in it.
+  // Mikka's sandbox is the boundary; Codex's own Seatbelt cannot nest in it.
   'sandbox_mode = "danger-full-access"',
   "",
 ].join("\n")

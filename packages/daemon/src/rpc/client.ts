@@ -1,5 +1,5 @@
 // Client for the daemon's local socket, used by the desktop's
-// DaemonSupervisor and `orvilo daemon status`. Handshakes on connect.
+// DaemonSupervisor and `mikka daemon status`. Handshakes on connect.
 import { readFileSync } from "node:fs"
 import { connect } from "node:net"
 
@@ -11,7 +11,7 @@ import {
   type DaemonRpcParams,
   type DaemonRpcResult,
   type HelloResult,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 import {
   createMessageConnection,
   ResponseError,

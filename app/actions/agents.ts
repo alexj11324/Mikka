@@ -15,8 +15,8 @@ import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/
 import { listSshHosts } from '@/lib/ssh'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
-import { modelNameSchema } from '@orvilo/protocol/agent-policy'
-import type { HarnessInfo } from '@orvilo/protocol/harness'
+import { modelNameSchema } from '@mikka/protocol/agent-policy'
+import type { HarnessInfo } from '@mikka/protocol/harness'
 import { resolveAgentPlacement, type PlacementResult } from '@/lib/agent-placement'
 import {
   AGENT_ROLES, BUILT_IN_AGENT_PRESETS, BUILT_IN_AGENT_ROLES, MAX_AGENT_INSTRUCTIONS_LENGTH,

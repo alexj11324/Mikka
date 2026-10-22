@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { useTranslations } from 'next-intl'
 import { ArrowLeft, Bot, Building2, Monitor, MonitorSmartphone, Moon, Search, SlidersHorizontal, SquarePen, Sun, UserRound, Users } from 'lucide-react'
@@ -14,9 +14,10 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { WorkspaceSettings } from '@/components/settings/workspace-settings'
 import { AgentsPanel } from '@/components/agents/agents-panel'
 import { DevicesWorkspace } from '@/components/devices/devices-workspace'
+import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 
-export type SettingsSection = 'preferences' | 'profile' | 'agents' | 'workspace' | 'devices'
-type SectionId = SettingsSection
+export type SettingsSectionId = 'preferences' | 'profile' | 'agents' | 'workspace' | 'devices'
+type SectionId = SettingsSectionId
 type SectionGroup = 'personal' | 'workspace'
 
 const SECTION_GROUPS: SectionGroup[] = ['personal', 'workspace']
@@ -34,11 +35,7 @@ const QUICK_LINKS = [
   { id: 'inviteMembers', group: 'workspace', href: '/settings/members?invite=1', icon: SquarePen },
 ] as const
 
-function SettingRow({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
-  return <div className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-col gap-1"><div className="text-sm font-medium">{title}</div>{description && <p className="text-sm text-muted-foreground">{description}</p>}</div><div className="shrink-0 text-sm">{children}</div></div>
-}
-
-export function SettingsView({ user, initialSection = 'preferences', onBack, onSignOut, signingOut, accountError }: { user: { id: string; name: string; email: string }; initialSection?: SettingsSection; onBack: () => void; onSignOut: () => void; signingOut: boolean; accountError: string }) {
+export function SettingsView({ user, initialSection = 'preferences', onBack, onSignOut, signingOut, accountError }: { user: { id: string; name: string; email: string }; initialSection?: SettingsSectionId; onBack: () => void; onSignOut: () => void; signingOut: boolean; accountError: string }) {
   const t = useTranslations('Settings')
   const navT = useTranslations('Nav')
   const commonT = useTranslations('Common')
@@ -88,8 +85,8 @@ export function SettingsView({ user, initialSection = 'preferences', onBack, onS
       <div className={cn('mx-auto flex w-full flex-col', section === 'agents' ? 'max-w-[1440px] gap-6 px-4 py-6 sm:px-6 xl:px-8' : 'max-w-3xl gap-9 px-6 py-10 sm:px-10 sm:py-16')}>
         <div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">{current.title}</h1><p className="text-sm text-muted-foreground">{current.description}</p></div>
         {accountError && <p role="alert" className="text-sm text-destructive">{accountError}</p>}
-        {section === 'preferences' && <section className="flex flex-col gap-3" aria-labelledby="appearance-heading"><h2 id="appearance-heading" className="text-sm font-medium">{t('appearance.title')}</h2><div className="rounded-xl border bg-muted/30 px-5"><SettingRow title={t('appearance.theme')} description={t('appearance.themeDescription')}><ToggleGroup aria-label={t('appearance.themeLabel')} variant="outline" spacing={0} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}><ToggleGroupItem value="light" aria-label={t('appearance.light')}><Sun />{t('appearance.light')}</ToggleGroupItem><ToggleGroupItem value="dark" aria-label={t('appearance.dark')}><Moon />{t('appearance.dark')}</ToggleGroupItem><ToggleGroupItem value="system" aria-label={t('appearance.systemLabel')}><Monitor />{t('appearance.system')}</ToggleGroupItem></ToggleGroup></SettingRow><SettingRow title={t('appearance.language')} description={t('appearance.languageDescription')}><span className="text-muted-foreground">{t('appearance.languageName')}</span></SettingRow></div></section>}
-        {section === 'profile' && <section className="flex flex-col gap-3" aria-labelledby="profile-heading"><h2 id="profile-heading" className="text-sm font-medium">{t('profile.heading')}</h2><div className="rounded-xl border bg-muted/30 px-5"><SettingRow title={t('profile.avatar')} description={t('profile.avatarDescription')}><Avatar className="size-10"><AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></SettingRow><SettingRow title={t('profile.name')}><span>{user.name || t('profile.notSet')}</span></SettingRow><SettingRow title={t('profile.email')}><span className="break-all">{user.email}</span></SettingRow></div><p className="text-xs text-muted-foreground">{t('profile.readOnly')}</p></section>}
+        {section === 'preferences' && <SettingsSection id="appearance-heading" title={t('appearance.title')}><SettingRow title={t('appearance.theme')} description={t('appearance.themeDescription')}><ToggleGroup aria-label={t('appearance.themeLabel')} variant="outline" spacing={0} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}><ToggleGroupItem value="light" aria-label={t('appearance.light')}><Sun />{t('appearance.light')}</ToggleGroupItem><ToggleGroupItem value="dark" aria-label={t('appearance.dark')}><Moon />{t('appearance.dark')}</ToggleGroupItem><ToggleGroupItem value="system" aria-label={t('appearance.systemLabel')}><Monitor />{t('appearance.system')}</ToggleGroupItem></ToggleGroup></SettingRow><SettingRow title={t('appearance.language')} description={t('appearance.languageDescription')}><span className="text-muted-foreground">{t('appearance.languageName')}</span></SettingRow></SettingsSection>}
+        {section === 'profile' && <div className="flex flex-col gap-3"><SettingsSection id="profile-heading" title={t('profile.heading')}><SettingRow title={t('profile.avatar')} description={t('profile.avatarDescription')}><Avatar className="size-10"><AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></SettingRow><SettingRow title={t('profile.name')}><span>{user.name || t('profile.notSet')}</span></SettingRow><SettingRow title={t('profile.email')}><span className="break-all">{user.email}</span></SettingRow></SettingsSection><p className="text-xs text-muted-foreground">{t('profile.readOnly')}</p></div>}
         {section === 'agents' && <AgentsPanel />}
         {section === 'workspace' && <WorkspaceSettings />}
         {section === 'devices' && <DevicesWorkspace user={user} localHostname="" initialDevices={[]} embedded />}

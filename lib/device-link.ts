@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { agentRuns, deviceTokens, devices, runMessages } from '@/lib/db/schema'
-import type { RunCommand } from '@orvilo/protocol/device'
+import type { RunCommand } from '@mikka/protocol/device'
 
 /**
  * The single workspace this MVP serves. The protocol's register answer

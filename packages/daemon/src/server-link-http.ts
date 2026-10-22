@@ -33,7 +33,7 @@ import {
   type RunCommand,
   type RunCompletion,
   type RunPatch,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 
 import {
   DaemonError,
@@ -70,7 +70,7 @@ export class SessionRejectedError extends DaemonError {
   constructor() {
     super(
       DAEMON_RPC_ERRORS.unauthorized,
-      "The server refused this device's session; run `orvilo daemon login` again."
+      "The server refused this device's session; run `mikka daemon login` again."
     )
   }
 }
@@ -83,6 +83,12 @@ interface CallOptions<T> {
   /** Default 15 s; long-polls wait longer. */
   timeoutMs?: number
   signal?: AbortSignal
+}
+
+// The server may live under a path (https://app.aspectlylabs.com/mikka), which
+// new URL("/v1/...", base) would drop, so paths are appended to the base.
+export function serverUrl(base: string, path: string): URL {
+  return new URL(`${base.replace(/\/+$/, "")}${path}`)
 }
 
 export class HttpServerLink implements ServerLink {
@@ -106,7 +112,7 @@ export class HttpServerLink implements ServerLink {
     }: { timeoutMs?: number; signal?: AbortSignal } = {}
   ): Promise<Response> {
     try {
-      return await this.fetchImpl(new URL(path, this.baseUrl), {
+      return await this.fetchImpl(serverUrl(this.baseUrl, path), {
         method,
         headers: {
           "content-type": "application/json",

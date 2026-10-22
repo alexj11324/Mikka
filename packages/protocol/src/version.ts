@@ -5,7 +5,7 @@
 import { coerce, gte, valid } from "semver"
 import { z } from "zod"
 
-export const CLIENT_VERSION_HEADER = "x-orvilo-client-version"
+export const CLIENT_VERSION_HEADER = "x-mikka-client-version"
 export const CLIENT_VERSION_PARAM = "client_version"
 
 /**
@@ -13,7 +13,7 @@ export const CLIENT_VERSION_PARAM = "client_version"
  * daemon) and the phone release on their own schedules, so the server keeps a
  * minimum per series (MIN_CLIENT_VERSION / MIN_MOBILE_CLIENT_VERSION).
  */
-export const CLIENT_KIND_HEADER = "x-orvilo-client"
+export const CLIENT_KIND_HEADER = "x-mikka-client"
 /** The relay handshake carries the same value as a query parameter. */
 export const CLIENT_KIND_PARAM = "client_kind"
 
