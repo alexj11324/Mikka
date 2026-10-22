@@ -16,9 +16,27 @@ test('Slack callback verifies signed challenges and rejects unauthorized events 
   expect(await valid.json()).toEqual({ challenge: 'ci-slack-challenge' })
   const tampered = await request.post(endpoint, { headers, data: body + ' ' })
   expect(tampered.status()).toBe(401)
+  const unsigned = await request.post(endpoint, { data: body })
+  expect(unsigned.status()).toBe(401)
+  const staleTimestamp = String(Number(timestamp) - 301)
+  const staleSignature = 'v0=' + createHmac('sha256', 'ci-only-slack-signing-secret').update(`v0:${staleTimestamp}:${body}`).digest('hex')
+  const stale = await request.post(endpoint, { headers: { ...headers, 'x-slack-request-timestamp': staleTimestamp, 'x-slack-signature': staleSignature }, data: body })
+  expect(stale.status()).toBe(401)
+
+  const invalidBody = '{'
+  const invalidSignature = 'v0=' + createHmac('sha256', 'ci-only-slack-signing-secret').update(`v0:${timestamp}:${invalidBody}`).digest('hex')
+  const invalid = await request.post(endpoint, { headers: { ...headers, 'x-slack-signature': invalidSignature }, data: invalidBody })
+  expect(invalid.status()).toBe(400)
 
   const unboundBody = JSON.stringify({ type: 'event_callback', api_app_id: 'A123', team_id: 'T123', event: { type: 'app_mention', user: 'U999', text: '<@U123> list agents' } })
   const unboundSignature = 'v0=' + createHmac('sha256', 'ci-only-slack-signing-secret').update(`v0:${timestamp}:${unboundBody}`).digest('hex')
   const unbound = await request.post(endpoint, { headers: { ...headers, 'x-slack-signature': unboundSignature }, data: unboundBody })
   expect(unbound.status()).toBe(204)
+
+  for (const identity of [{ api_app_id: 'A999', team_id: 'T123' }, { api_app_id: 'A123', team_id: 'T999' }]) {
+    const foreignBody = JSON.stringify({ type: 'event_callback', ...identity, event: { type: 'app_mention', user: 'U456', text: '<@U123> list agents' } })
+    const foreignSignature = 'v0=' + createHmac('sha256', 'ci-only-slack-signing-secret').update(`v0:${timestamp}:${foreignBody}`).digest('hex')
+    const foreign = await request.post(endpoint, { headers: { ...headers, 'x-slack-signature': foreignSignature }, data: foreignBody })
+    expect(foreign.status()).toBe(204)
+  }
 })
