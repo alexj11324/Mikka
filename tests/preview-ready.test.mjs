@@ -1,4 +1,5 @@
 import { test } from 'node:test'
+import { readFile } from 'node:fs/promises'
 import assert from 'node:assert/strict'
 import { warmPreview, previewWarmupPaths } from '../scripts/dev-preview.mjs'
 import { waitForPreviewReady } from '../lib/preview-ready.mjs'
@@ -16,6 +17,20 @@ test('startup compiles chat, images, history and workspace with read-only HEAD r
   })
   assert.deepEqual(seen, previewWarmupPaths.map(path => `/mikka${path}`))
   assert.ok(seen.includes('/mikka/api/agent'))
+})
+
+test('startup begins every warmup without waiting for other routes', async () => {
+  const started = []
+  const releases = []
+  const warming = warmPreview('http://localhost:3000', {
+    fetcher: url => {
+      started.push(url.pathname)
+      return new Promise(resolve => releases.push(() => resolve(new Response(null, { status: 401 }))))
+    }, log: () => {},
+  })
+  assert.equal(started.length, previewWarmupPaths.length)
+  releases.forEach(release => release())
+  await warming
 })
 
 test('startup supports deployments without a base path', async () => {
@@ -38,7 +53,7 @@ test('compile failures cannot report preview ready', async () => {
   }
 })
 
-test('page gate waits for startup compilation rather than triggering it', async () => {
+test('startup diagnostic marker waits for compilation', async () => {
   let reads = 0
   let delays = 0
   const ready = await waitForPreviewReady('test-ready', {
@@ -52,9 +67,14 @@ test('page gate waits for startup compilation rather than triggering it', async 
   assert.equal(delays, 1)
 })
 
-test('failed or timed out compilation blocks page readiness', async () => {
+test('failed or timed out compilation reports diagnostic failure', async () => {
   assert.equal(await waitForPreviewReady('test', { read: async () => 'failed' }), false)
   assert.equal(await waitForPreviewReady('test', { read: async () => 'pending', delay: async () => {}, timeout: 0 }), false)
+})
+
+test('page proxy does not wait for background chat compilation', async () => {
+  const source = await readFile(new URL('../proxy.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /waitForPreviewReady|PREVIEW_READY_FILE/)
 })
 
 test('production and ordinary non-gated invocations need no marker', async () => {
