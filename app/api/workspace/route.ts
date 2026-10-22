@@ -14,6 +14,10 @@ export async function GET(request: Request) {
       'Server-Timing': `auth;dur=${(authenticated - started).toFixed(1)}, workspace;dur=${(performance.now() - authenticated).toFixed(1)}`,
     } })
   } catch (error) {
-    return NextResponse.json({ error: error instanceof WorkspaceError ? error.code : 'workspaceReadFailed' }, { status: 403 })
+    if (error instanceof WorkspaceError) {
+      return NextResponse.json({ error: error.code }, { status: 403 })
+    }
+    console.error('Workspace settings could not be loaded', error instanceof Error ? error.name : 'UnknownError')
+    return NextResponse.json({ error: 'workspaceReadFailed' }, { status: 500 })
   }
 }
