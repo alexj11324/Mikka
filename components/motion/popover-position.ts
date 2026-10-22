@@ -4,6 +4,7 @@ import {
   type MutableRefObject,
   useCallback,
   useLayoutEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -41,6 +42,7 @@ export function usePopoverPortalPosition<
   active: boolean,
 ) {
   const [layout, setLayout] = useState<PortalLayout | null>(null);
+  const pendingFrame = useRef<number | null>(null);
 
   const update = useCallback(() => {
     const trigger = triggerRef.current;
@@ -63,24 +65,39 @@ export function usePopoverPortalPosition<
     setLayout((current) => (sameLayout(current, next) ? current : next));
   }, [contentRef, triggerRef]);
 
+  const scheduleUpdate = useCallback(() => {
+    if (pendingFrame.current !== null) return;
+    // One geometry read per paint, even when nested scroll containers and
+    // ResizeObserver emit several events in the same frame.
+    pendingFrame.current = requestAnimationFrame(() => {
+      pendingFrame.current = null;
+      update();
+    });
+  }, [update]);
+
   useLayoutEffect(() => {
+    // The initial position must be measured before the first visible paint.
     update();
     if (!active) return;
 
     const trigger = triggerRef.current;
     const content = contentRef.current;
-    const observer = new ResizeObserver(update);
+    const observer = new ResizeObserver(scheduleUpdate);
     if (trigger) observer.observe(trigger);
     if (content) observer.observe(content);
 
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
+    window.addEventListener("scroll", scheduleUpdate, true);
+    window.addEventListener("resize", scheduleUpdate);
     return () => {
       observer.disconnect();
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", scheduleUpdate, true);
+      window.removeEventListener("resize", scheduleUpdate);
+      if (pendingFrame.current !== null) {
+        cancelAnimationFrame(pendingFrame.current);
+        pendingFrame.current = null;
+      }
     };
-  }, [active, contentRef, triggerRef, update]);
+  }, [active, contentRef, scheduleUpdate, triggerRef, update]);
 
   return layout;
 }
