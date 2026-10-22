@@ -8,12 +8,11 @@ import type { LinearStateOption } from './mapping'
 import { linearMarkdownToIssueContent, issueContentToMarkdown } from './markdown'
 import { createLinearIssue, ensureLinearLabel, findLinearUserByEmail, linearIssue, linearTeams, updateLinearIssue, type LinearIssueSnapshot } from './client'
 import { hashValue } from './crypto'
-import { linearAccessToken } from './oauth'
+import { linearAccessToken } from './tokens'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers } from '@/lib/issue-numbering'
 import { issueDoneEvent } from '@/lib/coordinator-events'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
-import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { linearCommentSync } from './comment-sync'
 import { encodedIssueDocument, loadIssueDocument, replaceIssueDescription } from './document'
 import { linearDescriptionChanged, shouldApplyLinearSnapshot } from './sync-guards'
@@ -137,7 +136,10 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
     await tx.update(linearIssueLinks).set({ appSyncedAt: saved.updatedAt, linearUpdatedAt: new Date(remote.updatedAt), linearDescriptionHash: hashValue(remote.description ?? ''), syncStatus: 'synced', lastError: null, updatedAt: new Date() }).where(eq(linearIssueLinks.id, link.link.id))
     return saved
   })
-  if (doneEvent) await wakeCoordinator(team.ownerId)
+  if (doneEvent && (process.env.VERCEL === '1' || process.env.AI_GATEWAY_API_KEY)) {
+    const { wakeCoordinator } = await import('@/lib/coordinator/wake')
+    await wakeCoordinator(team.ownerId)
+  }
   return saved
 }
 

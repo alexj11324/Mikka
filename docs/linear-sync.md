@@ -1,6 +1,6 @@
 # Linear two-way sync
 
-The integration maps one Linear team to one Mikka account. New issues and changes to already linked issues sync in both directions. The Neon inbox records signed webhook deliveries before responding; an outbox trigger captures app edits in the same transaction as the issue or collaboration write. Request handlers attempt a sync immediately after responding, and Vercel Cron retries queued work.
+The integration maps one Linear team to one Mikka account. New issues and changes to already linked issues sync in both directions. The Neon inbox records signed webhook deliveries before responding; an outbox trigger captures app edits in the same transaction as the issue or collaboration write. The Mikka app and OAuth callback remain on Vercel; a Cloudflare Worker receives Linear webhooks and drains the durable inbox and outbox through Hyperdrive.
 
 ## Linear OAuth app
 
@@ -15,27 +15,28 @@ Register `http://localhost:3014/mikka/api/integrations/linear/callback` for loca
 Configure an application webhook that sends `Issue`, `Comment`, and `OAuthAuthorization` events to:
 
 ```text
-https://app.aspectlylabs.com/mikka/api/webhooks/linear
+https://linear-sync.aspectlylabs.com/mikka/api/webhooks/linear
 ```
 
 The OAuth flow uses PKCE, binds its state to the initiating browser and signed-in Mikka account, and requests `read,write,issues:create,comments:create`; the webhook is configured on the OAuth app, so the integration does not request Linear's broad `admin` scope. Copy the OAuth client ID, client secret, and webhook signing secret into the hosting environment.
 
 ## Environment
 
-Set these server-only environment variables:
+Set these server-only environment variables in the Mikka app and the Linear sync Worker as indicated, and configure the Worker binding:
 
 | Variable | Purpose |
 | --- | --- |
-| `LINEAR_CLIENT_ID` | OAuth application client ID |
-| `LINEAR_CLIENT_SECRET` | OAuth code and refresh-token exchange |
-| `LINEAR_TOKEN_ENCRYPTION_KEY` | 32 random bytes encoded as 64 hex characters; encrypts OAuth tokens stored in Neon |
-| `LINEAR_WEBHOOK_SECRET` | Linear OAuth application's webhook signing secret |
-| `CRON_SECRET` | Protects `/mikka/api/cron/linear-sync`; Vercel sends it in the bearer authorization header |
+| `LINEAR_CLIENT_ID` | OAuth application client ID; set in both deployments |
+| `LINEAR_CLIENT_SECRET` | OAuth code and refresh-token exchange; set in both deployments |
+| `LINEAR_TOKEN_ENCRYPTION_KEY` | 32 random bytes encoded as 64 hex characters; encrypts OAuth tokens stored in Neon; set in both deployments |
+| `LINEAR_WEBHOOK_SECRET` | Linear OAuth application's webhook signing secret; set on the Worker |
+| `CRON_SECRET` | Protects `/mikka/api/cron/linear-sync`; set on the Worker and app if Vercel Cron is also enabled |
 | `LINEAR_REDIRECT_URL` | Optional exact callback URL override; required in Vercel Preview because preview requests must not store their OAuth state in Production |
+| `HYPERDRIVE` binding | Cloudflare Hyperdrive connection to the same Neon branch used by the app |
 
 Generate an encryption key with `openssl rand -hex 32`. Never commit the generated value. Environments sharing the same Neon branch must share the same `LINEAR_TOKEN_ENCRYPTION_KEY`; production can use its own key because it uses a separate Neon branch.
 
-Vercel Cron runs only on Production deployments at `/mikka/api/cron/linear-sync`. Hobby projects support daily schedules; the checked-in schedule is therefore a daily recovery sweep. Issue writes and webhook receipts also dispatch their durable queue items after the response, so normal sync does not wait for that sweep. The sweep recovers work interrupted by deployments, timeouts, or provider errors.
+`cloudflare/linear-sync/wrangler.jsonc` binds the Worker to `linear-sync.aspectlylabs.com` and runs its recovery sweep daily at 04:00 UTC. Before deployment, create a Hyperdrive configuration for the target Neon branch, add its ID as the `HYPERDRIVE` binding, and set the Worker secrets above. For local development, the Worker uses its own request-scoped PostgreSQL pool and closes it after each webhook, batch, or scheduled run. Issue writes on Vercel and webhook receipts on Cloudflare still dispatch durable work immediately; the scheduled sweep recovers work interrupted by deployments, timeouts, or provider errors.
 
 ## Synced data
 

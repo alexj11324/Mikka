@@ -1,5 +1,5 @@
 import 'server-only'
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 
 function encryptionKey() {
   const value = process.env.LINEAR_TOKEN_ENCRYPTION_KEY ?? ''
@@ -24,19 +24,4 @@ export function unseal(value: string) {
   const decipher = createDecipheriv('aes-256-gcm', encryptionKey(), Buffer.from(encodedNonce, 'base64url'))
   decipher.setAuthTag(Buffer.from(encodedTag, 'base64url'))
   return Buffer.concat([decipher.update(Buffer.from(encodedCiphertext, 'base64url')), decipher.final()]).toString('utf8')
-}
-
-export function verifyLinearSignature(rawBody: string, signature: string, secret: string) {
-  if (!/^[a-f\d]{64}$/i.test(signature)) return false
-  const expected = createHmac('sha256', secret).update(rawBody).digest()
-  const actual = Buffer.from(signature, 'hex')
-  return actual.length === expected.length && timingSafeEqual(actual, expected)
-}
-
-export function verifyBearer(value: string | null, secret: string) {
-  const match = value?.match(/^Bearer (.+)$/)
-  if (!match) return false
-  const actual = Buffer.from(match[1]!)
-  const expected = Buffer.from(secret)
-  return actual.length === expected.length && timingSafeEqual(actual, expected)
 }

@@ -5,7 +5,7 @@ import { issues, linearCommentLinks, linearConnections, linearIssueLinks, linear
 import { LinearApiError, sanitizeLinearError } from './graphql'
 import { applyLinearCommentToApp } from './comment-sync'
 import { createAppIssueFromLinear, applyLinearIssueToApp, LinearSyncConflictError, syncAppIssueToLinear } from './issue-sync'
-import { linearAccessToken } from './oauth'
+import { linearAccessToken } from './tokens'
 import { linearComment, linearIssue } from './client'
 
 type InboxRow = typeof linearSyncInbox.$inferSelect

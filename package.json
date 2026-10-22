@@ -16,7 +16,7 @@
     "test:i18n": "node --test scripts/check-i18n.test.mjs",
     "i18n:check": "node scripts/check-i18n.mjs",
     "test:ssh-target": "node --import tsx --test lib/ssh-target.test.ts",
-    "test:linear-sync": "node --import tsx --test lib/linear-sync/mapping.test.ts lib/linear-sync/markdown.test.ts",
+    "test:linear-sync": "node --import tsx --test lib/db/request-scope.test.ts lib/linear-sync/mapping.test.ts lib/linear-sync/markdown.test.ts lib/linear-sync/webhook.test.ts cloudflare/linear-sync/src/index.test.ts",
     "test:coordinator-events": "node --import tsx --test lib/coordinator-events.test.ts lib/coordinator/context.test.ts lib/coordinator/triage.test.ts",
     "test:e2e": "playwright test",
     "test:performance": "playwright test tests/e2e/navigation-performance.spec.ts",
@@ -103,6 +103,7 @@
     "tailwindcss": "^4.1.18",
     "tsx": "4.23.15",
     "tw-animate-css": "^1.3.4",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "wrangler": "^4.151.3"
   }
 }

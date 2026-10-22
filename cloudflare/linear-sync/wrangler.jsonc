@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "mikka-linear-sync",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-22",
+  "compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
+  "workers_dev": true,
+  "routes": [{ "pattern": "linear-sync.aspectlylabs.com", "custom_domain": true }],
+  "triggers": { "crons": ["0 4 * * *"] },
+  "alias": { "server-only": "next/dist/compiled/server-only/empty.js" },
+  "observability": { "enabled": true }
+}
