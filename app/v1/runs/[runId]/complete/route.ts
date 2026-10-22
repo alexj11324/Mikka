@@ -8,6 +8,7 @@ import { authenticateDevice } from '@/lib/device-link'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
+import { revokeRunTokens } from '@/lib/mcp/worker'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     .returning({ id: agentRuns.id })
   // Only the completion that ended the run tells the Coordinator.
   if (ended.length) {
+    await revokeRunTokens(runId)
     await recordCoordinatorEvent(db, runFinishedEvent({ ...run, status, stopReason, report }))
     after(() => wakeCoordinator(run.userId))
   }

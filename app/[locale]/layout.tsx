@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import Script from 'next/script';
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
@@ -44,6 +45,8 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning className={fontSans.variable}>
+      {/* OpenUI 1.0.1 has no public opt-out; claim its bootstrap guard before imports run. */}
+      {process.env.NODE_ENV === 'development' && <Script id="disable-openui-devtools" strategy="beforeInteractive">{'globalThis[Symbol.for("openui.devtools.autoMount")] = true;'}</Script>}
       <body className="antialiased">
         <NextIntlClientProvider messages={messages}>
           <ThemeProvider>{children}</ThemeProvider>

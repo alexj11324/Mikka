@@ -102,9 +102,24 @@ export async function getIssue(userId: string, issueId: string) {
   if (!issue) return null
   const runs = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
     .where(and(eq(agentRuns.issueId, issue.id), eq(agentRuns.userId, userId))).orderBy(desc(agentRuns.createdAt)).limit(5)
+  const metadata = readIssueMetadata(issue.content)
+  // Children and the issues this one blocks point at it, so they are found by looking the other way.
+  const siblings = await db.select({ id: issues.id, title: issues.title, status: issues.status, content: issues.content }).from(issues).where(eq(issues.userId, issue.userId))
+  const linked = new Map(siblings.filter(row => !readIssueMetadata(row.content).deletedAt).map(row => [row.id, { id: row.id, title: row.title, status: row.status, parentId: readIssueMetadata(row.content).parentId, blockedByIds: readIssueMetadata(row.content).blockedByIds }]))
+  const pick = (ids: (string | null)[]) => ids.flatMap(id => {
+    const row = id ? linked.get(id) : undefined
+    return row ? [{ id: row.id, title: row.title, status: row.status }] : []
+  })
   return {
-    id: issue.id, number: readIssueMetadata(issue.content).number ?? null, title: issue.title,
+    id: issue.id, number: metadata.number ?? null, title: issue.title,
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
+    project: metadata.project, labels: metadata.labels.map(label => label.name), assignee: metadata.assignee ? { kind: metadata.assignee.kind, id: metadata.assignee.id, name: metadata.assignee.name } : null,
+    dueDate: metadata.dueDate, pullRequests: metadata.pullRequests,
+    relations: {
+      parent: pick([metadata.parentId])[0] ?? null,
+      children: pick([...linked.values()].filter(row => row.parentId === issue.id).map(row => row.id)),
+      blockedBy: pick(metadata.blockedByIds), blocks: pick([...linked.values()].filter(row => row.blockedByIds.includes(issue.id)).map(row => row.id)), related: pick(metadata.relatedIds), duplicateOf: pick([metadata.duplicateOfId])[0] ?? null,
+    },
     runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
   }
 }

@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl'
 import * as React from 'react'
 import useSWR from 'swr'
 import { listTeams } from '@/app/actions/teams'
-import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, SquarePen, SquareUserRound } from 'lucide-react'
+import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Scan, Search, Send, SquarePen, SquareUserRound, Workflow } from 'lucide-react'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
@@ -46,6 +46,10 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
     </SidebarHeader>
     <SidebarContent className="gap-5">
       <SidebarGroup className="pt-0"><SidebarMenu>{personal.map(item => <SidebarMenuItem key={item.id}><SidebarMenuButton tooltip={item.title} isActive={section === item.id} onClick={() => navigate(item.id)}><item.icon /><span>{item.title}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroup>
+      <SidebarGroup className="pt-0"><SidebarMenu>
+        <SidebarMenuItem><SidebarMenuButton tooltip={i18nText("Nav.agent")} isActive={section === 'agent'} onClick={() => navigate('agent')}><Send /><span>{i18nText("Nav.agent")}</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton tooltip={i18nText("Nav.coordinator")} isActive={section === 'coordinator'} onClick={() => navigate('coordinator')}><Workflow /><span>{i18nText("Nav.coordinator")}</span></SidebarMenuButton></SidebarMenuItem>
+      </SidebarMenu></SidebarGroup>
       <Collapsible defaultOpen className="group/workspace"><SidebarGroup>
         <SidebarGroupLabel render={<CollapsibleTrigger />} className="mb-1 cursor-pointer">{i18nText("Settings.sections.workspace.title")}<ChevronDown className="ml-1 transition-transform group-data-closed/workspace:-rotate-90" /></SidebarGroupLabel>
         <CollapsibleContent><SidebarMenu>

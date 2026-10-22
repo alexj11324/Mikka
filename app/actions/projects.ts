@@ -1,10 +1,10 @@
 'use server'
 import { getTranslations } from 'next-intl/server'
 
-import { headers } from 'next/headers'
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { ActionFailureError } from '@/lib/action-error'
+import { currentUser } from '@/lib/acting-user'
 import { projectDb, projects, projectEvents } from '@/lib/db/projects'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { updateIssueMetadata } from '@/app/actions/issue-metadata'
@@ -16,10 +16,9 @@ import { inArray } from 'drizzle-orm'
 import { lockTeamRelations } from '@/lib/team-access'
 
 async function userId() {
-  const i18nText = await getTranslations();
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new Error(i18nText("Errors.authRequired"))
-  return session.user.id
+  const user = await currentUser()
+  if (!user) throw new ActionFailureError('authRequired')
+  return user.id
 }
 export async function listProjects() {
   const context = await loadWorkspaceContext()

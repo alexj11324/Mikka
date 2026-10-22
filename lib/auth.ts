@@ -66,7 +66,7 @@ export const auth = betterAuth({
   },
   session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
   ...(process.env.NODE_ENV === 'development' ? { advanced: {
-    // The cross-site v0 preview requires secure SameSite=None session cookies.
-    defaultCookieAttributes: { sameSite: 'none' as const, secure: true },
+    // Partition preview sessions by top-level site when third-party cookies are blocked.
+    defaultCookieAttributes: { sameSite: 'none' as const, secure: true, partitioned: true },
   } } : {}),
 })

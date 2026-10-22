@@ -23,4 +23,5 @@ test('匿名访问旧设置入口会重定向到登录页并保留设置路径',
   await page.goto(app('/preview/settings'))
   await expect(page).toHaveURL(url => url.pathname === app('/sign-in') && url.searchParams.get('next') === '/settings/members')
   await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
+  await expect(page.getByLabel('邮箱', { exact: true })).toBeVisible()
 })

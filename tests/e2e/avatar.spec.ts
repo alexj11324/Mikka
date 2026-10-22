@@ -5,7 +5,7 @@ test("中文姓名不参与头像，账号图片优先，加载失败回退邮�
   const email = `alex-${randomUUID()}@example.com`;
   await register(page, "/settings/members", email);
   const label = `${email} 的头像`;
-  const memberAvatar = page.getByRole("img", { name: label, exact: true });
+  const memberAvatar = page.getByRole("region", { name: "成员", exact: true }).getByRole("img", { name: label, exact: true });
   await expect(memberAvatar).toHaveText("A");
   await page.getByRole("button", { name: "邀请成员", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "邀请成员", exact: true });
@@ -33,10 +33,6 @@ test("中文姓名不参与头像，账号图片优先，加载失败回退邮�
   await page.route(image, route => route.fulfill({ contentType: "image/png", body: "invalid-image" }));
   await page.reload();
   await expect(memberAvatar).toHaveText("A");
-  await page.getByRole("link", { name: "返回工作台", exact: true }).click();
-  const menu = page.getByRole("button", { name: "工作区菜单", exact: true });
-  await menu.click();
-  await page.getByRole("menuitem", { name: "邀请和管理成员", exact: true }).click();
   await page.getByRole("button", { name: "邀请成员", exact: true }).click();
   await expect(dialog.getByRole("img", { name: label, exact: true })).toHaveText("A");
 });

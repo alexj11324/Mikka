@@ -1,18 +1,17 @@
 import 'server-only'
-import { headers } from 'next/headers'
 import { and, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
-import { auth } from '@/lib/auth'
+import { currentUser } from '@/lib/acting-user'
 import { db } from '@/lib/db'
 import { issues, issueMembers } from '@/lib/db/schema'
 import { issueTeamAccess } from '@/lib/issue-team-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 
 export async function requireUser() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user
+  const user = await currentUser()
+  if (!user) throw new ActionFailureError('authRequired')
+  return user
 }
 
 export async function requireIssueAccess(id: string, includeDeleted = false) {

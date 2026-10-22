@@ -93,6 +93,22 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
       ].filter(Boolean).join('\n')
     case 'issue_done':
       return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to done.`, note].filter(Boolean).join('\n')
+    case 'run_report':
+      return [`[Event] The agent in run ${event.runId} reports progress: ${payload.text}`, event.issueId ? `Issue: ${event.issueId}.` : null, note].filter(Boolean).join('\n')
+    case 'run_question':
+      return [
+        `[Event] The agent in run ${event.runId} asks the person: ${payload.question}`,
+        Array.isArray(payload.options) ? `Options: ${payload.options.join(' / ')}` : null,
+        payload.context ? `Context: ${payload.context}` : null,
+        'The run keeps going. Ask the person, then pass their answer on with send_to_run.',
+        note,
+      ].filter(Boolean).join('\n')
+    case 'run_blocked':
+      return [
+        `[Event] The agent in run ${event.runId} is blocked: ${payload.reason}`,
+        'Tell the person what it needs. Pass their answer on with send_to_run, or stop_run if they say so.',
+        note,
+      ].filter(Boolean).join('\n')
   }
 }
 

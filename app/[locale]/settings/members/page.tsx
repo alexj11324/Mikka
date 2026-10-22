@@ -2,10 +2,8 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { auth } from '@/lib/auth'
-import { loadWorkspaceSettings } from '@/lib/workspace-access'
-import { WorkspaceApp } from '@/components/workspace-app'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Link, redirect } from '@/i18n/navigation'
+import { MembersPageView } from '@/components/settings/members-page'
+import { redirect } from '@/i18n/navigation'
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale()
@@ -17,14 +15,6 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
   const query = await searchParams
   const locale = await getLocale()
   const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) {
-    redirect({ href: '/sign-in?next=%2Fsettings%2Fmembers', locale })
-    return null
-  }
-  const initial = await loadWorkspaceSettings(query.workspace).catch(() => null)
-  if (!initial) {
-    const t = await getTranslations({ locale, namespace: 'Members' })
-    return <main className="mx-auto flex max-w-lg flex-col gap-6 p-8"><Alert variant="destructive"><AlertTitle>{t('noAccessTitle')}</AlertTitle><AlertDescription>{t('noAccessDescription')}</AlertDescription></Alert><Link href="/settings/members" className="underline underline-offset-4">{t('backToAccessible')}</Link></main>
-  }
-  return <WorkspaceApp user={session.user} initialMembers={initial} />
+  if (!session?.user) return redirect({ href: '/sign-in?next=%2Fsettings%2Fmembers', locale })
+  return <MembersPageView user={session.user} workspaceId={query.workspace} inviteInitially={query.invite === '1'} />
 }

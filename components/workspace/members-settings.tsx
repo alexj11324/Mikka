@@ -111,7 +111,6 @@ export function MembersSettings({
   inviteInitially: boolean;
   embedded?: boolean;
 }) {
-  const router = useRouter();
   const t = useTranslations("Members");
   const translateError = useActionError();
   const commonT = useTranslations("Common");
@@ -336,14 +335,11 @@ export function MembersSettings({
           </Link>
         </div>
         <div className="mt-auto hidden flex-col gap-3 px-3 pb-2 md:flex">
-
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Shield className="size-3.5" />
             {data.role === "admin" ? t("adminAccess") : t("memberAccess")}
           </div>
-          <span className="text-xs text-muted-foreground">
-            {t("brandFooter")}
-          </span>
+          <span className="text-xs text-muted-foreground">{t("brandFooter")}</span>
         </div>
       </aside>}
       <MainContent className={cn("min-w-0", embedded ? "w-full" : "flex flex-1 flex-col md:py-2 md:pr-2")}>
@@ -732,6 +728,6 @@ export function MembersSettings({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </section>
   );
 }

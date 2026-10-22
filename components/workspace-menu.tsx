@@ -98,7 +98,6 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
       <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-1rem)]">
         <DropdownMenuGroup>
           <DropdownMenuItem className="min-h-9" aria-label={i18nText("Settings.title")} aria-keyshortcuts="Control+, Meta+," onClick={() => settings()}><span className="flex-1">{i18nText("Settings.title")}</span><ShortcutKeys keys={['mod', ',']} aria-hidden="true" /></DropdownMenuItem>
-          <DropdownMenuItem className="min-h-9" onClick={() => settings('/settings/members')}>{i18nText("FeatureCopy.c_49509449")}</DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>

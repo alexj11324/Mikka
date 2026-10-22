@@ -51,6 +51,14 @@ test('compareMessages reports missing, extra and empty keys', () => {
   assert.ok(problems.some(problem => problem.includes('"Board.moved" must be a non-empty string')))
 })
 
+test('compareMessages rejects corrupted translation text in either locale', () => {
+  for (const locale of ['zh-CN', 'en']) {
+    const broken = structuredClone(messages)
+    broken[locale].Common.close = 'Broken\uFFFDtext'
+    assert.ok(compareMessages(broken).includes(`${locale}: "Common.close" contains a Unicode replacement character`))
+  }
+})
+
 test('compareMessages reports placeholder mismatches', () => {
   const broken = structuredClone(messages)
   broken.en.Board.moved = 'Moved'

@@ -39,6 +39,7 @@ export function compareMessages(messages) {
     const flat = flattenMessages(messages[locale])
     for (const [key, value] of flat) {
       if (typeof value !== 'string' || !value.trim()) problems.push(`${locale}: "${key}" must be a non-empty string`)
+      else if (value.includes('\uFFFD')) problems.push(`${locale}: "${key}" contains a Unicode replacement character`)
     }
   }
   const english = flattenMessages(messages.en)

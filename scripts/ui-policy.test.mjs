@@ -209,7 +209,7 @@ test('lint permits imported components but fails handwritten business UI without
     execFileSync('git', ['init', '--quiet'], { cwd })
     for (const library of policy.componentRoots) {
       mkdirSync(path.join(cwd, library), { recursive: true })
-      writeFileSync(path.join(cwd, library, 'example.tsx'), library === 'components/blocks/' ? 'import { Button } from "@/components/ui/button"; export const LibraryComponent = ({ onSave }) => <Button onClick={onSave}>Save</Button>' : 'export const LibraryComponent = ({ onSave }) => <button className="text-[13px]" onClick={onSave}>Save</button>')
+      writeFileSync(path.join(cwd, library, 'example.tsx'), !['components/ui/', 'components/reui/'].includes(library) ? 'import { Button } from "@/components/ui/button"; export const LibraryComponent = ({ onSave }) => <Button onClick={onSave}>Save</Button>' : 'export const LibraryComponent = ({ onSave }) => <button className="text-[13px]" onClick={onSave}>Save</button>')
     }
     writeFileSync(path.join(cwd, 'ui-policy.json'), JSON.stringify(policy))
     writeFileSync(path.join(cwd, 'components.json'), JSON.stringify({ style: policy.style, iconLibrary: policy.iconLibrary.replace('-react', '') }))

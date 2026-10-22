@@ -1,14 +1,13 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
+import { currentUser } from '@/lib/acting-user'
 import { accessibleTeams } from '@/lib/team-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { issueTeamScope } from '@/lib/issue-team-access'
-import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
@@ -26,9 +25,9 @@ type IssueRow = typeof issues.$inferSelect
 type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata> }
 
 async function getUserId() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user.id
+  const user = await currentUser()
+  if (!user) throw new ActionFailureError('authRequired')
+  return user.id
 }
 
 const documentSchema = z.custom<JSONContent>(value => {
