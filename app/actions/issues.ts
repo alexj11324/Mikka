@@ -94,7 +94,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
         return { issue: issueWithMetadata(issue) }
       })
-      if ('issue' in result) dispatchLinearIssueSync(result.issue.id)
+      if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error

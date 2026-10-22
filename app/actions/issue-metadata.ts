@@ -85,7 +85,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
         return { issue: issueWithMetadata(saved) }
       })
-      if ('issue' in result) dispatchLinearIssueSync(result.issue.id)
+      if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
