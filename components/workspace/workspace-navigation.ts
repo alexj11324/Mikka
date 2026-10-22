@@ -1,1 +1,1 @@
-export type WorkspaceSection = 'inbox' | 'my-issues' | 'agent' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues'
+export type WorkspaceSection = 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues'
