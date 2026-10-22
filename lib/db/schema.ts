@@ -116,6 +116,26 @@ export const runChunks = pgTable('run_chunks', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('run_chunks_run_seq_key').on(table.runId, table.seq)])
 
+/**
+ * Something a person's Coordinator should hear about: a run that ended, or an
+ * issue that moved to done. Written where it happens; the Coordinator reads
+ * the undelivered rows and marks them. `dedupeKey` keeps a repeated write to
+ * one row.
+ */
+export const COORDINATOR_EVENT_KINDS = ['run_finished', 'issue_done'] as const
+export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
+
+export const coordinatorEvents = pgTable('coordinator_events', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  kind: text('kind').$type<CoordinatorEventKind>().notNull(),
+  dedupeKey: text('dedupeKey').notNull(),
+  issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
+  runId: uuid('runId').references(() => agentRuns.id, { onDelete: 'cascade' }),
+  payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+  deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('coordinator_events_dedupe_key').on(table.dedupeKey), index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt)])
+
 /** A message a person sent a running agent, delivered on its next poll. */
 export const runMessages = pgTable('run_messages', {
   id: uuid('id').primaryKey(), runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
