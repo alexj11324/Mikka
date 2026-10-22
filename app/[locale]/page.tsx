@@ -24,5 +24,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
     listIssues(),
     getAgentHistory(user.id).catch(() => undefined),
   ])
-  return <IssueWorkspace key={user.id} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialIssues={initialIssues} initialAgentHistory={initialAgentHistory} initialSection={query.section === 'agent' ? 'agent' : 'projects'} initialSettingsSection={query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
+  return <IssueWorkspace key={user.id} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialIssues={initialIssues} initialAgentHistory={initialAgentHistory} initialSection={query.section === 'agent' ? 'agent' : 'projects'} initialSettingsSection={query.settings === 'integrations' || query.settings === 'agents' ? query.settings : undefined} googleEnabled={googleEnabled} />
 }

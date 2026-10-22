@@ -39,6 +39,7 @@ import type {
   ThreadItem,
   ThreadResponse,
   ThreadStartParams,
+  TurnStartParams,
   TokenUsageNotification,
   TurnNotification,
   UserInput,
@@ -408,7 +409,11 @@ export class CodexAdapter implements AgentAdapter {
       lastError = undefined
       const { turn } = await rpc.sendRequest<{ turn: { id: string } }>(
         "turn/start",
-        { threadId: sessionId, input: text(message) }
+        {
+          threadId: sessionId,
+          input: text(message),
+          ...(options.effort ? { effort: options.effort } : {}),
+        } satisfies TurnStartParams
       )
       activeTurn ??= turn.id
     }

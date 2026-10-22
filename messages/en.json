@@ -1358,6 +1358,10 @@
       "workspace": {
         "title": "Workspace",
         "description": "Basic information about the current workspace."
+      },
+      "agents": {
+        "title": "Agents",
+        "description": "Each agent is a role with its own prompt and runtime."
       }
     },
     "appearance": {
@@ -1788,5 +1792,142 @@
     "cancel": "Cancel",
     "creating": "Creating…",
     "createWorkspace": "Create workspace"
+  },
+  "Agents": {
+    "description": "Each agent is a role with its own prompt and runtime.",
+    "loadFailed": "Couldn't load agents. Try again in a moment.",
+    "addCustom": "Add a custom role, or start from a preset",
+    "groups": {
+      "default": "Default roles",
+      "custom": "Custom roles"
+    },
+    "status": {
+      "running": "Running",
+      "idle": "Idle",
+      "waiting": "Needs your approval",
+      "offline": "Device offline"
+    },
+    "roles": {
+      "coordinator": {
+        "summary": "Breaks work down, hands it to Workers and drives it to done."
+      },
+      "worker": {
+        "summary": "Completes one task in the repository and hands in a verified change."
+      },
+      "reviewer": {
+        "summary": "Reviews changes against the acceptance criteria and only blocks real problems."
+      }
+    },
+    "badges": {
+      "default": "Default",
+      "custom": "Custom"
+    },
+    "fields": {
+      "name": "Name",
+      "namePlaceholder": "Role name",
+      "summary": "Summary",
+      "summaryPlaceholder": "One line on what it does"
+    },
+    "tabs": {
+      "label": "Agent settings",
+      "prompt": "Prompt",
+      "runtime": "Runtime"
+    },
+    "prompt": {
+      "title": "System prompt",
+      "view": "View",
+      "preview": "Preview",
+      "edit": "Edit",
+      "empty": "No prompt yet.",
+      "placeholder": "# Role: …\n\nWhat this role does, how it works and what it hands in.",
+      "markdown": "Markdown supported"
+    },
+    "actions": {
+      "new": "New agent",
+      "more": "More actions",
+      "reset": "Restore default prompt",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "create": "Create"
+    },
+    "deleteDialog": {
+      "title": "Delete {name}?",
+      "description": "This removes the role and its run history. It can't be undone."
+    },
+    "runtime": {
+      "device": "Machine",
+      "pickDevice": "Choose a machine",
+      "noDevices": "No devices connected yet",
+      "online": "Online",
+      "offline": "Offline",
+      "pickHarness": "Choose a harness",
+      "noHarness": "No harness chosen",
+      "model": "Model",
+      "modelsUnreported": "This machine's daemon hasn't reported its models yet.",
+      "defaultModel": "Default",
+      "defaultEffort": "Default",
+      "noEffortLevels": "This model has no effort levels",
+      "effortNeedsModel": "Pick a machine and harness to see the levels",
+      "noDevice": "No machine"
+    },
+    "picker": {
+      "title": "Choose an icon",
+      "open": "Change icon and colour",
+      "icons": "Icons",
+      "search": "Search",
+      "results": "Results",
+      "noResults": "Nothing matches",
+      "color": "Colour",
+      "colorAuto": "Auto",
+      "colorRole": "Role colour",
+      "categories": {
+        "work": "Work",
+        "code": "Code",
+        "writing": "Writing",
+        "quality": "Quality",
+        "faces": "People",
+        "animals": "Animals",
+        "objects": "Objects",
+        "symbols": "Symbols"
+      },
+      "colors": {
+        "violet": "Violet",
+        "sky": "Sky",
+        "teal": "Teal",
+        "orange": "Orange",
+        "pink": "Pink",
+        "slate": "Slate"
+      }
+    },
+    "new": {
+      "title": "New agent",
+      "description": "Write one from scratch, or pick a preset whose prompt is already written. You can change it any time.",
+      "custom": "Custom role",
+      "customDescription": "Choose its name, icon and prompt: a role made for your own workflow.",
+      "fromPreset": "Or start from a preset"
+    },
+    "templates": {
+      "tester": {
+        "name": "Tester",
+        "summary": "Adds the missing tests and makes them pass, with repro steps for failures."
+      },
+      "frontend": {
+        "name": "Frontend",
+        "summary": "Builds the page from the design with the project's own components."
+      },
+      "security": {
+        "name": "Security review",
+        "summary": "Looks for injection, privilege and leaked-secret bugs; reports only what reproduces."
+      },
+      "docs": {
+        "name": "Docs writer",
+        "summary": "Keeps the README and change notes in step with the code."
+      },
+      "refactor": {
+        "name": "Refactorer",
+        "summary": "Tidies code without changing behaviour, each step covered by tests."
+      }
+    }
   }
 }

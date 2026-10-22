@@ -357,7 +357,7 @@
     "draftAuthor": "草稿作者",
     "unsavedDraft": "未保存草稿",
     "editorLabel": "任务描述编辑器",
-    "placeholderCompact": "\u6dfb\u52a0\u63cf\u8ff0\u2026",
+    "placeholderCompact": "添加描述…",
     "placeholderFull": "描述背景与验收标准，输入 / 插入内容…",
     "selectionRequired": "请先选中一段尚未评论的正文。",
     "hint": "输入 / 插入内容，选中文字设置格式",
@@ -1358,6 +1358,10 @@
       "workspace": {
         "title": "工作区",
         "description": "当前工作区的基本信息。"
+      },
+      "agents": {
+        "title": "Agent",
+        "description": "每个 Agent 是一个角色，有自己的提示词和运行环境。"
       }
     },
     "appearance": {
@@ -1464,7 +1468,7 @@
     "linksDescription": "尚未发送邮件。请将链接私下发送给对应成员；7 天内有效，仅限对应邮箱登录后接受。",
     "inviteLinkFor": "{email} 的邀请链接",
     "copyLinkFor": "复制 {email} 的邀请链接",
-    "linkCopied": "\u9080\u8bf7\u94fe\u63a5\u5df2\u590d\u5236\u3002",
+    "linkCopied": "邀请链接已复制。",
     "copyManually": "自动复制不可用，请选中链接后手动复制。",
     "refreshFailed": "邀请已创建，但列表刷新失败。请关闭弹窗后刷新页面，不要重复创建。",
     "imported": "已导入 {count} 个有效邮箱；共 {total} 位待邀请。",
@@ -1661,7 +1665,7 @@
     "fillQuestion": "填入提问",
     "askNow": "直接提问",
     "learnMore": "继续了解",
-    "theQuestionIsEmptyOrTooLong2": "\u63d0\u95ee\u5185\u5bb9\u4e3a\u7a7a\u6216\u8fc7\u957f\uff0c\u8bf7\u8c03\u6574\u540e\u5728\u6b64\u91cd\u65b0\u63d0\u4ea4\u3002",
+    "theQuestionIsEmptyOrTooLong2": "提问内容为空或过长，请调整后在此重新提交。",
     "unableToContinueYourChoicesAndAnswers": "本次继续未完成，选择和回答已保留，可以在此重试。",
     "submissionFailedYourChoicesAndAnswersAre": "提交失败，选择和回答已保留，请在此重试。",
     "taskContext": "任务背景：",
@@ -1740,7 +1744,7 @@
     "form": "表单",
     "formField": "表单字段",
     "input": "输入框",
-    "tabs": "\u6807\u7b7e\u9875",
+    "tabs": "标签页",
     "textParagraph": "正文段落",
     "responseContent": "正文",
     "unableToReadResponse": "回复内容无法读取",
@@ -1788,5 +1792,142 @@
     "cancel": "取消",
     "creating": "正在创建…",
     "createWorkspace": "创建工作区"
+  },
+  "Agents": {
+    "description": "每个 Agent 是一个角色，有自己的提示词和运行环境。",
+    "loadFailed": "Agent 列表加载失败，请稍后重试。",
+    "addCustom": "添加自定义角色，或从预置模板开始",
+    "groups": {
+      "default": "默认角色",
+      "custom": "自定义角色"
+    },
+    "status": {
+      "running": "运行中",
+      "idle": "空闲",
+      "waiting": "等你审批",
+      "offline": "设备离线"
+    },
+    "roles": {
+      "coordinator": {
+        "summary": "拆解任务、分派给 Worker，并推进到完成。"
+      },
+      "worker": {
+        "summary": "在仓库里完成一个任务，交付验证过的改动。"
+      },
+      "reviewer": {
+        "summary": "对照验收标准审查改动，只在真有问题时拦下。"
+      }
+    },
+    "badges": {
+      "default": "默认",
+      "custom": "自定义"
+    },
+    "fields": {
+      "name": "名称",
+      "namePlaceholder": "角色名称",
+      "summary": "简介",
+      "summaryPlaceholder": "一句话说明它做什么"
+    },
+    "tabs": {
+      "label": "Agent 设置",
+      "prompt": "提示词",
+      "runtime": "运行环境"
+    },
+    "prompt": {
+      "title": "系统提示词",
+      "view": "显示方式",
+      "preview": "预览",
+      "edit": "编辑",
+      "empty": "还没有提示词。",
+      "placeholder": "# Role: …\n\n写下这个角色要做什么、怎么做、交付什么。",
+      "markdown": "支持 Markdown"
+    },
+    "actions": {
+      "new": "新建 Agent",
+      "more": "更多操作",
+      "reset": "恢复默认提示词",
+      "delete": "删除",
+      "cancel": "取消",
+      "save": "保存",
+      "create": "创建"
+    },
+    "deleteDialog": {
+      "title": "删除 {name}？",
+      "description": "删除后这个角色和它的运行记录都会移除，无法恢复。"
+    },
+    "runtime": {
+      "device": "机器",
+      "pickDevice": "选择机器",
+      "noDevices": "还没有连接设备",
+      "online": "在线",
+      "offline": "离线",
+      "pickHarness": "选择 Harness",
+      "noHarness": "未选择 Harness",
+      "model": "模型",
+      "modelsUnreported": "这台机器的 daemon 还没上报模型列表。",
+      "defaultModel": "Default",
+      "defaultEffort": "默认",
+      "noEffortLevels": "这个模型没有档位",
+      "effortNeedsModel": "选好机器和 Harness 后显示可选档位",
+      "noDevice": "未选择机器"
+    },
+    "picker": {
+      "title": "选择图标",
+      "open": "更换图标和颜色",
+      "icons": "图标",
+      "search": "搜索",
+      "results": "搜索结果",
+      "noResults": "没有匹配的结果",
+      "color": "颜色",
+      "colorAuto": "自动",
+      "colorRole": "角色默认色",
+      "categories": {
+        "work": "工作",
+        "code": "开发",
+        "writing": "写作",
+        "quality": "质量",
+        "faces": "人物",
+        "animals": "动物",
+        "objects": "物品",
+        "symbols": "符号"
+      },
+      "colors": {
+        "violet": "紫",
+        "sky": "天蓝",
+        "teal": "青",
+        "orange": "橙",
+        "pink": "粉",
+        "slate": "灰蓝"
+      }
+    },
+    "new": {
+      "title": "新建 Agent",
+      "description": "自己从头写，或者选一个提示词已经写好的预置角色。之后随时能改。",
+      "custom": "自定义角色",
+      "customDescription": "自己定名字、图标和提示词，做一个只属于你工作流的角色。",
+      "fromPreset": "或从预置开始"
+    },
+    "templates": {
+      "tester": {
+        "name": "测试员",
+        "summary": "给改动补测试并跑通，失败时附复现步骤。"
+      },
+      "frontend": {
+        "name": "前端实现",
+        "summary": "按设计稿实现页面，用项目里已有的组件。"
+      },
+      "security": {
+        "name": "安全审查",
+        "summary": "找注入、越权和泄露密钥，只报能复现的问题。"
+      },
+      "docs": {
+        "name": "文档撰写",
+        "summary": "更新 README 和变更说明，跟代码保持一致。"
+      },
+      "refactor": {
+        "name": "重构",
+        "summary": "不改行为地整理代码，每一步都有测试兜底。"
+      }
+    }
   }
 }

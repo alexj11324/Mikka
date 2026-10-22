@@ -32,6 +32,8 @@ export interface ThreadResponse {
 export interface TurnStartParams {
   threadId: string
   input: UserInput[]
+  /** Reasoning effort for this turn and the ones after it. */
+  effort?: string | null
 }
 
 export interface TurnSteerParams {

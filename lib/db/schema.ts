@@ -2,7 +2,7 @@ import { pgTable, text, uuid, varchar, jsonb, integer, timestamp, primaryKey, in
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
-import type { AgentRole } from '../agent-roles'
+import type { AgentColor, AgentRole } from '../agent-roles'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
@@ -98,6 +98,12 @@ export const agents = pgTable('agents', {
   role: text('role').$type<AgentRole>().notNull().default('custom'),
   harness: text('harness').$type<SupportedHarness>(),
   model: text('model'),
+  /** Reasoning effort, one of the levels the harness reports for the model; null: the CLI's default. */
+  effort: text('effort'),
+  /** A lucide icon id from the avatar picker, or an emoji; null: the role's own icon. */
+  icon: text('icon'),
+  /** null: picked from the name. */
+  color: text('color').$type<AgentColor>(),
   name: text('name').notNull(), description: text('description').notNull().default(''),
   instructions: text('instructions').notNull().default(''),
   deviceId: uuid('deviceId').references(() => devices.id, { onDelete: 'set null' }),
@@ -121,7 +127,7 @@ export const agentRuns = pgTable('agent_runs', {
   deviceId: uuid('deviceId').references(() => devices.id, { onDelete: 'set null' }),
   deviceRepoId: uuid('deviceRepoId').references(() => deviceRepos.id, { onDelete: 'set null' }),
   /** What auto resolved to when the run was queued; null on runs from older builds. */
-  harness: text('harness').$type<SupportedHarness>(), model: text('model'),
+  harness: text('harness').$type<SupportedHarness>(), model: text('model'), effort: text('effort'),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),

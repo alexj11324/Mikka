@@ -17,8 +17,8 @@ import { modelNameSchema } from '@mikka/protocol/agent-policy'
 import { addRunMessage, queueRun, readRun, requestRunStop, runViewColumns, type RunDetail, type RunView } from '@/lib/agent-runs'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import {
-  AGENT_ROLES, BUILT_IN_AGENT_PRESETS, BUILT_IN_AGENT_ROLES, MAX_AGENT_INSTRUCTIONS_LENGTH,
-  isBuiltInAgentRole, type AgentRole,
+  AGENT_COLORS, AGENT_ROLES, BUILT_IN_AGENT_PRESETS, BUILT_IN_AGENT_ROLES, MAX_AGENT_INSTRUCTIONS_LENGTH,
+  isBuiltInAgentRole, type AgentColor, type AgentRole,
 } from '@/lib/agent-roles'
 
 async function getUserId(): Promise<string> {
@@ -58,10 +58,23 @@ export interface AgentView {
   harness: SupportedHarness | null
   /** null: auto, the harness CLI's own default. */
   model: string | null
+  /** null: the CLI's default effort for the model. */
+  effort: string | null
+  /** A lucide icon id from the avatar picker or an emoji; null: the role's own icon. */
+  icon: string | null
+  /** null: picked from the name. */
+  color: AgentColor | null
   /** null: auto, any of this person's enabled devices. */
   deviceId: string | null
   deviceName: string | null
+  status: AgentStatus
 }
+
+/**
+ * What the role is doing now: a live run, a run waiting on the person, its
+ * pinned device offline, or nothing.
+ */
+export type AgentStatus = 'running' | 'waiting' | 'offline' | 'idle'
 
 export type { RunDetail, RunView } from '@/lib/agent-runs'
 
@@ -176,16 +189,29 @@ function roleRank(role: string): number {
   return index === -1 ? AGENT_ROLES.length : index
 }
 
+const LIVE_RUN_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const
+
 export async function listAgents(): Promise<AgentView[]> {
   const userId = await getUserId()
   await ensureBuiltInAgents(userId)
   const rows = await db.select({
     id: agents.id, role: agents.role, name: agents.name, description: agents.description,
-    instructions: agents.instructions, harness: agents.harness, model: agents.model,
-    deviceId: agents.deviceId, deviceName: devices.name,
+    instructions: agents.instructions, harness: agents.harness, model: agents.model, effort: agents.effort,
+    icon: agents.icon, color: agents.color, deviceId: agents.deviceId, deviceName: devices.name,
+    deviceLastSeenAt: devices.lastSeenAt,
   }).from(agents).leftJoin(devices, eq(devices.id, agents.deviceId))
     .where(eq(agents.userId, userId)).orderBy(asc(agents.name))
-  return rows.sort((a, b) => roleRank(a.role) - roleRank(b.role))
+  const live = rows.length
+    ? await db.select({ agentId: agentRuns.agentId, status: agentRuns.status }).from(agentRuns)
+      .where(and(eq(agentRuns.userId, userId), inArray(agentRuns.status, [...LIVE_RUN_STATUSES])))
+    : []
+  return rows.map(({ deviceLastSeenAt, ...row }) => {
+    const runs = live.filter(run => run.agentId === row.id)
+    const offline = row.deviceId !== null && !(deviceLastSeenAt && Date.now() - deviceLastSeenAt.getTime() < DEVICE_ONLINE_WINDOW_MS)
+    const status: AgentStatus = runs.some(run => run.status === 'waiting_input') ? 'waiting'
+      : offline ? 'offline' : runs.length ? 'running' : 'idle'
+    return { ...row, status }
+  }).sort((a, b) => roleRank(a.role) - roleRank(b.role))
 }
 
 const agentFields = {
@@ -195,6 +221,9 @@ const agentFields = {
   deviceId: z.uuid().nullable(),
   harness: z.enum(SUPPORTED_HARNESSES).nullable(),
   model: modelNameSchema.nullable(),
+  effort: z.string().trim().min(1).max(40).nullable(),
+  icon: z.string().trim().min(1).max(40).nullable(),
+  color: z.enum(AGENT_COLORS).nullable(),
 }
 const agentInput = z.object(agentFields)
 const agentUpdateInput = z.object({ id: z.uuid(), ...agentFields })

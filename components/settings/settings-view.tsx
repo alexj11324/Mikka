@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { useTranslations } from 'next-intl'
-import { ArrowLeft, Building2, Monitor, Moon, Plug, Search, SlidersHorizontal, Sun, UserRound } from 'lucide-react'
+import { ArrowLeft, Bot, Building2, Monitor, Moon, Plug, Search, SlidersHorizontal, Sun, UserRound } from 'lucide-react'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { AppShellContent } from '@/components/app-shell'
 import { NavUser } from '@/components/nav-user'
@@ -14,20 +14,22 @@ import { MembersPanel } from '@/components/settings/members-panel'
 import { IntegrationsSettings } from '@/components/settings/integrations-settings'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { AgentsSettings } from '@/components/settings/agents/agents-settings'
 
-type SectionId = 'preferences' | 'profile' | 'integrations' | 'workspace' | 'members'
+type SectionId = 'preferences' | 'profile' | 'agents' | 'integrations' | 'workspace' | 'members'
 type SectionGroup = 'personal' | 'workspace'
 
 const SECTION_GROUPS: SectionGroup[] = ['personal', 'workspace']
 const SECTIONS = [
   { id: 'preferences', group: 'personal', icon: SlidersHorizontal },
   { id: 'profile', group: 'personal', icon: UserRound },
+  { id: 'agents', group: 'personal', icon: Bot },
   { id: 'integrations', group: 'personal', icon: Plug },
   { id: 'workspace', group: 'workspace', icon: Building2 },
   { id: 'members', group: 'workspace', icon: UserRound },
 ] as const
 
-export function SettingsView({ user, googleEnabled, onBack, onSignOut, signingOut, accountError, initialSection = 'preferences', inviteInitially = false, workspaceId }: { user: { name: string; email: string }; googleEnabled: boolean; onBack: () => void; onSignOut: () => void; signingOut: boolean; accountError: string; initialSection?: 'preferences' | 'members' | 'integrations'; inviteInitially?: boolean; workspaceId?: string }) {
+export function SettingsView({ user, googleEnabled, onBack, onSignOut, signingOut, accountError, initialSection = 'preferences', inviteInitially = false, workspaceId }: { user: { name: string; email: string }; googleEnabled: boolean; onBack: () => void; onSignOut: () => void; signingOut: boolean; accountError: string; initialSection?: 'preferences' | 'members' | 'integrations' | 'agents'; inviteInitially?: boolean; workspaceId?: string }) {
   const { data: workspaceData } = useWorkspace(user.email, workspaceId)
   const t = useTranslations('Settings')
   const navT = useTranslations('Nav')
@@ -42,6 +44,7 @@ export function SettingsView({ user, googleEnabled, onBack, onSignOut, signingOu
   const sectionText: Record<SectionId, { title: string; description: string }> = {
     preferences: { title: t('sections.preferences.title'), description: t('sections.preferences.description') },
     profile: { title: t('sections.profile.title'), description: t('sections.profile.description') },
+    agents: { title: t('sections.agents.title'), description: t('sections.agents.description') },
     integrations: { title: t('sections.integrations.title'), description: t('sections.integrations.description') },
     workspace: { title: t('sections.workspace.title'), description: t('sections.workspace.description') },
     members: { title: membersT('title'), description: t('sections.members.description') },
@@ -68,10 +71,11 @@ export function SettingsView({ user, googleEnabled, onBack, onSignOut, signingOu
     </Sidebar>
     <AppShellContent parent={workspaceData?.workspace.name ?? t('title')} title={current.title}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-6 py-10 sm:px-10 sm:py-16">
-        <div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">{current.title}</h1><p className="text-sm text-muted-foreground">{current.description}</p></div>
+        {section !== 'agents' && <div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">{current.title}</h1><p className="text-sm text-muted-foreground">{current.description}</p></div>}
         {accountError && <p role="alert" className="text-sm text-destructive">{accountError}</p>}
         {section === 'preferences' && <SettingsSection id="appearance-heading" title={t('appearance.title')}><SettingRow title={t('appearance.theme')} description={t('appearance.themeDescription')}><ToggleGroup aria-label={t('appearance.themeLabel')} variant="outline" spacing={0} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}><ToggleGroupItem value="light" aria-label={t('appearance.light')}><Sun />{t('appearance.light')}</ToggleGroupItem><ToggleGroupItem value="dark" aria-label={t('appearance.dark')}><Moon />{t('appearance.dark')}</ToggleGroupItem><ToggleGroupItem value="system" aria-label={t('appearance.systemLabel')}><Monitor />{t('appearance.system')}</ToggleGroupItem></ToggleGroup></SettingRow><SettingRow title={t('appearance.language')} description={t('appearance.languageDescription')}><span className="text-muted-foreground">{t('appearance.languageName')}</span></SettingRow></SettingsSection>}
         {section === 'profile' && <div className="flex flex-col gap-3"><SettingsSection id="profile-heading" title={t('profile.heading')}><SettingRow title={t('profile.avatar')} description={t('profile.avatarDescription')}><Avatar className="size-10"><AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></SettingRow><SettingRow title={t('profile.name')}><span>{user.name || t('profile.notSet')}</span></SettingRow><SettingRow title={t('profile.email')}><span className="break-all">{user.email}</span></SettingRow></SettingsSection><p className="text-xs text-muted-foreground">{t('profile.readOnly')}</p></div>}
+        {section === 'agents' && <AgentsSettings />}
         {section === 'integrations' && <IntegrationsSettings googleEnabled={googleEnabled} />}
         {section === 'workspace' && <WorkspaceSettings userKey={user.email} workspaceId={workspaceId} />}
         {section === 'members' && <MembersPanel userKey={user.email} workspaceId={workspaceId} inviteInitially={inviteInitially} />}

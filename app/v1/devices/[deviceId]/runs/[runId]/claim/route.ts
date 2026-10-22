@@ -57,6 +57,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     baseBranch: repo.baseBranch, harness, prompt: run.prompt,
     kind: run.kind, leaseExpiresAt,
     ...(run.model ? { model: run.model } : {}),
+    ...(run.effort ? { effort: run.effort } : {}),
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
   })

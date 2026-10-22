@@ -221,6 +221,12 @@ export const runAssignmentSchema = z.object({
    * (zod strips unknown keys), so this needs no version gate.
    */
   model: modelNameSchema.optional(),
+  /**
+   * The reasoning effort the CLI is asked to use, one of the levels the
+   * harness reported for the model. Absent: the CLI's own default. Older
+   * daemons ignore it.
+   */
+  effort: z.string().min(1).max(40).optional(),
   /** Mock harness only: fixture name under `packages/daemon/fixtures`. */
   fixture: z.string().max(200).optional(),
   /**
