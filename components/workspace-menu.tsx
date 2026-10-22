@@ -1,4 +1,5 @@
 'use client'
+import { useTranslations } from 'next-intl'
 
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
@@ -34,11 +35,12 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
   signingOut: boolean
   onBeforeChange?: (action: () => Promise<void>) => void
 }) {
+  const i18nText = useTranslations();
   const { setOpenMobile } = useSidebar()
   const { data, error, mutate } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
   const [menuOpen, setMenuOpen] = useState(false)
   const [pending, setPending] = useState(false)
-  const workspaceName = data?.workspace.name ?? '工作区'
+  const workspaceName = data?.workspace.name ?? i18nText("Settings.sections.workspace.title")
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
       if (event.isComposing || event.keyCode === 229 || event.repeat || pending || signingOut || event.altKey || event.shiftKey) return
@@ -69,7 +71,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
         const result = await switchWorkspace({ accountId, workspaceId })
         if (!result.ok) { toast.error(result.error); return }
         window.location.assign('/')
-      } catch { toast.error('切换未完成，请重试。') }
+      } catch { toast.error(i18nText("FeatureCopy.c_b8e346ef")) }
       finally { setPending(false) }
     })
   }
@@ -79,28 +81,28 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
       try {
         const session = await authClient.getSession({ query: { disableCookieCache: true } })
         if (session.error || !session.data?.user) throw new Error('Session unavailable')
-        if ((data?.accounts.length ?? 0) >= 5) { toast.error('最多同时登录 5 个账户，请先退出不用的账户。'); return }
+        if ((data?.accounts.length ?? 0) >= 5) { toast.error(i18nText("FeatureCopy.c_a2a50802")); return }
         window.location.assign('/sign-in?addAccount=1')
-      } catch { toast.error('无法添加账户，请重试。') }
+      } catch { toast.error(i18nText("FeatureCopy.c_c9988ff5")) }
       finally { setPending(false) }
     })
   }
   return <>
     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-      <DropdownMenuTrigger render={<SidebarMenuButton aria-label="工作区菜单" className="h-10" />}>
+      <DropdownMenuTrigger render={<SidebarMenuButton aria-label={i18nText("Nav.workspaceMenu")} className="h-10" />}>
         <WorkspaceAvatar name={workspaceName} />
         <span className="flex-1 truncate font-semibold">{workspaceName}</span>
         <ChevronDown />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-1rem)]">
         <DropdownMenuGroup>
-          <DropdownMenuItem className="min-h-9" aria-label="设置" aria-keyshortcuts="Control+, Meta+," onClick={() => settings()}><span className="flex-1">设置</span><ShortcutKeys keys={['mod', ',']} aria-hidden="true" /></DropdownMenuItem>
-          <DropdownMenuItem className="min-h-9" onClick={() => settings('/settings/members')}>邀请和管理成员</DropdownMenuItem>
+          <DropdownMenuItem className="min-h-9" aria-label={i18nText("Settings.title")} aria-keyshortcuts="Control+, Meta+," onClick={() => settings()}><span className="flex-1">{i18nText("Settings.title")}</span><ShortcutKeys keys={['mod', ',']} aria-hidden="true" /></DropdownMenuItem>
+          <DropdownMenuItem className="min-h-9" onClick={() => settings('/settings/members')}>{i18nText("FeatureCopy.c_49509449")}</DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="min-h-9">切换工作区</DropdownMenuSubTrigger>
+            <DropdownMenuSubTrigger className="min-h-9">{i18nText("FeatureCopy.c_646c2b4f")}</DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-72 max-w-[calc(100vw-1rem)]">
               {data?.accounts.map(account => <DropdownMenuGroup key={account.id}>
                 <DropdownMenuLabel className="truncate" title={account.email}>{account.email}</DropdownMenuLabel>
@@ -109,21 +111,21 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
                   <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
                   {account.id === data.accounts[0].id && workspace.id === data.workspace.id && <Check aria-hidden="true" />}
                 </DropdownMenuItem>)}
-                {!account.choices.length && <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => selectWorkspace(account.id)}>进入此账户</DropdownMenuItem>}
+                {!account.choices.length && <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => selectWorkspace(account.id)}>{i18nText("FeatureCopy.c_c352c6e7")}</DropdownMenuItem>}
               </DropdownMenuGroup>)}
               {!data && <DropdownMenuGroup>
                 <DropdownMenuLabel className="truncate" title={user.email}>{user.email}</DropdownMenuLabel>
-                {error ? <DropdownMenuItem className="min-h-9" onClick={() => void mutate()}>读取失败，点击重试</DropdownMenuItem> : <DropdownMenuLabel>正在读取工作区…</DropdownMenuLabel>}
+                {error ? <DropdownMenuItem className="min-h-9" onClick={() => void mutate()}>{i18nText("FeatureCopy.c_e3d18d12")}</DropdownMenuItem> : <DropdownMenuLabel>{i18nText("FeatureCopy.c_5d885f0b")}</DropdownMenuLabel>}
               </DropdownMenuGroup>}
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuLabel>账户</DropdownMenuLabel>
-                <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => run(async () => { setOpenMobile(false); window.location.assign('/workspaces/new') })}>创建工作区</DropdownMenuItem>
-                <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={addAccount}>添加账户</DropdownMenuItem>
+                <DropdownMenuLabel>{i18nText("FeatureCopy.c_c3d92b20")}</DropdownMenuLabel>
+                <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => run(async () => { setOpenMobile(false); window.location.assign('/workspaces/new') })}>{i18nText("FeatureCopy.c_d92d1b8d")}</DropdownMenuItem>
+                <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={addAccount}>{i18nText("FeatureCopy.c_c771c7d8")}</DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
-          <DropdownMenuItem className="min-h-9" onClick={onSignOut} disabled={signingOut || pending}>{signingOut ? '正在退出…' : '退出登录'}</DropdownMenuItem>
+          <DropdownMenuItem className="min-h-9" onClick={onSignOut} disabled={signingOut || pending}>{signingOut ? i18nText("Nav.signingOut") : i18nText("Nav.signOut")}</DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>

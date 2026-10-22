@@ -1,4 +1,5 @@
 'use client'
+import { useTranslations } from 'next-intl'
 
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
@@ -12,13 +13,14 @@ export function AppShell({ children, variant = 'workspace', fixed = false }: { c
 }
 
 export function AppShellContent({ parent, title, actions, children, variant = 'workspace', hideHeader = false }: { parent: string; title: string; actions?: ReactNode; children: ReactNode; variant?: 'workspace' | 'settings'; hideHeader?: boolean }) {
+  const i18nText = useTranslations();
   const { isMobile, openMobile, open } = useSidebar()
   return <SidebarInset className={cn('min-h-0 min-w-0', variant === 'settings' && 'overflow-y-auto overscroll-contain md:my-2 md:mr-2 md:rounded-xl md:border md:shadow-sm')}>
     {!hideHeader && <header className={cn('flex h-12 shrink-0 items-center justify-between gap-3 px-4', variant === 'settings' && 'md:hidden')}>
       <div className="flex min-w-0 items-center gap-2">
-        <SidebarTrigger className="-ml-1" aria-label="展开或收起侧栏" aria-expanded={isMobile ? openMobile : open} />
+        <SidebarTrigger className="-ml-1" aria-label={i18nText("Workspace.toggleSidebar")} aria-expanded={isMobile ? openMobile : open} />
         <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
-        <Breadcrumb aria-label="当前位置"><BreadcrumbList><BreadcrumbItem className="hidden sm:inline-flex"><span>{parent}</span></BreadcrumbItem><BreadcrumbSeparator className="hidden sm:block" /><BreadcrumbItem><BreadcrumbPage>{title}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
+        <Breadcrumb aria-label={i18nText("Workspace.breadcrumb")}><BreadcrumbList><BreadcrumbItem className="hidden sm:inline-flex"><span>{parent}</span></BreadcrumbItem><BreadcrumbSeparator className="hidden sm:block" /><BreadcrumbItem><BreadcrumbPage>{title}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </header>}

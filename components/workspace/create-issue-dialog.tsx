@@ -1,4 +1,5 @@
 'use client'
+import { useTranslations } from 'next-intl'
 
 import { useEffect, useRef, useState } from 'react'
 import type { JSONContent } from '@tiptap/react'
@@ -32,6 +33,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   initialStatus?: string
   initialTeamId?: string
 }) {
+  const i18nText = useTranslations();
   const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
   const [teamId, setTeamId] = useState(initialTeamId)
   const [title, setTitle] = useState('')
@@ -59,7 +61,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
 
   function close() {
     if (submitting.current) return
-    if (dirty && !window.confirm('放弃这份尚未创建的任务草稿？')) return
+    if (dirty && !window.confirm(i18nText("Issue.create.discardDraft"))) return
     onOpenChange(false)
   }
 
@@ -72,14 +74,14 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
     try {
       const result = await saveIssue({ title, content, status, priority })
       if (!('issue' in result) || !result.issue) {
-        setError(result.error ?? '创建失败，草稿已保留。')
+        setError(result.error ?? i18nText("Issue.create.createFailed"))
         return
       }
       if (teamId) {
         try {
           const relation = await setIssueTeam({ issueId: result.issue.id, teamId, expectedTeamId: null })
-          if (!relation.ok) toast.warning(`任务已创建，团队归属未保存：${relation.error} 请在任务详情重试。`)
-        } catch { toast.warning('任务已创建，但团队归属未保存。请在任务详情重试，不要重复创建。') }
+          if (!relation.ok) toast.warning(i18nText("FeatureCopy.c_20f17d52", { value0: (relation.error) }))
+        } catch { toast.warning(i18nText("FeatureCopy.c_6c08be2e")) }
       }
       onCreated(result.issue.id)
       if (createMore) {
@@ -87,13 +89,13 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
         setTitle('')
         setContent(EMPTY)
         setEditorKey(value => value + 1)
-        setNotice('任务已创建，可以继续添加下一项。')
+        setNotice(i18nText("Issue.create.createdNotice"))
         titleRef.current?.focus()
       } else {
         onOpenChange(false)
       }
     } catch {
-      setError('暂时无法创建，草稿已保留，请稍后重试。')
+      setError(i18nText("Issue.create.createError"))
     } finally {
       submitting.current = false
       setPending(false)
@@ -110,36 +112,36 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
         <header className="flex items-center justify-between gap-3 px-5 pt-4 sm:px-6">
           <div className="flex items-center gap-2 text-sm">
             <Badge variant="outline" className="gap-1.5 rounded-full"><SquareUserRound />ORV</Badge><ChevronRight className="size-3 text-muted-foreground" />
-            <DialogTitle className="sr-only">新建任务</DialogTitle><span aria-hidden="true">新建任务</span>
+            <DialogTitle className="sr-only">{i18nText("Projects.detail.newIssue")}</DialogTitle><span aria-hidden="true">{i18nText("Projects.detail.newIssue")}</span>
           </div>
-          <div className="flex items-center gap-1"><Button type="button" variant="ghost" size="icon-sm" aria-label={expanded ? '收起创建卡片' : '展开创建卡片'} aria-pressed={expanded} disabled={pending} onClick={() => setExpanded(value => !value)}>{expanded ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</Button><Button type="button" variant="ghost" size="icon-sm" aria-label="关闭新建任务" disabled={pending} onClick={close}><X data-icon="inline-start" /></Button></div>
+          <div className="flex items-center gap-1"><Button type="button" variant="ghost" size="icon-sm" aria-label={expanded ? i18nText("Issue.create.collapse") : i18nText("Issue.create.expand")} aria-pressed={expanded} disabled={pending} onClick={() => setExpanded(value => !value)}>{expanded ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</Button><Button type="button" variant="ghost" size="icon-sm" aria-label={i18nText("Issue.create.close")} disabled={pending} onClick={close}><X data-icon="inline-start" /></Button></div>
         </header>
-        <DialogDescription className="sr-only">填写标题和描述，选择状态与优先级后创建任务。</DialogDescription>
+        <DialogDescription className="sr-only">{i18nText("Issue.create.description")}</DialogDescription>
         <FieldSet disabled={pending} className={cn('flex min-w-0 flex-col gap-5 px-5 pt-5 pb-5 sm:px-6', expanded && 'min-h-96')}>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="new-issue-title" className="sr-only">任务标题</FieldLabel>
-              <Input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder="任务标题" value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent px-0 py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
+              <FieldLabel htmlFor="new-issue-title" className="sr-only">{i18nText("IssueDetail.dialog.taskTitleLabel")}</FieldLabel>
+              <Input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder={i18nText("IssueDetail.dialog.taskTitleLabel")} value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent px-0 py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
             </Field>
             <Field>
-              <FieldLabel className="sr-only">任务描述</FieldLabel>
+              <FieldLabel className="sr-only">{i18nText("Editor.descriptionLabel")}</FieldLabel>
               <div inert={pending}><IssueEditor key={editorKey} compact content={content} author={author} onChange={setContent} /></div>
             </Field>
           </FieldGroup>
           <div className="flex flex-wrap items-center gap-2">
-            <IssuePropertyMenu pill label="任务状态" value={status} options={ISSUE_STATUSES} icon={CircleDashed} disabled={pending} onChange={setStatus} />
-            <IssuePropertyMenu pill label="任务优先级" value={priority} options={ISSUE_PRIORITIES} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={setPriority} />
-            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><LockKeyhole />{teamId ? '工作区公开' : '私有'}</Badge>
+            <IssuePropertyMenu pill label={i18nText("Issue.statusLabel")} value={status} options={ISSUE_STATUSES} icon={CircleDashed} disabled={pending} onChange={setStatus} />
+            <IssuePropertyMenu pill label={i18nText("Issue.priorityLabel")} value={priority} options={ISSUE_PRIORITIES} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={setPriority} />
+            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><LockKeyhole />{teamId ? i18nText("FeatureCopy.c_c30fccc5") : i18nText("Issue.create.private")}</Badge>
           </div>
-          <FieldGroup><Field><FieldLabel htmlFor="new-issue-team">归属团队</FieldLabel><NativeSelect id="new-issue-team" value={teamId} disabled={pending || !!teamsError} onChange={event => setTeamId(event.target.value)}><NativeSelectOption value="">无团队 · 私有任务</NativeSelectOption>{teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{team.identifier} · {team.name}</NativeSelectOption>)}</NativeSelect><p className="text-xs text-muted-foreground">{teamsError ? '团队读取失败，请稍后重试。' : teamId ? '此任务将对团队所在工作区所有启用成员公开并允许编辑。' : '仅你和后续授权的协作成员可以访问。'}</p></Field></FieldGroup>
+          <FieldGroup><Field><FieldLabel htmlFor="new-issue-team">{i18nText("FeatureCopy.c_53d4919c")}</FieldLabel><NativeSelect id="new-issue-team" value={teamId} disabled={pending || !!teamsError} onChange={event => setTeamId(event.target.value)}><NativeSelectOption value="">{i18nText("FeatureCopy.c_a0860f69")}</NativeSelectOption>{teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{team.identifier} · {team.name}</NativeSelectOption>)}</NativeSelect><p className="text-xs text-muted-foreground">{teamsError ? i18nText("FeatureCopy.c_d7d814ec") : teamId ? i18nText("FeatureCopy.c_f762eaaa") : i18nText("FeatureCopy.c_db09ed1f")}</p></Field></FieldGroup>
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
           {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
         </FieldSet>
         <footer className="flex flex-wrap items-center justify-between gap-3 px-5 pt-1 pb-4 sm:px-6">
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShortcutKeys keys={['mod', 'Enter']} />创建</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShortcutKeys keys={['mod', 'Enter']} />{i18nText("Projects.form.createAction")}</span>
           <div className="flex items-center gap-3">
-            <FieldGroup className="contents"><Field orientation="horizontal"><Switch id="create-more" size="sm" checked={createMore} onCheckedChange={setCreateMore} disabled={pending} /><FieldLabel htmlFor="create-more">连续创建</FieldLabel></Field></FieldGroup>
-            <Button type="submit" size="sm" disabled={pending || !title.trim()}>{pending && <Spinner data-icon="inline-start" />}{pending ? '正在创建…' : '创建任务'}</Button>
+            <FieldGroup className="contents"><Field orientation="horizontal"><Switch id="create-more" size="sm" checked={createMore} onCheckedChange={setCreateMore} disabled={pending} /><FieldLabel htmlFor="create-more">{i18nText("Issue.create.createMore")}</FieldLabel></Field></FieldGroup>
+            <Button type="submit" size="sm" disabled={pending || !title.trim()}>{pending && <Spinner data-icon="inline-start" />}{pending ? i18nText("Invite.creating") : i18nText("Issue.create.submit")}</Button>
           </div>
         </footer>
       </form>

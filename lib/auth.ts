@@ -3,13 +3,14 @@ import { createAuthMiddleware } from 'better-auth/api'
 import { multiSession } from 'better-auth/plugins'
 import { nextCookies } from 'better-auth/next-js'
 import { pool } from '@/lib/db'
+import { withBasePath } from '@/lib/base-path'
 
 export const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
 export const authBaseURL = process.env.BETTER_AUTH_URL ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.V0_RUNTIME_URL)
 
 export const auth = betterAuth({
   appName: 'Mikka',
-  onAPIError: { errorURL: '/sign-in?oauth=failed' },
+  onAPIError: { errorURL: withBasePath('/sign-in?oauth=failed') },
   database: pool,
   socialProviders: githubEnabled ? {
     github: {
@@ -18,6 +19,8 @@ export const auth = betterAuth({
     },
   } : {},
   baseURL: authBaseURL,
+  // Its routes sit under the app's base path (app/api/auth → /mikka/api/auth).
+  basePath: withBasePath('/api/auth'),
   emailAndPassword: { enabled: true, autoSignIn: true },
   trustedOrigins: [
     ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000', ...[process.env.V0_RUNTIME_URL, process.env.V0_DEV_APP_URL, process.env.V0_BUILD_URL, process.env.V0_SANDBOX_URL].filter((value): value is string => !!value)] : []),

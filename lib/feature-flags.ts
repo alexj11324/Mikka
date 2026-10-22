@@ -13,7 +13,7 @@ export function featureAvailability(feature: UpcomingFeature, remoteValue: boole
     enabled: capability.implemented && remoteValue === true,
     key: capability.key,
     reason: remoteValue === true && !capability.implemented
-      ? '暂未开放：远端开关已开启，但此功能尚未实现。'
-      : '暂未开放：此功能的 PostHog 开关已关闭或尚未加载。',
+      ? 'FeatureCopy.c_7a3f5896'
+      : 'FeatureCopy.c_3760dbb0',
   }
 }

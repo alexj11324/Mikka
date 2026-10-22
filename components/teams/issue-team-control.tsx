@@ -1,4 +1,5 @@
 'use client'
+import { useTranslations } from 'next-intl'
 
 import { useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
@@ -10,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export function IssueTeamControl({ issueId, disabled }: { issueId: string; disabled: boolean }) {
+  const i18nText = useTranslations();
   const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
   const { data, error: readError, mutate } = useSWR(['issue-team', issueId], () => getIssueTeam(issueId))
   const { mutate: refresh } = useSWRConfig()
@@ -19,14 +21,14 @@ export function IssueTeamControl({ issueId, disabled }: { issueId: string; disab
   const selected = next ?? data ?? ''
   async function save() {
     if (data === undefined || pending || disabled) return
-    if (!window.confirm(selected ? '设为公开团队任务后，本工作区所有启用成员均可查看和编辑，是否继续？' : '移出团队后，仅创建者及显式授权的协作成员可以访问，是否继续？')) return
+    if (!window.confirm(selected ? i18nText("FeatureCopy.c_3b154930") : i18nText("FeatureCopy.c_81a1f593"))) return
     setPending(true); setError('')
     try {
       const result = await setIssueTeam({ issueId, teamId: selected || null, expectedTeamId: data })
       if (!result.ok) { setError(result.error); return }
       await mutate(result.data, { revalidate: false }); setNext(undefined); await refresh('issues')
-    } catch { setError('归属保存失败，请刷新重试。') }
+    } catch { setError(i18nText("FeatureCopy.c_95310b50")) }
     finally { setPending(false) }
   }
-  return <div className="flex flex-col gap-3 px-2"><FieldGroup><Field><FieldLabel htmlFor={`issue-team-${issueId}`}>归属团队</FieldLabel><NativeSelect id={`issue-team-${issueId}`} value={selected} disabled={disabled || pending || data === undefined || !!readError || !!teamsError} onChange={event => setNext(event.target.value)}><NativeSelectOption value="">无团队 · 私有/显式协作</NativeSelectOption>{teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{team.identifier} · {team.name}</NativeSelectOption>)}</NativeSelect></Field></FieldGroup><p className="text-xs leading-relaxed text-muted-foreground">{data ? '对该工作区启用成员公开，可协作编辑。' : '未加入团队，仅创建者和授权协作成员可访问。'}</p>{selected !== (data ?? '') && <Button size="sm" variant="outline" disabled={disabled || pending} onClick={() => void save()}>{pending ? '保存中…' : '保存团队归属'}</Button>}{(error || readError || teamsError) && <Alert variant="destructive"><AlertDescription>{error || '团队读取失败，请刷新后重试。'}</AlertDescription></Alert>}</div>
+  return <div className="flex flex-col gap-3 px-2"><FieldGroup><Field><FieldLabel htmlFor={`issue-team-${issueId}`}>{i18nText("FeatureCopy.c_53d4919c")}</FieldLabel><NativeSelect id={`issue-team-${issueId}`} value={selected} disabled={disabled || pending || data === undefined || !!readError || !!teamsError} onChange={event => setNext(event.target.value)}><NativeSelectOption value="">{i18nText("FeatureCopy.c_2114e0a1")}</NativeSelectOption>{teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{team.identifier} · {team.name}</NativeSelectOption>)}</NativeSelect></Field></FieldGroup><p className="text-xs leading-relaxed text-muted-foreground">{data ? i18nText("FeatureCopy.c_f9821279") : i18nText("FeatureCopy.c_c5bc7195")}</p>{selected !== (data ?? '') && <Button size="sm" variant="outline" disabled={disabled || pending} onClick={() => void save()}>{pending ? i18nText("FeatureCopy.c_6644f061") : i18nText("FeatureCopy.c_d1394c98")}</Button>}{(error || readError || teamsError) && <Alert variant="destructive"><AlertDescription>{error || i18nText("FeatureCopy.c_f4ae1a97")}</AlertDescription></Alert>}</div>
 }

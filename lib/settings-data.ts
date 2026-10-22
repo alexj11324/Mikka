@@ -1,3 +1,4 @@
+import { getTranslations } from 'next-intl/server'
 import type { listTeamMembers, loadTeamDirectory } from '@/app/actions/teams'
 
 export const settingsReadOptions = { revalidateIfStale: false, shouldRetryOnError: false } as const
@@ -12,10 +13,11 @@ export class SettingsReadError extends Error {
 }
 
 export async function fetchSettingsData<T>(url: string): Promise<T> {
+  const i18nText = await getTranslations();
   const response = await fetch(url, { cache: 'no-store' })
   if (!response.ok) {
     const body = await response.json().catch(() => null)
-    throw new SettingsReadError(body?.error ?? '数据读取失败，请稍后重试。', response.status)
+    throw new SettingsReadError(body?.error ?? i18nText("FeatureCopy.c_af7a3f0c"), response.status)
   }
   return response.json()
 }

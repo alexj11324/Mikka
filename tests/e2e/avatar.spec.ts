@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { test, expect, register } from "./fixtures";
+import { test, expect, register, app } from "./fixtures";
 
 test("中文姓名不参与头像，账号图片优先，加载失败回退邮箱首字母", async ({ page }) => {
   const email = `alex-${randomUUID()}@example.com`;
@@ -17,7 +17,7 @@ test("中文姓名不参与头像，账号图片优先，加载失败回退邮�
     contentType: "image/svg+xml",
     body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="blue"/></svg>',
   }));
-  const response = await page.request.post("/api/auth/update-user", {
+  const response = await page.request.post(app("/api/auth/update-user"), {
     headers: { Origin: new URL(page.url()).origin },
     data: { image },
   });

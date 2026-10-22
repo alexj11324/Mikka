@@ -1,4 +1,5 @@
 'use client'
+import { useTranslations } from 'next-intl'
 
 import { LogIn, LogOut, MoreHorizontal, Settings, SquareUserRound, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,8 +14,9 @@ type TeamMenuProps = {
 }
 
 export function TeamDirectoryMenu({ team, pending, navigate, teamHref, onMembership }: TeamMenuProps) {
+  const i18nText = useTranslations();
   return <DropdownMenu>
-    <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={`${team.name} 的操作`} disabled={pending} className="sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 data-popup-open:opacity-100" />}><MoreHorizontal /></DropdownMenuTrigger>
+    <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={i18nText("FeatureCopy.c_681e1f0f", { value0: (team.name) })} disabled={pending} className="sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 data-popup-open:opacity-100" />}><MoreHorizontal /></DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="w-48">
       <DropdownMenuGroup>
         <DropdownMenuSub>

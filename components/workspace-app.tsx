@@ -1,4 +1,5 @@
 'use client'
+import { useTranslations } from 'next-intl'
 
 import { useEffect, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
@@ -18,11 +19,12 @@ export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers
   initialTeams?: Awaited<ReturnType<typeof loadTeamDirectory>>
   initialMembers?: WorkspaceSettings
 }) {
+  const i18nText = useTranslations();
   const pathname = usePathname()
   const params = useSearchParams()
   const initialWorkspaceId = initialTeams?.workspace.id ?? initialMembers?.workspace.id
   useEffect(() => {
-    document.title = pathname === '/' ? 'Orvilo3 · 任务与文档工作台' : pathname === '/settings/teams' ? '团队管理 · Orvilo3' : pathname === '/settings/members' ? '成员管理 · Orvilo3' : '设置 · Orvilo3'
+    document.title = pathname === '/' ? i18nText("FeatureCopy.c_8b955749") : pathname === '/settings/teams' ? i18nText("FeatureCopy.c_b770743d") : pathname === '/settings/members' ? i18nText("FeatureCopy.c_53748f61") : i18nText("FeatureCopy.c_7ca3a071")
   }, [pathname])
   const [workspaceId, setWorkspaceId] = useState(initialTeams?.workspace.id ?? initialMembers?.workspace.id)
   const [cacheConfig] = useState(() => {

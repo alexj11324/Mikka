@@ -1,4 +1,5 @@
 'use client'
+import { useTranslations } from 'next-intl'
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -12,6 +13,7 @@ import { MembersSettings } from '@/components/workspace/members-settings'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 
 export function SettingsShell({ user, defaultWorkspaceId }: { user: { id: string; name: string; email: string; image?: string | null }; defaultWorkspaceId?: string }) {
+  const i18nText = useTranslations();
   const pathname = usePathname()
   const params = useSearchParams()
   const router = useRouter()
@@ -29,7 +31,7 @@ export function SettingsShell({ user, defaultWorkspaceId }: { user: { id: string
       if (result.error) throw new Error('sign out failed')
       await mutate(() => true, undefined, { revalidate: false })
       router.replace('/sign-in?login=1'); router.refresh()
-    } catch { setError('退出失败，请稍后重试。'); setSigningOut(false) }
+    } catch { setError(i18nText("Workspace.signOutFailed")); setSigningOut(false) }
   }
   return <AppShell variant="settings"><SettingsView user={user} activeSection={section} workspaceId={workspaceId} selectedTeamId={params.get('team') ?? undefined} onBack={() => pushSettingsHistory(params.get('team') ? `/?team=${encodeURIComponent(params.get('team')!)}` : '/')} onSignOut={() => void signOut()} signingOut={signingOut} accountError={error}>{section === 'teams' && <TeamDirectory key={workspaceId ?? 'default'} workspaceId={workspaceId} />}{section === 'members' && <MembersSettings key={`${workspaceId ?? 'default'}-${params.get('invite') ?? ''}`} workspaceId={workspaceId} inviteInitially={params.get('invite') === '1'} />}</SettingsView></AppShell>
 }

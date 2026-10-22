@@ -17,6 +17,7 @@ import { z } from "zod"
 
 import { DaemonError, ServerUnreachableError } from "./errors"
 import { DAEMON_VERSION } from "./paths"
+import { serverUrl } from "./server-link-http"
 
 export const DEVICE_CODE_PATH = `${AUTH_BASE_PATH}/device/code`
 export const DEVICE_TOKEN_PATH = `${AUTH_BASE_PATH}/device/token`
@@ -62,7 +63,7 @@ async function post(
   const fetchImpl = options.fetchImpl ?? fetch
   let response: Response
   try {
-    response = await fetchImpl(new URL(path, options.serverUrl), {
+    response = await fetchImpl(serverUrl(options.serverUrl, path), {
       method: "POST",
       headers: {
         "content-type": "application/json",

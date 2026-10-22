@@ -1,4 +1,5 @@
 'use client'
+import { useTranslations } from 'next-intl'
 
 import { useEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from './settings-link'
@@ -16,8 +17,8 @@ function GithubIcon() { return <img src="/icons/github.svg" alt="" className="si
 
 const navigation = [
   { title: 'Personal', items: [
-    { title: 'Preferences', label: '偏好设置', section: 'preferences', icon: SlidersHorizontal },
-    { title: 'Profile', label: '个人资料', section: 'profile', icon: UserRound },
+    { title: 'Preferences', section: 'preferences', icon: SlidersHorizontal },
+    { title: 'Profile', section: 'profile', icon: UserRound },
   ] },
   { title: 'Features', items: [
     { title: 'AI & agents', icon: Sparkles },
@@ -35,9 +36,9 @@ const navigation = [
     { title: 'GitHub', icon: GithubIcon },
   ] },
   { title: 'Administration', items: [
-    { title: 'Workspace', label: '工作区', section: 'workspace', icon: Building2 },
-    { title: 'Teams', label: '团队', section: 'teams', icon: SquareUserRound },
-    { title: 'Members', label: '成员', section: 'members', icon: Users },
+    { title: 'Workspace', section: 'workspace', icon: Building2 },
+    { title: 'Teams', section: 'teams', icon: SquareUserRound },
+    { title: 'Members', section: 'members', icon: Users },
     { title: 'Security', icon: ShieldCheck },
     { title: 'API', icon: CodeXml },
     { title: 'Applications', icon: Grid2X2 },
@@ -58,6 +59,7 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
   onSignOut: () => void
   signingOut: boolean
 }) {
+  const i18nText = useTranslations();
   const [query, setQuery] = useState('')
   const params = useSearchParams()
   const creating = params.get('create') === '1'
@@ -87,27 +89,31 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
     const next = destination.pathname.endsWith('/members') ? 'members' : destination.searchParams.get('section')
     onSectionChange(next === 'profile' || next === 'workspace' || next === 'members' ? next : 'preferences')
   }
-  return <Sidebar variant="sidebar" aria-label="设置导航">
+  return <Sidebar variant="sidebar" aria-label={i18nText("FeatureCopy.c_a8c7ae4f")}>
     <SidebarHeader className="px-4 pt-3 pb-2">
       <SidebarMenu><SidebarMenuItem><WorkspaceMenu user={user} onSettings={openSettings} onSignOut={onSignOut} signingOut={signingOut} /></SidebarMenuItem></SidebarMenu>
-      <SidebarMenu><SidebarMenuItem><SidebarMenuButton aria-label="返回工作台" render={activeSection ? <Link href={selectedTeamId ? `/?team=${encodeURIComponent(selectedTeamId)}` : '/'} /> : undefined} onClick={() => { setOpenMobile(false); if (!activeSection) onBack() }}><ArrowLeft /><span lang="en">Back to app</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>
-      <div className="relative mt-3"><Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" aria-hidden="true" /><SidebarInput className="pl-8" aria-label="搜索设置" placeholder="Search…" value={query} onChange={event => setQuery(event.target.value)} /></div>
+      <SidebarMenu><SidebarMenuItem><SidebarMenuButton aria-label={i18nText("Invite.backToWorkspace")} render={activeSection ? <Link href={selectedTeamId ? `/?team=${encodeURIComponent(selectedTeamId)}` : '/'} /> : undefined} onClick={() => { setOpenMobile(false); if (!activeSection) onBack() }}><ArrowLeft /><span lang="en">Back to app</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>
+      <div className="relative mt-3"><Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" aria-hidden="true" /><SidebarInput className="pl-8" aria-label={i18nText("Settings.searchLabel")} placeholder="Search…" value={query} onChange={event => setQuery(event.target.value)} /></div>
     </SidebarHeader>
     <SidebarContent ref={contentRef} className="px-2 pb-6">
       {navigation.map(group => {
-        const items = group.items.filter(item => `${group.title} ${item.title} ${'label' in item ? item.label : ''}`.toLowerCase().includes(normalizedQuery) && (activeSection || !('section' in item) || (item.section !== 'teams' && item.section !== 'members')))
+        const items = group.items.filter(item => {
+          const label = 'section' in item ? i18nText(`Settings.sections.${item.section}.title` as never) : item.title
+          return `${group.title} ${item.title} ${label}`.toLowerCase().includes(normalizedQuery) && (activeSection || !('section' in item) || (item.section !== 'teams' && item.section !== 'members'))
+        })
         return items.length > 0 && <SidebarGroup key={group.title} className="py-2"><SidebarGroupLabel lang="en">{group.title}</SidebarGroupLabel><SidebarMenu>{items.map(item => {
           const id = 'section' in item ? item.section : undefined
+          const label = id ? i18nText(`Settings.sections.${id}.title` as never) : item.title
           const selected = id === section && !selectedTeamId && !creating
           const release = id ? undefined : group.title === 'Features' ? productRelease : group.title === 'Integrations' ? integrationsRelease : administrationRelease
-          return <SidebarMenuItem key={item.title}><SidebarMenuButton aria-label={'label' in item ? item.label : item.title} disabled={!id || !!release && !release.enabled} data-feature-flag={release?.key} title={release?.reason} render={id && activeSection ? <Link href={href(id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => { if (id && !activeSection) onSectionChange(id); setOpenMobile(false) }}><item.icon /><span lang="en">{item.title}</span></SidebarMenuButton></SidebarMenuItem>
+          return <SidebarMenuItem key={item.title}><SidebarMenuButton aria-label={label} disabled={!id || !!release && !release.enabled} data-feature-flag={release?.key} title={release?.reason} render={id && activeSection ? <Link href={href(id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => { if (id && !activeSection) onSectionChange(id); setOpenMobile(false) }}><item.icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
         })}</SidebarMenu></SidebarGroup>
       })}
       {activeSection && <SidebarGroup className="py-2"><SidebarGroupLabel lang="en">Your teams</SidebarGroupLabel><SidebarMenu>{joinedTeams.map(team => {
         const selected = selectedTeamId === team.id
         const teamHref = `/settings/teams?workspace=${encodeURIComponent(team.workspaceId)}&team=${encodeURIComponent(team.id)}`
         return <SidebarMenuItem key={team.id}><SidebarMenuButton render={<Link href={teamHref} />} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => setOpenMobile(false)}><SquareUserRound className="text-info" /><span>{team.name}</span></SidebarMenuButton></SidebarMenuItem>
-      })}<SidebarMenuItem><SidebarMenuButton render={<Link href={`${href('teams')}&create=1`} />} aria-label="创建团队" isActive={creating} aria-current={creating ? 'page' : undefined} onClick={() => setOpenMobile(false)}><Plus /><span lang="en">Create a team</span></SidebarMenuButton></SidebarMenuItem>{error && <SidebarMenuItem><SidebarMenuButton onClick={() => void mutate()}>团队读取失败，重试</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></SidebarGroup>}
+      })}<SidebarMenuItem><SidebarMenuButton render={<Link href={`${href('teams')}&create=1`} />} aria-label={i18nText("FeatureCopy.c_cb11190c")} isActive={creating} aria-current={creating ? 'page' : undefined} onClick={() => setOpenMobile(false)}><Plus /><span lang="en">Create a team</span></SidebarMenuButton></SidebarMenuItem>{error && <SidebarMenuItem><SidebarMenuButton onClick={() => void mutate()}>{i18nText("FeatureCopy.c_c401eee8")}</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></SidebarGroup>}
     </SidebarContent>
     <SidebarRail />
   </Sidebar>

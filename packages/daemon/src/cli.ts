@@ -20,7 +20,7 @@ const USAGE = `Usage:
   mikka daemon status [--dev] [--data-dir <dir>]`
 
 const SERVER_URLS: Record<Flavor, string> = {
-  prod: "https://orvilo.aspectlylabs.com",
+  prod: "https://app.aspectlylabs.com/mikka",
   dev: "http://localhost:4000",
 }
 

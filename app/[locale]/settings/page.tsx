@@ -2,8 +2,12 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { WorkspaceApp } from '@/components/workspace-app'
+import { getTranslations } from 'next-intl/server'
 
-export const metadata: Metadata = { title: '设置 · Orvilo3', description: '管理个人偏好、工作区、团队和成员。' }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('Metadata')
+  return { title: t('settingsTitle'), description: t('settingsDescription') }
+}
 
 export default async function SettingsPage() {
   const session = await getSession()
