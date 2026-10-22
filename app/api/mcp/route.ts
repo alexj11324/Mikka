@@ -2,7 +2,9 @@ import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import { z } from 'zod'
 import { withBasePath } from '@/lib/base-path'
 import { mcpUserId, verifyMcpToken } from '@/lib/mcp/auth'
+import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { MCP_SCOPE } from '@/lib/mcp/resource'
+import * as actions from '@/lib/mcp/actions'
 import * as tools from '@/lib/mcp/tools'
 import * as worker from '@/lib/mcp/worker'
 
@@ -18,6 +20,11 @@ function message(value: string) {
   return { content: [{ type: 'text' as const, text: value }] }
 }
 
+/** A write's result: the value, or the action's error code as a tool error. */
+function outcome(value: unknown) {
+  return value && typeof value === 'object' && 'error' in value ? { ...json(value), isError: true } : json(value)
+}
+
 function notFound(what: string) {
   return { content: [{ type: 'text' as const, text: `${what} not found` }], isError: true }
 }
@@ -27,7 +34,8 @@ const id = z.uuid()
 /**
  * The Mikka MCP server: lets an agent such as Claude Code or Codex talk to the
  * person's Coordinator and read their issues and runs. Agents sign in with
- * OAuth (lib/auth.ts); every tool acts as the person who approved them.
+ * OAuth (lib/auth.ts); every tool acts as the person who approved them, and
+ * writes go through the same server actions as the UI (lib/mcp/actions.ts).
  */
 const handler = createMcpHandler(server => {
   server.registerTool('send_to_coordinator', {
@@ -79,6 +87,117 @@ const handler = createMcpHandler(server => {
     const run = await tools.getRun(mcpUserId(ctx.http?.authInfo), runId)
     return run ? json(run) : notFound('Run')
   })
+
+  server.registerTool('get_run_events', {
+    title: 'Read a run\'s events',
+    description: 'Page through a run\'s event stream (what the agent said and did), oldest first. Pass the returned `next` as `after` for the next page; `next` is null at the end.',
+    inputSchema: z.object({ runId: id, after: z.number().int().min(0).optional(), limit: z.number().int().min(1).max(200).optional().describe('Default 50.') }),
+    annotations: { readOnlyHint: true },
+  }, async (input, ctx) => {
+    const events = await actions.getRunEvents(mcpUserId(ctx.http?.authInfo), input)
+    return events ? json(events) : notFound('Run')
+  })
+
+  server.registerTool('search_issues', {
+    title: 'Search issues',
+    description: 'Find issues whose title or text contains the words, most recently updated first.',
+    inputSchema: z.object({ query: z.string().trim().min(1).max(200), status: z.enum(ISSUE_STATUS_CODES).optional() }),
+    annotations: { readOnlyHint: true },
+  }, async (input, ctx) => json(await actions.searchIssues(mcpUserId(ctx.http?.authInfo), input)))
+
+  server.registerTool('list_projects', {
+    title: 'List projects',
+    description: 'List the person\'s projects with their status, dates and issue ids.',
+    inputSchema: z.object({}),
+    annotations: { readOnlyHint: true },
+  }, async (_input, ctx) => json(await actions.listProjects(mcpUserId(ctx.http?.authInfo))))
+
+  server.registerTool('list_labels', {
+    title: 'List labels',
+    description: 'List the labels on the person\'s issues, most used first.',
+    inputSchema: z.object({}),
+    annotations: { readOnlyHint: true },
+  }, async (_input, ctx) => json(await actions.listLabels(mcpUserId(ctx.http?.authInfo))))
+
+  server.registerTool('list_agents', {
+    title: 'List agents',
+    description: 'List the person\'s agents with their harness, whether their device is online, and the repositories on that device. dispatch_run needs an agent id and one of its repository ids.',
+    inputSchema: z.object({}),
+    annotations: { readOnlyHint: true },
+  }, async (_input, ctx) => json(await actions.listAgents(mcpUserId(ctx.http?.authInfo))))
+
+  const issueChanges = {
+    status: z.enum(ISSUE_STATUS_CODES).optional(),
+    priority: z.enum(ISSUE_PRIORITY_CODES).optional(),
+    projectId: id.nullable().optional().describe('A project id from list_projects; null takes the issue out of its project.'),
+    labels: z.array(z.string().trim().min(1).max(40)).max(12).optional().describe('The full set of label names; a known name keeps its color.'),
+    assigneeAgentId: id.nullable().optional().describe('An agent id from list_agents; null unassigns.'),
+  }
+
+  server.registerTool('create_issue', {
+    title: 'Create an issue',
+    description: 'Create an issue for the person. Status defaults to todo and priority to normal.',
+    inputSchema: z.object({ title: z.string().trim().min(1).max(200), body: z.string().max(50_000).optional().describe('Plain text; one paragraph per line.'), ...issueChanges }),
+  }, async (input, ctx) => outcome(await actions.createIssue(mcpUserId(ctx.http?.authInfo), input)))
+
+  server.registerTool('update_issue', {
+    title: 'Update an issue',
+    description: 'Change an issue\'s title, status, priority, project, labels or assigned agent. Only the fields given change. The text is edited in the app, not here.',
+    inputSchema: z.object({ issueId: id, title: z.string().trim().min(1).max(200).optional(), ...issueChanges }),
+    annotations: { idempotentHint: true },
+  }, async (input, ctx) => outcome(await actions.updateIssue(mcpUserId(ctx.http?.authInfo), input)))
+
+  server.registerTool('link_issues', {
+    title: 'Link issues',
+    description: 'Add or remove a relation from one issue to another: parent, child, related, blockedBy, blocks or duplicate. `remove` takes it off; a parent link with a null target clears the parent.',
+    inputSchema: z.object({
+      issueId: id, kind: z.enum(['parent', 'child', 'related', 'blockedBy', 'blocks', 'duplicate']),
+      targetId: id.nullable(), remove: z.boolean().optional(),
+    }),
+  }, async (input, ctx) => outcome(await actions.linkIssues(mcpUserId(ctx.http?.authInfo), input)))
+
+  server.registerTool('dispatch_run', {
+    title: 'Dispatch a run',
+    description: 'Queue a run: one agent works one issue in one repository on its device. Returns the run id at once; follow it with get_run or list_runs.',
+    inputSchema: z.object({
+      issueId: id, agentId: id,
+      deviceRepoId: id.describe('A repository id from list_agents, on the agent\'s own device.'),
+      note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
+    }),
+  }, async (input, ctx) => outcome(await actions.dispatchRun(mcpUserId(ctx.http?.authInfo), input)))
+
+  server.registerTool('send_to_run', {
+    title: 'Message a running agent',
+    description: 'Send a message to the agent of a running run. It reads it on its next poll.',
+    inputSchema: z.object({ runId: id, text: z.string().trim().min(1).max(10_000) }),
+  }, async (input, ctx) => outcome(await actions.sendToRun(mcpUserId(ctx.http?.authInfo), input)))
+
+  server.registerTool('stop_run', {
+    title: 'Stop a run',
+    description: 'Ask a run to stop. The agent stops on its next poll and the run ends as stopped.',
+    inputSchema: z.object({ runId: id }),
+    annotations: { destructiveHint: true, idempotentHint: true },
+  }, async ({ runId }, ctx) => outcome(await actions.stopRun(mcpUserId(ctx.http?.authInfo), runId)))
+
+  server.registerTool('read_coordinator_memory', {
+    title: 'Read the Coordinator\'s memory',
+    description: 'Read the notes the Coordinator keeps about the person across conversations.',
+    inputSchema: z.object({}),
+    annotations: { readOnlyHint: true },
+  }, async (_input, ctx) => json(await actions.readMemory(mcpUserId(ctx.http?.authInfo))))
+
+  server.registerTool('remember', {
+    title: 'Add to the Coordinator\'s memory',
+    description: 'Save one short note to the Coordinator\'s memory: a lasting preference or decision, not status that will soon change.',
+    inputSchema: z.object({ note: z.string().trim().min(1).max(500) }),
+  }, async ({ note }, ctx) => outcome(await actions.remember(mcpUserId(ctx.http?.authInfo), note)))
+
+  server.registerTool('forget', {
+    title: 'Remove from the Coordinator\'s memory',
+    description: 'Remove every line of the Coordinator\'s memory that contains this text.',
+    inputSchema: z.object({ text: z.string().trim().min(1).max(200) }),
+    annotations: { destructiveHint: true, idempotentHint: true },
+  }, async ({ text }, ctx) => outcome(await actions.forget(mcpUserId(ctx.http?.authInfo), text)))
 }, { serverInfo: { name: 'mikka', version: '1.0.0' } })
 
 const authed = withMcpAuth(handler, verifyMcpToken, {
