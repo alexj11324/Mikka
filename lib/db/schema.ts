@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, varchar, jsonb, integer, timestamp, primaryKey, index, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, integer, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -117,12 +117,12 @@ export const runChunks = pgTable('run_chunks', {
 }, table => [uniqueIndex('run_chunks_run_seq_key').on(table.runId, table.seq)])
 
 /**
- * Something a person's Coordinator should hear about: a run that ended, or an
- * issue that moved to done. Written where it happens; the Coordinator reads
- * the undelivered rows and marks them. `dedupeKey` keeps a repeated write to
- * one row.
+ * Something a person's Coordinator should hear about: a message from the
+ * person, a run that ended, or an issue that moved to done. Written where it
+ * happens; the Coordinator reads the undelivered rows and marks them.
+ * `dedupeKey` keeps a repeated write to one row.
  */
-export const COORDINATOR_EVENT_KINDS = ['run_finished', 'issue_done'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 
 export const coordinatorEvents = pgTable('coordinator_events', {
@@ -135,6 +135,31 @@ export const coordinatorEvents = pgTable('coordinator_events', {
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt)])
+
+/**
+ * One person's Coordinator. A turn holds the lease (`leaseHolder` until
+ * `leaseUntil`) while it works, so two wakes never run the same conversation
+ * at once. `summary` replaces every message at or before `summaryThrough`
+ * when the history is sent to the model. `memory` is what the person asked it to remember, as Markdown lines; it
+ * goes into every prompt.
+ */
+export const coordinatorSessions = pgTable('coordinator_sessions', {
+  userId: text('userId').primaryKey(),
+  leaseHolder: text('leaseHolder'),
+  leaseUntil: timestamp('leaseUntil', { withTimezone: true }),
+  summary: text('summary'),
+  summaryThrough: integer('summaryThrough').notNull().default(0),
+  memory: text('memory').notNull().default(''),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** The Coordinator's conversation, one AI SDK model message per row, in `position` order. */
+export const coordinatorMessages = pgTable('coordinator_messages', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  position: integer('position').notNull(),
+  message: jsonb('message').$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('coordinator_messages_position_key').on(table.userId, table.position)])
 
 /** A message a person sent a running agent, delivered on its next poll. */
 export const runMessages = pgTable('run_messages', {

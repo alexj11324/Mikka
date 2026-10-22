@@ -15,9 +15,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import { useFeatureAvailability } from '@/hooks/use-feature-availability'
+import { withBasePath } from '@/lib/base-path'
 
 type Team = { id: string; workspaceId: string; name: string; identifier: string; description: string; memberCount: number; role: string | null }
-function SlackIcon() { return <img src="/icons/slack.svg" alt="" className="size-4" /> }
+function SlackIcon() { return <img src={withBasePath('/icons/slack.svg')} alt="" className="size-4" /> }
 type SettingsRow = { title: string; description?: string; icon?: LucideIcon | typeof SlackIcon; href?: string; label?: string; status?: ReactNode; action?: ReactNode; unavailable?: boolean; control?: 'switch' | 'button' | 'select'; controlLabel?: string }
 
 const sections = [

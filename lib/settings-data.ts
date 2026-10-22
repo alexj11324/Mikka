@@ -1,4 +1,3 @@
-import { getTranslations } from 'next-intl/server'
 import type { listTeamMembers, loadTeamDirectory } from '@/app/actions/teams'
 import { withBasePath } from '@/lib/base-path'
 
@@ -14,11 +13,10 @@ export class SettingsReadError extends Error {
 }
 
 export async function fetchSettingsData<T>(url: string): Promise<T> {
-  const i18nText = await getTranslations();
   const response = await fetch(withBasePath(url), { cache: 'no-store' })
   if (!response.ok) {
     const body = await response.json().catch(() => null)
-    throw new SettingsReadError(body?.error ?? i18nText("FeatureCopy.c_af7a3f0c"), response.status)
+    throw new SettingsReadError(body?.error ?? 'Failed to load settings data.', response.status)
   }
   return response.json()
 }
