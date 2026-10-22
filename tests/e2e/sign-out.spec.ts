@@ -10,7 +10,7 @@ for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
     if (mobile) await page.setViewportSize({ width: 390, height: 844 })
     await register(page, english ? '/devices' : path)
     if (english) await page.goto(app(path))
-    const accountMenu = page.getByRole('button', { name: english ? 'Account menu' : '账户菜单', exact: true })
+    const accountMenu = page.getByRole('button', { name: path.includes('devices') ? english ? 'Account menu' : '账户菜单' : '工作区菜单', exact: true })
     const pending = page.getByRole('status', { name: english ? 'Signing out…' : '正在退出…', exact: true })
     const cookie = (await context.cookies()).map(value => `${value.name}=${value.value}`).join('; ')
     const session = await page.request.get(app('/api/auth/get-session'))
@@ -99,7 +99,7 @@ test('sign-out waits for editor validation and preserves saved edits when revoca
     await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'SIGN_OUT_FAILED', message: 'Sign out failed' }) })
   })
   async function signOut() {
-    await page.getByRole('button', { name: '账户菜单', exact: true }).click()
+    await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
     await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
   }
   await title.fill('')
@@ -140,7 +140,7 @@ test('failed sign-out preserves an invalid project draft and its validation erro
     await gate
     await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'SIGN_OUT_FAILED', message: 'Sign out failed' }) })
   })
-  await page.getByRole('button', { name: '账户菜单', exact: true }).click()
+  await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
   await expect(page.getByRole('status', { name: '正在退出…', exact: true })).toBeVisible()
   await expect(name).toHaveCount(0)
