@@ -11,7 +11,7 @@ import { withBasePath } from '@/lib/base-path'
 import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
 
-export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, continueGitHub = false, callbackURL, testWorkspaceEnabled = false, next, continueURL }: { mode: 'sign-in' | 'sign-up'; githubEnabled?: boolean; oauthFailed?: boolean; continueGitHub?: boolean; callbackURL?: string; testWorkspaceEnabled?: boolean; next?: string; continueURL?: string }) {
+export function AuthForm({ mode, addAccount = false, githubEnabled = false, oauthFailed = false, continueGitHub = false, callbackURL, testWorkspaceEnabled = false, next, continueURL }: { mode: 'sign-in' | 'sign-up'; addAccount?: boolean; githubEnabled?: boolean; oauthFailed?: boolean; continueGitHub?: boolean; callbackURL?: string; testWorkspaceEnabled?: boolean; next?: string; continueURL?: string }) {
   const t = useTranslations('Auth')
   const locale = useLocale()
   const returnPath = safeAuthReturn(next)
@@ -86,8 +86,8 @@ export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, con
       setPending(false)
     }
   }
-  return <Auth registering={registering} next={returnPath}>
-    <SignInCard registering={registering} pending={pending} githubEnabled={githubEnabled} error={error} notice={notice} callbackURL={callbackURL} next={returnPath} onSubmit={submit} onGitHubSignIn={signInWithGitHub} />
+  return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
+    <SignInCard registering={registering} addAccount={addAccount} pending={pending} githubEnabled={githubEnabled} error={error} notice={notice} callbackURL={callbackURL} next={returnPath} onSubmit={submit} onGitHubSignIn={signInWithGitHub} />
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
       <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>{t('testWorkspaceCta')}</Button>
       <p className="text-muted-foreground text-xs">{t('testWorkspaceHint')}</p>

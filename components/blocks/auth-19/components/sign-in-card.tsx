@@ -14,6 +14,7 @@ import { GithubLight } from '@/components/ui/svgs/githubLight'
 
 type SignInCardProps = {
   registering: boolean
+  addAccount?: boolean
   pending: boolean
   githubEnabled: boolean
   error: string
@@ -24,17 +25,24 @@ type SignInCardProps = {
   onGitHubSignIn: () => Promise<void>
 }
 
-export function SignInCard({ registering, pending, githubEnabled, error, notice, callbackURL, next = '/', onSubmit, onGitHubSignIn }: SignInCardProps) {
+export function SignInCard({ registering, addAccount = false, pending, githubEnabled, error, notice, callbackURL, next = '/', onSubmit, onGitHubSignIn }: SignInCardProps) {
   const t = useTranslations('Auth')
+  function authHref(path: string) {
+    const params = new URLSearchParams()
+    if (next !== '/') params.set('next', next)
+    if (addAccount) params.set('addAccount', '1')
+    const query = params.toString()
+    return `${path}${query ? `?${query}` : ''}`
+  }
   return (
     <Card className="w-full max-w-[26rem] overflow-hidden p-0">
       <CardHeader className="px-7 pt-8 pb-5 sm:px-9 sm:pt-9 sm:pb-6">
         <div className="flex flex-col gap-1">
           <CardTitle className="text-2xl font-semibold tracking-tight text-balance">
-            <h1>{registering ? t('createTitle') : t('welcome')}</h1>
+            <h1>{addAccount ? t('addAccountTitle') : registering ? t('createTitle') : t('welcome')}</h1>
           </CardTitle>
           <CardDescription className="text-pretty">
-            {registering ? t('createDescription') : t('welcomeDescription')}
+            {addAccount ? t('addAccountDescription') : registering ? t('createDescription') : t('welcomeDescription')}
           </CardDescription>
         </div>
       </CardHeader>
@@ -88,7 +96,7 @@ export function SignInCard({ registering, pending, githubEnabled, error, notice,
         </form>
         <p className="text-muted-foreground text-center text-xs">
           {registering ? t('haveAccount') : t('noAccountShort')}{' '}
-          <Link href={`${registering ? '/sign-in' : '/sign-up'}${next === '/' ? '' : `?next=${encodeURIComponent(next)}`}`} className="text-foreground underline underline-offset-4">{registering ? t('signIn') : t('createAccount')}</Link>
+          <Link href={authHref(registering ? '/sign-in' : '/sign-up')} className="text-foreground underline underline-offset-4">{registering ? t('signIn') : t('createAccount')}</Link>
         </p>
       </CardContent>
     </Card>

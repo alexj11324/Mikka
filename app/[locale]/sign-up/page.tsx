@@ -14,14 +14,15 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t('signUpTitle'), description: t('signUpDescription') }
 }
 
-export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ next?: string; addAccount?: string }> }) {
   const query = await searchParams
   const next = safeAuthReturn(query.next)
+  const addAccount = query.addAccount === '1'
   const session = await auth.api.getSession({ headers: await headers() })
-  if (session?.user) {
+  if (session?.user && !addAccount) {
     const locale = await getLocale()
     if (next.startsWith('/?')) plainRedirect(`${getPathname({ locale, href: '/' })}${next.slice(1)}`)
     redirect({ href: next, locale })
   }
-  return <AuthForm next={next} mode="sign-up" githubEnabled={githubEnabled} />
+  return <AuthForm addAccount={addAccount} next={next} mode="sign-up" githubEnabled={githubEnabled} />
 }

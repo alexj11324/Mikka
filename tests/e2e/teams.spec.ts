@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register, browserClientHeaders, watchRuntime } from './fixtures'
+import { test, expect, register, browserClientHeaders, watchRuntime, app, BASE_PATH } from './fixtures'
 
 async function createTeam(page: Page, name: string, identifier: string) {
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
@@ -43,7 +43,7 @@ test('团队主页、任务和项目菜单右侧空白区域均可点击导航',
     await row.click({ position: { x: bounds.width - 12, y: bounds.height / 2 } })
     await expect(button).toHaveAttribute('data-active')
     await expect(breadcrumb).toContainText('导航团队')
-    await expect(breadcrumb.getByText(`团队${title}`, { exact: true })).toBeVisible()
+    await expect(breadcrumb.getByText(title, { exact: true })).toBeVisible()
   }
 })
 
@@ -128,7 +128,8 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
   const email = `team-member-${randomUUID()}@example.com`
   await invitation.getByLabel('邮箱地址', { exact: true }).fill(email)
   await invitation.getByRole('button', { name: '创建邀请链接', exact: true }).click()
-  const invitePath = new URL(await invitation.getByLabel(`${email} 的邀请链接`, { exact: true }).inputValue()).pathname
+  const inviteUrl = new URL(await invitation.getByLabel(`${email} 的邀请链接`, { exact: true }).inputValue()).pathname
+    const invitePath = inviteUrl.startsWith(BASE_PATH) ? inviteUrl.slice(BASE_PATH.length) || '/' : inviteUrl
   await invitation.getByRole('button', { name: '完成', exact: true }).click()
   const memberContext = await browser.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
   const runtime = watchRuntime(memberContext)
@@ -138,7 +139,7 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
     await member.getByRole('button', { name: '接受邀请并加入', exact: true }).click()
     await expect(member).toHaveURL(/\/settings\/members\?workspace=/)
     const workspaceId = new URL(member.url()).searchParams.get('workspace')!
-    await member.goto('/settings/teams')
+    await member.goto(app('/settings/teams'))
     const row = member.getByRole('row').filter({ hasText: '共享团队' })
     await row.getByRole('button', { name: '共享团队 的操作', exact: true }).click()
     await member.getByRole('menuitem', { name: 'Join team', exact: true }).click()
@@ -148,11 +149,11 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
     await row.getByRole('button', { name: '共享团队 的操作', exact: true }).click()
     await expect(member.getByRole('menuitem', { name: 'Join team', exact: true })).toBeVisible()
     await member.keyboard.press('Escape')
-    await member.goto('/')
+    await member.goto(app('/'))
     await showAllTasks(member)
     await expect(member.locator('[aria-label="任务列表"]').getByText(publicTitle, { exact: true })).toBeVisible()
     await expect(member.getByText(privateTitle, { exact: true })).toHaveCount(0)
-    await page.goto(`/settings/members?workspace=${workspaceId}`)
+    await page.goto(app(`/settings/members?workspace=${workspaceId}`))
     const membership = page.getByRole('row').filter({ hasText: email })
     await membership.getByRole('button', { name: /^管理 / }).click()
     await page.getByRole('menuitem', { name: '停用成员', exact: true }).click()
@@ -161,7 +162,7 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
     await member.reload()
     await showAllTasks(member)
     await expect(member.getByText(publicTitle, { exact: true })).toHaveCount(0)
-    await member.goto(`/settings/teams?workspace=${workspaceId}`)
+    await member.goto(app(`/settings/teams?workspace=${workspaceId}`))
     await expect(member.getByText('无法访问团队目录', { exact: true })).toBeVisible()
   } finally {
     await memberContext.close()

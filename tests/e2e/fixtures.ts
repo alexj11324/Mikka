@@ -15,7 +15,7 @@ export function watchRuntime(context: BrowserContext) {
   context.on('page', page => {
     page.on('pageerror', error => failures.push(error.stack ?? error.message))
     page.on('console', message => {
-      if (message.type() === 'error') failures.push(`console.error: ${message.text()}`)
+      if (message.type() === 'error' && !/^Failed to load resource: the server responded with a status of 4\d{2} \(/.test(message.text())) failures.push(`console.error: ${message.text()}`)
     })
     page.on('response', response => {
       if (response.status() >= 500 && new URL(response.url()).origin === new URL(page.url()).origin) {

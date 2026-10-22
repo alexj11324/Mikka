@@ -6,6 +6,7 @@ import useSWR from 'swr'
 import { Check, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { authClient } from '@/lib/auth-client'
+import { withBasePath } from '@/lib/base-path'
 import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import { switchWorkspace } from '@/app/actions/workspace'
@@ -82,7 +83,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
         const session = await authClient.getSession({ query: { disableCookieCache: true } })
         if (session.error || !session.data?.user) throw new Error('Session unavailable')
         if ((data?.accounts.length ?? 0) >= 5) { toast.error(i18nText("FeatureCopy.c_a2a50802")); return }
-        window.location.assign('/sign-in?addAccount=1')
+        window.location.assign(withBasePath('/sign-in?addAccount=1'))
       } catch { toast.error(i18nText("FeatureCopy.c_c9988ff5")) }
       finally { setPending(false) }
     })
@@ -120,7 +121,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuLabel>{i18nText("FeatureCopy.c_c3d92b20")}</DropdownMenuLabel>
-                <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => run(async () => { setOpenMobile(false); window.location.assign('/workspaces/new') })}>{i18nText("FeatureCopy.c_d92d1b8d")}</DropdownMenuItem>
+                <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => run(async () => { setOpenMobile(false); window.location.assign(withBasePath('/workspaces/new')) })}>{i18nText("FeatureCopy.c_d92d1b8d")}</DropdownMenuItem>
                 <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={addAccount}>{i18nText("FeatureCopy.c_c771c7d8")}</DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuSubContent>

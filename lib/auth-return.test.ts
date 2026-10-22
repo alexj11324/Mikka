@@ -14,6 +14,7 @@ test('allows supported local app destinations with validated settings context', 
   assert.equal(safeAuthReturn(`/?issue=${issueId}`), `/?issue=${issueId}`)
   assert.equal(safeAuthReturn(`/invite/${'a'.repeat(64)}`), `/invite/${'a'.repeat(64)}`)
   assert.equal(safeAuthReturn('/devices'), '/devices')
+assert.equal(safeAuthReturn('/workspaces/new'), '/workspaces/new')
 })
 
 test('rejects external redirects, unsupported settings state, and malformed context', () => {

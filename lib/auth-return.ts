@@ -18,6 +18,7 @@ export function safeAuthReturn(value?: string) {
   if (url.origin !== internalOrigin || url.hash) return '/'
   if (/^\/invite\/[a-f0-9]{64}$/.test(url.pathname) && !url.search) return url.pathname
   if (url.pathname === '/devices' && !url.search) return '/devices'
+  if (url.pathname === '/workspaces/new' && !url.search) return '/workspaces/new'
 
   if (url.pathname === '/') {
     const issue = url.searchParams.get('issue')

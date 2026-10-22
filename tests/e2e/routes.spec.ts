@@ -19,16 +19,7 @@ test('旧预览入口和设置入口均跳转到正式页面', async ({ request 
     expect(`${destination.pathname.replace(/\/$/, '')}${destination.search}`, source).toBe(app(target))
   }
 
-  const anonymousRequest = await playwrightRequest.newContext({
-    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3100',
-  })
-  try {
-    const settings = await anonymousRequest.get(app('/preview/settings'))
-    const signIn = new URL(settings.url())
-    expect(settings.status()).toBe(200)
-    expect(signIn.pathname).toBe(app('/sign-in'))
-    expect(signIn.searchParams.get('next')).toBe('/settings/members')
-  } finally {
-    await anonymousRequest.dispose()
-  }
+  await page.goto(app('/preview/settings'))
+  await expect(page).toHaveURL(url => url.pathname === app('/sign-in') && url.searchParams.get('next') === '/settings/members')
+  await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
 })

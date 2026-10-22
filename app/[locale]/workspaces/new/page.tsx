@@ -1,10 +1,9 @@
-import { getTranslations } from 'next-intl/server'
+import { getLocale, getTranslations } from 'next-intl/server'
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { auth } from '@/lib/auth'
+import { Link, redirect } from '@/i18n/navigation'
 import { buttonVariants } from '@/components/ui/button'
 import { CreateWorkspaceForm } from '@/components/workspace/create-workspace-form'
 
@@ -15,8 +14,9 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function NewWorkspacePage() {
   const i18nText = await getTranslations();
+  const locale = await getLocale()
   const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/sign-in?next=%2Fworkspaces%2Fnew')
+  if (!session?.user) redirect({ href: '/sign-in?next=%2Fworkspaces%2Fnew', locale })
   return <div className="flex min-h-dvh flex-col bg-background">
     <header className="flex items-center justify-between gap-4 px-4 py-5 sm:px-8">
       <Link href="/" className={buttonVariants({ variant: 'ghost', size: 'sm' })}><ArrowLeft data-icon="inline-start" />{i18nText("Devices.connect.back")}</Link>

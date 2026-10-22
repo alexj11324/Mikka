@@ -33,8 +33,8 @@ export function TeamForm({ workspaceId, team, existingIdentifiers = [], editable
       if (busy.current || !window.confirm(i18nText("FeatureCopy.c_39f8d12d"))) { event.preventDefault(); event.stopPropagation() }
     }
     window.addEventListener('beforeunload', beforeUnload)
-    document.addEventListener('click', beforeNavigate, true)
-    return () => { window.removeEventListener('beforeunload', beforeUnload); document.removeEventListener('click', beforeNavigate, true) }
+    window.addEventListener('click', beforeNavigate, true)
+    return () => { window.removeEventListener('beforeunload', beforeUnload); window.removeEventListener('click', beforeNavigate, true) }
   }, [dirty, pending])
   function close() { if (!busy.current && (!dirty || window.confirm(i18nText("FeatureCopy.c_39f8d12d")))) onClose() }
   async function submit() {
@@ -53,7 +53,7 @@ export function TeamForm({ workspaceId, team, existingIdentifiers = [], editable
       <Button type="button" variant="ghost" size="sm" className="self-start" aria-label={team ? i18nText("FeatureCopy.c_212cf650") : i18nText("Devices.connect.back")} disabled={pending} onClick={close}><ChevronLeft data-icon="inline-start" /><span lang="en">{team ? 'Team settings' : 'Back'}</span></Button>
       <header className="flex flex-col gap-2" lang="en"><h1 id="team-form-heading" className="text-2xl font-semibold tracking-tight">{team ? 'General' : 'Create a new team'}</h1><p className="text-sm text-muted-foreground">{team ? `Manage the name, identifier, and description of ${team.name}.` : 'Create a new team to manage separate cycles, workflows and notifications'}</p></header>
       <form aria-label={team ? i18nText("FeatureCopy.c_455685f2") : i18nText("FeatureCopy.c_4eec1ff7")} className="flex flex-col gap-8" onSubmit={event => { event.preventDefault(); void submit() }} onKeyDown={event => { if (event.nativeEvent.isComposing || event.keyCode === 229) return; if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); event.currentTarget.requestSubmit() } }}>
-        <SettingsGroup className="bg-transparent">
+        <SettingsGroup className="bg-card">
           <SettingsRow title="Icon & Name" htmlFor="team-name" data-disabled={pending} lang="en">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground" aria-hidden="true"><SquareUserRound className="size-4" /></span><Input id="team-name" required maxLength={100} value={name} onChange={event => { const value = event.target.value; setName(value); if (!team && !identifierEdited) setIdentifier(suggestTeamIdentifier(value, existingIdentifiers)) }} disabled={pending} readOnly={!editable} aria-label={i18nText("FeatureCopy.c_b2629c38")} placeholder="e.g. Engineering" className="min-w-0 flex-1 @md/field-group:w-48" />
           </SettingsRow>

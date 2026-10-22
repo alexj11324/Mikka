@@ -166,11 +166,11 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeVisible()
   await sidebar.getByRole('link', { name: '偏好设置', exact: true }).click()
   await expect(page.getByRole('group', { name: '界面主题', exact: true })).toBeVisible()
-  const preferenceTitleStyle = await page.locator('[data-slot="field-label"]').first().evaluate(element => {
+  const preferenceTitleStyle = await page.getByText('界面主题', { exact: true }).evaluate(element => {
     const style = getComputedStyle(element)
     return { color: style.color, weight: style.fontWeight, size: style.fontSize, leading: style.lineHeight }
   })
-  const preferenceCard = page.locator('[data-slot="field-group"]').first()
+  const preferenceCard = page.locator('[data-settings-card]').first()
   const preferenceCardBounds = await preferenceCard.boundingBox()
   const preferenceCardBackground = await preferenceCard.evaluate(element => getComputedStyle(element).backgroundColor)
   await sidebar.getByRole('link', { name: '团队', exact: true }).click()

@@ -52,7 +52,7 @@ test('菜单与参考一致，创建持久工作区、切换并同步成员上�
   await switcher.getByRole('menuitem', { name: original.name, exact: true }).click()
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText(original.name)
   expect((await selectedWorkspace(page)).id).toBe(original.id)
-  await page.goto(`/w/${slug}`)
+  await page.goto(app(`/w/${slug}`))
   await expect(page).toHaveURL(url => url.pathname === '/')
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText(name)
   expect((await selectedWorkspace(page)).id).toBe(created.id)
@@ -97,7 +97,7 @@ test('添加账户保留旧会话，可切回两个账户，退出后撤销全�
   await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
   await expect(page).toHaveURL(/\/sign-in/)
   expect((await context.cookies()).filter(cookie => cookie.name.includes('_multi-'))).toHaveLength(0)
-  await page.goto('/settings/members')
+  await page.goto(app('/settings/members'))
   await expect(page).toHaveURL(/\/sign-in/)
 })
 

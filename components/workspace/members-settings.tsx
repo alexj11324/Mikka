@@ -208,7 +208,7 @@ export function MembersSettings({
         ...change,
       });
       if ("error" in result) {
-        setError(translateError(result.error));
+        setError(result.error);
         return;
       }
       setChange(null);
@@ -228,7 +228,7 @@ export function MembersSettings({
     try {
       const result = await revokeWorkspaceInvitation(data.workspace.id, id);
       if ("error" in result) {
-        setError(translateError(result.error));
+        setError(result.error);
         return;
       }
       setNotice(t("invitationRevoked"));
