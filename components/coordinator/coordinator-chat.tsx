@@ -13,9 +13,10 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } fro
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from '@/components/ui/message-scroller'
 import { Spinner } from '@/components/ui/spinner'
+import { CitedText } from './cited-text'
 
 /** The person's conversation with their Coordinator, which dispatches agents to issues. */
-export function CoordinatorChat() {
+export function CoordinatorChat({ onOpenIssue }: { onOpenIssue: (id: string) => void }) {
   const t = useTranslations('Coordinator')
   const actionError = useActionError()
   const { data, mutate, error: loadError } = useSWR<Chat>('coordinator-chat', () => getCoordinatorChat(), {
@@ -55,7 +56,7 @@ export function CoordinatorChat() {
               {item.from === 'event'
                 ? <p className="text-center text-xs text-muted-foreground">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
-                    {item.text && <Bubble variant={item.from === 'person' ? 'secondary' : 'ghost'} align={item.from === 'person' ? 'end' : 'start'}><BubbleContent className="whitespace-pre-wrap">{item.text}</BubbleContent></Bubble>}
+                    {item.text && <Bubble variant={item.from === 'person' ? 'secondary' : 'ghost'} align={item.from === 'person' ? 'end' : 'start'}><BubbleContent className="whitespace-pre-wrap">{item.from === 'coordinator' ? <CitedText text={item.text} sources={data?.sources ?? {}} onOpenIssue={onOpenIssue} /> : item.text}</BubbleContent></Bubble>}
                     {item.tools.length > 0 && <MessageFooter>{t('usedTools', { tools: [...new Set(item.tools)].join(', ') })}</MessageFooter>}
                   </MessageContent></Message>}
             </MessageScrollerItem>)}

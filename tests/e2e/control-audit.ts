@@ -51,9 +51,11 @@ export async function clickWithEffect(page: Page, control: Locator) {
   }
 }
 
+// An unlabeled control falls back to its markup, without the ids React's useId
+// generates (`_r_2a_`): they depend on render order and change after a reload.
 export async function inspectControl(control: Locator, page: Page) {
   return control.evaluate((element, currentURL) => {
-    const label = element.getAttribute('aria-label') || element.getAttribute('title') || element.textContent?.trim().replace(/\s+/g, ' ') || element.outerHTML.slice(0, 160)
+    const label = element.getAttribute('aria-label') || element.getAttribute('title') || element.textContent?.trim().replace(/\s+/g, ' ') || element.outerHTML.replace(/\s[\w-]+="[^"]*_r_[\w]+_[^"]*"/g, '').slice(0, 160)
     let skip = ''
     if (element.closest('[inert], [aria-hidden="true"]')) skip = '浮层下的不可交互背景'
     else if (element.matches(':disabled, [aria-disabled="true"]')) skip = '禁用态，不可执行'

@@ -1,5 +1,6 @@
 'use client'
 
+import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useState } from 'react'
 import { ArrowDownAZ, ArrowUpAZ, Box, Plus } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
@@ -10,12 +11,19 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ProjectForm } from './project-form'
-import { ProjectDetail } from './project-detail'
+import dynamic from 'next/dynamic'
+
 import { PROJECT_STATUSES, PROJECT_ICON_TINTS, type Project } from './project-properties'
 import { ProjectPropertyControl } from './project-property-controls'
 import { useProjectUpdate } from './use-project-update'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+
+const ProjectForm = dynamic(() => import('./project-form').then(module => module.ProjectForm), {
+  loading: () => { const agentCopy = useAgentCopy(); return (<p role="status" className="p-6 text-sm text-muted-foreground">{agentCopy.loadingProjectForm}</p>) },
+})
+const ProjectDetail = dynamic(() => import('./project-detail').then(module => module.ProjectDetail), {
+  loading: () => { const agentCopy = useAgentCopy(); return (<div role="status" aria-label={agentCopy.loadingProjectDetails} className="flex flex-col gap-6 p-6"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>) },
+})
 
 export function ProjectWorkspace({ projects, loading, error, projectId, team, issues, userName, onSelect, onOpenTeam, onOpenIssue, onCreateIssue, onUpdated }: {
   projects: Project[]; loading: boolean; error: boolean; projectId: string | null; team?: string; issues: Awaited<ReturnType<typeof listIssues>>; userName: string; onSelect: (id: string | null) => void; onOpenTeam: () => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void

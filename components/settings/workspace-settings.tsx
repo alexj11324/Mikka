@@ -1,42 +1,24 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { useWorkspace } from '@/hooks/use-workspace'
 import { Input } from '@/components/ui/input'
-import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group'
 import { Field, FieldLabel, FieldGroup } from '@/components/ui/field'
-import { WORKSPACE_NAME, WORKSPACE_SLUG } from '@/components/workspace/issue-properties'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 
-export function WorkspaceSettings() {
+export function WorkspaceSettings({ userKey, workspaceId }: { userKey: string; workspaceId?: string }) {
   const t = useTranslations('Settings.workspaceForm')
-  const [name, setName] = useState(WORKSPACE_NAME)
-  const [slug, setSlug] = useState(WORKSPACE_SLUG)
-  const [host, setHost] = useState('')
-  useEffect(() => { setHost(window.location.host) }, [])
-  const invalidSlug = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 48
+  const commonT = useTranslations('Common')
+  const membersT = useTranslations('Members')
+  const { data, error, mutate } = useWorkspace(userKey, workspaceId)
+  if (!data && error) return <div role="alert" className="flex flex-col items-start gap-3"><p>{membersT('refreshFailed')}</p><Button variant="outline" onClick={() => void mutate()}>{commonT('retry')}</Button></div>
+  if (!data) return <Skeleton className="h-40 w-full" />
   return <section className="flex flex-col gap-4" aria-label={t('label')}>
     <FieldGroup data-settings-card className="gap-0 divide-y divide-border overflow-hidden rounded-2xl border bg-card">
-      <Field orientation="responsive" className="justify-between gap-3 px-5 py-5">
-        <FieldLabel htmlFor="workspace-name" className="@md/field-group:flex-none">{t('name')}</FieldLabel>
-        <div className="min-w-0 @md/field-group:flex-[0_1_28rem]">
-          <Input id="workspace-name" value={name} maxLength={100} onChange={event => setName(event.target.value)} />
-        </div>
-      </Field>
-      <Field orientation="responsive" data-invalid={invalidSlug || undefined} className="justify-between gap-3 px-5 py-5">
-        <FieldLabel htmlFor="workspace-url" className="@md/field-group:flex-none">URL</FieldLabel>
-        <div className="flex min-w-0 flex-col gap-2 @md/field-group:flex-[0_1_28rem]">
-          <InputGroup>
-            <InputGroupInput id="workspace-url" className="min-w-24" aria-describedby="workspace-url-help" aria-invalid={invalidSlug} value={slug} maxLength={48} autoCapitalize="none" spellCheck={false} onChange={event => setSlug(event.target.value)} />
-            <InputGroupAddon className="min-w-0 max-w-[calc(100%-6rem)] shrink-0"><InputGroupText className="block truncate" title={`${host}/`}>{host}/</InputGroupText></InputGroupAddon>
-          </InputGroup>
-          {invalidSlug && <p role="alert" className="text-xs text-destructive">{t('invalidSlug')}</p>}
-        </div>
-      </Field>
+      <Field orientation="responsive" className="justify-between gap-3 px-5 py-5"><FieldLabel htmlFor="workspace-name" className="@md/field-group:flex-none">{t('name')}</FieldLabel><div className="min-w-0 @md/field-group:flex-[0_1_28rem]"><Input id="workspace-name" value={data.workspace.name} readOnly /></div></Field>
+      <Field orientation="responsive" className="justify-between gap-3 px-5 py-5"><FieldLabel htmlFor="workspace-id" className="@md/field-group:flex-none">{t('id')}</FieldLabel><div className="min-w-0 @md/field-group:flex-[0_1_28rem]"><Input id="workspace-id" value={data.workspace.id} readOnly /></div></Field>
     </FieldGroup>
-    <p id="workspace-url-help" className="text-xs text-muted-foreground">{t('urlHelp')}</p>
-    <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <p role="status" className="text-xs text-muted-foreground">{t('previewNote')}</p>
-      <span className="text-xs text-muted-foreground">{t('previewLabel')}</span>
-    </div>
+    <p className="text-sm text-muted-foreground">{t('readOnlyNote')}</p>
   </section>
 }

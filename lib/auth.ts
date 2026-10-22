@@ -5,18 +5,33 @@ import { withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
 
 export const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
+export const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
 export const authBaseURL = appOrigin
 
 export const auth = betterAuth({
   appName: 'Mikka',
   onAPIError: { errorURL: withBasePath('/sign-in?oauth=failed') },
   database: pool,
-  socialProviders: githubEnabled ? {
-    github: {
+  account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [] } },
+  databaseHooks: {
+    account: {
+      create: { before: async account => ({ data: { ...account, idToken: null } }) },
+      update: { before: async account => ({ data: { ...account, idToken: null } }) },
+    },
+  },
+  socialProviders: {
+    ...(githubEnabled ? { github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    },
-  } : {},
+    } } : {}),
+    ...(googleEnabled ? { google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      scope: ['openid', 'email', 'profile'],
+      includeGrantedScopes: false,
+      requireEmailVerification: true,
+    } } : {}),
+  },
   baseURL: authBaseURL,
   // Its routes sit under the app's base path (app/api/auth → /mikka/api/auth).
   basePath: withBasePath('/api/auth'),
@@ -44,7 +59,7 @@ export const auth = betterAuth({
   })],
   session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
   ...(process.env.NODE_ENV === 'development' ? { advanced: {
-    // The cross-site v0 preview requires secure SameSite=None session cookies.
-    defaultCookieAttributes: { sameSite: 'none' as const, secure: true },
+    // Partition preview sessions by top-level site when third-party cookies are blocked.
+    defaultCookieAttributes: { sameSite: 'none' as const, secure: true, partitioned: true },
   } } : {}),
 })

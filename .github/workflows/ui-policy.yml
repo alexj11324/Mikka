@@ -36,6 +36,8 @@ jobs:
       - run: pnpm test:i18n
       - run: pnpm i18n:check
       - run: pnpm test:ssh-target
+      - run: pnpm test:auth-composio
+      - run: pnpm test:integrations
       - run: pnpm test:csv
       - run: pnpm test:issues
       - name: Audit business UI composition
@@ -106,7 +108,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:setup
       - run: pnpm build
-      - name: Navigation and real content ready within 1000ms (desktop + mobile, no retries)
+      - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
         run: pnpm test:performance --output=performance-results
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report

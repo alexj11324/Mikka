@@ -1,0 +1,5363 @@
+{
+  "library": {
+    "root": "Stack",
+    "components": {
+      "Card": {
+        "signature": "Card(children: (TextContent | MarkDownRenderer | CardHeader | Callout | TextCallout | CodeBlock | Image | ImageBlock | ImageGallery | Separator | HorizontalBarChart | RadarChart | PieChart | RadialChart | SingleStackedBarChart | ScatterChart | AreaChart | BarChart | LineChart | Table | TagBlock | Form | Buttons | IconButton | Steps | InlineHeader | EntityList | EditableTable | SnippetCardBlock | OverviewCardBlock | ContextCardBlock | CompositeCardBlock | VisualCardBlock | Tabs | Carousel | Stack)[], variant?: \"card\" | \"sunk\" | \"clear\", direction?: \"row\" | \"column\", gap?: \"none\" | \"xs\" | \"s\" | \"m\" | \"l\" | \"xl\" | \"2xl\", align?: \"start\" | \"center\" | \"end\" | \"stretch\" | \"baseline\", justify?: \"start\" | \"center\" | \"end\" | \"between\" | \"around\" | \"evenly\", wrap?: boolean)",
+        "description": "Styled container. variant: \"card\" (default, elevated) | \"sunk\" (recessed) | \"clear\" (transparent). Always full width. Accepts all Stack flex params (default: direction \"column\"). Cards flex to share space in row/wrap layouts."
+      },
+      "CardHeader": {
+        "signature": "CardHeader(title?: string, subtitle?: string)",
+        "description": "Header with optional title and subtitle"
+      },
+      "MarkDownRenderer": {
+        "signature": "MarkDownRenderer(textMarkdown: string, variant?: \"clear\" | \"card\" | \"sunk\")",
+        "description": "Renders markdown text with optional container variant"
+      },
+      "Callout": {
+        "signature": "Callout(variant: \"info\" | \"warning\" | \"error\" | \"success\" | \"neutral\", title: string, description: string, visible?: $binding<boolean>)",
+        "description": "Callout banner. Optional visible is a reactive $boolean — auto-dismisses after 3s by setting $visible to false."
+      },
+      "TextCallout": {
+        "signature": "TextCallout(variant?: \"neutral\" | \"info\" | \"warning\" | \"success\" | \"danger\", title?: string, description?: string)",
+        "description": "Text callout with variant, title, and description"
+      },
+      "Image": {
+        "signature": "Image(alt: string, src?: string)",
+        "description": "Image with alt text and optional URL"
+      },
+      "ImageBlock": {
+        "signature": "ImageBlock(src: string, alt?: string)",
+        "description": "Image block with loading state"
+      },
+      "ImageGallery": {
+        "signature": "ImageGallery(images: {src: string, alt?: string, details?: string}[])",
+        "description": "Gallery grid of images with modal preview"
+      },
+      "CodeBlock": {
+        "signature": "CodeBlock(language: string, codeString: string)",
+        "description": "Syntax-highlighted code block"
+      },
+      "InlineHeader": {
+        "signature": "InlineHeader(heading: string, description?: string)",
+        "description": "Compact section heading with an optional one-line description, for use inside cards."
+      },
+      "Table": {
+        "signature": "Table(columns: Col[])",
+        "description": "Data table — column-oriented. Each Col holds its own data array."
+      },
+      "Col": {
+        "signature": "Col(label: string, data: any, type?: \"string\" | \"number\" | \"action\")",
+        "description": "Column definition — holds label + data array"
+      },
+      "EditableTable": {
+        "signature": "EditableTable(name?: string, columns?: {type: \"text\" | \"number\" | \"date-single\" | \"select\" | \"url\", key?: string, header?: string, width?: number, options?: {value: string, label: string}[]}[], data?: {id: string, values: (string | number)[]}[])",
+        "description": "Spreadsheet-like table whose cells the user can edit inline (text, number, url, date, select columns); edits are saved back as a form field"
+      },
+      "BarChart": {
+        "signature": "BarChart(labels: string[], series: Series[], variant?: \"grouped\" | \"stacked\", xLabel?: string, yLabel?: string, height?: number)",
+        "description": "Vertical bars; use for comparing values across categories with one or more series"
+      },
+      "LineChart": {
+        "signature": "LineChart(labels: string[], series: Series[], variant?: \"linear\" | \"natural\" | \"step\", xLabel?: string, yLabel?: string, height?: number)",
+        "description": "Lines over categories; use for trends and continuous data over time"
+      },
+      "AreaChart": {
+        "signature": "AreaChart(labels: string[], series: Series[], variant?: \"linear\" | \"natural\" | \"step\", xLabel?: string, yLabel?: string, height?: number)",
+        "description": "Filled area under lines; use for cumulative totals or volume trends over time"
+      },
+      "RadarChart": {
+        "signature": "RadarChart(labels: string[], series: Series[])",
+        "description": "Spider/web chart; use for comparing multiple variables across one or more entities"
+      },
+      "HorizontalBarChart": {
+        "signature": "HorizontalBarChart(labels: string[], series: Series[], variant?: \"grouped\" | \"stacked\", xLabel?: string, yLabel?: string)",
+        "description": "Horizontal bars; prefer when category labels are long or for ranked lists"
+      },
+      "Series": {
+        "signature": "Series(category: string, values: number[])",
+        "description": "One data series"
+      },
+      "PieChart": {
+        "signature": "PieChart(labels: string[], values: number[], variant?: \"pie\" | \"donut\", appearance?: \"circular\" | \"semiCircular\")",
+        "description": "Circular slices; use plucked arrays: PieChart(data.categories, data.values)"
+      },
+      "RadialChart": {
+        "signature": "RadialChart(labels: string[], values: number[])",
+        "description": "Radial bars; use plucked arrays: RadialChart(data.categories, data.values)"
+      },
+      "SingleStackedBarChart": {
+        "signature": "SingleStackedBarChart(labels: string[], values: number[])",
+        "description": "Single horizontal stacked bar; use plucked arrays: SingleStackedBarChart(data.categories, data.values)"
+      },
+      "Slice": {
+        "signature": "Slice(category: string, value: number)",
+        "description": "One slice with label and numeric value"
+      },
+      "ScatterChart": {
+        "signature": "ScatterChart(datasets: ScatterSeries[], xLabel?: string, yLabel?: string)",
+        "description": "X/Y scatter plot; use for correlations, distributions, and clustering"
+      },
+      "ScatterSeries": {
+        "signature": "ScatterSeries(name: string, points: Point[])",
+        "description": "Named dataset"
+      },
+      "Point": {
+        "signature": "Point(x: number, y: number, z?: number)",
+        "description": "Data point with numeric coordinates"
+      },
+      "Form": {
+        "signature": "Form(name: string, buttons: Buttons, fields?: FormControl[])",
+        "description": "Form container with fields and explicit action buttons"
+      },
+      "FormControl": {
+        "signature": "FormControl(label: string, input: Input | TextArea | Select | DatePicker | Slider | CheckBoxGroup | RadioGroup | Chips | OptionCards, hint?: string)",
+        "description": "Field with label, input component, and optional hint text"
+      },
+      "Label": {
+        "signature": "Label(text: string)",
+        "description": "Text label"
+      },
+      "Input": {
+        "signature": "Input(name: string, placeholder?: string, type?: \"text\" | \"email\" | \"password\" | \"number\" | \"url\", rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, value?: $binding<string>)",
+        "description": ""
+      },
+      "TextArea": {
+        "signature": "TextArea(name: string, placeholder?: string, rows?: number, rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, value?: $binding<string>)",
+        "description": ""
+      },
+      "Select": {
+        "signature": "Select(name: string, items: SelectItem[], placeholder?: string, rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, value?: $binding<string>, size?: \"small\" | \"medium\" | \"large\")",
+        "description": ""
+      },
+      "SelectItem": {
+        "signature": "SelectItem(value: string, label: string)",
+        "description": "Option for Select"
+      },
+      "DatePicker": {
+        "signature": "DatePicker(name: string, mode?: \"single\" | \"range\", rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, value?: $binding<any>)",
+        "description": ""
+      },
+      "Slider": {
+        "signature": "Slider(name: string, variant: \"continuous\" | \"discrete\", min: number, max: number, step?: number, defaultValue?: number[], label?: string, rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, value?: $binding<number[]>)",
+        "description": "Numeric slider input; supports continuous and discrete (stepped) variants"
+      },
+      "CheckBoxGroup": {
+        "signature": "CheckBoxGroup(name: string, items: CheckBoxItem[], rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, value?: $binding<Record<string, boolean>>)",
+        "description": ""
+      },
+      "CheckBoxItem": {
+        "signature": "CheckBoxItem(label: string, description: string, name: string, defaultChecked?: boolean)",
+        "description": ""
+      },
+      "RadioGroup": {
+        "signature": "RadioGroup(name: string, items: RadioItem[], defaultValue?: string, rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, value?: $binding<string>)",
+        "description": ""
+      },
+      "RadioItem": {
+        "signature": "RadioItem(label: string, description: string, value: string)",
+        "description": ""
+      },
+      "SwitchGroup": {
+        "signature": "SwitchGroup(name: string, items: SwitchItem[], variant?: \"clear\" | \"card\" | \"sunk\", value?: $binding<Record<string, boolean>>)",
+        "description": "Group of switch toggles"
+      },
+      "SwitchItem": {
+        "signature": "SwitchItem(label?: string, description?: string, name: string, defaultChecked?: boolean)",
+        "description": "Individual switch toggle"
+      },
+      "ChipItem": {
+        "signature": "ChipItem(value: string, label: string, icon?: Icon, disabled?: boolean)",
+        "description": "A single selectable chip inside a Chips group, with a value, label and optional icon."
+      },
+      "Chips": {
+        "signature": "Chips(name: string, type?: \"single\" | \"multiple\", items?: ChipItem[], rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, defaultValue?: string | string[])",
+        "description": "A form field of compact selectable chips for choosing one or many short options; the selection is stored under `name`."
+      },
+      "OptionCard": {
+        "signature": "OptionCard(value: string, title: string, subtitle?: string, topContent?: Icon | Image, disabled?: boolean)",
+        "description": "A single selectable card inside an OptionCards group, with a value, title, optional subtitle and an optional Icon or Image on top."
+      },
+      "OptionCards": {
+        "signature": "OptionCards(name: string, type?: \"single\" | \"multiple\", items?: OptionCard[], rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, defaultValue?: string | string[])",
+        "description": "A form field of selectable cards (title, optional subtitle, optional icon or image) laid out in a responsive grid for choosing one or many options; the selection is stored under `name`."
+      },
+      "Button": {
+        "signature": "Button(label: string, action?: ActionExpression, variant?: \"primary\" | \"secondary\" | \"tertiary\", type?: \"normal\" | \"destructive\", size?: \"extra-small\" | \"small\" | \"medium\" | \"large\")",
+        "description": "Clickable button"
+      },
+      "Buttons": {
+        "signature": "Buttons(buttons: Button[], direction?: \"row\" | \"column\")",
+        "description": "Group of Button components. direction: \"row\" (default) | \"column\"."
+      },
+      "IconButton": {
+        "signature": "IconButton(name: string, icon: Icon, action?: ActionExpression, variant?: \"primary\" | \"secondary\" | \"tertiary\", size?: \"extra-small\" | \"small\" | \"medium\" | \"large\", shape?: \"square\" | \"circle\")",
+        "description": "Icon-only button. name is the accessible label and the action label; icon is an Icon; action fires on click."
+      },
+      "Stack": {
+        "signature": "Stack(children: any[], direction?: \"row\" | \"column\", gap?: \"none\" | \"xs\" | \"s\" | \"m\" | \"l\" | \"xl\" | \"2xl\", align?: \"start\" | \"center\" | \"end\" | \"stretch\" | \"baseline\", justify?: \"start\" | \"center\" | \"end\" | \"between\" | \"around\" | \"evenly\", wrap?: boolean)",
+        "description": "Flex container. direction: \"row\"|\"column\" (default \"column\"). gap: \"none\"|\"xs\"|\"s\"|\"m\"|\"l\"|\"xl\"|\"2xl\" (default \"m\"). align: \"start\"|\"center\"|\"end\"|\"stretch\"|\"baseline\". justify: \"start\"|\"center\"|\"end\"|\"between\"|\"around\"|\"evenly\"."
+      },
+      "Tabs": {
+        "signature": "Tabs(items: TabItem[])",
+        "description": "Tabbed container"
+      },
+      "TabItem": {
+        "signature": "TabItem(value: string, trigger: string, content: (TextContent | MarkDownRenderer | CardHeader | Callout | TextCallout | CodeBlock | Image | ImageBlock | ImageGallery | Separator | HorizontalBarChart | RadarChart | PieChart | RadialChart | SingleStackedBarChart | ScatterChart | AreaChart | BarChart | LineChart | Table | TagBlock | Form | Buttons | IconButton | Steps | InlineHeader | EntityList | EditableTable | SnippetCardBlock | OverviewCardBlock | ContextCardBlock | CompositeCardBlock | VisualCardBlock)[])",
+        "description": "value is unique id, trigger is tab label, content is array of components"
+      },
+      "Accordion": {
+        "signature": "Accordion(items: AccordionItem[])",
+        "description": "Collapsible sections"
+      },
+      "AccordionItem": {
+        "signature": "AccordionItem(value: string, trigger: string, content: (TextContent | MarkDownRenderer | CardHeader | Callout | TextCallout | CodeBlock | Image | ImageBlock | ImageGallery | Separator | HorizontalBarChart | RadarChart | PieChart | RadialChart | SingleStackedBarChart | ScatterChart | AreaChart | BarChart | LineChart | Table | TagBlock | Form | Buttons | IconButton | Steps | InlineHeader | EntityList | EditableTable | SnippetCardBlock | OverviewCardBlock | ContextCardBlock | CompositeCardBlock | VisualCardBlock)[])",
+        "description": "value is unique id, trigger is section title"
+      },
+      "Steps": {
+        "signature": "Steps(items: StepsItem[])",
+        "description": "Step-by-step guide"
+      },
+      "StepsItem": {
+        "signature": "StepsItem(title: string, details: string)",
+        "description": "title and details text for one step"
+      },
+      "Carousel": {
+        "signature": "Carousel(children: (TextContent | MarkDownRenderer | CardHeader | Callout | TextCallout | CodeBlock | Image | ImageBlock | ImageGallery | Separator | HorizontalBarChart | RadarChart | PieChart | RadialChart | SingleStackedBarChart | ScatterChart | AreaChart | BarChart | LineChart | Table | TagBlock | Form | Buttons | IconButton | Steps | InlineHeader | EntityList | EditableTable | SnippetCardBlock | OverviewCardBlock | ContextCardBlock | CompositeCardBlock | VisualCardBlock)[][], variant?: \"card\" | \"sunk\")",
+        "description": "Horizontal scrollable carousel"
+      },
+      "Separator": {
+        "signature": "Separator(orientation?: \"horizontal\" | \"vertical\", decorative?: boolean)",
+        "description": "Visual divider between content sections"
+      },
+      "TagBlock": {
+        "signature": "TagBlock(tags: string[], size?: \"sm\" | \"md\" | \"lg\")",
+        "description": "tags is an array of strings; optional size sm | md | lg"
+      },
+      "Tag": {
+        "signature": "Tag(text: string, icon?: Icon, size?: \"sm\" | \"md\" | \"lg\", variant?: \"neutral\" | \"info\" | \"success\" | \"warning\" | \"danger\")",
+        "description": "Styled tag/badge with optional Icon and variant"
+      },
+      "Icon": {
+        "signature": "Icon(name: string, category?: string)",
+        "description": "A lucide icon by kebab-case name (e.g. 'circle-check'). Optional category picks a topical fallback when the name doesn't resolve."
+      },
+      "EntityList": {
+        "signature": "EntityList(rows?: {left: string, right: string, rightVariant?: \"text\" | \"number\"}[], size?: \"small\" | \"default\", header?: {left: string, right: string, rightVariant?: \"text\" | \"number\"}, footer?: {left: string, right: string, rightVariant?: \"text\" | \"number\"})",
+        "description": "Two-column key/value rows (left label, right value). size 'default' supports optional header and footer rows; rightVariant 'number' uses tabular numbers."
+      },
+      "ListBlock": {
+        "signature": "ListBlock(items: ListItem[], variant?: \"number\" | \"image\", size?: \"default\" | \"small\")",
+        "description": "A list of items with number or image indicators. Each item can optionally have an action. size small renders a compact list."
+      },
+      "ListItem": {
+        "signature": "ListItem(title: string, subtitle?: string, image?: {src: string, alt: string}, actionLabel?: string, action?: ActionExpression)",
+        "description": "Item in a ListBlock — displays a title with an optional subtitle and image. When action is provided, the item becomes clickable."
+      },
+      "Text": {
+        "signature": "Text(variant?: \"text\" | \"number\", value: string, subtext?: string, subtextVariant?: \"text\" | \"number\" | \"metric\", size?: \"xs\" | \"sm\" | \"md\" | \"lg\")",
+        "description": "Plain text line with optional subtext. variant 'number' uses tabular number styling; subtextVariant 'metric' colors a leading +/- subtext green/red."
+      },
+      "BoldText": {
+        "signature": "BoldText(variant?: \"text\" | \"number\", value: string, subtext?: string, subtextVariant?: \"text\" | \"number\" | \"metric\", size?: \"xs\" | \"sm\" | \"md\" | \"lg\")",
+        "description": "Emphasized (bold) text line with optional subtext. variant 'number' uses tabular number styling; subtextVariant 'metric' colors a leading +/- subtext green/red."
+      },
+      "IconText": {
+        "signature": "IconText(icon: Icon, iconVariant?: \"neutral\" | \"info\" | \"success\" | \"warning\" | \"danger\" | \"inverted\" | \"filled\" | \"soft\", iconSize?: \"xs\" | \"s\" | \"m\" | \"l\" | \"xl\" | \"sm\" | \"md\" | \"lg\", title: string, subtitle?: string, bold?: boolean, layout?: \"horizontal\" | \"vertical\")",
+        "description": "An icon badge with a title and optional subtitle, laid out horizontally or vertically. iconVariant sets the badge color."
+      },
+      "ImageText": {
+        "signature": "ImageText(src: string, alt?: string, title: string, subtitle?: string, bold?: boolean, layout?: \"horizontal\" | \"vertical\", imageSize?: number)",
+        "description": "A small square image (thumbnail/avatar) with a title and optional subtitle. src must be a real image URL."
+      },
+      "ImageTextLarge": {
+        "signature": "ImageTextLarge(src: string, alt?: string, title: string, subtitle?: string, bold?: boolean)",
+        "description": "A full-width banner image above a bold title and optional subtitle. src must be a real image URL."
+      },
+      "MetricIndicatorInline": {
+        "signature": "MetricIndicatorInline(value: string, subtext?: string, trend?: {direction: \"up\" | \"down\", value: number})",
+        "description": "Headline metric value with an optional +/- percentage trend and subtext, all on one line."
+      },
+      "MetricIndicatorWithStrikethrough": {
+        "signature": "MetricIndicatorWithStrikethrough(value: string, subtext?: string, previousValue?: string, trend?: {direction: \"up\" | \"down\", value: number})",
+        "description": "Headline metric value with an optional struck-through previousValue, a +/- percentage trend, and subtext below."
+      },
+      "SnippetCardItem": {
+        "signature": "SnippetCardItem(id?: string, lhs: IconText | ImageText, rhs?: Text | BoldText)",
+        "description": "One row-style snippet card: a label on the left (IconText or ImageText) and an optional value on the right (Text or BoldText)."
+      },
+      "SnippetCardBlock": {
+        "signature": "SnippetCardBlock(items: SnippetCardItem[], layout?: \"grid\", responsive?: boolean, action?: ActionExpression, gap?: number | string)",
+        "description": "A responsive grid of compact label/value cards (2 per row) for showing several short facts side by side; optionally clickable with a shared action."
+      },
+      "OverviewCardItem": {
+        "signature": "OverviewCardItem(id?: string, top: IconText | ImageText | Text, bottom?: MetricIndicatorInline)",
+        "description": "One overview card: a heading slot at the top (IconText, ImageText or Text) and an optional MetricIndicatorInline at the bottom."
+      },
+      "OverviewCardBlock": {
+        "signature": "OverviewCardBlock(items: OverviewCardItem[], layout?: \"grid\" | \"carousel\", responsive?: boolean, action?: ActionExpression, gap?: number | string)",
+        "description": "A grid or horizontal carousel of compact overview cards, each with a heading (icon/image/text) on top and an inline metric below; optionally clickable with a shared action."
+      },
+      "ContextCardItem": {
+        "signature": "ContextCardItem(id?: string, title: string | Tag, body?: string, bgColor?: \"gray\", bgImageSrc?: string, bgImageAlt?: string)",
+        "description": "A single card inside a ContextCardBlock: a title (plain string or Tag), an optional markdown body, and an optional gray tint or background image."
+      },
+      "ContextCardBlock": {
+        "signature": "ContextCardBlock(items: ContextCardItem[], layout?: \"grid\" | \"carousel\", responsive?: boolean, action?: ActionExpression, gap?: number | string)",
+        "description": "A grid or carousel of compact tinted context cards (title or tag plus a short bold body); an optional action makes every card clickable."
+      },
+      "CompositeCardItem": {
+        "signature": "CompositeCardItem(id?: string, header?: IconText | ImageText | ImageTextLarge | Text | Image, body?: (Text | BoldText | MetricIndicatorInline | IconText | Image | AreaChart | BarChart | LineChart | ListBlock | TagBlock | EntityList)[], footer?: {price?: BoldText | MetricIndicatorWithStrikethrough, button?: Button})",
+        "description": "A single card inside a CompositeCardBlock: an optional header (icon/image/text), a stack of body elements (text, metrics, charts, lists, tags), and an optional price/button footer."
+      },
+      "CompositeCardBlock": {
+        "signature": "CompositeCardBlock(items: CompositeCardItem[], layout?: \"grid\" | \"carousel\", responsive?: boolean, action?: ActionExpression, gap?: number | string)",
+        "description": "A two-per-row grid or carousel of rich cards, each with an optional header, stacked body content (text, metrics, charts, lists, tags) and a price/button footer; an optional action makes every card clickable."
+      },
+      "VisualCardItem": {
+        "signature": "VisualCardItem(body: BoldText, id?: string, bgImageSrc?: string, tag?: Tag, bgImageAlt?: string)",
+        "description": "A single photo-first card inside a VisualCardBlock: a BoldText body panel, an optional Tag, and a background image (bgImageSrc must be a real URL; bgImageAlt is its alt text)."
+      },
+      "VisualCardBlock": {
+        "signature": "VisualCardBlock(items: VisualCardItem[], layout?: \"grid\" | \"carousel\", responsive?: boolean, action?: ActionExpression, gap?: number | string)",
+        "description": "A grid or carousel of photo-first cards: a full-bleed background image with a tag on top and a bold text panel at the bottom; an optional action makes every card clickable."
+      },
+      "Modal": {
+        "signature": "Modal(title: string, open?: $binding<boolean>, children: (TextContent | MarkDownRenderer | CardHeader | Callout | TextCallout | CodeBlock | Image | ImageBlock | ImageGallery | Separator | HorizontalBarChart | RadarChart | PieChart | RadialChart | SingleStackedBarChart | ScatterChart | AreaChart | BarChart | LineChart | Table | TagBlock | Form | Buttons | IconButton | Steps | InlineHeader | EntityList | EditableTable | SnippetCardBlock | OverviewCardBlock | ContextCardBlock | CompositeCardBlock | VisualCardBlock)[], size?: \"sm\" | \"md\" | \"lg\")",
+        "description": "Modal dialog. open is a reactive $boolean binding — set to true to open, X/Escape/backdrop auto-closes. Put Form with buttons inside children."
+      },
+      "TextContent": {
+        "signature": "TextContent(text: string, size?: \"small\" | \"default\" | \"large\" | \"small-heavy\" | \"large-heavy\")",
+        "description": "正文富文本。text 支持 Markdown 标题、列表、表格、引用、代码块、LaTeX 数学公式和 mermaid 围栏图表。公式用 $$ 包裹，Mermaid 放在 text 字符串内的 mermaid 代码围栏中。不要把整个 OpenUI 输出包进围栏。"
+      },
+      "BeCodeBlock": {
+        "signature": "BeCodeBlock(code: string, language?: string, filename?: string, highlightLines?: number[])",
+        "description": "beUI CodeBlock 语法高亮代码块，带行号、复制反馈和流式跟随。code 为纯代码字符串；language 为语言名，filename 可选；highlightLines 为需要强调的行号。只展示代码，不执行。Markdown 中的代码围栏也使用同一个 beUI 组件。"
+      },
+      "BeCard": {
+        "signature": "BeCard(title: string, children: any[], description?: string)",
+        "description": "beUI Card 紧凑内容卡片。用于有标题的建议、说明或内容分组，children 可嵌套已注册组件；description 可选。图文推荐使用 BeImageCard，不用普通内容卡片代替详细正文。"
+      },
+      "BeCardGrid": {
+        "signature": "BeCardGrid(children: any[])",
+        "description": "紧凑推荐卡片网格。children 为 1–6 个 BeImageCard，按回答区实际宽度自动排为 1、2 或 3 列，不按整个浏览器宽度判断。多个景点、酒店、地点或其他视觉推荐默认使用此网格，不要把多张 BeImage 纵向堆成大图。先输出网格引用，再逐张定义卡片，以便流式展示。"
+      },
+      "BeImageCard": {
+        "signature": "BeImageCard(title: string, query: string, description: string, tags?: string[], prompt?: string)",
+        "description": "紧凑图文推荐卡片，包含 16:9 小图、标题、标签和简介。title 为对象名称；query 为准确英文图片检索词而非 URL；description 为实质简介；tags 可选，最多 3 个短标签；prompt 可选，必须是携带完整上下文的继续了解问题，点击后在回答区直接继续，不触碰输入框。不伪造预订、收藏、评分或实时价格。图片异步检索，来源和许可可展开，不阻塞文字。搭配 BeCardGrid 使用。"
+      },
+      "BeImage": {
+        "signature": "BeImage(query: string, alt: string, caption?: string)",
+        "description": "单张正文资料配图，不是推荐卡片。仅适合单一主题的文章插图或用户明确要求大图时使用；多个景点、酒店、地点推荐应优先用 BeCardGrid + BeImageCard。异步查找 Wikimedia Commons 真实资料配图并展示来源、作者与许可。query 是具体主题检索词，优先使用准确英文名称，不是 URL；alt 为中文替代文字；caption 可选。最多使用 3 张，不阻塞正文，不伪造图片，不表示历史照片已经核实。"
+      },
+      "BeButton": {
+        "signature": "BeButton(label: \"直接提问\" | \"继续细化\" | \"填入提问\", action: string, variant?: \"primary\" | \"secondary\" | \"ghost\" | \"outline\")",
+        "description": "beUI 弹簧动效快捷提问按钮。label 使用“直接提问”或“继续细化”；action 必须是包含完整上下文、可立即发送的独立问题。点击后直接请求 Agent，不填入或清空底部输入框，不执行工作区操作。需要用户补充信息时使用 BeQuestions，不要展示重复的泛化按钮。“填入提问”仅兼容旧输出，实际显示并执行直接提问。"
+      },
+      "BeFollowUps": {
+        "signature": "BeFollowUps(items: {label: string, prompt: string}[])",
+        "description": "回答末尾的相关追问。items 为 1–3 个有实质帮助的下一步问题，label 直接显示具体问题，prompt 携带必要上下文。只在有价值时提供，不替代当前答案；需要补充关键信息用 BeQuestions。点击直接继续对话，不改变输入草稿。"
+      },
+      "BeBadge": {
+        "signature": "BeBadge(text: string, status?: \"neutral\" | \"info\" | \"success\" | \"warning\" | \"danger\" | \"loading\")",
+        "description": "beUI 动效状态徽标。只展示用户提供的状态或明确标注的建议，不表示执行了工作区操作。"
+      },
+      "BeStat": {
+        "signature": "BeStat(label: string, value: number, unit?: string, precision?: number)",
+        "description": "beUI 动态数字指标。label 为指标名，value 必须来自用户提供的数据，unit 为单位，precision 为小数位数。不编造数据、不读取工作区。"
+      },
+      "BeResponse": {
+        "signature": "BeResponse(children: any[])",
+        "description": "对应 AI Elements MessageResponse 的 beUI 回复内容分组。children 为已注册内容组件，流式状态由宿主控制，不自行模拟生成进度。"
+      },
+      "BeApproval": {
+        "signature": "BeApproval(title: string, description: string, context: string)",
+        "description": "对应 AI Elements Confirmation 的 beUI ApprovalCard，用于确认建议方案，不是工具授权。title 和 description 必须完整描述待确认建议；context 包含完整上下文。用户在卡片内确认、拒绝或要求修改后，直接提交意见并继续对话，不经输入框；不授权或执行工作区操作。"
+      },
+      "BeQuestions": {
+        "signature": "BeQuestions(context: string, questions: {id: string, title: string, options?: {value: string, label: string, description?: string}[], multiple?: boolean, allowCustom?: boolean}[])",
+        "description": "beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。"
+      },
+      "BeTodoList": {
+        "signature": "BeTodoList(title: string, items: {id: string, title: string, status?: \"pending\" | \"in-progress\" | \"completed\" | \"cancelled\", progress?: number, detail?: string}[], source?: \"suggestion\" | \"user\")",
+        "description": "对应 AI Elements Plan/Task 的 beUI TodoList。source=suggestion 为建议计划，所有项目强制显示���开始，不代表执行；source=user 仅展示用户本次明确提供的真实状态和进度。不能编造工具执行进度。"
+      },
+      "AgentIcon": {
+        "signature": "AgentIcon(name: \"assistant\" | \"reply\" | \"approve\" | \"question\" | \"progress\" | \"task\" | \"code\" | \"source\", label: string)",
+        "description": "现有 Lucide 图标白名单，不是 beUI 独立图标包。用于带中文含义的状态说明，不能传入 SVG、组件代码、路径或任意图标名。"
+      },
+      "ShadcnCard": {
+        "signature": "ShadcnCard(title: string, children: any[], description?: string)",
+        "description": "本地 shadcn 卡片。用于有标题的建议、说明或内容分组，可嵌套已注册组件。"
+      },
+      "ShadcnBadge": {
+        "signature": "ShadcnBadge(text: string, variant?: \"default\" | \"secondary\" | \"outline\" | \"destructive\")",
+        "description": "本地 shadcn 简短状态标签。"
+      },
+      "ShadcnAlert": {
+        "signature": "ShadcnAlert(title: string, description: string, variant?: \"default\" | \"destructive\")",
+        "description": "本地 shadcn 提示说明。只能展示信息，不表示执行了操作。"
+      },
+      "ShadcnProgress": {
+        "signature": "ShadcnProgress(label: string, value: number)",
+        "description": "本地 shadcn 进度条。只使用用户提供的百分比，不编造工作区进度。"
+      },
+      "ShadcnAccordion": {
+        "signature": "ShadcnAccordion(items: {title: string, content: string}[], multiple?: boolean)",
+        "description": "本地 shadcn 折叠说明列表。items 中每项包含 title 和 content 文本。"
+      },
+      "ShadcnTabs": {
+        "signature": "ShadcnTabs(items: {title: string, children: any[]}[])",
+        "description": "本地 shadcn 标签页。items 中每项包含 title 和 children 组件数组。"
+      },
+      "ShadcnTable": {
+        "signature": "ShadcnTable(columns: string[], rows: string[][])",
+        "description": "本地 shadcn 表格。columns 为列名数组，rows 为二维文本数组。最多 6 列、30 行。"
+      },
+      "ShadcnButton": {
+        "signature": "ShadcnButton(label: \"直接提问\" | \"继续细化\" | \"填入提问\", prompt: string, variant?: \"default\" | \"secondary\" | \"outline\" | \"ghost\")",
+        "description": "本地 shadcn 快捷提问按钮。label 使用“直接提问”或“继续细化”；prompt 为包含完整上下文的独立问题。点击后直接请求 Agent，不触碰底部提问草稿，不执行或保存工作区操作。“填入提问”仅兼容旧输出，实际执行直接提问。"
+      },
+      "ReuiBadge": {
+        "signature": "ReuiBadge(text: string, variant?: \"outline\" | \"secondary\" | \"primary-light\" | \"info-light\" | \"success-light\" | \"warning-light\" | \"destructive-light\")",
+        "description": "本地 REUI 语义状态徽标，可用不��状态颜色。"
+      },
+      "ReuiAlert": {
+        "signature": "ReuiAlert(title: string, description: string, variant?: \"default\" | \"info\" | \"success\" | \"warning\" | \"destructive\")",
+        "description": "本地 REUI 语义提示。不表示已保存、已更新或执行了任何工作区操作。"
+      },
+      "ReuiFrame": {
+        "signature": "ReuiFrame(title: string, children: any[], description?: string)",
+        "description": "本地 REUI 分组面板。标题及说明位于面板上方，children 为已注册组件。"
+      }
+    },
+    "componentGroups": [
+      {
+        "name": "消息回复",
+        "components": [
+          "BeResponse"
+        ],
+        "notes": [
+          "AI Elements MessageResponse → beUI StreamingResponse；回复正文可嵌套已注册组件。会话和输入框由宿主控制，不由模型创建。"
+        ]
+      },
+      {
+        "name": "审批与问题",
+        "components": [
+          "BeApproval",
+          "BeQuestions"
+        ],
+        "notes": [
+          "Confirmation → ApprovalCard；选择问题复用 ApprovalCard 提问模式。在回答区直接提交并继续对话，不执行工具、不持久保存审批。ToolApproval 已安装但仅供未来真实工具授权流程使用，不开放给模型伪造授权。"
+        ]
+      },
+      {
+        "name": "任务与进度",
+        "components": [
+          "BeTodoList",
+          "BeStat",
+          "ShadcnProgress"
+        ],
+        "notes": [
+          "Plan/Task → TodoList；Loader/Shimmer → AgentProgress、ReasoningText、ThinkingShimmer，由宿主根据请求状态控制。建议计划保持待开始；数字只能来自用户输入。"
+        ]
+      },
+      {
+        "name": "图标状态与操作",
+        "components": [
+          "AgentIcon",
+          "BeBadge",
+          "BeButton",
+          "BeFollowUps"
+        ],
+        "notes": [
+          "Lucide 提供图标；beUI AnimatedBadge 提供动态状态图标；Button 提供操作反馈。不得用动态图标伪造执行结果。"
+        ]
+      },
+      {
+        "name": "本地内容与兼容组件",
+        "components": [
+          "TextContent",
+          "BeCodeBlock",
+          "BeCard",
+          "BeCardGrid",
+          "BeImageCard",
+          "BeImage",
+          "ShadcnCard",
+          "ShadcnBadge",
+          "ShadcnAlert",
+          "ShadcnAccordion",
+          "ShadcnTabs",
+          "ShadcnTable",
+          "ShadcnButton",
+          "ReuiBadge",
+          "ReuiAlert",
+          "ReuiFrame"
+        ],
+        "notes": [
+          "复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock 用于代码回复；FileDiff、ToolResult、AgentActivity、Citations、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不自动生成虚构工具记录。"
+        ]
+      }
+    ],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "Card": {
+          "$ref": "#/$defs/Card"
+        },
+        "CardHeader": {
+          "$ref": "#/$defs/CardHeader"
+        },
+        "MarkDownRenderer": {
+          "$ref": "#/$defs/MarkDownRenderer"
+        },
+        "Callout": {
+          "$ref": "#/$defs/Callout"
+        },
+        "TextCallout": {
+          "$ref": "#/$defs/TextCallout"
+        },
+        "Image": {
+          "$ref": "#/$defs/Image"
+        },
+        "ImageBlock": {
+          "$ref": "#/$defs/ImageBlock"
+        },
+        "ImageGallery": {
+          "$ref": "#/$defs/ImageGallery"
+        },
+        "CodeBlock": {
+          "$ref": "#/$defs/CodeBlock"
+        },
+        "InlineHeader": {
+          "$ref": "#/$defs/InlineHeader"
+        },
+        "Table": {
+          "$ref": "#/$defs/Table"
+        },
+        "Col": {
+          "$ref": "#/$defs/Col"
+        },
+        "EditableTable": {
+          "$ref": "#/$defs/EditableTable"
+        },
+        "BarChart": {
+          "$ref": "#/$defs/BarChart"
+        },
+        "LineChart": {
+          "$ref": "#/$defs/LineChart"
+        },
+        "AreaChart": {
+          "$ref": "#/$defs/AreaChart"
+        },
+        "RadarChart": {
+          "$ref": "#/$defs/RadarChart"
+        },
+        "HorizontalBarChart": {
+          "$ref": "#/$defs/HorizontalBarChart"
+        },
+        "Series": {
+          "$ref": "#/$defs/Series"
+        },
+        "PieChart": {
+          "$ref": "#/$defs/PieChart"
+        },
+        "RadialChart": {
+          "$ref": "#/$defs/RadialChart"
+        },
+        "SingleStackedBarChart": {
+          "$ref": "#/$defs/SingleStackedBarChart"
+        },
+        "Slice": {
+          "$ref": "#/$defs/Slice"
+        },
+        "ScatterChart": {
+          "$ref": "#/$defs/ScatterChart"
+        },
+        "ScatterSeries": {
+          "$ref": "#/$defs/ScatterSeries"
+        },
+        "Point": {
+          "$ref": "#/$defs/Point"
+        },
+        "Form": {
+          "$ref": "#/$defs/Form"
+        },
+        "FormControl": {
+          "$ref": "#/$defs/FormControl"
+        },
+        "Label": {
+          "$ref": "#/$defs/Label"
+        },
+        "Input": {
+          "$ref": "#/$defs/Input"
+        },
+        "TextArea": {
+          "$ref": "#/$defs/TextArea"
+        },
+        "Select": {
+          "$ref": "#/$defs/Select"
+        },
+        "SelectItem": {
+          "$ref": "#/$defs/SelectItem"
+        },
+        "DatePicker": {
+          "$ref": "#/$defs/DatePicker"
+        },
+        "Slider": {
+          "$ref": "#/$defs/Slider"
+        },
+        "CheckBoxGroup": {
+          "$ref": "#/$defs/CheckBoxGroup"
+        },
+        "CheckBoxItem": {
+          "$ref": "#/$defs/CheckBoxItem"
+        },
+        "RadioGroup": {
+          "$ref": "#/$defs/RadioGroup"
+        },
+        "RadioItem": {
+          "$ref": "#/$defs/RadioItem"
+        },
+        "SwitchGroup": {
+          "$ref": "#/$defs/SwitchGroup"
+        },
+        "SwitchItem": {
+          "$ref": "#/$defs/SwitchItem"
+        },
+        "ChipItem": {
+          "$ref": "#/$defs/ChipItem"
+        },
+        "Chips": {
+          "$ref": "#/$defs/Chips"
+        },
+        "OptionCard": {
+          "$ref": "#/$defs/OptionCard"
+        },
+        "OptionCards": {
+          "$ref": "#/$defs/OptionCards"
+        },
+        "Button": {
+          "$ref": "#/$defs/Button"
+        },
+        "Buttons": {
+          "$ref": "#/$defs/Buttons"
+        },
+        "IconButton": {
+          "$ref": "#/$defs/IconButton"
+        },
+        "Stack": {
+          "$ref": "#/$defs/Stack"
+        },
+        "Tabs": {
+          "$ref": "#/$defs/Tabs"
+        },
+        "TabItem": {
+          "$ref": "#/$defs/TabItem"
+        },
+        "Accordion": {
+          "$ref": "#/$defs/Accordion"
+        },
+        "AccordionItem": {
+          "$ref": "#/$defs/AccordionItem"
+        },
+        "Steps": {
+          "$ref": "#/$defs/Steps"
+        },
+        "StepsItem": {
+          "$ref": "#/$defs/StepsItem"
+        },
+        "Carousel": {
+          "$ref": "#/$defs/Carousel"
+        },
+        "Separator": {
+          "$ref": "#/$defs/Separator"
+        },
+        "TagBlock": {
+          "$ref": "#/$defs/TagBlock"
+        },
+        "Tag": {
+          "$ref": "#/$defs/Tag"
+        },
+        "Icon": {
+          "$ref": "#/$defs/Icon"
+        },
+        "EntityList": {
+          "$ref": "#/$defs/EntityList"
+        },
+        "ListBlock": {
+          "$ref": "#/$defs/ListBlock"
+        },
+        "ListItem": {
+          "$ref": "#/$defs/ListItem"
+        },
+        "Text": {
+          "$ref": "#/$defs/Text"
+        },
+        "BoldText": {
+          "$ref": "#/$defs/BoldText"
+        },
+        "IconText": {
+          "$ref": "#/$defs/IconText"
+        },
+        "ImageText": {
+          "$ref": "#/$defs/ImageText"
+        },
+        "ImageTextLarge": {
+          "$ref": "#/$defs/ImageTextLarge"
+        },
+        "MetricIndicatorInline": {
+          "$ref": "#/$defs/MetricIndicatorInline"
+        },
+        "MetricIndicatorWithStrikethrough": {
+          "$ref": "#/$defs/MetricIndicatorWithStrikethrough"
+        },
+        "SnippetCardItem": {
+          "$ref": "#/$defs/SnippetCardItem"
+        },
+        "SnippetCardBlock": {
+          "$ref": "#/$defs/SnippetCardBlock"
+        },
+        "OverviewCardItem": {
+          "$ref": "#/$defs/OverviewCardItem"
+        },
+        "OverviewCardBlock": {
+          "$ref": "#/$defs/OverviewCardBlock"
+        },
+        "ContextCardItem": {
+          "$ref": "#/$defs/ContextCardItem"
+        },
+        "ContextCardBlock": {
+          "$ref": "#/$defs/ContextCardBlock"
+        },
+        "CompositeCardItem": {
+          "$ref": "#/$defs/CompositeCardItem"
+        },
+        "CompositeCardBlock": {
+          "$ref": "#/$defs/CompositeCardBlock"
+        },
+        "VisualCardItem": {
+          "$ref": "#/$defs/VisualCardItem"
+        },
+        "VisualCardBlock": {
+          "$ref": "#/$defs/VisualCardBlock"
+        },
+        "Modal": {
+          "$ref": "#/$defs/Modal"
+        },
+        "TextContent": {
+          "$ref": "#/$defs/TextContent"
+        },
+        "BeCodeBlock": {
+          "$ref": "#/$defs/BeCodeBlock"
+        },
+        "BeCard": {
+          "$ref": "#/$defs/BeCard"
+        },
+        "BeCardGrid": {
+          "$ref": "#/$defs/BeCardGrid"
+        },
+        "BeImageCard": {
+          "$ref": "#/$defs/BeImageCard"
+        },
+        "BeImage": {
+          "$ref": "#/$defs/BeImage"
+        },
+        "BeButton": {
+          "$ref": "#/$defs/BeButton"
+        },
+        "BeFollowUps": {
+          "$ref": "#/$defs/BeFollowUps"
+        },
+        "BeBadge": {
+          "$ref": "#/$defs/BeBadge"
+        },
+        "BeStat": {
+          "$ref": "#/$defs/BeStat"
+        },
+        "BeResponse": {
+          "$ref": "#/$defs/BeResponse"
+        },
+        "BeApproval": {
+          "$ref": "#/$defs/BeApproval"
+        },
+        "BeQuestions": {
+          "$ref": "#/$defs/BeQuestions"
+        },
+        "BeTodoList": {
+          "$ref": "#/$defs/BeTodoList"
+        },
+        "AgentIcon": {
+          "$ref": "#/$defs/AgentIcon"
+        },
+        "ShadcnCard": {
+          "$ref": "#/$defs/ShadcnCard"
+        },
+        "ShadcnBadge": {
+          "$ref": "#/$defs/ShadcnBadge"
+        },
+        "ShadcnAlert": {
+          "$ref": "#/$defs/ShadcnAlert"
+        },
+        "ShadcnProgress": {
+          "$ref": "#/$defs/ShadcnProgress"
+        },
+        "ShadcnAccordion": {
+          "$ref": "#/$defs/ShadcnAccordion"
+        },
+        "ShadcnTabs": {
+          "$ref": "#/$defs/ShadcnTabs"
+        },
+        "ShadcnTable": {
+          "$ref": "#/$defs/ShadcnTable"
+        },
+        "ShadcnButton": {
+          "$ref": "#/$defs/ShadcnButton"
+        },
+        "ReuiBadge": {
+          "$ref": "#/$defs/ReuiBadge"
+        },
+        "ReuiAlert": {
+          "$ref": "#/$defs/ReuiAlert"
+        },
+        "ReuiFrame": {
+          "$ref": "#/$defs/ReuiFrame"
+        }
+      },
+      "required": [
+        "Card",
+        "CardHeader",
+        "MarkDownRenderer",
+        "Callout",
+        "TextCallout",
+        "Image",
+        "ImageBlock",
+        "ImageGallery",
+        "CodeBlock",
+        "InlineHeader",
+        "Table",
+        "Col",
+        "EditableTable",
+        "BarChart",
+        "LineChart",
+        "AreaChart",
+        "RadarChart",
+        "HorizontalBarChart",
+        "Series",
+        "PieChart",
+        "RadialChart",
+        "SingleStackedBarChart",
+        "Slice",
+        "ScatterChart",
+        "ScatterSeries",
+        "Point",
+        "Form",
+        "FormControl",
+        "Label",
+        "Input",
+        "TextArea",
+        "Select",
+        "SelectItem",
+        "DatePicker",
+        "Slider",
+        "CheckBoxGroup",
+        "CheckBoxItem",
+        "RadioGroup",
+        "RadioItem",
+        "SwitchGroup",
+        "SwitchItem",
+        "ChipItem",
+        "Chips",
+        "OptionCard",
+        "OptionCards",
+        "Button",
+        "Buttons",
+        "IconButton",
+        "Stack",
+        "Tabs",
+        "TabItem",
+        "Accordion",
+        "AccordionItem",
+        "Steps",
+        "StepsItem",
+        "Carousel",
+        "Separator",
+        "TagBlock",
+        "Tag",
+        "Icon",
+        "EntityList",
+        "ListBlock",
+        "ListItem",
+        "Text",
+        "BoldText",
+        "IconText",
+        "ImageText",
+        "ImageTextLarge",
+        "MetricIndicatorInline",
+        "MetricIndicatorWithStrikethrough",
+        "SnippetCardItem",
+        "SnippetCardBlock",
+        "OverviewCardItem",
+        "OverviewCardBlock",
+        "ContextCardItem",
+        "ContextCardBlock",
+        "CompositeCardItem",
+        "CompositeCardBlock",
+        "VisualCardItem",
+        "VisualCardBlock",
+        "Modal",
+        "TextContent",
+        "BeCodeBlock",
+        "BeCard",
+        "BeCardGrid",
+        "BeImageCard",
+        "BeImage",
+        "BeButton",
+        "BeFollowUps",
+        "BeBadge",
+        "BeStat",
+        "BeResponse",
+        "BeApproval",
+        "BeQuestions",
+        "BeTodoList",
+        "AgentIcon",
+        "ShadcnCard",
+        "ShadcnBadge",
+        "ShadcnAlert",
+        "ShadcnProgress",
+        "ShadcnAccordion",
+        "ShadcnTabs",
+        "ShadcnTable",
+        "ShadcnButton",
+        "ReuiBadge",
+        "ReuiAlert",
+        "ReuiFrame"
+      ],
+      "additionalProperties": false,
+      "$defs": {
+        "Card": {
+          "type": "object",
+          "properties": {
+            "children": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "size": {
+                        "type": "string",
+                        "enum": [
+                          "small",
+                          "default",
+                          "large",
+                          "small-heavy",
+                          "large-heavy"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "$ref": "#/$defs/MarkDownRenderer"
+                  },
+                  {
+                    "$ref": "#/$defs/CardHeader"
+                  },
+                  {
+                    "$ref": "#/$defs/Callout"
+                  },
+                  {
+                    "$ref": "#/$defs/TextCallout"
+                  },
+                  {
+                    "$ref": "#/$defs/CodeBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/Image"
+                  },
+                  {
+                    "$ref": "#/$defs/ImageBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/ImageGallery"
+                  },
+                  {
+                    "$ref": "#/$defs/Separator"
+                  },
+                  {
+                    "$ref": "#/$defs/HorizontalBarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/RadarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/PieChart"
+                  },
+                  {
+                    "$ref": "#/$defs/RadialChart"
+                  },
+                  {
+                    "$ref": "#/$defs/SingleStackedBarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/ScatterChart"
+                  },
+                  {
+                    "$ref": "#/$defs/AreaChart"
+                  },
+                  {
+                    "$ref": "#/$defs/BarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/LineChart"
+                  },
+                  {
+                    "$ref": "#/$defs/Table"
+                  },
+                  {
+                    "$ref": "#/$defs/TagBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/Form"
+                  },
+                  {
+                    "$ref": "#/$defs/Buttons"
+                  },
+                  {
+                    "$ref": "#/$defs/IconButton"
+                  },
+                  {
+                    "$ref": "#/$defs/Steps"
+                  },
+                  {
+                    "$ref": "#/$defs/InlineHeader"
+                  },
+                  {
+                    "$ref": "#/$defs/EntityList"
+                  },
+                  {
+                    "$ref": "#/$defs/EditableTable"
+                  },
+                  {
+                    "$ref": "#/$defs/SnippetCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/OverviewCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/ContextCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/CompositeCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/VisualCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/Tabs"
+                  },
+                  {
+                    "$ref": "#/$defs/Carousel"
+                  },
+                  {
+                    "$ref": "#/$defs/Stack"
+                  }
+                ]
+              }
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "card",
+                "sunk",
+                "clear"
+              ]
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "row",
+                "column"
+              ]
+            },
+            "gap": {
+              "type": "string",
+              "enum": [
+                "none",
+                "xs",
+                "s",
+                "m",
+                "l",
+                "xl",
+                "2xl"
+              ]
+            },
+            "align": {
+              "type": "string",
+              "enum": [
+                "start",
+                "center",
+                "end",
+                "stretch",
+                "baseline"
+              ]
+            },
+            "justify": {
+              "type": "string",
+              "enum": [
+                "start",
+                "center",
+                "end",
+                "between",
+                "around",
+                "evenly"
+              ]
+            },
+            "wrap": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "children"
+          ],
+          "additionalProperties": false,
+          "description": "Styled container. variant: \"card\" (default, elevated) | \"sunk\" (recessed) | \"clear\" (transparent). Always full width. Accepts all Stack flex params (default: direction \"column\"). Cards flex to share space in row/wrap layouts."
+        },
+        "MarkDownRenderer": {
+          "type": "object",
+          "properties": {
+            "textMarkdown": {
+              "type": "string"
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "clear",
+                "card",
+                "sunk"
+              ]
+            }
+          },
+          "required": [
+            "textMarkdown"
+          ],
+          "additionalProperties": false,
+          "description": "Renders markdown text with optional container variant"
+        },
+        "CardHeader": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Header with optional title and subtitle"
+        },
+        "Callout": {
+          "type": "object",
+          "properties": {
+            "variant": {
+              "type": "string",
+              "enum": [
+                "info",
+                "warning",
+                "error",
+                "success",
+                "neutral"
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "visible": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "variant",
+            "title",
+            "description"
+          ],
+          "additionalProperties": false,
+          "description": "Callout banner. Optional visible is a reactive $boolean — auto-dismisses after 3s by setting $visible to false."
+        },
+        "TextCallout": {
+          "type": "object",
+          "properties": {
+            "variant": {
+              "type": "string",
+              "enum": [
+                "neutral",
+                "info",
+                "warning",
+                "success",
+                "danger"
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Text callout with variant, title, and description"
+        },
+        "CodeBlock": {
+          "type": "object",
+          "properties": {
+            "language": {
+              "type": "string"
+            },
+            "codeString": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "language",
+            "codeString"
+          ],
+          "additionalProperties": false,
+          "description": "Syntax-highlighted code block"
+        },
+        "Image": {
+          "type": "object",
+          "properties": {
+            "alt": {
+              "type": "string"
+            },
+            "src": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "alt"
+          ],
+          "additionalProperties": false,
+          "description": "Image with alt text and optional URL"
+        },
+        "ImageBlock": {
+          "type": "object",
+          "properties": {
+            "src": {
+              "type": "string"
+            },
+            "alt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "src"
+          ],
+          "additionalProperties": false,
+          "description": "Image block with loading state"
+        },
+        "ImageGallery": {
+          "type": "object",
+          "properties": {
+            "images": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "src": {
+                    "type": "string"
+                  },
+                  "alt": {
+                    "type": "string"
+                  },
+                  "details": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "src"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "images"
+          ],
+          "additionalProperties": false,
+          "description": "Gallery grid of images with modal preview"
+        },
+        "Separator": {
+          "type": "object",
+          "properties": {
+            "orientation": {
+              "type": "string",
+              "enum": [
+                "horizontal",
+                "vertical"
+              ]
+            },
+            "decorative": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Visual divider between content sections"
+        },
+        "HorizontalBarChart": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "series": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Series"
+              }
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "grouped",
+                "stacked"
+              ]
+            },
+            "xLabel": {
+              "type": "string"
+            },
+            "yLabel": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "labels",
+            "series"
+          ],
+          "additionalProperties": false,
+          "description": "Horizontal bars; prefer when category labels are long or for ranked lists"
+        },
+        "Series": {
+          "type": "object",
+          "properties": {
+            "category": {
+              "type": "string"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "required": [
+            "category",
+            "values"
+          ],
+          "additionalProperties": false,
+          "description": "One data series"
+        },
+        "RadarChart": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "series": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Series"
+              }
+            }
+          },
+          "required": [
+            "labels",
+            "series"
+          ],
+          "additionalProperties": false,
+          "description": "Spider/web chart; use for comparing multiple variables across one or more entities"
+        },
+        "PieChart": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "pie",
+                "donut"
+              ]
+            },
+            "appearance": {
+              "type": "string",
+              "enum": [
+                "circular",
+                "semiCircular"
+              ]
+            }
+          },
+          "required": [
+            "labels",
+            "values"
+          ],
+          "additionalProperties": false,
+          "description": "Circular slices; use plucked arrays: PieChart(data.categories, data.values)"
+        },
+        "RadialChart": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "required": [
+            "labels",
+            "values"
+          ],
+          "additionalProperties": false,
+          "description": "Radial bars; use plucked arrays: RadialChart(data.categories, data.values)"
+        },
+        "SingleStackedBarChart": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "required": [
+            "labels",
+            "values"
+          ],
+          "additionalProperties": false,
+          "description": "Single horizontal stacked bar; use plucked arrays: SingleStackedBarChart(data.categories, data.values)"
+        },
+        "ScatterChart": {
+          "type": "object",
+          "properties": {
+            "datasets": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ScatterSeries"
+              }
+            },
+            "xLabel": {
+              "type": "string"
+            },
+            "yLabel": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "datasets"
+          ],
+          "additionalProperties": false,
+          "description": "X/Y scatter plot; use for correlations, distributions, and clustering"
+        },
+        "ScatterSeries": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "points": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Point"
+              }
+            }
+          },
+          "required": [
+            "name",
+            "points"
+          ],
+          "additionalProperties": false,
+          "description": "Named dataset"
+        },
+        "Point": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "z": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "additionalProperties": false,
+          "description": "Data point with numeric coordinates"
+        },
+        "AreaChart": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "series": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Series"
+              }
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "linear",
+                "natural",
+                "step"
+              ]
+            },
+            "xLabel": {
+              "type": "string"
+            },
+            "yLabel": {
+              "type": "string"
+            },
+            "height": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "labels",
+            "series"
+          ],
+          "additionalProperties": false,
+          "description": "Filled area under lines; use for cumulative totals or volume trends over time"
+        },
+        "BarChart": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "series": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Series"
+              }
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "grouped",
+                "stacked"
+              ]
+            },
+            "xLabel": {
+              "type": "string"
+            },
+            "yLabel": {
+              "type": "string"
+            },
+            "height": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "labels",
+            "series"
+          ],
+          "additionalProperties": false,
+          "description": "Vertical bars; use for comparing values across categories with one or more series"
+        },
+        "LineChart": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "series": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Series"
+              }
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "linear",
+                "natural",
+                "step"
+              ]
+            },
+            "xLabel": {
+              "type": "string"
+            },
+            "yLabel": {
+              "type": "string"
+            },
+            "height": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "labels",
+            "series"
+          ],
+          "additionalProperties": false,
+          "description": "Lines over categories; use for trends and continuous data over time"
+        },
+        "Table": {
+          "type": "object",
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Col"
+              }
+            }
+          },
+          "required": [
+            "columns"
+          ],
+          "additionalProperties": false,
+          "description": "Data table — column-oriented. Each Col holds its own data array."
+        },
+        "Col": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "data": {},
+            "type": {
+              "type": "string",
+              "enum": [
+                "string",
+                "number",
+                "action"
+              ]
+            }
+          },
+          "required": [
+            "label",
+            "data"
+          ],
+          "additionalProperties": false,
+          "description": "Column definition — holds label + data array"
+        },
+        "TagBlock": {
+          "type": "object",
+          "properties": {
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "sm",
+                "md",
+                "lg"
+              ]
+            }
+          },
+          "required": [
+            "tags"
+          ],
+          "additionalProperties": false,
+          "description": "tags is an array of strings; optional size sm | md | lg"
+        },
+        "Form": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "buttons": {
+              "$ref": "#/$defs/Buttons"
+            },
+            "fields": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/FormControl"
+              }
+            }
+          },
+          "required": [
+            "name",
+            "buttons",
+            "fields"
+          ],
+          "additionalProperties": false,
+          "description": "Form container with fields and explicit action buttons"
+        },
+        "Buttons": {
+          "type": "object",
+          "properties": {
+            "buttons": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Button"
+              }
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "row",
+                "column"
+              ]
+            }
+          },
+          "required": [
+            "buttons"
+          ],
+          "additionalProperties": false,
+          "description": "Group of Button components. direction: \"row\" (default) | \"column\"."
+        },
+        "Button": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "action": {
+              "$ref": "#/$defs/ActionExpression"
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary",
+                "tertiary"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "destructive"
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "extra-small",
+                "small",
+                "medium",
+                "large"
+              ]
+            }
+          },
+          "required": [
+            "label"
+          ],
+          "additionalProperties": false,
+          "description": "Clickable button"
+        },
+        "ActionExpression": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "open_url"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "url"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "continue_conversation"
+                },
+                "context": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "params": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "FormControl": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "input": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Input"
+                },
+                {
+                  "$ref": "#/$defs/TextArea"
+                },
+                {
+                  "$ref": "#/$defs/Select"
+                },
+                {
+                  "$ref": "#/$defs/DatePicker"
+                },
+                {
+                  "$ref": "#/$defs/Slider"
+                },
+                {
+                  "$ref": "#/$defs/CheckBoxGroup"
+                },
+                {
+                  "$ref": "#/$defs/RadioGroup"
+                },
+                {
+                  "$ref": "#/$defs/Chips"
+                },
+                {
+                  "$ref": "#/$defs/OptionCards"
+                }
+              ]
+            },
+            "hint": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "label",
+            "input"
+          ],
+          "additionalProperties": false,
+          "description": "Field with label, input component, and optional hint text"
+        },
+        "Input": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "placeholder": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "text",
+                "email",
+                "password",
+                "number",
+                "url"
+              ]
+            },
+            "rules": {
+              "type": "object",
+              "properties": {
+                "required": {
+                  "type": "boolean"
+                },
+                "email": {
+                  "type": "boolean"
+                },
+                "url": {
+                  "type": "boolean"
+                },
+                "numeric": {
+                  "type": "boolean"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "minLength": {
+                  "type": "number"
+                },
+                "maxLength": {
+                  "type": "number"
+                },
+                "pattern": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "TextArea": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "placeholder": {
+              "type": "string"
+            },
+            "rows": {
+              "type": "number"
+            },
+            "rules": {
+              "type": "object",
+              "properties": {
+                "required": {
+                  "type": "boolean"
+                },
+                "email": {
+                  "type": "boolean"
+                },
+                "url": {
+                  "type": "boolean"
+                },
+                "numeric": {
+                  "type": "boolean"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "minLength": {
+                  "type": "number"
+                },
+                "maxLength": {
+                  "type": "number"
+                },
+                "pattern": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "Select": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SelectItem"
+              }
+            },
+            "placeholder": {
+              "type": "string"
+            },
+            "rules": {
+              "type": "object",
+              "properties": {
+                "required": {
+                  "type": "boolean"
+                },
+                "email": {
+                  "type": "boolean"
+                },
+                "url": {
+                  "type": "boolean"
+                },
+                "numeric": {
+                  "type": "boolean"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "minLength": {
+                  "type": "number"
+                },
+                "maxLength": {
+                  "type": "number"
+                },
+                "pattern": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "value": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "small",
+                "medium",
+                "large"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        "SelectItem": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value",
+            "label"
+          ],
+          "additionalProperties": false,
+          "description": "Option for Select"
+        },
+        "DatePicker": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "single",
+                "range"
+              ]
+            },
+            "rules": {
+              "type": "object",
+              "properties": {
+                "required": {
+                  "type": "boolean"
+                },
+                "email": {
+                  "type": "boolean"
+                },
+                "url": {
+                  "type": "boolean"
+                },
+                "numeric": {
+                  "type": "boolean"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "minLength": {
+                  "type": "number"
+                },
+                "maxLength": {
+                  "type": "number"
+                },
+                "pattern": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "value": {}
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "Slider": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "continuous",
+                "discrete"
+              ]
+            },
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "step": {
+              "type": "number"
+            },
+            "defaultValue": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "label": {
+              "type": "string"
+            },
+            "rules": {
+              "type": "object",
+              "properties": {
+                "required": {
+                  "type": "boolean"
+                },
+                "email": {
+                  "type": "boolean"
+                },
+                "url": {
+                  "type": "boolean"
+                },
+                "numeric": {
+                  "type": "boolean"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "minLength": {
+                  "type": "number"
+                },
+                "maxLength": {
+                  "type": "number"
+                },
+                "pattern": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "required": [
+            "name",
+            "variant",
+            "min",
+            "max"
+          ],
+          "additionalProperties": false,
+          "description": "Numeric slider input; supports continuous and discrete (stepped) variants"
+        },
+        "CheckBoxGroup": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/CheckBoxItem"
+              }
+            },
+            "rules": {
+              "type": "object",
+              "properties": {
+                "required": {
+                  "type": "boolean"
+                },
+                "email": {
+                  "type": "boolean"
+                },
+                "url": {
+                  "type": "boolean"
+                },
+                "numeric": {
+                  "type": "boolean"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "minLength": {
+                  "type": "number"
+                },
+                "maxLength": {
+                  "type": "number"
+                },
+                "pattern": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "value": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "name",
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        "CheckBoxItem": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "defaultChecked": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "description",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "RadioGroup": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RadioItem"
+              }
+            },
+            "defaultValue": {
+              "type": "string"
+            },
+            "rules": {
+              "type": "object",
+              "properties": {
+                "required": {
+                  "type": "boolean"
+                },
+                "email": {
+                  "type": "boolean"
+                },
+                "url": {
+                  "type": "boolean"
+                },
+                "numeric": {
+                  "type": "boolean"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "minLength": {
+                  "type": "number"
+                },
+                "maxLength": {
+                  "type": "number"
+                },
+                "pattern": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        "RadioItem": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "label",
+            "description",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        "Chips": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "default": "multiple",
+              "type": "string",
+              "enum": [
+                "single",
+                "multiple"
+              ]
+            },
+            "items": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ChipItem"
+              }
+            },
+            "rules": {
+              "type": "object",
+              "properties": {
+                "required": {
+                  "type": "boolean"
+                },
+                "email": {
+                  "type": "boolean"
+                },
+                "url": {
+                  "type": "boolean"
+                },
+                "numeric": {
+                  "type": "boolean"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "minLength": {
+                  "type": "number"
+                },
+                "maxLength": {
+                  "type": "number"
+                },
+                "pattern": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "defaultValue": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "type",
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "A form field of compact selectable chips for choosing one or many short options; the selection is stored under `name`."
+        },
+        "ChipItem": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "icon": {
+              "$ref": "#/$defs/Icon"
+            },
+            "disabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "value",
+            "label"
+          ],
+          "additionalProperties": false,
+          "description": "A single selectable chip inside a Chips group, with a value, label and optional icon."
+        },
+        "Icon": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false,
+          "description": "A lucide icon by kebab-case name (e.g. 'circle-check'). Optional category picks a topical fallback when the name doesn't resolve."
+        },
+        "OptionCards": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "default": "single",
+              "type": "string",
+              "enum": [
+                "single",
+                "multiple"
+              ]
+            },
+            "items": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/OptionCard"
+              }
+            },
+            "rules": {
+              "type": "object",
+              "properties": {
+                "required": {
+                  "type": "boolean"
+                },
+                "email": {
+                  "type": "boolean"
+                },
+                "url": {
+                  "type": "boolean"
+                },
+                "numeric": {
+                  "type": "boolean"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "minLength": {
+                  "type": "number"
+                },
+                "maxLength": {
+                  "type": "number"
+                },
+                "pattern": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "defaultValue": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "type",
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "A form field of selectable cards (title, optional subtitle, optional icon or image) laid out in a responsive grid for choosing one or many options; the selection is stored under `name`."
+        },
+        "OptionCard": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "topContent": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Icon"
+                },
+                {
+                  "$ref": "#/$defs/Image"
+                }
+              ]
+            },
+            "disabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "value",
+            "title"
+          ],
+          "additionalProperties": false,
+          "description": "A single selectable card inside an OptionCards group, with a value, title, optional subtitle and an optional Icon or Image on top."
+        },
+        "IconButton": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "icon": {
+              "$ref": "#/$defs/Icon"
+            },
+            "action": {
+              "$ref": "#/$defs/ActionExpression"
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary",
+                "tertiary"
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "extra-small",
+                "small",
+                "medium",
+                "large"
+              ]
+            },
+            "shape": {
+              "type": "string",
+              "enum": [
+                "square",
+                "circle"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "icon"
+          ],
+          "additionalProperties": false,
+          "description": "Icon-only button. name is the accessible label and the action label; icon is an Icon; action fires on click."
+        },
+        "Steps": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/StepsItem"
+              }
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "Step-by-step guide"
+        },
+        "StepsItem": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "details": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "details"
+          ],
+          "additionalProperties": false,
+          "description": "title and details text for one step"
+        },
+        "InlineHeader": {
+          "type": "object",
+          "properties": {
+            "heading": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "heading"
+          ],
+          "additionalProperties": false,
+          "description": "Compact section heading with an optional one-line description, for use inside cards."
+        },
+        "EntityList": {
+          "type": "object",
+          "properties": {
+            "rows": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "left": {
+                    "type": "string"
+                  },
+                  "right": {
+                    "type": "string"
+                  },
+                  "rightVariant": {
+                    "default": "text",
+                    "type": "string",
+                    "enum": [
+                      "text",
+                      "number"
+                    ]
+                  }
+                },
+                "required": [
+                  "left",
+                  "right",
+                  "rightVariant"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "size": {
+              "default": "default",
+              "type": "string",
+              "enum": [
+                "small",
+                "default"
+              ]
+            },
+            "header": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "string"
+                },
+                "right": {
+                  "type": "string"
+                },
+                "rightVariant": {
+                  "default": "text",
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "number"
+                  ]
+                }
+              },
+              "required": [
+                "left",
+                "right",
+                "rightVariant"
+              ],
+              "additionalProperties": false
+            },
+            "footer": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "string"
+                },
+                "right": {
+                  "type": "string"
+                },
+                "rightVariant": {
+                  "default": "text",
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "number"
+                  ]
+                }
+              },
+              "required": [
+                "left",
+                "right",
+                "rightVariant"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "rows",
+            "size"
+          ],
+          "additionalProperties": false,
+          "description": "Two-column key/value rows (left label, right value). size 'default' supports optional header and footer rows; rightVariant 'number' uses tabular numbers."
+        },
+        "EditableTable": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "default": "",
+              "type": "string"
+            },
+            "columns": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "text",
+                      "number",
+                      "date-single",
+                      "select",
+                      "url"
+                    ]
+                  },
+                  "key": {
+                    "default": "default",
+                    "type": "string"
+                  },
+                  "header": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "width": {
+                    "type": "number"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "key",
+                  "header"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "data": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "values": {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "values"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "name",
+            "columns",
+            "data"
+          ],
+          "additionalProperties": false,
+          "description": "Spreadsheet-like table whose cells the user can edit inline (text, number, url, date, select columns); edits are saved back as a form field"
+        },
+        "SnippetCardBlock": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "minItems": 2,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SnippetCardItem"
+              }
+            },
+            "layout": {
+              "default": "grid",
+              "type": "string",
+              "enum": [
+                "grid"
+              ]
+            },
+            "responsive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "action": {
+              "$ref": "#/$defs/ActionExpression"
+            },
+            "gap": {
+              "type": [
+                "number",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "items",
+            "layout",
+            "responsive"
+          ],
+          "additionalProperties": false,
+          "description": "A responsive grid of compact label/value cards (2 per row) for showing several short facts side by side; optionally clickable with a shared action."
+        },
+        "SnippetCardItem": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "lhs": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/IconText"
+                },
+                {
+                  "$ref": "#/$defs/ImageText"
+                }
+              ]
+            },
+            "rhs": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Text"
+                },
+                {
+                  "$ref": "#/$defs/BoldText"
+                }
+              ]
+            }
+          },
+          "required": [
+            "lhs"
+          ],
+          "additionalProperties": false,
+          "description": "One row-style snippet card: a label on the left (IconText or ImageText) and an optional value on the right (Text or BoldText)."
+        },
+        "IconText": {
+          "type": "object",
+          "properties": {
+            "icon": {
+              "$ref": "#/$defs/Icon"
+            },
+            "iconVariant": {
+              "default": "neutral",
+              "type": "string",
+              "enum": [
+                "neutral",
+                "info",
+                "success",
+                "warning",
+                "danger",
+                "inverted",
+                "filled",
+                "soft"
+              ]
+            },
+            "iconSize": {
+              "default": "m",
+              "type": "string",
+              "enum": [
+                "xs",
+                "s",
+                "m",
+                "l",
+                "xl",
+                "sm",
+                "md",
+                "lg"
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "bold": {
+              "default": false,
+              "type": "boolean"
+            },
+            "layout": {
+              "default": "horizontal",
+              "type": "string",
+              "enum": [
+                "horizontal",
+                "vertical"
+              ]
+            }
+          },
+          "required": [
+            "icon",
+            "iconVariant",
+            "iconSize",
+            "title",
+            "bold",
+            "layout"
+          ],
+          "additionalProperties": false,
+          "description": "An icon badge with a title and optional subtitle, laid out horizontally or vertically. iconVariant sets the badge color."
+        },
+        "ImageText": {
+          "type": "object",
+          "properties": {
+            "src": {
+              "type": "string"
+            },
+            "alt": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "bold": {
+              "default": false,
+              "type": "boolean"
+            },
+            "layout": {
+              "default": "horizontal",
+              "type": "string",
+              "enum": [
+                "horizontal",
+                "vertical"
+              ]
+            },
+            "imageSize": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "src",
+            "title",
+            "bold",
+            "layout"
+          ],
+          "additionalProperties": false,
+          "description": "A small square image (thumbnail/avatar) with a title and optional subtitle. src must be a real image URL."
+        },
+        "Text": {
+          "type": "object",
+          "properties": {
+            "variant": {
+              "default": "text",
+              "type": "string",
+              "enum": [
+                "text",
+                "number"
+              ]
+            },
+            "value": {
+              "type": "string"
+            },
+            "subtext": {
+              "type": "string"
+            },
+            "subtextVariant": {
+              "default": "text",
+              "type": "string",
+              "enum": [
+                "text",
+                "number",
+                "metric"
+              ]
+            },
+            "size": {
+              "default": "sm",
+              "type": "string",
+              "enum": [
+                "xs",
+                "sm",
+                "md",
+                "lg"
+              ]
+            }
+          },
+          "required": [
+            "variant",
+            "value",
+            "subtextVariant",
+            "size"
+          ],
+          "additionalProperties": false,
+          "description": "Plain text line with optional subtext. variant 'number' uses tabular number styling; subtextVariant 'metric' colors a leading +/- subtext green/red."
+        },
+        "BoldText": {
+          "type": "object",
+          "properties": {
+            "variant": {
+              "default": "text",
+              "type": "string",
+              "enum": [
+                "text",
+                "number"
+              ]
+            },
+            "value": {
+              "type": "string"
+            },
+            "subtext": {
+              "type": "string"
+            },
+            "subtextVariant": {
+              "default": "text",
+              "type": "string",
+              "enum": [
+                "text",
+                "number",
+                "metric"
+              ]
+            },
+            "size": {
+              "default": "sm",
+              "type": "string",
+              "enum": [
+                "xs",
+                "sm",
+                "md",
+                "lg"
+              ]
+            }
+          },
+          "required": [
+            "variant",
+            "value",
+            "subtextVariant",
+            "size"
+          ],
+          "additionalProperties": false,
+          "description": "Emphasized (bold) text line with optional subtext. variant 'number' uses tabular number styling; subtextVariant 'metric' colors a leading +/- subtext green/red."
+        },
+        "OverviewCardBlock": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "minItems": 2,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/OverviewCardItem"
+              }
+            },
+            "layout": {
+              "default": "grid",
+              "type": "string",
+              "enum": [
+                "grid",
+                "carousel"
+              ]
+            },
+            "responsive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "action": {
+              "$ref": "#/$defs/ActionExpression"
+            },
+            "gap": {
+              "type": [
+                "number",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "items",
+            "layout",
+            "responsive"
+          ],
+          "additionalProperties": false,
+          "description": "A grid or horizontal carousel of compact overview cards, each with a heading (icon/image/text) on top and an inline metric below; optionally clickable with a shared action."
+        },
+        "OverviewCardItem": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "top": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/IconText"
+                },
+                {
+                  "$ref": "#/$defs/ImageText"
+                },
+                {
+                  "$ref": "#/$defs/Text"
+                }
+              ]
+            },
+            "bottom": {
+              "$ref": "#/$defs/MetricIndicatorInline"
+            }
+          },
+          "required": [
+            "top"
+          ],
+          "additionalProperties": false,
+          "description": "One overview card: a heading slot at the top (IconText, ImageText or Text) and an optional MetricIndicatorInline at the bottom."
+        },
+        "MetricIndicatorInline": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            },
+            "subtext": {
+              "type": "string"
+            },
+            "trend": {
+              "type": "object",
+              "properties": {
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "up",
+                    "down"
+                  ]
+                },
+                "value": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "direction",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "value"
+          ],
+          "additionalProperties": false,
+          "description": "Headline metric value with an optional +/- percentage trend and subtext, all on one line."
+        },
+        "ContextCardBlock": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "minItems": 2,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ContextCardItem"
+              }
+            },
+            "layout": {
+              "default": "grid",
+              "type": "string",
+              "enum": [
+                "grid",
+                "carousel"
+              ]
+            },
+            "responsive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "action": {
+              "$ref": "#/$defs/ActionExpression"
+            },
+            "gap": {
+              "type": [
+                "number",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "items",
+            "layout",
+            "responsive"
+          ],
+          "additionalProperties": false,
+          "description": "A grid or carousel of compact tinted context cards (title or tag plus a short bold body); an optional action makes every card clickable."
+        },
+        "ContextCardItem": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/Tag"
+                }
+              ]
+            },
+            "body": {
+              "type": "string"
+            },
+            "bgColor": {
+              "type": "string",
+              "enum": [
+                "gray"
+              ]
+            },
+            "bgImageSrc": {
+              "type": "string"
+            },
+            "bgImageAlt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "additionalProperties": false,
+          "description": "A single card inside a ContextCardBlock: a title (plain string or Tag), an optional markdown body, and an optional gray tint or background image."
+        },
+        "Tag": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "icon": {
+              "$ref": "#/$defs/Icon"
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "sm",
+                "md",
+                "lg"
+              ]
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "neutral",
+                "info",
+                "success",
+                "warning",
+                "danger"
+              ]
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "additionalProperties": false,
+          "description": "Styled tag/badge with optional Icon and variant"
+        },
+        "CompositeCardBlock": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "minItems": 2,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/CompositeCardItem"
+              }
+            },
+            "layout": {
+              "default": "grid",
+              "type": "string",
+              "enum": [
+                "grid",
+                "carousel"
+              ]
+            },
+            "responsive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "action": {
+              "$ref": "#/$defs/ActionExpression"
+            },
+            "gap": {
+              "type": [
+                "number",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "items",
+            "layout",
+            "responsive"
+          ],
+          "additionalProperties": false,
+          "description": "A two-per-row grid or carousel of rich cards, each with an optional header, stacked body content (text, metrics, charts, lists, tags) and a price/button footer; an optional action makes every card clickable."
+        },
+        "CompositeCardItem": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "header": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/IconText"
+                },
+                {
+                  "$ref": "#/$defs/ImageText"
+                },
+                {
+                  "$ref": "#/$defs/ImageTextLarge"
+                },
+                {
+                  "$ref": "#/$defs/Text"
+                },
+                {
+                  "$ref": "#/$defs/Image"
+                }
+              ]
+            },
+            "body": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Text"
+                  },
+                  {
+                    "$ref": "#/$defs/BoldText"
+                  },
+                  {
+                    "$ref": "#/$defs/MetricIndicatorInline"
+                  },
+                  {
+                    "$ref": "#/$defs/IconText"
+                  },
+                  {
+                    "$ref": "#/$defs/Image"
+                  },
+                  {
+                    "$ref": "#/$defs/AreaChart"
+                  },
+                  {
+                    "$ref": "#/$defs/BarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/LineChart"
+                  },
+                  {
+                    "$ref": "#/$defs/ListBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/TagBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/EntityList"
+                  }
+                ]
+              }
+            },
+            "footer": {
+              "type": "object",
+              "properties": {
+                "price": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/BoldText"
+                    },
+                    {
+                      "$ref": "#/$defs/MetricIndicatorWithStrikethrough"
+                    }
+                  ]
+                },
+                "button": {
+                  "$ref": "#/$defs/Button"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "body"
+          ],
+          "additionalProperties": false,
+          "description": "A single card inside a CompositeCardBlock: an optional header (icon/image/text), a stack of body elements (text, metrics, charts, lists, tags), and an optional price/button footer."
+        },
+        "ImageTextLarge": {
+          "type": "object",
+          "properties": {
+            "src": {
+              "type": "string"
+            },
+            "alt": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "bold": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "src",
+            "title",
+            "bold"
+          ],
+          "additionalProperties": false,
+          "description": "A full-width banner image above a bold title and optional subtitle. src must be a real image URL."
+        },
+        "ListBlock": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ListItem"
+              }
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "number",
+                "image"
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "default",
+                "small"
+              ]
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "A list of items with number or image indicators. Each item can optionally have an action. size small renders a compact list."
+        },
+        "ListItem": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "image": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string"
+                },
+                "alt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "src",
+                "alt"
+              ],
+              "additionalProperties": false
+            },
+            "actionLabel": {
+              "type": "string"
+            },
+            "action": {
+              "$ref": "#/$defs/ActionExpression"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "additionalProperties": false,
+          "description": "Item in a ListBlock — displays a title with an optional subtitle and image. When action is provided, the item becomes clickable."
+        },
+        "MetricIndicatorWithStrikethrough": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            },
+            "subtext": {
+              "type": "string"
+            },
+            "previousValue": {
+              "type": "string"
+            },
+            "trend": {
+              "type": "object",
+              "properties": {
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "up",
+                    "down"
+                  ]
+                },
+                "value": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "direction",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "value"
+          ],
+          "additionalProperties": false,
+          "description": "Headline metric value with an optional struck-through previousValue, a +/- percentage trend, and subtext below."
+        },
+        "VisualCardBlock": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "minItems": 2,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/VisualCardItem"
+              }
+            },
+            "layout": {
+              "default": "grid",
+              "type": "string",
+              "enum": [
+                "grid",
+                "carousel"
+              ]
+            },
+            "responsive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "action": {
+              "$ref": "#/$defs/ActionExpression"
+            },
+            "gap": {
+              "type": [
+                "number",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "items",
+            "layout",
+            "responsive"
+          ],
+          "additionalProperties": false,
+          "description": "A grid or carousel of photo-first cards: a full-bleed background image with a tag on top and a bold text panel at the bottom; an optional action makes every card clickable."
+        },
+        "VisualCardItem": {
+          "type": "object",
+          "properties": {
+            "body": {
+              "$ref": "#/$defs/BoldText"
+            },
+            "id": {
+              "type": "string"
+            },
+            "bgImageSrc": {
+              "type": "string"
+            },
+            "tag": {
+              "$ref": "#/$defs/Tag"
+            },
+            "bgImageAlt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "body"
+          ],
+          "additionalProperties": false,
+          "description": "A single photo-first card inside a VisualCardBlock: a BoldText body panel, an optional Tag, and a background image (bgImageSrc must be a real URL; bgImageAlt is its alt text)."
+        },
+        "Tabs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TabItem"
+              }
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "Tabbed container"
+        },
+        "TabItem": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            },
+            "trigger": {
+              "type": "string"
+            },
+            "content": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "size": {
+                        "type": "string",
+                        "enum": [
+                          "small",
+                          "default",
+                          "large",
+                          "small-heavy",
+                          "large-heavy"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "$ref": "#/$defs/MarkDownRenderer"
+                  },
+                  {
+                    "$ref": "#/$defs/CardHeader"
+                  },
+                  {
+                    "$ref": "#/$defs/Callout"
+                  },
+                  {
+                    "$ref": "#/$defs/TextCallout"
+                  },
+                  {
+                    "$ref": "#/$defs/CodeBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/Image"
+                  },
+                  {
+                    "$ref": "#/$defs/ImageBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/ImageGallery"
+                  },
+                  {
+                    "$ref": "#/$defs/Separator"
+                  },
+                  {
+                    "$ref": "#/$defs/HorizontalBarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/RadarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/PieChart"
+                  },
+                  {
+                    "$ref": "#/$defs/RadialChart"
+                  },
+                  {
+                    "$ref": "#/$defs/SingleStackedBarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/ScatterChart"
+                  },
+                  {
+                    "$ref": "#/$defs/AreaChart"
+                  },
+                  {
+                    "$ref": "#/$defs/BarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/LineChart"
+                  },
+                  {
+                    "$ref": "#/$defs/Table"
+                  },
+                  {
+                    "$ref": "#/$defs/TagBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/Form"
+                  },
+                  {
+                    "$ref": "#/$defs/Buttons"
+                  },
+                  {
+                    "$ref": "#/$defs/IconButton"
+                  },
+                  {
+                    "$ref": "#/$defs/Steps"
+                  },
+                  {
+                    "$ref": "#/$defs/InlineHeader"
+                  },
+                  {
+                    "$ref": "#/$defs/EntityList"
+                  },
+                  {
+                    "$ref": "#/$defs/EditableTable"
+                  },
+                  {
+                    "$ref": "#/$defs/SnippetCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/OverviewCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/ContextCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/CompositeCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/VisualCardBlock"
+                  }
+                ]
+              }
+            }
+          },
+          "required": [
+            "value",
+            "trigger",
+            "content"
+          ],
+          "additionalProperties": false,
+          "description": "value is unique id, trigger is tab label, content is array of components"
+        },
+        "Carousel": {
+          "type": "object",
+          "properties": {
+            "children": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        },
+                        "size": {
+                          "type": "string",
+                          "enum": [
+                            "small",
+                            "default",
+                            "large",
+                            "small-heavy",
+                            "large-heavy"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/$defs/MarkDownRenderer"
+                    },
+                    {
+                      "$ref": "#/$defs/CardHeader"
+                    },
+                    {
+                      "$ref": "#/$defs/Callout"
+                    },
+                    {
+                      "$ref": "#/$defs/TextCallout"
+                    },
+                    {
+                      "$ref": "#/$defs/CodeBlock"
+                    },
+                    {
+                      "$ref": "#/$defs/Image"
+                    },
+                    {
+                      "$ref": "#/$defs/ImageBlock"
+                    },
+                    {
+                      "$ref": "#/$defs/ImageGallery"
+                    },
+                    {
+                      "$ref": "#/$defs/Separator"
+                    },
+                    {
+                      "$ref": "#/$defs/HorizontalBarChart"
+                    },
+                    {
+                      "$ref": "#/$defs/RadarChart"
+                    },
+                    {
+                      "$ref": "#/$defs/PieChart"
+                    },
+                    {
+                      "$ref": "#/$defs/RadialChart"
+                    },
+                    {
+                      "$ref": "#/$defs/SingleStackedBarChart"
+                    },
+                    {
+                      "$ref": "#/$defs/ScatterChart"
+                    },
+                    {
+                      "$ref": "#/$defs/AreaChart"
+                    },
+                    {
+                      "$ref": "#/$defs/BarChart"
+                    },
+                    {
+                      "$ref": "#/$defs/LineChart"
+                    },
+                    {
+                      "$ref": "#/$defs/Table"
+                    },
+                    {
+                      "$ref": "#/$defs/TagBlock"
+                    },
+                    {
+                      "$ref": "#/$defs/Form"
+                    },
+                    {
+                      "$ref": "#/$defs/Buttons"
+                    },
+                    {
+                      "$ref": "#/$defs/IconButton"
+                    },
+                    {
+                      "$ref": "#/$defs/Steps"
+                    },
+                    {
+                      "$ref": "#/$defs/InlineHeader"
+                    },
+                    {
+                      "$ref": "#/$defs/EntityList"
+                    },
+                    {
+                      "$ref": "#/$defs/EditableTable"
+                    },
+                    {
+                      "$ref": "#/$defs/SnippetCardBlock"
+                    },
+                    {
+                      "$ref": "#/$defs/OverviewCardBlock"
+                    },
+                    {
+                      "$ref": "#/$defs/ContextCardBlock"
+                    },
+                    {
+                      "$ref": "#/$defs/CompositeCardBlock"
+                    },
+                    {
+                      "$ref": "#/$defs/VisualCardBlock"
+                    }
+                  ]
+                }
+              }
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "card",
+                "sunk"
+              ]
+            }
+          },
+          "required": [
+            "children"
+          ],
+          "additionalProperties": false,
+          "description": "Horizontal scrollable carousel"
+        },
+        "Stack": {
+          "type": "object",
+          "properties": {
+            "children": {
+              "type": "array",
+              "items": {}
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "row",
+                "column"
+              ]
+            },
+            "gap": {
+              "type": "string",
+              "enum": [
+                "none",
+                "xs",
+                "s",
+                "m",
+                "l",
+                "xl",
+                "2xl"
+              ]
+            },
+            "align": {
+              "type": "string",
+              "enum": [
+                "start",
+                "center",
+                "end",
+                "stretch",
+                "baseline"
+              ]
+            },
+            "justify": {
+              "type": "string",
+              "enum": [
+                "start",
+                "center",
+                "end",
+                "between",
+                "around",
+                "evenly"
+              ]
+            },
+            "wrap": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "children"
+          ],
+          "additionalProperties": false,
+          "description": "Flex container. direction: \"row\"|\"column\" (default \"column\"). gap: \"none\"|\"xs\"|\"s\"|\"m\"|\"l\"|\"xl\"|\"2xl\" (default \"m\"). align: \"start\"|\"center\"|\"end\"|\"stretch\"|\"baseline\". justify: \"start\"|\"center\"|\"end\"|\"between\"|\"around\"|\"evenly\"."
+        },
+        "Slice": {
+          "type": "object",
+          "properties": {
+            "category": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "category",
+            "value"
+          ],
+          "additionalProperties": false,
+          "description": "One slice with label and numeric value"
+        },
+        "Label": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "additionalProperties": false,
+          "description": "Text label"
+        },
+        "SwitchGroup": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SwitchItem"
+              }
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "clear",
+                "card",
+                "sunk"
+              ]
+            },
+            "value": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "name",
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "Group of switch toggles"
+        },
+        "SwitchItem": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "defaultChecked": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false,
+          "description": "Individual switch toggle"
+        },
+        "Accordion": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/AccordionItem"
+              }
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "Collapsible sections"
+        },
+        "AccordionItem": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            },
+            "trigger": {
+              "type": "string"
+            },
+            "content": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "size": {
+                        "type": "string",
+                        "enum": [
+                          "small",
+                          "default",
+                          "large",
+                          "small-heavy",
+                          "large-heavy"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "$ref": "#/$defs/MarkDownRenderer"
+                  },
+                  {
+                    "$ref": "#/$defs/CardHeader"
+                  },
+                  {
+                    "$ref": "#/$defs/Callout"
+                  },
+                  {
+                    "$ref": "#/$defs/TextCallout"
+                  },
+                  {
+                    "$ref": "#/$defs/CodeBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/Image"
+                  },
+                  {
+                    "$ref": "#/$defs/ImageBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/ImageGallery"
+                  },
+                  {
+                    "$ref": "#/$defs/Separator"
+                  },
+                  {
+                    "$ref": "#/$defs/HorizontalBarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/RadarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/PieChart"
+                  },
+                  {
+                    "$ref": "#/$defs/RadialChart"
+                  },
+                  {
+                    "$ref": "#/$defs/SingleStackedBarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/ScatterChart"
+                  },
+                  {
+                    "$ref": "#/$defs/AreaChart"
+                  },
+                  {
+                    "$ref": "#/$defs/BarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/LineChart"
+                  },
+                  {
+                    "$ref": "#/$defs/Table"
+                  },
+                  {
+                    "$ref": "#/$defs/TagBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/Form"
+                  },
+                  {
+                    "$ref": "#/$defs/Buttons"
+                  },
+                  {
+                    "$ref": "#/$defs/IconButton"
+                  },
+                  {
+                    "$ref": "#/$defs/Steps"
+                  },
+                  {
+                    "$ref": "#/$defs/InlineHeader"
+                  },
+                  {
+                    "$ref": "#/$defs/EntityList"
+                  },
+                  {
+                    "$ref": "#/$defs/EditableTable"
+                  },
+                  {
+                    "$ref": "#/$defs/SnippetCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/OverviewCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/ContextCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/CompositeCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/VisualCardBlock"
+                  }
+                ]
+              }
+            }
+          },
+          "required": [
+            "value",
+            "trigger",
+            "content"
+          ],
+          "additionalProperties": false,
+          "description": "value is unique id, trigger is section title"
+        },
+        "Modal": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "open": {
+              "type": "boolean"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "size": {
+                        "type": "string",
+                        "enum": [
+                          "small",
+                          "default",
+                          "large",
+                          "small-heavy",
+                          "large-heavy"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "$ref": "#/$defs/MarkDownRenderer"
+                  },
+                  {
+                    "$ref": "#/$defs/CardHeader"
+                  },
+                  {
+                    "$ref": "#/$defs/Callout"
+                  },
+                  {
+                    "$ref": "#/$defs/TextCallout"
+                  },
+                  {
+                    "$ref": "#/$defs/CodeBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/Image"
+                  },
+                  {
+                    "$ref": "#/$defs/ImageBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/ImageGallery"
+                  },
+                  {
+                    "$ref": "#/$defs/Separator"
+                  },
+                  {
+                    "$ref": "#/$defs/HorizontalBarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/RadarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/PieChart"
+                  },
+                  {
+                    "$ref": "#/$defs/RadialChart"
+                  },
+                  {
+                    "$ref": "#/$defs/SingleStackedBarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/ScatterChart"
+                  },
+                  {
+                    "$ref": "#/$defs/AreaChart"
+                  },
+                  {
+                    "$ref": "#/$defs/BarChart"
+                  },
+                  {
+                    "$ref": "#/$defs/LineChart"
+                  },
+                  {
+                    "$ref": "#/$defs/Table"
+                  },
+                  {
+                    "$ref": "#/$defs/TagBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/Form"
+                  },
+                  {
+                    "$ref": "#/$defs/Buttons"
+                  },
+                  {
+                    "$ref": "#/$defs/IconButton"
+                  },
+                  {
+                    "$ref": "#/$defs/Steps"
+                  },
+                  {
+                    "$ref": "#/$defs/InlineHeader"
+                  },
+                  {
+                    "$ref": "#/$defs/EntityList"
+                  },
+                  {
+                    "$ref": "#/$defs/EditableTable"
+                  },
+                  {
+                    "$ref": "#/$defs/SnippetCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/OverviewCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/ContextCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/CompositeCardBlock"
+                  },
+                  {
+                    "$ref": "#/$defs/VisualCardBlock"
+                  }
+                ]
+              }
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "sm",
+                "md",
+                "lg"
+              ]
+            }
+          },
+          "required": [
+            "title",
+            "children"
+          ],
+          "additionalProperties": false,
+          "description": "Modal dialog. open is a reactive $boolean binding — set to true to open, X/Escape/backdrop auto-closes. Put Form with buttons inside children."
+        },
+        "TextContent": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "small",
+                "default",
+                "large",
+                "small-heavy",
+                "large-heavy"
+              ]
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "additionalProperties": false,
+          "description": "正文富文本。text 支持 Markdown 标题、列表、表格、引用、代码块、LaTeX 数学公式和 mermaid 围栏图表。公式用 $$ 包裹，Mermaid 放在 text 字符串内的 mermaid 代码围栏中。不要把整个 OpenUI 输出包进围栏。"
+        },
+        "BeCodeBlock": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "maxLength": 50000
+            },
+            "language": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "filename": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "highlightLines": {
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "additionalProperties": false,
+          "description": "beUI CodeBlock 语法高亮代码块，带行号、复制反馈和流式跟随。code 为纯代码字符串；language 为语言名，filename 可选；highlightLines 为需要强调的行号。只展示代码，不执行。Markdown 中的代码围栏也使用同一个 beUI 组件。"
+        },
+        "BeCard": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "children": {
+              "maxItems": 30,
+              "type": "array",
+              "items": {}
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 8000
+            }
+          },
+          "required": [
+            "title",
+            "children"
+          ],
+          "additionalProperties": false,
+          "description": "beUI Card 紧凑内容卡片。用于有标题的建议、说明或内容分组，children 可嵌套已注册组件；description 可选。图文推荐使用 BeImageCard，不用普通内容卡片代替详细正文。"
+        },
+        "BeCardGrid": {
+          "type": "object",
+          "properties": {
+            "children": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {}
+            }
+          },
+          "required": [
+            "children"
+          ],
+          "additionalProperties": false,
+          "description": "紧凑推荐卡片网格。children 为 1–6 个 BeImageCard，按回答区实际宽度自动排为 1、2 或 3 列，不按整个浏览器宽度判断。多个景点、酒店、地点或其他视觉推荐默认使用此网格，不要把多张 BeImage 纵向堆成大图。先输出网格引用，再逐张定义卡片，以便流式展示。"
+        },
+        "BeImageCard": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "query": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 160
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 800
+            },
+            "tags": {
+              "maxItems": 3,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              }
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            }
+          },
+          "required": [
+            "title",
+            "query",
+            "description"
+          ],
+          "additionalProperties": false,
+          "description": "紧凑图文推荐卡片，包含 16:9 小图、标题、标签和简介。title 为对象名称；query 为准确英文图片检索词而非 URL；description 为实质简介；tags 可选，最多 3 个短标签；prompt 可选，必须是携带完整上下文的继续了解问题，点击后在回答区直接继续，不触碰输入框。不伪造预订、收藏、评分或实时价格。图片异步检索，来源和许可可展开，不阻塞文字。搭配 BeCardGrid 使用。"
+        },
+        "BeImage": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 160
+            },
+            "alt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "caption": {
+              "type": "string",
+              "maxLength": 500
+            }
+          },
+          "required": [
+            "query",
+            "alt"
+          ],
+          "additionalProperties": false,
+          "description": "单张正文资料配图，不是推荐卡片。仅适合单一主题的文章插图或用户明确要求大图时使用；多个景点、酒店、地点推荐应优先用 BeCardGrid + BeImageCard。异步查找 Wikimedia Commons 真实资料配图并展示来源、作者与许可。query 是具体主题检索词，优先使用准确英文名称，不是 URL；alt 为中文替代文字；caption 可选。最多使用 3 张，不阻塞正文，不伪造图片，不表示历史照片已经核实。"
+        },
+        "BeButton": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "enum": [
+                "直接提问",
+                "继续细化",
+                "填入提问"
+              ]
+            },
+            "action": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary",
+                "ghost",
+                "outline"
+              ]
+            }
+          },
+          "required": [
+            "label",
+            "action"
+          ],
+          "additionalProperties": false,
+          "description": "beUI 弹簧动效快捷提问按钮。label 使用“直接提问”或“继续细化”；action 必须是包含完整上下文、可立即发送的独立问题。点击后直接请求 Agent，不填入或清空底部输入框，不执行工作区操作。需要用户补充信息时使用 BeQuestions，不要展示重复的泛化按钮。“填入提问”仅兼容旧输出，实际显示并执行直接提问。"
+        },
+        "BeFollowUps": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "minItems": 1,
+              "maxItems": 3,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  }
+                },
+                "required": [
+                  "label",
+                  "prompt"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "回答末尾的相关追问。items 为 1–3 个有实质帮助的下一步问题，label 直接显示具体问题，prompt 携带必要上下文。只在有价值时提供，不替代当前答案；需要补充关键信息用 BeQuestions。点击直接继续对话，不改变输入草稿。"
+        },
+        "BeBadge": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "neutral",
+                "info",
+                "success",
+                "warning",
+                "danger",
+                "loading"
+              ]
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "additionalProperties": false,
+          "description": "beUI 动效状态徽标。只展示用户提供的状态或明确标注的建议，不表示执行了工作区操作。"
+        },
+        "BeStat": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1000000000000,
+              "maximum": 1000000000000
+            },
+            "unit": {
+              "type": "string",
+              "maxLength": 12
+            },
+            "precision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4
+            }
+          },
+          "required": [
+            "label",
+            "value"
+          ],
+          "additionalProperties": false,
+          "description": "beUI 动态数字指标。label 为指标名，value 必须来自用户提供的数据，unit 为单位，precision 为小数位数。不编造数据、不读取工作区。"
+        },
+        "BeResponse": {
+          "type": "object",
+          "properties": {
+            "children": {
+              "maxItems": 30,
+              "type": "array",
+              "items": {}
+            }
+          },
+          "required": [
+            "children"
+          ],
+          "additionalProperties": false,
+          "description": "对应 AI Elements MessageResponse 的 beUI 回复内容分组。children 为已注册内容组件，流式状态由宿主控制，不自行模拟生成进度。"
+        },
+        "BeApproval": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "context": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            }
+          },
+          "required": [
+            "title",
+            "description",
+            "context"
+          ],
+          "additionalProperties": false,
+          "description": "对应 AI Elements Confirmation 的 beUI ApprovalCard，用于确认建议方案，不是工具授权。title 和 description 必须完整描述待确认建议；context 包含完整上下文。用户在卡片内确认、拒绝或要求修改后，直接提交意见并继续对话，不经输入框；不授权或执行工作区操作。"
+        },
+        "BeQuestions": {
+          "type": "object",
+          "properties": {
+            "context": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "questions": {
+              "minItems": 1,
+              "maxItems": 10,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "options": {
+                    "minItems": 1,
+                    "maxItems": 6,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 300
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "multiple": {
+                    "type": "boolean"
+                  },
+                  "allowCustom": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "context",
+            "questions"
+          ],
+          "additionalProperties": false,
+          "description": "beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。"
+        },
+        "BeTodoList": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "items": {
+              "minItems": 1,
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "in-progress",
+                      "completed",
+                      "cancelled"
+                    ]
+                  },
+                  "progress": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "detail": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "suggestion",
+                "user"
+              ]
+            }
+          },
+          "required": [
+            "title",
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "对应 AI Elements Plan/Task 的 beUI TodoList。source=suggestion 为建议计划，所有项目强制显示���开始，不代表执行；source=user 仅展示用户本次明确提供的真实状态和进度。不能编造工具执行进度。"
+        },
+        "AgentIcon": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "enum": [
+                "assistant",
+                "reply",
+                "approve",
+                "question",
+                "progress",
+                "task",
+                "code",
+                "source"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "required": [
+            "name",
+            "label"
+          ],
+          "additionalProperties": false,
+          "description": "现有 Lucide 图标白名单，不是 beUI 独立图标包。用于带中文含义的状态说明，不能传入 SVG、组件代码、路径或任意图标名。"
+        },
+        "ShadcnCard": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "children": {
+              "maxItems": 30,
+              "type": "array",
+              "items": {}
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 8000
+            }
+          },
+          "required": [
+            "title",
+            "children"
+          ],
+          "additionalProperties": false,
+          "description": "本地 shadcn 卡片。用于有标题的建议、说明或内容分组，可嵌套已注册组件。"
+        },
+        "ShadcnBadge": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "default",
+                "secondary",
+                "outline",
+                "destructive"
+              ]
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "additionalProperties": false,
+          "description": "本地 shadcn 简短状态标签。"
+        },
+        "ShadcnAlert": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "default",
+                "destructive"
+              ]
+            }
+          },
+          "required": [
+            "title",
+            "description"
+          ],
+          "additionalProperties": false,
+          "description": "本地 shadcn 提示说明。只能展示信息，不表示执行了操作。"
+        },
+        "ShadcnProgress": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "value": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "label",
+            "value"
+          ],
+          "additionalProperties": false,
+          "description": "本地 shadcn 进度条。只使用用户提供的百分比，不编造工作区进度。"
+        },
+        "ShadcnAccordion": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "maxItems": 10,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "content": {
+                    "type": "string",
+                    "maxLength": 8000
+                  }
+                },
+                "required": [
+                  "title",
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "multiple": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "本地 shadcn 折叠说明列表。items 中每项包含 title 和 content 文本。"
+        },
+        "ShadcnTabs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "children": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {}
+                  }
+                },
+                "required": [
+                  "title",
+                  "children"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "本地 shadcn 标签页。items 中每项包含 title 和 children 组件数组。"
+        },
+        "ShadcnTable": {
+          "type": "object",
+          "properties": {
+            "columns": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 8000
+              }
+            },
+            "rows": {
+              "maxItems": 30,
+              "type": "array",
+              "items": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 8000
+                }
+              }
+            }
+          },
+          "required": [
+            "columns",
+            "rows"
+          ],
+          "additionalProperties": false,
+          "description": "本地 shadcn 表格。columns 为列名数组，rows 为二维文本数组。最多 6 列、30 行。"
+        },
+        "ShadcnButton": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "enum": [
+                "直接提问",
+                "继续细化",
+                "填入提问"
+              ]
+            },
+            "prompt": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "default",
+                "secondary",
+                "outline",
+                "ghost"
+              ]
+            }
+          },
+          "required": [
+            "label",
+            "prompt"
+          ],
+          "additionalProperties": false,
+          "description": "本地 shadcn 快捷提问按钮。label 使用“直接提问”或“继续细化”；prompt 为包含完整上下文的独立问题。点击后直接请求 Agent，不触碰底部提问草稿，不执行或保存工作区操作。“填入提问”仅兼容旧输出，实际执行直接提问。"
+        },
+        "ReuiBadge": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "outline",
+                "secondary",
+                "primary-light",
+                "info-light",
+                "success-light",
+                "warning-light",
+                "destructive-light"
+              ]
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "additionalProperties": false,
+          "description": "本地 REUI 语义状态徽标，可用不��状态颜色。"
+        },
+        "ReuiAlert": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "default",
+                "info",
+                "success",
+                "warning",
+                "destructive"
+              ]
+            }
+          },
+          "required": [
+            "title",
+            "description"
+          ],
+          "additionalProperties": false,
+          "description": "本地 REUI 语义提示。不表示已保存、已更新或执行了任何工作区操作。"
+        },
+        "ReuiFrame": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "children": {
+              "maxItems": 30,
+              "type": "array",
+              "items": {}
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 8000
+            }
+          },
+          "required": [
+            "title",
+            "children"
+          ],
+          "additionalProperties": false,
+          "description": "本地 REUI 分组面板。标题及说明位于面板上方，children 为已注册组件。"
+        }
+      }
+    }
+  },
+  "promptOptions": {
+    "examples": [
+      "root = Stack([intro, next])\nintro = TextContent(\"美国天气可以直接查询 NWS，覆盖美国且无需 API Key；全球天气需另选覆盖全球的服务。\")\nnext = BeFollowUps([{label: \"NWS 和全球天气服务怎么选？\", prompt: \"我在为聊天助手选择天气接口。已知 NWS 覆盖美国、无需 API Key，请比较它与全球天气服务的覆盖、商用条件和接入复杂度。\"}])",
+      "root = Stack([intro, detail])\nintro = TextContent(\"先直接回答问题。\")\ndetail = TextContent(\"按用户要求分节展开背景、事实、原因和必要细节。\")",
+      "root = Stack([intro, cards, detail])\nintro = TextContent(\"香港景点推荐：先看山顶全景，再到海滨散步。\")\ncards = BeCardGrid([peak, harbour])\npeak = BeImageCard(\"太平山顶\", \"Victoria Peak Hong Kong skyline\", \"俯瞰维港与两岸天际线，建议日落前上山，兼看白天和夜景。\", [\"城市全景\", \"建议傍晚\"])\nharbour = BeImageCard(\"维多利亚港\", \"Hong Kong Victoria Harbour\", \"沿尖沙咀海滨散步欣赏港岛天际线，也可搭天星小轮从海上看香港。\", [\"海滨散步\", \"城市夜景\"])\ndetail = TextContent(\"卡片后继续按需展开交通、路线和注意事项，不用卡片代替详细回答。\")"
+    ],
+    "additionalRules": [
+      "For grid-like layouts, use Stack with direction \"row\" and wrap=true. Avoid justify=\"between\" unless you specifically want large gutters.",
+      "For forms, define one FormControl reference per field so controls can stream progressively.",
+      "For forms, always provide the second Form argument with Buttons(...) actions: Form(name, buttons, fields).",
+      "Never nest Form inside Form.",
+      "Use @Reset($var1, $var2) after form submit to restore defaults — not @Set($var, \"\")",
+      "Use existing components (Tabs, Accordion, Modal) before inventing ternary show/hide patterns",
+      "Card blocks (SnippetCardBlock, OverviewCardBlock, ContextCardBlock, CompositeCardBlock, VisualCardBlock) need at least 2 items; every item in a block must have the same structure.",
+      "Text / BoldText / IconText / ImageText / ImageTextLarge / MetricIndicatorInline / MetricIndicatorWithStrikethrough are inline building blocks used INSIDE card items — do not place them directly in a Stack or Card.",
+      "EntityList size='small' (no header/footer) is only for use inside a CompositeCardItem body; use size='default' everywhere else.",
+      "Image URLs must be real (from a tool result or the user) — never invent or template an image URL.",
+      "Always pass a category to Icon — it enables a topical fallback when the exact icon name is unavailable.",
+      "你是 Orvilo 工作台中的 UI 生成助手。默认使用简体中文。严格输出 OpenUI Lang，不要输出代码围栏、HTML 或 React 代码。",
+      "TextContent 的 text 字符串支持 Markdown（标题、粗体、列表、引用、表格、代码块）、KaTeX LaTeX 数学公式及 Mermaid 图表。数学公式使用 $$ 包裹，独立公式的 $$ 分别另起一行。流程图、时序图等使用 text 内标注 mermaid 的三反引号代码围栏。只在字符串内部使用 Markdown 围栏，整体回复仍严格遵循 OpenUI Lang；字符串中的换行、引号和 LaTeX 反斜杠按 OpenUI 字符串语法转义。Mermaid 不含初始化配置、HTML、外部图片或点击动作。",
+      "TextContent 使用 JSON 双引号字符串：换行写成 \\n，LaTeX 命令的每个反斜杠写成 \\\\，不要再重复转义整段正文，也不要在双引号内混入真实换行。例如：root = TextContent(\"### 自注意力机制\\n\\n每个 token 投影为查询、键和值。\\n\\n$$\\n\\\\mathrm{Attention}(Q,K,V)=\\\\mathrm{softmax}\\\\left(\\\\frac{QK^\\\\top}{\\\\sqrt{d_k}}\\\\right)V\\n$$\\n\\n- 缩放点积防止 softmax 饱和。\")",
+      "Mermaid 图表由宿主统一主题，优先使用 flowchart、sequenceDiagram、stateDiagram-v2、classDiagram、erDiagram。流程图使用简短中文节点、清晰分组和少量连线；短流程可 LR，宽或复杂流程用 TD，避免堆成一张超宽大图。核心节点用 A(核心处理):::focus，完成态用 :::success，需人工确认的节点用 :::warning，样式由宿主定义，不再输出 classDef、style、linkStyle 或硬编码颜色。每图只强调 1–2 个关键节点，其余保持克制。不要在标签内使用 HTML；节点内容尽量简短，需要换行时使用 Mermaid 支持的文字换行。不要生成 click 动作或初始化配置。",
+      "按功能组优先使用已注册的 beUI 组件：消息回复 BeResponse；方案确认 BeApproval；单选、多选、自定义提问 BeQuestions；建议计划或用户任务状态 BeTodoList；动态按钮 BeButton；状态徽标 BeBadge；用户数字指标 BeStat。图标用现有 Lucide 的 AgentIcon 白名单。内容卡片优先使用 BeCard（beUI Card compact），图文推荐使用 BeCardGrid + BeImageCard。提示、进度、折叠、标签页、表格可复用 ShadcnAlert、ShadcnProgress、ShadcnAccordion、ShadcnTabs、ShadcnTable、ReuiAlert、ReuiFrame。ShadcnCard、ShadcnButton、ShadcnBadge、ReuiBadge 仅用于兼容。所有组件均为已安装的本地源码，不得使用目录外组件或声称会自动安装组件。",
+      "根据问题选择合适的组件：项目计划使用 BeTodoList 并设 source=suggestion；只有用户提供真实状态才用 source=user；对比使用 ShadcnTabs 或 ShadcnTable；用户提供数字时可使用图表；简单问答使用 TextContent。BeApproval 只能确认建议，不是工具授权；BeApproval 和 BeQuestions 在回答区内直接提交并继续对话，不经输入框。加载状态 AgentProgress、ReasoningText、ThinkingShimmer 和真实工具授权 ToolApproval 由宿主控制，不由模型虚构。不要为了展示组件而堆砌界面。",
+      "用户的问题、语言、受众和所需深度决定回答。先给结论，再自然继续对话；事实来源、技术细节和不确定性在影响判断时说明，不以固定模板强迫长答或短答。用户要求详细时完整展开，不能用一张摘要表或追问按钮代替当前答案。一般知识可直接作答，不因用户没有提供材料而拒答；纠错时给出完整修正后的答案。重要正文默认纵向展开，折叠区仅放补充内容。",
+      "用户的工作区记录、业务统计和任务状态只能来自用户提供的数据。没有实时工作区数据和工具，不得声称查询、创建、保存或更新了项目、任务、文档。建议计划标明为建议；不得编造业务统计或实时信息。只有用户明确要求时才提供标明为示例的业务数据。",
+      "为了逐步显示回复，第一行先输出 root = Stack([intro, section1, section2, ...])，之后按阅读顺序立即定义 intro 和各段 TextContent。每段写完再写下一段，不要先生成长数组、所有表格数据或表单后才定义正文。问题清楚时先完整回答，不为流程而澄清。有值得继续探索的方向、未解决的障碍或可比较的下一步时，在正文末尾使用 BeFollowUps 展示 1–3 个具体相关追问，label 是用户看得懂的具体问题而非“继续细化”。没有实质下一步时不强行添加，不用泛泛的“还需要帮助吗”。缺少影响答案的关键信息时使用 BeQuestions 主动澄清，追问不能代替应当提供的答案，也不暗示已具备缺失的工具权限。",
+      "宿主保存历史到数据库用于恢复和展示，但每次模型请求不会自动包含历史。BeFollowUps 的 prompt、BeApproval、BeQuestions 的 context 和 @ToAssistant 的文字必须独立完整、包含继续回答所需的必要上下文；不要声称模型能记住未收到的会话内容。",
+      "所有回复内的按钮、确认、回答和表单提交都是用户主动发起的内联继续操作：在原组件内直接请求模型，回复追加到当前对话，不填入、不聚焦、不清空底部输入框，不执行工作区操作。BeButton、ShadcnButton 文案使用“直接提问”或“继续细化”，OpenUI 原生表单提交文案使用“提交回答并继续”；禁止“填入提问”和“已保存”等错误文案。action、prompt 或 @ToAssistant 必须包含完整上下文。",
+      "需求模糊或缺少信息时（例如用户仅输入“1”或“test”），在说明下方紧接 BeQuestions 提问卡片，提供具体问题、少量有意义的方向选项和 allowCustom=true，让用户在卡片内补充并直接提交。纯文本补充也使用 allowCustom=true 的 BeQuestions，不要让用户到主输入框回答，不要用多个相同的“直接提问”���钮代替澄清问题。",
+      "没有 Query 或 Mutation 的 toolProvider，不得生成 Query、Mutation、@Run、外部 URL 动作或 EditableTable；不索取密码、API Key 或其他密钥。多个景点、酒店、地点、建筑、艺术等视觉推荐，默认使用 BeCardGrid([card1, card2, ...]) + BeImageCard(title, query, description, tags?, prompt?)，展示 2–6 张紧凑图文卡片，每张包含小图、名称、实质简介和少量有意义的标签，不要逐条堆放通栏 BeImage ��图。只在单一主题的正文插图���用户明确要求大图时使用 1–3 个 BeImage(query, alt, caption?)。query 为准确的主题关键词（优先具体英文名称），宿主会异步查找 Wikimedia Commons 的真实配图并附来源及许可，不阻塞正文。没有查到图片时如实显示未找到；不要编造图片 URL，不使用随机或占位图片。历史配图只作资料参考，不把现代照片说成当年的现场照片。",
+      "一般正文使用纵向 Stack；推荐卡片放入 BeCardGrid，宿主按内容区宽度自动调整 1–3 列。先写 intro 正文，再定义 cards = BeCardGrid([card1, card2, ...])，随后逐张定义卡片，不先输出长数组或所有图片数据后才定义正文；图片不替代按需展开的详细解释。不要伪造预订、收藏、评分、实时价格或无实际行为的操作按钮。每次生成控制在 30 个数据行、10 个表单字段以内。"
+    ]
+  },
+  "localComponents": [
+    "TextContent",
+    "BeCodeBlock",
+    "BeCard",
+    "BeCardGrid",
+    "BeImageCard",
+    "BeImage",
+    "BeButton",
+    "BeFollowUps",
+    "BeBadge",
+    "BeStat",
+    "BeResponse",
+    "BeApproval",
+    "BeQuestions",
+    "BeTodoList",
+    "AgentIcon",
+    "ShadcnCard",
+    "ShadcnBadge",
+    "ShadcnAlert",
+    "ShadcnProgress",
+    "ShadcnAccordion",
+    "ShadcnTabs",
+    "ShadcnTable",
+    "ShadcnButton",
+    "ReuiBadge",
+    "ReuiAlert",
+    "ReuiFrame"
+  ]
+}

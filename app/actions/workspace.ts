@@ -3,6 +3,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { and, eq, gt, ne } from 'drizzle-orm'
 import { cookies } from 'next/headers'
+import { getTranslations } from 'next-intl/server'
 import { z } from 'zod'
 import { runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
@@ -14,6 +15,47 @@ import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 const roleSchema = z.enum(['admin', 'member'])
 const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/)
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex')
+
+async function result<T>(operation: () => Promise<T>) {
+  try { return { ok: true as const, data: await operation() } }
+  catch (error) {
+    const t = await getTranslations('Errors')
+    if (error instanceof WorkspaceError) return { ok: false as const, error: t(error.code) }
+    if (error instanceof z.ZodError) return { ok: false as const, error: t('validationGeneric') }
+    console.error('Workspace operation failed', error instanceof Error ? error.name : 'UnknownError')
+    return { ok: false as const, error: t('generic') }
+  }
+}
+
+async function saveWorkspaceSelection(workspaceId: string) {
+  ;(await cookies()).set('mikka-workspace', workspaceId, { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' : 'lax', secure: true, path: '/', maxAge: 31536000 })
+}
+
+export async function switchWorkspace(workspaceId: string) {
+  return result(async () => {
+    const user = await requireUser()
+    z.uuid().parse(workspaceId)
+    const [membership] = await workspaceDb.select({ id: workspaceMembers.workspaceId }).from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'))).limit(1)
+    if (!membership) throw new WorkspaceError('workspaceAccessDenied')
+    await saveWorkspaceSelection(workspaceId)
+    return { workspaceId }
+  })
+}
+
+export async function createWorkspace(name: string) {
+  return result(async () => {
+    const user = await requireUser()
+    const parsedName = z.string().trim().min(1).max(120).parse(name)
+    const workspaceId = crypto.randomUUID()
+    await workspaceDb.transaction(async tx => {
+      await tx.insert(workspaces).values({ id: workspaceId, userId: user.id, name: parsedName })
+      await tx.insert(workspaceMembers).values({ workspaceId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: 'admin' })
+    })
+    await saveWorkspaceSelection(workspaceId)
+    return { workspaceId }
+  })
+}
 
 export async function createWorkspaceInvitation(input: { workspaceId: string; emails: string[]; role: string }): Promise<ActionResult<{ email: string; path: string }[]>> {
   return runAction(async () => {

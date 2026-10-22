@@ -193,4 +193,3 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
     <IssueDescriptionHistory open={history} onOpenChange={setHistory} number={saved.metadata.number} title={title} currentContent={content} versions={versions} loadingError={!!historyError} onRetry={() => { void refreshVersions() }} onRestore={restore} />
   </div>
 }
-

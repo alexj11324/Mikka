@@ -19,9 +19,10 @@ test('旧预览入口和设置入口均跳转到正式页面', async ({ request 
     expect(`${destination.pathname.replace(/\/$/, '')}${destination.search}`, source).toBe(app(target))
   }
 
-  const settings = await request.get(app('/preview/settings'))
-  const signIn = new URL(settings.url())
-  expect(settings.status()).toBe(200)
-  expect(signIn.pathname).toBe(app('/sign-in'))
-  expect(signIn.searchParams.get('next')).toBe('/settings/members')
+})
+
+test('未登录旧设置入口最终进入登录页并保留返回目标', async ({ page }) => {
+  await page.goto(app('/preview/settings'))
+  await expect(page).toHaveURL(url => url.pathname === app('/sign-in') && url.searchParams.get('next') === '/settings/members')
+  await expect(page.getByLabel('邮箱', { exact: true })).toBeVisible()
 })

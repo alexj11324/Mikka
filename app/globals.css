@@ -1,3 +1,4 @@
+@layer theme, base, openui, components, utilities;
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -71,9 +72,41 @@
 --color-success: var(--success);
 --color-label-violet: var(--label-violet);
 --color-label-blue: var(--label-blue);
+/* Source chips and lists (components/ui/streaming-text), on the shadcn palette so both themes follow. */
+--color-page: var(--page);
+--color-canvas: var(--canvas);
+--color-surface: var(--surface);
+--color-inset: var(--inset);
+--color-hover: var(--hover);
+--color-hover-2: var(--hover-2);
+--color-ink: var(--ink);
+--color-ink-2: var(--ink-2);
+--color-ink-3: var(--ink-3);
+--color-line: var(--line);
+--color-line-strong: var(--line-strong);
+--radius-control: 8px;
+--ease-link: cubic-bezier(0.16, 1, 0.3, 1);
+--shadow-hairline: 0 0 0 1px var(--line);
 }
 
 :root {
+  --diagram-surface: color-mix(in oklch, var(--label-blue) 6%, var(--card));
+  --diagram-border: color-mix(in oklch, var(--label-blue) 30%, var(--border));
+  --diagram-line: color-mix(in oklch, var(--label-blue) 30%, var(--muted-foreground));
+  --diagram-focus-fill: color-mix(in oklch, var(--label-blue) 14%, var(--card));
+  --diagram-success-fill: color-mix(in oklch, var(--success) 12%, var(--card));
+  --diagram-warning-fill: color-mix(in oklch, var(--warning) 12%, var(--card));
+  --page: var(--background);
+  --canvas: var(--muted);
+  --surface: var(--card);
+  --inset: color-mix(in oklch, var(--muted) 70%, var(--background));
+  --hover: var(--accent);
+  --hover-2: color-mix(in oklch, var(--foreground) 9%, var(--background));
+  --ink: var(--foreground);
+  --ink-2: var(--muted-foreground);
+  --ink-3: color-mix(in oklch, var(--muted-foreground) 65%, var(--background));
+  --line: var(--border);
+  --line-strong: color-mix(in oklch, var(--border) 80%, var(--foreground));
   --project-action: oklch(0.56 0.17 277);
   --project-action-foreground: oklch(0.985 0 0);
   --label-violet: var(--color-violet-600);
