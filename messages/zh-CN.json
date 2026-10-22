@@ -131,6 +131,10 @@
     "welcome": "欢迎回来",
     "createDescription": "从第一个任务开始，把想法变成可追踪的进展。",
     "welcomeDescription": "登录 Mikka，继续你的任务与文档。",
+    "continueGoogle": "使用 Google 继续",
+    "googleScope": "仅请求登录所需的基本个人资料与邮箱。",
+    "googleNotConfigured": "Google 登录暂未配置，请使用邮箱继续。",
+    "viewGoogleCallback": "查看 Google OAuth 回调地址",
     "continueGithub": "使用 GitHub 继续",
     "githubScope": "仅获取登录所需的身份与邮箱，不请求仓库读写权限。",
     "githubNotConfigured": "GitHub 登录暂未配置，请使用邮箱继续。",
@@ -143,11 +147,12 @@
     "passwordPlaceholder": "至少 8 位字符",
     "submitCreate": "创建账号并进入",
     "submitSignIn": "登录工作台",
-    "oauthFailed": "GitHub 登录未完成，可能已取消或授权已过期。请重新尝试。",
-    "continueNotice": "请点击下方按钮，在此标签页完成 GitHub 授权。",
-    "tabOpened": "请在新标签页点击 GitHub 登录并完成授权；完成后可刷新此预览。",
+    "oauthFailed": "OAuth 登录未完成，可能已取消或授权已过期。请重新尝试。",
+    "continueNotice": "请点击下方对应的登录按钮，在此标签页完成授权。",
+    "tabOpened": "请在新标签页完成登录；完成后可刷新此预览。",
     "tabBlocked": "浏览器阻止了新标签页，请允许弹出窗口后重试。",
     "githubStartFailed": "暂时无法开始 GitHub 登录，请稍后重试。",
+    "googleStartFailed": "暂时无法开始 Google 登录，请稍后重试。",
     "submitFailed": "操作未成功，请检查填写的信息或稍后重试。",
     "sessionNotKept": "登录已响应，但浏览器未能保持会话。请允许此预览的第三方 Cookie，或在独立标签页打开后登录。",
     "connectionFailed": "暂时无法连接，请稍后重试。",
@@ -1320,6 +1325,10 @@
         "title": "个人资料",
         "description": "查看你在工作区中的账户信息。"
       },
+      "integrations": {
+        "title": "集成",
+        "description": "连接你的 Notion 和 Slack 个人账户。"
+      },
       "workspace": {
         "title": "工作区",
         "description": "当前工作区的基本信息。"
@@ -1356,6 +1365,28 @@
       "urlHelp": "URL 中的标识用于访问工作区。修改地址会影响现有链接。",
       "previewNote": "表单预览：尚未连接工作区存储，修改不会保存。",
       "previewLabel": "工作区表单预览"
+    },
+    "integrations": {
+      "heading": "已连接的应用",
+      "description": "通过 Composio 授权每个账户。",
+      "notion": "Notion",
+      "notionDescription": "连接一个 Notion 工作区。",
+      "slack": "Slack",
+      "slackDescription": "连接一个 Slack 工作区。",
+      "connected": "已连接",
+      "connect": "连接",
+      "disconnect": "断开连接",
+      "working": "处理中…",
+      "loading": "正在读取集成…",
+      "composioNotConfigured": "请在服务器设置 COMPOSIO_API_KEY 后启用连接。",
+      "loadFailed": "无法读取集成状态。",
+      "connectFailed": "无法开始连接，请重试。",
+      "disconnectFailed": "无法断开此账户。",
+      "webhookTitle": "事件接收",
+      "webhookDescription": "此地址会验证并确认 Composio 事件。若要改变 Mikka 数据，需要先选定具体事件和动作。",
+      "webhookPath": "接收地址",
+      "webhookReady": "API 密钥和签名密钥已设置；请在 Composio 注册公网地址以接收事件。",
+      "webhookSecretMissing": "同时设置 COMPOSIO_API_KEY 和 COMPOSIO_WEBHOOK_SECRET 后才能接收已验签的 webhook。"
     },
     "preview": {
       "userName": "预览用户"

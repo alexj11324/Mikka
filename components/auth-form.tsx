@@ -11,7 +11,7 @@ import { withBasePath } from '@/lib/base-path'
 import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
 
-export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, continueGitHub = false, callbackURL, testWorkspaceEnabled = false, next, continueURL }: { mode: 'sign-in' | 'sign-up'; githubEnabled?: boolean; oauthFailed?: boolean; continueGitHub?: boolean; callbackURL?: string; testWorkspaceEnabled?: boolean; next?: string; continueURL?: string }) {
+export function AuthForm({ mode, googleEnabled = false, githubEnabled = false, oauthFailed = false, continueGoogle = false, continueGitHub = false, googleCallbackURL, githubCallbackURL, testWorkspaceEnabled = false, next, continueURL }: { mode: 'sign-in' | 'sign-up'; googleEnabled?: boolean; githubEnabled?: boolean; oauthFailed?: boolean; continueGoogle?: boolean; continueGitHub?: boolean; googleCallbackURL?: string; githubCallbackURL?: string; testWorkspaceEnabled?: boolean; next?: string; continueURL?: string }) {
   const t = useTranslations('Auth')
   const locale = useLocale()
   const returnPath = safeAuthReturn(next)
@@ -22,7 +22,25 @@ export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, con
     : getPathname({ locale, href: returnPath }))
   const signIn = withBasePath(getPathname({ locale, href: '/sign-in' }))
   const [error, setError] = useState(oauthFailed ? t('oauthFailed') : '')
-  const [notice, setNotice] = useState(continueGitHub ? t('continueNotice') : '')
+  const [notice, setNotice] = useState(continueGoogle || continueGitHub ? t('continueNotice') : '')
+  async function signInWithGoogle() {
+    if (pending || !googleEnabled) return
+    if (window.self !== window.top) {
+      const tab = window.open(`${signIn}?continue=google&next=${encodeURIComponent(returnPath)}`, '_blank')
+      if (tab) tab.opener = null
+      setNotice(tab ? t('tabOpened') : t('tabBlocked'))
+      return
+    }
+    setPending(true); setError(''); setNotice('')
+    try {
+      const result = await authClient.signIn.social({ provider: 'google', callbackURL: home, errorCallbackURL: `${signIn}?oauth=failed&next=${encodeURIComponent(returnPath)}`, disableRedirect: true })
+      if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
+      window.location.assign(result.data.url)
+    } catch {
+      setError(t('googleStartFailed'))
+      setPending(false)
+    }
+  }
   async function signInWithGitHub() {
     if (pending || !githubEnabled) return
     if (window.self !== window.top) {
@@ -87,7 +105,7 @@ export function AuthForm({ mode, githubEnabled = false, oauthFailed = false, con
     }
   }
   return <Auth registering={registering} next={returnPath}>
-    <SignInCard registering={registering} pending={pending} githubEnabled={githubEnabled} error={error} notice={notice} callbackURL={callbackURL} next={returnPath} onSubmit={submit} onGitHubSignIn={signInWithGitHub} />
+    <SignInCard registering={registering} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} error={error} notice={notice} googleCallbackURL={googleCallbackURL} githubCallbackURL={githubCallbackURL} next={returnPath} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} />
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
       <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>{t('testWorkspaceCta')}</Button>
       <p className="text-muted-foreground text-xs">{t('testWorkspaceHint')}</p>

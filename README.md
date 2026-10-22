@@ -22,6 +22,19 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+### Google login and Composio
+
+Copy `.env.example` to `.env.local` and add the local database, Better Auth, and provider credentials. The app is served at `/mikka`, so register both Google OAuth redirect URIs in Google Cloud:
+
+```text
+http://localhost:3000/mikka/api/auth/callback/google
+https://app.aspectlylabs.com/mikka/api/auth/callback/google
+```
+
+Google login requests only the standard sign-in identity and email scopes. `BETTER_AUTH_URL` is the origin (`http://localhost:3000` locally and `https://app.aspectlylabs.com` in production); the auth route adds `/mikka/api/auth`. Production falls back to Vercel's project URL when `BETTER_AUTH_URL` is unset. Notion and Slack connections use Composio-managed OAuth and the signed-in Mikka user ID; set `COMPOSIO_API_KEY` on the server to enable them.
+
+Composio trigger deliveries use `POST /mikka/api/webhooks/composio` and require both `COMPOSIO_API_KEY` and `COMPOSIO_WEBHOOK_SECRET`. Register `https://app.aspectlylabs.com/mikka/api/webhooks/composio` with Composio, then store the signing secret. Local webhook testing needs a public HTTPS tunnel. The receiver verifies and acknowledges events; app-specific event actions still need to be selected.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 ## Learn More

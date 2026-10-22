@@ -39,7 +39,7 @@ function CreateLoading() {
 const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })
 const CreateIssueDialog = dynamic(() => import('./create-issue-dialog').then(module => module.CreateIssueDialog), { loading: CreateLoading })
 
-export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'projects' }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection }) {
+export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'projects', initialSettingsSection }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' }) {
   const { data: workspaceData } = useWorkspace(user.email)
   const t = useTranslations('Workspace')
   const tIssue = useTranslations('Issue')
@@ -58,8 +58,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     'all-issues': tOverview('sections.allIssues'),
   }
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members'; invite: boolean }>({ section: 'preferences', invite: false })
+  const [settingsOpen, setSettingsOpen] = useState(initialSettingsSection === 'integrations')
+  const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members' | 'integrations'; invite: boolean }>({ section: initialSettingsSection ?? 'preferences', invite: false })
   const [boardBusy, setBoardBusy] = useState(false)
   const { data: tasks = [], mutate, error } = useSWR(['issues', user.id], listIssues, { fallbackData: initialIssues, revalidateOnMount: false, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)
@@ -111,6 +111,13 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       setDirty(false)
       await action()
     } finally { leaving.current = false }
+  }
+  function closeSettings() {
+    setSettingsOpen(false)
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has('settings')) return
+    url.searchParams.delete('settings')
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
   }
   function showIssue(id: string | null) {
     setSelected(id); setDraftKey(value => value + 1)
@@ -175,7 +182,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   const viewTitle = view === 'all' ? t('allIssues') : view === 'mine' ? t('mine') : view === 'shared' ? t('shared') : view === 'favorites' ? t('favorites') : view === 'following' ? t('following') : statusLabel(view)
   return <AppShell fixed={!settingsOpen && !selected && (section === 'agent' || section === 'coordinator' || (!isProjects && !isOverview && layout === 'board'))}>
-    {settingsOpen ? <SettingsView initialSection={settingsTarget.section} inviteInitially={settingsTarget.invite} user={user} onBack={() => setSettingsOpen(false)} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
+    {settingsOpen ? <SettingsView initialSection={settingsTarget.section} inviteInitially={settingsTarget.invite} user={user} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
     <AppSidebar onWorkspaceChange={async () => { if (boardBusy || leaving.current) return false; let allowed = false; await leave(() => { setSelected(null); setProjectId(null); setQuery(''); allowed = true }); return allowed }} onSettings={(section = 'preferences', invite = false) => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsTarget({ section, invite }); setSettingsOpen(true) }) }} user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
     <AppShellContent hideHeader={!!selected || section === 'agent'} parent={workspaceData?.workspace.name ?? tNav('workspace')} title={sectionTitles[section]} actions={<Button variant="ghost" size="icon-sm" aria-label={t('openSearch')} disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}

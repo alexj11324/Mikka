@@ -5,18 +5,24 @@ import { withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
 
 export const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
+export const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
 export const authBaseURL = appOrigin
 
 export const auth = betterAuth({
   appName: 'Mikka',
   onAPIError: { errorURL: withBasePath('/sign-in?oauth=failed') },
   database: pool,
-  socialProviders: githubEnabled ? {
-    github: {
+  socialProviders: {
+    ...(githubEnabled ? { github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    },
-  } : {},
+    } } : {}),
+    ...(googleEnabled ? { google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      scope: ['openid', 'email', 'profile'],
+    } } : {}),
+  },
   baseURL: authBaseURL,
   // Its routes sit under the app's base path (app/api/auth → /mikka/api/auth).
   basePath: withBasePath('/api/auth'),

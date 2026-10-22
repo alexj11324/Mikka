@@ -11,20 +11,24 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { Separator } from '@/components/ui/separator'
 import { GithubDark } from '@/components/ui/svgs/githubDark'
 import { GithubLight } from '@/components/ui/svgs/githubLight'
+import { Google } from '@/components/ui/svgs/google'
 
 type SignInCardProps = {
   registering: boolean
   pending: boolean
+  googleEnabled: boolean
   githubEnabled: boolean
   error: string
   notice: string
-  callbackURL?: string
+  googleCallbackURL?: string
+  githubCallbackURL?: string
   next?: string
   onSubmit: FormEventHandler<HTMLFormElement>
+  onGoogleSignIn: () => Promise<void>
   onGitHubSignIn: () => Promise<void>
 }
 
-export function SignInCard({ registering, pending, githubEnabled, error, notice, callbackURL, next = '/', onSubmit, onGitHubSignIn }: SignInCardProps) {
+export function SignInCard({ registering, pending, googleEnabled, githubEnabled, error, notice, googleCallbackURL, githubCallbackURL, next = '/', onSubmit, onGoogleSignIn, onGitHubSignIn }: SignInCardProps) {
   const t = useTranslations('Auth')
   return (
     <Card className="w-full max-w-[26rem] overflow-hidden p-0">
@@ -40,6 +44,12 @@ export function SignInCard({ registering, pending, githubEnabled, error, notice,
       </CardHeader>
       <CardContent className="flex flex-col gap-6 px-7 pb-7 sm:px-9 sm:pb-8">
         <div className="flex flex-col gap-3">
+          <Button type="button" variant="outline" className="w-full justify-center px-4" disabled={pending || !googleEnabled} onClick={onGoogleSignIn}>
+            {pending ? <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" /> : <Google className="size-4" />}
+            {t('continueGoogle')}
+          </Button>
+          <p className="text-muted-foreground text-xs leading-5">{googleEnabled ? t('googleScope') : t('googleNotConfigured')}</p>
+          {googleCallbackURL && <details className="text-muted-foreground text-xs"><summary className="cursor-pointer">{t('viewGoogleCallback')}</summary><code className="mt-2 block break-all select-all">{googleCallbackURL}</code></details>}
           <Button type="button" variant="outline" className="w-full justify-center px-4" disabled={pending || !githubEnabled} onClick={onGitHubSignIn}>
             {pending ? <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" /> : <>
               <span aria-hidden="true" className="dark:hidden"><GithubLight className="size-4" /></span>
@@ -48,7 +58,7 @@ export function SignInCard({ registering, pending, githubEnabled, error, notice,
             {t('continueGithub')}
           </Button>
           <p className="text-muted-foreground text-xs leading-5">{githubEnabled ? t('githubScope') : t('githubNotConfigured')}</p>
-          {!githubEnabled && callbackURL && <details className="text-muted-foreground text-xs"><summary className="cursor-pointer">{t('viewCallback')}</summary><code className="mt-2 block break-all select-all">{callbackURL}</code></details>}
+          {!githubEnabled && githubCallbackURL && <details className="text-muted-foreground text-xs"><summary className="cursor-pointer">{t('viewCallback')}</summary><code className="mt-2 block break-all select-all">{githubCallbackURL}</code></details>}
           {notice && <p role="status" className="text-xs leading-5">{notice}</p>}
         </div>
         <div className="flex items-center gap-3">

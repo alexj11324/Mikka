@@ -131,6 +131,10 @@
     "welcome": "Welcome back",
     "createDescription": "Start with your first task and turn ideas into traceable progress.",
     "welcomeDescription": "Sign in to Mikka and continue with your tasks and documents.",
+    "continueGoogle": "Continue with Google",
+    "googleScope": "Only your basic profile and email are requested for sign-in.",
+    "googleNotConfigured": "Google sign-in is not configured yet. Continue with email.",
+    "viewGoogleCallback": "View the Google OAuth callback URL",
     "continueGithub": "Continue with GitHub",
     "githubScope": "Only the identity and email needed to sign in are requested; repository read/write access is not.",
     "githubNotConfigured": "GitHub sign-in is not configured yet. Continue with email.",
@@ -143,11 +147,12 @@
     "passwordPlaceholder": "At least 8 characters",
     "submitCreate": "Create account and continue",
     "submitSignIn": "Sign in to the workspace",
-    "oauthFailed": "GitHub sign-in did not finish. It may have been canceled or expired; please try again.",
-    "continueNotice": "Click the button below to finish GitHub authorization in this tab.",
-    "tabOpened": "Finish GitHub sign-in in the new tab; refresh this preview when done.",
+    "oauthFailed": "OAuth sign-in did not finish. It may have been canceled or expired; please try again.",
+    "continueNotice": "Click the provider button to finish OAuth authorization in this tab.",
+    "tabOpened": "Finish sign-in in the new tab; refresh this preview when done.",
     "tabBlocked": "The browser blocked the new tab. Allow pop-ups and try again.",
     "githubStartFailed": "Could not start GitHub sign-in. Please try again shortly.",
+    "googleStartFailed": "Could not start Google sign-in. Please try again shortly.",
     "submitFailed": "That did not work. Check the information you entered or try again.",
     "sessionNotKept": "Sign-in responded, but the browser did not keep the session. Allow third-party cookies for this preview, or open it in a separate tab and sign in.",
     "connectionFailed": "Could not connect. Please try again shortly.",
@@ -1320,6 +1325,10 @@
         "title": "Profile",
         "description": "See the account details used in your workspace."
       },
+      "integrations": {
+        "title": "Integrations",
+        "description": "Connect your personal Notion and Slack accounts."
+      },
       "workspace": {
         "title": "Workspace",
         "description": "Basic information about the current workspace."
@@ -1356,6 +1365,28 @@
       "urlHelp": "The URL slug identifies the workspace. Changing it affects existing links.",
       "previewNote": "Form preview: workspace storage is not connected, so changes are not saved.",
       "previewLabel": "Workspace form preview"
+    },
+    "integrations": {
+      "heading": "Connected apps",
+      "description": "Authorize each account through Composio.",
+      "notion": "Notion",
+      "notionDescription": "Connect a Notion workspace.",
+      "slack": "Slack",
+      "slackDescription": "Connect a Slack workspace.",
+      "connected": "Connected",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "working": "Working…",
+      "loading": "Loading integrations…",
+      "composioNotConfigured": "Set COMPOSIO_API_KEY on the server to enable connections.",
+      "loadFailed": "Could not load integration status.",
+      "connectFailed": "Could not start the connection. Please try again.",
+      "disconnectFailed": "Could not disconnect this account.",
+      "webhookTitle": "Event delivery",
+      "webhookDescription": "The endpoint verifies and acknowledges Composio events. Choose an event and action before using it to change Mikka data.",
+      "webhookPath": "Receiver endpoint",
+      "webhookReady": "The API key and signing secret are set. Register the public URL in Composio to deliver events.",
+      "webhookSecretMissing": "Set both COMPOSIO_API_KEY and COMPOSIO_WEBHOOK_SECRET to receive verified webhooks."
     },
     "preview": {
       "userName": "Preview user"
