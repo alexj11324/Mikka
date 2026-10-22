@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth, authBaseURL } from '@/lib/auth'
+import { BASE_PATH } from '@/lib/base-path'
 import { COMPOSIO_TOOLKITS, getComposio, isComposioToolkit } from '@/lib/composio'
+import { isComposioCallbackVerifierConfigured } from '@/lib/composio-config'
 import { listComposioPages } from '@/lib/composio-pagination'
-import { withBasePath } from '@/lib/base-path'
 
 const connectSchema = z.object({ toolkit: z.enum(COMPOSIO_TOOLKITS) })
 const disconnectSchema = z.object({ accountId: z.string().trim().min(1).max(255) })
@@ -16,16 +17,17 @@ export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
   const composio = getComposio()
-  const webhookConfigured = Boolean(composio && process.env.COMPOSIO_WEBHOOK_SECRET)
+  const callbackVerifierConfigured = isComposioCallbackVerifierConfigured(authBaseURL, BASE_PATH)
+  const webhookConfigured = Boolean(process.env.COMPOSIO_API_KEY && process.env.COMPOSIO_WEBHOOK_SECRET)
   if (!composio) {
-    return NextResponse.json({ configured: false, webhookConfigured, accounts: [] }, { headers: { 'Cache-Control': 'private, no-store' } })
+    return NextResponse.json({ configured: false, callbackVerifierConfigured, webhookConfigured, accounts: [] }, { headers: { 'Cache-Control': 'private, no-store' } })
   }
   try {
     const items = await listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [session.user.id], cursor }))
     const accounts = items
       .filter(account => isComposioToolkit(account.toolkit.slug))
       .map(account => ({ id: account.id, toolkit: account.toolkit.slug, status: account.status }))
-    return NextResponse.json({ configured: true, webhookConfigured, accounts }, { headers: { 'Cache-Control': 'private, no-store' } })
+    return NextResponse.json({ configured: true, callbackVerifierConfigured, webhookConfigured, accounts }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch {
     return NextResponse.json({ error: 'integrationsUnavailable' }, { status: 502 })
   }
@@ -39,11 +41,10 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: 'invalidIntegration' }, { status: 400 })
   const composio = getComposio()
   if (!composio) return NextResponse.json({ error: 'composioNotConfigured' }, { status: 503 })
-  if (!authBaseURL) return NextResponse.json({ error: 'serverUrlNotConfigured' }, { status: 503 })
+  if (!isComposioCallbackVerifierConfigured(authBaseURL, BASE_PATH)) return NextResponse.json({ error: 'callbackVerifierNotConfigured' }, { status: 503 })
   try {
-    const callbackURL = new URL(withBasePath('/?settings=integrations'), authBaseURL).toString()
     const composioSession = await composio.create(session.user.id)
-    const connection = await composioSession.authorize(parsed.data.toolkit, { callbackUrl: callbackURL })
+    const connection = await composioSession.authorize(parsed.data.toolkit)
     if (!connection.redirectUrl) return NextResponse.json({ error: 'integrationStartFailed' }, { status: 502 })
     return NextResponse.json({ redirectUrl: connection.redirectUrl }, { headers: { 'Cache-Control': 'no-store' } })
   } catch {

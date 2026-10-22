@@ -12,6 +12,13 @@ export const auth = betterAuth({
   appName: 'Mikka',
   onAPIError: { errorURL: withBasePath('/sign-in?oauth=failed') },
   database: pool,
+  account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [] } },
+  databaseHooks: {
+    account: {
+      create: { before: async account => ({ data: { ...account, idToken: null } }) },
+      update: { before: async account => ({ data: { ...account, idToken: null } }) },
+    },
+  },
   socialProviders: {
     ...(githubEnabled ? { github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
@@ -21,6 +28,8 @@ export const auth = betterAuth({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       scope: ['openid', 'email', 'profile'],
+      includeGrantedScopes: false,
+      requireEmailVerification: true,
     } } : {}),
   },
   baseURL: authBaseURL,

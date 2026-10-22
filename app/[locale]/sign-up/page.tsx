@@ -6,8 +6,8 @@ import { getLocale, getTranslations } from 'next-intl/server'
 import { AuthForm } from '@/components/auth-form'
 import { getPathname, redirect } from '@/i18n/navigation'
 import { auth, authBaseURL, githubEnabled, googleEnabled } from '@/lib/auth'
-import { BASE_PATH } from '@/lib/base-path'
-import { safeAuthReturn } from '@/lib/auth-return'
+import { BASE_PATH, withBasePath } from '@/lib/base-path'
+import { COMPOSIO_AUTH_CALLBACK_PATH, safeAuthReturn } from '@/lib/auth-return'
 import { authCallbackURL } from '@/lib/auth-callback'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -16,14 +16,16 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t('signUpTitle'), description: t('signUpDescription') }
 }
 
-export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ next?: string; oauth?: string; error?: string }> }) {
   const query = await searchParams
   const next = safeAuthReturn(query.next)
+  const composioResume = next === COMPOSIO_AUTH_CALLBACK_PATH ? withBasePath(next) : undefined
   const session = await auth.api.getSession({ headers: await headers() })
   if (session?.user) {
+    if (composioResume) plainRedirect(composioResume)
     const locale = await getLocale()
     if (next.startsWith('/?')) plainRedirect(`${getPathname({ locale, href: '/' })}${next.slice(1)}`)
     redirect({ href: next, locale })
   }
-  return <AuthForm next={next} mode="sign-up" googleEnabled={googleEnabled} githubEnabled={githubEnabled} googleCallbackURL={authCallbackURL(authBaseURL, 'google', BASE_PATH)} githubCallbackURL={authCallbackURL(authBaseURL, 'github', BASE_PATH)} />
+  return <AuthForm next={next} mode="sign-up" googleEnabled={googleEnabled} githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean(query.error)} continueComposio={Boolean(composioResume)} continueURL={composioResume} googleCallbackURL={authCallbackURL(authBaseURL, 'google', BASE_PATH)} githubCallbackURL={authCallbackURL(authBaseURL, 'github', BASE_PATH)} />
 }

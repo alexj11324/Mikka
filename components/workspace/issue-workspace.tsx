@@ -39,7 +39,7 @@ function CreateLoading() {
 const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })
 const CreateIssueDialog = dynamic(() => import('./create-issue-dialog').then(module => module.CreateIssueDialog), { loading: CreateLoading })
 
-export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'projects', initialSettingsSection }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' }) {
+export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'projects', initialSettingsSection, googleEnabled }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations'; googleEnabled: boolean }) {
   const { data: workspaceData } = useWorkspace(user.email)
   const t = useTranslations('Workspace')
   const tIssue = useTranslations('Issue')
@@ -182,7 +182,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   const viewTitle = view === 'all' ? t('allIssues') : view === 'mine' ? t('mine') : view === 'shared' ? t('shared') : view === 'favorites' ? t('favorites') : view === 'following' ? t('following') : statusLabel(view)
   return <AppShell fixed={!settingsOpen && !selected && (section === 'agent' || section === 'coordinator' || (!isProjects && !isOverview && layout === 'board'))}>
-    {settingsOpen ? <SettingsView initialSection={settingsTarget.section} inviteInitially={settingsTarget.invite} user={user} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
+    {settingsOpen ? <SettingsView initialSection={settingsTarget.section} inviteInitially={settingsTarget.invite} user={user} googleEnabled={googleEnabled} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
     <AppSidebar onWorkspaceChange={async () => { if (boardBusy || leaving.current) return false; let allowed = false; await leave(() => { setSelected(null); setProjectId(null); setQuery(''); allowed = true }); return allowed }} onSettings={(section = 'preferences', invite = false) => { if (!boardBusy && !leaving.current) void leave(() => { setSettingsTarget({ section, invite }); setSettingsOpen(true) }) }} user={user} section={section} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
     <AppShellContent hideHeader={!!selected || section === 'agent'} parent={workspaceData?.workspace.name ?? tNav('workspace')} title={sectionTitles[section]} actions={<Button variant="ghost" size="icon-sm" aria-label={t('openSearch')} disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}

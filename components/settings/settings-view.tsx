@@ -27,7 +27,7 @@ const SECTIONS = [
   { id: 'members', group: 'workspace', icon: UserRound },
 ] as const
 
-export function SettingsView({ user, onBack, onSignOut, signingOut, accountError, initialSection = 'preferences', inviteInitially = false, workspaceId }: { user: { name: string; email: string }; onBack: () => void; onSignOut: () => void; signingOut: boolean; accountError: string; initialSection?: 'preferences' | 'members' | 'integrations'; inviteInitially?: boolean; workspaceId?: string }) {
+export function SettingsView({ user, googleEnabled, onBack, onSignOut, signingOut, accountError, initialSection = 'preferences', inviteInitially = false, workspaceId }: { user: { name: string; email: string }; googleEnabled: boolean; onBack: () => void; onSignOut: () => void; signingOut: boolean; accountError: string; initialSection?: 'preferences' | 'members' | 'integrations'; inviteInitially?: boolean; workspaceId?: string }) {
   const { data: workspaceData } = useWorkspace(user.email, workspaceId)
   const t = useTranslations('Settings')
   const navT = useTranslations('Nav')
@@ -72,7 +72,7 @@ export function SettingsView({ user, onBack, onSignOut, signingOut, accountError
         {accountError && <p role="alert" className="text-sm text-destructive">{accountError}</p>}
         {section === 'preferences' && <SettingsSection id="appearance-heading" title={t('appearance.title')}><SettingRow title={t('appearance.theme')} description={t('appearance.themeDescription')}><ToggleGroup aria-label={t('appearance.themeLabel')} variant="outline" spacing={0} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}><ToggleGroupItem value="light" aria-label={t('appearance.light')}><Sun />{t('appearance.light')}</ToggleGroupItem><ToggleGroupItem value="dark" aria-label={t('appearance.dark')}><Moon />{t('appearance.dark')}</ToggleGroupItem><ToggleGroupItem value="system" aria-label={t('appearance.systemLabel')}><Monitor />{t('appearance.system')}</ToggleGroupItem></ToggleGroup></SettingRow><SettingRow title={t('appearance.language')} description={t('appearance.languageDescription')}><span className="text-muted-foreground">{t('appearance.languageName')}</span></SettingRow></SettingsSection>}
         {section === 'profile' && <div className="flex flex-col gap-3"><SettingsSection id="profile-heading" title={t('profile.heading')}><SettingRow title={t('profile.avatar')} description={t('profile.avatarDescription')}><Avatar className="size-10"><AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></SettingRow><SettingRow title={t('profile.name')}><span>{user.name || t('profile.notSet')}</span></SettingRow><SettingRow title={t('profile.email')}><span className="break-all">{user.email}</span></SettingRow></SettingsSection><p className="text-xs text-muted-foreground">{t('profile.readOnly')}</p></div>}
-        {section === 'integrations' && <IntegrationsSettings />}
+        {section === 'integrations' && <IntegrationsSettings googleEnabled={googleEnabled} />}
         {section === 'workspace' && <WorkspaceSettings userKey={user.email} workspaceId={workspaceId} />}
         {section === 'members' && <MembersPanel userKey={user.email} workspaceId={workspaceId} inviteInitially={inviteInitially} />}
       </div>

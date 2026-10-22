@@ -36,6 +36,7 @@ jobs:
       - run: pnpm test:i18n
       - run: pnpm i18n:check
       - run: pnpm test:ssh-target
+      - run: pnpm test:auth-composio
       - run: pnpm test:csv
       - run: pnpm test:issues
       - name: Audit business UI composition

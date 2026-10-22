@@ -31,9 +31,11 @@ http://localhost:3000/mikka/api/auth/callback/google
 https://app.aspectlylabs.com/mikka/api/auth/callback/google
 ```
 
-Google login requests only the standard sign-in identity and email scopes. `BETTER_AUTH_URL` is the origin (`http://localhost:3000` locally and `https://app.aspectlylabs.com` in production); the auth route adds `/mikka/api/auth`. Production falls back to Vercel's project URL when `BETTER_AUTH_URL` is unset. Notion and Slack connections use Composio-managed OAuth and the signed-in Mikka user ID; set `COMPOSIO_API_KEY` on the server to enable them.
+Google login requests only the standard sign-in identity and email scopes. Set `BETTER_AUTH_URL` to the origin (`http://localhost:3000` locally and `https://app.aspectlylabs.com` in Production); Better Auth adds `/mikka/api/auth`. Keep the Production value on the custom domain so its Google callback matches the registered URI. Existing email/password users can sign in with their password and link Google under Settings → Integrations; Mikka keeps Better Auth's verified-email account-linking check enabled.
 
-Composio trigger deliveries use `POST /mikka/api/webhooks/composio` and require both `COMPOSIO_API_KEY` and `COMPOSIO_WEBHOOK_SECRET`. Register `https://app.aspectlylabs.com/mikka/api/webhooks/composio` with Composio, then store the signing secret. Local webhook testing needs a public HTTPS tunnel. The receiver verifies and acknowledges events; app-specific event actions still need to be selected.
+Notion and Slack connections use Composio-managed OAuth and the signed-in Mikka user ID. Set `COMPOSIO_API_KEY` on the server and configure Composio's callback verifier to `https://app.aspectlylabs.com/mikka/api/integrations/composio/callback`. Set the same URL in `COMPOSIO_CALLBACK_VERIFIER_URL`; Mikka only starts connection flows when the values match. Composio keeps the connection pending until the signed-in Mikka user completes it. Local connection testing requires an HTTPS tunnel and a Composio project configured for that tunnel.
+
+Composio event deliveries use `POST /mikka/api/webhooks/composio`. Set `COMPOSIO_API_KEY` and `COMPOSIO_WEBHOOK_SECRET` on the server and register `https://app.aspectlylabs.com/mikka/api/webhooks/composio` in Composio. The receiver verifies and acknowledges events; app-specific event actions still need to be selected. Local webhook testing needs a public HTTPS tunnel.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
