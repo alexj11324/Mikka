@@ -174,6 +174,12 @@ export const runChunks = pgTable('run_chunks', {
  */
 export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
+/**
+ * How much an event matters: `attention` needs the person, `result` is worth
+ * a short note, `background` waits for the next turn without waking one.
+ */
+export const COORDINATOR_EVENT_TIERS = ['attention', 'result', 'background'] as const
+export type CoordinatorEventTier = (typeof COORDINATOR_EVENT_TIERS)[number]
 
 export const coordinatorEvents = pgTable('coordinator_events', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
@@ -182,6 +188,8 @@ export const coordinatorEvents = pgTable('coordinator_events', {
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
   runId: uuid('runId').references(() => agentRuns.id, { onDelete: 'cascade' }),
   payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+  /** Null until triaged; an untriaged event wakes the Coordinator. */
+  tier: text('tier').$type<CoordinatorEventTier>(),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt)])
