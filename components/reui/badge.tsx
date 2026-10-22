@@ -99,4 +99,8 @@ function Badge({
   })
 }
 
-export { Badge, badgeVariants, type BadgeProps }
+function BadgeButton({ disabled, ...props }: BadgeProps & { disabled?: boolean }) {
+  return <Badge {...props} render={<button type="button" disabled={disabled} />} />
+}
+
+export { Badge, BadgeButton, badgeVariants, type BadgeProps }

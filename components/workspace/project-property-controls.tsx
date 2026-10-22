@@ -15,7 +15,8 @@ import { Input } from '@/components/ui/input'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { PROJECT_HEALTH, PROJECT_PRIORITIES, PROJECT_STATUSES, type Project, type ProjectControlField } from './project-properties'
 
-import { statusTone, statusDots, type StatusTone } from '@/lib/status-appearance'
+import { statusTone, statusDots, statusTones, type StatusTone } from '@/lib/status-appearance'
+import { BadgeButton } from '@/components/reui/badge'
 
 type Choice = { value: string; label: string; icon?: LucideIcon; description?: string; tone?: StatusTone }
 export function ProjectPicker({ label, title, children, choices, selected, onChange, multiple = false, onCreate, createDisabled = false, disabled, plain = false, tone }: { tone?: StatusTone; label: string; title: string; children: ReactNode; choices: Choice[]; selected: string[]; onChange: (value: string) => void; multiple?: boolean; onCreate?: (value: string) => void; createDisabled?: boolean; disabled?: boolean; plain?: boolean }) {
@@ -34,7 +35,7 @@ export function ProjectPicker({ label, title, children, choices, selected, onCha
     setCreateDraft(null)
   }
   return <Popover open={open} onOpenChange={value => { setOpen(value); if (!value) { setQuery(''); setCreateDraft(null) } }}>
-    <PopoverTrigger render={<Button type="button" variant={plain ? 'ghost' : 'outline'} size="sm" disabled={disabled} aria-label={label} tone={tone} className={cn('h-7 max-w-full justify-start gap-1.5', !tone && !plain && 'rounded-full bg-muted/40 px-2 text-muted-foreground', plain && 'px-2 font-normal')} />}>{children}</PopoverTrigger>
+    {tone ? <PopoverTrigger render={<BadgeButton disabled={disabled} variant="outline" size="xl" className={cn('cursor-pointer px-2 py-0.5 hover:brightness-95', statusTones[tone])} aria-label={label} />}>{choices.find(choice => selected.includes(choice.value))?.label ?? label}</PopoverTrigger> : <PopoverTrigger render={<Button type="button" variant={plain ? 'ghost' : 'outline'} size="sm" disabled={disabled} aria-label={label} className={cn('h-7 max-w-full justify-start gap-1.5', !plain && 'rounded-full bg-muted/40 px-2 text-muted-foreground', plain && 'px-2 font-normal')} />}>{children}</PopoverTrigger>}
     <PopoverContent align="start" className="w-64 p-0">
       <Command><CommandInput aria-label={t('picker.searchLabel', { label: title })} placeholder={t('picker.searchPlaceholder', { label: title })} value={query} onValueChange={setQuery} />
         <CommandList><CommandEmpty>{onCreate ? t('picker.noMatchesCreate') : t('picker.noOptions')}</CommandEmpty><CommandGroup heading={title}>{choices.map(choice => <CommandItem key={choice.value} disabled={disabled} value={`${choice.label} ${choice.value}`} data-checked={selected.includes(choice.value)} aria-selected={selected.includes(choice.value)} onSelect={() => { onChange(choice.value); if (!multiple) setOpen(false) }}>{choice.tone ? <span aria-hidden="true" className={cn('size-2.5 shrink-0 rounded-full', statusDots[choice.tone])} /> : choice.icon && <choice.icon />}<span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="truncate">{choice.label}</span>{choice.description && <span className="text-xs text-muted-foreground">{choice.description}</span>}</span></CommandItem>)}
