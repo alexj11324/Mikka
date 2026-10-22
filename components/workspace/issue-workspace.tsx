@@ -29,7 +29,7 @@ import { PluginsSkillsView } from '@/components/plugins/plugins-skills-view'
 import type { WorkspaceSection } from './workspace-navigation'
 import type { AgentHistory } from '@/lib/agent-history'
 import { useAgentHistory } from '@/hooks/use-agent-history'
-import { loadAgentPanel, loadCoordinatorChat } from './chat-preload'
+import { loadAgentPanel } from './chat-preload'
 
 function DetailLoading() {
   const t = useTranslations('Workspace')
@@ -47,7 +47,6 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   useAgentHistory(user.id, initialAgentHistory)
   useEffect(() => {
     void loadAgentPanel().catch(() => {})
-    void loadCoordinatorChat().catch(() => {})
   }, [])
   const t = useTranslations('Workspace')
   const tIssue = useTranslations('Issue')
