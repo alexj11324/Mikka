@@ -107,17 +107,18 @@ function statusLabel(status: string, t: Translator) {
 }
 
 async function findAccessibleIssues(tx: Transaction, userId: string, match?: { id: string } | { number: number }) {
-  const condition = match?.id
+  const metadata = sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')`
+  const condition = match && 'id' in match
     ? eq(issues.id, match.id)
-    : match?.number
-      ? sql.raw("issues.content->'attrs'->'orvilo'->>'number' = '" + String(match.number) + "'")
+    : match && 'number' in match
+      ? sql`${metadata}->>'number' = ${String(match.number)}`
       : undefined
   const rows = await tx.select({ issue: issues }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(
       or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)),
       condition,
-      sql.raw("issues.content->'attrs'->'orvilo'->>'deletedAt' is null"),
+      sql`${metadata}->>'deletedAt' is null`,
     ))
     .orderBy(desc(issues.updatedAt))
     .limit(match ? 3 : 10)
