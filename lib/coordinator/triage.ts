@@ -7,7 +7,7 @@ import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema
 
 /** The decision model on Workers AI. */
 export const TRIAGE_MODEL = 'clef'
-/** At or above this probability, a finished run needs the person. */
+/** At or above this probability, an event needs the person. */
 export const ATTENTION_THRESHOLD = 0.5
 
 interface TriageEvent { kind: CoordinatorEventKind; payload: Record<string, unknown> }
@@ -24,24 +24,34 @@ export function ruleTier(event: TriageEvent): CoordinatorEventTier | null {
       if (event.payload.status === 'stopped' || event.payload.status === 'cancelled') return 'background'
       // A success that says nothing needs no judgment.
       return typeof event.payload.summary === 'string' && event.payload.summary.trim() ? null : 'result'
+    // An agent that asks or is stuck waits on the person.
+    case 'run_question':
+    case 'run_blocked':
+      return 'attention'
+    // A progress note is background unless the decision model sees something in it.
+    case 'run_report':
+      return typeof event.payload.text === 'string' && event.payload.text.trim() ? null : 'background'
   }
 }
 
-/** What the decision model reads about a finished run. */
+/** What the decision model reads about an event the rules left open. */
 export function triageState(event: TriageEvent) {
+  if (event.kind === 'run_report') return { agentProgressNote: String(event.payload.text ?? '').slice(0, 4000) }
   return { status: String(event.payload.status), stopReason: String(event.payload.stopReason), agentSummary: String(event.payload.summary ?? '').slice(0, 4000) }
 }
 
-export const TRIAGE_QUESTIONS = {
-  needsPerson: {
-    type: 'noul',
-    instructions: 'A coding agent finished a run and wrote this summary. Does the person need to look at it themselves: the agent says it could not finish or could not verify its work, hit a blocker, made a risky or surprising change, or is waiting for a decision?',
-  },
-} as const
+const FINISHED_QUESTION = 'A coding agent finished a run and wrote this summary. Does the person need to look at it themselves: the agent says it could not finish or could not verify its work, hit a blocker, made a risky or surprising change, or is waiting for a decision?'
+const REPORT_QUESTION = 'A coding agent is still working and sent this progress note. Does the person need to hear about it now, rather than with the final result: it changes the plan or scope, touches something risky (data, schema, auth, billing, production, deleting things), reports a problem or a surprising finding, or hints that it will need a decision?'
 
-/** The tier for a finished run from the model's probability that it needs the person. */
-export function tierFromDecision(needsPerson: number): CoordinatorEventTier {
-  return needsPerson >= ATTENTION_THRESHOLD ? 'attention' : 'result'
+/** The question the decision model answers, always under the key `needsPerson`. */
+export function triageQuestions(event: TriageEvent) {
+  return { needsPerson: { type: 'noul', instructions: event.kind === 'run_report' ? REPORT_QUESTION : FINISHED_QUESTION } } as const
+}
+
+/** The tier from the model's probability that the event needs the person. Below the threshold a finished run is a result and a progress note stays background. */
+export function tierFromDecision(needsPerson: number, kind: CoordinatorEventKind = 'run_finished'): CoordinatorEventTier {
+  if (needsPerson >= ATTENTION_THRESHOLD) return 'attention'
+  return kind === 'run_report' ? 'background' : 'result'
 }
 
 /** Keeps waking events in the next batch while showing selected events chronologically. */

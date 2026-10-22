@@ -1,12 +1,13 @@
 'use server'
 
-import { and, desc, eq, or, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { getTranslations } from 'next-intl/server'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { issues, issueMembers, issueVersions } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
+import { issueOwnerScope } from '@/lib/issue-owner-scope'
 import { issueWithMetadata, readIssueMetadata, withIssueMetadata, type IssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers } from '@/lib/issue-numbering'
 import { createsIssueCycle } from '@/lib/issue-relations'
@@ -18,7 +19,7 @@ export async function listIssueConnections(id: string) {
   const { issue, user } = await requireIssueAccess(id)
   const rows = await db.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, content: issues.content }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, user.id)))
-    .where(and(eq(issues.userId, issue.userId), or(eq(issues.userId, user.id), eq(issueMembers.memberId, user.id)))).orderBy(desc(issues.updatedAt))
+    .where(issueOwnerScope(user.id, issue.userId)).orderBy(desc(issues.updatedAt))
   return rows.filter(row => !readIssueMetadata(row.content).deletedAt).map(({ content, ...row }) => ({ ...row, metadata: readIssueMetadata(content) }))
 }
 

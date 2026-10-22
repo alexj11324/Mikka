@@ -236,6 +236,13 @@ export const runAssignmentSchema = z.object({
   /** Run lease; renewed through the device heartbeat. */
   leaseExpiresAt: isoTime.optional(),
   /**
+   * The Mikka MCP server for the agent inside this run: `report`, `ask` and
+   * `blocked` reach the person's Coordinator. Send `token` as a bearer token;
+   * it stops working when the run ends. Absent: the server could not issue
+   * one, and the run goes ahead without it.
+   */
+  mcp: z.object({ url: z.url(), token: z.string().min(1).max(200) }).optional(),
+  /**
    * What the orchestrator dispatched this run for (ADR 0023). `plan` writes a
    * spec and proposes a split instead of changing code (ADR ORV-205).
    */

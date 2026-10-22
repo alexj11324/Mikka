@@ -1,6 +1,32 @@
 import type { Page, TestInfo } from '@playwright/test'
 import { test, expect, register, BASE_PATH } from './fixtures'
 
+test('移动侧栏在水合与尺寸检测完成前不可点击，就绪后首次点击即可打开', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await register(page)
+
+  let releaseScripts!: () => void
+  const scriptsReady = new Promise<void>(resolve => { releaseScripts = resolve })
+  await page.route('**/*.js', async route => {
+    await scriptsReady
+    await route.continue()
+  })
+  try {
+    await page.reload({ waitUntil: 'commit' })
+    const trigger = page.getByRole('button', { name: '展开或收起侧栏', exact: true })
+    await expect(trigger).toBeVisible()
+    await expect(trigger).toBeDisabled()
+    releaseScripts()
+    await expect(trigger).toBeEnabled()
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await trigger.click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+  } finally {
+    releaseScripts()
+    await page.unrouteAll({ behavior: 'wait' })
+  }
+})
+
 const budgetMs = 1000
 
 type Destination = { path: string; selectors: string[]; text?: string }
@@ -49,8 +75,8 @@ async function measureNavigation(page: Page, info: TestInfo, name: string, desti
 
 const preferences: Destination = { path: '/', selectors: ['main [aria-label="界面主题"]', 'main button[aria-label="浅色"]'] }
 const profile: Destination = { path: '/', selectors: ['main section[aria-labelledby="profile-heading"]'], text: '回归测试成员' }
-const workspace: Destination = { path: '/', selectors: ['main section[aria-label="工作区基本信息"]', '#workspace-name', '#workspace-url'] }
-const members: Destination = { path: '/settings/members', selectors: ['input[aria-label="搜索成员或邀请"]', 'main table tbody'], text: '回归测试成员' }
+const workspace: Destination = { path: '/', selectors: ['main section[aria-label="工作区基本信息"]', '#workspace-name', '#workspace-id'] }
+const members: Destination = { path: '/', selectors: ['input[aria-label="搜索成员或邀请"]', 'main table tbody'], text: '回归测试成员' }
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   test(`进入设置、设置分区互切与成员页均不超过 1 秒 (${viewport.width}px)`, { tag: '@performance' }, async ({ page }, info) => {
@@ -85,8 +111,11 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     if (mobile) await expect(page.getByRole('dialog')).toBeHidden()
     await expect(page.getByRole('heading', { level: 1, name: '偏好设置' })).toBeHidden()
     sidebar = await openSidebar()
-    const membersLink = sidebar.getByRole('link', { name: '成员管理', exact: true })
-    await measureNavigation(page, info, '工作台进入成员管理', members, () => membersLink.click())
+    await sidebar.getByRole('button', { name: '账户菜单', exact: true }).click()
+    await measureNavigation(page, info, '重新进入设置', preferences, () => page.getByRole('menuitem', { name: '设置', exact: true }).click())
+    sidebar = await openSidebar()
+    const membersButton = sidebar.getByRole('button', { name: '成员', exact: true })
+    await measureNavigation(page, info, '设置进入成员管理', members, () => membersButton.click())
     // 真实输入验证内容已水合、可操作，而不是仅服务器 HTML 可见。
     await page.getByRole('textbox', { name: '搜索成员或邀请', exact: true }).fill('不匹配的搜索词')
     await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toHaveCount(0)

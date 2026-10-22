@@ -1,10 +1,20 @@
+@layer theme, base, openui, components, utilities;
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "@heroui/styles/components/calendar.css";
+@import "@heroui/styles/utilities";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+--color-accent-soft: var(--accent);
+--color-accent-soft-foreground: var(--accent-foreground);
+--color-accent-soft-hover: var(--secondary);
+--color-accent-hover: var(--secondary);
+--color-default: var(--muted);
+--color-focus: var(--ring);
+--color-danger: var(--destructive);
 --font-sans: var(--font-geist), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
 --font-heading: var(--font-sans);
 --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -80,6 +90,12 @@
 }
 
 :root {
+  --diagram-surface: color-mix(in oklch, var(--label-blue) 6%, var(--card));
+  --diagram-border: color-mix(in oklch, var(--label-blue) 30%, var(--border));
+  --diagram-line: color-mix(in oklch, var(--label-blue) 30%, var(--muted-foreground));
+  --diagram-focus-fill: color-mix(in oklch, var(--label-blue) 14%, var(--card));
+  --diagram-success-fill: color-mix(in oklch, var(--success) 12%, var(--card));
+  --diagram-warning-fill: color-mix(in oklch, var(--warning) 12%, var(--card));
   --page: var(--background);
   --canvas: var(--muted);
   --surface: var(--card);

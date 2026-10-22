@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { issueDoneEvent, runFinishedEvent } from './coordinator-events'
+import { issueDoneEvent, runBlockedEvent, runFinishedEvent, runQuestionEvent, runReportEvent } from './coordinator-events'
 
 const issue = { id: 'issue-1', userId: 'user-1', title: 'Fix login', status: 'done', revision: 4 }
 
@@ -20,4 +20,20 @@ test('a finished run is one event per run, with its summary', () => {
   assert.equal(event.dedupeKey, 'run_finished:run-1')
   assert.deepEqual(event.payload, { status: 'succeeded', stopReason: 'submitted', runKind: 'implement', summary: 'Fixed the redirect' })
   assert.equal(runFinishedEvent(run).payload.summary, null)
+})
+
+const workerRun = { id: 'run-1', userId: 'user-1', issueId: 'issue-1' }
+
+test('worker tool calls become events on the run, each one new', () => {
+  const first = runReportEvent(workerRun, 'Tests pass')
+  assert.equal(first.kind, 'run_report')
+  assert.match(first.dedupeKey, /^run_report:run-1:/)
+  assert.notEqual(first.dedupeKey, runReportEvent(workerRun, 'Tests pass').dedupeKey)
+  assert.deepEqual({ ...first, dedupeKey: '' }, { userId: 'user-1', kind: 'run_report', dedupeKey: '', issueId: 'issue-1', runId: 'run-1', payload: { text: 'Tests pass' } })
+  assert.deepEqual(runBlockedEvent(workerRun, 'No access').payload, { reason: 'No access' })
+})
+
+test('a question keeps only the parts the agent gave', () => {
+  assert.deepEqual(runQuestionEvent(workerRun, { question: 'Rename it?' }).payload, { question: 'Rename it?' })
+  assert.deepEqual(runQuestionEvent(workerRun, { question: 'Which?', options: ['A', 'B'], context: 'Both work' }).payload, { question: 'Which?', options: ['A', 'B'], context: 'Both work' })
 })

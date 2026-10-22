@@ -1,11 +1,10 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionErrorCode } from '@/lib/action-result'
-import { auth } from '@/lib/auth'
+import { currentUser } from '@/lib/acting-user'
 import { projectDb, projects, projectEvents } from '@/lib/db/projects'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { updateIssueMetadata } from '@/app/actions/issue-metadata'
@@ -23,9 +22,9 @@ function validationFailure(error: z.ZodError, fallback: string) {
 }
 
 async function userId() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user.id
+  const user = await currentUser()
+  if (!user) throw new ActionFailureError('authRequired')
+  return user.id
 }
 export async function listProjects() {
   const owner = await userId()

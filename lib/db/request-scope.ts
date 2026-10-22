@@ -2,8 +2,9 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { Pool } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import * as schema from './schema'
+import { mikkaDatabaseURL } from './config'
 
-function createPool(connectionString = process.env.MIKKA_DATABASE_URL ?? process.env.ORVILO_DATABASE_URL) {
+function createPool(connectionString = mikkaDatabaseURL(process.env)) {
   return new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10000, idleTimeoutMillis: 20000 })
 }
 

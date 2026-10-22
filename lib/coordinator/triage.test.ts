@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { chatItems, eventPrompt } from './context'
-import { ATTENTION_THRESHOLD, eventsForInbox, ruleTier, tierFromDecision, triageState } from './triage'
+import { ATTENTION_THRESHOLD, eventsForInbox, ruleTier, tierFromDecision, triageQuestions, triageState } from './triage'
 
 const run = (payload: Record<string, unknown>) => ({ kind: 'run_finished' as const, payload: { stopReason: 'submitted', ...payload } })
 
@@ -42,4 +42,21 @@ test('a waking message reaches a batch ahead of an older background backlog', ()
   assert.equal(batch.length, 50)
   assert.ok(batch.includes(message))
   assert.deepEqual(batch, [...batch].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()))
+})
+
+test('worker events: questions and blocks need the person, reports go to the model', () => {
+  assert.equal(ruleTier({ kind: 'run_question', payload: { question: 'Drop the old table?' } }), 'attention')
+  assert.equal(ruleTier({ kind: 'run_blocked', payload: { reason: 'No database access' } }), 'attention')
+  assert.equal(ruleTier({ kind: 'run_report', payload: { text: ' ' } }), 'background')
+  const report = { kind: 'run_report' as const, payload: { text: 'Migrated the users table' } }
+  assert.equal(ruleTier(report), null)
+  assert.deepEqual(triageState(report), { agentProgressNote: 'Migrated the users table' })
+  assert.match(triageQuestions(report).needsPerson.instructions, /progress note/)
+  assert.equal(tierFromDecision(0.9, 'run_report'), 'attention')
+  assert.equal(tierFromDecision(0.1, 'run_report'), 'background')
+})
+
+test('a worker question tells the Coordinator to relay the answer', () => {
+  const text = eventPrompt({ kind: 'run_question', issueId: null, runId: 'r2', payload: { question: 'Keep v1?', options: ['Yes', 'No'] }, tier: 'attention' })
+  assert.match(text, /asks the person: Keep v1\?\nOptions: Yes \/ No\n.*send_to_run/)
 })

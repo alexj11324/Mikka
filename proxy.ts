@@ -1,8 +1,27 @@
 import createMiddleware from 'next-intl/middleware'
-
+import { NextResponse, type NextRequest } from 'next/server'
 import { routing } from './i18n/routing'
 
-export default createMiddleware(routing)
+const localize = createMiddleware(routing)
+
+export default function proxy(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    const localePrefix = request.nextUrl.pathname.match(/^\/(en|zh-CN)(?=\/)/)?.[0] ?? ''
+    const pathname = request.nextUrl.pathname.slice(localePrefix.length)
+    if (pathname === '/preview' || pathname === '/preview/settings') {
+      const destination = request.nextUrl.clone()
+      destination.pathname = `${localePrefix}${pathname === '/preview' ? '/' : '/settings/members'}`
+      destination.search = ''
+      if (pathname === '/preview/settings') {
+        const workspace = request.nextUrl.searchParams.get('workspace')
+        if (workspace !== null) destination.searchParams.set('workspace', workspace)
+        if (request.nextUrl.searchParams.get('invite') === '1') destination.searchParams.set('invite', '1')
+      }
+      return NextResponse.redirect(destination)
+    }
+  }
+  return localize(request)
+}
 
 export const config = {
   // Pages only. `/api` (better-auth and device SSH), `/v1` (daemon API),

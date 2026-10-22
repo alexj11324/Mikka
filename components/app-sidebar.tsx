@@ -3,8 +3,9 @@
 import * as React from 'react'
 import { Link } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
-import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, MonitorSmartphone, Scan, Search, Send, SquarePen, SquareUserRound, Users, Workflow } from 'lucide-react'
+import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, MonitorSmartphone, Puzzle, Scan, Search, Send, SquarePen, SquareUserRound, Users, Workflow } from 'lucide-react'
 import { NavUser } from '@/components/nav-user'
+import { WorkspaceSwitcher } from '@/components/workspace/workspace-switcher'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -12,15 +13,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
 import type { WorkspaceSection } from '@/components/workspace/workspace-navigation'
 
-export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSettings, onSignOut, signingOut, ...props }: React.ComponentProps<typeof Sidebar> & {
+export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSettings, onSignOut, signingOut, onWorkspaceChange, ...props }: React.ComponentProps<typeof Sidebar> & {
   user: { name: string; email: string; image?: string | null }
   section: WorkspaceSection
   onNavigate: (section: WorkspaceSection) => boolean
   onSearch: () => void
   onCreate: () => void
-  onSettings: () => void
+  onSettings: (section?: 'preferences' | 'members', invite?: boolean) => void
   onSignOut: () => void
   signingOut: boolean
+  onWorkspaceChange: () => Promise<boolean>
 }) {
   const { setOpenMobile, open, openMobile, isMobile } = useSidebar()
   const t = useTranslations('Nav')
@@ -32,9 +34,7 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
     <SidebarHeader className="pb-4">
       <div className="flex items-center gap-1">
         <SidebarMenu className="min-w-0 flex-1"><SidebarMenuItem>
-          <DropdownMenu><DropdownMenuTrigger render={<SidebarMenuButton aria-label={t('workspaceMenu')} className="h-10" />}>
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">M</span><span className="flex-1 font-semibold">{WORKSPACE_NAME}</span><ChevronDown />
-          </DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup><DropdownMenuItem onClick={() => navigate('projects')}><Box />{t('workspaceProjects')}</DropdownMenuItem><DropdownMenuItem onClick={() => navigate('team-home')}><SquareUserRound />{t('teamHome')}</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
+          <WorkspaceSwitcher userKey={user.email} canLeave={onWorkspaceChange} />
         </SidebarMenuItem></SidebarMenu>
         <Button variant="ghost" size="icon-sm" aria-label={t('search')} title={t('searchTooltip')} onClick={() => { setOpenMobile(false); onSearch() }}><Search data-icon="inline-start" /></Button>
         <Button variant="secondary" size="icon-sm" aria-label={t('newTask')} title={t('newTaskHint')} onClick={() => { setOpenMobile(false); onCreate() }}><SquarePen data-icon="inline-start" /></Button>
@@ -61,11 +61,12 @@ export function AppSidebar({ user, section, onNavigate, onSearch, onCreate, onSe
     </SidebarContent>
     <SidebarFooter>
       <SidebarMenu>
-        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members" />} tooltip={t('members')}><Users /><span>{t('members')}</span></SidebarMenuButton></SidebarMenuItem>
-        <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings/members?invite=1" />} tooltip={t('inviteMembers')}><SquarePen /><span>{t('inviteMembers')}</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton onClick={() => { setOpenMobile(false); onSettings('members') }} tooltip={t('members')}><Users /><span>{t('members')}</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton onClick={() => { setOpenMobile(false); onSettings('members', true) }} tooltip={t('inviteMembers')}><SquarePen /><span>{t('inviteMembers')}</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton isActive={section === 'plugins'} aria-current={section === 'plugins' ? 'location' : undefined} onClick={() => navigate('plugins')} tooltip={t('plugins')}><Puzzle /><span>{t('plugins')}</span></SidebarMenuButton></SidebarMenuItem>
         <SidebarMenuItem><SidebarMenuButton render={<Link href="/devices" />} tooltip={t('devices')}><MonitorSmartphone /><span>{t('devices')}</span></SidebarMenuButton></SidebarMenuItem>
       </SidebarMenu>
-      <NavUser user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} />
+      <NavUser user={user} onSettings={() => { setOpenMobile(false); onSettings('preferences') }} onSignOut={onSignOut} signingOut={signingOut} />
     </SidebarFooter>
     <SidebarRail aria-label={t('sidebarRail')} title={t('toggleSidebar')} aria-expanded={isMobile ? openMobile : open} />
   </Sidebar>
