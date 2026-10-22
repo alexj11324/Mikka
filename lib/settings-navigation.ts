@@ -1,5 +1,5 @@
 const BASE_PATH = process.env.MIKKA_BASE_PATH ?? ''
-const appPaths = new Set(['/settings', '/settings/teams', '/settings/members'])
+const appPaths = new Set(['/', '/settings', '/settings/teams', '/settings/members'])
 const locales = new Set(['en', 'zh-CN'])
 
 type AppRoute = { pathname: string; locale?: string }

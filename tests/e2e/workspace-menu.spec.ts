@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register, browserClientHeaders, watchRuntime } from './fixtures'
+import { test, expect, register, browserClientHeaders, watchRuntime, app } from './fixtures'
 
 async function openSwitcher(page: Page) {
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
@@ -21,7 +21,7 @@ async function openWorkspacePage(page: Page) {
 }
 
 async function selectedWorkspace(page: Page) {
-  const response = await page.request.get('/api/workspace/switcher')
+  const response = await page.request.get(app('/api/workspace/switcher'))
   expect(response.ok()).toBeTruthy()
   const data = await response.json()
   return data.workspace as { id: string; name: string }
@@ -58,7 +58,7 @@ test('菜单与参考一致，创建持久工作区、切换并同步成员上�
   expect((await selectedWorkspace(page)).id).toBe(created.id)
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '邀请和管理成员', exact: true }).click()
-  const members = await page.request.get('/api/workspace')
+  const members = await page.request.get(app('/api/workspace'))
   expect((await members.json()).workspace.id).toBe(created.id)
 })
 

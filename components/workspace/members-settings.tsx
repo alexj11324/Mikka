@@ -75,6 +75,7 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty";
 import { withBasePath } from "@/lib/base-path";
+import { SettingsDataState } from "@/components/settings/settings-data-state";
 import { cn } from "@/lib/utils";
 
 async function fetchSettings(url: string): Promise<WorkspaceSettings> {
@@ -263,6 +264,7 @@ export function MembersSettings({
     downloadRef.current.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+  if (!ready) return <SettingsDataState title={t("title")} error={fetchError} onRetry={() => void mutate()} />
   const MainContent = embedded ? 'div' : 'main'
   return (
     <div data-settings-state={fetchError ? "error" : ready ? "ready" : "loading"} className={cn(!embedded && "flex min-h-dvh flex-col bg-background text-foreground md:flex-row", embedded && "w-full min-w-0")}>

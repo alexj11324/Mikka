@@ -9,9 +9,12 @@ export function SettingsLink({ workspaceId, href, onNavigate, ...props }: Compon
   const pathname = usePathname()
   const params = useSearchParams()
   const [intent, setIntent] = useState(false)
+  const current = typeof window === 'undefined'
+    ? new URL(`${pathname}?${params}`, 'https://settings.invalid')
+    : new URL(window.location.href)
   const local = typeof href === 'string' && isLocalSettingsNavigation(
-    new URL(`${pathname}?${params}`, 'https://settings.invalid'),
-    new URL(href, 'https://settings.invalid'),
+    current,
+    new URL(href, current),
     workspaceId,
   )
   return <Link {...props} href={href} prefetch={local ? false : props.prefetch ?? (intent ? true : null)} onPointerEnter={event => { if (!local) setIntent(true); props.onPointerEnter?.(event) }} onFocus={event => { if (!local) setIntent(true); props.onFocus?.(event) }} onNavigate={event => {

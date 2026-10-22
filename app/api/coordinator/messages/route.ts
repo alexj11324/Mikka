@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
-import { conversationForDisplay } from '@/lib/coordinator/store'
+import { chatView } from '@/lib/coordinator/store'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 
 export const dynamic = 'force-dynamic'
@@ -13,8 +13,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
-  const messages = await conversationForDisplay(session.user.id)
-  return NextResponse.json({ enabled: coordinatorEnabled(), messages }, { headers: { 'Cache-Control': 'private, no-store' } })
+  return NextResponse.json({ enabled: coordinatorEnabled(), ...(await chatView(session.user.id)) }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
 /**

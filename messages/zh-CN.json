@@ -167,7 +167,7 @@
     "signUpTitle": "注册 · Mikka",
     "signUpDescription": "创建工作账号，开始管理任务与文档。",
     "workspaceCreateTitle": "创建工作区 · Mikka",
-    "workspaceCreateDescription": "创建新的 Mikka 工作区，设置名称与专属网址，邀请团队协作。",
+    "workspaceCreateDescription": "创建新的 Mikka 工作区，设置名称与专属网址，邀请团队��作。",
     "settingsTitle": "设置 · Mikka",
     "settingsDescription": "管理个人偏好、工作区、团队和成员。",
     "teamsTitle": "团队管理 · Mikka",
@@ -330,7 +330,7 @@
     "unsavedDraft": "未保存草稿",
     "editorLabel": "任务描述编辑器",
     "placeholderCompact": "添加描述…",
-    "placeholderFull": "描述背景与验收标准，输入 / 插入内容…",
+    "placeholderFull": "描述背景与验收标准，输入 / 插入���容…",
     "selectionRequired": "请先选中一段尚未评论的正文。",
     "hint": "输入 / 插入内容，选中文字设置格式",
     "selectionComment": "选区评论",
@@ -551,7 +551,7 @@
           "hint": "小节标题"
         },
         "bullet-list": {
-          "title": "无序列表",
+          "title": "无序��表",
           "hint": "无序要点"
         },
         "numbered-list": {
@@ -723,7 +723,7 @@
       "closeDetail": "关闭任务详情",
       "titleRequired": "请填写任务标题，修改尚未保存。",
       "documentNotConnected": "文档尚未连接，修改已保留，请稍后重试。",
-      "saveFailedShort": "保存未成功。",
+      "saveFailedShort": "保存未��功。",
       "autosaveFailed": "自动保存失败，修改已保留，请重试。",
       "retryAutosave": "重试自动保存",
       "titleLabel": "任务标题",
@@ -871,8 +871,6 @@
     "noFollowingTitle": "尚未关注任务",
     "noFollowingDescription": "在任务的更多操作中选择「关注任务活动」，即可在这里追踪更新。",
     "viewAllTasks": "查看全部任务",
-    "agentDescription": "Agent 服务尚未接入，当前不会自动执行任务。",
-    "viewTeamTasks": "查看团队任务",
     "viewsTitle": "工作区视图",
     "viewsDescription": "按工作流状态查看任务，不改变任务本身。",
     "teamOverview": "团队工作概览",
@@ -999,7 +997,7 @@
     "loading": "正在加载成员",
     "addMember": "添加成员",
     "emailPlaceholder": "输入对方的注册邮箱",
-    "emailHint": "对方需先注册账号。添加后即可编辑正文、评论及保存版本，不会发送邀请邮件。",
+    "emailHint": "对方需先注册账号。添加后即可编辑正文、评论及保存版本，不会发送邀��邮件。",
     "adding": "正在添加…",
     "addedMessage": "成员已添加，对方登录后可在「协作任务」中访问此任务。",
     "addFailed": "添加失败，请稍后重试。",
@@ -1090,7 +1088,7 @@
       "noMembersHint": "可以调整筛选，或邀请同事加入工作区。"
     },
     "footer": {
-      "admin": "管理员可邀请、调整角色和停用成员。工作区须保留至少一位管理员。成员资格不改变已有任务的单独授权。",
+      "admin": "管理员可邀���、调整角色和停用成员。工作区须保留至少一位管理员。成员资格不改变已有任务的单独授权。",
       "member": "仅管理员可邀请成员和更改权限。如需操作，请联系工作区管理员。"
     },
     "confirmTitle": "确认更新成员权限？",
@@ -1285,7 +1283,7 @@
       "searchAria": "搜索可关联任务",
       "searchPlaceholder": "搜索任务…",
       "belongsToOther": "已属于其他项目",
-      "empty": "暂无可关联任务，请先创建任务。",
+      "empty": "暂无可关联任务，请先创建任务��",
       "save": "保存关联"
     },
     "milestones": {
@@ -1450,7 +1448,7 @@
     "c_db09ed1f": "仅你和后续授权的协作成员可以访问。",
     "c_10d239d6": "仅团队负责人和工作区管理员可修改团队设置。",
     "c_3a2b2e58": "仅团队负责人或工作区管理员可以管理团队。",
-    "c_63434fea": "仅当前工作区的启用成员可访问",
+    "c_63434fea": "仅当前工作区的启��成员可访问",
     "c_8f941499": "仅项目创建者可以公开私有项目。",
     "c_8b5a11e2": "介绍团队的职责与工作范围。",
     "c_cb791320": "仍有公开项目依赖此项目，请先移除依赖再取消团队关联。",
@@ -1499,7 +1497,7 @@
     "c_fd1c9fe6": "可关联同一工作区的多个团队，并指定一个主责团队。项目任务须归属于所选团队；历史私有数据不会自动公开。",
     "c_b676d0fb": "可在团队设置中查看和管理成员。",
     "c_747b74ce": "可见性",
-    "c_19b23b31": "团队不存在或不可访问",
+    "c_19b23b31": "团队不存在���不可访问",
     "c_f061da49": "团队不存在，或你不是此工作区的启用成员。",
     "c_55559894": "团队不能转移到其他工作区。",
     "c_1a0a74c5": "团队主页导航",
@@ -1652,5 +1650,20 @@
     "c_494c8a54": "正在读取{value0}",
     "c_352987c4": "移出团队：{value0}",
     "c_fdab9a02": "项目已创建，但团队关联未保存：{value0} 请在项目属性重试。"
+  },
+  "Coordinator": {
+    "label": "Coordinator",
+    "conversation": "与 Coordinator 的对话",
+    "emptyTitle": "和你的 Coordinator 聊聊",
+    "emptyDescription": "让它接手一个 issue、查看运行进度，或记住你的工作习惯。它会把 issue 派给你的 agent，并在运行结束时告诉你。",
+    "usedTools": "调用了 {tools}",
+    "working": "Coordinator 正在处理…",
+    "loadError": "对话加载失败，正在重试。",
+    "disabledTitle": "Coordinator 在这里没有运行",
+    "disabledDescription": "消息已保存，等这个部署配置好 Coordinator 后会得到回复。",
+    "failedTitle": "上一次回复失败了",
+    "input": "给 Coordinator 发消息",
+    "placeholder": "让 Coordinator 开始处理一个 issue…",
+    "send": "发送"
   }
 }

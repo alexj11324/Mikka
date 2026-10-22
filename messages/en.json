@@ -871,8 +871,6 @@
     "noFollowingTitle": "No followed tasks yet",
     "noFollowingDescription": "Choose “Follow task activity” in a task's more actions to track updates here.",
     "viewAllTasks": "View all tasks",
-    "agentDescription": "The Agent service is not connected yet; tasks do not run automatically.",
-    "viewTeamTasks": "View team tasks",
     "viewsTitle": "Workspace views",
     "viewsDescription": "View tasks by workflow status without changing the tasks.",
     "teamOverview": "Team work overview",
@@ -1652,5 +1650,20 @@
     "c_494c8a54": "Loading {value0}",
     "c_352987c4": "Remove from team: {value0}",
     "c_fdab9a02": "The project was created, but its team associations were not saved: {value0} Retry from project properties."
+  },
+  "Coordinator": {
+    "label": "Coordinator",
+    "conversation": "Conversation with the Coordinator",
+    "emptyTitle": "Talk to your Coordinator",
+    "emptyDescription": "Ask it to pick up an issue, check on runs, or remember how you like to work. It hands issues to your agents and tells you when runs finish.",
+    "usedTools": "Used {tools}",
+    "working": "Coordinator is working…",
+    "loadError": "Could not load the conversation. Retrying.",
+    "disabledTitle": "The Coordinator is not running here",
+    "disabledDescription": "Messages are saved and will be answered once the Coordinator is set up for this deployment.",
+    "failedTitle": "The last reply failed",
+    "input": "Message the Coordinator",
+    "placeholder": "Ask the Coordinator to start an issue…",
+    "send": "Send"
   }
 }

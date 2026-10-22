@@ -53,7 +53,9 @@ export async function clickWithEffect(page: Page, control: Locator) {
 
 export async function inspectControl(control: Locator, page: Page) {
   return control.evaluate((element, currentURL) => {
-    const label = element.getAttribute('aria-label') || element.getAttribute('title') || element.textContent?.trim().replace(/\s+/g, ' ') || element.outerHTML.slice(0, 160)
+    const labelledBy = element.getAttribute('aria-labelledby')?.split(/\s+/).map(id => document.getElementById(id)?.textContent?.trim() ?? '').filter(Boolean).join(' ')
+    const associatedLabel = element.id ? Array.from(document.querySelectorAll<HTMLLabelElement>('label[for]')).find(label => label.htmlFor === element.id)?.textContent?.trim() : ''
+    const label = element.getAttribute('aria-label') || element.getAttribute('title') || labelledBy || associatedLabel || element.closest('label')?.textContent?.trim().replace(/\s+/g, ' ') || element.textContent?.trim().replace(/\s+/g, ' ') || `${element.tagName.toLowerCase()} ${element.getAttribute('role') ?? ''} ${element.getAttribute('type') ?? ''}`.trim()
     let skip = ''
     if (element.closest('[inert], [aria-hidden="true"]')) skip = '浮层下的不可交互背景'
     else if (element.matches(':disabled, [aria-disabled="true"]')) skip = '禁用态，不可执行'

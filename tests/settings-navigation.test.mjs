@@ -20,9 +20,9 @@ test('设置页面间与团队子页使用即时导航', () => {
   ]) assert.equal(isLocalSettingsNavigation(url(from), url(to), workspace), true)
 })
 
-test('工作台与设置之间的路由切换交给 Next.js', () => {
-  assert.equal(isLocalSettingsNavigation(url('/'), url('/settings')), false)
-  assert.equal(isLocalSettingsNavigation(url('/settings'), url('/')), false)
+test('工作台与设置之间的路由切换使用即时导航', () => {
+  assert.equal(isLocalSettingsNavigation(url('/'), url('/settings')), true)
+  assert.equal(isLocalSettingsNavigation(url('/settings'), url('/')), true)
 })
 
 test('带 basePath 与 locale 前缀的设置路由仍使用即时导航', () => {
@@ -30,8 +30,8 @@ test('带 basePath 与 locale 前缀的设置路由仍使用即时导航', () =>
     ['/mikka/settings?section=preferences', '/mikka/settings/teams'],
     ['/mikka/en/settings', '/mikka/en/settings/members'],
   ]) assert.equal(isLocalSettingsNavigation(url(from), url(to), undefined, '/mikka'), true)
-  assert.equal(isLocalSettingsNavigation(url('/mikka'), url('/mikka/settings'), undefined, '/mikka'), false)
-  assert.equal(isLocalSettingsNavigation(url('/mikka/en'), url('/mikka/en/settings'), undefined, '/mikka'), false)
+  assert.equal(isLocalSettingsNavigation(url('/mikka'), url('/mikka/settings'), undefined, '/mikka'), true)
+  assert.equal(isLocalSettingsNavigation(url('/mikka/en'), url('/mikka/en/settings'), undefined, '/mikka'), true)
 })
 
 test('认证页、未知页面及外站不绕过 Next.js 路由', () => {
