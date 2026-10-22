@@ -15,8 +15,10 @@ import { Input } from '@/components/ui/input'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { PROJECT_HEALTH, PROJECT_PRIORITIES, PROJECT_STATUSES, type Project, type ProjectControlField } from './project-properties'
 
-type Choice = { value: string; label: string; icon?: LucideIcon; description?: string }
-export function ProjectPicker({ label, title, children, choices, selected, onChange, multiple = false, onCreate, createDisabled = false, disabled, plain = false }: { label: string; title: string; children: ReactNode; choices: Choice[]; selected: string[]; onChange: (value: string) => void; multiple?: boolean; onCreate?: (value: string) => void; createDisabled?: boolean; disabled?: boolean; plain?: boolean }) {
+import { statusTone, statusDots, type StatusTone } from '@/lib/status-appearance'
+
+type Choice = { value: string; label: string; icon?: LucideIcon; description?: string; tone?: StatusTone }
+export function ProjectPicker({ label, title, children, choices, selected, onChange, multiple = false, onCreate, createDisabled = false, disabled, plain = false, tone }: { tone?: StatusTone; label: string; title: string; children: ReactNode; choices: Choice[]; selected: string[]; onChange: (value: string) => void; multiple?: boolean; onCreate?: (value: string) => void; createDisabled?: boolean; disabled?: boolean; plain?: boolean }) {
   const t = useTranslations('Projects')
   const common = useTranslations('Common')
   const [open, setOpen] = useState(false)
@@ -32,10 +34,10 @@ export function ProjectPicker({ label, title, children, choices, selected, onCha
     setCreateDraft(null)
   }
   return <Popover open={open} onOpenChange={value => { setOpen(value); if (!value) { setQuery(''); setCreateDraft(null) } }}>
-    <PopoverTrigger render={<Button type="button" variant={plain ? 'ghost' : 'outline'} size="sm" disabled={disabled} aria-label={label} className={cn('h-7 max-w-full justify-start gap-1.5', !plain && 'rounded-full bg-muted/40 px-2 text-muted-foreground', plain && 'px-2 font-normal')} />}>{children}</PopoverTrigger>
+    <PopoverTrigger render={<Button type="button" variant={plain ? 'ghost' : 'outline'} size="sm" disabled={disabled} aria-label={label} tone={tone} className={cn('h-7 max-w-full justify-start gap-1.5', !tone && !plain && 'rounded-full bg-muted/40 px-2 text-muted-foreground', plain && 'px-2 font-normal')} />}>{children}</PopoverTrigger>
     <PopoverContent align="start" className="w-64 p-0">
       <Command><CommandInput aria-label={t('picker.searchLabel', { label: title })} placeholder={t('picker.searchPlaceholder', { label: title })} value={query} onValueChange={setQuery} />
-        <CommandList><CommandEmpty>{onCreate ? t('picker.noMatchesCreate') : t('picker.noOptions')}</CommandEmpty><CommandGroup heading={title}>{choices.map(choice => <CommandItem key={choice.value} disabled={disabled} value={`${choice.label} ${choice.value}`} data-checked={selected.includes(choice.value)} aria-selected={selected.includes(choice.value)} onSelect={() => { onChange(choice.value); if (!multiple) setOpen(false) }}>{choice.icon && <choice.icon />}<span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="truncate">{choice.label}</span>{choice.description && <span className="text-xs text-muted-foreground">{choice.description}</span>}</span></CommandItem>)}
+        <CommandList><CommandEmpty>{onCreate ? t('picker.noMatchesCreate') : t('picker.noOptions')}</CommandEmpty><CommandGroup heading={title}>{choices.map(choice => <CommandItem key={choice.value} disabled={disabled} value={`${choice.label} ${choice.value}`} data-checked={selected.includes(choice.value)} aria-selected={selected.includes(choice.value)} onSelect={() => { onChange(choice.value); if (!multiple) setOpen(false) }}>{choice.tone ? <span aria-hidden="true" className={cn('size-2.5 shrink-0 rounded-full', statusDots[choice.tone])} /> : choice.icon && <choice.icon />}<span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="truncate">{choice.label}</span>{choice.description && <span className="text-xs text-muted-foreground">{choice.description}</span>}</span></CommandItem>)}
           {onCreate && query.trim() && !choices.some(item => item.value === query.trim()) && <CommandItem disabled={disabled || createDisabled || query.trim().length > 50} value={query} onSelect={() => { onCreate(query.trim()); setQuery('') }}>{t('picker.createTag', { name: query.trim() })}</CommandItem>}
         </CommandGroup></CommandList>
       </Command>
@@ -74,17 +76,17 @@ export function ProjectPropertyControl({ field, value, onChange, userName, proje
   if (field === 'health') {
     const health = PROJECT_HEALTH.find(item => item.value === properties.health) ?? PROJECT_HEALTH[0]
     const healthLabel = label('health', health.value)
-    return <ProjectPicker {...shared} title={t('fields.health')} label={t('controls.healthValue', { value: healthLabel })} choices={PROJECT_HEALTH.map(item => ({ ...item, label: label('health', item.value) }))} selected={[health.value]} onChange={health => updateProperties({ health: health as ProjectDraft['properties']['health'] })}><health.icon data-icon="inline-start" /><span className="truncate">{healthLabel}</span></ProjectPicker>
+    return <ProjectPicker {...shared} tone={statusTone(health.value)} title={t('fields.health')} label={t('controls.healthValue', { value: healthLabel })} choices={PROJECT_HEALTH.map(item => ({ ...item, tone: statusTone(item.value), label: label('health', item.value) }))} selected={[health.value]} onChange={health => updateProperties({ health: health as ProjectDraft['properties']['health'] })}><health.icon data-icon="inline-start" /><span className="truncate">{healthLabel}</span></ProjectPicker>
   }
   if (field === 'status') {
     const state = PROJECT_STATUSES.find(item => item.value === value.status) ?? PROJECT_STATUSES[0]
     const stateLabel = label('status', state.value)
-    return <ProjectPicker {...shared} title={t('fields.status')} label={t('controls.statusValue', { value: stateLabel })} choices={PROJECT_STATUSES.map(item => ({ ...item, label: label('status', item.value) }))} selected={[value.status]} onChange={status => onChange({ status: status as ProjectDraft['status'] })}><state.icon data-icon="inline-start" /><span className="truncate">{stateLabel}</span></ProjectPicker>
+    return <ProjectPicker {...shared} tone={statusTone(state.value)} title={t('fields.status')} label={t('controls.statusValue', { value: stateLabel })} choices={PROJECT_STATUSES.map(item => ({ ...item, tone: statusTone(item.value), label: label('status', item.value) }))} selected={[value.status]} onChange={status => onChange({ status: status as ProjectDraft['status'] })}><state.icon data-icon="inline-start" /><span className="truncate">{stateLabel}</span></ProjectPicker>
   }
   if (field === 'priority') {
     const priority = PROJECT_PRIORITIES.find(item => item.value === value.priority) ?? PROJECT_PRIORITIES[0]
     const priorityLabel = label('priority', priority.value)
-    return <ProjectPicker {...shared} title={t('fields.priority')} label={t('controls.priorityValue', { value: priorityLabel })} choices={PROJECT_PRIORITIES.map(item => ({ ...item, label: label('priority', item.value) }))} selected={[value.priority]} onChange={priority => onChange({ priority: priority as ProjectDraft['priority'] })}><priority.icon data-icon="inline-start" /><span className="truncate">{priorityLabel}</span></ProjectPicker>
+    return <ProjectPicker {...shared} tone={statusTone(priority.value)} title={t('fields.priority')} label={t('controls.priorityValue', { value: priorityLabel })} choices={PROJECT_PRIORITIES.map(item => ({ ...item, tone: statusTone(item.value), label: label('priority', item.value) }))} selected={[value.priority]} onChange={priority => onChange({ priority: priority as ProjectDraft['priority'] })}><priority.icon data-icon="inline-start" /><span className="truncate">{priorityLabel}</span></ProjectPicker>
   }
   if (field === 'lead') return <ProjectPicker {...shared} title={t('fields.lead')} label={t('controls.leadValue', { value: value.lead ? userName : t('controls.leadUnset') })} choices={[{ value: '', label: t('controls.leadNone'), icon: UserRound }, { value: 'me', label: userName, icon: UserRound, description: t('controls.currentAccount') }]} selected={[value.lead]} onChange={lead => onChange({ lead: lead as '' | 'me' })}><UserRound data-icon="inline-start" /><span className="truncate">{value.lead ? userName : t('fields.lead')}</span></ProjectPicker>
   if (field === 'startDate' || field === 'targetDate') return <ProjectDatePicker {...shared} label={field === 'startDate' ? t('fields.startDate') : t('fields.targetDate')} icon={field === 'startDate' ? CalendarDays : CalendarCheck} value={value[field]} min={field === 'targetDate' ? value.startDate : undefined} max={field === 'startDate' ? value.targetDate : undefined} onChange={date => onChange({ [field]: date })} />
