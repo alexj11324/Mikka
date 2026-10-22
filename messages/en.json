@@ -1479,6 +1479,26 @@
     "failedTitle": "The last reply failed",
     "input": "Message the Coordinator",
     "placeholder": "Ask the Coordinator to start an issue…",
-    "send": "Send"
+    "send": "Send",
+    "citation": {
+      "issue": "Issue",
+      "run": "Run",
+      "runOf": "{agent} run",
+      "openIssue": "Open issue: {title}",
+      "openRunIssue": "{agent} run, open issue: {title}",
+      "noIssue": "No linked issue",
+      "runStatus": {
+        "queued": "Queued",
+        "preparing": "Preparing",
+        "running": "Running",
+        "waiting_input": "Waiting for input",
+        "finishing": "Finishing",
+        "succeeded": "Succeeded",
+        "stopped": "Stopped",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "sources": "{count, plural, one {# source} other {# sources}}"
+    }
   }
 }

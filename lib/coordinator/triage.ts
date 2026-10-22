@@ -1,11 +1,12 @@
 import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema'
 
 // How much an event matters, decided before the Coordinator sees it. Clear
-// cases follow fixed rules; the rest go to a decision model (Jev), which
-// answers a typed question with a probability instead of writing text.
+// cases follow fixed rules; the rest go to a decision model (Cloudflare's
+// Clef), which answers a typed question with a probability instead of
+// writing text.
 
-/** The decision model on the AI Gateway. */
-export const TRIAGE_MODEL = 'typesafe-ai/jev'
+/** The decision model on Workers AI. */
+export const TRIAGE_MODEL = 'clef'
 /** At or above this probability, a finished run needs the person. */
 export const ATTENTION_THRESHOLD = 0.5
 
@@ -33,7 +34,7 @@ export function triageState(event: TriageEvent) {
 
 export const TRIAGE_QUESTIONS = {
   needsPerson: {
-    type: 'boolean',
+    type: 'noul',
     instructions: 'A coding agent finished a run and wrote this summary. Does the person need to look at it themselves: the agent says it could not finish or could not verify its work, hit a blocker, made a risky or surprising change, or is waiting for a decision?',
   },
 } as const

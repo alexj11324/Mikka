@@ -8,5 +8,6 @@
   "routes": [{ "pattern": "linear-sync.aspectlylabs.com", "custom_domain": true }],
   "triggers": { "crons": ["0 4 * * *"] },
   "alias": { "server-only": "next/dist/compiled/server-only/empty.js" },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "4ff592ecae0c47c5bbb851e08dff2f75" }]
 }
