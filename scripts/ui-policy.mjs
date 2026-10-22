@@ -319,7 +319,7 @@ export function auditCss(file, text, policy) {
       if (!baseline) add(node, 'style/no-custom-css', '只保留全局基线 @apply，组件样式来自 registry。')
     }
     if (node.name.endsWith('keyframes') || node.name === 'utility' || node.name === 'font-face') add(node, 'style/no-custom-css', '不手写动画、字体或 utility 来绕过 registry 预设。')
-    if (node.name === 'import' && !['"tailwindcss"', '"tw-animate-css"', '"shadcn/tailwind.css"'].includes(node.params)) add(node, 'style/no-custom-css', '全局样式导入需要显式审核，不能引入自绘 CSS。')
+    if (node.name === 'import' && !['"tailwindcss"', '"tw-animate-css"', '"shadcn/tailwind.css"', '"@heroui/styles/components/calendar.css"', '"@heroui/styles/utilities"'].includes(node.params)) add(node, 'style/no-custom-css', '全局样式导入需要显式审核，不能引入自绘 CSS。')
   })
   return diagnostics
 }
