@@ -16,9 +16,10 @@ async function measureNavigation(page: Page, info: TestInfo, name: string, desti
       let readyFrames = 0
       function check() {
         const elements = selectors.map(selector => document.querySelector<HTMLElement>(selector))
-        const currentPath = basePath && (location.pathname === basePath || location.pathname.startsWith(`${basePath}/`))
+        const pathWithoutBase = basePath && (location.pathname === basePath || location.pathname.startsWith(`${basePath}/`))
           ? location.pathname.slice(basePath.length) || '/'
           : location.pathname
+        const currentPath = pathWithoutBase.replace(/^\/(?:en|zh-CN)(?=\/|$)/, '') || '/'
         const ready = currentPath === path && (!query || location.search.includes(query)) &&
           elements.every(element => element && element.getBoundingClientRect().height > 0 && !element.matches(':disabled')) &&
           (!text || elements.some(element => element?.textContent?.includes(text))) &&
