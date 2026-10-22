@@ -11,6 +11,12 @@ export interface CoordinatorEventInput {
   payload: Record<string, unknown>
 }
 
+/** A message the person wrote to their Coordinator. */
+export function userMessageEvent(userId: string, text: string): CoordinatorEventInput {
+  const id = crypto.randomUUID()
+  return { userId, kind: 'user_message', dedupeKey: `user_message:${id}`, issueId: null, runId: null, payload: { text } }
+}
+
 /** A run ended. One event per run, however often the daemon reports it. */
 export function runFinishedEvent(run: { id: string; userId: string; issueId: string | null; kind: string; status: RunStatus; stopReason: string; report?: RunReport | null }): CoordinatorEventInput {
   return {
