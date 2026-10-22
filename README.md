@@ -1,5 +1,9 @@
 # Mikka
 
+> **Your AI lead built for ambitious work — every agent, from laptop to cloud, working as one team.**
+>
+> 为大事而生的 AI lead：从本地到云端，所有 Agent 协作如一。
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
 
 ## Built with v0
