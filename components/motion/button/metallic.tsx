@@ -37,6 +37,7 @@ export const MetallicButton = forwardRef<
     children,
     onHoverStart,
     onHoverEnd,
+    onClick,
     ...rest
   },
   ref,
@@ -48,6 +49,7 @@ export const MetallicButton = forwardRef<
   return (
     <Button
       ref={ref}
+      onClick={onClick}
       variant="ghost"
       size={size}
       onHoverStart={(event, info) => {

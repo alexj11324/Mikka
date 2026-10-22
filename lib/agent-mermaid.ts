@@ -10,7 +10,20 @@ export function renderAgentMermaid(id: string, source: string, theme: 'dark' | '
   }
   // Mermaid configuration is global; serialize configuration and rendering across replies.
   const result = renderQueue.catch(() => undefined).then(async () => {
-    const [{ default: mermaid }, { default: DOMPurify }] = await Promise.all([import('mermaid'), import('dompurify')])
+    const [{ renderBeautifulAgentMermaid, supportsBeautifulMermaid }, { default: DOMPurify }] = await Promise.all([import('./agent-beautiful-mermaid'), import('dompurify')])
+    const sanitize = (svg: string) => DOMPurify.sanitize(svg, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      FORBID_TAGS: ['foreignObject', 'script', 'iframe', 'image', 'a', 'use', 'animate', 'set', 'animateTransform'],
+      FORBID_ATTR: ['href', 'xlink:href'],
+    }) as SanitizedMermaidSvg
+    if (supportsBeautifulMermaid(source)) {
+      try {
+        return sanitize(renderBeautifulAgentMermaid(`${id}${++renderSequence}`, source))
+      } catch {
+        // Valid Mermaid syntax not supported by the preferred renderer still uses strict Mermaid.
+      }
+    }
+    const { default: mermaid } = await import('mermaid')
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: 'strict',
@@ -25,11 +38,7 @@ export function renderAgentMermaid(id: string, source: string, theme: 'dark' | '
     const renderId = `agentmermaid${id}${++renderSequence}`
     try {
       const { svg } = await mermaid.render(renderId, source)
-      return DOMPurify.sanitize(svg, {
-        USE_PROFILES: { svg: true, svgFilters: true },
-        FORBID_TAGS: ['foreignObject', 'script', 'iframe', 'image', 'a'],
-        FORBID_ATTR: ['href', 'xlink:href'],
-      }) as SanitizedMermaidSvg
+      return sanitize(svg)
     } finally {
       document.getElementById(`d${renderId}`)?.remove()
     }

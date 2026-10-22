@@ -5,6 +5,7 @@ import { createParser, Renderer, type ActionEvent, type OpenUIError } from '@ope
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { getAgentUIIssue, type AgentUIIssue } from '@/lib/agent-ui-status'
+import { normalizeAgentUISource } from '@/lib/agent-ui-source'
 import { agentUILibrary } from './agent-ui-library'
 import { AgentMarkdown } from './agent-markdown'
 
@@ -43,22 +44,23 @@ export function AgentGenerativeUI({ response, isStreaming, onAction, showErrors 
 }) {
   const [reportedErrors, setReportedErrors] = useState<{ response: string; errors: OpenUIError[] } | null>(null)
   const isOpenUI = /(?:^|\n)\s*root\s*=/.test(response)
+  const normalizedResponse = useMemo(() => isOpenUI ? normalizeAgentUISource(response) : response, [response, isOpenUI])
   const handleError = useCallback((errors: OpenUIError[]) => {
     if (!isStreaming) setReportedErrors({ response, errors })
   }, [response, isStreaming])
   const issue = useMemo(() => {
     if (isStreaming || !showErrors || !isOpenUI) return null
     try {
-      return getAgentUIIssue(finalParser.parse(response), reportedErrors?.response === response ? reportedErrors.errors : [])
+      return getAgentUIIssue(finalParser.parse(normalizedResponse), reportedErrors?.response === response ? reportedErrors.errors : [])
     } catch {
       return getAgentUIIssue(null)
     }
-  }, [response, isStreaming, showErrors, isOpenUI, reportedErrors])
+  }, [response, normalizedResponse, isStreaming, showErrors, isOpenUI, reportedErrors])
 
   if (!isOpenUI) return isStreaming ? null : <AgentMarkdown text={response} />
 
   return <GenerationBoundary response={response} showErrors={!isStreaming && showErrors} onRetry={onRetry}>
-    <Renderer response={response} library={agentUILibrary} isStreaming={isStreaming} onAction={onAction} onError={handleError} publishObservability={false} />
+    <Renderer response={normalizedResponse} library={agentUILibrary} isStreaming={isStreaming} onAction={onAction} onError={handleError} publishObservability={false} />
     {issue && <GenerationError issue={issue} onRetry={onRetry} />}
   </GenerationBoundary>
 }

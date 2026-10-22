@@ -189,6 +189,7 @@ export const StatefulButton = forwardRef<HTMLButtonElement, StatefulButtonProps>
     errorText = "Try again",
     icon,
     disabled,
+    onClick,
     ...rest
   },
   ref,
@@ -206,7 +207,7 @@ export const StatefulButton = forwardRef<HTMLButtonElement, StatefulButtonProps>
     typeof stateText === "string" ? `${state}-${stateText}` : state;
 
   return (
-    <Button ref={ref} disabled={disabled || isBusy} aria-busy={isBusy} whileHover={undefined} {...rest}>
+    <Button ref={ref} onClick={onClick} disabled={disabled || isBusy} aria-busy={isBusy} whileHover={undefined} {...rest}>
       <span
         aria-live="polite"
         className="relative inline-flex items-center justify-center overflow-hidden"

@@ -472,7 +472,7 @@ export interface TooltipTriggerProps extends ComponentProps<"button"> {
   asChild?: boolean;
 }
 
-export function TooltipTrigger({ asChild = false, children, ref, ...props }: TooltipTriggerProps) {
+export function TooltipTrigger({ asChild = false, children, ref, onClick, ...props }: TooltipTriggerProps) {
   const { open, contentId, labelId, asLabel, empty, setTrigger } =
     useTooltipContext("TooltipTrigger");
   const child = asChild && isValidElement(children) ? children : null;
@@ -519,6 +519,7 @@ export function TooltipTrigger({ asChild = false, children, ref, ...props }: Too
     <button
       type="button"
       data-state={open ? "open" : "closed"}
+      onClick={onClick}
       {...props}
       ref={setRef as Ref<HTMLButtonElement>}
       {...aria}

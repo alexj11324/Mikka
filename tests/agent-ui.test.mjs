@@ -6,6 +6,12 @@ import { agentComponentCatalog, agentComponentGroups, createAgentLibrary } from 
 import { agentImageQuery, findAgentImage, parseAgentImage } from '../lib/agent-images.ts'
 import { getAgentUIIssue } from '../lib/agent-ui-status.ts'
 import { AGENT_DEMO_CODE, AGENT_DEMO_SECTIONS } from '../lib/agent-demo.ts'
+import { normalizeAgentUISource } from '../lib/agent-ui-source.ts'
+import { renderBeautifulAgentMermaid, supportsBeautifulMermaid } from '../lib/agent-beautiful-mermaid.ts'
+import { renderToStaticMarkup } from 'react-dom/server'
+import Markdown from 'react-markdown'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 
 test('综合演示每个分组都可解析，覆盖全部本地回复组件', () => {
   assert.ok(AGENT_DEMO_CODE.includes('export function summarize'))
@@ -110,6 +116,97 @@ test('TextContent 统一支持 Markdown、LaTeX 和 Mermaid，保留旧字号契
   assert.equal(agentComponentCatalog.TextContent.props.safeParse({ text, size: 'small-heavy' }).success, true)
   const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
   assert.ok(spec.promptOptions.additionalRules.some(rule => /KaTeX LaTeX/.test(rule) && /Mermaid/.test(rule)))
+})
+
+test('Beautiful Mermaid 实际渲染六类图表，主题自适应且样式不污染其他回复', () => {
+  const sources = [
+    'flowchart LR\nA(输入) --> B(核心处理):::focus\nB --> C(输出):::success',
+    'stateDiagram-v2\n[*] --> 等待\n等待 --> 完成\n完成 --> [*]',
+    'sequenceDiagram\n用户->>助手: 请求\n助手-->>用户: 回复',
+    'classDiagram\nclass Account {\n+String name\n}',
+    'erDiagram\nUSER ||--o{ MESSAGE : sends',
+    'xychart-beta\nx-axis [一月, 二月]\nbar [10, 20]',
+  ]
+  for (const [index, source] of sources.entries()) {
+    assert.equal(supportsBeautifulMermaid(source), true)
+    const svg = renderBeautifulAgentMermaid(`test${index}`, source)
+    assert.match(svg, /<svg id="agentbeautifultest\d+"/)
+    assert.match(svg, /var\(--foreground\)/)
+    assert.match(svg, /var\(--label-blue\)/)
+    assert.doesNotMatch(svg, /@import|fonts\.googleapis|&amp;display|<script|<foreignObject/)
+    for (const style of svg.matchAll(/<style>([\s\S]*?)<\/style>/g)) {
+      for (const rule of style[1].matchAll(/([^{}]+)\{/g)) {
+        for (const selector of rule[1].split(',')) assert.ok(selector.trim().startsWith(`#agentbeautifultest${index}`))
+      }
+    }
+    for (const reference of svg.matchAll(/url\(#([^)]+)\)/g)) {
+      assert.ok(reference[1].startsWith(`agentbeautifultest${index}-`))
+      assert.ok(svg.includes(`id="${reference[1]}"`))
+    }
+  }
+  const flow = renderBeautifulAgentMermaid('flow', sources[0])
+  assert.match(flow, /var\(--diagram-focus-fill\)/)
+  assert.match(flow, /var\(--diagram-success-fill\)/)
+  assert.match(flow, /data-id="B"/)
+  assert.match(flow, /#agentbeautifulflow text\s*\{/)
+  assert.equal(supportsBeautifulMermaid('%% comment\nflowchart TD\nA-->B'), true)
+  for (const source of ['pie\n"一" : 10', 'gantt\nsection 工作', 'mindmap\n  root((主题))']) {
+    assert.equal(supportsBeautifulMermaid(source), false)
+  }
+  assert.throws(() => renderBeautifulAgentMermaid('large', 'flowchart LR\n' + 'A'.repeat(20000)))
+  assert.throws(() => renderBeautifulAgentMermaid('config', '%%{init: {}}%%\nflowchart LR\nA-->B'))
+  assert.throws(() => renderBeautifulAgentMermaid('remote', 'flowchart LR\nA-->B\nstyle A fill:url(https://example.com)'))
+})
+
+test('精致图表优先，复杂语法保留严格 Mermaid 回退和 SVG 清洗', async () => {
+  const renderer = await readFile(new URL('../lib/agent-mermaid.ts', import.meta.url), 'utf8')
+  const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
+  assert.ok(renderer.indexOf('renderBeautifulAgentMermaid(`${id}') < renderer.indexOf("await import('mermaid')"))
+  assert.match(renderer, /securityLevel: 'strict'/)
+  assert.match(renderer, /DOMPurify\.sanitize/)
+  assert.match(renderer, /return sanitize\(svg\)/)
+  assert.ok(spec.promptOptions.additionalRules.some(rule => /:::focus/.test(rule) && /不再输出 classDef/.test(rule)))
+})
+
+test('混合真实换行与 JSON 转义的回复仍正确渲染标题、列表和自注意力公式', () => {
+  const text = '### 自注意力机制：唯一的原子操作\n\n每个 token 投影为查询、键和值。\n\n$$\n\\mathrm{Attention}(Q,K,V)=\\mathrm{softmax}\\!\\left(\\frac{QK^\\top}{\\sqrt{d_k}}\\right)V\n$$\n\n几个关键细节：\n\n- 除以 $\\sqrt{d_k}$ 防止饱和。\n- 因果掩码使用 $-\\infty$。'
+  const valid = `root = TextContent(${JSON.stringify(text)})`
+  const broken = valid.slice(0, -2) + '\n")'
+  const parser = createParser(library.toJSONSchema(), library.root)
+  assert.notEqual(parser.parse(broken).root.props.text, text + '\n')
+  const normalized = normalizeAgentUISource(broken)
+  const parsed = parser.parse(normalized)
+  assert.equal(parsed.root.props.text, text + '\n')
+  assert.deepEqual(parsed.meta.errors, [])
+  assert.equal(normalizeAgentUISource(valid), valid)
+  assert.equal(normalizeAgentUISource(normalized), normalized)
+  const markup = renderToStaticMarkup(Markdown({
+    remarkPlugins: [remarkMath], rehypePlugins: [[rehypeKatex, { trust: false, throwOnError: false }]],
+    children: parsed.root.props.text,
+  }))
+  assert.match(markup, /<h3>自注意力机制：唯一的原子操作<\/h3>/)
+  assert.match(markup, /<ul>/)
+  assert.match(markup, /class="katex-display"/)
+  assert.doesNotMatch(markup, /katex-error|\\\\n/)
+})
+
+test('修复仅处理 OpenUI 字符串语法，保留代码、矩阵换行、转义引号与流式前缀', () => {
+  const text = '```js\nconst path = "C:\\\\new";\nconst escaped = "\\\\n";\n```\n\n$$\n\\begin{matrix}a & b \\\\ c & d\\end{matrix}\n$$'
+  const source = `root = TextContent(${JSON.stringify(text)})`
+  assert.equal(normalizeAgentUISource(source), source)
+  const parser = createParser(library.toJSONSchema(), library.root)
+  const broken = source.slice(0, -2) + '\n")'
+  assert.equal(parser.parse(normalizeAgentUISource(broken)).root.props.text, text + '\n')
+  const raw = 'root = TextContent("第一行\n第二行\\n\\\\sqrt{x}")'
+  for (let end = 1; end <= raw.length; end++) {
+    const partial = normalizeAgentUISource(raw.slice(0, end))
+    assert.equal(normalizeAgentUISource(partial), partial)
+    assert.doesNotThrow(() => parser.parse(partial))
+  }
+  const invalidEscape = String.raw`root = TextContent("公式：$\sqrt{x}$")`
+  assert.equal(parser.parse(normalizeAgentUISource(invalidEscape)).root.props.text, String.raw`公式：$\sqrt{x}$`)
+  const comment = '// "保持注释原样"\nroot = TextContent(\'单引号原样\')'
+  assert.equal(normalizeAgentUISource(comment), comment)
 })
 
 test('相关追问支持具体问题、上下文及内联继续，不再被提示词压制', async () => {

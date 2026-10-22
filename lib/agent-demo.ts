@@ -20,7 +20,7 @@ export const AGENT_DEMO_SECTIONS = [
   },
   {
     id: 'diagrams', title: 'Mermaid 图表与代码围栏', description: '流程图和时序图自动渲染；代码围栏直接使用 beUI Code Block。',
-    response: `root = Stack([BeCodeBlock(${JSON.stringify(AGENT_DEMO_CODE)}, "typescript", "示例函数.ts", [4]), ${content('```mermaid\nflowchart LR\nA[提出需求] --> B[整理计划]\nB --> C{确认方案}\nC -->|同意| D[准备交付]\nC -->|修改| B\n```')}, ${content('```mermaid\nsequenceDiagram\n参与者->>助手: 选择演示内容\n助手-->>参与者: 本地渲染组件\nNote over 参与者,助手: 不请求模型\n```')}, ${content('```python\ndef completion_rate(done, total):\n    return done / total if total else 0\n```\n\n```\n不指定语言的单行代码也使用 beUI Code Block\n```')}])`,
+    response: `root = Stack([BeCodeBlock(${JSON.stringify(AGENT_DEMO_CODE)}, "typescript", "示例函数.ts", [4]), ${content('```mermaid\nflowchart LR\nA(提出需求) --> B(整理计划):::focus\nB --> C{确认方案}:::warning\nC -->|同意| D(准备交付):::success\nC -->|修改| B\n```')}, ${content('```mermaid\nsequenceDiagram\n参与者->>助手: 选择演示内容\n助手-->>参与者: 本地渲染组件\nNote over 参与者,助手: 不请求模型\n```')}, ${content('```python\ndef completion_rate(done, total):\n    return done / total if total else 0\n```\n\n```\n不指定语言的单行代码也使用 beUI Code Block\n```')}])`,
   },
   {
     id: 'cards', title: '卡片、指标与图片', description: 'beUI 卡片、动态数字、状态标签、图文网格与图片查看器。图片使用本地演示占位图。',

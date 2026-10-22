@@ -66,6 +66,12 @@
 }
 
 :root {
+  --diagram-surface: color-mix(in oklch, var(--label-blue) 6%, var(--card));
+  --diagram-border: color-mix(in oklch, var(--label-blue) 30%, var(--border));
+  --diagram-line: color-mix(in oklch, var(--label-blue) 30%, var(--muted-foreground));
+  --diagram-focus-fill: color-mix(in oklch, var(--label-blue) 14%, var(--card));
+  --diagram-success-fill: color-mix(in oklch, var(--success) 12%, var(--card));
+  --diagram-warning-fill: color-mix(in oklch, var(--warning) 12%, var(--card));
   --project-action: oklch(0.56 0.17 277);
   --project-action-foreground: oklch(0.985 0 0);
   --label-violet: var(--color-violet-600);
