@@ -24,7 +24,7 @@ export function closestSortedIndex(
 
 /** Index of the next assistant message after each row, computed in O(n). */
 export function nextAssistantIndices(senders: readonly string[]): Array<number | undefined> {
-  const next = new Array<number | undefined>(senders.length);
+  const next: Array<number | undefined> = [];
   let upcoming: number | undefined;
   for (let index = senders.length - 1; index >= 0; index -= 1) {
     next[index] = upcoming;
