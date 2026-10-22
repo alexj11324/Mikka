@@ -229,3 +229,13 @@ export const runMessages = pgTable('run_messages', {
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('run_messages_run_idx').on(table.runId, table.createdAt)])
+
+/**
+ * An OAuth client, such as Claude Code or Codex, registered with the OAuth
+ * provider plugin in lib/auth.ts. The plugin owns this table (0009); only the
+ * columns the app reads are listed.
+ */
+export const oauthClients = pgTable('oauthClient', {
+  id: text('id').primaryKey(), clientId: text('clientId').notNull().unique(),
+  name: text('name'), uri: text('uri'),
+})

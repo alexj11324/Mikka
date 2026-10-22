@@ -283,7 +283,9 @@
     "acceptanceTitle": "进入验收 · Mikka",
     "acceptanceDescription": "开发预览专用的独立验收工作台入口。",
     "settingsPreviewTitle": "设置预览 · Mikka",
-    "settingsPreviewDescription": "无需登录的设置界面预览，使用演示资料。"
+    "settingsPreviewDescription": "无需登录的设置界面预览，使用演示资料。",
+    "oauthConsentTitle": "授权 Agent · Mikka",
+    "oauthConsentDescription": "允许外部 Agent 以你的身份使用 Mikka。"
   },
   "NotFound": {
     "title": "页面不存在",
@@ -1447,6 +1449,18 @@
     "cookieNote": "如果预览限制了第三方 Cookie，请使用新标签页入口。",
     "devOnly": "仅限开发预览。任务与项目真实保存，且与正式账号数据隔离。",
     "switchAccount": "改用自己的账号登录"
+  },
+  "OAuthConsent": {
+    "label": "授权 Agent",
+    "title": "允许 {name} 使用 Mikka？",
+    "description": "它将以 {account} 的身份操作。",
+    "scopeCoordinator": "给你的 Coordinator 发消息并读取它的回复",
+    "scopeRead": "查看你的任务和 Agent 运行记录",
+    "note": "只授权你信任的 Agent。",
+    "allow": "允许",
+    "deny": "拒绝",
+    "failed": "授权未完成，请回到 Agent 重新连接。",
+    "unknownClient": "一个未命名的应用"
   },
   "Coordinator": {
     "label": "Coordinator",

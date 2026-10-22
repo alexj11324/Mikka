@@ -283,7 +283,9 @@
     "acceptanceTitle": "Acceptance · Mikka",
     "acceptanceDescription": "A separate acceptance workspace entry for development previews.",
     "settingsPreviewTitle": "Settings preview · Mikka",
-    "settingsPreviewDescription": "A signed-out settings preview with demo data."
+    "settingsPreviewDescription": "A signed-out settings preview with demo data.",
+    "oauthConsentTitle": "Authorize agent · Mikka",
+    "oauthConsentDescription": "Let an external agent use Mikka as you."
   },
   "NotFound": {
     "title": "Page not found",
@@ -1447,6 +1449,18 @@
     "cookieNote": "If the preview blocks third-party cookies, use the new-tab entry.",
     "devOnly": "Development preview only. Tasks and projects are saved for real and isolated from production accounts.",
     "switchAccount": "Sign in with your own account"
+  },
+  "OAuthConsent": {
+    "label": "Authorize agent",
+    "title": "Allow {name} to use Mikka?",
+    "description": "It will act as {account}.",
+    "scopeCoordinator": "Send messages to your Coordinator and read its replies",
+    "scopeRead": "See your issues and agent runs",
+    "note": "Only allow agents you trust.",
+    "allow": "Allow",
+    "deny": "Deny",
+    "failed": "Authorization did not finish. Go back to the agent and connect again.",
+    "unknownClient": "An unnamed app"
   },
   "Coordinator": {
     "label": "Coordinator",
