@@ -11,7 +11,11 @@ const nextConfig = {
   basePath,
   env: { MIKKA_BASE_PATH: basePath },
   async redirects() {
-    return [{ source: '/', destination: basePath, basePath: false, permanent: false }]
+    return [
+      // The app's previous address; keep its links working.
+      { source: '/:path*', has: [{ type: 'host', value: 'mikka.aspectlylabs.com' }], destination: `https://app.aspectlylabs.com${basePath}/:path*`, basePath: false, permanent: true },
+      { source: '/', destination: basePath, basePath: false, permanent: false },
+    ]
   },
   transpilePackages: ['@mikka/protocol'],
   async headers() {
