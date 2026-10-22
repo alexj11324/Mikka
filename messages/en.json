@@ -178,6 +178,8 @@
     "submitCreate": "Create account and continue",
     "submitSignIn": "Sign in to the workspace",
     "oauthFailed": "OAuth sign-in did not finish. It may have been canceled or expired; please try again.",
+    "googleAccountNotLinked": "This Google account is not linked to Mikka. Sign in with your existing method, then link Google in Settings → Integrations.",
+    "githubAccountNotLinked": "This GitHub account is not linked to Mikka. Sign in with the method already linked to your account, or create a Mikka account first.",
     "continueNotice": "Click the provider button to finish OAuth authorization in this tab.",
     "tabOpened": "Finish sign-in in the new tab; refresh this preview when done.",
     "tabBlocked": "The browser blocked the new tab. Allow pop-ups and try again.",

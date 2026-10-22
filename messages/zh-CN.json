@@ -178,6 +178,8 @@
     "submitCreate": "创建账号并进入",
     "submitSignIn": "登录工作台",
     "oauthFailed": "OAuth 登录未完成，可能已取消或授权已过期。请重新尝试。",
+    "googleAccountNotLinked": "此 Google 账号尚未关联 Mikka。请先用已有方式登录，再到“设置 → 集成”关联 Google。",
+    "githubAccountNotLinked": "此 GitHub 账号尚未关联 Mikka。请使用已关联的方式登录，或先创建 Mikka 账号。",
     "continueNotice": "请点击下方对应的登录按钮，在此标签页完成授权。",
     "tabOpened": "请在新标签页完成登录；完成后可刷新此预览。",
     "tabBlocked": "浏览器阻止了新标签页，请允许弹出窗口后重试。",

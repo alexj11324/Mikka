@@ -11,7 +11,7 @@ import { withBasePath } from '@/lib/base-path'
 import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
 
-export function AuthForm({ mode, addAccount = false, googleEnabled = false, githubEnabled = false, oauthFailed = false, continueGoogle = false, continueGitHub = false, continueComposio = false, googleCallbackURL, githubCallbackURL, testWorkspaceEnabled = false, next, continueURL }: { mode: 'sign-in' | 'sign-up'; addAccount?: boolean; googleEnabled?: boolean; githubEnabled?: boolean; oauthFailed?: boolean; continueGoogle?: boolean; continueGitHub?: boolean; continueComposio?: boolean; googleCallbackURL?: string; githubCallbackURL?: string; testWorkspaceEnabled?: boolean; next?: string; continueURL?: string }) {
+export function AuthForm({ mode, addAccount = false, googleEnabled = false, githubEnabled = false, oauthFailed = false, oauthAccountNotLinked, continueGoogle = false, continueGitHub = false, continueComposio = false, googleCallbackURL, githubCallbackURL, testWorkspaceEnabled = false, next, continueURL }: { mode: 'sign-in' | 'sign-up'; addAccount?: boolean; googleEnabled?: boolean; githubEnabled?: boolean; oauthFailed?: boolean; oauthAccountNotLinked?: 'google' | 'github' | null; continueGoogle?: boolean; continueGitHub?: boolean; continueComposio?: boolean; googleCallbackURL?: string; githubCallbackURL?: string; testWorkspaceEnabled?: boolean; next?: string; continueURL?: string }) {
   const t = useTranslations('Auth')
   const locale = useLocale()
   const returnPath = safeAuthReturn(next)
@@ -20,11 +20,15 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
   const home = continueURL ?? withBasePath(returnPath.startsWith('/?')
     ? `${getPathname({ locale, href: '/' })}${returnPath.slice(1)}`
     : getPathname({ locale, href: returnPath }))
-  const [error, setError] = useState(oauthFailed ? t('oauthFailed') : '')
+  const [error, setError] = useState(oauthAccountNotLinked === 'google' ? t('googleAccountNotLinked') : oauthAccountNotLinked === 'github' ? t('githubAccountNotLinked') : oauthFailed ? t('oauthFailed') : '')
   const [notice, setNotice] = useState(continueGoogle || continueGitHub || continueComposio ? t('continueNotice') : '')
-  function oauthErrorCallbackURL() {
+  function oauthErrorCallbackURL(provider: 'google' | 'github') {
     const url = new URL(window.location.href)
+    url.searchParams.delete('error')
+    url.searchParams.delete('error_description')
+    url.searchParams.delete('error_uri')
     url.searchParams.set('oauth', 'failed')
+    url.searchParams.set('provider', provider)
     return url.toString()
   }
   async function signInWithGoogle() {
@@ -37,7 +41,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }
     setPending(true); setError(''); setNotice('')
     try {
-      const result = await authClient.signIn.social({ provider: 'google', callbackURL: home, errorCallbackURL: oauthErrorCallbackURL(), disableRedirect: true })
+      const result = await authClient.signIn.social({ provider: 'google', callbackURL: home, errorCallbackURL: oauthErrorCallbackURL('google'), disableRedirect: true })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
     } catch {
@@ -55,7 +59,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }
     setPending(true); setError(''); setNotice('')
     try {
-      const result = await authClient.signIn.social({ provider: 'github', callbackURL: home, errorCallbackURL: oauthErrorCallbackURL(), disableRedirect: true })
+      const result = await authClient.signIn.social({ provider: 'github', callbackURL: home, errorCallbackURL: oauthErrorCallbackURL('github'), disableRedirect: true })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
     } catch {
