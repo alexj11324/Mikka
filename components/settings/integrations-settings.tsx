@@ -16,7 +16,7 @@ type IntegrationState = { configured: boolean; callbackVerifierConfigured: boole
 const TOOLKITS: Toolkit[] = ['notion', 'slack']
 const integrationPath = withBasePath('/api/integrations/composio')
 
-export function IntegrationsSettings({ googleEnabled }: { googleEnabled: boolean }) {
+export function IntegrationsSettings({ googleEnabled, showWebhookDetails = true }: { googleEnabled: boolean; showWebhookDetails?: boolean }) {
   const locale = useLocale()
   const t = useTranslations('Settings.integrations')
   const [state, setState] = useState<IntegrationState | null>(null)
@@ -165,11 +165,11 @@ export function IntegrationsSettings({ googleEnabled }: { googleEnabled: boolean
     {state && !state.configured && <p role="status" className="text-sm text-muted-foreground">{t('composioNotConfigured')}</p>}
     {state?.configured && !state.callbackVerifierConfigured && <p role="status" className="text-sm text-muted-foreground">{t('callbackVerifierNotConfigured')}</p>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    <SettingsSection id="composio-webhook-heading" title={t('webhookTitle')} description={t('webhookDescription')}>
+    {showWebhookDetails && <SettingsSection id="composio-webhook-heading" title={t('webhookTitle')} description={t('webhookDescription')}>
       <SettingRow title={t('webhookPath')} description={state?.webhookConfigured ? t('webhookReady') : t('webhookSecretMissing')}>
         <code className="text-xs">{withBasePath('/api/webhooks/composio')}</code>
       </SettingRow>
-    </SettingsSection>
+    </SettingsSection>}
     {callbackSuccess && <p role="status" className="text-sm text-muted-foreground">{callbackSuccess}</p>}
     {callbackError && <p role="alert" className="text-sm text-destructive">{callbackError}</p>}
   </div>
