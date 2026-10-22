@@ -1,5 +1,6 @@
 import { Pool } from 'pg'
 import { getMigrations } from 'better-auth/db/migration'
+import { oauthProvider } from '@better-auth/oauth-provider'
 import { SQL, is, sql } from 'drizzle-orm'
 import { getTableConfig, PgDialect, PgTable } from 'drizzle-orm/pg-core'
 import * as issueSchema from '../lib/db/schema.ts'
@@ -15,7 +16,8 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || !target.pa
 
 const authPool = new Pool({ connectionString, max: 1 })
 try {
-  const migration = await getMigrations({ database: authPool, emailAndPassword: { enabled: true } })
+  // The OAuth provider's tables (drizzle/0009); its pages do not matter here.
+  const migration = await getMigrations({ database: authPool, emailAndPassword: { enabled: true }, plugins: [oauthProvider({ loginPage: '/sign-in', consentPage: '/oauth/consent', disableJwtPlugin: true })] })
   await migration.runMigrations()
 } finally {
   if (!authPool.ended) await authPool.end()
