@@ -42,6 +42,8 @@
     "create": {
       "title": "新建任务",
       "discardDraft": "放弃这份尚未创建的任务草稿？",
+      "discardTitle": "放弃这份草稿？",
+      "discardAction": "放弃",
       "createFailed": "创建失败，草稿已保留。",
       "createdNotice": "任务已创建，可以继续添加下一项。",
       "createError": "暂时无法创建，草稿已保留，请稍后重试。",
@@ -753,6 +755,8 @@
       "assigned": "指派给{name}",
       "unassigned": "取消了负责人",
       "addedSubtask": "添加了子任务 {title}",
+      "addedLabel": "添加了标签 {name}",
+      "removedLabel": "移除了标签 {name}",
       "unknownAssignee": "某人"
     },
     "detail": {

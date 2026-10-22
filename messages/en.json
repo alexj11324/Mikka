@@ -42,6 +42,8 @@
     "create": {
       "title": "New task",
       "discardDraft": "Discard this unsaved task draft?",
+      "discardTitle": "Discard this draft?",
+      "discardAction": "Discard",
       "createFailed": "Could not create the task. Your draft has been kept.",
       "createdNotice": "Task created. You can add another one.",
       "createError": "Could not create the task. Your draft has been kept; please try again.",
@@ -753,6 +755,8 @@
       "assigned": "Assigned to {name}",
       "unassigned": "Cleared the assignee",
       "addedSubtask": "Added subtask {title}",
+      "addedLabel": "Added label {name}",
+      "removedLabel": "Removed label {name}",
       "unknownAssignee": "someone"
     },
     "detail": {

@@ -20,7 +20,7 @@ export type ActivityChild = {
 export type IssueActivityEvent = {
   id: string
   at: string
-  kind: 'created' | 'status' | 'priority' | 'title' | 'assigned' | 'unassigned' | 'subtask'
+  kind: 'created' | 'status' | 'priority' | 'title' | 'assigned' | 'unassigned' | 'subtask' | 'labelAdded' | 'labelRemoved'
   status?: string
   priority?: string
   title?: string
@@ -33,6 +33,10 @@ function timestamp(value: Date | string) {
 
 function assigneeOf(content: JSONContent) {
   return readIssueMetadata(content).assignee
+}
+
+function labelNames(content: JSONContent) {
+  return readIssueMetadata(content).labels.map(label => label.name)
 }
 
 /** Turns stored versions and current subtasks into a short, human activity list. Description-only autosaves are omitted. */
@@ -53,6 +57,14 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
     if ((before?.id ?? null) !== (after?.id ?? null)) {
       if (after) events.push({ id: `assign-${current.id}`, at, kind: 'assigned', assigneeName: after.name })
       else events.push({ id: `unassign-${current.id}`, at, kind: 'unassigned' })
+    }
+    const beforeLabels = new Set(labelNames(previous.content))
+    const afterLabels = new Set(labelNames(current.content))
+    for (const name of afterLabels) {
+      if (!beforeLabels.has(name)) events.push({ id: `label-add-${current.id}-${name}`, at, kind: 'labelAdded', title: name })
+    }
+    for (const name of beforeLabels) {
+      if (!afterLabels.has(name)) events.push({ id: `label-remove-${current.id}-${name}`, at, kind: 'labelRemoved', title: name })
     }
   }
   const createdAt = created ? Date.parse(timestamp(created.createdAt)) : Number.NEGATIVE_INFINITY

@@ -31,7 +31,7 @@ import { RichTextTable, RichTextTableBubble, RICH_TEXT_TABLE_PROSE, RICH_TEXT_TA
 import { DeleteTableDialog } from "@/components/blocks/rich-text-editor-2/components/delete-table-dialog"
 import { createRichTextMention, RICH_TEXT_MENTION_PROSE } from "@/components/blocks/rich-text-editor-2/components/rich-text-mention"
 import { RichTextChanges, useRichTextChanges, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_MARKUP_VIEW, type RichTextMarkupView } from "@/components/blocks/rich-text-editor-3/components/rich-text-changes"
-import { CommentMark, CommentPaint, addThread, createThreadStore, replyToThread, setThreadResolved, repaintComments, canAnchorComment, useCommentAnchors, RICH_TEXT_COMMENT_PROSE } from "@/components/blocks/rich-text-editor-4/components/rich-text-comments"
+import { CommentMark, CommentPaint, addThread, createThreadStore, replyToThread, setThreadResolved, bindThreadRepaint, canAnchorComment, useCommentAnchors, RICH_TEXT_COMMENT_PROSE } from "@/components/blocks/rich-text-editor-4/components/rich-text-comments"
 
 const EMPTY_DOCUMENT: JSONContent = { type: "doc", content: [{ type: "paragraph" }] }
 const EMPTY_THREADS: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadIndex = {}
@@ -89,7 +89,12 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
       handleKeyDown: (view, event) => {
         if (event.key !== "End" || event.shiftKey || event.altKey || !(event.ctrlKey || event.metaKey) || !view.editable) return false
         event.preventDefault()
-        view.dispatch(view.state.tr.setSelection(TextSelection.atEnd(view.state.doc)).scrollIntoView())
+        try {
+          const end = TextSelection.atEnd(view.state.doc)
+          if (!view.state.selection.eq(end)) view.dispatch(view.state.tr.setSelection(end).scrollIntoView())
+        } catch {
+          return false
+        }
         return true
       },
     },
@@ -125,17 +130,11 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
   }, [editor, mode, editable])
   useEffect(() => {
     if (!editor) return
-    let cancelled = false
-    const paint = () => {
-      queueMicrotask(() => {
-        if (cancelled || editor.isDestroyed) return
-        repaintComments(editor)
-      })
-    }
-    threadDoc.on('update', paint)
-    paint()
-    return () => { cancelled = true; threadDoc.off('update', paint) }
-  }, [threadDoc, editor, threads])
+    // Thread resolve/reopen does not change the ProseMirror document, so the
+    // paint plugin would keep the old highlight. Content updates must not
+    // dispatch again: that second transaction crashes Enter, Backspace and Delete.
+    return bindThreadRepaint(editor, threadStore.subscribe)
+  }, [editor, threadStore])
 
   function openLink() {
     if (!editor?.isEditable) return

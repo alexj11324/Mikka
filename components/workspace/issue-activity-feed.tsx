@@ -21,6 +21,8 @@ export function IssueActivityFeed({ versions, children }: { versions: ActivityVe
         : event.kind === 'title' ? t('changedTitle', { title: event.title ?? '' })
         : event.kind === 'assigned' ? t('assigned', { name: event.assigneeName || t('unknownAssignee') })
         : event.kind === 'unassigned' ? t('unassigned')
+        : event.kind === 'labelAdded' ? t('addedLabel', { name: event.title ?? '' })
+        : event.kind === 'labelRemoved' ? t('removedLabel', { name: event.title ?? '' })
         : t('addedSubtask', { title: event.title ?? '' })
       return <TimelineItem key={event.id} step={index + 1}>
         <TimelineIndicator />

@@ -41,6 +41,18 @@ test('always keeps the created row when later events exceed the limit', () => {
   assert.deepEqual(events.slice(1).map(event => event.title), ['T14', 'T15', 'T16'])
 })
 
+test('records label add and remove without a description-only row', () => {
+  const labeled = content(null)
+  labeled.attrs = { mikka: { assignee: null, labels: [{ name: 'QA-Bug', color: 'violet' }] } }
+  const events = deriveIssueActivity([
+    { id: 'v1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:00:00.000Z' },
+    { id: 'v2', revision: 2, title: 'A', status: 'todo', priority: 'normal', content: labeled, createdAt: '2026-10-22T10:01:00.000Z' },
+    { id: 'v3', revision: 3, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:02:00.000Z' },
+  ], [])
+  assert.deepEqual(events.map(event => event.kind), ['created', 'labelAdded', 'labelRemoved'])
+  assert.equal(events.find(event => event.kind === 'labelAdded')?.title, 'QA-Bug')
+})
+
 test('records clearing an assignee and ignores subtasks created before the parent', () => {
   const events = deriveIssueActivity([
     { id: 'v1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: content({ id: 'u', name: 'Ada' }), createdAt: '2026-10-22T10:00:00.000Z' },
