@@ -165,7 +165,7 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
     await showAllTasks(member)
     await expect(member.getByText(publicTitle, { exact: true })).toHaveCount(0)
     await member.goto(app(`/settings/teams?workspace=${workspaceId}`))
-    await expect(member.getByRole('alert')).toContainText('成员资格已被停用')
+    await expect(member.getByRole('alert').filter({ hasText: '成员资格已被停用' })).toBeVisible()
   } finally {
     await memberContext.close()
     expect(runtime).toEqual([])
