@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { useRouter, Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import useSWR from "swr";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import {
@@ -116,6 +116,7 @@ export function MembersSettings({
   const commonT = useTranslations("Common");
   const format = useFormatter();
   const locale = useLocale();
+  const router = useRouter();
   const requestedWorkspaceId = initial?.workspace.id ?? workspaceId;
   const settingsUrl = requestedWorkspaceId
     ? `/api/workspace?workspace=${encodeURIComponent(requestedWorkspaceId)}`
@@ -728,6 +729,6 @@ export function MembersSettings({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </div>
   );
 }

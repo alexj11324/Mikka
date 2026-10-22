@@ -1,7 +1,7 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import { Inbox, Send, Layers, Star, Bell } from 'lucide-react'
+import { Inbox, Layers, Star, Bell } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import { IssueList } from './issue-list'
 import { AgentPanel } from './agent-panel'
@@ -14,7 +14,6 @@ import type { AgentHistory } from '@/lib/agent-history'
 
 export function WorkspaceOverview({ section, teamName, counts, projectCount, onView, onProjects, tasks, userId, onOpen, initialAgentHistory }: { section: WorkspaceSection; teamName?: string; counts: Record<IssueView, number>; projectCount: number; onView: (view: IssueView) => void; onProjects: () => void; tasks: Awaited<ReturnType<typeof listIssues>>; userId: string; onOpen: (id: string) => void; initialAgentHistory?: AgentHistory }) {
   const i18nText = useTranslations();
-  const t = useTranslations('Overview')
   const tIssue = useTranslations('Issue')
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   if (section === 'agent') return <AgentPanel key={userId} userId={userId} initialHistory={initialAgentHistory} />
