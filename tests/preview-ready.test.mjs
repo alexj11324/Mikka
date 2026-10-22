@@ -1,7 +1,14 @@
 import { test } from 'node:test'
-import assert from 'node:assert/strict'
-import { warmPreview, previewWarmupPaths } from '../scripts/dev-preview.mjs'
 import { readFile } from 'node:fs/promises'
+import assert from 'node:assert/strict'
+import { isPreviewWarmupEnabled, warmPreview, previewWarmupPaths } from '../scripts/dev-preview.mjs'
+
+test('background precompilation is enabled by default and only explicit zero disables it', () => {
+  assert.equal(isPreviewWarmupEnabled({}), true)
+  assert.equal(isPreviewWarmupEnabled({ PREVIEW_WARMUP: '1' }), true)
+  assert.equal(isPreviewWarmupEnabled({ PREVIEW_WARMUP: '' }), true)
+  assert.equal(isPreviewWarmupEnabled({ PREVIEW_WARMUP: '0' }), false)
+})
 
 test('startup compiles chat, images, history and workspace with read-only HEAD requests', async () => {
   const seen = []
@@ -14,8 +21,23 @@ test('startup compiles chat, images, history and workspace with read-only HEAD r
       return new Response(null, { status: 401 })
     }, log: () => {},
   })
-  assert.deepEqual(seen, previewWarmupPaths.map(path => `/mikka${path}`))
+  assert.deepEqual(seen, previewWarmupPaths.map(path => path === '/' ? '/mikka' : `/mikka${path}`))
+  assert.ok(seen.includes('/mikka'))
   assert.ok(seen.includes('/mikka/api/agent'))
+})
+
+test('startup begins every warmup without waiting for other routes', async () => {
+  const started = []
+  const releases = []
+  const warming = warmPreview('http://localhost:3000', {
+    fetcher: url => {
+      started.push(url.pathname)
+      return new Promise(resolve => releases.push(() => resolve(new Response(null, { status: 401 }))))
+    }, log: () => {},
+  })
+  assert.equal(started.length, previewWarmupPaths.length)
+  releases.forEach(release => release())
+  await warming
 })
 
 test('startup supports deployments without a base path', async () => {
@@ -28,6 +50,12 @@ test('startup supports deployments without a base path', async () => {
     }, log: () => {},
   })
   assert.deepEqual(seen, previewWarmupPaths)
+})
+
+test('page warmup accepts the sign-in redirect but API redirects remain failures', async () => {
+  await warmPreview('http://localhost:3000', {
+    fetcher: async url => new Response(null, { status: url.pathname === '/mikka' ? 307 : 401 }), log: () => {},
+  })
 })
 
 test('compile failures cannot report preview ready', async () => {
@@ -52,7 +80,7 @@ test('optional warmup aborts a stalled request instead of hanging startup work',
       },
       log: () => {},
     }), { name: 'TimeoutError' })
-    assert.equal(calls, 1)
+    assert.equal(calls, previewWarmupPaths.length)
   } finally {
     clearInterval(keepAlive)
   }
@@ -64,9 +92,17 @@ test('page requests never wait for unrelated AI routes or readiness marker files
   assert.match(proxy, /return localize\(request\)/)
 })
 
-test('startup keeps Next readiness output intact and makes precompilation opt-in', async () => {
+test('preview bootstrap script is inside head to avoid hydration failure', async () => {
+  const layout = await readFile(new URL('../app/[locale]/layout.tsx', import.meta.url), 'utf8')
+  assert.match(layout, /<head>[\s\S]*?<Script id="disable-openui-devtools" strategy="beforeInteractive">[\s\S]*?<\/head>\s*<body/)
+  assert.doesNotMatch(layout, /<html[^>]*>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?\{process\.env/)
+})
+
+test('startup preserves readiness output and starts default warmup without awaiting it', async () => {
   const script = await readFile(new URL('../scripts/dev-preview.mjs', import.meta.url), 'utf8')
-  assert.match(script, /process\.env\.PREVIEW_WARMUP !== '1'/)
+  assert.match(script, /!isPreviewWarmupEnabled\(\) \|\| warming/)
+  assert.match(script, /void warmPreview\(/)
+  assert.match(script, /timeout = 120000/)
   assert.match(script, /process\.stdout\.write\(text\)/)
   assert.doesNotMatch(script, /PREVIEW_READY_FILE|writeFile|text\.replace/)
 })

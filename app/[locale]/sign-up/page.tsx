@@ -5,7 +5,7 @@ import { getLocale, getTranslations } from 'next-intl/server'
 
 import { AuthForm } from '@/components/auth-form'
 import { getPathname, redirect } from '@/i18n/navigation'
-import { auth, authBaseURL, githubEnabled, googleEnabled } from '@/lib/auth'
+import { auth, oauthCallbackBaseURL, githubEnabled, googleEnabled } from '@/lib/auth'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { COMPOSIO_AUTH_CALLBACK_PATH, safeAuthReturn } from '@/lib/auth-return'
 import { oauthAccountNotLinkedProvider } from '@/lib/auth-error'
@@ -28,5 +28,5 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
     if (next.startsWith('/?')) plainRedirect(`${getPathname({ locale, href: '/' })}${next.slice(1)}`)
     redirect({ href: next, locale })
   }
-  return <AuthForm next={next} mode="sign-up" googleEnabled={googleEnabled} githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean(query.error)} oauthAccountNotLinked={oauthAccountNotLinkedProvider(query.error, query.provider)} continueComposio={Boolean(composioResume)} continueURL={composioResume} googleCallbackURL={authCallbackURL(authBaseURL, 'google', BASE_PATH)} githubCallbackURL={authCallbackURL(authBaseURL, 'github', BASE_PATH)} />
+  return <AuthForm next={next} mode="sign-up" googleEnabled={googleEnabled} githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean(query.error)} oauthAccountNotLinked={oauthAccountNotLinkedProvider(query.error, query.provider)} continueComposio={Boolean(composioResume)} continueURL={composioResume} googleCallbackURL={authCallbackURL(oauthCallbackBaseURL, 'google', BASE_PATH)} githubCallbackURL={authCallbackURL(oauthCallbackBaseURL, 'github', BASE_PATH)} />
 }

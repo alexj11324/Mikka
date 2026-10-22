@@ -1,7 +1,7 @@
 'use client'
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
-import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
+import { fetchAgentHistory as fetchHistory, useAgentHistory } from '@/hooks/use-agent-history'
 import '@openuidev/react-ui/layered/styles/index.css'
 import { useRef, useState } from 'react'
 import useSWR from 'swr'
@@ -54,18 +54,9 @@ const agentTheme = createTheme({
   fontLabel: 'var(--font-sans)',
 })
 
-async function fetchHistory(url: string): Promise<AgentHistory> {
-  const response = await fetch(withBasePath(url), { cache: 'no-store', credentials: 'same-origin' })
-  const body = await response.json()
-  if (!response.ok) throw new Error(body.error ?? agentCopy.unableToRestoreChatHistory)
-  return body
-}
-
 export function AgentPanel({ userId, initialHistory }: { userId: string; initialHistory?: AgentHistory }) {
   const [demo, setDemo] = useState(false)
-  const latest = useSWR<AgentHistory>(['/api/agent/sessions', userId], ([url]: [string, string]) => fetchHistory(url), {
-    fallbackData: initialHistory, revalidateOnFocus: false, revalidateOnMount: !initialHistory,
-  })
+  const latest = useAgentHistory(userId, initialHistory)
   if (!latest.data) return <AgentHistoryLoading error={latest.error} onRetry={() => { void latest.mutate() }} />
   return <ThemeProvider cssSelector=".orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
     <div hidden={demo} className="h-full min-h-0"><AgentSessions userId={userId} initial={latest.data} onDemo={() => setDemo(true)} onSaved={async () => { await latest.mutate() }} /></div>
