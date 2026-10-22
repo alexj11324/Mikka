@@ -1,7 +1,7 @@
 import { test } from 'node:test'
+import { readFile } from 'node:fs/promises'
 import assert from 'node:assert/strict'
 import { warmPreview, previewWarmupPaths } from '../scripts/dev-preview.mjs'
-import { readFile } from 'node:fs/promises'
 
 test('startup compiles chat, images, history and workspace with read-only HEAD requests', async () => {
   const seen = []
@@ -14,8 +14,23 @@ test('startup compiles chat, images, history and workspace with read-only HEAD r
       return new Response(null, { status: 401 })
     }, log: () => {},
   })
-  assert.deepEqual(seen, previewWarmupPaths.map(path => `/mikka${path}`))
+  assert.deepEqual(seen, previewWarmupPaths.map(path => path === '/' ? '/mikka' : `/mikka${path}`))
+  assert.ok(seen.includes('/mikka'))
   assert.ok(seen.includes('/mikka/api/agent'))
+})
+
+test('startup begins every warmup without waiting for other routes', async () => {
+  const started = []
+  const releases = []
+  const warming = warmPreview('http://localhost:3000', {
+    fetcher: url => {
+      started.push(url.pathname)
+      return new Promise(resolve => releases.push(() => resolve(new Response(null, { status: 401 }))))
+    }, log: () => {},
+  })
+  assert.equal(started.length, previewWarmupPaths.length)
+  releases.forEach(release => release())
+  await warming
 })
 
 test('startup supports deployments without a base path', async () => {
@@ -28,6 +43,12 @@ test('startup supports deployments without a base path', async () => {
     }, log: () => {},
   })
   assert.deepEqual(seen, previewWarmupPaths)
+})
+
+test('page warmup accepts the sign-in redirect but API redirects remain failures', async () => {
+  await warmPreview('http://localhost:3000', {
+    fetcher: async url => new Response(null, { status: url.pathname === '/mikka' ? 307 : 401 }), log: () => {},
+  })
 })
 
 test('compile failures cannot report preview ready', async () => {
@@ -52,7 +73,7 @@ test('optional warmup aborts a stalled request instead of hanging startup work',
       },
       log: () => {},
     }), { name: 'TimeoutError' })
-    assert.equal(calls, 1)
+    assert.equal(calls, previewWarmupPaths.length)
   } finally {
     clearInterval(keepAlive)
   }

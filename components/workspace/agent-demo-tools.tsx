@@ -6,6 +6,7 @@ import { ToolResult, ToolResultOutput } from '@/components/agents/tool-result'
 import { ToolApproval, type ToolApprovalStatus } from '@/components/agents/tool-approval'
 import { Citations } from '@/components/agents/citations'
 import { ImageGeneration } from '@/components/agents/image-generation'
+import { withBasePath } from '@/lib/base-path'
 
 export function AgentDemoTools() {
   const [approval, setApproval] = useState<ToolApprovalStatus>('pending')
@@ -22,7 +23,7 @@ export function AgentDemoTools() {
     <Citations title="来源展示（演示）" defaultOpen citations={[{ id: 'demo', title: '示例引用，不对应真实检索结果', domain: '本地演示' }]} />
     <ImageGeneration status="complete" label="图片展示（演示占位图）" statusText="本地占位图，未生成图片" interactive={false} size="compact">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/placeholder.svg?height=360&width=640" alt="本地演示占位图，非模型生成" width={640} height={360} />
+      <img src={withBasePath('/placeholder.svg?height=360&width=640')} alt="本地演示占位图，非模型生成" width={640} height={360} />
     </ImageGeneration>
   </div>
 }
