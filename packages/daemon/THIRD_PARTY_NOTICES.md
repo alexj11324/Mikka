@@ -9,7 +9,7 @@ parsing in `parse.ts`) are adapted from
 AgentSeal, licensed under the MIT License below.
 
 The port is read-only. codeburn can refresh a Codex token and write
-`~/.codex/auth.json`; Orvilo does not. See `docs/adr/0027-local-credential-quota.md`.
+`~/.codex/auth.json`; Mikka does not. See `docs/adr/0027-local-credential-quota.md`.
 
 ```
 MIT License

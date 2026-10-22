@@ -32,7 +32,7 @@ const SECRET = "sk-ant-api03-fixturetokenvalue"
 const NOW = Date.parse("2026-10-16T12:00:00Z")
 
 function tempHome(): string {
-  return mkdtempSync(join(tmpdir(), "orvilo-quota-"))
+  return mkdtempSync(join(tmpdir(), "mikka-quota-"))
 }
 
 function writePrivate(file: string, contents: string) {

@@ -7,6 +7,7 @@ import { AuthForm } from '@/components/auth-form'
 import { getPathname, redirect as localeRedirect } from '@/i18n/navigation'
 import { isAcceptanceEnabled } from '@/lib/acceptance'
 import { auth, authBaseURL, githubEnabled } from '@/lib/auth'
+import { withBasePath } from '@/lib/base-path'
 import { safeAuthReturn } from '@/lib/auth-return'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -25,5 +26,5 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
     localeRedirect({ href: next, locale })
   }
   if (isAcceptanceEnabled() && query.login !== '1' && !query.oauth && !query.continue && !query.error && !query.next) redirect('/api/acceptance')
-  return <AuthForm next={next} mode="sign-in" githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean(query.error)} continueGitHub={query.continue === 'github'} callbackURL={authBaseURL ? `${authBaseURL.replace(/\/$/, '')}/api/auth/callback/github` : undefined} />
+  return <AuthForm next={next} mode="sign-in" githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean(query.error)} continueGitHub={query.continue === 'github'} callbackURL={authBaseURL ? `${authBaseURL.replace(/\/$/, '')}${withBasePath('/api/auth/callback/github')}` : undefined} />
 }

@@ -6,7 +6,7 @@ import { issueStatusForLinearType } from './mapping'
 import { issueContentToMarkdown, linearMarkdownToIssueContent } from './markdown'
 import { shouldApplyLinearSnapshot } from './sync-guards'
 
-test('maps Linear review and duplicate states into Orvilo statuses', () => {
+test('maps Linear review and duplicate states into Mikka statuses', () => {
   assert.equal(issueStatusForLinearType('started', 'todo', 'In Review'), 'review')
   assert.equal(issueStatusForLinearType('started', 'review', 'In Progress'), 'doing')
   assert.equal(issueStatusForLinearType('canceled', 'todo', 'Duplicate'), 'duplicate')

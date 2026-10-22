@@ -15,14 +15,14 @@ export function WorkspaceSettings() {
   useEffect(() => { setHost(window.location.host) }, [])
   const invalidSlug = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 48
   return <section className="flex flex-col gap-4" aria-label={t('label')}>
-    <FieldGroup className="gap-0 rounded-xl border bg-muted/30 px-5">
-      <Field orientation="responsive" className="justify-between gap-3 py-5">
+    <FieldGroup data-settings-card className="gap-0 divide-y divide-border overflow-hidden rounded-2xl border bg-card">
+      <Field orientation="responsive" className="justify-between gap-3 px-5 py-5">
         <FieldLabel htmlFor="workspace-name" className="@md/field-group:flex-none">{t('name')}</FieldLabel>
         <div className="min-w-0 @md/field-group:flex-[0_1_28rem]">
           <Input id="workspace-name" value={name} maxLength={100} onChange={event => setName(event.target.value)} />
         </div>
       </Field>
-      <Field orientation="responsive" data-invalid={invalidSlug || undefined} className="justify-between gap-3 py-5">
+      <Field orientation="responsive" data-invalid={invalidSlug || undefined} className="justify-between gap-3 px-5 py-5">
         <FieldLabel htmlFor="workspace-url" className="@md/field-group:flex-none">URL</FieldLabel>
         <div className="flex min-w-0 flex-col gap-2 @md/field-group:flex-[0_1_28rem]">
           <InputGroup>

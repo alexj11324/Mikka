@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { requireUser, requireIssueAccess } from '@/lib/issue-access'
 import { db } from '@/lib/db'
 import { issues, linearConnections, linearIssueLinks, linearSyncInbox, linearSyncOutbox, linearTeamSyncs } from '@/lib/db/schema'
-import { createLinearAuthorizationUrl, disconnectLinear, LINEAR_OAUTH_STATE_COOKIE, linearAccessToken, linearOAuthConfigured } from '@/lib/linear-sync/oauth'
+import { createLinearAuthorizationUrl, disconnectLinear, LINEAR_OAUTH_CALLBACK_PATH, LINEAR_OAUTH_STATE_COOKIE, linearAccessToken, linearOAuthConfigured } from '@/lib/linear-sync/oauth'
 import { linearTeams } from '@/lib/linear-sync/client'
 import { dispatchLinearIssueSync, dispatchLinearWebhook } from '@/lib/linear-sync/dispatch'
 
@@ -31,7 +31,7 @@ export async function getLinearIntegrationState() {
 export async function startLinearOAuth() {
   const user = await requireUser()
   const authorization = await createLinearAuthorizationUrl(user.id)
-  ;(await cookies()).set(LINEAR_OAUTH_STATE_COOKIE, authorization.state, { httpOnly: true, sameSite: 'lax', secure: true, path: '/api/integrations/linear/callback', maxAge: 600 })
+  ;(await cookies()).set(LINEAR_OAUTH_STATE_COOKIE, authorization.state, { httpOnly: true, sameSite: 'lax', secure: true, path: LINEAR_OAUTH_CALLBACK_PATH, maxAge: 600 })
   return { url: authorization.url }
 }
 

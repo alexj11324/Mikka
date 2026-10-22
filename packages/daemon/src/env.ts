@@ -32,7 +32,8 @@ export const ENV_DENY_PATTERNS: readonly RegExp[] = [
   /^GITHUB_TOKEN$/,
   /^GH_TOKEN$/,
   /^NPM_TOKEN$/,
-  /^ORVILO_/,
+  /^MIKKA_/,
+  /^ORVILO_/, // pre-rename name of the same variables
   /^ELECTRON_/,
   /^NODE_OPTIONS$/,
   /SECRET/,
@@ -62,6 +63,6 @@ export function buildChildEnv(
     const value = host[name]
     if (value !== undefined && !isDeniedEnvName(name)) env[name] = value
   }
-  if (options.runId) env.ORVILO_RUN_ID = options.runId
+  if (options.runId) env.MIKKA_RUN_ID = options.runId
   return env
 }

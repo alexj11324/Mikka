@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { requireUser } from '@/lib/issue-access'
-import { exchangeLinearCode, LINEAR_OAUTH_STATE_COOKIE } from '@/lib/linear-sync/oauth'
+import { exchangeLinearCode, LINEAR_OAUTH_CALLBACK_PATH, LINEAR_OAUTH_STATE_COOKIE } from '@/lib/linear-sync/oauth'
+import { withBasePath } from '@/lib/base-path'
 
 export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const failure = new URL('/?linear=error', url.origin)
+  const failure = new URL(withBasePath('/?linear=error'), url.origin)
   const cookieStore = await cookies()
   const redirect = (destination: URL) => {
     const response = NextResponse.redirect(destination)
-    response.cookies.set(LINEAR_OAUTH_STATE_COOKIE, '', { httpOnly: true, sameSite: 'lax', secure: true, path: '/api/integrations/linear/callback', maxAge: 0 })
+    response.cookies.set(LINEAR_OAUTH_STATE_COOKIE, '', { httpOnly: true, sameSite: 'lax', secure: true, path: LINEAR_OAUTH_CALLBACK_PATH, maxAge: 0 })
     return response
   }
   if (url.searchParams.has('error')) return redirect(failure)
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
   try {
     const user = await requireUser()
     await exchangeLinearCode(state, code, user.id)
-    return redirect(new URL('/?linear=connected', url.origin))
+    return redirect(new URL(withBasePath('/?linear=connected'), url.origin))
   } catch {
     return redirect(failure)
   }

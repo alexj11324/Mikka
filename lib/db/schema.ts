@@ -1,7 +1,7 @@
 import { pgTable, text, uuid, varchar, jsonb, integer, timestamp, primaryKey, index, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
-import type { HarnessInfo } from '@orvilo/protocol/harness'
+import type { HarnessInfo } from '@mikka/protocol/harness'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),

@@ -90,7 +90,7 @@ export async function acceptWorkspaceInvitation(token: string): Promise<ActionRe
       await tx.update(workspaceInvitations).set({ status: 'accepted' }).where(and(eq(workspaceInvitations.id, invitation.id), eq(workspaceInvitations.workspaceId, candidate.workspaceId), eq(workspaceInvitations.email, user.email.toLowerCase())))
       return candidate.workspaceId
     })
-    ;(await cookies()).set('orvilo-workspace', workspaceId, { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' : 'lax', secure: true, path: '/', maxAge: 31536000 })
+    ;(await cookies()).set('mikka-workspace', workspaceId, { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' : 'lax', secure: true, path: '/', maxAge: 31536000 })
     return { workspaceId }
   })
 }

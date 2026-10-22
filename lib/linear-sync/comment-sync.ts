@@ -48,7 +48,7 @@ export async function linearCommentSync(issue: IssueRow, issueLink: IssueLink, s
           rootCommentId ??= index === 0 ? link.linearCommentId : undefined
           if (!persistedCommentAuthorMatches(link.authorUserId, message.authorUserId)) throw new Error('Comment author does not match its saved Linear mapping')
           if (link.syncStatus === 'synced' && link.bodyHash === hashValue(message.body)) continue
-          if (!link.authorUserId) throw new Error('A Linear-authored comment cannot be edited from Orvilo')
+          if (!link.authorUserId) throw new Error('A Linear-authored comment cannot be edited from Mikka')
           const token = await commentToken(issue.userId, link.authorUserId, organizationId, ownerToken)
           const exists = await externalCommentExists(token, link.linearCommentId, issueLink.linearIssueId)
           if (exists) {
@@ -125,7 +125,7 @@ export async function applyLinearCommentToApp(input: {
   threadId ??= `discussion-${input.id}`
   const messageId = existing?.messageId ?? `${threadId}-linear-${input.id}`
   const body = linearMarkdownToPlainText(input.body)
-  if (body.length > 2000) throw new Error('Linear comment is larger than Orvilo supports')
+  if (body.length > 2000) throw new Error('Linear comment is larger than Mikka supports')
   await db.transaction(async tx => {
     await tx.execute(sql`select set_config('orvilo.linear_sync_source', 'linear', true)`)
     const [latestIssue] = await tx.select({ updatedAt: issues.updatedAt }).from(issues).where(eq(issues.id, input.issue.id)).for('update').limit(1)

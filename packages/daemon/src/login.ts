@@ -1,9 +1,9 @@
-// `orvilo daemon login`: OAuth 2.0 device authorization (RFC 8628) against
+// `mikka daemon login`: OAuth 2.0 device authorization (RFC 8628) against
 // the server's Better Auth device-authorization plugin, like `gh auth login`.
 //
-//   1. POST /api/auth/device/code   { client_id: "orvilo-daemon" }
+//   1. POST /api/auth/device/code   { client_id: "mikka-daemon" }
 //   2. show the user code and the verification link (the desktop app's
-//      approve screen, `orvilo[-dev]://device?user_code=...`)
+//      approve screen, `mikka[-dev]://device?user_code=...`)
 //   3. poll POST /api/auth/device/token every `interval` seconds until the
 //      user approved (or denied, or the code expired)
 //
@@ -12,11 +12,12 @@ import {
   AUTH_BASE_PATH,
   CLIENT_VERSION_HEADER,
   DAEMON_CLIENT_ID,
-} from "@orvilo/protocol"
+} from "@mikka/protocol"
 import { z } from "zod"
 
 import { DaemonError, ServerUnreachableError } from "./errors"
 import { DAEMON_VERSION } from "./paths"
+import { serverUrl } from "./server-link-http"
 
 export const DEVICE_CODE_PATH = `${AUTH_BASE_PATH}/device/code`
 export const DEVICE_TOKEN_PATH = `${AUTH_BASE_PATH}/device/token`
@@ -62,7 +63,7 @@ async function post(
   const fetchImpl = options.fetchImpl ?? fetch
   let response: Response
   try {
-    response = await fetchImpl(new URL(path, options.serverUrl), {
+    response = await fetchImpl(serverUrl(options.serverUrl, path), {
       method: "POST",
       headers: {
         "content-type": "application/json",

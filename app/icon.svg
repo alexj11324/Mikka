@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="19.2 19.2 61.6 61.6">
+  <style>
+    .on { fill: #000000; }
+    .off { fill: #000000; opacity: 0.1; }
+    @media (prefers-color-scheme: dark) {
+      .on { fill: #FFFFFF; }
+      .off { fill: #FFFFFF; }
+    }
+  </style>
+  <g class="off"><circle cx="38" cy="26" r="4.8"/><circle cx="50" cy="26" r="4.8"/><circle cx="62" cy="26" r="4.8"/><circle cx="50" cy="38" r="4.8"/><circle cx="38" cy="50" r="4.8"/><circle cx="62" cy="50" r="4.8"/><circle cx="38" cy="62" r="4.8"/><circle cx="50" cy="62" r="4.8"/><circle cx="62" cy="62" r="4.8"/><circle cx="38" cy="74" r="4.8"/><circle cx="50" cy="74" r="4.8"/><circle cx="62" cy="74" r="4.8"/></g>
+  <g class="on"><circle cx="26" cy="26" r="4.8"/><circle cx="74" cy="26" r="4.8"/><circle cx="26" cy="38" r="4.8"/><circle cx="38" cy="38" r="4.8"/><circle cx="62" cy="38" r="4.8"/><circle cx="74" cy="38" r="4.8"/><circle cx="26" cy="50" r="4.8"/><circle cx="50" cy="50" r="4.8"/><circle cx="74" cy="50" r="4.8"/><circle cx="26" cy="62" r="4.8"/><circle cx="74" cy="62" r="4.8"/><circle cx="26" cy="74" r="4.8"/><circle cx="74" cy="74" r="4.8"/></g>
+</svg>

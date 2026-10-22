@@ -1,5 +1,5 @@
 // What every real harness adapter needs about one run: the sandbox policy,
-// the Orvilo MCP server (hand-in tools) and the handoff file it writes, and
+// the Mikka MCP server (hand-in tools) and the handoff file it writes, and
 // the instructions that tell the agent how a run ends.
 import { execFileSync } from "node:child_process"
 import {
@@ -13,8 +13,8 @@ import {
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
-import type { Harness, RunKind } from "@orvilo/protocol"
-import { planHandoff, planSplitProblem } from "@orvilo/protocol/plan"
+import type { Harness, RunKind } from "@mikka/protocol"
+import { planHandoff, planSplitProblem } from "@mikka/protocol/plan"
 import {
   SKILL_BODY_FILE,
   SKILLS_DIR,
@@ -22,7 +22,7 @@ import {
   skillSlug,
   skillsPromptSection,
   type RunSkill,
-} from "@orvilo/protocol/skill"
+} from "@mikka/protocol/skill"
 
 import type { AgentReport, ExitEvent } from "../adapters/types"
 import { assertSafeId } from "../ids"
@@ -61,10 +61,10 @@ export const HARNESS_DOMAINS: Record<Exclude<Harness, "mock">, string[]> = {
   ],
 }
 
-export const MCP_SERVER_SCRIPT = resolve(import.meta.dirname, "orvilo-mcp.mjs")
+export const MCP_SERVER_SCRIPT = resolve(import.meta.dirname, "mikka-mcp.mjs")
 
-/** Name of the MCP server in every harness's config (`mcp__orvilo__submit`). */
-export const MCP_SERVER_NAME = "orvilo"
+/** Name of the MCP server in every harness's config (`mcp__mikka__submit`). */
+export const MCP_SERVER_NAME = "mikka"
 
 export interface McpServerSpec {
   command: string
@@ -97,7 +97,7 @@ export interface RunContextOptions {
   nodeBinary?: string
 }
 
-/** Recorded by `orvilo-mcp.mjs`. */
+/** Recorded by `mikka-mcp.mjs`. */
 interface HandoffFile {
   kind: "submit" | "ask" | "blocked"
   summary?: string
@@ -405,7 +405,7 @@ function planFromHandoff(
 export function planInstructions(): string {
   return [
     "This is a planning run: you write a spec, not code.",
-    "Do not change any file in the repository, and do not run its build or tests. Everything you produce goes into the `spec` and `split` arguments of the `orvilo` `submit` tool.",
+    "Do not change any file in the repository, and do not run its build or tests. Everything you produce goes into the `spec` and `split` arguments of the `mikka` `submit` tool.",
     "",
     "Write the spec for the requirement in the brief:",
     "- `title`: the feature, named the way the person asking would say it.",
@@ -432,13 +432,13 @@ export function planInstructions(): string {
 /** Appended to the harness's system prompt (or the first message). */
 export function runInstructions(worktree: string, policy?: RunPolicy): string {
   return [
-    "You are running as an Orvilo agent, unattended, in a git worktree:",
+    "You are running as an Mikka agent, unattended, in a git worktree:",
     `${worktree}`,
     "Rules for this run:",
     ...policyInstructions(runPolicy(policy)),
-    "- Do not commit, push or switch branches. Orvilo verifies, commits and pushes your work after you hand it in.",
+    "- Do not commit, push or switch branches. Mikka verifies, commits and pushes your work after you hand it in.",
     "- Run every command in the foreground. Nothing keeps running after your turn: when your turn ends, the run ends.",
-    "- When the task is done and checked, call the `submit` tool of the `orvilo` MCP server with a short summary. That is the only way to finish successfully.",
+    "- When the task is done and checked, call the `submit` tool of the `mikka` MCP server with a short summary. That is the only way to finish successfully.",
     "- If you need a decision from a human, call `ask_human`. If something outside the code blocks you, call `report_blocked`.",
     "- Ending your turn without calling one of these tools counts as unfinished work.",
   ].join("\n")
@@ -446,4 +446,4 @@ export function runInstructions(worktree: string, policy?: RunPolicy): string {
 
 /** Message sent when a session is resumed after a daemon restart. */
 export const RESUME_MESSAGE =
-  "Orvilo was restarted while you were working. Continue the task where you left off, and call the orvilo `submit` tool when you are done."
+  "Mikka was restarted while you were working. Continue the task where you left off, and call the mikka `submit` tool when you are done."

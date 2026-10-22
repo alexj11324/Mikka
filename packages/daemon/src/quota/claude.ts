@@ -2,7 +2,7 @@
 // Credential location and payload fields are adapted from codeburn (MIT),
 // Copyright (c) 2026 AgentSeal. See packages/daemon/THIRD_PARTY_NOTICES.md.
 // This reader never refreshes or writes the credential.
-import type { QuotaSnapshot, QuotaVendor, QuotaWindow } from "@orvilo/protocol"
+import type { QuotaSnapshot, QuotaVendor, QuotaWindow } from "@mikka/protocol"
 
 import type { KeychainOutcome } from "./files"
 import { sanitizeError } from "./files"

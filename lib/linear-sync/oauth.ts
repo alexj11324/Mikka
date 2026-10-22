@@ -5,15 +5,19 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { linearConnections, linearOAuthStates, linearTeamSyncs } from '@/lib/db/schema'
 import { authBaseURL } from '@/lib/auth'
+import { withBasePath } from '@/lib/base-path'
 import { hashValue, seal, unseal } from './crypto'
 import { linearIdentity } from './client'
 import { LinearApiError } from './graphql'
 
 const tokenPayload = z.object({ access_token: z.string().min(1), refresh_token: z.string().min(1), expires_in: z.number().positive() })
 export const LINEAR_OAUTH_STATE_COOKIE = 'linear-oauth-state'
+export const LINEAR_OAUTH_CALLBACK_PATH = withBasePath('/api/integrations/linear/callback')
 
 export function linearRedirectUrl() {
-  const fallback = process.env.VERCEL_ENV === 'preview' ? '' : authBaseURL ? new URL('/api/integrations/linear/callback', authBaseURL).toString() : ''
+  const fallback = process.env.VERCEL_ENV === 'preview'
+    ? ''
+    : authBaseURL ? new URL(LINEAR_OAUTH_CALLBACK_PATH, authBaseURL).toString() : ''
   const value = process.env.LINEAR_REDIRECT_URL ?? fallback
   if (!value) throw new Error('Linear OAuth is not configured')
   const url = new URL(value)

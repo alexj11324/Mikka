@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { and, eq, sql } from 'drizzle-orm'
-import { runEventBatchSchema } from '@orvilo/protocol/device'
+import { runEventBatchSchema } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, devices, runChunks } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'

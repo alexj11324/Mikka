@@ -5,8 +5,8 @@ import { useTranslations } from 'next-intl'
 import { ArrowRight, RefreshCw, Unplug } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { disconnectLinearAccount, disableLinearTeam, enableLinearTeam, getLinearIntegrationState, listLinearTeamOptions, retryLinearDelivery, retryLinearIssue, startLinearOAuth } from '@/app/actions/linear-sync'
 
 type IntegrationState = Awaited<ReturnType<typeof getLinearIntegrationState>>
@@ -100,63 +100,37 @@ export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | nu
     finally { setBusy(false) }
   }
 
-  return <section className="flex flex-col gap-4" aria-labelledby="linear-heading">
-    <div className="rounded-xl border bg-muted/30 px-5">
-      <div className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h2 id="linear-heading" className="text-sm font-medium">{t('title')}</h2>
-          <p className="text-sm text-muted-foreground">{state?.connected ? t('connectedTo', { organization: state.organizationName ?? '' }) : t('description')}</p>
+  return <div className="flex flex-col gap-8">
+    <SettingsSection
+      id="linear-heading"
+      title={t('title')}
+      description={state?.connected ? t('connectedTo', { organization: state.organizationName ?? '' }) : t('description')}
+      action={state?.connected ? <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{t('connected')}</Badge><Button variant="outline" size="sm" disabled={busy} onClick={() => void disconnect()}><Unplug data-icon="inline-start" />{t('disconnect')}</Button></div> : <Button size="sm" disabled={busy || !state?.configured} onClick={() => void connect()}>{t('connect')}<ArrowRight data-icon="inline-end" /></Button>}
+    >
+      {state?.connected && <SettingRow title={t('teamLabel')} description={t('teamDescription')}>
+        <div className="flex flex-col items-start gap-2">
+          <NativeSelect aria-label={t('teamLabel')} id="linear-team" value={activeTeam?.linearTeamId ?? selectedTeam} disabled={busy || teams.length === 0 || Boolean(activeTeam)} onChange={event => setSelectedTeam(event.target.value)}>
+            <NativeSelectOption value="">{t('teamPlaceholder')}</NativeSelectOption>
+            {teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{team.key} · {team.name}</NativeSelectOption>)}
+          </NativeSelect>
+          {activeTeam && <div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{t('syncActive', { team: activeTeam.linearTeamName })}</Badge><Button variant="outline" size="sm" disabled={busy} onClick={() => void disableTeam()}>{t('pause')}</Button></div>}
+          {!activeTeam && <Button size="sm" disabled={busy || !selectedTeam} onClick={() => void enableTeam()}>{t('enable')}</Button>}
+          {activeTeam?.lastError && <p role="alert" className="text-xs text-destructive">{activeTeam.lastError}</p>}
         </div>
-        {state?.connected ? <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{t('connected')}</Badge>
-          <Button variant="outline" size="sm" disabled={busy} onClick={() => void disconnect()}><Unplug data-icon="inline-start" />{t('disconnect')}</Button>
-        </div> : <Button size="sm" disabled={busy || !state?.configured} onClick={() => void connect()}>{t('connect')}<ArrowRight data-icon="inline-end" /></Button>}
-      </div>
-    </div>
+      </SettingRow>}
+    </SettingsSection>
 
     {state && !state.configured && <p className="text-xs text-muted-foreground">{t('notConfigured')}</p>}
     {notice === 'connected' && <p role="status" className="text-sm text-success-foreground">{t('oauthSuccess')}</p>}
     {notice === 'error' && <p role="alert" className="text-sm text-destructive">{t('oauthError')}</p>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
-    {state?.connected && <div className="flex flex-col gap-4 rounded-xl border px-5 py-5">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="linear-team">{t('teamLabel')}</Label>
-        <NativeSelect id="linear-team" value={activeTeam?.linearTeamId ?? selectedTeam} disabled={busy || teams.length === 0 || Boolean(activeTeam)} onChange={event => setSelectedTeam(event.target.value)}>
-          <NativeSelectOption value="">{t('teamPlaceholder')}</NativeSelectOption>
-          {teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{team.key} · {team.name}</NativeSelectOption>)}
-        </NativeSelect>
-        <p className="text-xs text-muted-foreground">{t('teamDescription')}</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {activeTeam ? <>
-          <Badge variant="outline">{t('syncActive', { team: activeTeam.linearTeamName })}</Badge>
-          <Button variant="outline" size="sm" disabled={busy} onClick={() => void disableTeam()}>{t('pause')}</Button>
-        </> : <Button size="sm" disabled={busy || !selectedTeam} onClick={() => void enableTeam()}>{t('enable')}</Button>}
-        {activeTeam?.lastError && <p role="alert" className="w-full text-xs text-destructive">{activeTeam.lastError}</p>}
-      </div>
-    </div>}
+    {!!state?.errors.length && <SettingsSection id="linear-failed-issues" title={t('failedIssues')}>
+      {state.errors.map(item => <SettingRow key={item.id} title={`${item.identifier ? `${item.identifier} · ` : ''}${item.title}`} description={item.message ?? t('operationError')}><Button variant="outline" size="sm" disabled={busy} onClick={() => void retry(item.issueId)}><RefreshCw data-icon="inline-start" />{t('retry')}</Button></SettingRow>)}
+    </SettingsSection>}
 
-    {!!state?.errors.length && <div className="flex flex-col gap-3 rounded-xl border px-5 py-5">
-      <h3 className="text-sm font-medium">{t('failedIssues')}</h3>
-      {state.errors.map(item => <div key={item.id} className="flex flex-col gap-2 rounded-lg bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{item.identifier ? `${item.identifier} · ` : ''}{item.title}</p>
-          <p className="text-xs text-destructive">{item.message ?? t('operationError')}</p>
-        </div>
-        <Button variant="outline" size="sm" disabled={busy} onClick={() => void retry(item.issueId)}><RefreshCw data-icon="inline-start" />{t('retry')}</Button>
-      </div>)}
-    </div>}
-
-    {!!state?.inboundErrors.length && <div className="flex flex-col gap-3 rounded-xl border px-5 py-5">
-      <h3 className="text-sm font-medium">{t('inboundFailures')}</h3>
-      {state.inboundErrors.map(item => <div key={item.id} className="flex flex-col gap-2 rounded-lg bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-medium">{t('deliveryType', { type: item.eventType })}</p>
-          <p className="text-xs text-destructive">{item.message ?? t('operationError')}</p>
-        </div>
-        <Button variant="outline" size="sm" disabled={busy} onClick={() => void retryDelivery(item.id)}><RefreshCw data-icon="inline-start" />{t('retry')}</Button>
-      </div>)}
-    </div>}
-  </section>
+    {!!state?.inboundErrors.length && <SettingsSection id="linear-inbound-failures" title={t('inboundFailures')}>
+      {state.inboundErrors.map(item => <SettingRow key={item.id} title={t('deliveryType', { type: item.eventType })} description={item.message ?? t('operationError')}><Button variant="outline" size="sm" disabled={busy} onClick={() => void retryDelivery(item.id)}><RefreshCw data-icon="inline-start" />{t('retry')}</Button></SettingRow>)}
+    </SettingsSection>}
+  </div>
 }

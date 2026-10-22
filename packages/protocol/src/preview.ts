@@ -1,12 +1,12 @@
 // Deliverable previews: an HTML page an agent wrote, opened inside the app.
 // The page is untrusted, so it never runs on the app's own origin. Electron
-// main serves it on its own scheme (`orvilo-preview:`); the renderer shows it
+// main serves it on its own scheme (`mikka-preview:`); the renderer shows it
 // in an iframe with `sandbox="allow-scripts"`. The page gets an opaque origin,
 // inline scripts and styles, and no network: it cannot reach the app, the
 // bridge, the session, or the internet.
 import { z } from "zod"
 
-export const PREVIEW_SCHEME = "orvilo-preview"
+export const PREVIEW_SCHEME = "mikka-preview"
 
 /** Largest page the app will preview (bytes of UTF-16 text, roughly). */
 export const PREVIEW_MAX_LENGTH = 5 * 1024 * 1024
@@ -38,7 +38,7 @@ const META = `<meta http-equiv="Content-Security-Policy" content="${DIRECTIVES.j
  * so the page keeps standards mode.
  *
  * A meta CSP is defense-in-depth, not isolation: it cannot sandbox the page.
- * Callers must still load previews through `orvilo-preview:` or an iframe with
+ * Callers must still load previews through `mikka-preview:` or an iframe with
  * `sandbox="allow-scripts"` and no `allow-same-origin`.
  */
 export function withPreviewCsp(html: string): string {

@@ -170,7 +170,7 @@ test('only the configured component-library directories are outside the business
 })
 
 test('lint permits imported components but fails handwritten business UI without any source lock', async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), 'orvilo-ui-policy-'))
+  const cwd = mkdtempSync(path.join(tmpdir(), 'mikka-ui-policy-'))
   const filename = 'components/example.tsx'
   const original = 'import { Button } from "@/components/ui/button"; export const Example = ({ onSave }) => <Button variant="outline" onClick={onSave}>Save</Button>'
   const execute = async () => {

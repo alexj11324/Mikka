@@ -84,11 +84,11 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
   if (!link) return null
   if (link.link.teamSyncId !== team.id) return null
   if (!shouldApplyLinearSnapshot({ remoteUpdatedAt: new Date(remote.updatedAt), localUpdatedAt: link.issue.updatedAt, appSyncedAt: link.link.appSyncedAt, linearUpdatedAt: link.link.linearUpdatedAt, force })) return link.issue
-  if (remote.title.length > 200) throw new LinearSyncConflictError('Linear issue title is longer than Orvilo supports')
+  if (remote.title.length > 200) throw new LinearSyncConflictError('Linear issue title is longer than Mikka supports')
 
   const incomingContent = linearMarkdownToIssueContent(remote.description)
-  if (JSON.stringify(incomingContent).length > 250_000) throw new LinearSyncConflictError('Linear description is larger than Orvilo supports')
-  if (remote.labels.length > 12) throw new LinearSyncConflictError('Linear issue has more than 12 labels; Orvilo supports up to 12')
+  if (JSON.stringify(incomingContent).length > 250_000) throw new LinearSyncConflictError('Linear description is larger than Mikka supports')
+  if (remote.labels.length > 12) throw new LinearSyncConflictError('Linear issue has more than 12 labels; Mikka supports up to 12')
   const assignee = await localAssigneeForRemote(team.ownerId, link.issue.id, remote, false)
   const nextPriority = issuePriorityForLinear(remote.priority)
   return db.transaction(async tx => {
@@ -133,10 +133,10 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
 export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssueSnapshot) {
   const linearId = z.uuid().safeParse(remote.id)
   if (!linearId.success) throw new LinearSyncConflictError('Linear returned an invalid issue ID')
-  if (remote.title.length > 200) throw new LinearSyncConflictError('Linear issue title is longer than Orvilo supports')
-  if (remote.labels.length > 12) throw new LinearSyncConflictError('Linear issue has more than 12 labels; Orvilo supports up to 12')
+  if (remote.title.length > 200) throw new LinearSyncConflictError('Linear issue title is longer than Mikka supports')
+  if (remote.labels.length > 12) throw new LinearSyncConflictError('Linear issue has more than 12 labels; Mikka supports up to 12')
   const content = linearMarkdownToIssueContent(remote.description)
-  if (JSON.stringify(content).length > 250_000) throw new LinearSyncConflictError('Linear description is larger than Orvilo supports')
+  if (JSON.stringify(content).length > 250_000) throw new LinearSyncConflictError('Linear description is larger than Mikka supports')
   const assignee = await localAssigneeForRemote(team.ownerId, remote.id, remote, true)
   const created = await db.transaction(async tx => {
     await tx.execute(sql`select set_config('orvilo.linear_sync_source', 'linear', true)`)
@@ -146,7 +146,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
       const [existingLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.issueId, sameId.id)).limit(1)
       if (existingLink && existingLink.linearIssueId !== remote.id) throw new LinearSyncConflictError('The issue is already linked to another Linear issue')
       const [remoteLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.linearIssueId, remote.id)).limit(1)
-      if (remoteLink && remoteLink.issueId !== sameId.id) throw new LinearSyncConflictError('The Linear issue is already linked in Orvilo')
+      if (remoteLink && remoteLink.issueId !== sameId.id) throw new LinearSyncConflictError('The Linear issue is already linked in Mikka')
       const syncRemote = existingLink
         ? !existingLink.linearUpdatedAt || remote.updatedAt > existingLink.linearUpdatedAt.toISOString()
         : remote.updatedAt > sameId.updatedAt.toISOString()
@@ -158,7 +158,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
       return { issue: sameId, syncRemote }
     }
     const [collision] = await tx.select({ id: issues.id }).from(issues).where(eq(issues.id, linearId.data)).limit(1)
-    if (collision) throw new LinearSyncConflictError('Linear issue ID conflicts with an existing Orvilo issue')
+    if (collision) throw new LinearSyncConflictError('Linear issue ID conflicts with an existing Mikka issue')
     const number = await allocateIssueNumbers(tx, team.ownerId)
     const metadata = {
       ...readIssueMetadata({ type: 'doc' }),

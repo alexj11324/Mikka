@@ -1,11 +1,11 @@
 // The Claude Code, Codex and Cursor adapters driven end to end through the
 // daemon, against fake CLIs that speak each real protocol (stream-json,
-// `codex app-server` JSON-RPC, ACP) and call Orvilo's MCP hand-in tool. The
+// `codex app-server` JSON-RPC, ACP) and call Mikka's MCP hand-in tool. The
 // sandbox is off here; `agents.test.ts` and `real-agents.test.ts` cover it.
 import { chmodSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
-import { isTerminalRunState, type Harness } from "@orvilo/protocol"
+import { isTerminalRunState, type Harness } from "@mikka/protocol"
 import { execa } from "execa"
 import { afterEach, describe, expect, it } from "vitest"
 
@@ -14,7 +14,7 @@ import type { RunChunk } from "../src/chunks"
 import { Daemon } from "../src/main"
 import { MemoryServer } from "../src/server-link"
 import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
-import { resolveAgentSettings } from "@orvilo/protocol/agent-policy"
+import { resolveAgentSettings } from "@mikka/protocol/agent-policy"
 
 const FAKES = resolve(import.meta.dirname, "fakes")
 const BINARIES = {
@@ -126,7 +126,7 @@ describe.each(["claude_code", "codex", "cursor"] as const)(
       expect(texts(chunks)).not.toBe("")
       const publish = chunks.find((c) => c.type === "data-publish")
       expect(publish).toMatchObject({
-        data: { branch: `orvilo/run-${runId}`, pushed: true },
+        data: { branch: `mikka/run-${runId}`, pushed: true },
       })
       // The completion carries the same result for the orchestrator.
       expect(completion?.report.publish).toEqual(
@@ -136,7 +136,7 @@ describe.each(["claude_code", "codex", "cursor"] as const)(
         "--git-dir",
         origin,
         "show",
-        `orvilo/run-${runId}:NOTES.md`,
+        `mikka/run-${runId}:NOTES.md`,
       ])
       expect(stdout).toBe("notes")
     })
@@ -186,9 +186,9 @@ describe.each(["claude_code", "codex", "cursor"] as const)(
 describe("the issue branch", () => {
   const PERSON = {
     GIT_AUTHOR_NAME: "Person",
-    GIT_AUTHOR_EMAIL: "person@orvilo.invalid",
+    GIT_AUTHOR_EMAIL: "person@mikka.invalid",
     GIT_COMMITTER_NAME: "Person",
-    GIT_COMMITTER_EMAIL: "person@orvilo.invalid",
+    GIT_COMMITTER_EMAIL: "person@mikka.invalid",
   }
 
   function queueOnIssue(server: MemoryServer, pushBranch: string) {
@@ -208,7 +208,7 @@ describe("the issue branch", () => {
     await execa("git", ["push", "-q", "origin", "main"], { cwd: repo })
     const person = join(tempDir("orvp-"), "clone")
     await execa("git", ["clone", "-q", origin, person])
-    await execa("git", ["checkout", "-q", "-b", "orvilo/orv-1"], {
+    await execa("git", ["checkout", "-q", "-b", "mikka/orv-1"], {
       cwd: person,
     })
     writeFileSync(join(person, "PERSON.md"), "by hand\n")
@@ -217,27 +217,27 @@ describe("the issue branch", () => {
       cwd: person,
       env: PERSON,
     })
-    await execa("git", ["push", "-q", "origin", "orvilo/orv-1"], {
+    await execa("git", ["push", "-q", "origin", "mikka/orv-1"], {
       cwd: person,
     })
     const personTip = (
       await execa("git", ["rev-parse", "HEAD"], { cwd: person })
     ).stdout
 
-    const runId = queueOnIssue(server, "orvilo/orv-1")
+    const runId = queueOnIssue(server, "mikka/orv-1")
     await started(daemon, runId)
     expect(await ended(daemon, runId)).toMatchObject({ state: "succeeded" })
     const publish = server.runs.get(runId)?.completion?.report.publish
     expect(publish).toMatchObject({
-      branch: "orvilo/orv-1",
+      branch: "mikka/orv-1",
       pushed: true,
       remote: "origin",
     })
     const remote = (...args: string[]) =>
       execa("git", ["--git-dir", origin, ...args]).then((r) => r.stdout)
-    expect(await remote("rev-parse", "orvilo/orv-1")).toBe(publish?.commit)
-    expect(await remote("rev-parse", "orvilo/orv-1^")).toBe(personTip)
-    const files = await remote("ls-tree", "--name-only", "orvilo/orv-1")
+    expect(await remote("rev-parse", "mikka/orv-1")).toBe(publish?.commit)
+    expect(await remote("rev-parse", "mikka/orv-1^")).toBe(personTip)
+    const files = await remote("ls-tree", "--name-only", "mikka/orv-1")
     expect(files.split("\n")).toEqual(
       expect.arrayContaining(["NOTES.md", "PERSON.md"])
     )
@@ -246,18 +246,18 @@ describe("the issue branch", () => {
   it("starts from the base branch when the issue branch cannot be fetched", async () => {
     const { repo, origin, server, daemon } = await setup()
     await execa("git", ["push", "-q", "origin", "main"], { cwd: repo })
-    const runId = queueOnIssue(server, "orvilo/orv-2")
+    const runId = queueOnIssue(server, "mikka/orv-2")
     await started(daemon, runId)
     expect(await ended(daemon, runId)).toMatchObject({ state: "succeeded" })
     expect(server.runs.get(runId)?.completion?.report.publish).toMatchObject({
-      branch: "orvilo/orv-2",
+      branch: "mikka/orv-2",
       pushed: true,
     })
     const parent = await execa("git", [
       "--git-dir",
       origin,
       "rev-parse",
-      "orvilo/orv-2^",
+      "mikka/orv-2^",
     ])
     expect(parent.stdout).toBe(
       (await execa("git", ["rev-parse", "main"], { cwd: repo })).stdout
@@ -289,7 +289,7 @@ describe("workspace agent policy (ADR 0028)", () => {
       },
     })
     await expect(
-      execa("git", ["--git-dir", origin, "rev-parse", `orvilo/run-${runId}`])
+      execa("git", ["--git-dir", origin, "rev-parse", `mikka/run-${runId}`])
     ).rejects.toThrow()
   })
 
@@ -315,7 +315,7 @@ describe("workspace agent policy (ADR 0028)", () => {
       false
     )
     await expect(
-      execa("git", ["--git-dir", origin, "rev-parse", `orvilo/run-${runId}`])
+      execa("git", ["--git-dir", origin, "rev-parse", `mikka/run-${runId}`])
     ).rejects.toThrow()
   })
 })

@@ -1,4 +1,4 @@
-// Shared flat ESLint config for every Orvilo workspace.
+// Shared flat ESLint config for every Mikka workspace.
 import js from "@eslint/js"
 import i18next from "eslint-plugin-i18next"
 import reactHooks from "eslint-plugin-react-hooks"
@@ -41,22 +41,22 @@ export function noLiteralStrings(files) {
   }
 }
 
-// Raw elements that have an installed @orvilo/ui component.
+// Raw elements that have an installed @mikka/ui component.
 const RAW_ELEMENTS = {
-  button: "Button (@orvilo/ui/components/ui/button)",
-  input: "Input / InputGroup (@orvilo/ui/components/ui/input)",
-  select: "Select (@orvilo/ui/components/ui/select)",
-  textarea: "Textarea (@orvilo/ui/components/ui/textarea)",
-  dialog: "Dialog (@orvilo/ui/components/ui/dialog)",
+  button: "Button (@mikka/ui/components/ui/button)",
+  input: "Input / InputGroup (@mikka/ui/components/ui/input)",
+  select: "Select (@mikka/ui/components/ui/select)",
+  textarea: "Textarea (@mikka/ui/components/ui/textarea)",
+  dialog: "Dialog (@mikka/ui/components/ui/dialog)",
   aside: "Sidebar (an installed sidebar block)",
-  nav: "Sidebar / Breadcrumb (@orvilo/ui/components/ui/…)",
-  table: "Table / DataGrid (@orvilo/ui/components/ui/table)",
-  kbd: "Kbd (@orvilo/ui/components/ui/kbd)",
+  nav: "Sidebar / Breadcrumb (@mikka/ui/components/ui/…)",
+  table: "Table / DataGrid (@mikka/ui/components/ui/table)",
+  kbd: "Kbd (@mikka/ui/components/ui/kbd)",
 }
 
 /**
  * Renderer screens compose installed registry components; a raw element
- * that has an @orvilo/ui equivalent is a hand-rolled copy (DESIGN.md).
+ * that has an @mikka/ui equivalent is a hand-rolled copy (DESIGN.md).
  * `ignores` lists files still being rebuilt (ui-surfaces.json legacy).
  *
  * `render={<a />}` / `render={<span />}` is exempt: Base UI's `render` prop
@@ -86,7 +86,7 @@ export function noRawElements(files, ignores = []) {
         "error",
         ...Object.entries(RAW_ELEMENTS).map(([name, use]) => ({
           selector: rawElementSelector(name),
-          message: `Raw <${name}>: use @orvilo/ui ${use} instead.`,
+          message: `Raw <${name}>: use @mikka/ui ${use} instead.`,
         })),
       ],
     },
@@ -94,11 +94,11 @@ export function noRawElements(files, ignores = []) {
 }
 
 /** Shown on every banned control import. ESLint appends it to its own preamble. */
-export const USE_ORVILO_UI = "use @orvilo/ui"
+export const USE_MIKKA_UI = "use @mikka/ui"
 
 /**
  * Import specifiers that resolve to the UI's `components/ui` from outside
- * that directory. `@orvilo/ui/components/ui/*` is the replacement and must
+ * that directory. `@mikka/ui/components/ui/*` is the replacement and must
  * not match. `../ui/debounced-input` is a different folder
  * (`data-table-filter/ui`) and stays allowed.
  */
@@ -106,7 +106,7 @@ export const LEGACY_UI_IMPORT_PATTERN =
   "^(?:@/components/ui(?:/.+)?|(?:\\.{1,2}/)+components/ui(?:/.+)?|(?:\\.\\./)+ui/(?!debounced-input(?:\\.[jt]sx?)?$).+)$"
 
 /**
- * Renderer code composes `@orvilo/ui`. The vendored primitives that
+ * Renderer code composes `@mikka/ui`. The vendored primitives that
  * used to live in the old `components/ui`, and `tailwindcss-animate`, are not
  * available at all — the directory is gone (ADR ORV-283).
  */
@@ -121,15 +121,15 @@ export function noLegacyControlImports(files, ignores = []) {
           patterns: [
             {
               group: ["@radix-ui/*", "@radix-ui/**"],
-              message: USE_ORVILO_UI,
+              message: USE_MIKKA_UI,
             },
             {
               group: ["tailwindcss-animate", "tailwindcss-animate/*"],
-              message: USE_ORVILO_UI,
+              message: USE_MIKKA_UI,
             },
             {
               regex: LEGACY_UI_IMPORT_PATTERN,
-              message: USE_ORVILO_UI,
+              message: USE_MIKKA_UI,
             },
           ],
         },
@@ -295,15 +295,15 @@ export function noInertControls(files, allowlist = null, ignores = []) {
   return {
     files,
     ignores,
-    plugins: { orvilo: { rules: { "no-inert-control": inertControls } } },
+    plugins: { mikka: { rules: { "no-inert-control": inertControls } } },
     rules: {
-      "orvilo/no-inert-control": ["error", allowlist ? { allowlist } : {}],
+      "mikka/no-inert-control": ["error", allowlist ? { allowlist } : {}],
     },
   }
 }
 
 // Plain DOM elements given a click/key handler or an interactive role are a
-// hand-rolled control. The message names the @orvilo/ui component to use.
+// hand-rolled control. The message names the @mikka/ui component to use.
 const INTERACTIVE_HANDLERS = new Set([
   "onClick",
   "onDoubleClick",
@@ -374,13 +374,13 @@ export const handwrittenControls = {
     type: "problem",
     docs: {
       description:
-        "Plain elements must not act as controls; compose an @orvilo/ui component.",
+        "Plain elements must not act as controls; compose an @mikka/ui component.",
     },
     schema: [],
     messages: {
       handler:
-        "<{{tag}} {{attr}}> is a hand-written control. Use @orvilo/ui Button (or the matching component: Toggle, Tabs, DropdownMenu, Collapsible, Command…) instead.",
-      role: '<{{tag}} role="{{role}}"> is a hand-written control. Use @orvilo/ui {{use}} instead.',
+        "<{{tag}} {{attr}}> is a hand-written control. Use @mikka/ui Button (or the matching component: Toggle, Tabs, DropdownMenu, Collapsible, Command…) instead.",
+      role: '<{{tag}} role="{{role}}"> is a hand-written control. Use @mikka/ui {{use}} instead.',
     },
   },
   create(context) {
@@ -450,12 +450,12 @@ export const staticInlineStyles = {
     type: "problem",
     docs: {
       description:
-        "Literal visual inline styles are hand-written styling; use classes, tokens or @orvilo/ui variants.",
+        "Literal visual inline styles are hand-written styling; use classes, tokens or @mikka/ui variants.",
     },
     schema: [],
     messages: {
       literal:
-        "style={{ {{key}}: … }} is a hard-coded visual style. Use a Tailwind class / design token or the @orvilo/ui component variant. Inline style is only for computed values and CSS variables.",
+        "style={{ {{key}}: … }} is a hard-coded visual style. Use a Tailwind class / design token or the @mikka/ui component variant. Inline style is only for computed values and CSS variables.",
     },
   },
   create(context) {
@@ -609,19 +609,19 @@ const APPEARANCE_ALLOW = new Set([
 ])
 
 /** Layout-only escape hatch, for the few places a plain element must be seen. */
-const APPEARANCE_IGNORE = /orvilo-ui-allow-appearance/
+const APPEARANCE_IGNORE = /mikka-ui-allow-appearance/
 
 export const handwrittenSurfaces = {
   meta: {
     type: "problem",
     docs: {
       description:
-        "Plain elements must not style their own surface; use an @orvilo/ui component.",
+        "Plain elements must not style their own surface; use an @mikka/ui component.",
     },
     schema: [],
     messages: {
       surface:
-        '<{{tag}}> draws its own surface with "{{cls}}". Use an @orvilo/ui component (Card, Table, Badge, Separator, Item…) or a ReUI block instead of styling a plain element.',
+        '<{{tag}}> draws its own surface with "{{cls}}". Use an @mikka/ui component (Card, Table, Badge, Separator, Item…) or a ReUI block instead of styling a plain element.',
     },
   },
   create(context) {
@@ -675,7 +675,7 @@ export const handwrittenSurfaces = {
 
 // Roles that describe a component's structure. A plain element carrying one
 // is a hand-built table, grid, progress bar or tab panel; the matching
-// @orvilo/ui component already renders the role (ORV-283).
+// @mikka/ui component already renders the role (ORV-283).
 const SEMANTIC_ROLES = new Set([
   "table",
   "row",
@@ -702,11 +702,11 @@ export const semanticRoles = {
     type: "problem",
     docs: {
       description:
-        "Plain elements must not carry semantic roles; use the @orvilo/ui component.",
+        "Plain elements must not carry semantic roles; use the @mikka/ui component.",
     },
     schema: [],
     messages: {
-      role: '<{{tag}} role="{{role}}"> is a hand-built semantic. Use the matching @orvilo/ui component (Table, Progress, Separator, Tabs, Tooltip, Alert…) instead.',
+      role: '<{{tag}} role="{{role}}"> is a hand-built semantic. Use the matching @mikka/ui component (Table, Progress, Separator, Tabs, Tooltip, Alert…) instead.',
     },
   },
   create(context) {
@@ -735,12 +735,12 @@ export const nativeTitles = {
     type: "problem",
     docs: {
       description:
-        "Native title= is a browser tooltip; use the @orvilo/ui Tooltip.",
+        "Native title= is a browser tooltip; use the @mikka/ui Tooltip.",
     },
     schema: [],
     messages: {
       title:
-        "<{{tag}} title> is a native browser tooltip. Use @orvilo/ui Tooltip instead.",
+        "<{{tag}} title> is a native browser tooltip. Use @mikka/ui Tooltip instead.",
     },
   },
   create(context) {
@@ -797,7 +797,7 @@ export const linkAsButton = {
     },
     schema: [],
     messages: {
-      link: '<{{tag}} className="{{cls}}"> paints a link as a button. Use @orvilo/ui Button with render={<Link … />} instead.',
+      link: '<{{tag}} className="{{cls}}"> paints a link as a button. Use @mikka/ui Button with render={<Link … />} instead.',
     },
   },
   create(context) {
@@ -862,7 +862,7 @@ export const arbitraryTextSizes = {
   },
 }
 
-// Icons inside an @orvilo/ui component that sizes its own icons are sized by
+// Icons inside an @mikka/ui component that sizes its own icons are sized by
 // that component's CSS; a size-* class there is hand-fighting it (shadcn icons
 // rule). A standalone icon picks from the closed scale: 12/16/20/24 for inline
 // icons (size-3/4/5/6) and 32/40/48 for illustrations (size-8/10/12).
@@ -1387,11 +1387,11 @@ export const inlineSvgs = {
 }
 
 /**
- * One plugin object for every orvilo-ui rule. Flat config refuses two
+ * One plugin object for every mikka-ui rule. Flat config refuses two
  * different objects under the same plugin name, so the rule groups below
  * share this one and only choose which rules to enable.
  */
-const ORVILO_UI_PLUGIN = {
+const MIKKA_UI_PLUGIN = {
   rules: {
     "no-handwritten-control": handwrittenControls,
     "no-static-inline-style": staticInlineStyles,
@@ -1413,12 +1413,12 @@ export function typeScaleRules(files, ignores = []) {
   return {
     files,
     ignores,
-    plugins: { "orvilo-ui": ORVILO_UI_PLUGIN },
+    plugins: { "mikka-ui": MIKKA_UI_PLUGIN },
     rules: {
-      "orvilo-ui/no-arbitrary-text-size": "error",
-      "orvilo-ui/no-icon-size": "error",
-      "orvilo-ui/no-avatar-text-size": "error",
-      "orvilo-ui/no-avatar-size": "error",
+      "mikka-ui/no-arbitrary-text-size": "error",
+      "mikka-ui/no-icon-size": "error",
+      "mikka-ui/no-avatar-text-size": "error",
+      "mikka-ui/no-avatar-size": "error",
     },
   }
 }
@@ -1428,16 +1428,16 @@ export function noHandwrittenUi(files, ignores = []) {
   return {
     files,
     ignores,
-    plugins: { "orvilo-ui": ORVILO_UI_PLUGIN },
+    plugins: { "mikka-ui": MIKKA_UI_PLUGIN },
     rules: {
-      "orvilo-ui/no-handwritten-control": "error",
-      "orvilo-ui/no-static-inline-style": "error",
-      "orvilo-ui/no-hardcoded-color": "error",
-      "orvilo-ui/no-handwritten-surface": "error",
-      "orvilo-ui/no-semantic-role": "error",
-      "orvilo-ui/no-native-title": "error",
-      "orvilo-ui/no-link-button": "error",
-      "orvilo-ui/no-inline-svg": "error",
+      "mikka-ui/no-handwritten-control": "error",
+      "mikka-ui/no-static-inline-style": "error",
+      "mikka-ui/no-hardcoded-color": "error",
+      "mikka-ui/no-handwritten-surface": "error",
+      "mikka-ui/no-semantic-role": "error",
+      "mikka-ui/no-native-title": "error",
+      "mikka-ui/no-link-button": "error",
+      "mikka-ui/no-inline-svg": "error",
     },
   }
 }

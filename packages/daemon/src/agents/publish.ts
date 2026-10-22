@@ -19,7 +19,7 @@ import {
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import type { RunPublish } from "@orvilo/protocol"
+import type { RunPublish } from "@mikka/protocol"
 import { execa } from "execa"
 
 import { runBranch } from "../worktrees"
@@ -65,9 +65,9 @@ const SAFE_GIT = [
 
 const FALLBACK_IDENTITY = [
   "-c",
-  "user.name=Orvilo Agent",
+  "user.name=Mikka Agent",
   "-c",
-  "user.email=agent@orvilo.invalid",
+  "user.email=agent@mikka.invalid",
 ]
 
 /**
@@ -152,7 +152,7 @@ export async function snapshotTree(
   env?: NodeJS.ProcessEnv
 ): Promise<string> {
   const git = await pinnedGit(repoPath, worktree, env)
-  const dir = mkdtempSync(join(tmpdir(), "orvilo-index-"))
+  const dir = mkdtempSync(join(tmpdir(), "mikka-index-"))
   const index = { GIT_INDEX_FILE: join(dir, "index") }
   try {
     await git(["read-tree", "HEAD"], index)
@@ -172,11 +172,11 @@ export function commitMessage(options: {
   const title = (lines[0] || "Agent changes").slice(0, 72)
   const body = lines.slice(1).join("\n").trim()
   return [
-    `orvilo: ${title}`,
+    `mikka: ${title}`,
     ...(body ? ["", body] : []),
     "",
-    `Orvilo-Run: ${options.runId}`,
-    `Orvilo-Issue: ${options.issueId}`,
+    `Mikka-Run: ${options.runId}`,
+    `Mikka-Issue: ${options.issueId}`,
   ].join("\n")
 }
 

@@ -1,6 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "*": false,
+      "**": false
+    }
+  },
   "crons": [
-    { "path": "/api/cron/linear-sync", "schedule": "0 4 * * *" }
+    { "path": "/mikka/api/cron/linear-sync", "schedule": "0 4 * * *" }
   ]
 }

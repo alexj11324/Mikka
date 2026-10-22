@@ -42,7 +42,7 @@ const uuid = z.uuid()
  * Run events. Message content uses the Vercel AI SDK's UI message formats
  * (`UIMessageChunk` while streaming, `UIMessage` when final), which AI
  * Elements renders and `useChat` / `readUIMessageStream` assemble, so
- * Orvilo defines no message parts of its own. The envelope only checks the
+ * Mikka defines no message parts of its own. The envelope only checks the
  * shape here; `validateRunEvent` runs the SDK's own validators.
  */
 export const runEvent = z.discriminatedUnion("kind", [

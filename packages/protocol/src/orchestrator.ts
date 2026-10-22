@@ -180,13 +180,13 @@ export type NoPrReason = (typeof NO_PR_REASONS)[number]
 // Review rules (ORV-172, ADR ORV-172). The gate an issue passes between a
 // verified hand-in and In Review is a workspace setting, with one override per
 // repository: whether a pull request and green CI are required, which harness
-// runs the read-only check, and the branch and pull request text Orvilo uses.
+// runs the read-only check, and the branch and pull request text Mikka uses.
 // The defaults are exactly the behaviour of ADR 0024 and ADR 0046, so a
 // workspace that never opens the settings page sees no change.
 // ---------------------------------------------------------------------------
 
 /** The branch every run of an issue pushes to (ADR 0024). */
-export const DEFAULT_BRANCH_TEMPLATE = "orvilo/{team}-{number}"
+export const DEFAULT_BRANCH_TEMPLATE = "mikka/{team}-{number}"
 
 /** Variables a branch template may use. `{number}` is required. */
 export const BRANCH_TEMPLATE_VARS = ["{team}", "{number}"] as const
@@ -251,7 +251,7 @@ export const reviewRuleSchema = z.object({
    */
   checkHarness: z.enum(REVIEW_CHECK_HARNESSES).nullable().default(null),
   branchTemplate: branchTemplateSchema.default(DEFAULT_BRANCH_TEMPLATE),
-  /** `{key}`, `{title}` and `{summary}`; null keeps Orvilo's default text. */
+  /** `{key}`, `{title}` and `{summary}`; null keeps Mikka's default text. */
   prBodyTemplate: prBodyTemplateSchema.default(null),
 })
 export type ReviewRule = z.infer<typeof reviewRuleSchema>
@@ -279,7 +279,7 @@ export function issueBranch(
 }
 
 /**
- * The pull request body, from a workspace's template or Orvilo's own text.
+ * The pull request body, from a workspace's template or Mikka's own text.
  * A placeholder with no value becomes empty rather than staying literal.
  */
 export function pullRequestBody(
@@ -289,7 +289,7 @@ export function pullRequestBody(
   if (!template) {
     return [
       vars.summary?.trim(),
-      `Opened by Orvilo for ${vars.key}. Later fix rounds push to this branch.`,
+      `Opened by Mikka for ${vars.key}. Later fix rounds push to this branch.`,
     ]
       .filter(Boolean)
       .join("\n\n---\n\n")
