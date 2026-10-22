@@ -74,6 +74,7 @@ import {
   EmptyDescription,
   EmptyMedia,
 } from "@/components/ui/empty";
+import { withBasePath } from "@/lib/base-path";
 
 async function fetchSettings(url: string): Promise<WorkspaceSettings> {
   const response = await fetch(url);
@@ -105,7 +106,7 @@ export function MembersSettings({
     error: fetchError,
     mutate,
   } = useSWR(
-    `/api/workspace?workspace=${initial.workspace.id}`,
+    withBasePath(`/api/workspace?workspace=${initial.workspace.id}`),
     fetchSettings,
     { fallbackData: initial, revalidateOnMount: true },
   );
