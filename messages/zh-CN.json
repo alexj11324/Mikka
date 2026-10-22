@@ -1451,6 +1451,26 @@
     "failedTitle": "上一次回复失败了",
     "input": "给 Coordinator 发消息",
     "placeholder": "让 Coordinator 开始处理一个 issue…",
-    "send": "发送"
+    "send": "发送",
+    "citation": {
+      "issue": "Issue",
+      "run": "运行",
+      "runOf": "{agent} 的运行",
+      "openIssue": "打开 issue：{title}",
+      "openRunIssue": "{agent} 的运行，打开 issue：{title}",
+      "noIssue": "没有关联的 issue",
+      "runStatus": {
+        "queued": "排队中",
+        "preparing": "准备中",
+        "running": "运行中",
+        "waiting_input": "等待输入",
+        "finishing": "收尾中",
+        "succeeded": "已完成",
+        "stopped": "已停止",
+        "failed": "失败",
+        "cancelled": "已取消"
+      },
+      "sources": "{count} 个来源"
+    }
   }
 }
