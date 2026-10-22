@@ -33,7 +33,7 @@ const handler = createMcpHandler(server => {
 
   server.registerTool('read_coordinator_messages', {
     title: 'Read the Coordinator conversation',
-    description: 'Read the conversation with the Coordinator, oldest first: the person\'s messages and the Coordinator\'s replies (with the names of tools it called). Pass `after` to get only newer messages, and waitSeconds to wait for the Coordinator to reply. `last` is the position to pass as `after` next time.',
+    description: 'Read the conversation with the Coordinator, oldest first: the person\'s messages and the Coordinator\'s replies (with the names of tools it called). Pass `after` to get only newer messages, and waitSeconds to wait for the Coordinator to reply. `last` is the position to pass as `after` next time; `working` says a turn is running and `lastError` why the last one failed.',
     inputSchema: z.object({
       after: z.number().int().min(0).optional().describe('Only messages after this position.'),
       limit: z.number().int().min(1).max(100).optional().describe('At most this many of the newest messages. Default 20.'),

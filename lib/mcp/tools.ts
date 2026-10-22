@@ -6,7 +6,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { db } from '@/lib/db'
-import { agentRuns, agents, coordinatorMessages, issueMembers, issues } from '@/lib/db/schema'
+import { agentRuns, agents, coordinatorMessages, coordinatorSessions, issueMembers, issues } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
@@ -56,20 +56,32 @@ async function messagesAfter(userId: string, after: number, limit: number) {
   })
 }
 
+/** Whether a turn is running, and why the last one failed (cleared when a turn succeeds). */
+async function turnState(userId: string) {
+  const [session] = await db.select({ leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt })
+    .from(coordinatorSessions).where(eq(coordinatorSessions.userId, userId)).limit(1)
+  return {
+    working: Boolean(session?.leaseUntil && session.leaseUntil.getTime() > Date.now()),
+    error: session?.lastError ?? null, errorAt: session?.lastErrorAt ?? null,
+  }
+}
+
 /**
  * The conversation after `after` (the newest `limit` messages). With
- * `waitSeconds`, waits until the Coordinator has replied after `after`, or the
- * time runs out.
+ * `waitSeconds`, waits until the Coordinator has replied after `after`, a turn
+ * fails, or the time runs out.
  */
 export async function readCoordinatorMessages(userId: string, input: { after?: number; limit?: number; waitSeconds?: number }) {
   const after = input.after ?? 0
   const limit = input.limit ?? 20
-  const deadline = Date.now() + (input.waitSeconds ?? 0) * 1000
+  const started = new Date()
+  const deadline = started.getTime() + (input.waitSeconds ?? 0) * 1000
   for (;;) {
-    const messages = await messagesAfter(userId, after, limit)
+    const [messages, turn] = await Promise.all([messagesAfter(userId, after, limit), turnState(userId)])
     const replied = messages.some(message => message.role === 'assistant')
-    if (replied || Date.now() + REPLY_POLL_MS > deadline) {
-      return { messages, replied, last: messages.at(-1)?.position ?? after, coordinatorRunning: coordinatorEnabled() }
+    const failed = Boolean(turn.errorAt && turn.errorAt >= started)
+    if (replied || failed || Date.now() + REPLY_POLL_MS > deadline) {
+      return { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: coordinatorEnabled() }
     }
     await new Promise(resolve => { setTimeout(resolve, REPLY_POLL_MS) })
   }
