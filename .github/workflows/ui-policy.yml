@@ -116,6 +116,47 @@ jobs:
       - run: pnpm typecheck
         if: always()
 
+  conversation-reads-db:
+    name: Conversation reads against Postgres
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+      CONVERSATION_READS_REQUIRE_DB: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply migrations to the throwaway database
+        run: pnpm migrate
+        env:
+          MIGRATE: '1'
+      - run: pnpm test:conversation-reads
+
   browser-tests:
     name: Production build and browser interactions
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
