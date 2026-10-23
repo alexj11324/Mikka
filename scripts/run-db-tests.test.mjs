@@ -55,6 +55,9 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(workflow.indexOf('- run: pnpm test:e2e:setup') < workflow.indexOf('run: pnpm test:db\n'))
   assert.match(workflow, /MIGRATION_BOOTSTRAP_CI: '1'/)
   assert.match(workflow, /REQUIRE_DB: '1'/)
+  assert.match(workflow, /pnpm test:performance --output=performance-results/)
+  assert.match(workflow, /pnpm test:e2e --grep-invert @performance/)
+  assert.match(workflow, /image: postgres:17/)
   for (const name of ['test:agent', 'test:suggestions', 'test:integrations', 'test:issues', 'test:db-runner']) {
     assert.ok(workflow.includes(`pnpm ${name}`), `${name} strict gate retained`)
     assert.ok(pkg.check.includes(`pnpm ${name}`), `${name} in check`)

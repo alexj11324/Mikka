@@ -59,7 +59,8 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
     if (!selected.has(name)) throw new Error(`Expected DB script not enrolled: ${name}`)
   }
   for (const [file, source] of Object.entries(files)) {
-    if (!/\.(test|spec)\.(ts|mjs|js)$/.test(file) || file === BOOTSTRAP) continue
+    // Playwright DB fixtures run in the preserved server-backed browser/performance gates.
+    if (!/\.(test|spec)\.(ts|mjs|js)$/.test(file) || file === BOOTSTRAP || file.startsWith('tests/e2e/')) continue
     const databaseBacked = /(?:\.db\.test\.|-db\.test\.)/.test(file) || /(?:from\s*['"]pg['"]|import\(['"]pg['"]\)|REQUIRE_DB|CONVERSATION_READS_REQUIRE_DB)/.test(source)
     if (!databaseBacked || covered.has(file)) continue
     const matches = Object.entries(scripts).filter(([name, command]) => name.startsWith('test:') && commandHas(command, file))
