@@ -585,7 +585,7 @@ test('真实配图异步展示来源，支持放大缩放和 Escape 关闭，失
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   await page.route('**/api/agent', route => route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream('root = Stack([TextContent("正文不等待配图加载。"), BeImage("Hong Kong Victoria Harbour", "维多利亚港资料配图", "维多利亚港现代风光")])') }))
   const imageUrl = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a4/Hong_Kong_Harbour_Night_2019-06-11.jpg/960px-Hong_Kong_Harbour_Night_2019-06-11.jpg'
-  await page.route('**/api/agent?q=*', route => route.fulfill({ json: { image: { src: imageUrl, width: 960, height: 454, title: 'Hong Kong Harbour Night 2019-06-11.jpg', source: 'https://commons.wikimedia.org/wiki/File:Hong_Kong_Harbour_Night_2019-06-11.jpg', author: 'Benh LIEU SONG', license: 'CC BY-SA 4.0' } } }))
+  await page.route('**/api/agent/images?q=*', route => route.fulfill({ json: { image: { src: imageUrl, width: 960, height: 454, title: 'Hong Kong Harbour Night 2019-06-11.jpg', source: 'https://commons.wikimedia.org/wiki/File:Hong_Kong_Harbour_Night_2019-06-11.jpg', author: 'Benh LIEU SONG', license: 'CC BY-SA 4.0' } } }))
   await input.fill('介绍维多利亚港并配图')
   await panel.getByRole('button', { name: '发送消息' }).click()
   await expect(panel.getByText('正文不等待配图加载。', { exact: true })).toBeVisible()
@@ -602,7 +602,7 @@ test('真实配图异步展示来源，支持放大缩放和 Escape 关闭，失
   await expect(thumbnail).toBeFocused()
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  await page.route('**/api/agent?q=*', route => route.fulfill({ json: { image: null } }))
+  await page.route('**/api/agent/images?q=*', route => route.fulfill({ json: { image: null } }))
   await page.route('**/api/agent', route => route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream('root = Stack([TextContent("没有配图仍显示完整正文。"), BeImage("Missing photo query", "暂无配图")])') }))
   await input.fill('没有检索结果的配图')
   await panel.getByRole('button', { name: '发送消息' }).click()
@@ -619,7 +619,7 @@ test('紧凑图文卡片使用 beUI Card、来源可展开、无冗余等待文�
   const imageReady = new Promise<void>(resolve => { releaseImage = resolve })
   const imageUrl = 'https://upload.wikimedia.org/wikipedia/commons/a/ab/hong-kong.jpg'
   await page.route(imageUrl, route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><rect width="960" height="540" fill="#ddd"/></svg>' }))
-  await page.route('**/api/agent?q=*', async route => {
+  await page.route('**/api/agent/images?q=*', async route => {
     await imageReady
     await route.fulfill({ json: { image: { src: imageUrl, width: 960, height: 540, title: 'Hong Kong', source: 'https://commons.wikimedia.org/wiki/File:Hong_Kong.jpg', author: '摄影师', license: 'CC BY-SA 4.0' } } })
   })
