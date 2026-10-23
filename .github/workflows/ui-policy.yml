@@ -158,7 +158,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Generate ephemeral test-only auth secret
-        run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+        run: |
+          secret="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")"
+          echo "::add-mask::$secret"
+          echo "BETTER_AUTH_SECRET=$secret" >> "$GITHUB_ENV"
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:setup
       - name: Verify legacy workspace migration and idempotency
