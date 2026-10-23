@@ -163,6 +163,22 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await config(id,a)
     await send(id,'ownership revoked')
     await assert.rejects(processGroupTurn(scoped,id,{...fallbackRuntime,async agents(_,ids) {return members.filter(m=>m.id!==a && ids.includes(m.id))}}),MissingGroupLeadError)
+    // A human group member can address an explicitly group-selected creator agent,
+    // never an arbitrary private agent belonging to themselves or another owner.
+    const memberSend = await handleGroup(scoped,directory,{...base,userId:'member',resource:'messages',id,body:JSON.stringify({body:'member asks selected agent',mentions:[{memberType:'agent',memberId:b}]})},true)
+    assert.equal(memberSend.status,201); await processGroupTurn(scoped,id,runtime)
+    const memberPrivate = await handleGroup(scoped,directory,{...base,userId:'member',resource:'messages',id,body:JSON.stringify({body:'private outsider',mentions:[{memberType:'agent',memberId:outsider}]})},true)
+    assert.equal(memberPrivate.status,422)
+    // Revocation while a fake provider is generating cannot publish afterwards.
+    let live = true
+    const revokedDuring = await send(id,'removed during generation',[a])
+    await processGroupTurn(scoped,id,{...runtime,async authorized(w,u) {return live && runtime.authorized(w,u)},async generate() {live=false;return {text:'must not publish',mentions:[]}}})
+    assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[revokedDuring])).rows[0].n,0)
+    // Provider cancellation clears status/releases session lock; a new root proceeds.
+    const canceled = await send(id,'cancelled provider',[a])
+    await assert.rejects(processGroupTurn(scoped,id,{...runtime,async generate() {throw new DOMException('cancelled','AbortError')}}),{name:'AbortError'})
+    assert.deepEqual((await scoped.query('SELECT status,"agentId" FROM group_turns WHERE "messageId"=$1',[canceled])).rows[0],{status:'failed',agentId:null})
+    await send(id,'after cancellation',[a]); assert.equal(await processGroupTurn(scoped,id,runtime),true)
     const revoked = await send(id,'revoked workspace',[a])
     await assert.rejects(processGroupTurn(scoped,id,{...runtime,async authorized() {return false},async generate() {assert.fail('revoked actor must not generate')}}),/no_longer_authorized/)
     assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[revoked])).rows[0].status,'failed')

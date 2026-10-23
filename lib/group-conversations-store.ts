@@ -99,7 +99,10 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
           ...(queueAgents ? { leadAgentId: group.leadAgentId ?? null, routingError: failed.rows[0]?.error === 'group_lead_required' ? { code: 'group_lead_required', action: 'Ask the group owner to PATCH /api/conversations/:id with an eligible leadAgentId, then send a new message.' } : null } : {}) }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)
-        if (!await directory(group.workspaceId, userId, input.mentions)) return fail(422)
+        // Group-selected agents belong to the creator, not necessarily this sender.
+        // Caller membership was verified above; directory ownership plus current
+        // group membership below still excludes arbitrary/private agent assignment.
+        if (!await directory(group.workspaceId, queueAgents ? group.createdBy : userId, input.mentions)) return fail(422)
         for (const m of input.mentions) {
           const { rowCount } = await q('SELECT 1 FROM conversation_members WHERE "conversationId"=$1 AND "memberType"=$2 AND "memberId"=$3 AND "leftAt" IS NULL', [req.id, m.memberType, m.memberId])
           if (!rowCount) return fail(422)
