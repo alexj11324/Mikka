@@ -11,6 +11,7 @@ import { Pool } from 'pg'
 import { migrationGate } from './migrate-gate.mjs'
 
 const gate = migrationGate(process.env)
+for (const warning of gate.warnings) console.warn(`migrate: warning: ${warning}`)
 if (!gate.run) {
   console.log(`migrate: skipped (${gate.reason})`)
   process.exit(0)
