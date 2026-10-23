@@ -8,7 +8,7 @@ The Composio Slack connection is separate: it supplies user-authorized integrati
 
 Keep `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` in Infisical and deliver them through the deployment's native cloud Secret Sync. Set `SLACK_APP_ID`, `SLACK_TEAM_ID`, `SLACK_BOT_USER_ID`, and `SLACK_USER_BINDINGS` for that same installation. The binding is a JSON object mapping verified Slack member ids to existing Mikka user ids. Establish the binding from the member's authenticated Slack connection, not their display name or a message claiming an email address. Unbound senders are ignored.
 
-`drizzle/0018_slack_chat_state.sql` is applied by `scripts/migrate.mjs` like every other migration. Runtime DDL is disabled. No new Redis service is required. The Chat SDK's Postgres state supplies message deduplication and locks across serverless instances.
+`drizzle/20261023040200_slack_chat_state.sql` is applied by `scripts/migrate.mjs` like every other migration. Runtime DDL is disabled. No new Redis service is required. The Chat SDK's Postgres state supplies message deduplication and locks across serverless instances.
 
 ## Slack app settings and acceptance
 
