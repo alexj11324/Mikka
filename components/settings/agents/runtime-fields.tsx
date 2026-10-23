@@ -131,6 +131,8 @@ export function RuntimeFields({ devices, runtime, onChange }: { devices: DeviceV
       <Picker label={t('model')} value={model?.value ?? runtime.model} placeholder={t('defaultModel')} disabled={!models.length} onChange={pickModel}
         options={models.map(item => ({ value: item.value, label: item.displayName || item.value }))} />
     </SettingRow>
+    {/* One height whether the model has levels or not, so the rows below stay put when the model changes. */}
+    <div data-slot="effort-row" className="min-h-[6.25rem] sm:min-h-[4.75rem]">
     {levels.length > 0
       ? <SettingRow title="Effort">
         {/* Levels as a toggle group where they fit; a Select on narrow screens. DEFAULT_EFFORT is the CLI's own default (null). */}
@@ -145,6 +147,7 @@ export function RuntimeFields({ devices, runtime, onChange }: { devices: DeviceV
         </div>
       </SettingRow>
       : <SettingRow title="Effort" description={models.length ? t('noEffortLevels') : t('effortNeedsModel')} />}
+    </div>
     <SettingRow title={t('permissionMode')} description={runtime.harness && !permissionModes.length ? t('permissionModesUnreported') : runtime.permissionMode ? t('permissionAsks') : undefined}>
       <Picker label={t('permissionMode')} value={runtime.permissionMode ?? DEFAULT_PERMISSION} placeholder={t('defaultPermission')} disabled={!permissionModes.length}
         onChange={mode => onChange({ ...runtime, permissionMode: mode === DEFAULT_PERMISSION ? null : mode })}

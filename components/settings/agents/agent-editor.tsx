@@ -120,10 +120,11 @@ export function AgentEditor({ agent, initial, devices, onBack, onSaved, onCreate
           : <Input aria-label={t('fields.summary')} placeholder={t('fields.summaryPlaceholder')} value={draft.description} maxLength={200}
               className="h-6 border-none px-0 text-sm text-muted-foreground shadow-none focus-visible:ring-0 dark:bg-transparent"
               onChange={event => setDraft({ ...draft, description: event.target.value })} onBlur={() => commitText('description')} />}
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {draft.harness && <Badge variant="outline" size="xl" className="gap-1.5 font-medium"><HarnessIcon harness={draft.harness} />{HARNESS_LABELS[draft.harness]}</Badge>}
-          {draft.harness && <Badge variant="outline" size="xl" className="font-medium">{modelSummary(models, runtime, t('runtime.defaultModel'))}</Badge>}
-          <Badge variant="outline" size="xl" className="ml-auto gap-1.5 font-medium"><Laptop data-icon="inline-start" />{device?.name ?? t('runtime.noDevice')}</Badge>
+        {/* One line at every width: chips truncate rather than wrap, so picking a harness does not push the tabs down. Narrow screens show the harness as its icon. */}
+        <div data-slot="agent-chips" className="mt-2 flex min-w-0 gap-1.5">
+          {draft.harness && <Badge variant="outline" size="xl" className="min-w-0 shrink-0 gap-1.5 font-medium sm:shrink"><HarnessIcon harness={draft.harness} /><span className="sr-only sm:not-sr-only sm:truncate">{HARNESS_LABELS[draft.harness]}</span></Badge>}
+          {draft.harness && <Badge variant="outline" size="xl" className="min-w-0 shrink font-medium"><span className="truncate">{modelSummary(models, runtime, t('runtime.defaultModel'))}</span></Badge>}
+          <Badge variant="outline" size="xl" className="ml-auto min-w-0 shrink gap-1.5 font-medium"><Laptop data-icon="inline-start" /><span className="truncate">{device?.name ?? t('runtime.noDevice')}</span></Badge>
         </div>
       </div>
       {agent && <DropdownMenu>

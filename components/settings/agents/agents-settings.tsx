@@ -16,6 +16,7 @@ import { AGENT_TEMPLATE_IDS, AGENT_TEMPLATES, isBuiltInAgentRole, type AgentTemp
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
 import { AgentEditor, draftOf, type AgentDraft } from './agent-editor'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AgentAvatar, AgentGlyph, AgentStatusBadge, HarnessIcon } from './agent-parts'
 import { modelSummary, reportedModels } from './runtime-fields'
 
@@ -90,7 +91,9 @@ function AgentRow({ agent, devices, onOpen }: { agent: AgentView; devices: Devic
       <span className="truncate">{agent.harness ? modelSummary(models, agent, t('runtime.defaultModel')) : t('runtime.noHarness')}</span>
     </span>
     <span className="hidden w-20 shrink-0 items-center gap-1.5 text-xs text-muted-foreground sm:flex">
-      <Laptop data-icon="inline-start" className="size-3.5" /><span className="truncate">{agent.deviceName ?? t('runtime.noDevice')}</span>
+      <Laptop data-icon="inline-start" className="size-3.5" />
+      {/* The full name on hover when the column cuts it short. */}
+      <Tooltip><TooltipTrigger render={<span className="truncate" />}>{agent.deviceName ?? t('runtime.noDevice')}</TooltipTrigger><TooltipContent>{agent.deviceName ?? t('runtime.noDevice')}</TooltipContent></Tooltip>
     </span>
     <ChevronRight data-icon="inline-end" className="text-muted-foreground" />
   </Button>

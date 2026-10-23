@@ -35,7 +35,7 @@ test('Agent 设置：默认角色、详情两个标签、从预置创建并删�
 async function seedDevice(email: string) {
   const client = new pg.Client({ connectionString: process.env.E2E_DATABASE_URL })
   await client.connect()
-  const harnesses = [{ harness: 'claude_code', installed: true, version: '2.0', models: [{ value: 'opus', displayName: 'Opus', efforts: ['low', 'medium', 'high'] }], permissionModes: ['plan'] }]
+  const harnesses = [{ harness: 'claude_code', installed: true, version: '2.0', models: [{ value: 'opus', displayName: 'Opus', efforts: ['low', 'medium', 'high'] }, { value: 'haiku', displayName: 'Haiku', efforts: [] }], permissionModes: ['plan'] }]
   await client.query(`insert into devices (id, "ownerId", name, harnesses, "lastSeenAt") select $1, id, 'Studio Mac', $2, now() from "user" where email = $3`, [randomUUID(), JSON.stringify(harnesses), email])
   await client.end()
 }
@@ -84,4 +84,33 @@ test('Effort：窄屏改用下拉选择', async ({ page }) => {
   await expect(page.getByRole('option')).toHaveText(['默认', 'Low', 'Medium', 'High'])
   await page.getByRole('option', { name: 'Medium' }).click()
   await expect(select).toContainText('Medium')
+})
+
+for (const width of [1280, 402]) test(`布局：切换到没有档位的模型时权限模式行不移动（${width}px）`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  const { email } = await register(page)
+  await seedDevice(email)
+  await openRuntime(page)
+  const permission = page.getByRole('combobox', { name: '权限模式' })
+  const before = await permission.boundingBox()
+  await pickModel(page)
+  const withLevels = await permission.boundingBox()
+  await page.getByRole('combobox', { name: '模型' }).click()
+  await page.getByRole('option', { name: 'Haiku' }).click()
+  await expect(page.getByText('这个模型没有档位')).toBeVisible()
+  const withoutLevels = await permission.boundingBox()
+  expect(withLevels?.y).toBe(before?.y)
+  expect(withoutLevels?.y).toBe(withLevels?.y)
+})
+
+test('布局：402px 下选择 Harness 后标题区高度不变', async ({ page }) => {
+  await page.setViewportSize({ width: 402, height: 900 })
+  const { email } = await register(page)
+  await seedDevice(email)
+  await openRuntime(page)
+  const tabs = page.getByRole('tab', { name: '运行环境' })
+  const before = await tabs.boundingBox()
+  await pickModel(page)
+  await expect(page.locator('[data-slot="agent-chips"]')).toContainText('Opus')
+  expect((await tabs.boundingBox())?.y).toBe(before?.y)
 })
