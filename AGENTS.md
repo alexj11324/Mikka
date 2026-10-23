@@ -40,4 +40,13 @@ Source: Design Lead's final spec (no Figma). Component default styles still win.
 - `components/chat/unread-divider.tsx` (the unread divider) is exempt by file.
 - A `border-b`/`border-t` that is not a list item is treated as a layout boundary and is allowed.
 - The task-detail timeline's vertical connector (`border-l` / `w-px` positioned line) is a connector, not a divider; vertical side borders are not checked.
-- Any other justified exception: put `// ui-policy-allow divider: <reason>` (or `{/* … */}`) on the line of the element or up to two lines above it, and @Design Lead in the PR for review. A comment without a reason does not count.
+- Any other justified exception: put a real code comment `// ui-policy-allow divider: <reason>` (or `{/* … */}` inside JSX) directly before the JSX element. Only comments parsed by TypeScript count (the same text in a string or attribute does not); it applies only to the immediately following element (its attributes may span multiple lines), never to siblings; the reason must be at least 10 characters. `pnpm lint:ui` prints the exemption count and each `file:line` with its reason. @Design Lead in the PR for review.
+- Sticky group headers inside a list (`sticky` in the class) may keep `border-b`; they are layout boundaries, not list dividers.
+
+**需要人工 review (lint:ui cannot see these)**
+
+- Hand-repeated `<li>` / rows written out one by one (no `.map` / `Array.from`), each with `border-b`.
+- A border drawn inside a child component (`<Row />` whose own root has `border-b`), when the list lives in another file.
+- An empty `<div />` used as a divider by other means (e.g. inline style, `h-[1px]` via a variable lint can't resolve).
+- A `<Separator>` restyled through the `style` prop instead of `className`.
+- A conditionally rendered first/last `<Separator>` (e.g. `{i > 0 && <Separator />}` or `{showFooter && <Separator />}` at the edge).

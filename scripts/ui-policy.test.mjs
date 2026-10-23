@@ -129,19 +129,104 @@ test('spec-approved dividers stay legal', () => {
   assert.deepEqual(rules(source), [])
 })
 
-test('divider exemptions: code comment with a reason, and the unread divider file', () => {
-  const source = `${prefix}
-    const ui = items.map(item => (
+const dividerRules = source => auditSource('components/example.tsx', `${prefix}\n${source}`, policy).filter(d => d.rule.startsWith('style/divider')).map(d => d.rule)
+const flags = (source, rule) => assert.ok(dividerRules(source).includes(rule), `expected ${rule}: ${source}`)
+const clean = source => assert.deepEqual(dividerRules(source), [], source)
+
+test('QA #78: list-item borders through class helpers', () => {
+  flags('const ui = <div className={cn("border-b", "last:border-0")} />', 'style/divider-list-item')
+  flags('const ui = <div className={cn("py-2", active && "border-b last:border-b-0")} />', 'style/divider-list-item')
+  flags('const ui = items.map(i => <div key={i} className={cn("flex", "border-b")} />)', 'style/divider-list-item')
+  flags('import clsx from "clsx"; const ui = <div className={clsx("border-t", "first:border-t-0")} />', 'style/divider-list-item')
+  flags('import { clsx } from "clsx"; const ui = items.map(i => <div key={i} className={clsx("border-b")} />)', 'style/divider-list-item')
+  flags('import { twMerge } from "tailwind-merge"; const ui = <div className={twMerge("border-b", "last:border-0")} />', 'style/divider-list-item')
+  flags('const row = "border-b py-2"; const ui = items.map(i => <div key={i} className={row} />)', 'style/divider-list-item')
+  assert.ok(rules('import { cva } from "class-variance-authority"; const row = cva("border-b last:border-0")').includes('components/no-custom-implementation'), 'cva stays banned outright')
+  clean('const ui = <header className={cn("sticky top-0", "border-b")} />')
+  clean('const ui = <div className={cn("border-b-0", "last:border-0")} />')
+  clean('const ui = <div className={cn("divide-y")}>{items.map(i => <div key={i} className={cn("py-2")} />)}</div>')
+})
+
+test('QA #78: list items returned via Fragment and Array.from', () => {
+  flags('import { Fragment } from "react"; const ui = items.map(i => <Fragment key={i}><div className="border-b py-2" /></Fragment>)', 'style/divider-list-item')
+  flags('const ui = items.map(i => <><div className="border-b" /></>)', 'style/divider-list-item')
+  flags('const ui = items.map(i => (<React.Fragment key={i}><dt className="border-t" /><dd /></React.Fragment>))', 'style/divider-list-item')
+  flags('const ui = Array.from(items, i => <div key={i} className="border-b" />)', 'style/divider-list-item')
+  flags('const ui = Array.from({ length: 3 }, (_, i) => { return <div key={i} className="border-y" /> })', 'style/divider-list-item')
+  flags('const ui = <div className="divide-y">{items.map(i => <><div key={i} className="rounded border" /></>)}</div>', 'style/divider-between-bordered')
+  flags('const ui = <div className="divide-y">{Array.from(items, i => <div key={i} className="bg-muted" />)}</div>', 'style/divider-between-bordered')
+  clean('const ui = Array.from(items, i => <div key={i} className="py-2" />)')
+  clean('const ui = Array.from(items)')
+  clean('const ui = items.forEach(i => <div className="border-b" />)')
+  clean('const ui = <><header className="border-b" /><main /></>')
+  clean('const ui = items.map(i => <Fragment key={i}><div className="py-2" /></Fragment>)')
+})
+
+test('QA #78: sticky group headers inside map are layout boundaries', () => {
+  clean('const ui = groups.map(g => <div key={g} className="sticky top-0 border-b bg-background px-3 py-1" />)')
+  clean('const ui = groups.map(g => <Fragment key={g}><div className="sticky top-0 border-b" /><Rows /></Fragment>)')
+  clean('const ui = groups.map(g => <div key={g} className={cn("sticky top-0", "border-b")} />)')
+  flags('const ui = groups.map(g => <div key={g} className="relative border-b" />)', 'style/divider-list-item')
+})
+
+test('QA #78: exemption comments are real comments for the next element only', () => {
+  clean(`const ui = items.map(item => (
       // ui-policy-allow divider: sticky table header row needs its own rule
       <div key={item} className="border-b last:border-0" />
-    ))`
-  assert.deepEqual(rules(source), [])
-  const noReason = `${prefix}
-    const ui = items.map(item => (
+    ))`)
+  clean(`const ui = <div>
+      {/* ui-policy-allow divider: legacy audit table keeps row rules */}
+      <div
+        key="a"
+        data-x="1"
+        className="border-b last:border-0"
+      />
+    </div>`)
+  clean(`const ui = items.map(item => (
+      /* ui-policy-allow divider: printed report rows need row rules */
+      <div key={item} className="border-b" />
+    ))`)
+  // reason too short (< 10 characters)
+  flags(`const ui = items.map(item => (
+      // ui-policy-allow divider: legacy
+      <div key={item} className="border-b last:border-0" />
+    ))`, 'style/divider-list-item')
+  flags(`const ui = items.map(item => (
       // ui-policy-allow divider:
       <div key={item} className="border-b last:border-0" />
-    ))`
-  assert.ok(rules(noReason).includes('style/divider-list-item'), 'exemption without a reason must not count')
+    ))`, 'style/divider-list-item')
+  // a string literal with the same text is not a comment
+  flags(`const note = "ui-policy-allow divider: this is only a string literal"
+    const ui = items.map(item => <div key={item} className="border-b" />)`, 'style/divider-list-item')
+  flags(`const ui = <div><span title="ui-policy-allow divider: this is only an attribute" />
+      <div className="border-b last:border-0" /></div>`, 'style/divider-list-item')
+  // the comment covers only the immediately following element
+  const both = dividerRules(`const ui = <div>
+      {/* ui-policy-allow divider: only the first row is exempt here */}
+      <div className="border-b last:border-0" />
+      <div className="border-b last:border-0" />
+    </div>`)
+  assert.deepEqual(both, ['style/divider-list-item'])
+  // a comment far above (not leading the element) does not apply
+  flags(`// ui-policy-allow divider: file-level comment should not apply
+    const x = 1
+    const ui = <div className="border-b last:border-0" />`, 'style/divider-list-item')
+})
+
+test('QA #78: exemptions are reported with location and reason', () => {
+  const result = auditSource('components/example.tsx', `${prefix}
+    const ui = <div>
+      {/* ui-policy-allow divider: legacy audit table keeps row rules */}
+      <div className="border-b last:border-0" />
+    </div>`, policy)
+  assert.equal(result.filter(d => d.rule.startsWith('style/divider')).length, 0)
+  assert.equal(result.exemptions.length, 1)
+  assert.equal(result.exemptions[0].line, 3) // the comment's own line
+  assert.deepEqual(result.exemptions[0].rules, ['style/divider-list-item'])
+  assert.equal(result.exemptions[0].reason, 'legacy audit table keeps row rules')
+})
+
+test('unread divider file stays exempt', () => {
   const unread = `import { Separator } from '@/components/ui/separator'; const ui = <div><Separator className="bg-primary" /></div>`
   assert.deepEqual(auditSource('components/chat/unread-divider.tsx', unread, policy).filter(d => d.rule.startsWith('style/divider')), [])
 })

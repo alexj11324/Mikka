@@ -83,25 +83,65 @@ function checkUtility(token, policy, report) {
 // 分隔线豁免：文件级（规范明确保留的组件）+ 代码注释级（`ui-policy-allow divider: 理由`，PR 需 @Design Lead）。
 export const DIVIDER_EXEMPT_FILES = ['components/chat/unread-divider.tsx']
 const DIVIDER_RULES = new Set(['style/divider-list-item', 'style/divider-default', 'style/divider-element', 'style/divider-between-bordered', 'style/divider-edge'])
-const DIVIDER_ALLOW_COMMENT = /ui-policy-allow\s+divider\s*:\s*\S/
+const DIVIDER_ALLOW_COMMENT = /ui-policy-allow\s+divider\s*:\s*(.*?)\s*(?:\*\/)?\s*$/s
+export const DIVIDER_REASON_MIN = 10
 
 export function auditSource(file, text, policy) {
   const dividerExemptFile = DIVIDER_EXEMPT_FILES.includes(file)
-  const lines = text.split('\n')
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), variables = new Map(), seen = new Set()
   const add = (node, rule, message) => {
     const start = node.getStart(source)
     if (DIVIDER_RULES.has(rule)) {
       if (dividerExemptFile) return
-      const at = source.getLineAndCharacterOfPosition(start).line
-      if (lines.slice(Math.max(0, at - 2), at + 1).some(line => DIVIDER_ALLOW_COMMENT.test(line))) return
+      const exemption = dividerExemption(node)
+      if (exemption) { recordExemption(exemption, rule); return }
     }
     const key = `${start}:${rule}:${message}`
     if (seen.has(key)) return
     seen.add(key)
     const { line, character } = source.getLineAndCharacterOfPosition(start)
     diagnostics.push({ file, line: line + 1, column: character + 1, rule, message })
+  }
+  const exemptions = new Map()
+  const recordExemption = (exemption, rule) => {
+    const { line, character } = source.getLineAndCharacterOfPosition(exemption.pos)
+    const key = `${line}:${character}`
+    const entry = exemptions.get(key) ?? { file, line: line + 1, column: character + 1, reason: exemption.reason, rules: [] }
+    if (!entry.rules.includes(rule)) entry.rules.push(rule)
+    exemptions.set(key, entry)
+  }
+  // 豁免注释只认 TS 解析出的真实注释（// 或 /* */，含 JSX 里的 {/* */}），字符串里的同样文字不算；
+  // 只作用于紧跟其后的那一个 JSX 元素（属性跨多行也算同一个元素），理由至少 DIVIDER_REASON_MIN 个字符。
+  const commentsBefore = element => {
+    const ranges = [...(ts.getLeadingCommentRanges(text, element.getFullStart()) ?? [])]
+    const container = element.parent
+    if (container && (ts.isJsxElement(container) || ts.isJsxFragment(container))) {
+      const siblings = container.children.filter(child => !(ts.isJsxText(child) && !child.text.trim()))
+      const previous = siblings[siblings.indexOf(element) - 1]
+      if (previous && ts.isJsxExpression(previous) && !previous.expression) {
+        const inner = text.slice(previous.getStart(source) + 1, previous.getEnd() - 1)
+        const offset = previous.getStart(source) + 1
+        for (const range of ts.getLeadingCommentRanges(inner, 0) ?? []) ranges.push({ pos: range.pos + offset, end: range.end + offset })
+      }
+    }
+    return ranges
+  }
+  const owningElement = node => {
+    for (let p = node; p; p = p.parent) {
+      if (ts.isJsxSelfClosingElement(p)) return p
+      if (ts.isJsxOpeningElement(p)) return p.parent
+    }
+    return null
+  }
+  const dividerExemption = node => {
+    const element = owningElement(node)
+    if (!element) return null
+    for (const range of commentsBefore(element)) {
+      const match = text.slice(range.pos, range.end).replace(/^\/\/|^\/\*|\*\/$/g, '').match(DIVIDER_ALLOW_COMMENT)
+      if (match && [...match[1].trim()].length >= DIVIDER_REASON_MIN) return { pos: range.pos, reason: match[1].trim() }
+    }
+    return null
   }
   function index(node) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
@@ -157,6 +197,7 @@ export function auditSource(file, text, policy) {
     if (ts.isConditionalExpression(node)) return merge([node.whenTrue, node.whenFalse])
     if (ts.isBinaryExpression(node)) return merge(node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ? [node.right] : [node.left, node.right])
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && imports.get(node.expression.text)?.name === 'cn' && ['cn', '@/lib/utils'].includes(imports.get(node.expression.text)?.from)) return merge(node.arguments)
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && ((imports.get(node.expression.text)?.from === 'clsx' && ['clsx', 'default'].includes(imports.get(node.expression.text)?.name)) || (imports.get(node.expression.text)?.from === 'tailwind-merge' && ['twMerge', 'twJoin'].includes(imports.get(node.expression.text)?.name)))) return merge(node.arguments)
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && imports.get(node.expression.text)?.name === 'buttonVariants' && imports.get(node.expression.text)?.from === '@/components/ui/button') {
       const options = node.arguments[0]
       if (!options) return { strings: [], known: true }
@@ -209,26 +250,35 @@ export function auditSource(file, text, policy) {
       return /^border(?:-\d+|-\[\d+px\])?$/.test(base) || /^ring(?:-\d+)?$/.test(base) || (base.startsWith('bg-') && !/^bg-(?:transparent|none|clip-|origin-|cover|contain|center|repeat|no-repeat|fixed|local|scroll|auto|blend-)/.test(base))
     })
   }
-  // 直接 JSX 子项；子项是 {list.map(x => <Row />)} 时取回调返回的元素。
+  // 重复渲染的回调：list.map(cb) / list.flatMap(cb) / Array.from(items, cb)。
+  const repeatCallback = call => {
+    if (!call || !ts.isCallExpression(call) || !ts.isPropertyAccessExpression(call.expression)) return null
+    const method = call.expression.name.text
+    const callback = ['map', 'flatMap'].includes(method) ? call.arguments[0] : method === 'from' && call.expression.expression.getText(source) === 'Array' ? call.arguments[1] : null
+    return callback && (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback)) ? callback : null
+  }
+  const isFragment = element => ts.isJsxFragment(element) || (ts.isJsxElement(element) && /^(?:React\.)?Fragment$/.test(element.openingElement.tagName.getText(source)))
+  // 直接 JSX 子项；子项是 {list.map(x => <Row />)} 时取回调返回的元素，Fragment 展开。
   const jsxChildren = node => {
     if (!ts.isJsxOpeningElement(node) || !ts.isJsxElement(node.parent)) return []
     const out = []
     const collect = expression => {
       if (!expression) return
       if (ts.isParenthesizedExpression(expression)) return collect(expression.expression)
+      if (isFragment(expression)) return expression.children.forEach(child => ts.isJsxExpression(child) ? collect(child.expression) : collect(child))
       if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) return out.push(expression)
       if (ts.isConditionalExpression(expression)) { collect(expression.whenTrue); collect(expression.whenFalse); return }
       if (ts.isBinaryExpression(expression)) return collect(expression.right)
-      if (ts.isCallExpression(expression) && ts.isPropertyAccessExpression(expression.expression) && expression.expression.name.text === 'map') {
-        const callback = expression.arguments[0]
-        if (callback && (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback))) {
+      if (ts.isCallExpression(expression)) {
+        const callback = repeatCallback(expression)
+        if (callback) {
           if (!ts.isBlock(callback.body)) collect(callback.body)
           else ts.forEachChild(callback.body, function walk(n) { if (ts.isReturnStatement(n)) collect(n.expression); else if (!ts.isFunctionLike(n)) ts.forEachChild(n, walk) })
         }
       }
     }
     for (const child of node.parent.children) {
-      if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) out.push(child)
+      if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) collect(child)
       else if (ts.isJsxExpression(child)) collect(child.expression)
     }
     return out
@@ -236,14 +286,15 @@ export function auditSource(file, text, policy) {
   // 元素是否为 .map() 回调直接返回的根元素（即重复的列表项）。
   const isMapItem = node => {
     let element = ts.isJsxSelfClosingElement(node) ? node : node.parent
+    // <>{…}</> / <Fragment key> 包裹的列表项：Fragment 的直接子元素视同列表项。
+    if (element.parent && isFragment(element.parent)) element = element.parent
     let p = element.parent
     while (p && ts.isParenthesizedExpression(p)) p = p.parent
     let fn = null
     if (p && (ts.isArrowFunction(p) || ts.isFunctionExpression(p))) fn = p
     else if (p && ts.isReturnStatement(p)) { for (let q = p.parent; q; q = q.parent) if (ts.isFunctionLike(q)) { fn = q; break } }
     if (!fn || !(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))) return false
-    const call = fn.parent
-    return !!call && ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression) && ['map', 'flatMap'].includes(call.expression.name.text)
+    return repeatCallback(fn.parent) === fn
   }
   function visit(node) {
     const cssAssertionProperty = /\.spec\.[jt]sx?$/.test(file) && !!node.parent && ts.isCallExpression(node.parent) && ts.isPropertyAccessExpression(node.parent.expression) && node.parent.expression.name.text === 'toHaveCSS' && node.parent.arguments[0] === node
@@ -282,6 +333,18 @@ export function auditSource(file, text, policy) {
         const classes = resolve(expression)
         if (!frameworkShell && !classes.known) add(classAttr, 'style/static-layout-only', 'className 必须可静态检查，动态组合请使用 cn() 和明确的布局常量。')
         if (!frameworkShell && expression && (ts.isTemplateExpression(expression) || ts.isConditionalExpression(expression))) add(classAttr, 'style/use-cn', '条件 className 使用 cn()，不拼接模板或直接使用三元表达式。')
+        {
+          // 跨 cn()/clsx() 多个参数合并判断（border-b 与 last:border-0 可能在不同参数里）。
+          const allTokens = classes.strings.flatMap(value => splitUtilities(value))
+          const allBases = allTokens.map(utilityBase)
+          const sideRule = allBases.some(base => /^border-[tby](?:-(?!0$|0px$|\[0px\]$|transparent$|\[transparent\]$).+)?$/.test(base))
+          const edgeReset = allTokens.some(token => /(?:^|:)(?:last|first|last-of-type|first-of-type):!?border-(?:[tby]-)?0!?$/.test(token))
+          if (sideRule && !allBases.includes('sticky') && (edgeReset || isMapItem(node))) add(classAttr, 'style/divider-list-item', '列表项之间不写 border-b / border-t（含 last:border-0 写法）；在父容器上用 divide-y。border-b 只用于页面顶栏、面板标题栏等布局边界。')
+          if (allBases.some(base => /^divide-[xy](?:-reverse)?$/.test(base))) {
+            const bordered = jsxChildren(node).find(child => isBordered(child))
+            if (bordered) add(classAttr, 'style/divider-between-bordered', `divide-* 的子项（<${canonical(bordered)}>）已有边框/背景/卡片，不再加分隔线；改用 gap。`)
+          }
+        }
         for (const value of classes.strings) {
           const tokens = splitUtilities(value)
           if (tokens.includes('overflow-hidden') && tokens.includes('text-ellipsis') && tokens.includes('whitespace-nowrap')) add(classAttr, 'style/truncate', '使用 truncate 简写。')
@@ -290,13 +353,6 @@ export function auditSource(file, text, policy) {
           const filled = bases.some(base => /^bg-(?!transparent|none$|clip-|origin-|cover|contain|center|left|right|top|bottom|repeat|no-repeat|fixed|local|scroll|auto|blend-)/.test(base))
           const drawnRule = filled && bases.some(base => /^[hw]-(?:px|0\.5|\[(?:0\.5|1|2)px\])$/.test(base))
           if (drawnRule && name !== 'Separator') add(classAttr, 'style/divider-element', '不要用 h-px / w-px + bg-* 手画分隔线；改用 <Separator />（列表行用父容器 divide-y）。')
-          const sideRule = bases.some(base => /^border-[tby](?:-(?!0$|0px$|\[0px\]$|transparent$|\[transparent\]$).+)?$/.test(base))
-          const edgeReset = tokens.some(token => /(?:^|:)(?:last|first|last-of-type|first-of-type):!?border-(?:[tby]-)?0!?$/.test(token))
-          if (sideRule && (edgeReset || isMapItem(node))) add(classAttr, 'style/divider-list-item', '列表项之间不写 border-b / border-t（含 last:border-0 写法）；在父容器上用 divide-y。border-b 只用于页面顶栏、面板标题栏等布局边界。')
-          if (bases.some(base => /^divide-[xy](?:-reverse)?$/.test(base))) {
-            const bordered = jsxChildren(node).find(child => isBordered(child))
-            if (bordered) add(classAttr, 'style/divider-between-bordered', `divide-* 的子项（<${canonical(bordered)}>）已有边框/背景/卡片，不再加分隔线；改用 gap。`)
-          }
           for (const token of tokens) {
             const base = utilityBase(token)
             // 组件调用处的视觉 class 不做限制。Mikka 的规则集里没有这一条，
@@ -366,6 +422,7 @@ export function auditSource(file, text, policy) {
     ts.forEachChild(node, visit)
   }
   visit(source)
+  Object.defineProperty(diagnostics, 'exemptions', { value: [...exemptions.values()], enumerable: false })
   return diagnostics
 }
 
