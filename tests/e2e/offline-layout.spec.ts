@@ -9,8 +9,12 @@ for (const width of [1280, 402]) {
       await page.setViewportSize({ width, height: 900 })
       await register(page)
       // Use main's responsive rail: phones expose it inside the sidebar.
-      if (width < 768) await page.getByRole('button', { name: '展开或收起侧栏', exact: true }).click()
-      await page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name: '看板', exact: true }).click()
+      if (width < 768) {
+        await page.getByRole('button', { name: '展开或收起侧栏', exact: true }).click()
+        await page.locator('[data-slot="sidebar"][data-mobile="true"]').getByRole('button', { name: '看板', exact: true }).click()
+      } else {
+        await page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name: '看板', exact: true }).click()
+      }
       await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
       // Use the visible board-column action on both breakpoints.
       await page.getByRole('region', { name: '任务看板', exact: true }).getByRole('button', { name: '新建待整理任务', exact: true }).click()
