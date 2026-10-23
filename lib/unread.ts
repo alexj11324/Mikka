@@ -76,10 +76,11 @@ export function createReadReporter<T extends { position: number }>(options: {
   let pending: T | null = null
   let lastSentAt = -Infinity
   let timer: unknown = null
+  let stopped = false
 
   function fire(via: (target: T) => void) {
     if (timer !== null) { timers.clearTimeout(timer); timer = null }
-    if (!pending) return
+    if (!pending || stopped) return
     const target = pending
     pending = null
     sent = target.position
@@ -88,6 +89,7 @@ export function createReadReporter<T extends { position: number }>(options: {
   }
   return {
     report(target: T) {
+      if (stopped) return
       if (sent !== null && target.position <= sent) return
       if (pending && target.position <= pending.position) return
       pending = target
@@ -96,6 +98,11 @@ export function createReadReporter<T extends { position: number }>(options: {
       else if (timer === null) timer = timers.setTimeout(() => { timer = null; fire(options.send) }, wait)
     },
     flush() { fire(options.sendNow ?? options.send) },
+    /** The server's position is authoritative; never report at or below it again. */
+    advance(position: number | null) { if (position !== null && (sent === null || position > sent)) sent = position },
+    /** Stop for this visit (e.g. 403/404/422): no retries, no further requests. */
+    stop() { stopped = true; pending = null; if (timer !== null) { timers.clearTimeout(timer); timer = null } },
+    get stopped() { return stopped },
     get sentPosition() { return sent },
   }
 }

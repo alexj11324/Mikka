@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { conversationReadSource, type ConversationRead, type ConversationReadSource } from '@/lib/conversation-reads'
+import { conversationReadSource, ReadError, type ConversationRead, type ConversationReadSource } from '@/lib/conversation-reads'
 import { arrivedSinceLeftBottom, createReadReporter, dividerPosition, lastVisiblePosition, mergeReadPosition, unreadBelowDivider, type UnreadItem } from '@/lib/unread'
 
 const AT_BOTTOM_PX = 24
@@ -14,7 +14,8 @@ export const UNREAD_DIVIDER_ATTR = 'data-unread-divider'
  */
 export function useUnreadIndicators({ conversationId, items, rootRef, source = conversationReadSource }: {
   conversationId: string
-  items: (UnreadItem & { messageId: string })[]
+  /** `reportable` = a persisted message the server knows; only those are ever sent as read. */
+  items: (UnreadItem & { messageId: string; reportable: boolean })[]
   rootRef: RefObject<HTMLElement | null>
   source?: ConversationReadSource
 }) {
@@ -43,9 +44,21 @@ export function useUnreadIndicators({ conversationId, items, rootRef, source = c
   }, [divider, read, items])
 
   const reporter = useMemo(() => createReadReporter<{ messageId: string; position: number }>({
-    send: target => { void source.mark(conversationId, target).then(value => setRead(current => current && (current.lastReadPosition ?? -1) >= (value.lastReadPosition ?? -1) ? current : value)).catch(() => {}) },
-    sendNow: target => source.beacon(conversationId, target),
+    send: target => {
+      void source.mark(conversationId, target).then(value => {
+        // The server's answer is authoritative (it is forward-only itself).
+        reporter.advance(value.lastReadPosition)
+        setRead(value)
+      }).catch(error => {
+        // 403/404/422 (or anything else): degrade silently, no retry loop for this visit.
+        if (!(error instanceof ReadError) || error.status >= 400) reporter.stop()
+      })
+    },
+    sendNow: target => { if (!reporter.stopped) source.beacon(conversationId, target) },
   }), [conversationId, source])
+
+  const reportableIds = items.filter(item => item.reportable).map(item => item.messageId).join(',')
+  useEffect(() => { source.observe?.(conversationId, reportableIds ? reportableIds.split(',') : []) }, [conversationId, source, reportableIds])
 
   useEffect(() => {
     const onHide = () => { if (document.visibilityState === 'hidden') reporter.flush() }
@@ -61,7 +74,7 @@ export function useUnreadIndicators({ conversationId, items, rootRef, source = c
     const box = element.getBoundingClientRect()
     const nodes = [...element.querySelectorAll<HTMLElement>(`[${MESSAGE_POSITION_ATTR}]`)]
     const position = lastVisiblePosition(nodes.map(node => { const rect = node.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, position: Number(node.getAttribute(MESSAGE_POSITION_ATTR)) } }), box)
-    const target = position === null ? undefined : itemsRef.current.find(item => item.position === position)
+    const target = position === null ? undefined : itemsRef.current.findLast(item => item.reportable && item.position <= position)
     // Don't report until the open-time placement ran, or the initial scroll-to-end would mark everything read.
     if (target && ready.current && document.visibilityState !== 'hidden') reporter.report({ messageId: target.messageId, position: target.position })
     const line = element.querySelector<HTMLElement>(`[${UNREAD_DIVIDER_ATTR}]`)

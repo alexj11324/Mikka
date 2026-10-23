@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { arrivedSinceLeftBottom, createReadReporter, dividerPosition, formatCount, isHalfVisible, lastVisiblePosition, mergeReadPosition, unreadBelowDivider } from './unread'
-import { createMockReadSource } from './conversation-reads'
+import { createMockReadSource, MOCK_READ_KEY, ReadError } from './conversation-reads'
 
 const items = [
   { position: 1, own: false }, { position: 2, own: true }, { position: 3, own: false },
@@ -102,6 +102,7 @@ test('mock source mirrors backend: no record, forward-only via max, two pages sh
   const storage = memoryStorage()
   const pageA = createMockReadSource(() => storage)
   const pageB = createMockReadSource(() => storage)
+  for (const page of [pageA, pageB]) page.observe?.('c', ['1', '3', '5', '7'])
   assert.deepEqual(await pageA.get('c'), { lastReadMessageId: null, lastReadPosition: null, unreadCount: 0 })
   await pageA.mark('c', { messageId: '5', position: 5 })
   const stale = await pageB.mark('c', { messageId: '3', position: 3 })
@@ -109,4 +110,32 @@ test('mock source mirrors backend: no record, forward-only via max, two pages sh
   assert.equal(stale.lastReadMessageId, '5')
   pageB.beacon('c', { messageId: '7', position: 7 })
   assert.equal((await pageA.get('c')).lastReadPosition, 7)
+})
+
+test('mock source rejects unknown or non-persisted ids with 422, like the server', async () => {
+  const storage = memoryStorage()
+  const page = createMockReadSource(() => storage)
+  page.observe?.('c', ['1', '2'])
+  await assert.rejects(page.mark('c', { messageId: '3', position: 3 }), (error: unknown) => error instanceof ReadError && error.status === 422)
+  await assert.rejects(page.mark('c', { messageId: '2', position: 9 }), (error: unknown) => error instanceof ReadError && error.status === 422)
+  page.beacon('c', { messageId: '3', position: 3 })
+  assert.equal((await page.get('c')).lastReadPosition, null)
+  storage.setItem(MOCK_READ_KEY + 'c', JSON.stringify({ simulateStatus: 403 }))
+  await assert.rejects(page.mark('c', { messageId: '2', position: 2 }), (error: unknown) => error instanceof ReadError && error.status === 403)
+})
+
+test('reporter: server position is authoritative and stop() ends all requests', () => {
+  const clock = fakeTimers()
+  const sent: number[] = []
+  const reporter = createReadReporter<{ position: number }>({ send: t => sent.push(t.position), timers: clock })
+  reporter.advance(10)
+  reporter.report({ position: 8 })
+  assert.deepEqual(sent, [])
+  reporter.report({ position: 11 })
+  assert.deepEqual(sent, [11])
+  reporter.stop()
+  clock.advance(5000)
+  reporter.report({ position: 12 })
+  reporter.flush()
+  assert.deepEqual(sent, [11])
 })

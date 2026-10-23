@@ -6,7 +6,7 @@ import { test, expect, register } from './fixtures'
 // seed that key. Messages come from rewriting only the `getCoordinatorChat` server
 // action response (same approach as working-status.spec.ts); no production code changes.
 const READ_KEY = 'mikka:mock-conversation-read:coordinator'
-type Item = { position: number; from: 'person' | 'coordinator'; text: string; tools: string[]; createdAt: string }
+type Item = { position: number; from: 'person' | 'coordinator'; text: string; tools: string[]; createdAt: string; pending?: true }
 const message = (position: number, from: Item['from'] = 'coordinator'): Item => ({ position, from, text: `消息 ${position} ${'内容 '.repeat(40)}`, tools: [], createdAt: '2026-10-22T00:00:00.000Z' })
 const range = (from: number, to: number, who: Item['from'] = 'coordinator') => Array.from({ length: to - from + 1 }, (_, index) => message(from + index, who))
 
@@ -30,16 +30,20 @@ async function mockChat(page: Page, initial: Item[]) {
   return state
 }
 
-async function seedRead(page: Page, position: number | null) {
-  await page.addInitScript(([key, value]) => {
-    if (value === null) localStorage.removeItem(key as string)
-    else localStorage.setItem(key as string, JSON.stringify({ lastReadMessageId: String(value), lastReadPosition: value, unreadCount: 0 }))
-  }, [READ_KEY, position] as const)
+async function seedRead(page: Page, position: number | null, extra: Record<string, unknown> = {}) {
+  // Only on the first load of this page, so a reload / second page doesn't reset state.
+  await page.addInitScript(([key, value, more]) => {
+    if (sessionStorage.getItem('mik8-seeded')) return
+    sessionStorage.setItem('mik8-seeded', '1')
+    if (value === null && !Object.keys(more).length) localStorage.removeItem(key)
+    else localStorage.setItem(key, JSON.stringify({ lastReadMessageId: value === null ? null : String(value), lastReadPosition: value, unreadCount: 0, ...more }))
+  }, [READ_KEY, position, extra] as [string, number | null, Record<string, unknown>])
 }
+const storedPosts = (page: Page) => page.evaluate(key => JSON.parse(localStorage.getItem(key) ?? 'null')?.posts ?? 0, READ_KEY)
 
 async function openCoordinator(page: Page) {
   await page.getByRole('button', { name: 'Coordinator', exact: true }).first().click()
-  await expect(page.getByRole('region', { name: 'Coordinator' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Coordinator', exact: true })).toBeVisible()
 }
 
 const divider = (page: Page) => page.locator('[data-unread-divider]')
@@ -109,6 +113,7 @@ test('未读：顶部按钮点 × 只关掉', async ({ page }) => {
   await seedRead(page, 10)
   await register(page)
   await openCoordinator(page)
+  await expect(divider(page)).toBeInViewport()
   await viewport(page).evaluate(element => element.scrollTo({ top: element.scrollHeight }))
   await topPill(page).getByRole('button', { name: '关闭' }).click()
   await expect(topPill(page)).toHaveCount(0)
@@ -135,6 +140,7 @@ test('未读：手动滚到底部时底部按钮自动消失，计数归零', as
   await seedRead(page, 30)
   await register(page)
   await openCoordinator(page)
+  await expect(page.getByText('消息 30', { exact: false })).toBeInViewport()
   await viewport(page).evaluate(element => element.scrollTo({ top: 0 }))
   chat.items = [...chat.items, ...range(31, 32)]
   await expect(bottomPill(page)).toBeVisible({ timeout: 15_000 })
@@ -155,6 +161,8 @@ test('未读：已读位置按可视区域最后一条上报（节流 2s），�
   const visible = await storedPosition(page)
   expect(visible).toBeLessThan(40)
   await viewport(page).evaluate(element => element.scrollTo({ top: element.scrollHeight }))
+  // Let the scroll event land (well inside the 2s throttle window), then hide: flush must send now.
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
     document.dispatchEvent(new Event('visibilitychange'))
@@ -167,6 +175,7 @@ test('未读：两个页面同步且已读位置不回退', async ({ page, conte
   await seedRead(page, 10)
   await register(page)
   await openCoordinator(page)
+  await expect(divider(page)).toBeInViewport()
   await viewport(page).evaluate(element => element.scrollTo({ top: element.scrollHeight }))
   await expect.poll(() => storedPosition(page), { timeout: 5000 }).toBe(40)
   const other = await context.newPage()
@@ -178,3 +187,40 @@ test('未读：两个页面同步且已读位置不回退', async ({ page, conte
   expect(await storedPosition(other)).toBe(40)
   await expect(divider(other)).toHaveCount(0)
 })
+
+test('未读：可视区域最后一条是未落库的合成消息时，上报它前面最后一条已持久化消息', async ({ page }) => {
+  await mockChat(page, [...range(1, 30), { ...message(31, 'person'), pending: true }])
+  await seedRead(page, 10)
+  await register(page)
+  await openCoordinator(page)
+  await expect.poll(() => storedPosition(page)).toBeGreaterThan(10)
+  await viewport(page).evaluate(element => element.scrollTo({ top: element.scrollHeight }))
+  await expect(page.getByText('消息 31', { exact: false })).toBeInViewport()
+  await expect.poll(() => storedPosition(page), { timeout: 5000 }).toBe(30)
+  await page.waitForTimeout(2500)
+  expect(await storedPosition(page)).toBe(30)
+})
+
+for (const status of [422, 403]) {
+  test(`未读：POST /read 返回 ${status} 时静默降级，界面无报错且不重试`, async ({ page }) => {
+    await mockChat(page, range(1, 40))
+    await seedRead(page, 10, { simulateStatus: status })
+    await register(page)
+    await openCoordinator(page)
+    await expect(divider(page)).toBeInViewport()
+    await expect.poll(() => storedPosts(page), { timeout: 5000 }).toBeGreaterThan(0)
+    for (const top of [0.5, 0.8, 1]) {
+      await viewport(page).evaluate((element, ratio) => element.scrollTo({ top: element.scrollHeight * ratio }), top)
+      await page.waitForTimeout(1500)
+    }
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await page.waitForTimeout(500)
+    expect(await storedPosts(page), '失败后本次访问不再发送').toBe(1)
+    expect(await storedPosition(page)).toBe(10)
+    await expect(divider(page)).toHaveCount(1)
+    await expect(page.getByRole('alert').filter({ hasText: /失败|错误|出错|error|failed/i })).toHaveCount(0)
+  })
+}

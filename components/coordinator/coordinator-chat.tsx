@@ -31,7 +31,7 @@ export function CoordinatorChat({ onOpenIssue }: { onOpenIssue: (id: string) => 
   const items = useMemo(() => data?.items ?? [], [data])
   const rootRef = useRef<HTMLElement>(null)
   // Events are system lines, not messages; the person's own messages never count as unread.
-  const unreadItems = useMemo(() => items.filter(item => item.from !== 'event').map(item => ({ position: item.position, messageId: String(item.position), own: item.from === 'person' })), [items])
+  const unreadItems = useMemo(() => items.filter(item => item.from !== 'event').map(item => ({ position: item.position, messageId: String(item.position), own: item.from === 'person', reportable: !item.pending })), [items])
   const unread = useUnreadIndicators({ conversationId: 'coordinator', items: unreadItems, rootRef })
 
   async function send(event?: FormEvent) {
