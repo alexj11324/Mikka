@@ -7,6 +7,8 @@ import dynamic from 'next/dynamic'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
+import { remarkCitations } from '@/lib/coordinator/citations'
+import { CitationAnchor, useAgentCitations } from './agent-citations'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 const MermaidDiagram = dynamic(() => import('./agent-mermaid').then(module => module.AgentMermaid), {
@@ -32,13 +34,14 @@ export function AgentMarkdownContent({ text, isStreaming = false, size = 'defaul
   rehypePlugins?: NonNullable<ComponentProps<typeof Markdown>['rehypePlugins']>
 }) {
   const agentCopy = useAgentCopy()
+  const citations = useAgentCitations()
 
   return <div data-agent-markdown className={cn('agent-markdown flex min-w-0 max-w-full flex-col gap-3 break-words text-sm leading-7 [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden', {
     'text-xs': size === 'small' || size === 'small-heavy',
     'text-base': size === 'large' || size === 'large-heavy',
     'font-semibold': size === 'small-heavy' || size === 'large-heavy',
   })}>
-    <Markdown remarkPlugins={[...remarkPlugins, ...mathRemarkPlugins]} rehypePlugins={rehypePlugins} skipHtml components={{
+    <Markdown remarkPlugins={[...remarkPlugins, ...mathRemarkPlugins, ...(citations ? [remarkCitations] : [])]} rehypePlugins={rehypePlugins} skipHtml components={{
       h1: ({ node: _node, ...props }) => <h1 {...props} className="mt-3 text-2xl font-semibold leading-snug" />,
       h2: ({ node: _node, ...props }) => <h2 {...props} className="mt-3 text-xl font-semibold leading-snug" />,
       h3: ({ node: _node, ...props }) => <h3 {...props} className="mt-2 text-lg font-semibold leading-snug" />,
@@ -48,7 +51,7 @@ export function AgentMarkdownContent({ text, isStreaming = false, size = 'defaul
       ul: ({ node: _node, ...props }) => <ul {...props} className="flex list-disc flex-col gap-1 ps-6" />,
       ol: ({ node: _node, ...props }) => <ol {...props} className="flex list-decimal flex-col gap-1 ps-6" />,
       blockquote: ({ node: _node, ...props }) => <blockquote {...props} className="rounded-lg bg-muted px-4 py-3 text-muted-foreground" />,
-      a: ({ node: _node, href, ...props }) => <a {...props} href={href} className="text-primary underline underline-offset-4" target="_blank" rel="noopener noreferrer" />,
+      a: ({ node: _node, ...props }) => <CitationAnchor {...props} />,
       img: ({ alt }) => <span className="text-muted-foreground">{alt || agentCopy.image}{agentCopy.useTheIllustrationComponentForImages}</span>,
       pre: ({ children }) => {
         const child = Children.toArray(children).find(child => isValidElement<{ className?: string; children?: ReactNode }>(child))

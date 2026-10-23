@@ -1,6 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { citedIds, splitCitations } from './citations'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { citedIds, remarkCitations, splitCitations } from './citations'
 
 const ISSUE = '3f6c1a52-8d0e-4b7a-9c3e-1f2a3b4c5d6e'
 const RUN = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
@@ -42,4 +46,20 @@ test('splitCitations reads Markdown links and bare URLs as web sources', () => {
     { type: 'text', text: '.' },
   ])
   assert.deepEqual(citedIds([`https://example.com/runs/${RUN}`]), { issueIds: [], runIds: [] })
+})
+
+const markdown = (text: string) => renderToStaticMarkup(createElement(Markdown, { remarkPlugins: [remarkGfm, remarkCitations] }, text))
+
+test('remarkCitations links citations for the chip renderer and keeps line breaks', () => {
+  assert.equal(markdown(`已派给 [[run:${RUN}]]\n处理 ${ISSUE}`),
+    `<p>已派给 <a href="#cite/run/${RUN}">[[run:${RUN}]]</a><br/>\n处理 <a href="#cite/any/${ISSUE}">${ISSUE}</a></p>`)
+})
+
+test('remarkCitations leaves code and Markdown links alone', () => {
+  assert.equal(markdown(`\`${ISSUE}\` [PR](https://github.com/a/b/pull/1)`),
+    `<p><code>${ISSUE}</code> <a href="https://github.com/a/b/pull/1">PR</a></p>`)
+})
+
+test('remarkCitations links a URL glued to Chinese text', () => {
+  assert.equal(markdown('看https://example.com/a。'), '<p>看<a href="https://example.com/a">https://example.com/a</a>。</p>')
 })
