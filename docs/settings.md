@@ -10,7 +10,9 @@ supplies content.
    control on the right. Use `SettingRow`.
 2. **No surface on a row.** A row never carries `bg-*`, `rounded-*`, `border`,
    `shadow-*` or `ring-*`. `SettingsSection` already separates rows with
-   `divide-y`; that is the only separator.
+   `divide-y`; that is the only separator. This exception applies to the
+   settings pages (`components/settings/`) only; everywhere else, use spacing
+   instead of divider lines.
 3. **Sections are surface-free.** `SettingsSection` renders a heading and a
    hairline-separated list. Do not wrap it in `Card`, `Frame`, or a
    `rounded-xl border bg-muted/30` div.

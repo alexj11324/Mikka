@@ -141,6 +141,8 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
    `h-px bg-*`。分组用间距（`gap-*`）或背景（`bg-muted/*`）。
 2. 竖线（`border-l/r`、`orientation="vertical"`）和盒状边框（`border`）可以保留。
 3. 这条已经落在 `style/no-horizontal-rule`；先跑 `node scripts/lint-ui.mjs`，不要靠肉眼。
+4. 例外：`components/settings/` 里由 `SettingsSection` 提供的行分隔（`divide-y`）不算在内，
+   只限设置页；其他地方一律不加分割线。
 
 
 ---
