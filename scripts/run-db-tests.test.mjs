@@ -36,7 +36,7 @@ test('feature inventory fails on deleted suite, removed script or zero enrollmen
   assert.throws(() => inventory(files, scripts, ['test:active-agents']), /Expected DB suite missing/)
 })
 test('discovers every present pg/DB suite and rejects unregistered or ambiguous files', () => {
-  const extra = 'tests/suggestions.db.test.ts'
+  const extra = 'scripts/suggestions.db.test.ts'
   const tree = { ...files, [extra]: '', 'lib/another.test.ts': "const pg = await import('pg')" }
   assert.throws(() => inventory(tree, scripts), /needs one explicit/)
   const full = { ...scripts, 'test:suggestions-db': `node --test ${extra}`, 'test:another-db': 'node --test lib/another.test.ts' }
@@ -46,6 +46,7 @@ test('discovers every present pg/DB suite and rejects unregistered or ambiguous 
 test('this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates', () => {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8')).scripts
   const tree = readTree()
+  assert.ok(Object.hasOwn(tree, 'scripts/run-db-tests.test.mjs'), 'script-hosted suites are discovered too')
   const plan = inventory(tree, pkg)
   assert.ok(plan.scripts.includes('test:groups'))
   assert.ok(plan.scripts.includes('test:workspace-migration-db'))
