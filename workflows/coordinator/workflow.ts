@@ -4,6 +4,7 @@ import { getWorkflowMetadata } from 'workflow'
 import { z } from 'zod'
 import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { createComposioAITools } from '@/lib/composio-actions'
+import { splitTelegramText } from '@/lib/telegram/messages'
 import * as steps from './steps'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
@@ -33,7 +34,12 @@ export async function coordinatorTurn(userId: string) {
       const { instructions, messages } = await steps.preparePrompt(userId)
       const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS) })
       await steps.appendMessages(userId, holder, result.response.messages)
-      if (inbox.telegramTargets.length && result.text.trim()) await steps.sendTelegramReply(userId, inbox.telegramTargets, result.text)
+      if (inbox.telegramTargets.length && result.text.trim()) {
+        const threads = await steps.telegramReplyThreads(userId, inbox.telegramTargets)
+        for (const threadId of threads) {
+          for (const chunk of splitTelegramText(result.text)) await steps.sendTelegramChunk(threadId, chunk)
+        }
+      }
     } catch (error) {
       // The messages stay in the conversation; the next wake answers them.
       await steps.failTurn(userId, holder, error instanceof Error ? error.message : String(error))
