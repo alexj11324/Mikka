@@ -7,3 +7,13 @@
 - Preserve unrelated changes and keep secret values out of terminal output, screenshots and reports.
 - Follow `docs/acceptance.md` for runtime acceptance. Use direct Google/GitHub OAuth and reuse authorized browser sessions; do not require the user to enter a Mikka password for routine acceptance. Diagnose account-linking conflicts separately without weakening account ownership checks.
 - Hand off the Agent's branch, commit SHA and unique Preview deployment URL. Keep that version fixed during acceptance; v0 `Latest`, moving branch aliases and the shared production domain cannot identify a frozen Agent delivery.
+
+## UI component styles
+
+- Use the default styles that ship with the component libraries (beUI, shadcn, HeroUI). Do not restyle a component to reproduce an old screen, and do not edit the source of registry components.
+- Migrate old screens to the new components' styles; do not bend new components to match old styles.
+- When a design spec differs from a component's default look, the component default wins. Accessibility handling (for example a crossfade instead of motion under reduced motion) may wrap the component from outside without changing the component itself.
+
+## Merge flow for frontend changes
+
+- Every PR that touches the frontend passes QA review first. Then post its Preview link to the design group for the UI Designer's design review. Only after the design review passes is the PR reported to Alex for merge approval. List the pages and states to review in the PR description.
