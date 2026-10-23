@@ -71,6 +71,8 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await expect(children.getByRole('button', { name: '子任务 0 / 0', exact: true })).toBeVisible()
     await children.getByRole('button', { name: '添加现有任务', exact: true }).click()
     const existing = page.getByRole('dialog', { name: '添加现有子任务', exact: true })
+    // Regression: reopening the picker right after unlinking must not filter against a stale board snapshot.
+    await expect(existing.getByRole('option').filter({ hasText: child })).toBeVisible()
     await existing.getByRole('combobox', { name: '搜索关联任务', exact: true }).fill(child)
     await existing.getByRole('option').filter({ hasText: child }).click()
     await expect(existing).not.toBeVisible()

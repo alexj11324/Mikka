@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, ChevronRight, Circle, Flag, GitBranch, Link2, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils'
 
 type Issue = Awaited<ReturnType<typeof getIssue>>
 export type RelationKind = 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'
+// Picker-only cache key (not shared with the board's ['issues', userId]); mutate it after any relation change.
+export const relationPickerKey = (userId: string) => ['issues', 'relation-picker', userId] as const
 const closed = (status: string) => ['done', 'canceled', 'duplicate'].includes(status)
 
 export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, onSelect, validationError }: { kind: RelationKind; task: Issue; open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; onSelect: (id: string) => void; validationError?: string }) {
@@ -26,8 +28,10 @@ export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, o
   const [query, setQuery] = useState('')
   // Relations change between openings; never filter against a stale board snapshot.
   const { data: connections, error, mutate } = useSWR(open ? ['issue-connections', task.id] : null, () => listIssueConnections(task.id))
-  const { data: board } = useSWR(open ? ['issues', 'relation-picker', task.userId] : null, listIssues, { revalidateOnMount: true, dedupingInterval: 0 })
-  const source = board ?? connections
+  const { data: latestBoard, isValidating } = useSWR(open ? relationPickerKey(task.userId) : null, listIssues, { revalidateOnMount: true, dedupingInterval: 0 })
+  // While revalidating, the cached board may predate the last relation change; wait for fresh data instead of filtering against it.
+  const board = isValidating ? undefined : latestBoard
+  const source = board ?? (isValidating ? undefined : connections)
   const needle = query.trim().toLowerCase()
   const sameOwner = (source ?? []).filter(row => row.id !== task.id && row.ownerId === task.userId && (kind !== 'child' || row.metadata.parentId !== task.id))
   const otherOwner = (board ?? []).some(row => row.id !== task.id && row.ownerId !== task.userId)
@@ -43,6 +47,7 @@ export function IssueRelations({ task, mode, onOpen, onCreate, onPick, getCurren
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const groupLabel = (value: RelationKind) => t.has(`groupLabel.${value}` as never) ? t(`groupLabel.${value}` as never) : value
   const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
+  const { mutate: refresh } = useSWRConfig()
   const { data: rows, error, mutate } = useSWR(['issue-connections', task.id], () => listIssueConnections(task.id), { refreshInterval: 10000 })
   const [expanded, setExpanded] = useState(true)
   const [pending, setPending] = useState(false)
@@ -57,7 +62,7 @@ export function IssueRelations({ task, mode, onOpen, onCreate, onPick, getCurren
       if (!latest) return
       const result = await updateIssueRelation({ id: task.id, revision: latest.revision, kind, targetId, remove: true })
       if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error))
-      onSaved(result.issue); await mutate(); toast.success(t('removed'))
+      onSaved(result.issue); await Promise.all([mutate(), refresh(relationPickerKey(task.userId))]); toast.success(t('removed'))
     } catch (error) { toast.error(error instanceof Error ? error.message : t('removeFailed')) }
     finally { busy.current = false; setPending(false) }
   }

@@ -17,7 +17,8 @@ async function createTask(page: Page, title: string, team?: string) {
   await page.getByRole('button', { name: '新建任务', exact: true }).first().click()
   const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
   await dialog.getByLabel('任务标题', { exact: true }).fill(title)
-  await dialog.getByLabel('团队', { exact: true }).selectOption(team ? { label: team } : '')
+  // Create-issue dialog renders a NativeSelect: drive it with selectOption.
+  await dialog.getByRole('combobox', { name: '团队', exact: true }).selectOption(team ? { label: team } : '')
   await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
   await expect(dialog).not.toBeVisible()
 }
@@ -78,7 +79,13 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await createTask(page, publicTitle, 'PRODUCT · 产品团队')
   await showAllTasks(page)
   await page.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: publicTitle }).click()
-  await expect(page.getByRole('combobox', { name: '团队', exact: true })).toContainText('PRODUCT · 产品团队')
+  // Detail page renders a Base UI Select: open the trigger and check the selected option.
+  const teamSelect = page.getByRole('combobox', { name: '团队', exact: true })
+  await expect(teamSelect).toContainText('PRODUCT · 产品团队')
+  await teamSelect.click()
+  await expect(page.getByRole('option', { name: 'PRODUCT · 产品团队', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('listbox')).toHaveCount(0)
   await expect(page.getByText('对该工作区启用成员公开，可协作编辑。', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
   await page.getByRole('button', { name: '项目', exact: true }).first().click()

@@ -16,7 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { IssueRelationPicker, type RelationKind } from './issue-relations'
+import { IssueRelationPicker, relationPickerKey, type RelationKind } from './issue-relations'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from './issue-properties'
 import type { MetadataRequest } from './issue-metadata-controls'
 
@@ -84,7 +84,7 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       const result = await operation(latest)
       if (!result.issue) throw new Error(actionError(result.error ?? 'generic'))
       if (mode === 'current') onSaved(result.issue)
-      await Promise.all([mutate(['issue-connections', task.id]), mutate('issues')])
+      await Promise.all([mutate(['issue-connections', task.id]), mutate('issues'), mutate(relationPickerKey(task.userId))])
       if (mode === 'duplicate') onOpen(result.issue.id)
       if (mode === 'delete') {
         onDeleted()
