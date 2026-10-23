@@ -65,14 +65,22 @@ export type SearchParams = {
   cursor: { updatedAt: string; id: string } | null
 }
 
-export function encodeCursor(row: { updatedAt: Date; id: string }) {
-  return Buffer.from(JSON.stringify({ u: row.updatedAt.toISOString(), i: row.id })).toString('base64url')
+/**
+ * The cursor carries updatedAt at Postgres' full microsecond precision (cursorKey, rendered by
+ * the database as UTC text). A JS Date only keeps milliseconds, so a cursor built from one would
+ * skip rows whose updatedAt differs from the last row only below the millisecond.
+ */
+const CURSOR_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/
+const cursorKey = sql<string>`to_char(${issues.updatedAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
+
+export function encodeCursor(row: { cursorKey: string; id: string }) {
+  return Buffer.from(JSON.stringify({ u: row.cursorKey, i: row.id })).toString('base64url')
 }
 
 function decodeCursor(value: string) {
   try {
     const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8'))
-    if (typeof parsed?.u !== 'string' || Number.isNaN(Date.parse(parsed.u)) || typeof parsed?.i !== 'string' || !UUID.test(parsed.i)) return null
+    if (typeof parsed?.u !== 'string' || !CURSOR_TIME.test(parsed.u) || typeof parsed?.i !== 'string' || !UUID.test(parsed.i)) return null
     return { updatedAt: parsed.u as string, id: parsed.i as string }
   } catch { return null }
 }
@@ -162,16 +170,19 @@ export function escapeLike(text: string) {
 }
 
 export function searchCondition(query: SearchQuery): SQL | undefined {
+  // TODO(MIK-16): the number lookup reads content JSON and has no index, so it scans the user's
+  // visible issues. Accepted for now (per-user issue counts are small); add an expression index
+  // or a real number column if this shows up in query stats.
   if (query.kind === 'number') return sql`(${meta}->>'number') = ${String(query.number)}`
   if (query.kind === 'title') return sql`${issues.title} ilike ${'%' + escapeLike(query.text) + '%'}`
   return undefined
 }
 
-export type SearchRow = { id: string; ownerId: string; ownerName: string | null; title: string; status: string; priority: string; revision: number; updatedAt: Date; metadata: Metadata }
+export type SearchRow = { id: string; ownerId: string; ownerName: string | null; title: string; status: string; priority: string; revision: number; updatedAt: Date; cursorKey: string; metadata: Metadata }
 
 /** One page of candidate rows under listIssues' row-level visibility (team filtering is the caller's). */
 export async function fetchCandidates(db: Db, input: { userId: string; publicIds: string[]; excludedIds: string[]; query: SearchQuery; cursor: { updatedAt: string; id: string } | null; limit: number }) {
-  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt, metadata: sql<Metadata | null>`${meta}` })
+  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt, cursorKey, metadata: sql<Metadata | null>`${meta}` })
     .from(issues).leftJoin(users, eq(users.id, issues.userId))
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, input.userId)))
     .where(and(
@@ -233,13 +244,15 @@ export async function searchIssues(db: Db, input: {
     if (batch.length <= params.limit) { more = false; break }
     more = true
     const last = batch[batch.length - 1]
-    cursor = { updatedAt: last.updatedAt.toISOString(), id: last.id }
+    cursor = { updatedAt: last.cursorKey, id: last.id }
   }
   const page = items.slice(0, params.limit)
   const hasNext = items.length > params.limit || more
   return {
     items: page.map((row): SearchResultItem => ({
       id: row.id,
+      // Output keeps the ORV- prefix on purpose: it is what the rest of the UI shows today.
+      // Input accepts both ORV- and MIK-; switching the displayed prefix is a separate change.
       identifier: row.metadata.number ? `ORV-${row.metadata.number}` : null,
       title: row.title, status: row.status, priority: row.priority,
       ownerId: row.ownerId, ownerName: row.ownerName,
@@ -249,7 +262,7 @@ export async function searchIssues(db: Db, input: {
         && canEditIssueRelation({ actorId: userId, ownerId: current.ownerId, currentId: current.id, targetId: row.id, memberIssueIds: members }),
     })),
     // When every scanned row was hidden by the team filter, resume after the last scanned row.
-    nextCursor: !hasNext ? null : page.length ? encodeCursor(page[page.length - 1]) : cursor ? encodeCursor({ updatedAt: new Date(cursor.updatedAt), id: cursor.id }) : null,
+    nextCursor: !hasNext ? null : page.length ? encodeCursor(page[page.length - 1]) : cursor ? encodeCursor({ cursorKey: cursor.updatedAt, id: cursor.id }) : null,
     truncated,
   }
 }

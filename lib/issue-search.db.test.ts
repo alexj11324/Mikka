@@ -7,12 +7,15 @@ import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
+import { issueSearchVisibility } from '@/lib/issue-search-visibility'
 import { parseSearchParams, RELATION_DEPTH_LIMIT, searchIssues, type CurrentIssue } from '@/lib/issue-search'
 
 const url = process.env.MIKKA_DATABASE_URL
 const host = url ? new URL(url) : null
-const devLocal = !!host && host.hostname === '127.0.0.1' && host.port === '15432'
-if (process.env.REQUIRE_DB === '1' && !devLocal) throw new Error('REQUIRE_DB=1 but MIKKA_DATABASE_URL is not dev-local (127.0.0.1:15432); run via ~/.mikka/local-run.sh')
+// The bridge port defaults to dev-local's 15432; MIKKA_TEST_DB_PORT overrides it (e.g. a CI service).
+const port = process.env.MIKKA_TEST_DB_PORT || '15432'
+const devLocal = !!host && host.hostname === '127.0.0.1' && host.port === port
+if (process.env.REQUIRE_DB === '1' && !devLocal) throw new Error(`REQUIRE_DB=1 but MIKKA_DATABASE_URL is not dev-local (127.0.0.1:${port}); run via ~/.mikka/local-run.sh`)
 const skip = devLocal ? false : 'no dev-local database (set REQUIRE_DB=1 to require it)'
 const pool = devLocal ? new Pool({ connectionString: url, max: 2 }) : null
 const db = pool ? drizzle(pool) : null
@@ -157,4 +160,60 @@ test('a 2500-id publicIds list still runs as one = ANY parameter', { skip }, () 
   const publicIds = [...Array.from({ length: 2499 }, () => randomUUID()), target]
   const result = await search(tx, viewer, `q=${t}`, null, everyone, publicIds)
   assert.deepEqual(result.items.map(item => item.id), [target])
+}))
+
+test('paging keeps rows whose updatedAt differs only below the millisecond, and exact ties', { skip }, () => inTx(async tx => {
+  const owner = await user(tx, 'Owner')
+  const t = tag()
+  const ids: string[] = []
+  // Same millisecond: +300µs, +200µs, and two rows tied at exactly +100µs (ordered by id).
+  for (const micros of [300, 200, 100, 100]) {
+    const id = randomUUID()
+    await tx.execute(sql`insert into issues (id, "userId", title, content, status, priority, "updatedAt") values (${id}, ${owner}, ${`${t} tie`}, '{"type":"doc","content":[],"attrs":{"mikka":{}}}'::jsonb, 'todo', 'normal', '2030-01-01T00:00:00.000Z'::timestamptz + make_interval(secs => ${micros / 1e6}::float8))`)
+    ids.push(id)
+  }
+  const expected = [ids[0], ids[1], ...[ids[2], ids[3]].sort().reverse()]
+  const seen: string[] = []
+  let cursor: string | null = null
+  do {
+    const page = await search(tx, owner, `q=${t}&limit=1${cursor ? `&cursor=${cursor}` : ''}`)
+    seen.push(...page.items.map(item => item.id))
+    cursor = page.nextCursor
+  } while (cursor && seen.length < 10)
+  assert.deepEqual(seen, expected)
+}))
+
+test('team visibility across workspaces and teams, through the real query (no isVisible stub)', { skip }, () => inTx(async tx => {
+  const me = await user(tx, 'Me'), alice = await user(tx, 'Alice')
+  const t = tag()
+  const wsA = randomUUID(), wsB = randomUUID(), wsC = randomUUID()
+  const teamA = randomUUID(), teamA2 = randomUUID(), teamB = randomUUID(), teamC = randomUUID()
+  for (const ws of [wsA, wsB, wsC]) await tx.execute(sql`insert into mikka_workspaces (id, "userId", name) values (${ws}, ${alice}, ${'ws ' + t})`)
+  // I am active in A, active in B, suspended in C.
+  for (const [ws, status] of [[wsA, 'active'], [wsB, 'active'], [wsC, 'suspended']] as const)
+    await tx.execute(sql`insert into mikka_workspace_members ("workspaceId", "userId", name, email, role, status) values (${ws}, ${me}, 'Me', ${me + '@example.test'}, 'member', ${status})`)
+  for (const [team, ws, ident] of [[teamA, wsA, 'TA'], [teamA2, wsA, 'TA2'], [teamB, wsB, 'TB'], [teamC, wsC, 'TC']])
+    await tx.execute(sql`insert into orvilo_teams (id, "workspaceId", "userId", name, identifier) values (${team}, ${ws}, ${alice}, ${ident}, ${ident})`)
+  const linked = async (title: string, team: string, ws: string) => {
+    const id = await issue(tx, alice, `${t} ${title}`)
+    await tx.execute(sql`insert into orvilo_team_issues ("issueId", "teamId", "workspaceId", "userId") values (${id}, ${team}, ${ws}, ${alice})`)
+    return id
+  }
+  const inA = await linked('team A', teamA, wsA)
+  const inA2 = await linked('team A2', teamA2, wsA)
+  const inB = await linked('team B', teamB, wsB)
+  const inC = await linked('team C (suspended)', teamC, wsC)
+  const personal = await issue(tx, me, `${t} personal`)
+  await issue(tx, alice, `${t} alice private`)
+
+  const searchIn = async (ws: string) => {
+    const { publicIds, isVisible } = await issueSearchVisibility(tx, me, ws)
+    return new Set((await search(tx, me, `q=${t}&limit=50`, null, isVisible, publicIds)).items.map(item => item.id))
+  }
+  // Workspace A: both of A's teams plus my unlinked personal issue; not B's, C's or Alice's private one.
+  assert.deepEqual(await searchIn(wsA), new Set([inA, inA2, personal]))
+  // Workspace B: only B's team issue plus the personal one.
+  assert.deepEqual(await searchIn(wsB), new Set([inB, personal]))
+  // Suspended membership in C shows nothing from C, even when C is the current workspace.
+  assert.deepEqual(await searchIn(wsC), new Set([personal]))
 }))

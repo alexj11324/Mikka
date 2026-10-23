@@ -4,9 +4,9 @@ import { ActionFailureError } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
-import { issueTeamScope } from '@/lib/issue-team-access'
+import { issueSearchVisibility } from '@/lib/issue-search-visibility'
 import { parseSearchParams, searchIssues, SearchInputError } from '@/lib/issue-search'
-import { accessibleTeams } from '@/lib/team-access'
+import { workspaceDb } from '@/lib/workspace-db'
 import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
 
 /**
@@ -35,15 +35,8 @@ export async function GET(request: Request) {
     if (params.excludeId && params.excludeId !== params.issueId) await requireIssueAccess(params.excludeId)
     const current = currentAccess ? { id: currentAccess.issue.id, ownerId: currentAccess.issue.userId, metadata: readIssueMetadata(currentAccess.issue.content) } : null
     // Same visibility as listIssues: team-linked issues only through teams in this workspace.
-    const teams = await accessibleTeams(userId, context.workspace.id)
-    const publicIds = (await issueTeamScope(userId)).map(link => link.issueId)
-    const result = await searchIssues(db, {
-      userId, params, publicIds, current,
-      isVisible: async ids => {
-        const links = ids.length ? await issueTeamScope(userId, ids) : []
-        return new Set(ids.filter(id => { const link = links.find(item => item.issueId === id); return !link || teams.some(team => team.id === link.teamId) }))
-      },
-    })
+    const { publicIds, isVisible } = await issueSearchVisibility(workspaceDb, userId, context.workspace.id)
+    const result = await searchIssues(db, { userId, params, publicIds, current, isVisible })
     return NextResponse.json(result, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     if (error instanceof SearchInputError) return NextResponse.json({ error: error.code }, { status: 400 })
