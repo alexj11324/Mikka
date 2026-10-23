@@ -41,7 +41,10 @@ export async function respondGroup(request: Request, resource: GroupRequest['res
     after(async () => {
       // Bounded request lifetime. Durable queued roots resume on the next history poll/send.
       try {
-        await processGroupTurn(pool, id, groupRuntime)
+        const deadline = Date.now() + 220000
+        while (Date.now() < deadline - 20000) {
+          if (!await processGroupTurn(pool, id, groupRuntime, deadline)) break
+        }
       } catch { console.error('Group turn failed; retained in group_turns without automatic replay') }
     })
   }

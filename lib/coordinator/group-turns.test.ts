@@ -117,6 +117,29 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const nothing = await send(id,'nothing',[a,b])
     await processGroupTurn(scoped,id,{...runtime,async generate() {return {text:'[nothing to add]',mentions:[]}}})
     assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[nothing])).rows[0].n,0)
+    const failed = await send(id,'provider failed',[a])
+    await assert.rejects(processGroupTurn(scoped,id,{...runtime,async generate() {throw new Error('private provider detail must not persist')}}), /private provider detail/)
+    const failure = (await scoped.query('SELECT status,error,"agentId" FROM group_turns WHERE "messageId"=$1',[failed])).rows[0]
+    assert.deepEqual(failure,{status:'failed',error:'generation_failed_not_replayed',agentId:null})
+    const recovery = await send(id,'after error',[a])
+    assert.equal(await processGroupTurn(scoped,id,runtime),true) // error released the session lock
+    assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[recovery])).rows[0].status,'complete')
+    const interrupted = await send(id,'interrupted',[a])
+    await scoped.query(`UPDATE group_turns SET status='running',"agentId"=$2 WHERE "messageId"=$1`,[interrupted,a])
+    assert.equal(await processGroupTurn(scoped,id,runtime),false)
+    assert.equal((await scoped.query('SELECT error,"agentId" FROM group_turns WHERE "messageId"=$1',[interrupted])).rows[0].error,'interrupted_generation_not_replayed')
+    const revoked = await send(id,'revoked workspace',[a])
+    await assert.rejects(processGroupTurn(scoped,id,{...runtime,async authorized() {return false},async generate() {assert.fail('revoked actor must not generate')}}),UnknownMentionError)
+    assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[revoked])).rows[0].status,'failed')
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
   } finally { await scoped.end(); await pool.query(`DROP SCHEMA "${schema}" CASCADE`); await pool.end() }
+})
+test('expired execution budget cancels before generation/status publication', async () => {
+  await assert.rejects(runGroupRounds({by:'mention',responders:[a]},message,{
+    async eligible() {return members}, async generate() {assert.fail('expired')},async status() {assert.fail('expired')}, async publish() {assert.fail('expired')},
+  },Date.now()-1),/budget_exceeded/)
+})
+test('production adapter does not select private standing instructions or sessions',async () => {
+  const runtime = await readFile(new URL('./group-runtime.ts',import.meta.url),'utf8')
+  assert.doesNotMatch(runtime,/agents\.instructions|agent_sessions|agent_turns|personalMemory|personal_memory/)
 })

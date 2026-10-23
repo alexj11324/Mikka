@@ -3,7 +3,7 @@ import type { Pool, PoolClient } from 'pg'
 import { addsNothing, correctionFrom, followUpInstructions, mentionRoute, UnknownMentionError, type GroupMessage, type GroupRoute, type RoutingCorrection, type RoutingMember } from './group-routing'
 
 export const GROUP_MAX_ROUNDS = 3
-export type GroupAgent = RoutingMember & { instructions: string }
+export type GroupAgent = RoutingMember
 export type GroupReply = { text: string; mentions: string[] }
 export type GroupRuntime = {
   agents(ownerId: string, ids: string[]): Promise<GroupAgent[]>
@@ -18,7 +18,7 @@ export async function enqueueGroupTurn(client: PoolClient, conversationId: strin
  * transaction: concurrent workers queue, while membership changes remain possible.
  * A crashed generation is marked failed on next wake, NEVER automatically replayed.
  */
-export async function processGroupTurn(pool: Pool, conversationId: string, runtime: GroupRuntime): Promise<boolean> {
+export async function processGroupTurn(pool: Pool, conversationId: string, runtime: GroupRuntime, deadline = Date.now() + 220000): Promise<boolean> {
   const client = await pool.connect()
   let locked = false
   let discard = false
@@ -75,7 +75,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
             return true
           } catch (error) { await client.query('ROLLBACK'); throw error }
         },
-      })
+      }, deadline)
     }
     await client.query(`UPDATE group_turns SET status='complete',"updatedAt"=now() WHERE "messageId"=$1`, [messageId])
     return true
@@ -96,8 +96,7 @@ export async function runGroupRounds(route: GroupRoute, message: GroupMessage, i
   generate: GroupRuntime['generate']
   publish(id: string, reply: GroupReply): Promise<boolean>
   status(id: string | null): Promise<void>
-}) {
-  const deadline = Date.now() + 220000
+}, deadline = Date.now() + 220000) {
   let next = route.responders
   const earlier: { author: string; text: string }[] = []
   for (let round = 0; round < GROUP_MAX_ROUNDS && next.length; round++) {
