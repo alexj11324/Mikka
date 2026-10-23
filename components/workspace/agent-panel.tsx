@@ -2,7 +2,6 @@
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { fetchAgentHistory as fetchHistory, useAgentHistory } from '@/hooks/use-agent-history'
-import '@openuidev/react-ui/layered/styles/index.css'
 import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -11,8 +10,8 @@ import type { AgentHistory } from '@/lib/agent-history'
 import type { ActionEvent } from '@openuidev/react-lang'
 import { toast } from 'sonner'
 import { useCompletion } from '@ai-sdk/react'
-import { createTheme, ThemeProvider } from '@openuidev/react-ui/ThemeProvider'
 import { AgentComposer } from './agent-composer'
+import { AgentThemeProvider } from './agent-theme'
 import dynamic from 'next/dynamic'
 
 import { AgentResponse } from './agent-response'
@@ -32,27 +31,6 @@ const fetchAgentWithImages: typeof fetch = async (input, options) => {
   })
 }
 
-const agentTheme = createTheme({
-  background: 'var(--background)',
-  foreground: 'var(--background)',
-  sunk: 'var(--muted)',
-  highlightSubtle: 'var(--background)',
-  highlight: 'var(--accent)',
-  textNeutralPrimary: 'var(--foreground)',
-  textNeutralSecondary: 'var(--muted-foreground)',
-  textNeutralTertiary: 'var(--muted-foreground)',
-  textAccentPrimary: 'var(--primary-foreground)',
-  interactiveAccentDefault: 'var(--primary)',
-  interactiveAccentHover: 'var(--primary)',
-  interactiveAccentDisabled: 'var(--muted)',
-  borderDefault: 'var(--border)',
-  borderInteractive: 'var(--input)',
-  borderInteractiveEmphasis: 'var(--ring)',
-  borderAccent: 'var(--primary)',
-  fontBody: 'var(--font-sans)',
-  fontHeading: 'var(--font-sans)',
-  fontLabel: 'var(--font-sans)',
-})
 
 /** `request` opens a session from outside (the conversation list): a session id, or null for a new conversation. */
 export type AgentSessionRequest = { sessionId: string | null; nonce: number }
@@ -61,10 +39,10 @@ export function AgentPanel({ userId, initialHistory, request, onActive }: { user
   const [demo, setDemo] = useState(false)
   const latest = useAgentHistory(userId, initialHistory)
   if (!latest.data) return <AgentHistoryLoading error={latest.error} onRetry={() => { void latest.mutate() }} />
-  return <ThemeProvider cssSelector=".orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
+  return <AgentThemeProvider>
     <div hidden={demo} className="h-full min-h-0"><AgentSessions userId={userId} initial={latest.data} request={request} onActive={onActive} onDemo={() => setDemo(true)} onSaved={async () => { await latest.mutate() }} /></div>
     {demo && <AgentDemo onClose={() => setDemo(false)} />}
-  </ThemeProvider>
+  </AgentThemeProvider>
 }
 
 function AgentHistoryLoading({ error, onRetry }: { error?: Error; onRetry: () => void }) {

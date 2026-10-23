@@ -1481,6 +1481,8 @@
       "googleLinkFailed": "Could not start Google account linking.",
       "heading": "Connected apps",
       "description": "Authorize each account through Composio.",
+      "gmail": "Gmail",
+      "gmailDescription": "Connect Gmail so important new mail shows up in your suggestions.",
       "notion": "Notion",
       "notionDescription": "Connect a Notion workspace.",
       "slack": "Slack",
