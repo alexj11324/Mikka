@@ -217,3 +217,49 @@ test('team visibility across workspaces and teams, through the real query (no is
   // Suspended membership in C shows nothing from C, even when C is the current workspace.
   assert.deepEqual(await searchIn(wsC), new Set([personal]))
 }))
+
+// Access-control mutants (QA round 4): each filter in issue-search-visibility.ts must be load-bearing.
+// :19 eq(workspaceMembers.userId, userId) — another user's active membership must not grant me access.
+// :23 inArray(teamIssues.teamId, allTeamIds) — publicIds must not include teams I cannot access.
+test('visibility ignores other users\' memberships and teams I cannot access', { skip }, () => inTx(async tx => {
+  const me = await user(tx, 'Me'), bob = await user(tx, 'Bob')
+  const t = tag()
+  const mine = randomUUID(), bobsOnly = randomUUID(), suspended = randomUUID()
+  for (const ws of [mine, bobsOnly, suspended]) await tx.execute(sql`insert into mikka_workspaces (id, "userId", name) values (${ws}, ${bob}, ${'ws ' + t})`)
+  const join = (ws: string, who: string, status: string) =>
+    tx.execute(sql`insert into mikka_workspace_members ("workspaceId", "userId", name, email, role, status) values (${ws}, ${who}, 'x', ${who + ws + '@example.test'}, 'member', ${status})`)
+  await join(mine, me, 'active')
+  await join(suspended, me, 'suspended')
+  // Bob is active everywhere, including where I am absent or suspended.
+  for (const ws of [mine, bobsOnly, suspended]) await join(ws, bob, 'active')
+  const team = async (ws: string, ident: string) => {
+    const id = randomUUID()
+    await tx.execute(sql`insert into orvilo_teams (id, "workspaceId", "userId", name, identifier) values (${id}, ${ws}, ${bob}, ${ident}, ${ident})`)
+    return id
+  }
+  const [tMine, tBob, tSusp] = [await team(mine, 'TM'), await team(bobsOnly, 'TBO'), await team(suspended, 'TS')]
+  const linked = async (title: string, teamId: string, ws: string) => {
+    const id = await issue(tx, bob, `${t} ${title}`)
+    await tx.execute(sql`insert into orvilo_team_issues ("issueId", "teamId", "workspaceId", "userId") values (${id}, ${teamId}, ${ws}, ${bob})`)
+    return id
+  }
+  const inMine = await linked('mine', tMine, mine)
+  const inBob = await linked('bob only', tBob, bobsOnly)
+  const inSusp = await linked('suspended', tSusp, suspended)
+
+  const { publicIds, isVisible } = await issueSearchVisibility(tx, me, mine)
+  const ours = new Set([inMine, inBob, inSusp])
+  assert.deepEqual(new Set(publicIds.filter(id => ours.has(id))), new Set([inMine]), 'publicIds: only teams where I am an active member')
+  // Rows from outside this test's fixtures (dev-local data) must not leak in either.
+  const { rows } = await tx.execute(sql`select ti."issueId" from orvilo_team_issues ti join mikka_workspace_members m on m."workspaceId" = ti."workspaceId" and m."userId" = ${me} and m.status = 'active'`)
+  assert.deepEqual(new Set(publicIds), new Set(rows.map(r => r.issueId as string)), 'publicIds is exactly my active teams\' issues')
+  assert.deepEqual(await isVisible([inMine, inBob, inSusp]), new Set([inMine]))
+  // Asking for a workspace I am not in (or suspended in) must not open its teams to me.
+  for (const ws of [bobsOnly, suspended]) {
+    const other = await issueSearchVisibility(tx, me, ws)
+    assert.deepEqual(await other.isVisible([inMine, inBob, inSusp]), new Set(), `no team issue visible when asking for ${ws === bobsOnly ? 'Bob\'s' : 'a suspended'} workspace`)
+    assert.ok(!other.publicIds.includes(inBob) && !other.publicIds.includes(inSusp))
+  }
+  const found = new Set((await search(tx, me, `q=${t}&limit=50`, null, isVisible, publicIds)).items.map(item => item.id))
+  assert.deepEqual(found, new Set([inMine]), 'search shows only my active team\'s issue')
+}))
