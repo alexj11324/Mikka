@@ -49,6 +49,7 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
   ] as const
   const { mutate } = useSWRConfig()
   const [relation, setRelation] = useState<RelationKind | null>(null)
+  const queuedRelation = useRef<RelationKind | null>(null)
   const [dialog, setDialog] = useState<'createChild' | 'duplicate' | 'dueDate' | 'estimate' | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [fieldDefault, setFieldDefault] = useState('')
@@ -84,7 +85,8 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       const result = await operation(latest)
       if (!result.issue) throw new Error(actionError(result.error ?? 'generic'))
       if (mode === 'current') onSaved(result.issue)
-      await Promise.all([mutate(['issue-connections', task.id]), mutate(['issues', userId]), mutate(relationPickerKey(userId))])
+      // 'current' saves go through onSaved, whose saved() in issue-workspace already refetches the viewer's board.
+      await Promise.all([mutate(['issue-connections', task.id]), mode === 'current' ? undefined : mutate(['issues', userId]), mutate(relationPickerKey(userId))])
       if (mode === 'duplicate') onOpen(result.issue.id)
       if (mode === 'delete') {
         onDeleted()
@@ -115,7 +117,8 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
   const unavailable = disabled || pending
   return <>
     <Button variant="ghost" size="icon-sm" aria-label={favorite ? tMenu('unfavorite') : tMenu('favorite')} aria-pressed={favorite} disabled={unavailable} onClick={() => { void toggleFavorite() }}><Star data-icon="inline-start" fill={favorite ? 'currentColor' : 'none'} /></Button>
-    <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={tWorkspaceDetail('moreActions')} disabled={unavailable} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end" className="max-h-[min(80svh,720px)] w-64 overflow-y-auto">
+    {/* Open the relation picker only after the menu's exit animation finishes, so the menu doesn't ghost over the dialog. */}
+    <DropdownMenu onOpenChange={open => { if (open) queuedRelation.current = null }} onOpenChangeComplete={open => { if (!open && queuedRelation.current) { setRelation(queuedRelation.current); queuedRelation.current = null } }}><DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={tWorkspaceDetail('moreActions')} disabled={unavailable} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end" className="max-h-[min(80svh,720px)] w-64 overflow-y-auto">
       <DropdownMenuGroup>
         <DropdownMenuSub><DropdownMenuSubTrigger><Circle />{tMenu('setStatus')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{statusOptions.map(status => <DropdownMenuItem key={status.value} onClick={() => onStatus(status.value)}><status.icon /><span className="flex-1">{status.label}</span>{task.status === status.value && <Check />}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
         <DropdownMenuSub><DropdownMenuSubTrigger><Signal />{tMenu('setPriority')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{priorityOptions.map(priority => <DropdownMenuItem key={priority.value} onClick={() => onPriority(priority.value)}><priority.icon {...priority.iconProps} /><span className="flex-1">{priority.label}</span>{task.priority === priority.value && <Check />}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
@@ -128,10 +131,10 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
         <DropdownMenuItem onClick={() => openDialog('createChild')}><Plus />{tMenu('createChild')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { setError(''); setRelation('child') }}><ListPlus />{tMenu('addExistingChild')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { setError(''); setRelation('parent') }}><GitBranch />{tMenu('setParent')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { setError(''); queuedRelation.current = 'child' }}><ListPlus />{tMenu('addExistingChild')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { setError(''); queuedRelation.current = 'parent' }}><GitBranch />{tMenu('setParent')}</DropdownMenuItem>
         {task.metadata.parentId && <DropdownMenuItem onClick={() => { void run(issue => updateIssueRelation({ id: task.id, revision: issue.revision, targetId: null, kind: 'parent', remove: true })) }}><X />{tMenu('removeParent')}</DropdownMenuItem>}
-        <DropdownMenuSub><DropdownMenuSubTrigger><Link2 />{tMenu('addRelation')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{(['related', 'blockedBy', 'blocks', 'duplicate'] as RelationKind[]).map(kind => <DropdownMenuItem key={kind} onClick={() => { setError(''); setRelation(kind) }}>{kind === 'blocks' || kind === 'blockedBy' ? <Flag /> : <Link2 />}{relationTitle(kind)}…</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
+        <DropdownMenuSub><DropdownMenuSubTrigger><Link2 />{tMenu('addRelation')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{(['related', 'blockedBy', 'blocks', 'duplicate'] as RelationKind[]).map(kind => <DropdownMenuItem key={kind} onClick={() => { setError(''); queuedRelation.current = kind }}>{kind === 'blocks' || kind === 'blockedBy' ? <Flag /> : <Link2 />}{relationTitle(kind)}…</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>

@@ -64,9 +64,16 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await page.reload()
     await expect(children.getByRole('button', { name: '子任务 1 / 1', exact: true })).toBeVisible()
 
-    const invalidParent = await chooseRelation(page, '设置父任务', child)
-    await expect(invalidParent.getByRole('alert')).toHaveText('父子任务不能形成循环。')
-    await invalidParent.getByRole('button', { name: '关闭', exact: true }).click()
+    // The parent picker hides this task's descendants (the server still rejects parent cycles with issueParentCycle),
+    // so searching for the child yields the query-specific CommandEmpty state.
+    await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: '设置父任务…', exact: true }).click()
+    const parentPicker = page.getByRole('dialog', { name: '设置父任务', exact: true })
+    await expect(parentPicker.getByRole('option').filter({ hasText: blocker })).toBeVisible()
+    await parentPicker.getByRole('combobox', { name: '搜索关联任务', exact: true }).fill(child)
+    await expect(parentPicker.getByText('没有匹配的任务', { exact: true })).toBeVisible()
+    await expect(parentPicker.getByRole('option')).toHaveCount(0)
+    await parentPicker.getByRole('button', { name: '关闭', exact: true }).click()
     await children.getByRole('button', { name: `移除子任务关系：${child}`, exact: true }).click()
     await expect(children.getByRole('button', { name: '子任务 0 / 0', exact: true })).toBeVisible()
     // Regression: reopening the picker right after unlinking must not filter against the board snapshot cached
@@ -142,4 +149,98 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await expect(children.getByRole('button', { name: '子任务 1 / 1', exact: true })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   })
+
+  test(`关系选择器读取失败时显示错误和重新读取 ${viewport.width}`, async ({ page }) => {
+    test.setTimeout(120000)
+    await register(page)
+    const suffix = randomUUID().slice(0, 8)
+    const current = `读取失败当前任务 ${suffix}`
+    const target = `读取失败目标任务 ${suffix}`
+    await createIssue(page, current)
+    await createIssue(page, target)
+    await page.getByRole('button', { name: '任务', exact: true }).click()
+    await openIssue(page, current)
+    await page.setViewportSize(viewport)
+    // Start from an empty SWR cache so the picker has no stale board to fall back on.
+    await page.reload()
+    await expect(page.getByRole('button', { name: '更多任务操作', exact: true })).toBeEnabled()
+
+    // Fail every server action while the picker loads (listIssueConnections + listIssues). A non-RSC 200 body makes the action promise reject
+    // without a browser 'Failed to load resource' console error, which the runtime guard would flag.
+    let failing = true
+    await page.route('**/*', route => {
+      const request = route.request()
+      if (failing && request.method() === 'POST' && request.headers()['next-action']) return route.fulfill({ status: 200, contentType: 'text/plain', body: 'mocked failure' })
+      return route.fallback()
+    })
+    await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: '设置父任务…', exact: true }).click()
+    const picker = page.getByRole('dialog', { name: '设置父任务', exact: true })
+    await expect(picker.getByRole('alert').filter({ hasText: '任务读取失败' })).toBeVisible()
+    // The alert sits outside the Command list; the reload option stays in the list.
+    await expect(picker.getByRole('listbox').getByText('任务读取失败', { exact: true })).toHaveCount(0)
+    const reload = picker.getByRole('option', { name: '重新读取任务', exact: true })
+    await expect(reload).toBeVisible()
+
+    failing = false
+    await reload.click()
+    await expect(picker.getByRole('option').filter({ hasText: target })).toBeVisible()
+    await expect(picker.getByRole('alert').filter({ hasText: '任务读取失败' })).toHaveCount(0)
+    await expect(reload).toHaveCount(0)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  })
 }
+
+test('402x400 短视口：关系选择器标题和关闭按钮不被裁切，列表在内部滚动，状态高度不跳', async ({ page }) => {
+  test.setTimeout(120000)
+  await register(page)
+  const suffix = randomUUID().slice(0, 8)
+  const current = `短视口当前任务 ${suffix}`
+  await createIssue(page, current)
+  for (let i = 0; i < 8; i++) await createIssue(page, `短视口候选 ${i} ${suffix}`)
+  await page.getByRole('button', { name: '任务', exact: true }).click()
+  await openIssue(page, current)
+  await page.setViewportSize({ width: 402, height: 400 })
+  // Hold the picker's reads so the loading state is visible: its text is muted via an inner span, CommandEmpty keeps its default color.
+  let releaseReads!: () => void
+  const readsHeld = new Promise<void>(resolve => { releaseReads = resolve })
+  let holding = true
+  await page.route('**/*', async route => {
+    if (holding && route.request().method() === 'POST' && route.request().headers()['next-action']) await readsHeld
+    return route.fallback()
+  })
+  await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
+  await page.getByRole('menuitem', { name: '设置父任务…', exact: true }).click()
+  const loading = page.getByRole('dialog', { name: '设置父任务', exact: true }).locator('[cmdk-empty]')
+  await expect(loading.getByText('正在读取任务…', { exact: true })).toHaveClass(/text-muted-foreground/)
+  await expect(loading).not.toHaveClass(/text-muted-foreground/)
+  holding = false
+  releaseReads()
+  await page.unroute('**/*')
+  // The dialog opens only after the menu has closed (no menu ghosting over it).
+  const picker = page.getByRole('dialog', { name: '设置父任务', exact: true })
+  await expect(picker).toBeVisible()
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  await expect(picker.getByRole('option').filter({ hasText: `短视口候选 7 ${suffix}` })).toBeVisible()
+  const inViewport = async (box: { y: number; height: number } | null) => { expect(box).not.toBeNull(); expect(box!.y).toBeGreaterThanOrEqual(0); expect(box!.y + box!.height).toBeLessThanOrEqual(400) }
+  await inViewport(await picker.boundingBox())
+  await inViewport(await picker.getByRole('heading', { name: '设置父任务', exact: true }).boundingBox())
+  await inViewport(await picker.locator('[data-slot="dialog-close"]').first().boundingBox())
+  const list = picker.locator('[data-slot="command-list"]')
+  expect(await list.evaluate(el => el.scrollHeight > el.clientHeight && getComputedStyle(el).overflowY === 'auto')).toBe(true)
+  const listHeight = (await list.boundingBox())!.height
+  // Empty state keeps the list's minimum height instead of collapsing.
+  await picker.getByRole('combobox', { name: '搜索关联任务', exact: true }).fill(`不存在 ${suffix}`)
+  await expect(picker.getByText('没有匹配的任务', { exact: false })).toBeVisible()
+  expect((await list.boundingBox())!.height).toBeGreaterThanOrEqual(Math.min(listHeight, 144) - 1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  // Closing the picker and dismissing a reopened menu without picking must not reopen a previously queued picker.
+  await page.keyboard.press('Escape')
+  await expect(picker).toHaveCount(0)
+  await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
+  await expect(page.getByRole('menu')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  await page.waitForTimeout(500)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
