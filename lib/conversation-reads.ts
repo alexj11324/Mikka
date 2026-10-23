@@ -17,6 +17,7 @@ export type ConversationRead = {
 export type MarkReadBody = { messageId: string }
 
 export type ReadTarget = { messageId: string; position: number }
+export type ObservedMessage = { position: number; id?: string }
 
 /** A non-2xx answer from the read API; `status` is the HTTP status (422 unknown id, 403/404 no access). */
 export class ReadError extends Error {
@@ -29,8 +30,8 @@ export interface ConversationReadSource {
   /** Fire-and-forget during page hide / unmount; the next GET restores the position. */
   beacon(conversationId: string, target: ReadTarget): void
   subscribe?(conversationId: string, onChange: (read: ConversationRead) => void): () => void
-  /** Mock only: the persisted message ids the page currently knows, so the mock can 422 like the server. */
-  observe?(conversationId: string, messageIds: readonly string[]): void
+  /** Mock only: the persisted messages the page currently knows (position, plus uuid when available), so the mock can 422 like the server. */
+  observe?(conversationId: string, messages: readonly ObservedMessage[]): void
 }
 
 const url = (id: string) => withBasePath(`/api/conversations/${encodeURIComponent(id)}/read`)
@@ -60,7 +61,8 @@ export const MOCK_READ_KEY = 'mikka:mock-conversation-read:'
 /**
  * Local mock until Backend ships the API. Persists per conversation in localStorage so two
  * tabs share it (storage events) and e2e can seed it. Follows the server rules: messageId must
- * be a persisted message the page has observed (else 422), forward-only via max(). unreadCount
+ * be a persisted message the page has observed, given either as its uuid or its numeric position
+ * (422 only when no such message exists), forward-only via max(). unreadCount
  * is 0 — the UI counts locally.
  *
  * Test-only knobs on the stored record: `simulateStatus` makes every mark fail with that status,
@@ -73,7 +75,14 @@ export function createMockReadSource(storage: () => StorageLike | null = () => (
     const value = raw ? JSON.parse(raw) as Partial<ConversationRead> : {}
     return { lastReadMessageId: value.lastReadMessageId ?? null, lastReadPosition: value.lastReadPosition ?? null, unreadCount: 0 }
   }
-  const known = new Map<string, Set<string>>()
+  const known = new Map<string, { positions: Set<number>; ids: Map<string, number> }>()
+  /** Real rule: messageId is a numeric position or a message uuid; resolve it to a persisted position or 422. */
+  const resolve = (id: string, messageId: string): number => {
+    const messages = known.get(id)
+    const position = /^\d+$/.test(messageId) ? Number(messageId) : messages?.ids.get(messageId)
+    if (position === undefined || !messages?.positions.has(position)) throw new ReadError(422)
+    return position
+  }
   const raw = (id: string) => { const value = storage()?.getItem(MOCK_READ_KEY + id) ?? memory.get(id); return value ? JSON.parse(value) as Record<string, unknown> : {} }
   const write = (id: string, value: Record<string, unknown>) => {
     const text = JSON.stringify(value)
@@ -85,9 +94,9 @@ export function createMockReadSource(storage: () => StorageLike | null = () => (
     const record = raw(id)
     write(id, { ...record, posts: (typeof record.posts === 'number' ? record.posts : 0) + 1 })
     if (typeof record.simulateStatus === 'number') throw new ReadError(record.simulateStatus)
-    if (!known.get(id)?.has(target.messageId) || String(target.position) !== target.messageId) throw new ReadError(422)
+    const resolved = resolve(id, target.messageId)
     const current = read(id)
-    const position = mergeReadPosition(current.lastReadPosition, target.position)
+    const position = mergeReadPosition(current.lastReadPosition, resolved)
     if (position === current.lastReadPosition) return current
     const next: ConversationRead = { lastReadMessageId: target.messageId, lastReadPosition: position, unreadCount: 0 }
     write(id, { ...raw(id), ...next })
@@ -97,7 +106,7 @@ export function createMockReadSource(storage: () => StorageLike | null = () => (
     async get(id) { return read(id) },
     async mark(id, target) { return mark(id, target) },
     beacon(id, target) { try { mark(id, target) } catch { /* fire-and-forget */ } },
-    observe(id, messageIds) { known.set(id, new Set(messageIds)) },
+    observe(id, messages) { known.set(id, { positions: new Set(messages.map(message => message.position)), ids: new Map(messages.flatMap(message => message.id ? [[message.id, message.position] as const] : [])) }) },
     subscribe(id, onChange) {
       if (typeof window === 'undefined') return () => {}
       const listener = (event: StorageEvent) => { if (event.key === MOCK_READ_KEY + id) onChange(read(id)) }

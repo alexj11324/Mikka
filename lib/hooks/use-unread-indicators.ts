@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { conversationReadSource, ReadError, type ConversationRead, type ConversationReadSource } from '@/lib/conversation-reads'
+import { conversationReadSource, type ConversationRead, type ConversationReadSource } from '@/lib/conversation-reads'
 import { arrivedSinceLeftBottom, createReadReporter, dividerPosition, lastVisiblePosition, mergeReadPosition, unreadBelowDivider, type UnreadItem } from '@/lib/unread'
 
 const AT_BOTTOM_PX = 24
@@ -49,16 +49,16 @@ export function useUnreadIndicators({ conversationId, items, rootRef, source = c
         // The server's answer is authoritative (it is forward-only itself).
         reporter.advance(value.lastReadPosition)
         setRead(value)
-      }).catch(error => {
-        // 403/404/422 (or anything else): degrade silently, no retry loop for this visit.
-        if (!(error instanceof ReadError) || error.status >= 400) reporter.stop()
+      }).catch(() => {
+        // Any failure (403/404/422, 5xx, network): degrade silently, no retry loop for this visit.
+        reporter.stop()
       })
     },
     sendNow: target => { if (!reporter.stopped) source.beacon(conversationId, target) },
   }), [conversationId, source])
 
-  const reportableIds = items.filter(item => item.reportable).map(item => item.messageId).join(',')
-  useEffect(() => { source.observe?.(conversationId, reportableIds ? reportableIds.split(',') : []) }, [conversationId, source, reportableIds])
+  const reportablePositions = items.filter(item => item.reportable).map(item => item.position).join(',')
+  useEffect(() => { source.observe?.(conversationId, reportablePositions ? reportablePositions.split(',').map(position => ({ position: Number(position) })) : []) }, [conversationId, source, reportablePositions])
 
   useEffect(() => {
     const onHide = () => { if (document.visibilityState === 'hidden') reporter.flush() }

@@ -59,7 +59,7 @@ export function CoordinatorChat({ onOpenIssue }: { onOpenIssue: (id: string) => 
         <MessageScrollerViewport aria-label={t('conversation')}>
           <MessageScrollerContent className="mx-auto w-full max-w-3xl px-4 py-6">
             {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyMedia variant="icon"><Send /></EmptyMedia><EmptyTitle>{t('emptyTitle')}</EmptyTitle><EmptyDescription>{t('emptyDescription')}</EmptyDescription></EmptyHeader></Empty>}
-            {items.map(item => <Fragment key={item.position}>
+            {items.map(item => <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
               {unread.divider === item.position && <UnreadDivider />}
               <MessageScrollerItem messageId={String(item.position)} scrollAnchor={item.from === 'person'} {...(item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
               {item.from === 'event'

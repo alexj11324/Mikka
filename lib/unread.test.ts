@@ -102,7 +102,7 @@ test('mock source mirrors backend: no record, forward-only via max, two pages sh
   const storage = memoryStorage()
   const pageA = createMockReadSource(() => storage)
   const pageB = createMockReadSource(() => storage)
-  for (const page of [pageA, pageB]) page.observe?.('c', ['1', '3', '5', '7'])
+  for (const page of [pageA, pageB]) page.observe?.('c', [1, 3, 5, 7].map(position => ({ position })))
   assert.deepEqual(await pageA.get('c'), { lastReadMessageId: null, lastReadPosition: null, unreadCount: 0 })
   await pageA.mark('c', { messageId: '5', position: 5 })
   const stale = await pageB.mark('c', { messageId: '3', position: 3 })
@@ -115,9 +115,9 @@ test('mock source mirrors backend: no record, forward-only via max, two pages sh
 test('mock source rejects unknown or non-persisted ids with 422, like the server', async () => {
   const storage = memoryStorage()
   const page = createMockReadSource(() => storage)
-  page.observe?.('c', ['1', '2'])
+  page.observe?.('c', [{ position: 1 }, { position: 2 }])
   await assert.rejects(page.mark('c', { messageId: '3', position: 3 }), (error: unknown) => error instanceof ReadError && error.status === 422)
-  await assert.rejects(page.mark('c', { messageId: '2', position: 9 }), (error: unknown) => error instanceof ReadError && error.status === 422)
+  await assert.rejects(page.mark('c', { messageId: '00000000-0000-4000-8000-000000000000', position: 1 }), (error: unknown) => error instanceof ReadError && error.status === 422)
   page.beacon('c', { messageId: '3', position: 3 })
   assert.equal((await page.get('c')).lastReadPosition, null)
   storage.setItem(MOCK_READ_KEY + 'c', JSON.stringify({ simulateStatus: 403 }))
@@ -138,4 +138,14 @@ test('reporter: server position is authoritative and stop() ends all requests', 
   reporter.report({ position: 12 })
   reporter.flush()
   assert.deepEqual(sent, [11])
+})
+
+test('mock source accepts a message uuid or its numeric position, like the server', async () => {
+  const storage = memoryStorage()
+  const page = createMockReadSource(() => storage)
+  const uuid = '11111111-1111-4111-8111-111111111111'
+  page.observe?.('c', [{ position: 1 }, { position: 2, id: uuid }, { position: 3 }])
+  assert.equal((await page.mark('c', { messageId: uuid, position: 2 })).lastReadPosition, 2)
+  assert.equal((await page.mark('c', { messageId: '3', position: 3 })).lastReadPosition, 3)
+  assert.equal((await page.mark('c', { messageId: uuid, position: 2 })).lastReadPosition, 3)
 })
