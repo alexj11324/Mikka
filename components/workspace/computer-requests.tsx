@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import useSWR from 'swr'
-import Image from 'next/image'
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,14 +12,14 @@ import type { ComputerOperation } from '@/lib/cua/operation'
 type Request = { id: string; operation: ComputerOperation; expiresAt: string }
 export function ComputerRequests({ sessionId, loading, generation }: { sessionId: string | null; loading: boolean; generation: string }) {
   const copy = useAgentCopy()
-  // Revalidate after a turn, not a timer. Only authenticated server-created
+  // Poll while a live model tool is waiting. Only authenticated server-created
   // operations are renderable here; model-generated approval text does nothing.
-  const { data, mutate } = useSWR<{ desktop: string; requests: Request[] }>(sessionId && !loading ? ['computer-requests', sessionId, generation] : null,
+  const { data, mutate } = useSWR<{ desktop: string; requests: Request[] }>(sessionId ? ['computer-requests', sessionId, generation] : null,
     async () => {
       const response = await fetch(withBasePath(`/api/agent/computer?sessionId=${sessionId}`), { credentials: 'same-origin', cache: 'no-store' })
       if (!response.ok) throw new Error(copy.computerRequestFailed)
       return response.json()
-    }, { revalidateOnFocus: true })
+    }, { revalidateOnFocus: true, refreshInterval: current => loading || current?.requests.length ? 500 : 0 })
   if (!sessionId || !data?.requests.length) return null
   return <section aria-label={copy.computerApproval} className="flex flex-col gap-2">
     {data.requests.map(request => <ComputerRequest key={request.id} request={request} sessionId={sessionId} desktop={data.desktop} onDecided={() => { void mutate() }} />)}
@@ -30,7 +29,6 @@ function ComputerRequest({ request, sessionId, desktop, onDecided }: { request: 
   const copy = useAgentCopy()
   const [busy, setBusy] = useState(false)
   const [decided, setDecided] = useState(false)
-  const [image, setImage] = useState<string>()
   const [message, setMessage] = useState('')
   async function decide(approve: boolean) {
     if (busy || decided) return
@@ -42,11 +40,9 @@ function ComputerRequest({ request, sessionId, desktop, onDecided }: { request: 
         body: JSON.stringify({ id: request.id, sessionId, approve }),
       })
       if (!response.ok) throw new Error(copy.computerRequestFailed)
-      const result = await response.json()
-      setImage(result.result?.image)
-      setMessage(approve ? copy.computerExecuted : copy.computerDenied)
+      setMessage(approve ? copy.computerApprovalQueued : copy.computerDenied)
     } catch { setMessage(copy.computerRequestFailed) }
-    finally { setBusy(false); if (!approve) onDecided() }
+    finally { setBusy(false); onDecided() }
   }
   return <Card size="sm">
     <CardHeader><CardTitle>{copy.computerApproval}</CardTitle></CardHeader>
@@ -59,7 +55,6 @@ function ComputerRequest({ request, sessionId, desktop, onDecided }: { request: 
         <Button size="sm" variant="outline" disabled={busy} onClick={() => { void decide(false) }}>{copy.computerDeny}</Button>
       </div>}
       {message && <Alert><AlertDescription>{message}</AlertDescription></Alert>}
-      {image && <Image src={image} alt={copy.computerScreenshot} width={1600} height={1000} unoptimized className="h-auto w-full" />}
     </CardContent>
   </Card>
 }

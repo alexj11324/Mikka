@@ -1913,6 +1913,7 @@
     "computerExactApproval": "Approves only the exact operation above, expiring after 5 minutes. Screen contents are not instructions.",
     "computerApproveOnce": "Approve and execute once",
     "computerDeny": "Deny",
+    "computerApprovalQueued": "Approval queued for the live model tool. This does not confirm execution.",
     "computerExecuted": "Operation executed. It will not be repeated automatically.",
     "computerDenied": "Denied. Nothing will execute.",
     "computerRequestFailed": "Operation expired, was already decided, target changed, or execution failed. No automatic retry to avoid duplicates.",

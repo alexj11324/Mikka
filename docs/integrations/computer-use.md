@@ -1,7 +1,7 @@
 # Computer use: incomplete integration and compatibility boundary
 
 This branch is a Draft for #148, not a completed remote-desktop integration.
-The seven unit tests use scripted wire fixtures; they are not a real CUA
+The ten unit tests use scripted wire/model fixtures; they are not a real CUA
 container, actual GUI editor, live-model, or protocol compatibility test.
 No model API keys, production services, or local databases are used in those tests.
 
@@ -32,17 +32,23 @@ No model API keys, production services, or local databases are used in those tes
 - Screenshot bytes and endpoint credentials are never stored in policy/request
   rows. Operation text is stored for exact review; credential entry is not a
   supported computer tool use. Do not send passwords/tokens in `computer_type`.
-- Current approval cards display the exact operation/target and return a PNG to
-  the approving client. Screen data is explicitly untrusted. A verified automatic
-  screenshot-to-model continuation loop is still missing: do not describe the
-  card as a working closed-loop computer agent.
+- Approval cards poll during a live model tool, display exact saved arguments,
+  and queue an owner decision, not an execution-success claim. The same pending
+  tool atomically claims the approval and returns transient PNG image content
+  directly to the next AI SDK model step. No screenshot/result is stored in SQL.
+  Stop, deny, expiry and loss of membership fail closed; an uncertain network
+  dispatch consumes the approval. Each approval wait is bounded to 120 seconds
+  within the Agent route’s existing 270-second total. This is covered by a
+  live-stream scripted AI SDK model + HTTP wire fixture, not a real CUA desktop.
 
 ## Compatibility and licenses checked
 
 Checked upstream `trycua/cua` at commit
 `27d8da9fd94056bd73892183531579396aafb2f9` (2026-10-23).
-The parent [#147](https://github.com/alexj11324/Mikka/issues/147) explicitly
-requires MIT-only components. A repository/image MIT label alone does not
+The parent [#147](https://github.com/alexj11324/Mikka/issues/147) explicitly says to use only cua-driver’s MIT parts and not install
+cua-perception. It does not state that every component of an external image must
+be MIT. The separately bundled spacesd service still requires an applicable
+component/use decision; the driver’s MIT license does not answer that question. A repository/image MIT label alone does not
 establish the bundled component's license. The component evidence below concerns
 copying/distributing it; connecting to an independently operated external service
 is a separate terms/deployment decision, not a legal conclusion or permission.
@@ -54,16 +60,16 @@ not claimed unavailable.
 
 | Artifact / protocol | Evidence | Status for this request |
 | --- | --- | --- |
-| Requested `trycua/cua-xfce:0.3.0` | Public registry index `sha256:e188a008084e1034f5ff003e7983c58596d9c0e47adf5c34078b362aad2a57e7`; Linux amd64 image `sha256:0ac954ee74d5a3878484ddf5e4df7e83a1fdeeef1ec9a8d8744b76afcd0187fb`; revision `5da241ac4b4ff2cb165f3c48401391674d7f1dbd`. Inspected registry config/history exposes 3211 and explicitly installs spacesd v0.1.0. | Image exists, but includes the separately FSL-licensed spacesd component despite an overall MIT image label. Not pulled/started under the MIT-only requirement. Real editor/input/screenshot E2E remains open. |
+| Requested `trycua/cua-xfce:0.3.0` | Public registry index `sha256:e188a008084e1034f5ff003e7983c58596d9c0e47adf5c34078b362aad2a57e7`; Linux amd64 image `sha256:0ac954ee74d5a3878484ddf5e4df7e83a1fdeeef1ec9a8d8744b76afcd0187fb`; revision `5da241ac4b4ff2cb165f3c48401391674d7f1dbd`. Inspected registry config/history exposes 3211 and explicitly installs spacesd v0.1.0. | Image exists, but includes the separately FSL-licensed spacesd component despite an overall MIT image label. Not pulled/started: applicable FSL service use has not been resolved; this is not a claim that #147 requires a wholly MIT image. Real editor/input/screenshot E2E remains open. |
 | Current documented `trycua/xfce-cua` | `libs/xfce-cua/README.md`: driver-only runtime, no spacesd, no auto-start; example starts driver with bypass-approval flag. | Cannot supply the requested endpoint as documented. Not silently substituted or started with bypass approvals. |
 | `cua-spacesd` v0.7.0 / current | `libs/cua-spacesd/LICENSE` is FSL-1.1-MIT, copyright 2026 Cua AI, Inc. Current generated HTML5/TS bindings also component licensed. | No FSL source/generated bindings copied or bundled. A separate service's operation/terms are not granted by MIT driver licensing. |
 | First spacesd directory commit `9166817485ae53f3966935c13878a8196d79a399` (2026-10-01) | That exact `libs/cua-spacesd/LICENSE` is already FSL-1.1-MIT. Parent `93d0f7af24b1561f98f6a85cd20ca2b35f37db35` has no spacesd directory. | This checked history does not supply a pinned MIT-era spacesd. No claimed compatible MIT binary. |
-| `cua-driver-rs-v0.38.0`, commit `85e2b1318bd77ccf3cfa88ccdf875a4bb7eaed19` | Rust workspace explicitly MIT; driver crate inherits workspace license. Root MIT copyright 2025 Cua AI, Inc. Published Linux/macOS binary assets exist. | Candidate for #149 only, not spacesd's gRPC-Web endpoint. Release archive SHA256SUMS checked; binary reports 0.38.0; MCP --help verified, including runtime ownership and standard/bounded/unrestricted modes. Linux #149 Xvfb screenshot/click verified through the approval broker. Not spacesd compatibility. Never include cua-perception/OmniParser. |
+| `cua-driver-rs-v0.38.0`, commit `85e2b1318bd77ccf3cfa88ccdf875a4bb7eaed19` | Rust workspace explicitly MIT; driver crate inherits workspace license. Root MIT copyright 2025 Cua AI, Inc. Published Linux/macOS binary assets exist. | Candidate for #149 only, not spacesd's gRPC-Web endpoint. Release archive SHA256SUMS checked; binary reports 0.38.0; MCP --help verified, including runtime ownership and standard/bounded/unrestricted modes. Real driver evidence is tracked separately in stacked #161; it does not prove remote endpoint compatibility. Never include cua-perception/OmniParser. |
 | Independent `lib/cua/grpc-web.ts` | Locally authored bounded unary codec with scripted local HTTP fixtures and explicit gRPC success/error handling; no upstream implementation dependency. | Compatibility candidate, not real CUA validation. Pin/test against an applicable service/protocol before production. |
 
 ## Database effect and CI
 
-`20261023163933_computer_requests.sql` targets `DATABASE_URL`, the workspace DB.
+`20261023185539_computer_requests.sql` targets `DATABASE_URL`, the workspace DB.
 It creates new small `agent_settings` and `computer_requests` tables and a new
 owner/session index. It is idempotent, uses no rewrite of existing tables, stores
 no endpoint credentials or screenshots, and cascades on workspace deletion.
@@ -71,24 +77,54 @@ Rollback before use: drop the two new tables. Approval text should have a define
 retention/deletion policy before production enablement; this Draft adds no cron job.
 
 Only CI's existing Postgres 17 `mikka_e2e` may execute database tests. The added
-migration test uses an isolated transaction/schema, applies the remote migration twice,
-checks defaults, approval constraints and one-time claim conditions, then rolls back. The local-device migration test applies its additive migration three times and checks defaults and existing row retention. Unit/RPC tests, not this migration test, cover local replay, expiry and argument binding. It does
-not establish authenticated HTTP route or policy-race E2E coverage. Existing
+migration test uses an isolated transaction/schema, applies the migration twice,
+checks default settings/owner/session/target/replay and rollback cleanup. It does
+not alone establish authenticated HTTP route or policy-race E2E coverage.
+`computer-store-ci.test.ts` separately uses the actual Drizzle store/policy
+implementations with an injected active-membership/workspace-lock guard, scoped
+PG17 schemas and concurrent connections to cover admin enforcement, owner/session/
+target binding, approved claim races, deny revocation and stopped approvals.
+It does not import the Next/auth runtime or prove end-to-end session auth.
+The added browser fixture verifies native HTTP auth rejection/strict decision
+payloads and that exact-operation review stays visible while the model waits;
+its fake stream is not remote service validation.
+`20261023185540_computer_live_approval.sql` replaces only the new approval-ledger
+status constraint to admit approved/cancelled; it stores no output and is
+idempotent. Drain live streams and remove new-state rows before rolling it back. Existing
 migration runner/CI overlap with #84/#86 and #115 must be reconciled before merge.
 
 ## Remaining acceptance
 
-1. Resolve the requested pinned image's bundled FSL service versus MIT-only
-   scope, or identify an appropriately licensed endpoint service. Do not import FSL code or change image/protocol by accident.
+1. Decide only the prepared isolated internal-CI service use described in
+   `docs/ci-prepared/cua-service-terms.md`; FSL explicitly permits internal use,
+   but public commercial service/distribution is a distinct factual question.
+   Do not copy FSL source or change the requested endpoint/protocol.
 2. Verify the independent wire codec against that actual service, including auth,
    failure/trailer handling, scale/bounds and Unicode/chords.
-3. Complete screenshot-to-model resume with executable exact approvals and real
-   OpenUI output; plain model text saying “approved” is never consent.
+3. Live screenshot-to-scripted-model continuation is implemented and fixture-tested;
+   actual requested-service + editor/readback remains open. Plain model text
+   saying “approved” is never consent. Real-model/real-machine final signoff is
+   Alex’s step under #147, not a CI API-key dependency.
 4. Add CI's actual container + editor input/screenshot assertions and real policy,
    membership, cancellation, concurrent approval and resumption route tests.
 5. Wire workspace controls through the protected settings UI's owner, not by editing
-   those files here. The separate #149 path uses a local authenticated review proxy;
-   real model-provider continuation acceptance remains distinct from its scripted MCP tests.
+   those files here. The separate stacked #149 local-driver path is described below.
+
+## Exact remote-service decision (still open)
+
+The requested pinned image exists and installs spacesd v0.1.0 (provenance above).
+No FSL implementation or generated bindings are copied/distributed by this PR.
+Running that bundled service is a separate use of a non-MIT component; this PR
+has not made a legal/organizational eligibility decision or launched it. To finish
+actual CUA endpoint acceptance, the bounded prepared decision is only this exact pinned image's isolated
+internal-CI use. The terms expressly include internal use; owner approval does
+not establish license compliance or authorize public commercial hosting. A newer
+MIT local-driver MCP endpoint is not silently interchangeable with this gRPC-Web
+service. Meanwhile, all codec/model-loop tests remain clearly marked fixtures.
+
+The exact bundled v0.1.0 terms, image provenance and executable but disabled
+service job are recorded in `docs/ci-prepared/cua-service-terms.md`. Internal CI
+is expressly permitted in the FSL text; approval is not a legal exception.
 
 ## Local driver (#149, stacked on #148)
 
@@ -98,12 +134,12 @@ Claude, Codex and Cursor receive a second `computer` MCP server only when detect
 
 Each operation waits in the same MCP tool call for an owner decision. Use `mikka daemon computer pending` locally to inspect run, executable fingerprint, normalized operation, expiry and review digest, then `mikka daemon computer approve <id> <digest>` or `deny <id> <digest>`. These use the existing secret-handshaken owner RPC; the model-facing socket cannot list or approve. The run must remain live, the device signed in, the permission not denied/read-only, and binary bytes unchanged. A five-minute request is claimed before execution, never refunded after failure/uncertainty, and is discarded on daemon restart. After approval the actual driver result returns to the pending model call, not a textual "resume" instruction. Desktop output is untrusted data, not new authorization.
 
-The local Unix socket is scoped to the OS owner and the daemon's protected secret. This is not a new hardened multi-user OS boundary or a grant for a remote collaborator to operate the device. The local owner CLI remains a fallback; a second owner web surface at `/devices/approvals` now reviews daemon snapshots through the existing authenticated device HTTP link. The page displays the exact call, executable fingerprint, run and expiry. The same-origin session decision queues only an ID, digest and approve/deny boolean; the daemon matches it to a still-pending request and rechecks run policy, expiry and binary bytes before execution. No screenshot or tool result is uploaded through the review endpoint. The owner sees “queued”, not an invented execution success. Real signed-in Claude/Codex/Cursor reasoning after a desktop result remains unverified. macOS CI on head `7d36022` performed the real native-dialog screenshot/approved click/second screenshot; that runner evidence does not configure or certify another Mac’s OS permissions. Keep this PR Draft until exact-head CI and remaining acceptance gaps are resolved.
+The local Unix socket is scoped to the OS owner and the daemon's protected secret. This is not a new hardened multi-user OS boundary or a grant for a remote collaborator to operate the device. The local owner CLI remains a fallback; a second owner web surface at `/devices/approvals` now reviews daemon snapshots through the existing authenticated device HTTP link. The page displays the exact call, executable fingerprint, run and expiry. The same-origin session decision queues only an ID, digest and approve/deny boolean; the daemon matches it to a still-pending request and rechecks run policy, expiry and binary bytes before execution. No screenshot or tool result is uploaded through the review endpoint. The owner sees “queued”, not an invented execution success. Real signed-in Claude/Codex/Cursor reasoning after a desktop result remains Alex's final check, not an implementation prerequisite. Prior-head macOS CI performed the real native-dialog screenshot/approved click/second screenshot; that runner evidence does not configure or certify another Mac’s OS permissions. Prior-head evidence does not certify the newly integrated parent; keep Draft until integrated-head CI/browser/native acceptance is complete.
 
 Linux validation starts isolated Xvfb and xmessage, asks for a screenshot through the broker, then separately approves a click on its OK button and asserts that the actual desktop process exits. It uses the checksum-pinned published driver, not a fake protocol implementation. Separate unit/RPC tests cover absence/version mismatch, permission denial, normalization, argument binding, replay, expiry, revocation, failed execution, request-only proxy and authenticated owner review.
 
 ### Web review ledger (#149)
 
-`20261023165000_local_computer_reviews.sql` creates a new short-lived operation ledger. It references devices/runs with cascading deletes and has an owner/expiry index; no existing data rewrite or backfill. Rollback before use is dropping only this new table. Normal migration serialization/brief metadata locks apply. A five-minute daemon snapshot is hash-bound and never extended by the web. Device authentication must own the device and each live run. Browser authentication must own that run/device and have a fresh device snapshot. Replays, extra fields, changed arguments/digest, cross-owner requests and stopped/expired runs fail closed. Only pending operation text/metadata is stored, not screenshots, execution results or tokens; credential entry remains unsupported. Expired owner rows are deleted on review reads/sync, and a device's no-longer-pending snapshots are removed at next sync. There is no background cleanup job or production retention guarantee while offline.
+`20261023185542_local_computer_reviews.sql` creates a new short-lived operation ledger. It references devices/runs with cascading deletes and has an owner/expiry index; no existing data rewrite or backfill. Rollback before use is dropping only this new table. Normal migration serialization/brief metadata locks apply. A five-minute daemon snapshot is hash-bound and never extended by the web. Device authentication must own the device and each live run. Browser authentication must own that run/device and have a fresh device snapshot. Replays, extra fields, changed arguments/digest, cross-owner requests and stopped/expired runs fail closed. Only pending operation text/metadata is stored, not screenshots, execution results or tokens; credential entry remains unsupported. Expired owner rows are deleted on review reads/sync, and a device's no-longer-pending snapshots are removed at next sync. There is no background cleanup job or production retention guarantee while offline.
 
 The browser regression uses only CI ephemeral Postgres to exercise real authenticated device and browser HTTP routes, owner decision rendering, changed arguments, replay and stopped-run rejection. A separate scripted MCP client verifies that the original blocked call receives a result and submits its next screenshot/click operation; this is not a signed-in model reasoning test. Linux/macOS native-driver evidence is a separate real-driver test, not proof those providers used this web route.

@@ -17,7 +17,7 @@ test('workspace CUA migration is additive, idempotent, scoped, and admits one at
     await client.query(`create schema "${schema}"`)
     await client.query(`set local search_path to "${schema}"`)
     await client.query('create table mikka_workspaces (id uuid primary key)')
-    const migration = await readFile(new URL('../drizzle/20261023163933_computer_requests.sql', import.meta.url), 'utf8')
+    const migration = await readFile(new URL('../drizzle/20261023185539_computer_requests.sql', import.meta.url), 'utf8')
     await client.query(migration)
     await client.query(migration)
     const workspace = randomUUID(), session = randomUUID(), id = randomUUID()

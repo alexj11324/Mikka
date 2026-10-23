@@ -15,7 +15,7 @@ test('local review ledger migration is idempotent and decision cannot be replaye
     await db.query(`create schema "${schema}"`);
     await db.query(`set local search_path to "${schema}"`);
     await db.query('create table devices (id uuid primary key); create table agent_runs (id uuid primary key)');
-    const sql = await readFile(new URL('../drizzle/20261023165000_local_computer_reviews.sql', import.meta.url), 'utf8');
+    const sql = await readFile(new URL('../drizzle/20261023185542_local_computer_reviews.sql', import.meta.url), 'utf8');
     await db.query(sql); await db.query(sql);
     const [id, device, run] = [randomUUID(),randomUUID(),randomUUID()];
     await db.query('insert into devices values ($1)', [device]);

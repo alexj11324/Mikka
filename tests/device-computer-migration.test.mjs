@@ -24,7 +24,7 @@ test("local computer metadata migration preserves devices and reruns safely", as
     await client.query("insert into devices values ('existing','Untouched')");
     const sql = await readFile(
       new URL(
-        "../drizzle/20261023163000_device_computer_capability.sql",
+        "../drizzle/20261023185541_device_computer_capability.sql",
         import.meta.url,
       ),
       "utf8",
