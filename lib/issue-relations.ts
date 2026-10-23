@@ -50,3 +50,14 @@ export function compareDescriptions(before: JSONContent, after: JSONContent) {
   }
   return { content: { type: 'doc', content }, changes }
 }
+
+/**
+ * Whether `actorId` may change relations between `currentId` and `targetId`.
+ * Owners always may; anyone else must be a member of both issues. Shared by
+ * `updateIssueRelation` and the relation picker search (`canRelate`).
+ */
+export function canEditIssueRelation(input: { actorId: string; ownerId: string; currentId: string; targetId: string | null; memberIssueIds: Iterable<string> }) {
+  if (input.actorId === input.ownerId) return true
+  const memberships = new Set(input.memberIssueIds)
+  return [input.currentId, ...(input.targetId ? [input.targetId] : [])].every(id => memberships.has(id))
+}

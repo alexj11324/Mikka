@@ -10,7 +10,7 @@ import { requireIssueAccess } from '@/lib/issue-access'
 import { issueOwnerScope } from '@/lib/issue-owner-scope'
 import { issueWithMetadata, readIssueMetadata, withIssueMetadata, type IssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers } from '@/lib/issue-numbering'
-import { createsIssueCycle } from '@/lib/issue-relations'
+import { canEditIssueRelation, createsIssueCycle } from '@/lib/issue-relations'
 import { dispatchLinearIssueSync, dispatchLinearWork } from '@/lib/linear-sync/dispatch'
 
 const relationSchema = z.object({ id: z.uuid(), revision: z.number().int().positive(), targetId: z.uuid().nullable(), kind: z.enum(['parent', 'child', 'related', 'blockedBy', 'blocks', 'duplicate']), remove: z.boolean().default(false) })
@@ -43,7 +43,7 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
         if (target && (!other || readIssueMetadata(other.content).deletedAt)) return { error: 'issueTargetUnavailable' }
         if (user.id !== issue.userId) {
           const memberships = await tx.select({ id: issueMembers.issueId }).from(issueMembers).where(and(eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, user.id)))
-          if (![current.id, ...(other ? [other.id] : [])].every(id => memberships.some(member => member.id === id))) return { error: 'issueAccessChanged' }
+          if (!canEditIssueRelation({ actorId: user.id, ownerId: issue.userId, currentId: current.id, targetId: other?.id ?? null, memberIssueIds: memberships.map(member => member.id) })) return { error: 'issueAccessChanged' }
         }
         const metadata = readIssueMetadata(current.content)
         const targetMetadata = other ? readIssueMetadata(other.content) : null
