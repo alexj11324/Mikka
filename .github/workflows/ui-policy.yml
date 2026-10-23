@@ -185,3 +185,51 @@ jobs:
             performance-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  cua-remote-service:
+    name: Requested pinned CUA service, isolated internal CI only
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      CI: 'true'
+      CUA_DESKTOP_URL: http://127.0.0.1:3211
+      CUA_DESKTOP_TOKEN: mikka-cua-ci-disposable-not-a-secret
+      CUA_WORKSPACE_ID: a5f221a6-502d-4c82-bc96-36e97d277a8f
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq tesseract-ocr
+      - name: Start exact requested amd64 image, loopback-only, no host data
+        run: |
+          docker run --platform linux/amd64 --detach --name mikka-cua-ci \
+            --publish 127.0.0.1:3211:3211 --shm-size=512m \
+            --env CUA_ENV_TOKEN="$CUA_DESKTOP_TOKEN" \
+            trycua/cua-xfce@sha256:0ac954ee74d5a3878484ddf5e4df7e83a1fdeeef1ec9a8d8744b76afcd0187fb
+          # Only socket readiness; never bypass the approval broker to probe input.
+          for i in $(seq 1 90); do
+            if (echo > /dev/tcp/127.0.0.1/3211) 2>/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Scripted streaming model, exact approvals, real authenticated service, PNG readback
+        run: node --import tsx scripts/ci/cua-remote-service.mjs
+      - name: Save non-secret desktop evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cua-remote-service-evidence
+          path: test-results/cua-remote-service/*.png
+          retention-days: 3
+      - name: Remove disposable service even on failure
+        if: always()
+        run: docker rm --force mikka-cua-ci || true
