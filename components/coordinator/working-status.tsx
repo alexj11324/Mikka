@@ -4,20 +4,17 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { motion, useReducedMotion } from 'motion/react'
 import { useWorkingParticipants } from '@/hooks/use-working-participants'
-import { workersKey, workingAvatars, workingLabel } from '@/lib/working-status'
+import { COALESCE_MS, createCoalescer, workersKey, workingAvatars, workingLabel } from '@/lib/working-status'
 import { Avatar, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarImage } from '@/components/ui/avatar'
 import { ActionSwapRollText } from '@/components/motion/action-swap-roll'
 import { TextShimmer } from '@/components/motion/text-shimmer'
 
-const COALESCE_MS = 300
-
 /** Waits until the value has held still for `delay`, so bursts only show their last state. */
 function useSettled<T>(value: T, delay: number) {
   const [settled, setSettled] = useState(value)
-  useEffect(() => {
-    const timer = setTimeout(() => setSettled(value), delay)
-    return () => clearTimeout(timer)
-  }, [value, delay])
+  const [coalescer] = useState(() => createCoalescer<T>(delay, setSettled))
+  useEffect(() => { coalescer.push(value) }, [coalescer, value])
+  useEffect(() => () => coalescer.cancel(), [coalescer])
   return settled
 }
 

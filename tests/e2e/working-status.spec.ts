@@ -1,8 +1,10 @@
 import type { Page } from '@playwright/test'
 import { test, expect, register } from './fixtures'
 
-// The Coordinator's own state comes from a server action, so these tests drive the bar
-// through the Agent source only (`/api/agent/sessions`).
+// The Agent source is driven by routing `/api/agent/sessions`. The Coordinator's state
+// comes from the `getCoordinatorChat` server action; like progressive-loading.spec.ts we
+// intercept `next-action` POSTs, fetch the real response and rewrite only the chat view's
+// `enabled`/`working` flags. No production code or test flag is involved.
 type Status = 'pending' | 'complete'
 function history(status: Status | null) {
   return { sessions: [], sessionId: status ? '00000000-0000-4000-8000-000000000001' : null, turns: status ? [{ id: 't1', prompt: 'p', completion: '', status, error: null }] : [] }
@@ -12,6 +14,24 @@ async function mockSessions(page: Page, initial: Status | null) {
   const state = { status: initial }
   await page.route('**/api/agent/sessions?*', route => route.fulfill({ json: history(state.status) }))
   await page.route('**/api/agent/sessions', route => route.fulfill({ json: history(state.status) }))
+  return state
+}
+
+async function mockCoordinatorWorking(page: Page, initial: boolean) {
+  const state = { working: initial }
+  await page.route('**/*', async route => {
+    const request = route.request()
+    if (request.method() !== 'POST' || !request.headers()['next-action']) return route.fallback()
+    const response = await route.fetch()
+    const body = await response.text()
+    // Only the Coordinator chat view carries items + working + enabled.
+    if (!(body.includes('"items":') && body.includes('"working":') && body.includes('"enabled":'))) return route.fulfill({ response, body })
+    const rewritten = body
+      .replace(/"working":(true|false)/g, `"working":${state.working}`)
+      .replace(/"enabled":(true|false)/g, '"enabled":true')
+      .replace(/"error":"[^"]*"/g, '"error":null')
+    return route.fulfill({ response, body: rewritten })
+  })
   return state
 }
 
@@ -72,4 +92,21 @@ test('谁正在工作：减弱动效时没有滚动和流光', async ({ page }) 
   await expect(bar(page).locator('[data-static-text]')).toHaveText('Agent 正在工作…')
   // The roll keeps an invisible sizer copy; the crossfade renders a single row.
   await expect(bar(page).locator('[data-working-text]')).toHaveCount(1)
+})
+
+test('谁正在工作：仅 Coordinator 工作时显示单人文案', async ({ page }) => {
+  await mockSessions(page, null)
+  await mockCoordinatorWorking(page, true)
+  await register(page)
+  await openCoordinator(page)
+  await expect(bar(page).locator('[data-working-text]').first()).toContainText('Coordinator 正在工作…')
+})
+
+test('谁正在工作：Coordinator 与 Agent 同时工作时显示双人文案', async ({ page }) => {
+  await mockSessions(page, 'pending')
+  await mockCoordinatorWorking(page, true)
+  await register(page)
+  await openCoordinator(page)
+  await expect(bar(page).locator('[data-working-text]').first()).toContainText('Coordinator 和 Agent 正在工作…')
+  await expect(bar(page).locator('[data-slot="avatar"]')).toHaveCount(2)
 })

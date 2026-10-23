@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { agentIsWorking, workersFromActiveAgents, nextTrackedWorkers, workersKey, workingAvatars, workingLabel } from './working-status'
+import { agentIsWorking, COALESCE_MS, createCoalescer, workersFromActiveAgents, nextTrackedWorkers, workersKey, workingAvatars, workingLabel } from './working-status'
 
 test('workingLabel picks the key and params by count', () => {
   assert.equal(workingLabel([]), null)
@@ -51,4 +51,26 @@ test('workersFromActiveAgents adapts the MIK-7 shape', () => {
   assert.deepEqual(workersFromActiveAgents(undefined), [])
   assert.deepEqual(workersFromActiveAgents({ agents: [{ id: 'x', name: 'X', avatarUrl: '/a.png', startedAt: '2026-10-22T00:00:00Z' }] }),
     [{ id: 'x', name: 'X', avatarUrl: '/a.png', startedAt: '2026-10-22T00:00:00Z' }])
+})
+
+test('createCoalescer only settles the last value within 300ms', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const settled: string[] = []
+  const coalescer = createCoalescer<string>(COALESCE_MS, value => settled.push(value))
+  coalescer.push('a')
+  t.mock.timers.tick(100)
+  coalescer.push('a|b')
+  t.mock.timers.tick(299)
+  coalescer.push('b')
+  t.mock.timers.tick(299)
+  assert.deepEqual(settled, [])
+  t.mock.timers.tick(1)
+  assert.deepEqual(settled, ['b'])
+  coalescer.push('c')
+  t.mock.timers.tick(300)
+  assert.deepEqual(settled, ['b', 'c'])
+  coalescer.push('d')
+  coalescer.cancel()
+  t.mock.timers.tick(1000)
+  assert.deepEqual(settled, ['b', 'c'])
 })

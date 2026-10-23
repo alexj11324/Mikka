@@ -59,3 +59,20 @@ export function nextTrackedWorkers(previous: TrackedWorker[], current: Worker[],
   const known = new Set(previous.map(worker => worker.id))
   return [...kept, ...current.filter(worker => !known.has(worker.id)).map(worker => ({ ...worker, misses: 0 }))]
 }
+
+export const COALESCE_MS = 300
+
+/**
+ * Coalesces bursts: each push restarts the timer and only the last value
+ * pushed within `delay` reaches `onSettle`.
+ */
+export function createCoalescer<T>(delay: number, onSettle: (value: T) => void) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  return {
+    push(value: T) {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => { timer = undefined; onSettle(value) }, delay)
+    },
+    cancel() { if (timer) clearTimeout(timer); timer = undefined },
+  }
+}
