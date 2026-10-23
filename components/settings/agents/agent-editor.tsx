@@ -15,6 +15,7 @@ import { createAgent, deleteAgent, resetAgentInstructions, updateAgent, type Age
 import { isBuiltInAgentRole, MAX_AGENT_INSTRUCTIONS_LENGTH, type AgentRole } from '@/lib/agent-roles'
 import { useActionError } from '@/lib/use-action-error'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useMediaQuery } from '@/lib/hooks/use-media-query'
 import { AgentStatusBadge, HARNESS_LABELS, HarnessIcon } from './agent-parts'
 import { AvatarPicker } from './avatar-picker'
 import { modelSummary, reportedModels, RuntimeFields, type Runtime } from './runtime-fields'
@@ -42,6 +43,8 @@ export function AgentEditor({ agent, initial, devices, onBack, onSaved, onCreate
   onDeleted: () => void
 }) {
   const t = useTranslations('Agents')
+  // Below sm the harness chip is icon-only, so its name comes from a tooltip; from sm up the label is visible and the tooltip is off.
+  const harnessLabelVisible = useMediaQuery('(min-width: 40rem)', true)
   const translateError = useActionError()
   const [draft, setDraft] = useState<AgentDraft>(initial)
   const [saved, setSaved] = useState<AgentDraft>(initial)
@@ -124,11 +127,11 @@ export function AgentEditor({ agent, initial, devices, onBack, onSaved, onCreate
         {/* One line at every width: chips truncate rather than wrap, so picking a harness does not push the tabs down. Narrow screens show the harness as its icon. */}
         <div data-slot="agent-chips" className="mt-2 flex min-w-0 gap-1.5">
           {/* On narrow screens the chip is only the icon: focusable, with the name in a tooltip. */}
-          {draft.harness && <Tooltip>
+          {draft.harness && <Tooltip disabled={harnessLabelVisible}>
             <TooltipTrigger render={<Badge variant="outline" size="xl" tabIndex={0} className="min-w-0 shrink-0 gap-1.5 font-medium sm:shrink" />}>
               <HarnessIcon harness={draft.harness} /><span className="sr-only sm:not-sr-only sm:truncate">{HARNESS_LABELS[draft.harness]}</span>
             </TooltipTrigger>
-            <TooltipContent className="sm:hidden">{HARNESS_LABELS[draft.harness]}</TooltipContent>
+            <TooltipContent>{HARNESS_LABELS[draft.harness]}</TooltipContent>
           </Tooltip>}
           {draft.harness && <Badge variant="outline" size="xl" className="min-w-0 shrink font-medium"><span className="truncate">{modelSummary(models, runtime, t('runtime.defaultModel'))}</span></Badge>}
           <Badge variant="outline" size="xl" className="ml-auto min-w-0 shrink gap-1.5 font-medium"><Laptop data-icon="inline-start" /><span className="truncate">{device?.name ?? t('runtime.noDevice')}</span></Badge>

@@ -34,7 +34,7 @@ export function SignOutBoundary({ pending, children }: { pending: boolean; child
 export function AppShellContent({ parent, title, actions, children, variant = 'workspace', hideHeader = false }: { parent: string; title: string; actions?: ReactNode; children: ReactNode; variant?: 'workspace' | 'settings'; hideHeader?: boolean }) {
   const i18nText = useTranslations();
   const { isMobile, openMobile, open } = useSidebar()
-  return <SidebarInset className={cn('min-h-0 min-w-0', variant === 'settings' && 'overflow-y-auto overscroll-contain [scrollbar-gutter:stable] md:my-2 md:mr-2 md:rounded-xl md:border md:shadow-sm')}>
+  return <SidebarInset className={cn('min-h-0 min-w-0', variant === 'settings' && 'overflow-hidden md:my-2 md:mr-2 md:rounded-xl md:border md:shadow-sm')}>
     {!hideHeader && <header className={cn('flex h-12 shrink-0 items-center justify-between gap-3 px-4', variant === 'settings' && 'md:hidden')}>
       <div className="flex min-w-0 items-center gap-2">
         <SidebarTrigger className="-ml-1" aria-label={i18nText("Workspace.toggleSidebar")} aria-expanded={isMobile ? openMobile : open} />
@@ -43,6 +43,9 @@ export function AppShellContent({ parent, title, actions, children, variant = 'w
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </header>}
-    {children}
+    {variant === 'settings'
+      // Settings scroll inside this container; a stable gutter keeps content from shifting horizontally when the scrollbar appears/disappears.
+      ? <div data-slot="settings-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">{children}</div>
+      : children}
   </SidebarInset>
 }

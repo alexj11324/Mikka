@@ -135,3 +135,30 @@ test('列表：键盘聚焦一行时能读到完整的机器名', async ({ page 
   await page.keyboard.press('Tab')
   await expect(page.locator('[data-slot="tooltip-content"]', { hasText: name })).toBeHidden()
 })
+
+for (const width of [1280, 402]) test(`Harness 标签：只在窄屏（图标模式）显示提示（${width}px）`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  const { email } = await register(page)
+  await seedDevice(email)
+  await openRuntime(page)
+  await pickModel(page)
+  const chip = page.locator('[data-slot="agent-chips"] [data-slot="tooltip-trigger"]').first()
+  const tip = page.locator('[data-slot="tooltip-content"]', { hasText: 'Claude Code' })
+  await chip.focus()
+  await page.keyboard.press('Shift+Tab')
+  await page.keyboard.press('Tab')
+  await expect(chip).toBeFocused()
+  if (width === 402) {
+    await expect(tip).toBeVisible()
+    await page.keyboard.press('Tab')
+    await expect(tip).toBeHidden()
+    await chip.hover()
+    await expect(tip).toBeVisible()
+  } else {
+    await page.waitForTimeout(800)
+    await expect(tip).toHaveCount(0)
+    await chip.hover()
+    await page.waitForTimeout(800)
+    await expect(tip).toHaveCount(0)
+  }
+})

@@ -131,7 +131,11 @@ export function RuntimeFields({ devices, runtime, onChange }: { devices: DeviceV
       <Picker label={t('model')} value={model?.value ?? runtime.model} placeholder={t('defaultModel')} disabled={!models.length} onChange={pickModel}
         options={models.map(item => ({ value: item.value, label: item.displayName || item.value }))} />
     </SettingRow>
-    {/* One height whether the model has levels or not, so the rows below stay put when the model changes. */}
+    {/* One height whether the model has levels or not, so the rows below stay put when the model changes.
+        Min-heights = tallest Effort row variant, rounded up to a quarter rem (measured in Chromium):
+        - < sm (stacked, 402px): Select variant ≈ 95.25px → 6.25rem (100px)
+        - ≥ sm (inline, 1280px): "no levels" hint ≈ 73.25px, ToggleGroup 64px → 4.75rem (76px)
+        Re-measure if the row's copy, padding or controls change. */}
     <div data-slot="effort-row" className="min-h-[6.25rem] sm:min-h-[4.75rem]">
     {levels.length > 0
       ? <SettingRow title="Effort">
