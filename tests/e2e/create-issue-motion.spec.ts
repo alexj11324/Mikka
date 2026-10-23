@@ -92,6 +92,12 @@ test('创建时卡片乐观插入；保存失败时回滚并提示', async ({ pa
 })
 })
 
+// Regression test. Requirement: this test must FAIL if optimisticCreate's mutate uses populateCache: false
+// (the real card must come from the mutate result, not from a later refetch).
+// Why it cannot catch the old hand-written optimisticCreate: SWR discards the response of any request issued before
+// a local mutate, and listIssues is a server action that runs serially with the save on the client (Next.js queues
+// server actions), so no refresh can return a card-less board while the save is pending. The old hand-written
+// implementation therefore cannot reach the race path in the current architecture.
 test('保存期间发生一次看板刷新，乐观卡片不被覆盖', async ({ page }) => {
   await register(page)
   await page.getByRole('button', { name: '任务', exact: true }).click()
