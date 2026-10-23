@@ -14,6 +14,7 @@ import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from '@/components/ui/message-scroller'
 import { Spinner } from '@/components/ui/spinner'
 import { CitedText } from './cited-text'
+import { WorkingStatus } from './working-status'
 
 /** The person's conversation with their Coordinator, which dispatches agents to issues. */
 export function CoordinatorChat({ onOpenIssue }: { onOpenIssue: (id: string) => void }) {
@@ -71,6 +72,7 @@ export function CoordinatorChat({ onOpenIssue }: { onOpenIssue: (id: string) => 
       {data && !data.enabled && <Alert><AlertTitle>{t('disabledTitle')}</AlertTitle><AlertDescription>{t('disabledDescription')}</AlertDescription></Alert>}
       {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
+      <WorkingStatus coordinatorWorking={Boolean(data?.working)} />
       <form onSubmit={send}>
         <InputGroup>
           <InputGroupTextarea aria-label={t('input')} placeholder={t('placeholder')} value={draft} maxLength={10_000} rows={2} disabled={sending} onChange={event => setDraft(event.target.value)} onKeyDown={onKeyDown} />

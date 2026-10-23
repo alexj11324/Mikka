@@ -1872,6 +1872,14 @@
     "unknownClient": "An unnamed app"
   },
   "Coordinator": {
+    "workingStatus": {
+      "coordinator": "Coordinator",
+      "agent": "Agent",
+      "one": "{a} is working…",
+      "two": "{a} and {b} are working…",
+      "three": "{a}, {b} and {c} are working…",
+      "many": "{a}, {b} and {count, plural, one {# other} other {# others}} are working…"
+    },
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
     "emptyTitle": "Talk to your Coordinator",

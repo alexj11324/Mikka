@@ -1872,6 +1872,14 @@
     "unknownClient": "一个未命名的应用"
   },
   "Coordinator": {
+    "workingStatus": {
+      "coordinator": "Coordinator",
+      "agent": "Agent",
+      "one": "{a} 正在工作…",
+      "two": "{a} 和 {b} 正在工作…",
+      "three": "{a}、{b} 和 {c} 正在工作…",
+      "many": "{a}、{b} 和另外 {count} 位正在工作…"
+    },
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
     "emptyTitle": "和你的 Coordinator 聊聊",
