@@ -1,7 +1,7 @@
 // Server-side cycle guard for updateIssueRelation, against a real database.
 // Runs the action through actAs (the same path MCP tools use).
 // Needs MIKKA_DATABASE_URL (issues) and DATABASE_URL (workspace tables, read by issue access);
-// run it via ~/.mikka/local-run.sh, which sets both to dev-local. It is not in CI yet.
+// run it via ~/.mikka/local-run.sh, which sets both to dev-local. CI runs it with REQUIRE_DB=1 once #85 (MIK-19) merges.
 // Skips without them; REQUIRE_DB=1 makes a missing database a failure.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
