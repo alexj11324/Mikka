@@ -44,7 +44,7 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 1280, height: 900
     await expect(submenu).not.toBeVisible()
     await status.focus()
     await page.keyboard.press('End')
-    const last = page.getByRole('menuitem', { name: '删除任务', exact: true })
+    const last = page.getByRole('menuitem', { name: '删除任务…', exact: true })
     await expect(last).toBeFocused()
     await expectInsideViewport(last, viewport.width, viewport.height)
     await page.keyboard.press('Home')
