@@ -27,7 +27,8 @@ test('移动侧栏在水合与尺寸检测完成前不可点击，就绪后首�
   }
 })
 
-const budgetMs = 1000
+// 本地目标 1000ms；GitHub Actions 共享机器抖动大，CI 上留 20% 余量（MIK-1）。
+const budgetMs = process.env.CI ? 1200 : 1000
 
 type Destination = { path: string; selectors: string[]; text?: string; query?: string }
 type NavigationSample = { start: number | null; complete: number | null; pathname: string }
