@@ -64,6 +64,10 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
     assert.equal((await search({q:'rare-needle'},viewer,otherWorkspace)).items.length,0)
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2',[workspace,viewer])
     assert.equal((await search({q:'rare-needle'},viewer)).items.length,0)
+    // Bulk fixture inserts leave GIN fast-update entries in its pending list.
+    // Flush as normal vacuum would before measuring steady-state planner cost;
+    // do not disable sequential scans or force an index plan.
+    await pool.query("select gin_clean_pending_list('issues_title_search_trgm_idx'::regclass)")
     await pool.query('analyze issues')
     const plan=await pool.query('explain (analyze,buffers,format json) select id from issues where "userId"=$1 and title ilike $2 order by "updatedAt" desc,id desc limit 21',[owner,'%rare-needle%'])
     console.log('CI synthetic selective title EXPLAIN:',JSON.stringify(plan.rows[0]['QUERY PLAN']))
