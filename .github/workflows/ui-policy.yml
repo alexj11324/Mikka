@@ -159,20 +159,15 @@ jobs:
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
       # MIK-19: DB-backed unit tests against this job's local Postgres service (env above).
-      # REQUIRE_DB=1 turns a missing database into a failure instead of a skip. Scripts that are
-      # not on main yet are skipped until the PR that adds them lands.
+      # Explicit allowlist in scripts/run-db-tests.mjs: a listed script missing from package.json
+      # fails, and each must run >= 1 test with 0 skipped. REQUIRE_DB=1 makes a missing DB fail.
       - name: DB-backed tests (local Postgres, REQUIRE_DB=1)
         env:
           REQUIRE_DB: '1'
           MIKKA_TEST_DB_PORT: '5432'
         run: |
-          for script in test:agents test:active-agents test:relation-cycle test:issues; do
-            if node -e "process.exit(require('./package.json').scripts?.[process.argv[1]] ? 0 : 1)" "$script"; then
-              echo "::group::pnpm $script"; pnpm "$script"; echo "::endgroup::"
-            else
-              echo "skip $script (not defined in package.json yet)"
-            fi
-          done
+          node --test scripts/run-db-tests.test.mjs
+          node scripts/run-db-tests.mjs
       - run: pnpm build
         id: build
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
