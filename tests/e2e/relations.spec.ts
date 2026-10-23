@@ -64,9 +64,16 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await page.reload()
     await expect(children.getByRole('button', { name: '子任务 1 / 1', exact: true })).toBeVisible()
 
-    const invalidParent = await chooseRelation(page, '设置父任务', child)
-    await expect(invalidParent.getByRole('alert')).toHaveText('父子任务不能形成循环。')
-    await invalidParent.getByRole('button', { name: '关闭', exact: true }).click()
+    // The parent picker hides this task's descendants (the server still rejects parent cycles with issueParentCycle),
+    // so searching for the child yields the query-specific empty state, under the group label.
+    await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: '设置父任务…', exact: true }).click()
+    const parentPicker = page.getByRole('dialog', { name: '设置父任务', exact: true })
+    await expect(parentPicker.getByRole('option').filter({ hasText: blocker })).toBeVisible()
+    await parentPicker.getByRole('combobox', { name: '搜索关联任务', exact: true }).fill(child)
+    await expect(parentPicker.getByRole('status').filter({ hasText: '没有匹配的任务' })).toBeVisible()
+    await expect(parentPicker.getByRole('option')).toHaveCount(0)
+    await parentPicker.getByRole('button', { name: '关闭', exact: true }).click()
     await children.getByRole('button', { name: `移除子任务关系：${child}`, exact: true }).click()
     await expect(children.getByRole('button', { name: '子任务 0 / 0', exact: true })).toBeVisible()
     // Regression: reopening the picker right after unlinking must not filter against the board snapshot cached

@@ -84,7 +84,8 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       const result = await operation(latest)
       if (!result.issue) throw new Error(actionError(result.error ?? 'generic'))
       if (mode === 'current') onSaved(result.issue)
-      await Promise.all([mutate(['issue-connections', task.id]), mutate(['issues', userId]), mutate(relationPickerKey(userId))])
+      // 'current' saves go through onSaved, whose saved() in issue-workspace already refetches the viewer's board.
+      await Promise.all([mutate(['issue-connections', task.id]), mode === 'current' ? undefined : mutate(['issues', userId]), mutate(relationPickerKey(userId))])
       if (mode === 'duplicate') onOpen(result.issue.id)
       if (mode === 'delete') {
         onDeleted()
