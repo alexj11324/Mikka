@@ -1,9 +1,5 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createElement } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
-import Markdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { citedIds, remarkCitations, splitCitations } from './citations'
 
 const ISSUE = '3f6c1a52-8d0e-4b7a-9c3e-1f2a3b4c5d6e'
@@ -48,18 +44,29 @@ test('splitCitations reads Markdown links and bare URLs as web sources', () => {
   assert.deepEqual(citedIds([`https://example.com/runs/${RUN}`]), { issueIds: [], runIds: [] })
 })
 
-const markdown = (text: string) => renderToStaticMarkup(createElement(Markdown, { remarkPlugins: [remarkGfm, remarkCitations] }, text))
+type Node = { type: string; value?: string; url?: string; children?: Node[] }
+const text = (value: string): Node => ({ type: 'text', value })
+const link = (url: string, value: string): Node => ({ type: 'link', url, children: [text(value)] })
+/** Runs the plugin on a paragraph, as remark-parse and remark-gfm would hand it over. */
+const transform = (...children: Node[]) => {
+  const tree: Node = { type: 'root', children: [{ type: 'paragraph', children }] }
+  remarkCitations()(tree)
+  return tree.children?.[0].children
+}
 
 test('remarkCitations links citations for the chip renderer and keeps line breaks', () => {
-  assert.equal(markdown(`已派给 [[run:${RUN}]]\n处理 ${ISSUE}`),
-    `<p>已派给 <a href="#cite/run/${RUN}">[[run:${RUN}]]</a><br/>\n处理 <a href="#cite/any/${ISSUE}">${ISSUE}</a></p>`)
+  assert.deepEqual(transform(text(`已派给 [[run:${RUN}]]\n处理 ${ISSUE}`)), [
+    text('已派给 '), link(`#cite/run/${RUN}`, `[[run:${RUN}]]`), { type: 'break' }, text('处理 '), link(`#cite/any/${ISSUE}`, ISSUE),
+  ])
 })
 
 test('remarkCitations leaves code and Markdown links alone', () => {
-  assert.equal(markdown(`\`${ISSUE}\` [PR](https://github.com/a/b/pull/1)`),
-    `<p><code>${ISSUE}</code> <a href="https://github.com/a/b/pull/1">PR</a></p>`)
+  const children = [{ type: 'inlineCode', value: ISSUE }, text(' '), link('https://github.com/a/b/pull/1', 'PR')]
+  assert.deepEqual(transform(...structuredClone(children)), children)
 })
 
-test('remarkCitations links a URL glued to Chinese text', () => {
-  assert.equal(markdown('看https://example.com/a。'), '<p>看<a href="https://example.com/a">https://example.com/a</a>。</p>')
+test('remarkCitations cuts a GFM autolink glued to Chinese text', () => {
+  assert.deepEqual(transform(text('看'), link('https://example.com/a。后面', 'https://example.com/a。后面')), [
+    text('看'), link('https://example.com/a', 'https://example.com/a'), text('。后面'),
+  ])
 })
