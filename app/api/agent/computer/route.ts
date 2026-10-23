@@ -1,8 +1,6 @@
 import { auth } from '@/lib/auth'
 import { computerRequestStore } from '@/lib/cua/store'
-import { decideComputerRequest } from '@/lib/cua/broker'
 import { desktopConfig, desktopFingerprint } from '@/lib/cua/operation'
-import { executeDesktop } from '@/lib/cua/grpc-web'
 import { workspaceComputerAccess } from '@/lib/cua/policy'
 import { z } from 'zod'
 
@@ -36,6 +34,10 @@ export async function POST(request: Request) {
   const config = desktopConfig()
   if (!config) return Response.json({ error: 'Desktop unavailable' }, { status: 503, headers })
   try {
-    return Response.json(await decideComputerRequest(computerRequestStore, userId, parsed.data.sessionId, parsed.data.id, parsed.data.approve, config, executeDesktop), { headers })
+    const row = parsed.data.approve
+      ? await computerRequestStore.approve(parsed.data.id, userId, parsed.data.sessionId, desktopFingerprint(config), new Date())
+      : await computerRequestStore.consume(parsed.data.id, userId, parsed.data.sessionId, desktopFingerprint(config), new Date(), 'denied')
+    if (!row) throw new Error('Not pending')
+    return Response.json({ status: parsed.data.approve ? 'approved' : 'denied' }, { headers })
   } catch { return Response.json({ error: 'Operation expired, changed, consumed, or failed. No automatic retry.' }, { status: 409, headers }) }
 }

@@ -66,11 +66,11 @@ export function decodeGrpcWeb(body: Buffer, headerStatus: string | null = null) 
   if (!payload) throw new Error('Desktop RPC returned no message')
   return payload
 }
-export async function executeDesktop(config: DesktopConfig, operation: ComputerOperation, fetcher: typeof fetch = fetch) {
+export async function executeDesktop(config: DesktopConfig, operation: ComputerOperation, fetcher: typeof fetch = fetch, signal?: AbortSignal) {
   const { method, payload } = encodeOperation(operation)
   const frame = Buffer.alloc(5); frame.writeUInt32BE(payload.length, 1)
   const response = await fetcher(`${config.url}/cua.env.v1.ComputerService/${method}`, {
-    method: 'POST', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(15000),
+    method: 'POST', redirect: 'error', cache: 'no-store', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
     headers: { 'content-type': 'application/grpc-web+proto', 'x-grpc-web': '1', 'x-cua-env-authorization': `Bearer ${config.token}` },
     body: Buffer.concat([frame, payload]),
   })

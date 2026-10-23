@@ -110,6 +110,8 @@ export async function POST(request: Request) {
     try { if (await workspaceComputerAccess(session.user.id, computerConfig) === 'deny') computerConfig = null }
     catch { computerConfig = null } // Unknown membership/policy source never permits tools.
   }
+  const liveController = new AbortController()
+  const liveSignal = AbortSignal.any([request.signal, liveController.signal])
   const result = streamText({
     model: opencode('deepseek-v4.1-flash'),
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
@@ -117,14 +119,14 @@ export async function POST(request: Request) {
     messages,
     tools: {
       ...createAgentWebTools({ signal: request.signal }),
-      ...createComputerTools(computerConfig, computerRequestStore, session.user.id, sessionId),
+      ...createComputerTools(computerConfig, computerRequestStore, session.user.id, sessionId, liveSignal),
       ...createComposioAITools((action, input) => runComposioAction(session.user.id, action, input)),
     },
     stopWhen: isStepCount(5),
     prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
     maxRetries: 1,
     timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
-    abortSignal: request.signal,
+    abortSignal: liveSignal,
     onError: ({ error }) => {
       if (!request.signal.aborted) console.error('Agent generation failed:', agentErrorMessage(error))
     },
@@ -138,6 +140,6 @@ export async function POST(request: Request) {
       stream: result.stream,
       sendReasoning: false,
       onError: agentErrorMessage,
-    }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),
+    }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), liveSignal, () => liveController.abort()),
   })
 }

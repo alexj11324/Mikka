@@ -162,6 +162,8 @@ jobs:
         run: node --test tests/workspace-migration.test.mjs
       - name: Workspace computer approval migration, isolated CI database only
         run: node --test tests/computer-request-migration.test.mjs
+      - name: Computer policy, live claims and cancellation (CI ephemeral PG17 only)
+        run: node --import tsx --test tests/computer-store-ci.test.ts
       - run: pnpm build
         id: build
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
