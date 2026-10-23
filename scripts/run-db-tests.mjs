@@ -60,7 +60,7 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
   }
   for (const [file, source] of Object.entries(files)) {
     // Playwright DB fixtures run in the preserved server-backed browser/performance gates.
-    if (!/\.(test|spec)\.(ts|mjs|js)$/.test(file) || file === BOOTSTRAP || file.startsWith('tests/e2e/')) continue
+    if (!/\.(test|spec)\.(ts|mjs|js)$/.test(file) || file === BOOTSTRAP || file === 'scripts/run-db-tests.test.mjs' || file.startsWith('tests/e2e/')) continue
     const databaseBacked = /(?:\.db\.test\.|-db\.test\.)/.test(file) || /(?:from\s*['"]pg['"]|import\(['"]pg['"]\)|REQUIRE_DB|CONVERSATION_READS_REQUIRE_DB)/.test(source)
     if (!databaseBacked || covered.has(file)) continue
     const matches = Object.entries(scripts).filter(([name, command]) => name.startsWith('test:') && commandHas(command, file))
@@ -81,7 +81,7 @@ export function readTree(root = '.') {
       else if (/\.(ts|mjs|js)$/.test(file)) files[file] = readFileSync(resolve(root, file), 'utf8')
     }
   }
-  walk('lib'); walk('tests')
+  walk('lib'); walk('tests'); walk('scripts')
   return files
 }
 
