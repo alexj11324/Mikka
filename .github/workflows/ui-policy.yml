@@ -159,6 +159,10 @@ jobs:
       - name: Group conversation API and migrations (temporary Postgres 17 only)
         run: pnpm test:groups
       - run: pnpm test:e2e:setup
+      - name: Actor history writers and idempotent migration (temporary Postgres 17 only)
+        run: pnpm test:activity-actor-db
+        env:
+          REQUIRE_DB: '1'
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
       - run: pnpm build

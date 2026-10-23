@@ -71,3 +71,12 @@ test('the migration is timestamp-named, later than 20261023040300, and idempoten
   assert.equal((sql.match(/ADD COLUMN IF NOT EXISTS/g) ?? []).length, 2)
   assert.match(sql, /IF NOT EXISTS \(SELECT 1 FROM pg_constraint/)
 })
+
+test('parallel/nested contexts retain the authenticated actor without cross-request leakage', async () => {
+  await Promise.all(['a','b'].map(async id => actingContext.run({ userId: id, actor: agentActor(`agent-${id}`) }, async () => {
+    await new Promise(resolve => setTimeout(resolve, 2))
+    assert.deepEqual(activityActor(id), agentActor(`agent-${id}`))
+    await actingContext.run({ userId: id, actor: systemActor('job') }, async () => assert.deepEqual(activityActor(id), systemActor('job')))
+    assert.deepEqual(activityActor(id), agentActor(`agent-${id}`))
+  })))
+})

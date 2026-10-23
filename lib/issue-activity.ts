@@ -1,3 +1,4 @@
+import type { ActivityActorView } from './activity-actor-view'
 import type { JSONContent } from '@tiptap/core'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 
@@ -11,6 +12,7 @@ export type ActivityVersion = {
   /** Who made the change (server-set); null on rows from before MIK-17. */
   actorType?: 'user' | 'agent' | 'system' | null
   actorId?: string | null
+  actor?: ActivityActorView | null
   createdAt: Date | string
 }
 

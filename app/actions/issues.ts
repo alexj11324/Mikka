@@ -25,6 +25,7 @@ import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { after } from 'next/server'
 import { judgeIssueScope } from '@/lib/issue-scope-judge'
 import { TASK_SCOPES } from '@/lib/task-identifier'
+import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { activityActor } from '@/lib/activity-actor'
 
 type IssueRow = typeof issues.$inferSelect
@@ -153,7 +154,8 @@ export async function changeIssuePriority(input: { id: string; priority: string;
 export async function listIssueVersions(id: string) {
   const { issue } = await requireIssueAccess(id)
   const userId = issue.userId
-  return db.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
+  const versions = await db.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
+  return enrichActivityActors(versions, userId)
 }
 
 /**
@@ -176,6 +178,7 @@ export async function setIssueScope(input: { id: string; revision: number; scope
       const [saved] = await tx.update(issues).set({ scope: parsed.data.scope, scopeSetBy: 'user', scopeConfidence: null, revision: parsed.data.revision + 1, updatedAt: new Date() })
         .where(and(eq(issues.id, issue.id), eq(issues.userId, userId), eq(issues.revision, parsed.data.revision))).returning()
       if (!saved) return { error: 'issueStale' as const }
+      await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(userId) })
       return { issue: await issueView(saved, tx) }
     })
     if ('issue' in result && parsed.data.scope === 'workspace') dispatchLinearIssueSync(issue.id)
