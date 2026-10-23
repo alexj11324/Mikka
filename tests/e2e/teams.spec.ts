@@ -22,6 +22,16 @@ async function createTask(page: Page, title: string, team?: string) {
   await dialog.getByRole('combobox', { name: '团队', exact: true }).selectOption(team ? { label: team } : '')
   await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
   await expect(dialog).not.toBeVisible()
+  if (team) {
+    // Team assignment alone must not publish a personal task (#125/#127).
+    // These collaboration fixtures explicitly opt into workspace scope.
+    await showAllTasks(page)
+    await page.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: title }).click()
+    await page.getByRole('button', { name: '归属：个人', exact: true }).click()
+    await page.getByRole('menuitem', { name: '工作区', exact: true }).click()
+    await expect(page.getByRole('button', { name: '归属：工作区', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
+  }
 }
 async function showAllTasks(page: Page) {
   await rail(page, '看板').click()
