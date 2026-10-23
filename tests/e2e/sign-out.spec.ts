@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, rail, app } from './fixtures'
+import { test, expect, register, rail, app, openCreateIssue, openIssueFromSearch } from './fixtures'
 
 test.use({ expectedConsoleErrors: [{ path: app('/api/auth/sign-out'), message: 'Failed to load resource: the server responded with a status of 400 (Bad Request)' }] })
 
@@ -85,15 +85,11 @@ test('sign-out waits for editor validation and preserves saved edits when revoca
   await register(page)
   const original = `退出保存 ${randomUUID()}`
   await rail(page, '看板').click()
-  await page.getByRole('button', { name: '新建任务', exact: true }).click()
-  const create = page.getByRole('dialog', { name: '新建任务', exact: true })
+  const create = await openCreateIssue(page)
   await create.getByLabel('任务标题', { exact: true }).fill(original)
   await create.getByRole('button', { name: '创建任务', exact: true }).click()
   await expect(create).not.toBeVisible()
-  await page.getByRole('button', { name: '打开全局搜索', exact: true }).click()
-  const search = page.getByRole('dialog', { name: '搜索任务', exact: true })
-  await search.getByRole('combobox', { name: '全局搜索任务', exact: true }).fill(original)
-  await search.getByRole('option').filter({ hasText: original }).click()
+  await openIssueFromSearch(page, original)
   const title = page.getByLabel('任务标题', { exact: true })
   await expect(title).toHaveValue(original)
   await expect(page.getByRole('button', { name: '更多任务操作', exact: true })).toBeEnabled()

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register, rail, browserClientHeaders, watchRuntime, app, BASE_PATH } from './fixtures'
+import { test, expect, register, rail, browserClientHeaders, watchRuntime, app, BASE_PATH, openCreateIssue } from './fixtures'
 
 async function createTeam(page: Page, name: string, identifier: string) {
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
@@ -15,8 +15,7 @@ async function createTeam(page: Page, name: string, identifier: string) {
 }
 async function createTask(page: Page, title: string, team?: string) {
   if (await rail(page, '看板').getAttribute('aria-current') !== 'page') await rail(page, '看板').click()
-  await page.getByRole('button', { name: '新建任务', exact: true }).first().click()
-  const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
+  const dialog = await openCreateIssue(page)
   await dialog.getByLabel('任务标题', { exact: true }).fill(title)
   // Create-issue dialog renders a NativeSelect: drive it with selectOption.
   await dialog.getByRole('combobox', { name: '团队', exact: true }).selectOption(team ? { label: team } : '')
@@ -25,7 +24,13 @@ async function createTask(page: Page, title: string, team?: string) {
 }
 async function showAllTasks(page: Page) {
   await rail(page, '看板').click()
-  await page.getByRole('button', { name: '列表视图', exact: true }).click()
+  // The board opens on 只看我的; teammates' public tasks need it off.
+  const onlyMine = page.getByRole('switch', { name: '只看我的', exact: true })
+  if (await onlyMine.isChecked()) await onlyMine.click()
+  await expect(onlyMine).not.toBeChecked()
+}
+function boardCard(page: Page, title: string) {
+  return page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })
 }
 
 test('公开团队创建、搜索、编辑、负责人保护、任务归属和项目多团队关联', async ({ page }) => {
@@ -58,7 +63,7 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await createTask(page, privateTitle)
   await createTask(page, publicTitle, 'PRODUCT · 产品团队')
   await showAllTasks(page)
-  await page.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: publicTitle }).click()
+  await boardCard(page, publicTitle).click()
   // Detail page renders a Base UI Select: open the trigger and check the selected option.
   const teamSelect = page.getByRole('combobox', { name: '团队', exact: true })
   await expect(teamSelect).toContainText('PRODUCT · 产品团队')
@@ -141,7 +146,7 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
     await member.keyboard.press('Escape')
     await member.goto(app('/'))
     await showAllTasks(member)
-    await expect(member.locator('[aria-label="任务列表"]').getByText(publicTitle, { exact: true })).toBeVisible()
+    await expect(boardCard(member, publicTitle)).toBeVisible()
     await expect(member.getByText(privateTitle, { exact: true })).toHaveCount(0)
     await page.goto(app(`/settings/members?workspace=${workspaceId}`))
     const membership = page.getByRole('row').filter({ hasText: email })
@@ -190,7 +195,7 @@ test('非创建者成员在他人公开任务上改父子关系，关系区与�
     await page.goto(app('/'))
     await showAllTasks(page)
     for (const title of [parentTitle, childTitle]) {
-      await page.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: title }).click()
+      await boardCard(page, title).click()
       await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
       await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
       await page.getByRole('menuitem', { name: '管理协作成员…', exact: true }).click()
@@ -202,7 +207,7 @@ test('非创建者成员在他人公开任务上改父子关系，关系区与�
     }
     await member.goto(app('/'))
     await showAllTasks(member)
-    await member.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: parentTitle }).click()
+    await boardCard(member, parentTitle).click()
     await expect(member.getByLabel('任务标题', { exact: true })).toHaveValue(parentTitle)
     // Non-owners cannot delete (owner-only menu item), so delete/undo is covered by the owner flow only.
     await member.getByRole('button', { name: '更多任务操作', exact: true }).click()

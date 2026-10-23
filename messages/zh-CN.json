@@ -2165,5 +2165,110 @@
     "cancel": "取消",
     "creating": "正在创建…",
     "createWorkspace": "创建工作区"
+  },
+  "Shell": {
+    "pinned": "置顶",
+    "searchPlaceholder": "搜索对话、任务、Agent、知识库",
+    "searchLabel": "全局搜索",
+    "searchDescription": "搜索对话、任务和项目，用方向键选择，按 Enter 打开。",
+    "searchEmpty": "没有匹配的结果",
+    "groups": {
+      "conversations": "对话",
+      "tasks": "任务",
+      "projects": "项目",
+      "actions": "快捷操作"
+    },
+    "newTask": "新建任务",
+    "newConversation": "新对话",
+    "openList": "展开对话列表",
+    "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
+    "whoIsWorking": "谁在工作",
+    "agentsWorking": "{count} 个 agent 正在处理任务",
+    "panel": {
+      "label": "右栏",
+      "tabs": "右栏内容",
+      "details": "详情",
+      "tasks": "任务",
+      "browser": "浏览器",
+      "knowledge": "知识库",
+      "schedules": "定时任务",
+      "search": "搜索",
+      "widen": "加宽右栏",
+      "narrow": "恢复右栏宽度",
+      "close": "关闭右栏",
+      "open": "打开右栏"
+    },
+    "details": {
+      "conversation": "当前对话",
+      "kind": "类型",
+      "coordinatorKind": "Coordinator · 置顶",
+      "agentKind": "Agent 对话",
+      "updated": "最近活动",
+      "none": "还没有消息"
+    },
+    "suggestions": {
+      "title": "建议",
+      "morning": "早上好，{name}。",
+      "afternoon": "下午好，{name}。",
+      "evening": "晚上好，{name}。",
+      "briefing": "有 {count} 条新消息值得看，先看",
+      "noneToday": "今天还没有新的建议。",
+      "routine": "例行事项",
+      "emptyTitle": "这里是空的",
+      "emptyDescription": "Check back later",
+      "refresh": "刷新建议",
+      "loadError": "建议加载失败。",
+      "action": {
+        "reply": "回复",
+        "review": "Review",
+        "handle": "处理",
+        "read": "查看"
+      },
+      "source": {
+        "gmail": "Gmail",
+        "slack": "Slack",
+        "notion": "Notion",
+        "github": "GitHub",
+        "linear": "Linear"
+      }
+    },
+    "tasks": {
+      "mine": "我的任务",
+      "waiting": "等你",
+      "running": "运行中",
+      "failed": "出错",
+      "doneToday": "已完成",
+      "today": "今天 {count}",
+      "empty": "还没有派给 Agent 的任务。",
+      "status": {
+        "waiting_input": "等你回复",
+        "queued": "排队中",
+        "preparing": "准备中",
+        "running": "运行中",
+        "finishing": "收尾中",
+        "failed": "失败",
+        "succeeded": "已完成"
+      },
+      "command": "指挥这个任务…",
+      "commandLabel": "给 Coordinator 发指令",
+      "send": "发送",
+      "sent": "已发给 Coordinator。",
+      "sendFailed": "没发出去，再试一次。"
+    },
+    "empty": {
+      "nothing": "这里是空的",
+      "arrange": "让 Agent 安排",
+      "knowledgePrompt": "帮我把常用的资料整理进知识库：",
+      "schedulesPrompt": "帮我设一个定时任务："
+    },
+    "board": {
+      "title": "看板",
+      "synced": "已与 Linear 同步",
+      "onlyMine": "只看我的",
+      "coordinatorPlaceholder": "告诉 Coordinator 怎么安排…",
+      "collapse": "收起 Coordinator",
+      "expand": "展开 Coordinator",
+      "unassigned": "未分配"
+    }
   }
 }

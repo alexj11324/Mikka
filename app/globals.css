@@ -74,6 +74,16 @@
 --color-success: var(--success);
 --color-label-violet: var(--label-violet);
 --color-label-blue: var(--label-blue);
+/* App shell layers (Nav v3.1): the top bar and icon rail, then the list and right panels, then the conversation. */
+--color-shell-chrome: var(--shell-chrome);
+--color-shell-panel: var(--shell-panel);
+--color-shell-raised: var(--shell-raised);
+--color-avatar-1: var(--avatar-1);
+--color-avatar-2: var(--avatar-2);
+--color-avatar-3: var(--avatar-3);
+--color-avatar-4: var(--avatar-4);
+--color-avatar-5: var(--avatar-5);
+--color-avatar-foreground: var(--avatar-foreground);
 /* Source chips and lists (components/ui/streaming-text), on the shadcn palette so both themes follow. */
 --color-page: var(--page);
 --color-canvas: var(--canvas);
@@ -122,6 +132,15 @@
 --project-action-foreground: oklch(0.985 0 0);
 --label-violet: var(--color-violet-600);
 --label-blue: var(--color-blue-600);
+--shell-chrome: oklch(0.955 0 0);
+--shell-panel: oklch(0.982 0 0);
+--shell-raised: oklch(1 0 0);
+--avatar-1: var(--color-blue-500);
+--avatar-2: var(--color-pink-500);
+--avatar-3: var(--color-emerald-500);
+--avatar-4: var(--color-violet-500);
+--avatar-5: var(--color-orange-500);
+--avatar-foreground: oklch(0.985 0 0);
   --background: oklch(1 0 0);
 --foreground: oklch(0.145 0 0);
 --card: oklch(1 0 0);
@@ -179,6 +198,15 @@
 --settings-muted-foreground: oklch(0.71 0 0);
 --label-violet: var(--color-violet-400);
 --label-blue: var(--color-blue-400);
+--shell-chrome: oklch(0.12 0 0);
+--shell-panel: oklch(0.185 0 0);
+--shell-raised: oklch(0.255 0 0);
+--avatar-1: var(--color-blue-500);
+--avatar-2: var(--color-pink-500);
+--avatar-3: var(--color-emerald-500);
+--avatar-4: var(--color-violet-500);
+--avatar-5: var(--color-orange-500);
+--avatar-foreground: oklch(0.985 0 0);
   --background: oklch(0.145 0 0);
 --foreground: oklch(0.985 0 0);
 --card: oklch(0.205 0 0);

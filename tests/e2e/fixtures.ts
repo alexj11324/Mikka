@@ -15,6 +15,36 @@ export function rail(page: Page, name: '对话' | '看板' | '插件') {
   return page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name, exact: true })
 }
 
+/** Opens ⌘K from the top bar; returns the dialog. */
+export async function openSearch(page: Page) {
+  await page.getByRole('button', { name: '全局搜索', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '全局搜索', exact: true })
+  await expect(dialog).toBeVisible()
+  return dialog
+}
+
+/** Searches ⌘K for a task by title and opens it. */
+export async function openIssueFromSearch(page: Page, title: string) {
+  const dialog = await openSearch(page)
+  await dialog.getByRole('combobox', { name: '全局搜索', exact: true }).fill(title)
+  await dialog.getByRole('option').filter({ hasText: title }).click()
+}
+
+/** The board has no create button (Figma 57:2); new tasks come from ⌘K's 新建任务 action. */
+export async function openCreateIssue(page: Page) {
+  const dialog = await openSearch(page)
+  await dialog.getByRole('option', { name: '新建任务', exact: true }).click()
+  const create = page.getByRole('dialog', { name: '新建任务', exact: true })
+  await expect(create).toBeVisible()
+  return create
+}
+
+/** The current conversation's title pill over the chat (desktop). */
+export function conversationPill(page: Page) {
+  // Conversations opened earlier stay mounted but hidden; only the current one is visible.
+  return page.locator('[data-slot="conversation-pill"]:visible [data-slot="conversation-pill-title"]')
+}
+
 type ExpectedConsoleError = { path: string; message: string }
 
 export function watchRuntime(context: BrowserContext, expectedConsoleErrors: ExpectedConsoleError[] = []) {

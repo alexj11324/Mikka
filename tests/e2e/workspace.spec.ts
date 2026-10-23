@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, rail, app } from './fixtures'
+import { test, expect, register, rail, app, openCreateIssue, openIssueFromSearch } from './fixtures'
 
 test('未登录访问受保护页面、注册和登录链接', async ({ page }) => {
   await page.goto(app('/settings/members'))
@@ -67,25 +67,19 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   const account = await register(page)
   await expect(page.getByRole('button', { name: /^Coordinator/ })).toHaveAttribute('aria-current', 'page')
   await rail(page, '看板').click()
-  await expect(page.getByRole('heading', { name: '全部任务', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '新建任务', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
-  await expect(dialog).toBeVisible()
+  await expect(page.getByRole('heading', { name: '看板', exact: true })).toBeVisible()
+  const dialog = await openCreateIssue(page)
   const title = `按钮回归 ${randomUUID()}`
   await dialog.getByLabel('任务标题', { exact: true }).fill(title)
   await dialog.getByRole('button', { name: /^任务状态/ }).click()
   await page.getByRole('menuitem', { name: '进行中', exact: true }).click()
   await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
   await expect(dialog).not.toBeVisible()
-  await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
   await page.reload()
   await rail(page, '看板').click()
-  await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '列表视图', exact: true }).click()
-  await expect(page.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: title })).toBeVisible()
-  await page.getByRole('button', { name: '打开全局搜索', exact: true }).click()
-  await page.getByRole('dialog', { name: '搜索任务', exact: true }).getByRole('combobox', { name: '全局搜索任务', exact: true }).fill(title)
-  await page.getByRole('option').filter({ hasText: title }).click()
+  await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
+  await openIssueFromSearch(page, title)
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
   await expect(page.getByRole('button', { name: '账户菜单', exact: true })).toHaveCount(0)
   await rail(page, '插件').click()
@@ -108,5 +102,5 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await page.getByRole('button', { name: '登录工作台', exact: true }).click()
   await expect(page).toHaveURL(url => url.pathname === app('/'))
   await rail(page, '看板').click()
-  await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
 })

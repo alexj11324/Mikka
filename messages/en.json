@@ -2165,5 +2165,110 @@
     "cancel": "Cancel",
     "creating": "Creating…",
     "createWorkspace": "Create workspace"
+  },
+  "Shell": {
+    "pinned": "Pinned",
+    "searchPlaceholder": "Search conversations, tasks, agents, knowledge",
+    "searchLabel": "Search everything",
+    "searchDescription": "Search conversations, tasks and projects. Use the arrow keys to choose and Enter to open.",
+    "searchEmpty": "Nothing matches",
+    "groups": {
+      "conversations": "Conversations",
+      "tasks": "Tasks",
+      "projects": "Projects",
+      "actions": "Quick actions"
+    },
+    "newTask": "New task",
+    "newConversation": "New conversation",
+    "openList": "Show conversations",
+    "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
+    "whoIsWorking": "Who's working",
+    "agentsWorking": "{count, plural, one {# agent is} other {# agents are}} on tasks",
+    "panel": {
+      "label": "Right panel",
+      "tabs": "Right panel content",
+      "details": "Details",
+      "tasks": "Tasks",
+      "browser": "Browser",
+      "knowledge": "Knowledge",
+      "schedules": "Schedules",
+      "search": "Search",
+      "widen": "Widen panel",
+      "narrow": "Restore panel width",
+      "close": "Close panel",
+      "open": "Open panel"
+    },
+    "details": {
+      "conversation": "This conversation",
+      "kind": "Type",
+      "coordinatorKind": "Coordinator · pinned",
+      "agentKind": "Agent conversation",
+      "updated": "Last activity",
+      "none": "No messages yet"
+    },
+    "suggestions": {
+      "title": "Suggestions",
+      "morning": "Good morning, {name}.",
+      "afternoon": "Good afternoon, {name}.",
+      "evening": "Good evening, {name}.",
+      "briefing": "{count, plural, one {# new message is} other {# new messages are}} worth a look, starting with",
+      "noneToday": "No new suggestions today.",
+      "routine": "Routine",
+      "emptyTitle": "Nothing here",
+      "emptyDescription": "Check back later",
+      "refresh": "Refresh suggestions",
+      "loadError": "Suggestions failed to load.",
+      "action": {
+        "reply": "Reply",
+        "review": "Review",
+        "handle": "Handle",
+        "read": "Read"
+      },
+      "source": {
+        "gmail": "Gmail",
+        "slack": "Slack",
+        "notion": "Notion",
+        "github": "GitHub",
+        "linear": "Linear"
+      }
+    },
+    "tasks": {
+      "mine": "My tasks",
+      "waiting": "Waiting on you",
+      "running": "Running",
+      "failed": "Failed",
+      "doneToday": "Done",
+      "today": "today {count}",
+      "empty": "No tasks handed to an agent yet.",
+      "status": {
+        "waiting_input": "needs your reply",
+        "queued": "queued",
+        "preparing": "preparing",
+        "running": "running",
+        "finishing": "finishing",
+        "failed": "failed",
+        "succeeded": "done"
+      },
+      "command": "Direct this task…",
+      "commandLabel": "Send an instruction to the Coordinator",
+      "send": "Send",
+      "sent": "Sent to the Coordinator.",
+      "sendFailed": "That didn't send. Try again."
+    },
+    "empty": {
+      "nothing": "Nothing here",
+      "arrange": "Let an agent set it up",
+      "knowledgePrompt": "Help me put the documents I use often into the knowledge base: ",
+      "schedulesPrompt": "Help me set up a scheduled task: "
+    },
+    "board": {
+      "title": "Board",
+      "synced": "Synced with Linear",
+      "onlyMine": "Only mine",
+      "coordinatorPlaceholder": "Tell the Coordinator what to arrange…",
+      "collapse": "Collapse Coordinator",
+      "expand": "Expand Coordinator",
+      "unassigned": "Unassigned"
+    }
   }
 }

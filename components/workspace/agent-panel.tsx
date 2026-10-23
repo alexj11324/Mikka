@@ -35,12 +35,12 @@ const fetchAgentWithImages: typeof fetch = async (input, options) => {
 /** `request` opens a session from outside (the conversation list): a session id, or null for a new conversation. */
 export type AgentSessionRequest = { sessionId: string | null; nonce: number }
 
-export function AgentPanel({ userId, initialHistory, request, onActive }: { userId: string; initialHistory?: AgentHistory; request?: AgentSessionRequest; onActive?: (sessionId: string | null) => void }) {
+export function AgentPanel({ userId, initialHistory, request, onActive, onSessions }: { userId: string; initialHistory?: AgentHistory; request?: AgentSessionRequest; onActive?: (sessionId: string | null) => void; onSessions?: (sessions: AgentChatSession[]) => void }) {
   const [demo, setDemo] = useState(false)
   const latest = useAgentHistory(userId, initialHistory)
   if (!latest.data) return <AgentHistoryLoading error={latest.error} onRetry={() => { void latest.mutate() }} />
   return <AgentThemeProvider>
-    <div hidden={demo} className="h-full min-h-0"><AgentSessions userId={userId} initial={latest.data} request={request} onActive={onActive} onDemo={() => setDemo(true)} onSaved={async () => { await latest.mutate() }} /></div>
+    <div hidden={demo} className="h-full min-h-0"><AgentSessions userId={userId} initial={latest.data} request={request} onActive={onActive} onSessions={onSessions} onDemo={() => setDemo(true)} onSaved={async () => { await latest.mutate() }} /></div>
     {demo && <AgentDemo onClose={() => setDemo(false)} />}
   </AgentThemeProvider>
 }
@@ -56,7 +56,7 @@ function AgentHistoryLoading({ error, onRetry }: { error?: Error; onRetry: () =>
 type OpenSession = { key: string; initial?: AgentHistory; sessionId?: string }
 type LiveSession = AgentChatSession & { key: string }
 
-function AgentSessions({ userId, initial, request, onActive, onSaved, onDemo }: { userId: string; initial: AgentHistory; request?: AgentSessionRequest; onActive?: (sessionId: string | null) => void; onSaved: () => Promise<void>; onDemo: () => void }) {
+function AgentSessions({ userId, initial, request, onActive, onSessions, onSaved, onDemo }: { userId: string; initial: AgentHistory; request?: AgentSessionRequest; onActive?: (sessionId: string | null) => void; onSessions?: (sessions: AgentChatSession[]) => void; onSaved: () => Promise<void>; onDemo: () => void }) {
   const firstKey = request ? request.sessionId ?? `new-${request.nonce}` : initial.sessionId ?? 'new'
   const [opened, setOpened] = useState<OpenSession[]>(() => [request && request.sessionId !== initial.sessionId ? (request.sessionId ? { key: firstKey, sessionId: request.sessionId } : { key: firstKey, initial: { sessions: [], sessionId: null, turns: [] } }) : { key: firstKey, initial }])
   const [activeKey, setActiveKey] = useState(firstKey)
@@ -88,6 +88,12 @@ function AgentSessions({ userId, initial, request, onActive, onSaved, onDemo }: 
   const activeEntry = opened.find(entry => entry.key === activeKey)
   const activeId = activeEntry ? live[activeEntry.key]?.id ?? activeEntry.sessionId ?? activeEntry.initial?.sessionId ?? null : null
   useEffect(() => { onActive?.(activeId) }, [activeId, onActive])
+  // The conversation list lives outside this panel; it also needs sessions that are still streaming and not saved yet.
+  const historyKey = history.map(session => `${session.id}:${session.updatedAt}:${session.title}:${session.running ? 1 : 0}`).join('|')
+  const historyRef = useRef(history)
+  useEffect(() => { historyRef.current = history })
+  useEffect(() => { onSessions?.(historyRef.current) }, [historyKey, onSessions])
+  useEffect(() => () => onSessions?.([]), [onSessions])
 
   return opened.map(entry => <div key={entry.key} hidden={entry.key !== activeKey} className="h-full min-h-0">
     <AgentSessionLoader entry={entry} userId={userId} sessions={history} onSelect={select} onReset={reset} onSaved={onSaved} onDemo={onDemo}
