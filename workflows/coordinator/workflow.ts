@@ -47,6 +47,11 @@ function coordinatorTools(userId: string) {
   const id = z.uuid()
   return {
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input)),
+    web_search: tool({
+      description: 'Search the public web. Use only when the answer depends on current or external information. Returns titles, URLs and snippets; cite the URLs. If it returns searchUnavailable, tell the person search is temporarily unavailable instead of retrying.',
+      inputSchema: z.object({ query: z.string().trim().min(2).max(300), limit: z.number().int().min(1).max(10).optional() }),
+      execute: input => steps.webSearchStep(userId, input),
+    }),
     list_issues: tool({
       description: 'List the person\'s issues, most recently updated first. Optionally only one status (todo, doing, review, done and so on).',
       inputSchema: z.object({ status: z.string().optional() }),
