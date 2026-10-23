@@ -254,6 +254,19 @@ export const coordinatorMessages = pgTable('coordinator_messages', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('coordinator_messages_position_key').on(table.userId, table.position)])
 
+/**
+ * How far a person has read a conversation (MIK-8). `conversationId` is
+ * `'coordinator'` for the person's own Coordinator chat. Forward-only; see
+ * lib/conversation-reads-store.ts.
+ */
+export const conversationReads = pgTable('conversation_reads', {
+  userId: text('userId').notNull(),
+  conversationId: text('conversationId').notNull(),
+  lastReadPosition: integer('lastReadPosition').notNull().default(0),
+  lastReadMessageId: text('lastReadMessageId'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ name: 'conversation_reads_pkey', columns: [table.userId, table.conversationId] })])
+
 /** A message a person sent a running agent, delivered on its next poll. */
 export const runMessages = pgTable('run_messages', {
   id: uuid('id').primaryKey(), runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
