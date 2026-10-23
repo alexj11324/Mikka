@@ -1,16 +1,15 @@
 import { NextResponse } from 'next/server'
-import { eq } from 'drizzle-orm'
 import { deviceHeartbeatSchema } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
-import { devices } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
+import { recordDeviceHeartbeat } from '@/lib/run-leases'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * `POST /v1/devices/:deviceId/heartbeat`: online state and the harnesses the
- * device reports right now. The answer carries renewed run leases; this app
- * runs no lease-based scheduling yet, so it is empty.
+ * device reports right now. Renews the runs the daemon reported (if on this
+ * device and unfinished) to now + RUN_LEASE_MS and answers with those leases.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
@@ -19,6 +18,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (!await ownedDevice(deviceId, caller.userId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   const parsed = deviceHeartbeatSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
-  await db.update(devices).set({ harnesses: parsed.data.harnesses, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
-  return NextResponse.json({ leases: {} })
+  const leases = await recordDeviceHeartbeat(db, deviceId, parsed.data.harnesses, parsed.data.runs.map(run => run.runId))
+  return NextResponse.json({ leases })
 }
