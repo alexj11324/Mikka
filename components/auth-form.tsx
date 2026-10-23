@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { authClient } from '@/lib/auth-client'
 import { getPathname } from '@/i18n/navigation'
@@ -31,49 +31,61 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     url.searchParams.set('provider', provider)
     return url.toString()
   }
+  const pendingRef = useRef(false)
+  const [pending, setPending] = useState(false)
+  function beginSubmit() {
+    if (pendingRef.current) return false
+    pendingRef.current = true
+    setPending(true)
+    setError('')
+    setNotice('')
+    return true
+  }
+  function endSubmit() {
+    pendingRef.current = false
+    setPending(false)
+  }
   async function signInWithGoogle() {
-    if (pending || !googleEnabled) return
+    if (!googleEnabled) return
     if (window.self !== window.top) {
       const tab = window.open(window.location.href, '_blank')
       if (tab) tab.opener = null
       setNotice(tab ? t('tabOpened') : t('tabBlocked'))
       return
     }
-    setPending(true); setError(''); setNotice('')
+    if (!beginSubmit()) return
     try {
       const result = await authClient.signIn.social({ provider: 'google', callbackURL: home, errorCallbackURL: oauthErrorCallbackURL('google'), disableRedirect: true })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
     } catch {
       setError(t('googleStartFailed'))
-      setPending(false)
+      endSubmit()
     }
   }
   async function signInWithGitHub() {
-    if (pending || !githubEnabled) return
+    if (!githubEnabled) return
     if (window.self !== window.top) {
       const tab = window.open(window.location.href, '_blank')
       if (tab) tab.opener = null
       setNotice(tab ? t('tabOpened') : t('tabBlocked'))
       return
     }
-    setPending(true); setError(''); setNotice('')
+    if (!beginSubmit()) return
     try {
       const result = await authClient.signIn.social({ provider: 'github', callbackURL: home, errorCallbackURL: oauthErrorCallbackURL('github'), disableRedirect: true })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
     } catch {
       setError(t('githubStartFailed'))
-      setPending(false)
+      endSubmit()
     }
   }
-  const [pending, setPending] = useState(false)
   const registering = mode === 'sign-up'
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (pending) return
+    if (!beginSubmit()) return
     const data = new FormData(event.currentTarget)
-    setPending(true); setError('')
     try {
       const credentials = { email: String(data.get('email')).trim(), password: String(data.get('password')) }
       const result = registering ? await authClient.signUp.email({ ...credentials, name: String(data.get('name')).trim() }) : await authClient.signIn.email(credentials)
@@ -82,11 +94,10 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
       if (!session.data?.user) { setError(t('sessionNotKept')); return }
       window.location.replace(home)
     } catch { setError(t('connectionFailed')) }
-    finally { setPending(false) }
+    finally { endSubmit() }
   }
   async function enterTestWorkspace() {
-    if (pending) return
-    setPending(true); setError(''); setNotice('')
+    if (!beginSubmit()) return
     try {
       const response = await fetch(withBasePath('/api/test-workspace'), { method: 'POST' })
       if (!response.ok) throw new Error('Test workspace unavailable')
@@ -109,7 +120,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     } catch {
       setError(t('testWorkspaceFailed'))
     } finally {
-      setPending(false)
+      endSubmit()
     }
   }
   return <Auth registering={registering} addAccount={addAccount} next={returnPath}>

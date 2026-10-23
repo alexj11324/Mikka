@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
 import useSWR from "swr";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
@@ -154,12 +154,18 @@ export function MembersSettings({
   const [downloadUrl, setDownloadUrl] = useState<string | undefined>();
   const canManage = data.role === "admin" && !fetchError;
   const query = search.trim().toLowerCase();
-  const filters = [
-    { value: "all", label: t("filters.all") },
-    { value: "active", label: t("filters.active") },
-    { value: "invited", label: t("filters.invited") },
-    { value: "suspended", label: t("filters.suspended") },
-  ];
+  const filterAll = t("filters.all")
+  const filterActive = t("filters.active")
+  const filterInvited = t("filters.invited")
+  const filterSuspended = t("filters.suspended")
+  const filters = useMemo(() => [
+    { value: "all", label: filterAll },
+    { value: "active", label: filterActive },
+    { value: "invited", label: filterInvited },
+    { value: "suspended", label: filterSuspended },
+  ], [filterAll, filterActive, filterInvited, filterSuspended])
+  const filterItems = useMemo(() => canManage ? filters : filters.filter((item) => item.value !== "invited"), [canManage, filters])
+  const workspaceItems = useMemo(() => data.choices.map((item) => ({ value: item.id, label: item.name })), [data.choices])
   const date = (value: string) =>
     format.dateTime(new Date(value), {
       year: "numeric",
@@ -299,10 +305,7 @@ export function MembersSettings({
           </div>
           <Select
             value={data.workspace.id}
-            items={data.choices.map((item) => ({
-              value: item.id,
-              label: item.name,
-            }))}
+            items={workspaceItems}
             onValueChange={(value) => {
               if (value) router.push(`/settings/members?workspace=${value}`);
             }}
@@ -370,11 +373,7 @@ export function MembersSettings({
                 </div>
                 <Select
                   value={filter}
-                  items={
-                    canManage
-                      ? filters
-                      : filters.filter((item) => item.value !== "invited")
-                  }
+                  items={filterItems}
                   onValueChange={(value) => setFilter(value ?? "all")}
                 >
                   <SelectTrigger aria-label={t("filterLabel")}>

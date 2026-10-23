@@ -77,7 +77,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
           <Separator className="flex-1" />
         </div>
         {error && <p id="auth-error" role="alert" className="text-destructive text-sm">{error}</p>}
-        <form method="post" className="flex flex-col gap-5" onSubmit={onSubmit} aria-busy={pending} aria-describedby={error ? 'auth-error' : undefined}>
+        <form className="flex flex-col gap-5" onSubmit={onSubmit} aria-busy={pending} aria-describedby={error ? 'auth-error' : undefined}>
           <FieldGroup>
             {registering && <Field data-disabled={pending} className="gap-2">
               <FieldLabel htmlFor="name">{t('name')}</FieldLabel>

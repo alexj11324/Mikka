@@ -1,7 +1,7 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { JSONContent } from '@tiptap/react'
 import { ChartNoAxesColumnIncreasing, ChevronRight, CircleDashed, LockKeyhole, Maximize2, Minimize2, SquareUserRound, X } from 'lucide-react'
 import { saveIssue } from '@/app/actions/issues'
@@ -12,6 +12,7 @@ import { setIssueTeam } from '@/app/actions/team-relations'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Field, FieldGroup, FieldLabel, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
@@ -25,18 +26,20 @@ import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 
 const EMPTY: JSONContent = { type: 'doc', content: [{ type: 'paragraph' }] }
 
-export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initialTeamId = '', initialStatus = 'todo' }: {
+export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initialTeamId = '', initialStatus = 'todo', initialTitle = '' }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: (id: string) => void
   author: string
   initialStatus?: string
   initialTeamId?: string
+  initialTitle?: string
 }) {
   const i18nText = useTranslations();
   const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
   const [teamId, setTeamId] = useState(initialTeamId)
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState(initialTitle)
+  const seenAhead = useRef(initialTitle)
   const [content, setContent] = useState<JSONContent>(EMPTY)
   const [status, setStatus] = useState(initialStatus)
   const [priority, setPriority] = useState('normal')
@@ -46,11 +49,41 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   const [notice, setNotice] = useState('')
   const [editorKey, setEditorKey] = useState(0)
   const titleRef = useRef<HTMLInputElement>(null)
+  const focusTitle = useCallback(() => {
+    const field = titleRef.current
+    if (!field) return null
+    const end = field.value.length
+    field.setSelectionRange(end, end)
+    return field
+  }, [])
   const submitting = useRef(false)
   const [defaults, setDefaults] = useState({ status: initialStatus, priority: 'normal' })
   const dirty = !!title.trim() || JSON.stringify(content) !== JSON.stringify(EMPTY) || status !== defaults.status || priority !== defaults.priority || teamId !== initialTeamId
   const [expanded, setExpanded] = useState(false)
+  const [discardOpen, setDiscardOpen] = useState(false)
 
+  useEffect(() => {
+    if (!initialTitle.startsWith(seenAhead.current)) return
+    const extra = initialTitle.slice(seenAhead.current.length)
+    seenAhead.current = initialTitle
+    if (extra) setTitle(current => current + extra)
+  }, [initialTitle])
+  useLayoutEffect(() => {
+    if (!open) return
+    let frame = 0
+    const place = () => {
+      const field = titleRef.current
+      if (!field) return
+      field.focus()
+      const end = field.value.length
+      field.setSelectionRange(end, end)
+    }
+    place()
+    // The dialog focus manager focuses again on the next frame. Place the caret
+    // after that so characters typed ahead stay in front of the cursor.
+    queueMicrotask(() => { frame = requestAnimationFrame(place) })
+    return () => cancelAnimationFrame(frame)
+  }, [open, editorKey, initialTitle])
   useEffect(() => { if (notice && !pending) titleRef.current?.focus() }, [notice, pending])
   useEffect(() => {
     if (!open || !dirty) return
@@ -61,18 +94,23 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
 
   function close() {
     if (submitting.current) return
-    if (dirty && !window.confirm(i18nText("Issue.create.discardDraft"))) return
+    if (dirty) { setDiscardOpen(true); return }
+    onOpenChange(false)
+  }
+  function discard() {
+    setDiscardOpen(false)
     onOpenChange(false)
   }
 
   async function create() {
-    if (submitting.current || !title.trim()) return
+    const currentTitle = titleRef.current?.value ?? title
+    if (submitting.current || !currentTitle.trim()) return
     submitting.current = true
     setPending(true)
     setError('')
     setNotice('')
     try {
-      const result = await saveIssue({ title, content, status, priority })
+      const result = await saveIssue({ title: currentTitle, content, status, priority })
       if (!('issue' in result) || !result.issue) {
         setError(result.error ?? i18nText("Issue.create.createFailed"))
         return
@@ -102,8 +140,8 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
     }
   }
 
-  return <Dialog open={open} onOpenChange={value => { if (!value) close() }}>
-    <DialogContent showCloseButton={false} initialFocus={titleRef} className={cn('max-h-[calc(100svh-2rem)] gap-0 overflow-y-auto p-0 sm:top-[20svh] sm:max-h-[76svh] sm:max-w-3xl sm:translate-y-0', expanded && 'sm:max-w-5xl')}>
+  return <><Dialog open={open} onOpenChange={value => { if (!value) close() }}>
+    <DialogContent showCloseButton={false} initialFocus={focusTitle} className={cn('max-h-[calc(100svh-2rem)] gap-0 overflow-y-auto p-0 sm:top-[20svh] sm:max-h-[76svh] sm:max-w-3xl sm:translate-y-0', expanded && 'sm:max-w-5xl')}>
       <form onSubmit={event => { event.preventDefault(); void create() }} onKeyDown={event => {
         if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
         if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void create() }
@@ -121,7 +159,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="new-issue-title" className="sr-only">{i18nText("IssueDetail.dialog.taskTitleLabel")}</FieldLabel>
-              <Input ref={titleRef} id="new-issue-title" autoComplete="off" maxLength={200} placeholder={i18nText("IssueDetail.dialog.taskTitleLabel")} value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent px-0 py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
+              <Input ref={titleRef} id="new-issue-title" autoFocus autoComplete="off" maxLength={200} placeholder={i18nText("IssueDetail.dialog.taskTitleLabel")} value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent px-0 py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
             </Field>
             <Field>
               <FieldLabel className="sr-only">{i18nText("Editor.descriptionLabel")}</FieldLabel>
@@ -147,4 +185,16 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
       </form>
     </DialogContent>
   </Dialog>
+  <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{i18nText("Issue.create.discardTitle")}</AlertDialogTitle>
+        <AlertDialogDescription>{i18nText("Issue.create.discardDraft")}</AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>{i18nText("Common.cancel")}</AlertDialogCancel>
+        <AlertDialogAction onClick={discard}>{i18nText("Issue.create.discardAction")}</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog></>
 }

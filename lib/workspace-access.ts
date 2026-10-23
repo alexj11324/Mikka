@@ -1,4 +1,4 @@
-import { getTranslations } from 'next-intl/server'
+import { getLocale } from 'next-intl/server'
 import 'server-only'
 import { createHash } from 'node:crypto'
 import { cookies } from 'next/headers'
@@ -9,6 +9,11 @@ import { z } from 'zod'
 import { requireUser } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaces, workspaceMembers, workspaceInvitations } from '@/lib/db/workspace-schema'
+import { defaultWorkspaceName, renameGeneratedWorkspace, type WorkspaceLocale } from '@/lib/workspace-name'
+
+function workspaceLocale(value: string): WorkspaceLocale {
+  return value === 'en' ? 'en' : 'zh-CN'
+}
 
 export class WorkspaceError extends Error {
   constructor(readonly code: string) {
@@ -31,7 +36,7 @@ export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: st
 }
 
 export async function loadWorkspaceContext(requestedId?: string, authenticatedUser?: AuthenticatedUser) {
-  const t = await getTranslations('Members')
+  const locale = workspaceLocale(await getLocale())
   if (requestedId) z.uuid().parse(requestedId)
   const [user, cookieStore] = await Promise.all([authenticatedUser ?? requireUser(), cookies()])
   const readChoices = () => workspaceDb.select({ id: workspaces.id, name: workspaces.name, role: workspaceMembers.role }).from(workspaces)
@@ -44,7 +49,7 @@ export async function loadWorkspaceContext(requestedId?: string, authenticatedUs
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`workspace-owner:${user.id}`}, 0))`)
       const [own] = await tx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.userId, user.id)).limit(1)
       if (own) return
-      const defaultName = user.name ? t('defaultWorkspaceName', { name: user.name }) : t('myWorkspace')
+      const defaultName = defaultWorkspaceName(locale, user.name)
       const hash = createHash('sha256').update(`orvilo-default:${user.id}`).digest('hex')
       const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
       await tx.insert(workspaces).values({ id, userId: user.id, name: defaultName.slice(0, 120) }).onConflictDoNothing()
@@ -55,7 +60,19 @@ export async function loadWorkspaceContext(requestedId?: string, authenticatedUs
 
   const savedId = (cookieStore.get('mikka-workspace') ?? cookieStore.get('orvilo-workspace'))?.value
   const workspaceId = requestedId ?? choices.find(item => item.id === savedId)?.id ?? choices[0]?.id
-  const selected = choices.find(item => item.id === workspaceId)
+  let selected = choices.find(item => item.id === workspaceId)
+  if (selected) {
+    const nextName = renameGeneratedWorkspace(selected.name, locale, user.name)
+    if (nextName) {
+      const [owned] = await workspaceDb.select({ userId: workspaces.userId }).from(workspaces).where(eq(workspaces.id, selected.id)).limit(1)
+      if (owned?.userId === user.id) {
+        const name = nextName.slice(0, 120)
+        await workspaceDb.update(workspaces).set({ name }).where(and(eq(workspaces.id, selected.id), eq(workspaces.userId, user.id)))
+        choices = choices.map(item => item.id === selected?.id ? { ...item, name } : item)
+        selected = choices.find(item => item.id === workspaceId)
+      }
+    }
+  }
   if (!selected) throw new WorkspaceError('workspaceAccessDenied')
   return {
     workspace: { id: selected.id, name: selected.name },

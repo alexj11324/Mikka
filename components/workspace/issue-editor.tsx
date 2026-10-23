@@ -1,10 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
+import type { EditorView } from "@tiptap/pm/view"
 import { useTranslations } from "next-intl"
 import { IssueActivity } from './issue-activity'
 import { useEditor, getSchema, type JSONContent } from "@tiptap/react"
+import { TextSelection } from "@tiptap/pm/state"
 import { Collaboration } from "@tiptap/extension-collaboration"
+import { ySyncPluginKey } from "@tiptap/y-tiptap"
 import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap"
 import * as Y from "yjs"
 import { Check, FileText, MessageSquare, X } from "lucide-react"
@@ -29,7 +32,7 @@ import { RichTextTable, RichTextTableBubble, RICH_TEXT_TABLE_PROSE, RICH_TEXT_TA
 import { DeleteTableDialog } from "@/components/blocks/rich-text-editor-2/components/delete-table-dialog"
 import { createRichTextMention, RICH_TEXT_MENTION_PROSE } from "@/components/blocks/rich-text-editor-2/components/rich-text-mention"
 import { RichTextChanges, useRichTextChanges, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_MARKUP_VIEW, type RichTextMarkupView } from "@/components/blocks/rich-text-editor-3/components/rich-text-changes"
-import { CommentMark, CommentPaint, addThread, createThreadStore, replyToThread, setThreadResolved, repaintComments, canAnchorComment, useCommentAnchors, RICH_TEXT_COMMENT_PROSE } from "@/components/blocks/rich-text-editor-4/components/rich-text-comments"
+import { CommentMark, CommentPaint, addThread, createThreadStore, replyToThread, setThreadResolved, bindThreadRepaint, canAnchorComment, useCommentAnchors, RICH_TEXT_COMMENT_PROSE } from "@/components/blocks/rich-text-editor-4/components/rich-text-comments"
 
 const EMPTY_DOCUMENT: JSONContent = { type: "doc", content: [{ type: "paragraph" }] }
 const EMPTY_THREADS: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadIndex = {}
@@ -78,13 +81,31 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
     ...createEditorExtensions(threadStore.isOpen, author, !!sharedDoc, compact, placeholder),
     ...(sharedDoc ? [Collaboration.configure({ document: sharedDoc })] : []),
   ], [threadStore, author, sharedDoc, compact, placeholder])
+  // useEditor calls setOptions whenever editorProps is a new object. setOptions
+  // re-runs the Yjs binding, so a fresh object on every parent render loops.
+  const editorProps = useMemo(() => ({
+    attributes: { role: "textbox", "aria-label": label, "aria-multiline": "true" },
+    handleKeyDown: (view: EditorView, event: KeyboardEvent) => {
+      if (event.key !== "End" || event.shiftKey || event.altKey || !(event.ctrlKey || event.metaKey) || !view.editable) return false
+      event.preventDefault()
+      try {
+        const end = TextSelection.atEnd(view.state.doc)
+        if (!view.state.selection.eq(end)) view.dispatch(view.state.tr.setSelection(end).scrollIntoView())
+      } catch {
+        return false
+      }
+      return true
+    },
+  }), [label])
   const editor = useEditor({
     extensions,
     content: sharedDoc ? undefined : content ?? EMPTY_DOCUMENT,
     immediatelyRender: false,
-    editorProps: { attributes: { role: "textbox", "aria-label": label, "aria-multiline": "true" } },
+    editorProps,
     onUpdate: ({ editor: current, transaction }) => {
-      if (transaction.docChanged) changeRef.current(current.getJSON())
+      if (!transaction.docChanged || !current.isFocused) return
+      if (transaction.getMeta(ySyncPluginKey)?.isChangeOrigin) return
+      changeRef.current(current.getJSON())
     },
   })
   useEffect(() => {
@@ -111,12 +132,13 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
     editor.storage.richTextChanges.tracking = mode === "suggesting"
     editor.setEditable(editable)
   }, [editor, mode, editable])
-  useEffect(() => { if (editor && !editor.isDestroyed) repaintComments(editor) }, [editor, threads])
   useEffect(() => {
-    const observer = () => { if (editor && !editor.isDestroyed) repaintComments(editor) }
-    threadDoc.on('update', observer)
-    return () => { threadDoc.off('update', observer) }
-  }, [threadDoc, editor])
+    if (!editor) return
+    // Thread resolve/reopen does not change the ProseMirror document, so the
+    // paint plugin would keep the old highlight. Content updates must not
+    // dispatch again: that second transaction crashes Enter, Backspace and Delete.
+    return bindThreadRepaint(editor, threadStore.subscribe)
+  }, [editor, threadStore])
 
   function openLink() {
     if (!editor?.isEditable) return
@@ -152,7 +174,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
           {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
         </div>
       </div>
-      {layout === 'issue' && !compact && <><div className="flex flex-wrap items-center justify-between gap-2 pb-7">
+      {layout === 'issue' && !compact && <><div className="flex flex-wrap items-center justify-between gap-2 pb-2">
         <span className="text-xs text-muted-foreground">{t('hint')}</span>
         <Button variant="ghost" size="xs" onClick={() => setPanel(panel === 'comments' ? '' : 'comments')} aria-expanded={panel === 'comments'}><MessageSquare data-icon="inline-start" />{t('selectionComment')}</Button>
       </div>

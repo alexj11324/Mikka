@@ -174,10 +174,32 @@ export const CommentPaint = Extension.create<CommentPaintOptions>({
   },
 })
 
-/** Re-reads isOpen after a thread resolves or reopens on any client. */
+/** Re-reads isOpen after a thread resolves or reopens on any client.
+ * Content edits already repaint in the plugin. A second transaction from a
+ * Yjs update crashes Enter, Backspace and Delete, so failures stay local. */
 export function repaintComments(editor: Editor) {
   if (editor.isDestroyed) return
-  editor.view.dispatch(editor.state.tr.setMeta(COMMENT_PAINT_KEY, true))
+  try {
+    const view = editor.view
+    if (view.isDestroyed) return
+    view.dispatch(view.state.tr.setMeta(COMMENT_PAINT_KEY, true))
+  } catch {
+    // Decorations can wait for the next edit. Letting this escape blanks the page.
+  }
+}
+
+/** Paints again when thread records change and the document itself does not. */
+export function bindThreadRepaint(editor: Editor, subscribe: (onStoreChange: () => void) => () => void) {
+  let cancelled = false
+  const stop = subscribe(() => {
+    queueMicrotask(() => {
+      if (!cancelled) repaintComments(editor)
+    })
+  })
+  return () => {
+    cancelled = true
+    stop()
+  }
 }
 
 interface CommentShortcutOptions {
