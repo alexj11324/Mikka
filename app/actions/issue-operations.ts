@@ -7,6 +7,7 @@ import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { issues, issueMembers, issueVersions } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
+import { issueVisibility } from '@/lib/issue-visibility'
 import { issueOwnerScope } from '@/lib/issue-owner-scope'
 import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
 import { readIssueMetadata, withIssueMetadata, type IssueMetadata } from '@/lib/issue-metadata'
@@ -20,7 +21,7 @@ export async function listIssueConnections(id: string) {
   const { issue, user } = await requireIssueAccess(id)
   const rows = await db.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, content: issues.content, createdAt: issues.createdAt }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, user.id)))
-    .where(issueOwnerScope(user.id, issue.userId)).orderBy(desc(issues.updatedAt))
+    .where(and(eq(issues.userId, issue.userId), (await issueVisibility(user.id)).predicate)).orderBy(desc(issues.updatedAt))
   const live = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
   const identifiers = await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
   return live.map(({ content, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))

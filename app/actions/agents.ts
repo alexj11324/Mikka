@@ -1,5 +1,7 @@
 'use server'
 
+import { visibleRuns } from '@/lib/agent-runs'
+
 import { headers } from 'next/headers'
 import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
@@ -8,12 +10,12 @@ import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import {
-  agents, agentRuns, deviceRepos, deviceTokens, devices,
+  agents, deviceRepos, deviceTokens, devices,
   SUPPORTED_HARNESSES, type SupportedHarness,
 } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/device-link'
 import { listSshHosts } from '@/lib/ssh'
-import { addRunMessage, queueRun, readRun, requestRunStop, runViewColumns, type RunDetail, type RunView } from '@/lib/agent-runs'
+import { addRunMessage, queueRun, readRun, requestRunStop, type RunDetail, type RunView } from '@/lib/agent-runs'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
 async function getUserId(): Promise<string> {
@@ -223,12 +225,7 @@ export async function startRun(input: { issueId: string; agentId: string; device
 
 export async function listRuns(issueId: string): Promise<RunView[]> {
   const userId = await getUserId()
-  const parsed = z.uuid().safeParse(issueId)
-  if (!parsed.success) return []
-  const rows = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.issueId, parsed.data), eq(agentRuns.userId, userId)))
-    .orderBy(desc(agentRuns.createdAt)).limit(20)
-  return rows
+  return visibleRuns(userId, { issueId })
 }
 
 export async function getRun(runId: string): Promise<RunDetail | null> {

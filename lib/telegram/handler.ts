@@ -1,3 +1,4 @@
+import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 
 import { createHash } from 'node:crypto'
@@ -126,7 +127,7 @@ async function findAccessibleIssues(tx: Transaction, userId: string, match?: { i
   const rows = await tx.select({ issue: issues }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(
-      or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)),
+      (await issueVisibility(userId)).predicate,
       condition,
       sql`${metadata}->>'deletedAt' is null`,
     ))
