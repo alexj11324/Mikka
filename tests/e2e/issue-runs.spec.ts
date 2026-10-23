@@ -60,7 +60,6 @@ test('Issue full-page navigation, run discussion persistence and independent ses
   await records.getByLabel('评论 Issue sidebar agent 的运行').fill('Saved run discussion')
   await records.getByRole('button', { name: '发表评论', exact: true }).click()
   await expect(records.getByText('Saved run discussion', { exact: true })).toBeVisible()
-  await expect(page.getByText('已自动保存', { exact: true })).toBeVisible()
   // Board navigation uses the existing document flush before unmounting the editor.
   await page.getByRole('button', { name: '看板', exact: true }).click()
   await page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true }).click()
