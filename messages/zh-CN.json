@@ -2179,7 +2179,6 @@
     "commentLabel": "评论 {agent} 的运行",
     "postComment": "发表评论",
     "empty": "此任务还没有 agent 运行记录。",
-    "recentLimit": "最多显示当前账号可见的最近 20 次运行。",
     "loading": "正在读取运行记录…",
     "loadFailed": "无法读取运行记录。",
     "retry": "重试",

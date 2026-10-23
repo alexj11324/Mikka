@@ -37,18 +37,18 @@ export function IssueRunSession({ runId, issueId, onClose }: { runId: string; is
   }
   return <Sheet open modal={false} disablePointerDismissal onOpenChange={open => { if (!open) onClose() }}>
     <SheetContent side="right" showOverlay={false}>
-      <SheetHeader><SheetTitle>{t('sessionTitle', { agent: data?.run.agentName ?? t('agent') })}</SheetTitle><SheetDescription>{t('sessionDescription')}</SheetDescription></SheetHeader>
+      <SheetHeader><SheetTitle>{t('sessionTitle', { agent: data?.run.agentName ?? t('agent') })}</SheetTitle><SheetDescription className="sr-only">{t('sessionDescription')}</SheetDescription></SheetHeader>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
-        {error ? <div role="alert"><p>{t('loadFailed')}</p><Button variant="outline" onClick={() => { void mutate() }}>{t('retry')}</Button></div> : data === undefined ? <div role="status" aria-label={t('loading')}><Skeleton className="h-20 w-full" /></div> : !data ? <p role="status">{t('unavailable')}</p> : <>
+        {error ? <div role="alert"><p className="text-sm text-destructive">{t('loadFailed')}</p><Button variant="outline" onClick={() => { void mutate() }}>{t('retry')}</Button></div> : data === undefined ? <div role="status" aria-label={t('loading')}><Skeleton className="h-20 w-full" /></div> : !data ? <p role="status" className="text-sm text-muted-foreground">{t('unavailable')}</p> : <>
           <div role="status" aria-live="polite"><Badge variant="outline">{runStatusKey(data.run.status) ? statusLabel(runStatusKey(data.run.status)!) : data.run.status}</Badge></div>
-          {data.run.error && <p role="alert">{data.run.error}</p>}
+          {data.run.error && <p role="alert" className="text-sm text-destructive">{data.run.error}</p>}
           <div role="log" aria-label={t('output')} className="flex flex-col gap-4">
             {output.map(block => <div key={block.id}><p className="text-xs text-muted-foreground">{t(block.kind)}</p>{block.kind === 'text' ? <AgentMarkdown text={block.text} isStreaming={active} /> : <p className="whitespace-pre-wrap break-words text-sm">{block.text}</p>}</div>)}
-            {!output.length && <p>{t('noOutput')}</p>}
+            {!output.length && <p className="text-sm text-muted-foreground">{t('noOutput')}</p>}
           </div>
           {data.run.report && <IssueRunReport report={data.run.report} />}
-          <section aria-label={t('messages')} className="flex flex-col gap-2"><h3>{t('messages')}</h3>{data.messages.map(entry => <p key={entry.id} className="whitespace-pre-wrap break-words text-sm">{entry.text}</p>)}</section>
-          {active ? <form className="flex flex-col gap-2" onSubmit={event => { event.preventDefault(); void send() }}><FieldGroup><Field><FieldLabel htmlFor={`run-message-${runId}`}>{t('messageLabel')}</FieldLabel><Textarea id={`run-message-${runId}`} value={message} onChange={event => setMessage(event.target.value)} maxLength={10000} disabled={sending} /></Field></FieldGroup>{sendError && <p role="alert">{t('sendFailed')}</p>}<Button type="submit" disabled={sending || !message.trim()}>{sending ? t('sending') : t('send')}</Button></form> : <p>{t('ended')}</p>}
+          <section aria-label={t('messages')} className="flex flex-col gap-2"><h3 className="text-sm font-semibold">{t('messages')}</h3>{data.messages.map(entry => <p key={entry.id} className="whitespace-pre-wrap break-words text-sm">{entry.text}</p>)}</section>
+          {active ? <form className="flex flex-col gap-2" onSubmit={event => { event.preventDefault(); void send() }}><FieldGroup><Field><FieldLabel htmlFor={`run-message-${runId}`}>{t('messageLabel')}</FieldLabel><Textarea id={`run-message-${runId}`} value={message} onChange={event => setMessage(event.target.value)} maxLength={10000} disabled={sending} /></Field></FieldGroup>{sendError && <p role="alert" className="text-sm text-destructive">{t('sendFailed')}</p>}<Button type="submit" disabled={sending || !message.trim()}>{sending ? t('sending') : t('send')}</Button></form> : <p className="text-sm text-muted-foreground">{t('ended')}</p>}
         </>}
       </div>
     </SheetContent>

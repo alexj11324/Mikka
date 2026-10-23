@@ -2179,7 +2179,6 @@
     "commentLabel": "Comment on {agent}’s run",
     "postComment": "Post comment",
     "empty": "No agent runs for this issue yet.",
-    "recentLimit": "Up to 20 recent runs visible to your account.",
     "loading": "Loading runs…",
     "loadFailed": "Could not load the run.",
     "retry": "Retry",
