@@ -1,11 +1,11 @@
 import { test, expect, register, app } from './fixtures'
 
 // Network failure is the action under test, not an ignored application exception.
-test.use({ expectedConsoleErrors: [{ path: app('/'), message: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED' }] })
+test.use({ trace: 'on', expectedConsoleErrors: [{ path: app('/'), message: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED' }] })
 
 for (const width of [1280, 402]) {
   for (const layout of ['board', 'list'] as const) {
-    test(`offline refresh keeps ${layout} bounds stable at ${width}px`, async ({ page, context }) => {
+    test(`offline refresh keeps ${layout} bounds stable at ${width}px`, async ({ page, context }, testInfo) => {
       await page.setViewportSize({ width, height: 900 })
       await register(page)
       // Open the task view from the responsive navigation.
@@ -33,6 +33,13 @@ for (const width of [1280, 402]) {
       const before = await toolbar.boundingBox()
       expect(before).not.toBeNull()
 
+      const capture = async (name: string) => {
+        const path = testInfo.outputPath(`${name}.png`)
+        await page.screenshot({ path, fullPage: true })
+        await testInfo.attach(name, { path, contentType: 'image/png' })
+      }
+      await capture('online-before')
+
       // SWR intentionally pauses polling once navigator.onLine is false. Cut an
       // in-flight refresh instead, as happens when a real connection drops.
       await page.route('**/mikka', async route => {
@@ -45,11 +52,13 @@ for (const width of [1280, 402]) {
         await expect(notice).toBeVisible({ timeout: 30000 })
         await expect.poll(() => toolbar.boundingBox()).toEqual(before)
         await expect.poll(() => content.boundingBox()).toEqual(contentBefore)
+        await capture('offline-notice')
         if (layout === 'board') await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
         await context.setOffline(false)
         await expect(notice).toHaveCount(0, { timeout: 20000 })
         await expect.poll(() => toolbar.boundingBox()).toEqual(before)
         await expect.poll(() => content.boundingBox()).toEqual(contentBefore)
+        await capture('online-recovered')
       } finally {
         await context.setOffline(false)
         await page.unroute('**/mikka')
