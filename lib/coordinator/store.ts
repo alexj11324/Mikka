@@ -177,7 +177,7 @@ export async function citationSources(userId: string, texts: readonly string[]):
 /** The latest of the conversation for the chat, oldest first. */
 export async function chatView(userId: string, limit = 200): Promise<ChatView> {
   const [session] = await db.select().from(coordinatorSessions).where(eq(coordinatorSessions.userId, userId)).limit(1)
-  const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
+  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(eq(coordinatorMessages.userId, userId))
     .orderBy(desc(coordinatorMessages.position)).limit(limit)
   // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.
