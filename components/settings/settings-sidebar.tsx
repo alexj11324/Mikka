@@ -17,12 +17,12 @@ import { withBasePath } from '@/lib/base-path'
 function GithubIcon() { return <img src={withBasePath('/icons/github.svg')} alt="" className="size-4 shrink-0" /> }
 
 const navigation = [
-  { title: 'Personal', items: [
+  { title: 'Personal', key: 'personal', items: [
     { title: 'Preferences', section: 'preferences', icon: SlidersHorizontal },
     { title: 'Profile', section: 'profile', icon: UserRound },
     { title: 'Integrations', section: 'integrations', icon: Plug },
   ] },
-  { title: 'Features', items: [
+  { title: 'Features', key: 'features', items: [
     { title: 'AI & agents', icon: Sparkles },
     { title: 'Loops', icon: Orbit },
     { title: 'Initiatives', icon: Flag },
@@ -33,11 +33,11 @@ const navigation = [
     { title: 'Asks', icon: HandHelping },
     { title: 'Emojis', icon: Smile },
   ] },
-  { title: 'Integrations', items: [
+  { title: 'Integrations', key: 'integrations', items: [
     { title: 'All integrations', icon: Blocks },
     { title: 'GitHub', icon: GithubIcon },
   ] },
-  { title: 'Administration', items: [
+  { title: 'Administration', key: 'administration', items: [
     { title: 'Workspace', section: 'workspace', icon: Building2 },
     { title: 'Teams', section: 'teams', icon: SquareUserRound },
     { title: 'Members', section: 'members', icon: Users },
@@ -101,9 +101,9 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
       {navigation.map(group => {
         const items = group.items.filter(item => {
           const label = 'section' in item ? i18nText(`Settings.sections.${item.section}.title` as never) : item.title
-          return `${group.title} ${item.title} ${label}`.toLowerCase().includes(normalizedQuery) && (activeSection || !('section' in item) || (item.section !== 'teams' && item.section !== 'members'))
+          return `${group.title} ${i18nText(`Settings.groups.${group.key}`)} ${item.title} ${label}`.toLowerCase().includes(normalizedQuery) && (activeSection || !('section' in item) || (item.section !== 'teams' && item.section !== 'members'))
         })
-        return items.length > 0 && <SidebarGroup key={group.title} className="py-2"><SidebarGroupLabel lang="en">{group.title}</SidebarGroupLabel><SidebarMenu>{items.map(item => {
+        return items.length > 0 && <SidebarGroup key={group.title} className="py-2"><SidebarGroupLabel>{i18nText(`Settings.groups.${group.key}`)}</SidebarGroupLabel><SidebarMenu>{items.map(item => {
           const id = 'section' in item ? item.section : undefined
           const label = id ? i18nText(`Settings.sections.${id}.title` as never) : item.title
           const selected = id === section && !selectedTeamId && !creating
@@ -111,7 +111,7 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
           return <SidebarMenuItem key={item.title}><SidebarMenuButton aria-label={label} disabled={!id || !!release && !release.enabled} data-feature-flag={release?.key} title={release?.reason} render={id && activeSection ? <Link href={href(id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => { if (id && !activeSection) onSectionChange(id); setOpenMobile(false) }}><item.icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
         })}</SidebarMenu></SidebarGroup>
       })}
-      {activeSection && <SidebarGroup className="py-2"><SidebarGroupLabel lang="en">Your teams</SidebarGroupLabel><SidebarMenu>{joinedTeams.map(team => {
+      {activeSection && <SidebarGroup className="py-2"><SidebarGroupLabel>{i18nText("Settings.groups.yourTeams")}</SidebarGroupLabel><SidebarMenu>{joinedTeams.map(team => {
         const selected = selectedTeamId === team.id
         const teamHref = `/settings/teams?workspace=${encodeURIComponent(team.workspaceId)}&team=${encodeURIComponent(team.id)}`
         return <SidebarMenuItem key={team.id}><SidebarMenuButton render={<Link href={teamHref} />} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => setOpenMobile(false)}><SquareUserRound className="text-info" /><span>{team.name}</span></SidebarMenuButton></SidebarMenuItem>
