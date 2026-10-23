@@ -9,11 +9,11 @@ import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { Google } from '@/components/ui/svgs/google'
 
-type Toolkit = 'notion' | 'slack'
+type Toolkit = 'gmail' | 'notion' | 'slack'
 type Account = { id: string; toolkit: Toolkit; status: string }
 type IntegrationState = { configured: boolean; callbackVerifierConfigured: boolean; webhookConfigured: boolean; accounts: Account[] }
 
-const TOOLKITS: Toolkit[] = ['notion', 'slack']
+const TOOLKITS: Toolkit[] = ['gmail', 'notion', 'slack']
 const integrationPath = withBasePath('/api/integrations/composio')
 
 export function IntegrationsSettings({ googleEnabled, showWebhookDetails = true }: { googleEnabled: boolean; showWebhookDetails?: boolean }) {
@@ -144,8 +144,8 @@ export function IntegrationsSettings({ googleEnabled, showWebhookDetails = true 
     <SettingsSection id="connected-apps-heading" title={t('heading')} description={t('description')}>
       {TOOLKITS.map(toolkit => {
         const accounts = state?.accounts.filter(item => item.toolkit === toolkit) ?? []
-        const title = toolkit === 'notion' ? t('notion') : t('slack')
-        const description = toolkit === 'notion' ? t('notionDescription') : t('slackDescription')
+        const title = t(toolkit)
+        const description = t(`${toolkit}Description`)
         return <SettingRow key={toolkit} title={title} description={description}>
           <div className="flex flex-col items-end gap-2">
             {accounts.map(account => <div key={account.id} className="flex items-center gap-3">
