@@ -132,7 +132,7 @@
 --project-action-foreground: oklch(0.985 0 0);
 --label-violet: var(--color-violet-600);
 --label-blue: var(--color-blue-600);
---shell-chrome: oklch(0.955 0 0);
+--shell-chrome: oklch(0.97 0 0);
 --shell-panel: oklch(0.982 0 0);
 --shell-raised: oklch(1 0 0);
 --avatar-1: var(--color-blue-500);

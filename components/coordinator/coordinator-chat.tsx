@@ -1,13 +1,17 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { ArrowUp, Send } from 'lucide-react'
+import { ArrowUp, Plus, Send } from 'lucide-react'
+import { toast } from 'sonner'
 import { getCoordinatorChat, sendCoordinatorMessage, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import { listTaskRuns } from '@/app/actions/task-runs'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { cn } from '@/lib/utils'
+import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
+import { Input } from '@/components/ui/input'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { useActionError } from '@/lib/use-action-error'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
@@ -28,6 +32,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000, revalidateOnFocus: false })
   const working = [...new Map((runs ?? []).filter(run => ['preparing', 'running', 'finishing'].includes(run.status)).map(run => [run.agentId, run.agentName])).values()]
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const fileId = useId()
   const actionError = useActionError()
   const { data, mutate, error: loadError } = useSWR<Chat>('coordinator-chat', () => getCoordinatorChat(), {
     refreshInterval: latest => latest?.working ? 2000 : 10000,
@@ -59,6 +65,17 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       return true
     } catch { setSendError(actionError()); return false } finally { setSending(false) }
   }
+  async function attach(files: File[]) {
+    let next = draft
+    for (const file of files) {
+      const block = await textAttachment(file, 10_000 - next.length - 2)
+      if (!block) { toast.error(tShell('attachUnsupported', { max: 10_000 })); continue }
+      next = next.trim() ? `${next.trimEnd()}\n\n${block}` : block
+    }
+    setDraft(next)
+    inputRef.current?.focus()
+  }
+
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
@@ -96,14 +113,18 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     <div className={cn('mx-auto flex w-full max-w-3xl flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4')}>
       {!compact && working.length > 0 && <p className="flex items-center gap-3 px-2 text-xs text-muted-foreground"><span>{tShell('whoIsWorking')}</span><span className="flex [&>*+*]:-ml-1.5">{working.slice(0, 5).map(name => <LetterAvatar key={name} name={name} size="stack" />)}</span><span>{tShell('agentsWorking', { count: working.length })}</span></p>}
       {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
-      {data && !data.enabled && <Alert><AlertTitle>{t('disabledTitle')}</AlertTitle><AlertDescription>{t('disabledDescription')}</AlertDescription></Alert>}
       {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
+      {/* Grok-style composer: one rounded bar, attach on the left, send on the right. */}
       <form onSubmit={send}>
-        <InputGroup className="rounded-2xl bg-muted/50">
-          <InputGroupTextarea ref={inputRef} aria-label={t('input')} placeholder={placeholder ?? tShell('coordinatorPlaceholder')} className={cn(compact ? 'min-h-12' : 'min-h-16')} value={draft} maxLength={10_000} rows={2} disabled={sending} onChange={event => setDraft(event.target.value)} onKeyDown={onKeyDown} />
-          <InputGroupAddon align="block-end">
-            <InputGroupButton type="submit" variant="default" size="icon-sm" className="ml-auto" aria-label={t('send')} disabled={sending || !draft.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>
+        <FieldGroup className="sr-only"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
+        <InputGroup className="min-h-12 rounded-3xl bg-background shadow-xs">
+          <InputGroupAddon align="inline-start" className="self-end pb-2">
+            <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
+          </InputGroupAddon>
+          <InputGroupTextarea ref={inputRef} aria-label={t('input')} placeholder={placeholder ?? t('input')} className="max-h-48 min-h-12 py-3.5" value={draft} maxLength={10_000} rows={1} disabled={sending} onChange={event => setDraft(event.target.value)} onKeyDown={onKeyDown} />
+          <InputGroupAddon align="inline-end" className="self-end pb-2">
+            <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" aria-label={t('send')} disabled={sending || !draft.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
       </form>

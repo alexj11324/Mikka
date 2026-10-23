@@ -13,17 +13,19 @@ export function WorkspaceContentLoading() {
   </div>
 }
 
+/** The first paint: the same window frame as the app (window bar, rail, one card) so nothing jumps when it arrives. */
 export function WorkspaceLoading() {
-  return <div className="flex min-h-dvh bg-background text-foreground">
-    <aside aria-hidden="true" className="hidden w-64 shrink-0 flex-col gap-6 border-r bg-sidebar p-4 md:flex">
-      <Skeleton className="h-8 w-32" />
-      <Skeleton className="h-8 w-full" />
-      <div className="flex flex-col gap-3">{Array.from({ length: 6 }, (_, index) => <Skeleton key={index} className="h-8 w-full" />)}</div>
-      <Skeleton className="mt-auto h-10 w-full" />
-    </aside>
-    <main className="flex min-w-0 flex-1 flex-col">
-      <div aria-hidden="true" className="flex h-12 shrink-0 items-center gap-3 px-4"><Skeleton className="size-6" /><Skeleton className="h-4 w-32" /></div>
-      <WorkspaceContentLoading />
-    </main>
+  return <div className="flex h-svh flex-col overflow-hidden bg-shell-chrome text-foreground">
+    <div aria-hidden="true" className="hidden h-11 shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center gap-3 pr-2 pl-3 md:grid"><span /><Skeleton className="h-7 w-full rounded-full" /><span /></div>
+    <div className="flex min-h-0 flex-1 md:pr-2 md:pb-2">
+      <div aria-hidden="true" className="hidden w-14 shrink-0 flex-col items-center gap-1 pt-1 md:flex">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="size-9 rounded-lg" />)}</div>
+      <div className="flex min-w-0 flex-1 overflow-hidden bg-background md:rounded-xl md:shadow-xs md:ring-1 md:ring-border">
+        <aside aria-hidden="true" className="hidden w-64 shrink-0 flex-col gap-3 border-r p-3 md:flex">
+          <Skeleton className="h-8 w-24" />
+          {Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-12 w-full rounded-xl" />)}
+        </aside>
+        <main className="flex min-w-0 flex-1 flex-col"><WorkspaceContentLoading /></main>
+      </div>
+    </div>
   </div>
 }

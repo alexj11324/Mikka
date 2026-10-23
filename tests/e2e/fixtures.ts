@@ -10,8 +10,8 @@ export function app(path: string) {
   return `${BASE_PATH}${path}`
 }
 
-/** Buttons on the left icon rail (对话 / 看板 / 插件). Phones have no rail. */
-export function rail(page: Page, name: '对话' | '看板' | '插件') {
+/** Buttons on the left icon rail (主页 / 看板 / 插件). Phones have no rail. */
+export function rail(page: Page, name: '主页' | '看板' | '插件') {
   return page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name, exact: true })
 }
 

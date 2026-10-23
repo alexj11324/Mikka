@@ -48,7 +48,7 @@ export function AgentPanel({ userId, initialHistory, request, onActive, onSessio
 function AgentHistoryLoading({ error, onRetry }: { error?: Error; onRetry: () => void }) {
   const agentCopy = useAgentCopy()
 
-  return <section aria-label={agentCopy.agentConversationWorkspace} aria-busy={!error} className="flex h-[calc(100svh-4rem)] flex-col gap-4 p-4">
+  return <section aria-label={agentCopy.agentConversationWorkspace} aria-busy={!error} className="flex h-full min-h-0 flex-col gap-4 p-4">
     {error ? <><p role="alert">{agentCopy.chatHistoryFailedToLoad}</p><Button variant="outline" onClick={onRetry}>{agentCopy.retry}</Button></> : <><Skeleton className="h-14 w-full" /><Skeleton className="h-20 w-2/3" /><Skeleton className="mt-auto h-24 w-full" /></>}
   </section>
 }

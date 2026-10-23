@@ -1,23 +1,74 @@
 'use client'
 
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { PanelRightClose, PanelRightOpen } from 'lucide-react'
+import { Box, CircleUserRound, Columns3, Flag, List, ListFilter, PanelRightClose, PanelRightOpen, Plus, RefreshCw, Settings2, SquareKanban, Tag, X } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import { listAgents } from '@/app/actions/agents'
+import { listTaskRuns } from '@/app/actions/task-runs'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
+import { ConversationPill } from '@/components/nav/conversation-pill'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
+import { AGENT_STATES, CARD_PROPERTIES, DEFAULT_CARD_PROPERTIES, DEFAULT_HIDDEN_COLUMNS, agentStateOf, type AgentState, type CardProperty } from '@/components/blocks/kanban-board-1/components/data'
 import { Button } from '@/components/ui/button'
+import { ButtonGroup, ButtonGroupText } from '@/components/ui/button-group'
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
+import { Toggle } from '@/components/ui/toggle'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+import { statusIconTints } from '@/lib/status-appearance'
 import { IssueBoard } from './issue-board'
+import { IssueList } from './issue-list'
+import { AgentSphere } from './issue-assignee-menu'
+import { LabelDot } from './issue-metadata-controls'
+import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from './issue-properties'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
+type Scope = 'all' | 'workspace' | 'personal'
+type FilterField = 'status' | 'priority' | 'assignee' | 'labels' | 'project' | 'agentState'
+type Filters = Partial<Record<FilterField, string[]>>
+type Sort = 'priority' | 'updated' | 'created'
+type Completed = 'all' | 'week' | 'month'
+type Display = { sort: Sort; completed: Completed; showEmpty: boolean; properties: CardProperty[]; hidden: IssueStatus[] }
 
-const MINE_KEY = 'mikka:board-only-mine'
+const SETTINGS_KEY = 'mikka:board-v2'
 const SIDEBAR_KEY = 'mikka:board-coordinator-open'
+const ME = 'me'
+const NONE = 'none'
+const DEFAULT_DISPLAY: Display = { sort: 'priority', completed: 'week', showEmpty: true, properties: DEFAULT_CARD_PROPERTIES, hidden: DEFAULT_HIDDEN_COLUMNS }
+const DEFAULT_SETTINGS = { scope: 'all' as Scope, view: 'board' as 'board' | 'list', filters: { assignee: [ME] } as Filters, display: DEFAULT_DISPLAY }
+const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 }
+const COMPLETED_DAYS: Record<Completed, number> = { all: Infinity, week: 7, month: 30 }
+const FILTER_FIELDS: { field: FilterField; icon: typeof Flag }[] = [
+  { field: 'status', icon: ISSUE_STATUSES[1].icon }, { field: 'priority', icon: Flag }, { field: 'assignee', icon: CircleUserRound },
+  { field: 'labels', icon: Tag }, { field: 'project', icon: Box }, { field: 'agentState', icon: SquareKanban },
+]
+
+/** Board settings kept per browser: scope, view, filters and the 显示 options. */
+function useBoardSettings() {
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? 'null')
+      if (stored) setSettings(current => ({ ...current, ...stored, display: { ...current.display, ...stored.display } }))
+    } catch { /* storage unavailable */ }
+  }, [])
+  function update(patch: Partial<typeof DEFAULT_SETTINGS>) {
+    setSettings(current => {
+      const next = { ...current, ...patch }
+      try { window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(next)) } catch { /* storage unavailable */ }
+      return next
+    })
+  }
+  return [settings, update] as const
+}
 
 function useStoredFlag(key: string, fallback: boolean) {
   const [value, setValue] = useState(fallback)
@@ -32,50 +83,161 @@ function useStoredFlag(key: string, fallback: boolean) {
 }
 
 /**
- * The board as its own page (MIK-24, Figma 57:2 / 57:94): one 只看我的 switch,
- * four columns of title-and-agent cards, and the Coordinator conversation in a
- * 360px sidebar that folds into a pill (MIK-45).
+ * The board page, v2 (Figma 77:2): scope segment, filters, Linear sync, board
+ * or list, 显示 options and 新建任务 over five status columns, with the
+ * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
-export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
+export function BoardPage({ issues, userId, onOpen, onCreateIssue, onUpdated, onBusyChange }: {
   issues: Issue[]
   userId: string
   onOpen: (id: string) => boolean | void
+  onCreateIssue: () => void
   onUpdated: () => Promise<unknown>
   onBusyChange: (busy: boolean) => void
 }) {
   const t = useTranslations('Shell.board')
   const tNav = useTranslations('Nav')
-  const switchId = useId()
-  const [onlyMine, setOnlyMine] = useStoredFlag(MINE_KEY, true)
+  const tIssue = useTranslations('Issue')
+  const titleId = useId()
+  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
+  const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
+  const [settings, update] = useBoardSettings()
+  const { scope, view, filters, display } = settings
   const [sidebar, setSidebar] = useStoredFlag(SIDEBAR_KEY, true)
+  const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
   const { data: agents } = useSWR('agents', () => listAgents(), { revalidateOnFocus: false })
-  const myAgents = new Set((agents ?? []).map(agent => agent.id))
+  const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000, revalidateOnFocus: false })
+  const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
+  const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run.status); return state ? [[run.issueId, state] as const] : [] })), [runs])
+  const subtasks = useMemo(() => {
+    const result = new Map<string, { done: number; total: number }>()
+    for (const issue of issues) {
+      const parent = issue.metadata.parentId
+      if (parent) { const entry = result.get(parent) ?? { done: 0, total: 0 }; entry.total++; if (issue.status === 'done') entry.done++; result.set(parent, entry) }
+    }
+    for (const issue of issues) if (!result.has(issue.id) && issue.checklist.total) result.set(issue.id, { done: issue.checklist.checked, total: issue.checklist.total })
+    return result
+  }, [issues])
+
   // Mine: assigned to me, created by me, or held by one of my agents.
-  const shown = onlyMine ? issues.filter(issue => issue.ownerId === userId || issue.metadata.assignee?.id === userId || (issue.metadata.assignee?.kind === 'agent' && myAgents.has(issue.metadata.assignee.id))) : issues
+  const isMine = (issue: Issue) => issue.ownerId === userId || issue.metadata.assignee?.id === userId || (issue.metadata.assignee?.kind === 'agent' && myAgents.has(issue.metadata.assignee.id))
+  const valuesOf = (issue: Issue, field: FilterField): string[] => {
+    switch (field) {
+      case 'status': return [issue.status]
+      case 'priority': return [issue.priority]
+      case 'assignee': return [...(isMine(issue) ? [ME] : []), issue.metadata.assignee?.id ?? NONE]
+      case 'labels': return issue.metadata.labels.map(label => label.name)
+      case 'project': return [issue.metadata.project ?? NONE]
+      case 'agentState': return [agentStates.get(issue.id) ?? NONE]
+    }
+  }
+  const now = Date.now()
+  const shown = issues
+    .filter(issue => scope === 'all' || issue.scope === scope)
+    .filter(issue => Object.entries(filters).every(([field, values]) => !values?.length || valuesOf(issue, field as FilterField).some(value => values.includes(value))))
+    .filter(issue => issue.status !== 'done' || now - new Date(issue.updatedAt).getTime() <= COMPLETED_DAYS[display.completed] * 86400000)
+    .toSorted((a, b) => display.sort === 'priority' ? (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9) || +new Date(b.updatedAt) - +new Date(a.updatedAt)
+      : +new Date(display.sort === 'created' ? b.createdAt : b.updatedAt) - +new Date(display.sort === 'created' ? a.createdAt : a.updatedAt))
+  const count = (status: IssueStatus) => shown.filter(issue => issue.status === status).length
+  const columns = ISSUE_STATUSES.map(status => status.value).filter(status => !display.hidden.includes(status) && (display.showEmpty || count(status) > 0))
+  const hidden = display.hidden.map(status => ({ status, count: count(status) }))
+
+  // Every value a filter can take, from the tasks on the board.
+  const assignees = [...new Map(issues.flatMap(issue => issue.metadata.assignee ? [[issue.metadata.assignee.id, issue.metadata.assignee] as const] : [])).values()]
+  const labels = [...new Map(issues.flatMap(issue => issue.metadata.labels.map(label => [label.name, label] as const))).values()]
+  const projects = [...new Set(issues.flatMap(issue => issue.metadata.project ? [issue.metadata.project] : []))]
+  const options: Record<FilterField, { value: string; label: string; mark?: React.ReactNode }[]> = {
+    status: ISSUE_STATUSES.map(status => ({ value: status.value, label: statusLabel(status.value), mark: <status.icon className={cn(statusIconTints[status.tone])} /> })),
+    priority: ISSUE_PRIORITIES.map(priority => ({ value: priority.value, label: priorityLabel(priority.value), mark: <priority.icon {...priority.iconProps} /> })),
+    assignee: [{ value: ME, label: t('me') }, ...assignees.filter(assignee => assignee.id !== userId).map(assignee => ({ value: assignee.id, label: assignee.name, mark: assignee.kind === 'agent' ? <AgentSphere name={assignee.name} compact /> : <LetterAvatar name={assignee.name} size="row" /> })), { value: NONE, label: t('unassigned'), mark: <CircleUserRound /> }],
+    labels: labels.map(label => ({ value: label.name, label: label.name, mark: <LabelDot color={label.color} /> })),
+    project: [...projects.map(project => ({ value: project, label: project, mark: <Box /> })), { value: NONE, label: t('noProject') }],
+    agentState: [...AGENT_STATES.map(state => ({ value: state, label: t(`card.agent.${state}` as `card.agent.${AgentState}`) })), { value: NONE, label: t('noRun') }],
+  }
+  function toggleFilter(field: FilterField, value: string) {
+    const current = filters[field] ?? []
+    const next = current.includes(value) ? current.filter(item => item !== value) : [...current, value]
+    update({ filters: { ...filters, [field]: next } })
+  }
+  const setDisplay = (patch: Partial<Display>) => update({ display: { ...display, ...patch } })
+  const activeFilters = (Object.entries(filters) as [FilterField, string[]][]).filter(([, values]) => values?.length)
+
   return <div className="flex min-h-0 flex-1">
-    <section aria-labelledby={`${switchId}-title`} className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-6 pt-5 pb-3 sm:px-8">
-      <header className="flex flex-col gap-3">
-        <div className="flex items-baseline gap-3">
-          <h1 id={`${switchId}-title`} className="text-xl font-semibold">{t('title')}</h1>
-          <p className="text-xs text-muted-foreground">{t('synced')}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Switch id={switchId} checked={onlyMine} onCheckedChange={setOnlyMine} className="data-checked:bg-sidebar-primary" />
-          <Label htmlFor={switchId} className="font-normal">{t('onlyMine')}</Label>
-        </div>
-      </header>
-      {!sidebar && <Button variant="secondary" className="absolute top-4 right-6 h-9 gap-2 rounded-full pr-3 pl-1.5 font-semibold shadow-md" aria-expanded={false} aria-label={t('expand')} onClick={() => setSidebar(true)}>
+    <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex h-14 shrink-0 items-center justify-center">
+        <p data-slot="conversation-pill" className="flex h-8 items-center gap-1.5 rounded-full bg-muted px-3 text-sm font-medium">
+          <SquareKanban aria-hidden="true" className="size-4 text-muted-foreground" /><span id={titleId}>{t('title')}</span>
+        </p>
+      </div>
+      {!sidebar && <Button variant="secondary" className="absolute top-3 right-4 h-9 gap-2 rounded-full pr-3 pl-1.5 font-semibold shadow-md" aria-expanded={false} aria-label={t('expand')} onClick={() => setSidebar(true)}>
         <LetterAvatar name="Coordinator" tone="coordinator" size="pill" />{tNav('coordinator')}<PanelRightOpen data-icon="inline-end" />
       </Button>}
-      <IssueBoard issues={shown} onOpen={id => { onOpen(id) }} onUpdated={onUpdated} onBusyChange={onBusyChange} />
-    </section>
-    {sidebar && <aside aria-label={tNav('coordinator')} className="hidden w-90 shrink-0 flex-col border-l bg-shell-panel lg:flex">
-      <div className="flex h-14 shrink-0 items-center gap-2.5 px-4">
-        <LetterAvatar name="Coordinator" tone="coordinator" size="pill" />
-        <h2 className="flex-1 text-sm font-semibold">{tNav('coordinator')}</h2>
-        <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('collapse')} aria-expanded onClick={() => setSidebar(false)} />}><PanelRightClose data-icon="inline-start" /></TooltipTrigger><TooltipContent side="left">{t('collapse')}</TooltipContent></Tooltip>
+      <div role="toolbar" aria-label={t('toolbar')} className="flex shrink-0 flex-wrap items-center gap-2 px-5 pb-3">
+        <ToggleGroup aria-label={t('scopeLabel')} size="sm" spacing={0} className="rounded-lg bg-muted p-0.5" value={[scope]} onValueChange={values => { const next = values[0] as Scope | undefined; if (next) update({ scope: next }) }}>
+          {(['all', 'workspace', 'personal'] as const).map(value => <ToggleGroupItem key={value} value={value} className="h-7 rounded-md px-3 font-normal text-muted-foreground aria-pressed:bg-background aria-pressed:font-medium aria-pressed:text-foreground aria-pressed:shadow-xs">{t(`scope.${value}`)}</ToggleGroupItem>)}
+        </ToggleGroup>
+        <Separator orientation="vertical" className="mx-1 h-5" />
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="text-muted-foreground" />}><ListFilter data-icon="inline-start" />{t('filter')}</DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52"><DropdownMenuGroup>
+            {FILTER_FIELDS.map(({ field, icon: Icon }) => <DropdownMenuSub key={field}>
+              <DropdownMenuSubTrigger><Icon />{t(`filterField.${field}`)}</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="max-h-80 w-52 overflow-y-auto">
+                {options[field].map(option => <DropdownMenuCheckboxItem key={option.value} checked={filters[field]?.includes(option.value) ?? false} closeOnClick={false} onCheckedChange={() => toggleFilter(field, option.value)}>{option.mark}<span className="truncate">{option.label}</span></DropdownMenuCheckboxItem>)}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>)}
+          </DropdownMenuGroup></DropdownMenuContent>
+        </DropdownMenu>
+        {activeFilters.map(([field, values]) => <ButtonGroup key={field} aria-label={t(`filterField.${field}`)}>
+          <ButtonGroupText className="h-6 px-2 text-xs text-muted-foreground">{t(`filterField.${field}`)}</ButtonGroupText>
+          <ButtonGroupText className="h-6 max-w-48 truncate px-2 text-xs">{values.map(value => options[field].find(option => option.value === value)?.label ?? value).join(', ')}</ButtonGroupText>
+          <Button variant="outline" size="icon-xs" aria-label={t('removeFilter', { field: t(`filterField.${field}`) })} onClick={() => update({ filters: { ...filters, [field]: [] } })}><X data-icon="inline-start" /></Button>
+        </ButtonGroup>)}
+        <div className="ml-auto flex items-center gap-1">
+          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('synced')} className="text-success-foreground" onClick={() => { void onUpdated() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{t('synced')}</TooltipContent></Tooltip>
+          <ToggleGroup aria-label={t('viewLabel')} size="sm" spacing={0} value={[view]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') update({ view: next }) }}>
+            <ToggleGroupItem value="board" aria-label={t('viewBoard')}><Columns3 /></ToggleGroupItem>
+            <ToggleGroupItem value="list" aria-label={t('viewList')}><List /></ToggleGroupItem>
+          </ToggleGroup>
+          <Popover>
+            <PopoverTrigger render={<Button variant="ghost" size="sm" />}><Settings2 data-icon="inline-start" />{t('display')}</PopoverTrigger>
+            <PopoverContent align="end" className="w-80 gap-3">
+              <div className="flex items-center justify-between gap-3"><Label>{t('sort')}</Label>
+                <Select value={display.sort} onValueChange={value => setDisplay({ sort: value as Sort })} items={(['priority', 'updated', 'created'] as const).map(value => ({ value, label: t(`sortBy.${value}`) }))}>
+                  <SelectTrigger size="sm" className="w-28" aria-label={t('sort')}><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectGroup>{(['priority', 'updated', 'created'] as const).map(value => <SelectItem key={value} value={value}>{t(`sortBy.${value}`)}</SelectItem>)}</SelectGroup></SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between gap-3"><Label>{t('completed')}</Label>
+                <Select value={display.completed} onValueChange={value => setDisplay({ completed: value as Completed })} items={(['week', 'month', 'all'] as const).map(value => ({ value, label: t(`completedRange.${value}`) }))}>
+                  <SelectTrigger size="sm" className="w-28" aria-label={t('completed')}><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectGroup>{(['week', 'month', 'all'] as const).map(value => <SelectItem key={value} value={value}>{t(`completedRange.${value}`)}</SelectItem>)}</SelectGroup></SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between gap-3"><Label htmlFor={`${titleId}-empty`}>{t('showEmpty')}</Label><Switch id={`${titleId}-empty`} checked={display.showEmpty} onCheckedChange={showEmpty => setDisplay({ showEmpty })} /></div>
+              <p className="pt-2 text-xs text-muted-foreground">{t('cardProperties')}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {CARD_PROPERTIES.map(property => <Toggle key={property} size="sm" variant="outline" pressed={display.properties.includes(property)} className="h-7 rounded-md px-2 text-xs font-normal aria-pressed:border-sidebar-primary/30 aria-pressed:bg-sidebar-primary/10 aria-pressed:text-sidebar-primary" onPressedChange={pressed => setDisplay({ properties: pressed ? [...display.properties, property] : display.properties.filter(item => item !== property) })}>{t(`property.${property}`)}</Toggle>)}
+              </div>
+              <p className="pt-2 text-xs text-muted-foreground">{t('hiddenColumns')}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {ISSUE_STATUSES.map(status => { const isHidden = display.hidden.includes(status.value); return <Toggle key={status.value} size="sm" variant="outline" pressed={isHidden} aria-label={t(isHidden ? 'showColumn' : 'hideColumnNamed', { status: statusLabel(status.value) })} className={cn('h-7 rounded-md px-2 text-xs font-normal aria-pressed:border-sidebar-primary/30 aria-pressed:bg-sidebar-primary/10 aria-pressed:text-sidebar-primary', !isHidden && 'text-muted-foreground')} onPressedChange={pressed => setDisplay({ hidden: pressed ? [...display.hidden, status.value] : display.hidden.filter(item => item !== status.value) })}><status.icon className={cn(statusIconTints[status.tone])} />{statusLabel(status.value)}</Toggle> })}
+              </div>
+            </PopoverContent>
+          </Popover>
+          <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={onCreateIssue}><Plus data-icon="inline-start" />{t('newTask')}</Button>
+        </div>
       </div>
-      <CoordinatorChat compact placeholder={t('coordinatorPlaceholder')} onOpenIssue={id => { onOpen(id) }} />
+      {view === 'board'
+        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} context={{ properties: new Set(display.properties), agentStates, subtasks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { setSidebar(true); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
+        : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={onCreateIssue} /></div>}
+    </section>
+    {sidebar && <aside aria-label={tNav('coordinator')} className="relative hidden w-90 shrink-0 flex-col border-l lg:flex">
+      {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}
+      <ConversationPill name={tNav('coordinator')} tone="coordinator" />
+      <div className="absolute top-3.5 right-3 z-20"><Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('collapse')} aria-expanded onClick={() => setSidebar(false)} />}><PanelRightClose data-icon="inline-start" /></TooltipTrigger><TooltipContent side="left">{t('collapse')}</TooltipContent></Tooltip></div>
+      <div aria-hidden="true" className="h-14 shrink-0" />
+      <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { onOpen(id) }} />
     </aside>}
   </div>
 }

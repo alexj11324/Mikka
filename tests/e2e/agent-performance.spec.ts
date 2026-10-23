@@ -90,7 +90,7 @@ test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 �
 
   await rail(page, '看板').click()
   const returnStart = await page.evaluate(() => performance.now())
-  await rail(page, '对话').click()
+  await rail(page, '主页').click()
   panel = await assertInteractiveWithinBudget(page, info, '返回会话', returnStart, '第三轮性能验收的已保存正文')
   expect(historyRequests).toHaveLength(2)
 

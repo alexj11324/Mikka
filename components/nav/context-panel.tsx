@@ -194,7 +194,7 @@ export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue
   const [tab, setTab] = useState<PanelTab>('tasks')
   const [wide, setWide] = useState(false)
   const waiting = runs.filter(run => run.status === 'waiting_input' && issues.some(issue => issue.id === run.issueId)).length
-  return <aside aria-label={t('label')} className={cn('sticky top-10 hidden h-[calc(100svh-2.5rem)] shrink-0 flex-col border-l bg-shell-panel transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90')}>
+  return <aside aria-label={t('label')} className={cn('hidden min-h-0 shrink-0 flex-col border-l transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90')}>
     <Tabs value={tab} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
       <div className="flex h-11 shrink-0 items-center gap-1 px-2">
         <TabsList aria-label={t('tabs')} className="gap-0.5 bg-transparent p-0">

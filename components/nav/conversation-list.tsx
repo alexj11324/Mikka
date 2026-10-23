@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
+import { cn } from '@/lib/utils'
 import { sessionPreview, type SavedAgentSession } from '@/lib/agent-history'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { LetterAvatar } from './letter-avatar'
@@ -93,8 +94,7 @@ export function ConversationList({ sessions, active, onOpen, rail, onRail, user,
   const unread = useUnread(activeId, latest)
   function choose(conversation: Conversation) { onOpen(conversation); setOpenMobile(false) }
   const untitled = i18nText('Nav.untitledConversation')
-  return <Sidebar collapsible="offcanvas" mobileTitle={i18nText('Nav.sidebarTitle')} mobileDescription={i18nText('Nav.sidebarDescription')} mobileCloseLabel={i18nText('Common.close')}
-    className="md:top-10 md:h-[calc(100svh-2.5rem)] data-[side=left]:left-14 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] [&>[data-slot=sidebar-inner]]:bg-shell-panel">
+  const body = <>
     <SidebarHeader className="px-3 pt-3 pb-1">
       <div className="flex h-8 items-center gap-1 pl-1">
         <MikkaMark />
@@ -123,6 +123,12 @@ export function ConversationList({ sessions, active, onOpen, rail, onRail, user,
       <SidebarMenu>{RAIL_ITEMS.filter(item => item.id !== 'conversations').map(item => <SidebarMenuItem key={item.id}><SidebarMenuButton isActive={rail === item.id} onClick={() => { onRail(item.id); setOpenMobile(false) }}><item.icon /><span>{i18nText(item.label)}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
       <SidebarMenu><SidebarMenuItem><WorkspaceMenu user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} onBeforeChange={onBeforeChange} /></SidebarMenuItem></SidebarMenu>
     </SidebarFooter>}
-    <SidebarRail aria-label={i18nText('Nav.sidebarRail')} title={i18nText('Workspace.toggleSidebar')} aria-expanded={isMobile ? openMobile : open} />
-  </Sidebar>
+  </>
+  if (isMobile) return <Sidebar collapsible="offcanvas" mobileTitle={i18nText('Nav.sidebarTitle')} mobileDescription={i18nText('Nav.sidebarDescription')} mobileCloseLabel={i18nText('Common.close')}>{body}</Sidebar>
+  // On desktop the list is the first column inside the card; it folds to nothing and the rail stays.
+  return <div data-slot="conversation-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} className={cn('relative hidden shrink-0 overflow-hidden border-r transition-[width] duration-150 ease-out motion-reduce:transition-none md:block', open ? 'w-64' : 'w-0 border-r-0')}>
+    <Sidebar collapsible="none" className="w-64 bg-transparent">{body}</Sidebar>
+    {/* Comma's edge toggle: an invisible strip along the edge that shows a hairline on hover. */}
+    <SidebarRail label={i18nText('Nav.sidebarRail')} title={i18nText('Nav.collapseList')} className="right-0 left-auto w-2 cursor-col-resize ltr:translate-x-0 rtl:translate-x-0 after:inset-y-3 after:start-auto after:right-0 after:w-px after:bg-border after:opacity-0 after:transition-opacity hover:after:opacity-100" />
+  </div>
 }
