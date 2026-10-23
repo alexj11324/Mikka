@@ -166,15 +166,8 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
 
   return <div className="flex min-h-0 flex-1">
     <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex h-14 shrink-0 items-center justify-center">
-        <p data-slot="conversation-pill" className="flex h-8 items-center gap-1.5 rounded-full bg-muted px-3 text-sm font-medium">
-          <SquareKanban aria-hidden="true" className="size-4 text-muted-foreground" /><span id={titleId}>{t('title')}</span>
-        </p>
-      </div>
-      {!sidebar && <Button variant="secondary" className="absolute top-3 right-4 h-9 gap-2 rounded-full pr-3 pl-1.5 font-semibold shadow-md" aria-expanded={false} aria-label={t('expand')} onClick={() => setSidebar(true)}>
-        <LetterAvatar name="Coordinator" tone="coordinator" size="pill" />{tNav('coordinator')}<PanelRightOpen data-icon="inline-end" />
-      </Button>}
-      <div role="toolbar" aria-label={t('toolbar')} className="flex shrink-0 flex-wrap items-center gap-2 px-5 pb-3">
+      <h1 id={titleId} className="sr-only">{t('title')}</h1>
+      <div role="toolbar" aria-label={t('toolbar')} className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 px-5 py-3">
         <ToggleGroup aria-label={t('scopeLabel')} size="sm" spacing={0} className="rounded-lg bg-muted p-0.5" value={[scope]} onValueChange={values => { const next = values[0] as Scope | undefined; if (next) update({ scope: next }) }}>
           {(['all', 'workspace', 'personal'] as const).map(value => <ToggleGroupItem key={value} value={value} className="h-7 rounded-md px-3 font-normal text-muted-foreground aria-pressed:bg-background aria-pressed:font-medium aria-pressed:text-foreground aria-pressed:shadow-xs">{t(`scope.${value}`)}</ToggleGroupItem>)}
         </ToggleGroup>
@@ -228,6 +221,9 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
             </PopoverContent>
           </Popover>
           <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setNewTask({})}><Plus data-icon="inline-start" />{t('newTask')}</Button>
+          {!sidebar && <Button variant="secondary" size="sm" className="ml-1 gap-2 rounded-full pr-3 pl-1 font-semibold" aria-expanded={false} aria-label={t('expand')} onClick={() => setSidebar(true)}>
+            <LetterAvatar name="Coordinator" tone="coordinator" size="pill" />{tNav('coordinator')}<PanelRightOpen data-icon="inline-end" />
+          </Button>}
         </div>
       </div>
       {view === 'board'
