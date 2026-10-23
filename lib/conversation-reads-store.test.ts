@@ -7,6 +7,7 @@ import { handleRead, originAllowed, requestHost, type ReadRequest } from './conv
 // Pure checks always run. DB checks need a reachable MIKKA_DATABASE_URL whose
 // schema already has conversation_reads (applied by scripts/migrate.mjs; the
 // test never creates tables) and skip otherwise, e.g. in the UI policy CI job.
+// CONVERSATION_READS_REQUIRE_DB=1 turns that skip into a failure (CI DB job).
 // Locally: ~/.mikka/local-run.sh pnpm test:conversation-reads
 
 test('request host: first x-forwarded-host value wins, Host is the fallback', () => {
@@ -51,7 +52,12 @@ const post = (messageId: unknown, over: Partial<ReadRequest> = {}) => handleRead
 
 before(async () => {
   const probed = await probe(process.env.MIKKA_DATABASE_URL)
-  if (typeof probed === 'string') { skipReason = probed; return }
+  if (typeof probed === 'string') {
+    // CI with a real Postgres service sets this so a broken DB fails loudly instead of skipping.
+    if (process.env.CONVERSATION_READS_REQUIRE_DB === '1') throw new Error(`CONVERSATION_READS_REQUIRE_DB=1 but ${probed}`)
+    skipReason = probed
+    return
+  }
   pool = probed
   // alice: 1 user, 2 assistant(+tool)+3 assistant = one reply, 4 user, 5 assistant, 6 event (user) ; bob: 1 assistant
   const rows: [string, string, number, object][] = [
