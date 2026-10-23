@@ -95,7 +95,7 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     await db.insert(issueMembers).values({ issueId: root.id, userId: owner, memberId: member })
     // #127 correctly denies a stale invitation to a personal issue. The actor
     // collaboration matrix needs an explicitly published, workspace-linked task.
-    assert.deepEqual(await actAs(member, () => saveIssue({ ...input, id: root.id, revision: 1 })), { error: 'issueNotFound' })
+    assert.deepEqual(await actAs(member, () => saveIssue({ ...input, id: root.id, revision: 1 })), { error: 'issueNotFound', params: undefined })
     await history(root.id, 'user', owner)
     await publishFixture(root.id)
     let saved = expectIssue(await actAs(member, () => saveIssue({ ...input, id: root.id, revision: 1, title: 'Member edit' })))
