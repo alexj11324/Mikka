@@ -1,4 +1,5 @@
 import 'server-only'
+import { noteLogUser } from '@/lib/request-log'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { headers } from 'next/headers'
 import { eq } from 'drizzle-orm'
@@ -21,9 +22,11 @@ export function actAs<T>(userId: string, fn: () => Promise<T>): Promise<T> {
 export async function currentUser(): Promise<{ id: string; name: string; email: string; image?: string | null } | null> {
   const userId = actingUser.getStore()
   if (userId) {
+    noteLogUser(userId)
     const [user] = await db.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(users).where(eq(users.id, userId)).limit(1)
     return user ?? null
   }
   const session = await auth.api.getSession({ headers: await headers() })
+  noteLogUser(session?.user?.id)
   return session?.user ?? null
 }

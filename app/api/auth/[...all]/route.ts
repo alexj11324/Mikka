@@ -1,3 +1,4 @@
+import { withRequestLog } from '@/lib/request-log'
 import { auth } from '@/lib/auth'
 import { BASE_PATH } from '@/lib/base-path'
 import { toNextJsHandler } from 'better-auth/next-js'
@@ -15,5 +16,5 @@ function withBasePathURL(route: (request: Request) => Promise<Response>) {
   }
 }
 
-export const GET = withBasePathURL(handler.GET)
-export const POST = withBasePathURL(handler.POST)
+export const GET = withRequestLog('/api/auth/[...all]', withBasePathURL(handler.GET))
+export const POST = withRequestLog('/api/auth/[...all]', withBasePathURL(handler.POST))

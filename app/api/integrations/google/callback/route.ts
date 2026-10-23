@@ -1,3 +1,4 @@
+import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPathname } from '@/i18n/navigation'
 import { routing } from '@/i18n/routing'
@@ -5,7 +6,7 @@ import { auth } from '@/lib/auth'
 import { withBasePath } from '@/lib/base-path'
 import { completeGoogleLink } from '@/lib/google-link'
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   const requestedLocale = request.nextUrl.searchParams.get('locale')
   const locale = routing.locales.includes(requestedLocale as typeof routing.locales[number])
     ? requestedLocale as typeof routing.locales[number]
@@ -18,6 +19,8 @@ export async function GET(request: NextRequest) {
   }
 
   const session = await auth.api.getSession({ headers: request.headers })
+
+  noteLogUser(session?.user?.id)
   if (!session?.user) return redirectResult('failed')
 
   try {
@@ -30,3 +33,5 @@ export async function GET(request: NextRequest) {
     return redirectResult('failed')
   }
 }
+
+export const GET = withRequestLog('/api/integrations/google/callback', handleGET)

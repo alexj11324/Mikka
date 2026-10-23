@@ -1,3 +1,4 @@
+import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, authBaseURL } from '@/lib/auth'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
@@ -19,7 +20,7 @@ function integrationRedirect(request: NextRequest, result: string) {
   return NextResponse.redirect(url)
 }
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   if (!isComposioCallbackVerifierConfigured(authBaseURL, BASE_PATH)) {
     return new Response('Composio callback verifier is not configured.', { status: 503, headers: noStore })
   }
@@ -30,6 +31,8 @@ export async function GET(request: NextRequest) {
   }
 
   const session = await auth.api.getSession({ headers: request.headers })
+
+  noteLogUser(session?.user?.id)
   if (!session?.user) {
     const params = new URLSearchParams({ next: COMPOSIO_AUTH_CALLBACK_PATH })
     const response = NextResponse.redirect(new URL(withBasePath(`/sign-in?${params}`), request.url))
@@ -66,3 +69,5 @@ export async function GET(request: NextRequest) {
     return response
   }
 }
+
+export const GET = withRequestLog('/api/integrations/composio/callback', handleGET)
