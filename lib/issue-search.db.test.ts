@@ -34,7 +34,7 @@ let clock = 0
 async function issue(tx: Tx, ownerId: string, title: string, metadata: Record<string, unknown> = {}) {
   const id = randomUUID()
   const content = { type: 'doc', content: [], attrs: { mikka: metadata } }
-  await tx.execute(sql`insert into issues (id, "userId", title, content, status, priority, "updatedAt") values (${id}, ${ownerId}, ${title}, ${JSON.stringify(content)}::jsonb, 'todo', 'none', now() + make_interval(secs => ${++clock}))`)
+  await tx.execute(sql`insert into issues (id, "userId", title, content, status, priority, "updatedAt") values (${id}, ${ownerId}, ${title}, ${JSON.stringify(content)}::jsonb, 'todo', 'normal', now() + make_interval(secs => ${++clock}::int))`)
   return id
 }
 async function member(tx: Tx, issueId: string, ownerId: string, memberId: string) {
