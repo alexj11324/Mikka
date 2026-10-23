@@ -51,7 +51,8 @@ test('worker events: questions and blocks need the person, reports go to the mod
   const report = { kind: 'run_report' as const, payload: { text: 'Migrated the users table' } }
   assert.equal(ruleTier(report), null)
   assert.deepEqual(triageState(report), { agentProgressNote: 'Migrated the users table' })
-  assert.match(triageQuestions(report).needsPerson.instructions, /progress note/)
+  assert.match(triageQuestions(report)[0].instructions, /progress note/)
+  assert.equal(triageQuestions(report)[0].type, 'predicate')
   assert.equal(tierFromDecision(0.9, 'run_report'), 'attention')
   assert.equal(tierFromDecision(0.1, 'run_report'), 'background')
 })
