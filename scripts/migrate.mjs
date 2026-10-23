@@ -4,9 +4,12 @@
 // skip it.
 //
 // A file targets MIKKA_DATABASE_URL unless its first lines contain
-// `-- target: DATABASE_URL` (the workspace database).
+// `-- target: DATABASE_URL` (the workspace database). A file with
+// `-- migrate: no-transaction` in its header runs statement by statement,
+// outside a transaction; see scripts/migration-steps.mjs for its rules.
 import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
+import { migrationSteps } from './migration-steps.mjs'
 
 const shouldRun = process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production'
 if (!shouldRun) {
@@ -34,7 +37,8 @@ for (const name of files) {
   const target = /^--\s*target:\s*(\w+)/m.exec(sql)?.[1] ?? 'MIKKA_DATABASE_URL'
   if (!(target in targets)) throw new Error(`migrate: ${name} names unknown target ${target}`)
   if (!byTarget.has(target)) byTarget.set(target, [])
-  byTarget.get(target).push({ name, sql })
+  // Validated up front so a bad file fails before anything is applied.
+  byTarget.get(target).push({ name, steps: migrationSteps(name, sql) })
 }
 
 for (const [target, pending] of byTarget) {
@@ -45,12 +49,13 @@ for (const [target, pending] of byTarget) {
     await pool.query('create table if not exists schema_migrations (name text primary key, "appliedAt" timestamptz not null default now())')
     const { rows } = await pool.query('select name from schema_migrations')
     const applied = new Set(rows.map((row) => row.name))
-    for (const { name, sql } of pending) {
+    for (const { name, steps } of pending) {
       if (applied.has(name)) continue
       const client = await pool.connect()
       try {
         // Files may manage their own transaction; the record is written after.
-        await client.query(sql)
+        // No-transaction files arrive as several steps, each its own autocommit query.
+        for (const step of steps) await client.query(step)
         await client.query('insert into schema_migrations (name) values ($1)', [name])
         console.log(`migrate: applied ${name} to ${target}`)
       } finally {
