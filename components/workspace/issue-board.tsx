@@ -125,7 +125,7 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
 
   return <section aria-label={t('label')} className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 px-4 pb-2 sm:px-6">
     <div className="flex shrink-0 items-center justify-between gap-3">
-      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || t('instructions')}</p>
+      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message}</p>
       <div className="flex shrink-0 items-center gap-1">
         <Button type="button" variant="ghost" size="icon-sm" aria-label={t('scrollLeft')} aria-controls={viewportId} disabled={!canScroll.left} onClick={() => scrollBoard(-1)}><ChevronLeft data-icon="inline-start" /></Button>
         <Button type="button" variant="ghost" size="icon-sm" aria-label={t('scrollRight')} aria-controls={viewportId} disabled={!canScroll.right} onClick={() => scrollBoard(1)}><ChevronRight data-icon="inline-start" /></Button>

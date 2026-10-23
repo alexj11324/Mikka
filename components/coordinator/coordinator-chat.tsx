@@ -8,7 +8,7 @@ import { getCoordinatorChat, sendCoordinatorMessage, type CoordinatorChat as Cha
 import { useActionError } from '@/lib/use-action-error'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from '@/components/ui/message-scroller'
@@ -62,7 +62,7 @@ export function CoordinatorChat({ onOpenIssue }: { onOpenIssue: (id: string) => 
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={t('conversation')}>
           <MessageScrollerContent className="mx-auto w-full max-w-3xl px-4 py-6">
-            {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyMedia variant="icon"><Send /></EmptyMedia><EmptyTitle>{t('emptyTitle')}</EmptyTitle><EmptyDescription>{t('emptyDescription')}</EmptyDescription></EmptyHeader></Empty>}
+            {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyMedia variant="icon"><Send /></EmptyMedia><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty>}
             {items.map(item => <MessageScrollerItem key={item.position} messageId={String(item.position)} scrollAnchor={item.from === 'person'}>
               {item.from === 'event'
                 ? <p className="text-center text-xs text-muted-foreground">{item.text.replace(/^\[Event\]\s*/, '')}</p>
