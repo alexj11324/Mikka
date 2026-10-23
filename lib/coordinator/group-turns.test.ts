@@ -129,7 +129,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     assert.equal(await processGroupTurn(scoped,id,runtime),false)
     assert.equal((await scoped.query('SELECT error,"agentId" FROM group_turns WHERE "messageId"=$1',[interrupted])).rows[0].error,'interrupted_generation_not_replayed')
     const revoked = await send(id,'revoked workspace',[a])
-    await assert.rejects(processGroupTurn(scoped,id,{...runtime,async authorized() {return false},async generate() {assert.fail('revoked actor must not generate')}}),UnknownMentionError)
+    await assert.rejects(processGroupTurn(scoped,id,{...runtime,async authorized() {return false},async generate() {assert.fail('revoked actor must not generate')}}),/no_longer_authorized/)
     assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[revoked])).rows[0].status,'failed')
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
   } finally { await scoped.end(); await pool.query(`DROP SCHEMA "${schema}" CASCADE`); await pool.end() }
