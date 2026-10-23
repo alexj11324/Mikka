@@ -168,6 +168,10 @@ jobs:
         run: REQUIRE_DB=1 pnpm test:visibility-db
       - name: Issue search and indexed pagination (temporary Postgres 17 only)
         run: REQUIRE_DB=1 pnpm test:issue-search-db
+      - name: Actor history writers and idempotent migration (temporary Postgres 17 only)
+        run: pnpm test:activity-actor-db
+        env:
+          REQUIRE_DB: '1'
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
       - run: pnpm build
