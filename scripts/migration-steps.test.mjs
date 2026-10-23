@@ -85,7 +85,9 @@ dbTest('applyMigration: INVALID index after execution fails and is not recorded'
   const client = new pg.Client({ connectionString: databaseUrl })
   await client.connect()
   const schema = `mig_test_${process.pid}_${Date.now()}`
-  t.after(async () => { await client.query(`drop schema if exists ${schema} cascade`); await client.end() })
+  // The dev-local bridge pools server connections and does not reset session state, so the
+  // search_path set below must be reset explicitly or it leaks into other clients.
+  t.after(async () => { try { await client.query('reset search_path'); await client.query(`drop schema if exists ${schema} cascade`) } finally { await client.end() } })
   await client.query(`create schema ${schema}; set search_path to ${schema}`)
   await client.query('create table schema_migrations (name text primary key); create table t (a int); insert into t values (1), (1)')
   const recorded = async () => (await client.query('select name from schema_migrations')).rows.map(r => r.name)
