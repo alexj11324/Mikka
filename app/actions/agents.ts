@@ -8,12 +8,17 @@ import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import {
-  agents, agentRuns, deviceRepos, deviceTokens, devices,
+  agents, agentRuns, deviceRepos, deviceTokens, devices, issueMembers,
   SUPPORTED_HARNESSES, type SupportedHarness,
 } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/device-link'
 import { listSshHosts } from '@/lib/ssh'
 import { addRunMessage, queueRun, readRun, requestRunStop, runViewColumns, type RunDetail, type RunView } from '@/lib/agent-runs'
+import { requireIssueAccess } from '@/lib/issue-access'
+import { workspaceDb } from '@/lib/workspace-db'
+import { teamIssues } from '@/lib/db/team-schema'
+import { workspaceMembers } from '@/lib/db/workspace-schema'
+import { ISSUE_RUN_SUMMARY_LIMIT, projectIssueRunSummaries, type IssueRunSummary } from '@/lib/issue-run-summary'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
 async function getUserId(): Promise<string> {
@@ -229,6 +234,31 @@ export async function listRuns(issueId: string): Promise<RunView[]> {
     .where(and(eq(agentRuns.issueId, parsed.data), eq(agentRuns.userId, userId)))
     .orderBy(desc(agentRuns.createdAt)).limit(20)
   return rows
+}
+
+/** Current collaborators see bounded lifecycle summaries, never another owner's private output or controls. */
+export async function listIssueRunSummaries(issueId: string): Promise<IssueRunSummary[]> {
+  const { issue, user } = await requireIssueAccess(issueId)
+  // A team-linked issue follows the same active-workspace membership rule as requireIssueAccess.
+  // Direct issue membership must not resurrect access after removal from its workspace.
+  const [link] = await workspaceDb.select({ workspaceId: teamIssues.workspaceId }).from(teamIssues)
+    .where(eq(teamIssues.issueId, issue.id)).limit(1)
+  let memberIds: string[]
+  if (link) {
+    const members = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, link.workspaceId), eq(workspaceMembers.status, 'active')))
+    memberIds = members.map(member => member.id)
+  } else {
+    const members = await db.select({ id: issueMembers.memberId }).from(issueMembers).where(eq(issueMembers.issueId, issue.id))
+    memberIds = [issue.userId, ...members.map(member => member.id)]
+  }
+  if (!memberIds.includes(user.id)) return []
+  // Explicit selection and projection are independent privacy boundaries. No joins to private agents/chunks/messages.
+  const rows = await db.select({ id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId,
+    status: agentRuns.status, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt }).from(agentRuns)
+    .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, memberIds)))
+    .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_RUN_SUMMARY_LIMIT)
+  return projectIssueRunSummaries(rows, issue.id, user.id, new Set(memberIds))
 }
 
 export async function getRun(runId: string): Promise<RunDetail | null> {

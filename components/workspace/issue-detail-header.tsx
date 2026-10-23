@@ -27,8 +27,8 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
       <Breadcrumb aria-label={t('breadcrumb')} className="min-w-0"><BreadcrumbList className="flex-nowrap gap-2 sm:gap-2">
         <BreadcrumbItem className="hidden shrink-0 md:inline-flex"><span className="max-w-40 truncate" title={workspaceName}>{workspaceName}</span></BreadcrumbItem>
         <BreadcrumbSeparator className="hidden md:block" />
-        <BreadcrumbItem className="hidden shrink-0 sm:inline-flex"><Button variant="ghost" size="xs" disabled={pending} onClick={onClose}>{tDetail('breadcrumbTask')}</Button></BreadcrumbItem>
-        <BreadcrumbSeparator className="hidden sm:block" />
+        <BreadcrumbItem className="shrink-0"><Button variant="ghost" size="xs" disabled={pending} onClick={onClose}>{tDetail('breadcrumbBoard')}</Button></BreadcrumbItem>
+        <BreadcrumbSeparator />
         <BreadcrumbItem className="min-w-0"><BreadcrumbPage className="flex min-w-0 items-center gap-2"><span className="shrink-0">{issueIdentifier({ identifier })}</span><span className="hidden truncate text-muted-foreground lg:inline" title={title}>{title}</span></BreadcrumbPage></BreadcrumbItem>
       </BreadcrumbList></Breadcrumb>
     </div>
