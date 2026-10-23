@@ -2,6 +2,9 @@
 -- MIK-11/12. Additive tables only; normal implicit transaction, no existing-table scans.
 -- Production build applies this migration. IF NOT EXISTS makes retries safe.
 SET LOCAL lock_timeout = '5s';
+-- Serialize two copies of this additive migration (IF NOT EXISTS alone can race
+-- PostgreSQL type/catalog creation). Other migration families still need the runner lock.
+SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || '.group-conversations', 0));
 CREATE TABLE IF NOT EXISTS conversations (
  id uuid PRIMARY KEY, "workspaceId" uuid NOT NULL,
  kind text NOT NULL CHECK (kind IN ('group','agent_dm')), title text NOT NULL,

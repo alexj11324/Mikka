@@ -48,10 +48,13 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
   const scoped = new Pool({ connectionString: dbURL, max: 16, options: `-c search_path=${schema}` })
   try {
     const migration = await readFile(new URL('../drizzle/20261023152500_group_conversations.sql', import.meta.url), 'utf8')
-    await scoped.query(migration)
+    await Promise.all([scoped.query(migration), scoped.query(migration)])
     await scoped.query(migration) // production retry / coexistence with #69
     const reads = await readFile(new URL('../tests/fixtures/conversation-reads-69.sql', import.meta.url), 'utf8')
-    await scoped.query(reads)
+    await scoped.query(reads) // this migration first, then #69
+    await scoped.query('DROP TABLE conversation_reads')
+    await scoped.query(reads) // #69 first, then this migration
+    await scoped.query(migration)
     const run = (changes: Partial<GroupRequest>) => handleGroup(scoped, directory, { ...base, ...changes })
     for (const input of [undefined, '{', JSON.stringify({ workspaceId, title: '', members: [] }), JSON.stringify({ workspaceId: randomUUID(), title: 'foreign' }), JSON.stringify({ workspaceId, title: 'private', members: [{ memberType: 'agent', memberId: privateAgent }] })]) {
       assert.ok([404, 422].includes((await run({ method: 'POST', body: input })).status))
