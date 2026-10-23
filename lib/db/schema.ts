@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, numeric, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -20,8 +20,19 @@ export const issues = pgTable('issues', {
   title: varchar('title', { length: 200 }).notNull(),
   content: jsonb('content').$type<JSONContent>().notNull(),
   status: text('status').notNull(), priority: text('priority').notNull(),
+  // Workspace issues sync with Linear; personal ones never leave Mikka (MIK-46).
+  scope: text('scope').$type<'workspace' | 'personal'>().notNull().default('personal'),
+  // The agent judges scope at creation; a person's change wins and teaches the next judgment (MIK-47).
+  scopeSetBy: text('scopeSetBy').$type<'agent' | 'user'>().notNull().default('agent'),
+  scopeConfidence: real('scopeConfidence'),
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+// The personal issue prefix someone chose; without a row it comes from their email (MIK-46).
+export const issuePrefixes = pgTable('issue_prefixes', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  prefix: varchar('prefix', { length: 4 }).notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 export const agentSessions = pgTable('agent_sessions', {
@@ -246,14 +257,6 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
-/** One call to the decision model, with what it cost, so the month's spend can be capped. */
-export const decisionCalls = pgTable('decision_calls', {
-  id: uuid('id').primaryKey(), purpose: text('purpose').notNull(), model: text('model').notNull(),
-  inputTokens: integer('inputTokens').notNull().default(0),
-  costUsd: numeric('costUsd', { precision: 12, scale: 8 }).notNull(),
-  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('decision_calls_created_idx').on(table.createdAt)])
-
 // --- Suggestions (MIK-41) ---------------------------------------------------
 //
 // External notifications from connected apps, judged by fixed rules or the
@@ -300,6 +303,12 @@ export const briefings = pgTable('briefings', {
   total: integer('total').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.userId, table.localDate] })])
+
+/** When the person's Composio trigger subscriptions were last checked (lib/suggestions/sources.ts). */
+export const suggestionTriggerChecks = pgTable('suggestion_trigger_checks', {
+  userId: text('userId').primaryKey(),
+  checkedAt: timestamp('checkedAt', { withTimezone: true }).notNull(),
+})
 
 /** The Coordinator's conversation, one AI SDK model message per row, in `position` order. */
 export const coordinatorMessages = pgTable('coordinator_messages', {

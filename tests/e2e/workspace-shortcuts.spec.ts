@@ -1,4 +1,4 @@
-import { test, expect, register } from './fixtures'
+import { test, expect, register, rail } from './fixtures'
 
 for (const { platform, modifier } of [
   { platform: 'macOS', modifier: '⌘' },
@@ -15,8 +15,9 @@ for (const { platform, modifier } of [
     await expect(settings.locator('[data-slot="kbd-group"]')).toHaveCount(1)
     await expect(settings.locator('[data-slot="kbd"]')).toHaveText([modifier, ','])
     await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: '搜索任务', exact: true }).hover()
+    await page.getByRole('button', { name: '打开全局搜索', exact: true }).hover()
     await expect(page.locator('[data-slot="tooltip-content"] [data-slot="kbd"]')).toHaveText([modifier, 'K'])
+    await rail(page, '看板').click()
     await page.getByRole('button', { name: '新建任务', exact: true }).click()
     const create = page.getByRole('dialog', { name: '新建任务', exact: true })
     await expect(create.locator('footer [data-slot="kbd"]')).toHaveText([modifier, 'Enter'])

@@ -47,7 +47,7 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
   await pool.query(`CREATE SCHEMA "${schema}"`)
   const scoped = new Pool({ connectionString: dbURL, max: 16, options: `-c search_path=${schema}` })
   try {
-    const migration = await readFile(new URL('../drizzle/20261023152500_group_conversations.sql', import.meta.url), 'utf8')
+    const migration = await readFile(new URL('../drizzle/20261023213851_group_conversations.sql', import.meta.url), 'utf8')
     await Promise.all([scoped.query(migration), scoped.query(migration)])
     await scoped.query(migration) // production retry / coexistence with #69
     const reads = await readFile(new URL('../tests/fixtures/conversation-reads-69.sql', import.meta.url), 'utf8')

@@ -45,7 +45,7 @@ function TaskCard({ task, status, disabled, isOverlay = false, onOpen, onStatusC
   const controlsDisabled = disabled || isOverlay
   const card = <Card size="sm" className={cn('select-none gap-2 shadow-xs transition-shadow hover:ring-foreground/20 hover:shadow-sm', isOverlay && 'pointer-events-none shadow-lg')}>
     <CardHeader className="flex min-w-0 items-center justify-between gap-2">
-      <CardDescription className="truncate tabular-nums">{issueIdentifier(task.metadata.number, tIssue('unassignedNumber'))}</CardDescription>
+      <CardDescription className="truncate tabular-nums">{issueIdentifier(task, tIssue('unassignedNumber'))}</CardDescription>
       <div className="flex shrink-0 items-center gap-1">
         <CardControlBoundary><IssuePropertyMenu label={tIssue('priorityLabel')} value={task.priority} options={priorityOptions} icon={Flag} iconOnly compact pill disabled={controlsDisabled} onChange={value => onPriorityChange(task, value)} /></CardControlBoundary>
         <CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary>
