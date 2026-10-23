@@ -10,7 +10,6 @@ import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumn
 import { Button } from '@/components/ui/button'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { LabelDot, IssueMetadataControls, type MetadataRequest, type MetadataSavedIssue } from '@/components/workspace/issue-metadata-controls'
 import { IssuePropertyMenu } from '@/components/workspace/issue-property-menu'
 import { CardControlBoundary, CardCreatedAt } from '@/components/workspace/issue-card-controls'
@@ -140,28 +139,6 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   </KanbanItem>
 }
 
-/** Column-top quick add (Figma 86:2): type a title, Enter saves into this column, Escape drops it. */
-function InlineCreate({ status, onCreate, onClose }: { status: IssueStatus; onCreate: (status: IssueStatus, title: string) => Promise<boolean>; onClose: () => void }) {
-  const t = useTranslations('Shell.board')
-  const [title, setTitle] = useState('')
-  const [saving, setSaving] = useState(false)
-  async function submit() {
-    const value = title.trim()
-    if (!value || saving) return
-    setSaving(true)
-    const ok = await onCreate(status, value)
-    setSaving(false)
-    if (ok) setTitle('')
-  }
-  return <div className="rounded-lg border border-sidebar-primary bg-card p-2 shadow-xs ring-3 ring-sidebar-primary/20">
-    <Input autoFocus aria-label={t('inlineTitle')} placeholder={t('inlineTitle')} value={title} disabled={saving} className="h-8 border-0 px-1 shadow-none focus-visible:ring-0 dark:bg-transparent" onChange={event => setTitle(event.target.value)} onBlur={() => { if (!title.trim()) onClose() }} onKeyDown={event => {
-      if (event.nativeEvent.isComposing) return
-      if (event.key === 'Enter') { event.preventDefault(); void submit() }
-      if (event.key === 'Escape') { event.preventDefault(); onClose() }
-    }} />
-  </div>
-}
-
 type KanbanBoardProps = Omit<ComponentProps<typeof Kanban<BoardTask>>, 'children' | 'getItemValue'> & {
   value: BoardColumns
   columns: IssueStatus[]
@@ -172,7 +149,7 @@ type KanbanBoardProps = Omit<ComponentProps<typeof Kanban<BoardTask>>, 'children
   viewportId: string
   instructionsId: string
   onViewportKeyDown: ComponentProps<'div'>['onKeyDown']
-  onCreate: (status: IssueStatus, title: string) => Promise<boolean>
+  onCreate: (status: IssueStatus) => void
   onHideColumn: (status: IssueStatus) => void
   onShowColumn: (status: IssueStatus) => void
 } & CardHandlers
@@ -183,7 +160,6 @@ export function KanbanBoard({ columns, hiddenColumns: hidden, context, pending =
   const tBoard = useTranslations('Shell.board')
   const tIssue = useTranslations('Issue')
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
-  const [adding, setAdding] = useState<IssueStatus | null>(null)
   const shown = BOARD_COLUMNS.filter(column => columns.includes(column.value))
   return <Kanban {...props} getItemValue={item => item.id} className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
     <BoardScrollArea viewportRef={viewportRef} id={viewportId} role="region" aria-label={t('horizontalScroll')} aria-describedby={instructionsId} tabIndex={0} onKeyDown={onViewportKeyDown}>
@@ -199,16 +175,15 @@ export function KanbanBoard({ columns, hiddenColumns: hidden, context, pending =
                 <DropdownMenu>
                   <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" className="ml-auto text-muted-foreground" aria-label={tBoard('columnMenu', { status: statusLabel(column.value) })} />}><Ellipsis /></DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => setAdding(column.value)}><Plus />{tBoard('newTask')}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onCreate(column.value)}><Plus />{tBoard('newTask')}</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onHideColumn(column.value)}><EyeOff />{tBoard('hideColumn')}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button variant="ghost" size="icon-xs" className="text-muted-foreground" aria-label={t('newTaskIn', { status: statusLabel(column.value) })} disabled={pending} onClick={() => setAdding(column.value)}><Plus /></Button>
+                <Button variant="ghost" size="icon-xs" className="text-muted-foreground" aria-label={t('newTaskIn', { status: statusLabel(column.value) })} disabled={pending} onClick={() => onCreate(column.value)}><Plus /></Button>
               </div>
               <KanbanColumnContent value={column.value} className="min-h-0 flex-1 gap-1.5 overflow-y-auto overscroll-y-contain p-0.5" aria-label={t('columnContent', { status: statusLabel(column.value) })}>
-                {adding === column.value && <InlineCreate status={column.value} onCreate={onCreate} onClose={() => setAdding(null)} />}
                 {tasks.map(task => <TaskCard key={task.id} task={task} disabled={pending} context={context} {...handlers} />)}
-                {!tasks.length && adding !== column.value && <Button variant="ghost" aria-label={t('newTaskIn', { status: statusLabel(column.value) })} disabled={pending} onClick={() => setAdding(column.value)} className="h-28 w-full rounded-lg border border-dashed border-foreground/15 text-muted-foreground hover:bg-background/60"><Plus /></Button>}
+                {!tasks.length && <Button variant="ghost" aria-label={t('newTaskIn', { status: statusLabel(column.value) })} disabled={pending} onClick={() => onCreate(column.value)} className="h-28 w-full rounded-lg border border-dashed border-foreground/15 text-muted-foreground hover:bg-background/60"><Plus /></Button>}
               </KanbanColumnContent>
             </section>
           </KanbanColumn>

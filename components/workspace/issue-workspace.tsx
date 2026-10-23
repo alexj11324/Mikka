@@ -17,6 +17,7 @@ import { TeamHome } from '@/components/teams/team-home'
 import { AppFrame, AppShell, AppShellContent, SignOutBoundary, WindowBar } from '@/components/app-shell'
 import { IssueList } from './issue-list'
 import { BoardPage } from './board-page'
+import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { GlobalSearch, SearchPill } from '@/components/nav/global-search'
 import { ContextPanel } from '@/components/nav/context-panel'
 import { listTaskRuns } from '@/app/actions/task-runs'
@@ -32,7 +33,7 @@ import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
-import { listProjects, setProjectIssues } from '@/app/actions/projects'
+import { listProjects } from '@/app/actions/projects'
 import { listTeams } from '@/app/actions/teams'
 import { listProjectTeams } from '@/app/actions/team-relations'
 import { WorkspaceOverview } from './workspace-overview'
@@ -56,12 +57,7 @@ function DetailLoading() {
   const t = useTranslations('Workspace')
   return <div role="status" aria-label={t('loadingEditor')} className="flex flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>
 }
-function CreateLoading() {
-  const t = useTranslations('Workspace')
-  return <p role="status" className="p-6 text-sm text-muted-foreground">{t('loadingCreate')}</p>
-}
 const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })
-const CreateIssueDialog = dynamic(() => import('./create-issue-dialog').then(module => module.CreateIssueDialog), { loading: CreateLoading })
 const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module => module.ProjectWorkspace), { loading: DetailLoading })
 const SettingsShell = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsShell))
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView))
@@ -255,17 +251,6 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   const saved = useCallback((id: string) => { setSelected(id); void mutate() }, [mutate])
   function create(status: IssueStatus = ISSUE_STATUSES.some(item => item.value === view) ? view as IssueStatus : 'todo') { if (boardBusy) return; setTypedAhead(''); setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreateStatus(status); setCreating(true) }
-  async function issueCreated(id: string) {
-    void mutate()
-    if (!creationProject) return
-    try {
-      const latest = (await listProjects()).find(project => project.id === creationProject)
-      if (!latest) throw new Error('project missing')
-      const result = await setProjectIssues({ id: latest.id, revision: latest.revision, issueIds: [...latest.issueIds, id] })
-      if (result.error) throw new Error(result.error)
-      await refreshProjects()
-    } catch { setAccountError(i18nText("Workspace.projectLinkFailed")) }
-  }
   function signOut() {
     if (boardBusy || leaving.current) return
     void leave(async () => {
@@ -334,7 +319,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     setCoordinatorPrefill(current => ({ text: prompt, nonce: (current?.nonce ?? 0) + 1 }))
   }
   const dialogs = <>
-    {creating && <CreateIssueDialog initialTitle={typedAhead} initialTeamId={(creationProject ? projectTeams.find(link => link.projectId === creationProject && link.isPrimary)?.teamId : section.startsWith('team-') ? teamId : null) ?? ''} initialStatus={createStatus} open={creating} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} onCreated={id => { void issueCreated(id) }} author={user.name || user.email} />}
+    <NewTaskDialog open={creating} status={createStatus} project={creationProject ? scopedProjects.find(project => project.id === creationProject)?.name : null} initialText={typedAhead} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />
     {searchOpen && <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} sessions={conversationSessions} coordinatorLine={lastCoordinatorItem ? sessionPreview(lastCoordinatorItem.text.replace(/\[\[(?:issue|run):[0-9a-f-]{36}\]\]/gi, ''), null) : undefined} issues={tasks} projects={projects}
       onConversation={openConversation} onIssue={open} onCreateIssue={() => create()}
       onProject={id => { void leave(() => { applySelection(null, 'replace'); changeSection('projects'); setTeamId(null); setProjectId(id) }) }} />}
