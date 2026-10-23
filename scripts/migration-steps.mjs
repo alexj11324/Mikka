@@ -11,7 +11,7 @@
 // the checks below (stripping is not string-aware, so it must never reach Postgres).
 //
 // A no-transaction file holds exactly ONE statement and is never split. After stripping
-// comments it is rejected if it has a second semicolon, any `$` (dollar quoting), or the words
+// comments it is rejected if a `;` sits in a comment (count differs after stripping), if it has a second semicolon, any `$` (dollar quoting), or the words
 // BEGIN, COMMIT, END or ROLLBACK. Put each CONCURRENTLY index in its own file.
 // For CREATE INDEX CONCURRENTLY, migrate.mjs then checks pg_index.indisvalid; a failed build
 // leaves an INVALID index (which IF NOT EXISTS would silently skip next time), so an invalid
@@ -56,6 +56,11 @@ export function planMigration(name, sql) {
     if (/\bconcurrently\b/i.test(body)) throw new Error(`migrate: ${name} uses CONCURRENTLY; put it alone in a file marked "-- migrate: no-transaction"`)
     return { target, noTransaction, sql, concurrentIndex: null }
   }
+  // Comments may hide a `;` (e.g. `-- a; b`), and a `;` inside a string literal may follow
+  // `--` and be stripped with it. Require the count to survive stripping, so nothing the
+  // checks below cannot see reaches Postgres.
+  const semicolons = (text) => (text.match(/;/g) ?? []).length
+  if (semicolons(sql) !== semicolons(body)) throw new Error(`migrate: ${name} is no-transaction and has a ; inside a comment; remove it`)
   const statement = body.replace(/;\s*$/, '').trim()
   if (statement.includes(';')) throw new Error(`migrate: ${name} is no-transaction and must contain exactly one statement`)
   if (statement.includes('$')) throw new Error(`migrate: ${name} is no-transaction and cannot use $ quoting`)

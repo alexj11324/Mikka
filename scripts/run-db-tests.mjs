@@ -3,10 +3,14 @@
 // Explicit allowlist: a listed script that package.json does not define is a failure,
 // and each script must run at least one test and skip none (REQUIRE_DB=1 is also set).
 // Add a script here in the PR that adds its DB tests.
+//
+// Limit: a test that returns early (e.g. `if (!db) return`) counts as passed, not skipped, so
+// the summary cannot see it. Only REQUIRE_DB=1 inside the test file (fail when no DB) catches
+// that; every allowlisted DB test must honour REQUIRE_DB.
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
-export const DB_TEST_SCRIPTS = ['test:issues']
+export const DB_TEST_SCRIPTS = ['test:migrations', 'test:issues']
 
 /** Totals from node:test's summary (TAP `# pass 3` or spec `ℹ pass 3`). */
 export function parseSummary(output) {
@@ -21,12 +25,13 @@ export function checkSummary(script, status, totals) {
   if (totals.tests === undefined) return `${script}: no node:test summary found`
   if (totals.tests < 1) return `${script}: ran no tests`
   if (totals.skipped) return `${script}: ${totals.skipped} skipped (DB tests must not skip in CI)`
+  if (totals.todo) return `${script}: ${totals.todo} todo (not allowed in CI)`
   if (totals.fail) return `${script}: ${totals.fail} failed`
   return null
 }
 
-function main(scripts = DB_TEST_SCRIPTS) {
-  const defined = JSON.parse(readFileSync('package.json', 'utf8')).scripts ?? {}
+/** Runs the allowlist; returns the exit code. `defined` is package.json's scripts (injectable for tests). */
+export function main(scripts = DB_TEST_SCRIPTS, defined = JSON.parse(readFileSync('package.json', 'utf8')).scripts ?? {}) {
   if (scripts.length === 0) { console.log('No DB test scripts allowlisted yet.'); return 0 }
   const missing = scripts.filter(s => !defined[s])
   if (missing.length) { console.error(`Allowlisted but not in package.json: ${missing.join(', ')}`); return 1 }
