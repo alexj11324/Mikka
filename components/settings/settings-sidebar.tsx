@@ -10,6 +10,7 @@ import { listTeams } from '@/app/actions/teams'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
+import { settingsItemVisible } from '@/lib/settings-sidebar-search'
 import type { SettingsSection } from './settings-view'
 import { useFeatureAvailability } from '@/hooks/use-feature-availability'
 import { withBasePath } from '@/lib/base-path'
@@ -101,13 +102,13 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
       {navigation.map(group => {
         const items = group.items.filter(item => {
           const label = 'section' in item ? i18nText(`Settings.sections.${item.section}.title` as never) : i18nText(`Settings.nav.${item.key}`)
-          return `${group.title} ${i18nText(`Settings.groups.${group.key}`)} ${item.title} ${label}`.toLowerCase().includes(normalizedQuery) && (activeSection || !('section' in item) || (item.section !== 'teams' && item.section !== 'members'))
+          return settingsItemVisible({ query, groupTitle: group.title, groupLabel: i18nText(`Settings.groups.${group.key}`), itemTitle: item.title, label, section: 'section' in item ? item.section : undefined, routed: Boolean(activeSection) })
         })
-        return items.length > 0 && <SidebarGroup key={group.title} className="py-2"><SidebarGroupLabel>{i18nText(`Settings.groups.${group.key}`)}</SidebarGroupLabel><SidebarMenu>{items.map(item => {
+        return items.length > 0 && <SidebarGroup key={group.key} className="py-2"><SidebarGroupLabel>{i18nText(`Settings.groups.${group.key}`)}</SidebarGroupLabel><SidebarMenu>{items.map(item => {
           const id = 'section' in item ? item.section : undefined
           const label = id ? i18nText(`Settings.sections.${id}.title` as never) : 'key' in item ? i18nText(`Settings.nav.${item.key}`) : item.title
           const selected = id === section && !selectedTeamId && !creating
-          const release = id ? undefined : group.title === 'Features' ? productRelease : group.title === 'Integrations' ? integrationsRelease : administrationRelease
+          const release = id ? undefined : group.key === 'features' ? productRelease : group.key === 'integrations' ? integrationsRelease : administrationRelease
           return <SidebarMenuItem key={item.title}><SidebarMenuButton aria-label={label} disabled={!id || !!release && !release.enabled} data-feature-flag={release?.key} title={release?.reason} render={id && activeSection ? <Link href={href(id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => { if (id && !activeSection) onSectionChange(id); setOpenMobile(false) }}><item.icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
         })}</SidebarMenu></SidebarGroup>
       })}
