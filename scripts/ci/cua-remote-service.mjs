@@ -19,8 +19,17 @@ const packages = docker('exec', 'mikka-cua-ci', '/opt/venv/bin/python3', '-c', '
 assert.ok(!/^cua-(?:perception|som)$/im.test(packages), 'No perception/OmniParser distribution may be installed')
 await assert.rejects(executeDesktop({ ...config, token: 'deliberately-wrong-disposable-token' }, { tool: 'screenshot' }), 'Service must reject wrong-token screenshot')
 docker('cp', 'scripts/ci/cua-editor-fixture.py', 'mikka-cua-ci:/tmp/mikka-editor.py')
-docker('exec', '--detach', '--user', 'cua', '--env', 'DISPLAY=:1', 'mikka-cua-ci', '/usr/bin/python3', '/tmp/mikka-editor.py')
-await new Promise(resolve => setTimeout(resolve, 2500))
+docker('exec', '--detach', '--user', 'cua', '--env', 'DISPLAY=:1', 'mikka-cua-ci', 'sh', '-c', '/usr/bin/python3 /tmp/mikka-editor.py >/tmp/mikka-editor.log 2>&1')
+// A detached launch only acknowledges spawning. Wait for GTK to map/focus its
+// window, and surface its own startup error rather than OCRing an empty desktop.
+let editorReady = false
+for (let attempt = 0; attempt < 40; attempt++) {
+  const state = docker('exec', 'mikka-cua-ci', 'sh', '-c', 'if test -f /tmp/mikka-editor.ready; then echo ready; fi; cat /tmp/mikka-editor.log')
+  if (state.startsWith('ready')) { editorReady = true; break }
+  if (/Traceback|ModuleNotFoundError|cannot open display/i.test(state)) throw new Error(`Editor fixture startup failed: ${state}`)
+  await new Promise(resolve => setTimeout(resolve, 250))
+}
+assert.ok(editorReady, 'GTK editor must map before approved service input')
 
 // This disposable in-memory test owner approves exact saved operations. Production
 // authenticated owner/membership/policy/claim races are separate PG17/browser CI.

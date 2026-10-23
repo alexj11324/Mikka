@@ -1,7 +1,7 @@
 """Mikka-owned disposable GTK editor fixture; no upstream CUA source."""
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Pango
+from gi.repository import Gtk, Pango, GLib
 window = Gtk.Window(title='Mikka isolated CI editor')
 window.set_default_size(900, 600)
 view = Gtk.TextView()
@@ -13,4 +13,12 @@ window.connect('destroy', Gtk.main_quit)
 window.show_all()
 view.grab_focus()
 window.present()
+def ready():
+    view.grab_focus()
+    window.present()
+    with open('/tmp/mikka-editor.ready', 'w') as marker:
+        marker.write('mapped')
+    return False
+
+GLib.timeout_add(1000, ready)
 Gtk.main()
