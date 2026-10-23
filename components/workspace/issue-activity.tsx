@@ -10,11 +10,12 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/textarea'
 
-export function IssueActivity({ author, threads, anchors, events, onComment, onReply, onResolve, onSelect }: {
+export function IssueActivity({ author, threads, anchors, events, runs, onComment, onReply, onResolve, onSelect }: {
   author: string
   threads: ThreadRecord[]
   anchors: CommentAnchor[]
   events?: ReactNode
+  runs?: ReactNode
   onComment: (body: string) => void
   onReply: (id: string, body: string) => void
   onResolve: (id: string, resolved: boolean) => void
@@ -35,6 +36,7 @@ export function IssueActivity({ author, threads, anchors, events, onComment, onR
   return <section aria-label={t('label')} className="flex flex-col gap-6">
     <div className="flex items-center gap-2"><h2 className="text-sm font-semibold">{t('title')}</h2><span className="text-xs text-muted-foreground">{threads.length ? t('threads', { count: threads.length }) : t('subtitle')}</span></div>
     {events}
+    {runs}
     {[...threads].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(thread => <article key={thread.id} className="flex gap-3">
       <Avatar className="size-7 shrink-0"><AvatarFallback>{thread.author.slice(0, 1)}</AvatarFallback></Avatar>
       <div className="flex min-w-0 flex-1 flex-col gap-2">

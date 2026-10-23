@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import type { EditorView } from "@tiptap/pm/view"
 import { useTranslations } from "next-intl"
 import { IssueActivity } from './issue-activity'
+import { isRunDiscussion } from '@/lib/issue-run-conversation'
 import { useEditor, getSchema, type JSONContent } from "@tiptap/react"
 import { TextSelection } from "@tiptap/pm/state"
 import { Collaboration } from "@tiptap/extension-collaboration"
@@ -53,7 +54,7 @@ export function createDocumentSeed(content: JSONContent) {
   doc.destroy()
   return update
 }
-export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, persisted = false, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
+export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, persisted = false, compact = false, layout = 'document', activity, runRecords, afterDescription, label: labelProp, disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; runRecords?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
   const t = useTranslations('Editor')
   const author = authorProp ?? t('draftAuthor')
   const syncLabel = syncLabelProp ?? t('unsavedDraft')
@@ -186,7 +187,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
       </div>}</>}
     </section>
     {layout === 'issue' && !compact && afterDescription}
-    {layout === 'issue' && !compact && <IssueActivity author={author} threads={threadList} anchors={anchors} events={activity} onComment={body => {
+    {layout === 'issue' && !compact && <IssueActivity author={author} threads={threadList.filter(thread => !isRunDiscussion(thread.id))} anchors={anchors} events={activity} runs={runRecords} onComment={body => {
       const now = new Date().toISOString()
       addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body, at: now }] }, 'issue-discussion')
     }} onReply={(id, body) => { replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString() }) }} onResolve={(id, resolved) => { setThreadResolved(threadDoc, id, resolved) }} onSelect={id => {

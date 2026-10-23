@@ -962,6 +962,7 @@
     "viewProjects": "查看项目"
   },
   "IssueDetail": {
+    "breadcrumbBoard": "看板",
     "connecting": "正在连接…",
     "deletedTitle": "此任务已被删除",
     "unavailableTitle": "任务不可用",
@@ -2169,5 +2170,34 @@
     "cancel": "取消",
     "creating": "正在创建…",
     "createWorkspace": "创建工作区"
+  },
+  "IssueRuns": {
+    "title": "Agent 运行记录",
+    "agent": "Agent",
+    "open": "打开会话",
+    "comment": "评论",
+    "commentLabel": "评论 {agent} 的运行",
+    "postComment": "发表评论",
+    "empty": "此任务还没有 agent 运行记录。",
+    "recentLimit": "最多显示当前账号可见的最近 20 次运行。",
+    "loading": "正在读取运行记录…",
+    "loadFailed": "无法读取运行记录。",
+    "retry": "重试",
+    "unavailable": "此运行不可用，或已不属于当前任务。",
+    "sessionTitle": "{agent} 的会话",
+    "sessionDescription": "此任务已保存的执行记录。收起侧边栏不会停止 agent。",
+    "output": "Agent 输出",
+    "noOutput": "还没有已保存的输出。",
+    "text": "Agent",
+    "reasoning": "思考",
+    "tool": "工具",
+    "error": "错误",
+    "report": "交付报告",
+    "messages": "发给 agent 的消息",
+    "messageLabel": "给正在运行的 agent 发消息",
+    "send": "发送给 agent",
+    "sending": "正在发送…",
+    "sendFailed": "消息发送失败，草稿已保留。",
+    "ended": "此次运行已结束。仍可查看会话，并在运行记录下评论。"
   }
 }
