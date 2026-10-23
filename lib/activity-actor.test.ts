@@ -86,8 +86,12 @@ test('the migration is timestamp-named, later than 20261023040300, and idempoten
 
 // Dev-local DB test: the migration on every pre-existing column layout, run twice, in a scratch
 // schema inside a rolled-back transaction (SET LOCAL, so nothing leaks through the pooled bridge).
-const databaseUrl = process.env.MIKKA_DATABASE_URL
-if (!databaseUrl && process.env.REQUIRE_DB === '1') test('database required', () => assert.fail('REQUIRE_DB=1 but no MIKKA_DATABASE_URL'))
+// Only a real test database: dev-local's bridge (127.0.0.1:15432) or the CI service named by
+// MIKKA_TEST_DB_PORT. Jobs that set a placeholder MIKKA_DATABASE_URL without a server skip.
+const rawUrl = process.env.MIKKA_DATABASE_URL ?? process.env.ORVILO_DATABASE_URL
+const testHost = rawUrl ? new URL(rawUrl) : null
+const databaseUrl = testHost && testHost.hostname === '127.0.0.1' && testHost.port === (process.env.MIKKA_TEST_DB_PORT || '15432') ? rawUrl : undefined
+if (!databaseUrl && process.env.REQUIRE_DB === '1') test('database required', () => assert.fail('REQUIRE_DB=1 but MIKKA_DATABASE_URL is not the test database (127.0.0.1:MIKKA_TEST_DB_PORT, default 15432)'))
 test('actor migration: fresh, snake, both and half-migrated layouts', { skip: databaseUrl ? false : 'no database' }, async () => {
   const { default: pg } = await import('pg')
   const name = readdirSync('drizzle').find(file => file.endsWith('_activity_version_actor.sql'))!
