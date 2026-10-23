@@ -40,7 +40,11 @@ BEGIN
     ALTER TABLE issue_versions DROP COLUMN IF EXISTS actor_type;
     ALTER TABLE issue_versions DROP COLUMN IF EXISTS actor_id;
   ELSE
-    -- Only snake columns: rename them in place.
+    -- Only snake columns: rename them in place. Rows are not filtered here, so a row with
+    -- actor_id set and actor_type NULL becomes "actorId" without "actorType". That row fails
+    -- VALIDATE of issue_versions_actor_id_needs_type_check below, and because the whole file is
+    -- one transaction (see the header) the error rolls back these renames too: the table stays
+    -- in its snake layout and the next run retries from there, never a half-renamed state.
     IF has_snake_type THEN ALTER TABLE issue_versions RENAME COLUMN actor_type TO "actorType"; END IF;
     IF has_snake_id THEN ALTER TABLE issue_versions RENAME COLUMN actor_id TO "actorId"; END IF;
   END IF;
