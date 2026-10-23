@@ -291,6 +291,9 @@ jobs:
             sleep 1
           done
           exit 1
+      - name: Install system GTK Python binding for Mikka-owned editor fixture
+        run: |
+          docker exec --user root mikka-cua-ci sh -c 'apt-get update -qq && apt-get install -y -qq python3-gi'
       - name: Scripted streaming model, exact approvals, real authenticated service, PNG readback
         run: node --import tsx scripts/ci/cua-remote-service.mjs
       - name: Save non-secret desktop evidence only
