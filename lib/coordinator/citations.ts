@@ -16,6 +16,8 @@ export interface IssueSource {
   kind: 'issue'
   id: string
   number: number | null
+  /** `MIK-12` or `ALEX-12`, from `taskIdentifier`. */
+  identifier: string | null
   title: string
   status: string
   priority: string
@@ -27,7 +29,7 @@ export interface RunSource {
   agentName: string
   harness: string
   status: string
-  issue: { id: string; number: number | null; title: string } | null
+  issue: { id: string; number: number | null; identifier: string | null; title: string } | null
   createdAt: string
   finishedAt: string | null
 }

@@ -1435,6 +1435,19 @@
       "previewNote": "表单预览：尚未连接工作区存储，修改不会保存。",
       "previewLabel": "工作区表单预览"
     },
+    "issuePrefix": {
+      "title": "个人任务编号",
+      "description": "个人任务只留在 Mikka，不写进 Linear，编号用你自己的 4 个字母前缀。工作区任务用 Linear 的编号。",
+      "label": "前缀",
+      "current": "个人任务显示为 {example}。",
+      "needsChoice": "还没有可用的前缀：邮箱里的字母不够 4 个，或和已连接的 Linear 团队重名。请填 4 个字母。",
+      "save": "保存",
+      "saved": "已保存，个人任务现在显示为 {example}。",
+      "invalid": "请填 4 个英文字母。",
+      "taken": "和已连接的 Linear 团队 key 重名，请换一个。",
+      "loadError": "无法读取个人任务编号。",
+      "saveError": "保存失败，请重试。"
+    },
     "linear": {
       "title": "Linear",
       "description": "连接 Linear 账号，在 Linear 和 Orvilo 之间同步任务与评论。",
@@ -1447,7 +1460,7 @@
       "oauthError": "无法连接 Linear，请重试。",
       "teamLabel": "Linear 团队",
       "teamPlaceholder": "选择团队",
-      "teamDescription": "每个 Orvilo 账号目前可同步一个 Linear 团队。新任务会自动同步，已有任务在下次变更后加入同步。",
+      "teamDescription": "每个 Mikka 账号目前可同步一个 Linear 团队。只有工作区任务会同步，个人任务只留在 Mikka。",
       "enable": "开启双向同步",
       "pause": "暂停同步",
       "syncActive": "正在同步 {team}",
@@ -1543,7 +1556,7 @@
     "created": "已创建待办任务 {issue}：{title}\n用 /status 查看任务。",
     "noTasks": "还没有可查看的任务。",
     "finishDraft": "请先完成或丢弃当前草稿，再关联任务。",
-    "linkUsage": "请使用 /link ORV-123 或 /link <任务 UUID>。",
+    "linkUsage": "请使用 /link MIK-12、/link ALEX-12 或 /link <任务 UUID>。",
     "taskUnavailable": "找不到该任务，或当前账号无权访问。",
     "ambiguous": "该任务编号有歧义，请改用完整任务 UUID。",
     "linked": "已将本会话关联到 {issue}：{title}",

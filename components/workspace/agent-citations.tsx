@@ -79,7 +79,7 @@ export function CitationSources({ text }: { text: string }) {
     else if (part.type === 'citation') {
       const source = sources[part.id]
       if (!source || (part.kind && part.kind !== source.kind)) continue
-      if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: source.number ? issueIdentifier(source.number) : 'Mikka', icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
+      if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
       else {
         const issue = source.issue
         listed.set(source.id, { name: t('runOf', { agent: source.agentName }), domain: source.harness === 'claude_code' ? 'Claude Code' : 'Codex', icon: source.harness === 'claude_code' ? <Claude /> : <OpenAI />, onSelect: issue ? () => onOpenIssue(issue.id) : undefined })
@@ -100,7 +100,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   const status = ISSUE_STATUSES.find(item => item.value === issue.status) ?? ISSUE_STATUSES[1]
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
   const tone = status.value === 'doing' ? 'text-warning-foreground' : status.value === 'review' ? 'text-info-foreground' : status.value === 'done' ? 'text-success-foreground' : 'text-muted-foreground'
-  const identifier = issue.number ? issueIdentifier(issue.number) : null
+  const identifier = issue.identifier
   return <InlineCitation>
     <InlineCitationTrigger aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)} className={TASK_CHIP}>
       <span aria-hidden="true" className={cn(STATUS_DOT, tone)} />
@@ -155,7 +155,7 @@ export function RunCitation({ run, onOpen }: { run: RunSource; onOpen: (id: stri
     <InlineCitationContent>
       <InlineCitationBody>
         <InlineCitationSource><HarnessIcon />{harness} · {run.agentName}</InlineCitationSource>
-        <InlineCitationTitle>{issue ? `${issue.number ? `${issueIdentifier(issue.number)} ` : ''}${issue.title}` : t('noIssue')}</InlineCitationTitle>
+        <InlineCitationTitle>{issue ? `${issue.identifier ? `${issue.identifier} ` : ''}${issue.title}` : t('noIssue')}</InlineCitationTitle>
         <InlineCitationMeta>
           <Badge variant={RUN_BADGES[run.status] ?? 'secondary'} size="sm">{status}</Badge>
           <span>{format.dateTime(new Date(run.finishedAt ?? run.createdAt), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
