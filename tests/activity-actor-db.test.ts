@@ -67,10 +67,15 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
   const stranger = `actor-stranger-${randomUUID()}`
   const threadId = `actor-test-${randomUUID()}`
   const telegramId = randomUUID()
+  const workspace = randomUUID(), teamId = randomUUID()
   const input = { title: 'Actor regression', content: { type: 'doc', content: [{ type: 'paragraph' }] }, status: 'todo' as const, priority: 'normal' as const }
   const expectIssue = (result: unknown): typeof issues.$inferSelect => {
     assert.ok(result && typeof result === 'object' && 'issue' in result, JSON.stringify(result))
     return (result as { issue: typeof issues.$inferSelect }).issue
+  }
+  const publishFixture = async (id: string) => {
+    await pool.query("update issues set scope='workspace' where id=$1", [id])
+    await pool.query('insert into orvilo_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [id, teamId, workspace, owner])
   }
   const latest = async (id: string) => (await db.select().from(issues).where(eq(issues.id, id)))[0]
   const history = async (id: string, type: string, actorId: string | null) => {
@@ -82,15 +87,24 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     for (const [id, name] of [[owner, 'Owner'], [member, 'Member'], [stranger, 'Stranger']]) {
       await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$2,$3,false,now(),now())', [id, name, `${id}@example.invalid`])
     }
+    await pool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,$3)', [workspace, owner, 'Actor fixture'])
+    for (const id of [owner, member]) await pool.query("insert into mikka_workspace_members (\"workspaceId\",\"userId\",name,email,role,status) values ($1,$2,$2,$3,'member','active')", [workspace, id, `${id}@example.invalid`])
+    await pool.query('insert into orvilo_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,$4,$5)', [teamId, workspace, owner, 'Actor fixture', 'ACT'])
     const root = expectIssue(await actAs(owner, () => saveIssue({ ...input, actorType: 'agent', actorId: 'spoof' } as Parameters<typeof saveIssue>[0])))
     await history(root.id, 'user', owner)
     await db.insert(issueMembers).values({ issueId: root.id, userId: owner, memberId: member })
+    // #127 correctly denies a stale invitation to a personal issue. The actor
+    // collaboration matrix needs an explicitly published, workspace-linked task.
+    assert.deepEqual(await actAs(member, () => saveIssue({ ...input, id: root.id, revision: 1 })), { error: 'issueNotFound' })
+    await history(root.id, 'user', owner)
+    await publishFixture(root.id)
     let saved = expectIssue(await actAs(member, () => saveIssue({ ...input, id: root.id, revision: 1, title: 'Member edit' })))
     await history(root.id, 'user', member)
     saved = expectIssue(await actAs(member, () => updateIssueMetadata({ id: root.id, revision: saved.revision, patch: { estimate: 3 } })))
     await history(root.id, 'user', member)
     const second = expectIssue(await actAs(owner, () => saveIssue({ ...input, title: 'Relation target' })))
     await db.insert(issueMembers).values({ issueId: second.id, userId: owner, memberId: member })
+    await publishFixture(second.id)
     saved = expectIssue(await actAs(member, () => updateIssueRelation({ id: root.id, revision: saved.revision, kind: 'related', targetId: second.id })))
     await history(root.id, 'user', member)
     await history(second.id, 'user', member)
@@ -147,7 +161,11 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     }
     await db.delete(telegramConversations).where(eq(telegramConversations.threadId, threadId))
     await db.delete(telegramLinks).where(eq(telegramLinks.userId, owner))
+    await pool.query('delete from orvilo_team_issues where \"teamId\"=$1', [teamId])
     await db.delete(issues).where(eq(issues.userId, owner))
+    await pool.query('delete from orvilo_teams where id=$1', [teamId])
+    await pool.query('delete from mikka_workspace_members where \"workspaceId\"=$1', [workspace])
+    await pool.query('delete from mikka_workspaces where id=$1', [workspace])
     await db.delete(linearTeamSyncs).where(eq(linearTeamSyncs.ownerId, owner))
     for (const id of [owner, member, stranger]) await db.delete(users).where(eq(users.id, id))
     await pool.end()
