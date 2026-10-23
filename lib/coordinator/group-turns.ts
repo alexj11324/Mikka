@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
-import { addsNothing, correctionFrom, followUpInstructions, mentionRoute, UnknownMentionError, type GroupMessage, type GroupRoute, type RoutingCorrection, type RoutingMember } from './group-routing'
+import { addsNothing, correctionFrom, followUpInstructions, mentionRoute, MissingGroupLeadError, UnknownMentionError, type GroupMessage, type GroupRoute, type RoutingCorrection, type RoutingMember } from './group-routing'
 
 export const GROUP_MAX_ROUNDS = 3
 export type GroupAgent = RoutingMember
@@ -8,7 +8,7 @@ export type GroupReply = { text: string; mentions: string[] }
 export type GroupRuntime = {
   agents(ownerId: string, ids: string[]): Promise<GroupAgent[]>
   authorized(workspaceId: string, userId: string): Promise<boolean>
-  route(message: GroupMessage, members: GroupAgent[], leadId: string, corrections: RoutingCorrection[]): Promise<GroupRoute>
+  route(message: GroupMessage, members: GroupAgent[], leadId: string | null, corrections: RoutingCorrection[]): Promise<GroupRoute>
   generate(agent: GroupAgent, input: { message: GroupMessage; earlier: { author: string; text: string }[]; followUp: string; members: RoutingMember[]; ask?: string }): Promise<GroupReply>
 }
 export async function enqueueGroupTurn(client: PoolClient, conversationId: string, messageId: string, userId: string) {
@@ -28,7 +28,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     if (!acquired.rows[0].acquired) return false
     locked = true
     await client.query(`UPDATE group_turns SET status='failed',"agentId"=NULL,error='interrupted_generation_not_replayed',"updatedAt"=now() WHERE "conversationId"=$1 AND status='running'`, [conversationId])
-    const { rows } = await client.query(`SELECT t.*, m.body,m.mentions,m.position,c."workspaceId",c."createdBy" FROM group_turns t
+    const { rows } = await client.query(`SELECT t.*, m.body,m.mentions,m.position,c."workspaceId",c."createdBy",c."leadAgentId" FROM group_turns t
       JOIN conversation_messages m ON m.id=t."messageId" JOIN conversations c ON c.id=t."conversationId"
       WHERE t."conversationId"=$1 AND t.status='queued' ORDER BY m.position LIMIT 1`, [conversationId])
     const root = rows[0]
@@ -58,9 +58,10 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       const correction = route.responders.length === 1 ? correctionFrom({ message: previous.rows[0].body, responderId: route.responders[0], by: route.by }, input) : null
       if (correction) await client.query(`INSERT INTO group_routing_corrections ("messageId","conversationId",message,"wrongId","rightId") VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`, [messageId, conversationId, correction.message, correction.wrongId, correction.rightId ?? null])
     }
-    if (members.length) {
+    if (!members.length) throw new MissingGroupLeadError()
+    {
       const corrections = await client.query(`SELECT message,"wrongId","rightId" FROM group_routing_corrections WHERE "conversationId"=$1 ORDER BY "createdAt" DESC,"messageId" DESC LIMIT 10`, [conversationId])
-      const route = mentionRoute(input, members) ?? await runtime.route(input, members, members[0].id, corrections.rows.reverse().map(c => ({ ...c, rightId: c.rightId ?? undefined })))
+      const route = mentionRoute(input, members) ?? await runtime.route(input, members, members.some(m => m.id === root.leadAgentId) ? root.leadAgentId : null, corrections.rows.reverse().map(c => ({ ...c, rightId: c.rightId ?? undefined })))
       const unknown = route.responders.filter(id => !members.some(m => m.id === id))
       if (unknown.length) throw new UnknownMentionError(unknown)
       await client.query('UPDATE group_turns SET route=$2 WHERE "messageId"=$1', [messageId, JSON.stringify(route)])
@@ -85,7 +86,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     return true
   } catch (error) {
     if (!messageId) throw error
-    await client.query(`UPDATE group_turns SET status='failed',"agentId"=NULL,error=$2,"updatedAt"=now() WHERE "messageId"=$1`, [messageId, error instanceof UnknownMentionError ? 'unknown_mention' : 'generation_failed_not_replayed'])
+    await client.query(`UPDATE group_turns SET status='failed',"agentId"=NULL,error=$2,"updatedAt"=now() WHERE "messageId"=$1`, [messageId, error instanceof UnknownMentionError ? 'unknown_mention' : error instanceof MissingGroupLeadError ? 'group_lead_required' : 'generation_failed_not_replayed'])
     throw error
   } finally {
     try { if (locked) await client.query(`SELECT pg_advisory_unlock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0))`, [conversationId]) }
