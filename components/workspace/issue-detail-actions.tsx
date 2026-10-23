@@ -84,11 +84,11 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       const result = await operation(latest)
       if (!result.issue) throw new Error(actionError(result.error ?? 'generic'))
       if (mode === 'current') onSaved(result.issue)
-      await Promise.all([mutate(['issue-connections', task.id]), mutate('issues'), mutate(relationPickerKey(task.userId))])
+      await Promise.all([mutate(['issue-connections', task.id]), mutate(['issues', task.userId]), mutate(relationPickerKey(task.userId))])
       if (mode === 'duplicate') onOpen(result.issue.id)
       if (mode === 'delete') {
         onDeleted()
-        toast.success(t('taskDeleted'), { description: t('taskDeletedDescription'), action: { label: t('undo'), onClick: () => { void setIssueDeleted({ id: task.id, restore: true }).then(async response => { if (response.error) toast.error(actionError(response.error)); else { await mutate('issues'); onOpen(task.id) } }).catch(() => toast.error(t('restoreViaLinkFailed'))) } } })
+        toast.success(t('taskDeleted'), { description: t('taskDeletedDescription'), action: { label: t('undo'), onClick: () => { void setIssueDeleted({ id: task.id, restore: true }).then(async response => { if (response.error) toast.error(actionError(response.error)); else { await mutate(['issues', task.userId]); onOpen(task.id) } }).catch(() => toast.error(t('restoreViaLinkFailed'))) } } })
       } else toast.success(mode === 'child' ? t('childCreated') : mode === 'duplicate' ? t('duplicateCreated') : mode === 'favorite' ? t('favorited') : mode === 'unfavorite' ? t('unfavorited') : t('taskUpdated'))
       return true
     } catch (error) { const message = error instanceof Error ? error.message : t('operationFailed'); setError(message); toast.error(message); return false }

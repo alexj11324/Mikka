@@ -28,7 +28,7 @@ export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, o
   const [query, setQuery] = useState('')
   // Relations change between openings; never filter against a stale board snapshot.
   const { data: connections, error, mutate } = useSWR(open ? ['issue-connections', task.id] : null, () => listIssueConnections(task.id))
-  const { data: latestBoard, isValidating } = useSWR(open ? relationPickerKey(task.userId) : null, listIssues, { revalidateOnMount: true, dedupingInterval: 0 })
+  const { data: latestBoard, isValidating } = useSWR(open ? relationPickerKey(task.userId) : null, listIssues)
   // While revalidating, the cached board may predate the last relation change; wait for fresh data instead of filtering against it.
   const board = isValidating ? undefined : latestBoard
   const source = board ?? (isValidating ? undefined : connections)

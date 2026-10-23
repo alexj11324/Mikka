@@ -20,7 +20,7 @@ for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
     const routePattern = '**/api/auth/sign-out'
     const hold = async () => {
       const gate = new Promise<boolean>(resolve => { release = resolve })
-      // Measure the reserved scrollbar gutter before any overlay locks scrolling (documentElement.clientWidth reports the full viewport, so measure on body).
+      // Measure the reserved scrollbar gutter before any overlay locks scrolling (with html `scrollbar-gutter: stable`, documentElement.clientWidth here still equals innerWidth, while body.clientWidth excludes the reserved gutter, so measure on body).
       const gutter = await page.evaluate(() => innerWidth - document.body.clientWidth)
       await page.route(routePattern, async route => {
         if (await gate) await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'SIGN_OUT_FAILED', message: 'Sign out failed' }) })
