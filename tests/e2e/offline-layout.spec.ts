@@ -12,7 +12,9 @@ for (const width of [1280, 402]) {
       if (width < 768) await page.getByRole('button', { name: '展开或收起侧栏', exact: true }).click()
       await page.getByRole('button', { name: '任务', exact: true }).click()
       await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
-      await page.getByRole('button', { name: '新建任务', exact: true }).click()
+      // The global create button lives in the closed mobile sidebar. Use the
+      // visible board-column action on both breakpoints instead.
+      await page.getByRole('region', { name: '任务看板', exact: true }).getByRole('button', { name: '新建待整理任务', exact: true }).click()
       const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
       const title = `Offline layout ${width} ${layout}`
       await dialog.getByLabel('任务标题', { exact: true }).fill(title)
