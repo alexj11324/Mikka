@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
+import { hasMathDelimiters } from '@/lib/math-delimiters'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 const MermaidDiagram = dynamic(() => import('./agent-mermaid').then(module => module.AgentMermaid), {
@@ -24,7 +25,7 @@ export type AgentMarkdownProps = {
 }
 
 export const AgentMarkdown = memo(function AgentMarkdown(props: AgentMarkdownProps) {
-  return props.text.includes('$') ? <MathMarkdown {...props} /> : <AgentMarkdownContent {...props} />
+  return hasMathDelimiters(props.text) ? <MathMarkdown {...props} /> : <AgentMarkdownContent {...props} />
 })
 
 export function AgentMarkdownContent({ text, isStreaming = false, size = 'default', mathRemarkPlugins = [], rehypePlugins = [] }: AgentMarkdownProps & {
@@ -33,7 +34,7 @@ export function AgentMarkdownContent({ text, isStreaming = false, size = 'defaul
 }) {
   const agentCopy = useAgentCopy()
 
-  return <div data-agent-markdown className={cn('agent-markdown flex min-w-0 max-w-full flex-col gap-3 break-words text-sm leading-7 [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden', {
+  return <div data-agent-markdown className={cn('agent-markdown flex min-w-0 max-w-full flex-col gap-3 break-words text-sm leading-7 [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex_.cjk_fallback]:font-sans', {
     'text-xs': size === 'small' || size === 'small-heavy',
     'text-base': size === 'large' || size === 'large-heavy',
     'font-semibold': size === 'small-heavy' || size === 'large-heavy',
