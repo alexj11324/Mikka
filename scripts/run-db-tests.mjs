@@ -10,7 +10,7 @@
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
-export const DB_TEST_SCRIPTS = []
+export const DB_TEST_SCRIPTS = ['test:migrations']
 
 /** Totals from node:test's summary (TAP `# pass 3` or spec `ℹ pass 3`). */
 export function parseSummary(output) {

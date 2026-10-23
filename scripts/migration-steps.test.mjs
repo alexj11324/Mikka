@@ -21,9 +21,9 @@ test('directives count only in the header (leading comment / blank lines)', () =
 })
 
 test('no-transaction: exactly one statement, trailing semicolon optional, comments ignored', () => {
-  const sql = `-- Trigram index.\n${NOTX}-- built without blocking writes; see MIK-16\ncreate index concurrently if not exists issues_title_trgm_idx\n  on issues using gin (title gin_trgm_ops); -- trailing; note\n`
+  const sql = `-- Trigram index.\n${NOTX}-- built without blocking writes, see MIK-16\ncreate index concurrently if not exists issues_title_trgm_idx\n  on issues using gin (title gin_trgm_ops); -- trailing note\n`
   assert.deepEqual(plan(sql), { target: 'MIKKA_DATABASE_URL', noTransaction: true, sql, concurrentIndex: 'issues_title_trgm_idx' })
-  assert.equal(plan(`${NOTX}/* block; comment */ create index concurrently "q_idx" on t (a)`).concurrentIndex, 'q_idx')
+  assert.equal(plan(`${NOTX}/* block comment */ create index concurrently "q_idx" on t (a)`).concurrentIndex, 'q_idx')
   assert.equal(plan(`${NOTX}create unique index concurrently u_idx on t (a);`).concurrentIndex, 'u_idx')
   assert.equal(plan(`${NOTX}alter type s add value if not exists 'x';`).concurrentIndex, null)
 })
@@ -107,4 +107,13 @@ dbTest('applyMigration: INVALID index after execution fails and is not recorded'
   // The statement now succeeds (IF NOT EXISTS skips the INVALID index); only the post-execution check catches it.
   await assert.rejects(applyMigration(client, 'dup.sql', planMigration('dup.sql', dup)), /u_idx is INVALID.*not recorded/)
   assert.deepEqual(await recorded(), ['ok.sql'], 'failed file not recorded')
+})
+
+test('no-transaction: the ; count must survive comment stripping', () => {
+  rejects(`${NOTX}-- note; with a semicolon\ncreate index concurrently i on t (a)`, /; inside a comment/)
+  rejects(`${NOTX}/* a; b */ create index concurrently i on t (a)`, /; inside a comment/)
+  rejects(`${NOTX}create index concurrently i on t (a); -- trailing; note`, /; inside a comment/)
+  // A ; inside a string after -- would be stripped along with it; the count catches it.
+  rejects(`${NOTX}create index concurrently i on t (a) where b <> '--;'`, /; inside a comment/)
+  assert.equal(plan(`${NOTX}-- plain note\ncreate index concurrently i on t (a);`).concurrentIndex, 'i')
 })
