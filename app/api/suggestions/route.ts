@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import type { SuggestionSource } from '@/lib/db/schema'
+import { ensureComposioTriggers } from '@/lib/suggestions/sources'
 import { briefingHighlights, listSuggestions, todaysBriefing } from '@/lib/suggestions/store'
 
 export const runtime = 'nodejs'
@@ -15,6 +16,11 @@ const headers = { 'Cache-Control': 'private, no-store' }
 export async function GET(request: Request) {
   const user = (await getSession())?.user
   if (!user) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
+  // Hobby cron runs once a day, so opening the list is when a missing trigger gets re-created.
+  after(async () => {
+    try { await ensureComposioTriggers(user.id) }
+    catch (error) { console.error('Composio trigger check failed', error instanceof Error ? error.message : error) }
+  })
   const timeZone = new URL(request.url).searchParams.get('tz') ?? request.headers.get('x-vercel-ip-timezone')
   const [briefing, items] = await Promise.all([todaysBriefing(user.id, timeZone), listSuggestions(user.id)])
   const groups = new Map<SuggestionSource, typeof items>()

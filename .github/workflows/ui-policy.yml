@@ -84,6 +84,7 @@ jobs:
       - run: pnpm test:linear-sync
       - run: pnpm test:coordinator-events
       - run: pnpm test:auth-composio
+      - run: pnpm test:groups
       - run: pnpm test:integrations
       - run: pnpm test:csv
       - run: pnpm test:settings
@@ -155,6 +156,8 @@ jobs:
       - name: Generate ephemeral test-only auth secret
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
       - run: pnpm exec playwright install --with-deps chromium
+      - name: Group conversation API and migrations (temporary Postgres 17 only)
+        run: pnpm test:groups
       - run: pnpm test:e2e:setup
       - name: Verify run summary membership and privacy against isolated database
         run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-run-summaries.integration.ts

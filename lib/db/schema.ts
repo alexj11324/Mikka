@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, varchar, jsonb, integer, numeric, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -257,14 +257,6 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
-/** One call to the decision model, with what it cost, so the month's spend can be capped. */
-export const decisionCalls = pgTable('decision_calls', {
-  id: uuid('id').primaryKey(), purpose: text('purpose').notNull(), model: text('model').notNull(),
-  inputTokens: integer('inputTokens').notNull().default(0),
-  costUsd: numeric('costUsd', { precision: 12, scale: 8 }).notNull(),
-  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('decision_calls_created_idx').on(table.createdAt)])
-
 // --- Suggestions (MIK-41) ---------------------------------------------------
 //
 // External notifications from connected apps, judged by fixed rules or the
@@ -311,6 +303,12 @@ export const briefings = pgTable('briefings', {
   total: integer('total').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.userId, table.localDate] })])
+
+/** When the person's Composio trigger subscriptions were last checked (lib/suggestions/sources.ts). */
+export const suggestionTriggerChecks = pgTable('suggestion_trigger_checks', {
+  userId: text('userId').primaryKey(),
+  checkedAt: timestamp('checkedAt', { withTimezone: true }).notNull(),
+})
 
 /** The Coordinator's conversation, one AI SDK model message per row, in `position` order. */
 export const coordinatorMessages = pgTable('coordinator_messages', {
@@ -361,3 +359,35 @@ export const telegramConversations = pgTable('telegram_conversations', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('telegram_conversations_user_idx').on(table.userId)])
+
+/** Group history retains former memberships; agent DMs are exposed only through links. */
+export const conversations = pgTable('conversations', {
+  id: uuid('id').primaryKey(), workspaceId: uuid('workspaceId').notNull(),
+  kind: text('kind').$type<'group' | 'agent_dm'>().notNull(), title: text('title').notNull(),
+  createdBy: text('createdBy').notNull(), lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull().default(sql`0`),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
+export const conversationMembers = pgTable('conversation_members', {
+  conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  memberType: text('memberType').$type<'user' | 'agent'>().notNull(), memberId: text('memberId').notNull(),
+  role: text('role').$type<'owner' | 'member'>().notNull(),
+  joinedAt: timestamp('joinedAt', { withTimezone: true }).notNull().defaultNow(), leftAt: timestamp('leftAt', { withTimezone: true }),
+}, t => [primaryKey({ columns: [t.conversationId, t.memberType, t.memberId] }), index('conversation_members_identity_idx').on(t.memberType, t.memberId)])
+export const conversationMessages = pgTable('conversation_messages', {
+  id: uuid('id').primaryKey(), conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  position: bigint('position', { mode: 'bigint' }).notNull(), authorType: text('authorType').$type<'user' | 'agent'>().notNull(),
+  authorId: text('authorId').notNull(), body: text('body').notNull(), mentions: jsonb('mentions').notNull().default([]),
+  replyToId: uuid('replyToId'), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [unique('conversation_messages_position_key').on(t.conversationId, t.position), index('conversation_messages_timeline_idx').on(t.conversationId, t.position.desc())])
+// Same names/types as unmerged MIK-8 (#69); deliberately no FK: 'coordinator' is also a valid id.
+export const conversationReads = pgTable('conversation_reads', {
+  userId: text('userId').notNull(), conversationId: text('conversationId').notNull(),
+  lastReadPosition: integer('lastReadPosition').notNull().default(0), lastReadMessageId: text('lastReadMessageId'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.conversationId] })])
+export const conversationLinks = pgTable('conversation_links', {
+  id: uuid('id').primaryKey(), sourceConversationId: uuid('sourceConversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  linkedConversationId: uuid('linkedConversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  anchorPosition: bigint('anchorPosition', { mode: 'bigint' }).notNull(), firstPosition: bigint('firstPosition', { mode: 'bigint' }).notNull(),
+  lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull(), messageCount: bigint('messageCount', { mode: 'bigint' }).notNull(),
+}, t => [index('conversation_links_source_idx').on(t.sourceConversationId, t.anchorPosition)])
