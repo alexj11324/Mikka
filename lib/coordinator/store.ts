@@ -89,8 +89,11 @@ export async function setEventTier(id: string, tier: CoordinatorEventTier): Prom
   await db.update(coordinatorEvents).set({ tier }).where(and(eq(coordinatorEvents.id, id), isNull(coordinatorEvents.tier)))
 }
 
-/** Appends the turn's new messages and renews the lease. */
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[]): Promise<void> {
+/**
+ * Appends the turn's new messages and renews the lease. `warning` says why the
+ * reply may be cut short; it shows in the chat until a turn ends cleanly.
+ */
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null): Promise<void> {
   await db.transaction(async tx => {
     if (messages.length) {
       const first = await nextPosition(tx, userId)
@@ -98,7 +101,8 @@ export async function appendMessages(userId: string, holder: string, messages: M
         id: crypto.randomUUID(), userId, position: first + index, message: message as unknown as Record<string, unknown>,
       })))
     }
-    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(Date.now() + LEASE_MS), lastError: null, lastErrorAt: null, updatedAt: new Date() })
+    const now = new Date()
+    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning, lastErrorAt: warning ? now : null, updatedAt: now })
       .where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.leaseHolder, holder)))
   })
 }

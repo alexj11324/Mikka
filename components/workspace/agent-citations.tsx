@@ -1,10 +1,10 @@
 'use client'
 
-import { Fragment, useState } from 'react'
+import { createContext, useContext, useState, type ComponentProps } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getLinkPreview } from '@/app/actions/link-preview'
-import { splitCitations, type CitationPart, type CitationSource, type IssueSource, type RunSource } from '@/lib/coordinator/citations'
+import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { cn } from 'cn'
 import { Badge } from '@/components/reui/badge'
@@ -20,66 +20,92 @@ const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destructive-l
   succeeded: 'success-light', stopped: 'secondary', failed: 'destructive-light', cancelled: 'secondary',
 }
 
-type Previews = Record<string, LinkPreview | null>
+/** A task chip is wider than a source chip: it carries the title too. */
+const TASK_CHIP = 'max-w-72 pl-1.5'
+const STATUS_DOT = 'size-1.5 shrink-0 rounded-full bg-current'
+
+export type LinkPreviews = Record<string, LinkPreview | null>
 
 /**
- * A Coordinator reply: its cited issues, runs and web pages as source chips
- * in the text, then an "N sources" toggle that lists them all. A citation it
- * cannot show stays as written.
+ * What a conversation's replies cite: the issues and runs looked up for the
+ * person, and link previews for web pages. Inside it, Markdown shows citations
+ * and web links as source chips; outside it, as plain text and links.
  */
-export function CitedText({ text, sources, onOpenIssue }: { text: string; sources: Record<string, CitationSource>; onOpenIssue: (id: string) => void }) {
-  const t = useTranslations('Coordinator.citation')
-  const [open, setOpen] = useState(false)
-  const parts = splitCitations(text)
-  const urls = [...new Set(parts.flatMap(part => part.type === 'link' ? [part.url] : []))]
-  const { data: previews = {} } = useSWR<Previews>(urls.length ? ['link-previews', ...urls] : null, async () => {
+export interface AgentCitations {
+  sources: Record<string, CitationSource>
+  previews: LinkPreviews
+  onOpenIssue: (id: string) => void
+}
+
+export const AgentCitationsContext = createContext<AgentCitations | null>(null)
+
+export function useAgentCitations() {
+  return useContext(AgentCitationsContext)
+}
+
+/** Link previews for every web page cited in `texts`, fetched once. */
+export function useLinkPreviews(texts: readonly string[]): LinkPreviews {
+  const urls = [...new Set(texts.flatMap(text => splitCitations(text).flatMap(part => part.type === 'link' ? [part.url] : [])))].sort()
+  const { data = {} } = useSWR<LinkPreviews>(urls.length ? ['link-previews', ...urls] : null, async () => {
     const results = await Promise.all(urls.map(url => getLinkPreview(url).catch(() => null)))
     return Object.fromEntries(urls.map((url, index) => [url, results[index]]))
   }, { revalidateOnFocus: false, revalidateIfStale: false, shouldRetryOnError: false })
-  const resolve = (part: Extract<CitationPart, { type: 'citation' }>) => {
-    const source = sources[part.id]
-    return source && (!part.kind || part.kind === source.kind) ? source : null
+  return data
+}
+
+/** Markdown `a`: a citation or web link as a source chip when the conversation provides citations. */
+export function CitationAnchor({ href, children, className: _className, ...props }: ComponentProps<'a'>) {
+  const citations = useAgentCitations()
+  if (citations && href?.startsWith(CITATION_HREF)) {
+    const [kind, id] = href.slice(CITATION_HREF.length).split('/') as [CitationKind | 'any', string]
+    const source = citations.sources[id]
+    if (!source || (kind !== 'any' && kind !== source.kind)) return <>{children}</>
+    return <CitationChip id={id} kind={source.kind} />
   }
+  if (citations && href && /^https?:\/\//i.test(href)) return <WebCitation url={href} label={typeof children === 'string' && children !== href ? children : null} />
+  return <a {...props} href={href} className="text-primary underline underline-offset-4" target="_blank" rel="noopener noreferrer">{children}</a>
+}
+
+/** The "N sources" toggle under a reply, listing every issue, run and page it cites. */
+export function CitationSources({ text }: { text: string }) {
+  const t = useTranslations('Coordinator.citation')
+  const citations = useAgentCitations()
+  const [open, setOpen] = useState(false)
+  if (!citations) return null
+  const { sources, previews, onOpenIssue } = citations
   const listed = new Map<string, StreamingSource>()
-  for (const part of parts) {
+  for (const part of splitCitations(text)) {
     if (part.type === 'link') listed.set(part.url, linkSource(part.url, part.label, previews[part.url]))
     else if (part.type === 'citation') {
-      const source = resolve(part)
-      if (source?.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
-      if (source?.kind === 'run') {
+      const source = sources[part.id]
+      if (!source || (part.kind && part.kind !== source.kind)) continue
+      if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
+      else {
         const issue = source.issue
         listed.set(source.id, { name: t('runOf', { agent: source.agentName }), domain: source.harness === 'claude_code' ? 'Claude Code' : 'Codex', icon: source.harness === 'claude_code' ? <Claude /> : <OpenAI />, onSelect: issue ? () => onOpenIssue(issue.id) : undefined })
       }
     }
   }
-  return <>
-    {parts.map((part, index) => {
-      if (part.type === 'text') return <Fragment key={index}>{part.text}</Fragment>
-      if (part.type === 'link') return <LinkCitation key={index} url={part.url} label={part.label} preview={previews[part.url]} />
-      const source = resolve(part)
-      if (!source) return <Fragment key={index}>{part.raw}</Fragment>
-      return source.kind === 'issue'
-        ? <IssueCitation key={index} issue={source} onOpen={onOpenIssue} />
-        : <RunCitation key={index} run={source} onOpen={onOpenIssue} />
-    })}
-    {listed.size > 0 && <div className="mt-2 flex flex-col whitespace-normal">
-      <SourcesSummary sources={[...listed.values()]} label={t('sources', { count: listed.size })} open={open} onOpenChange={setOpen} className="-ml-1 self-start" />
-      <SourcesList sources={[...listed.values()]} open={open} />
-    </div>}
-  </>
+  if (!listed.size) return null
+  return <div className="flex flex-col">
+    <SourcesSummary sources={[...listed.values()]} label={t('sources', { count: listed.size })} open={open} onOpenChange={setOpen} className="-ml-1 self-start" />
+    <SourcesList sources={[...listed.values()]} open={open} />
+  </div>
 }
 
-function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: string) => void }) {
+/** A task mentioned in a reply: status dot, number and title, inline with the text. */
+export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: string) => void }) {
   const t = useTranslations('Coordinator.citation')
   const tIssue = useTranslations('Issue')
   const status = ISSUE_STATUSES.find(item => item.value === issue.status) ?? ISSUE_STATUSES[1]
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
-  const tone = status.value === 'doing' ? 'text-warning-foreground' : status.value === 'review' ? 'text-success-foreground' : status.value === 'done' ? 'text-info-foreground' : 'text-muted-foreground'
+  const tone = status.value === 'doing' ? 'text-warning-foreground' : status.value === 'review' ? 'text-info-foreground' : status.value === 'done' ? 'text-success-foreground' : 'text-muted-foreground'
   const identifier = issue.identifier
   return <InlineCitation>
-    <InlineCitationTrigger aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)}>
-      <SourceAvatar source={{ name: issue.title, domain: 'Mikka', icon: <Mikka /> }} />
-      <InlineCitationLabel>{identifier ?? issue.title}</InlineCitationLabel>
+    <InlineCitationTrigger aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)} className={TASK_CHIP}>
+      <span aria-hidden="true" className={cn(STATUS_DOT, tone)} />
+      {identifier && <span className="shrink-0">{identifier}</span>}
+      <InlineCitationLabel className="font-sans">{issue.title}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
@@ -94,7 +120,24 @@ function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: str
   </InlineCitation>
 }
 
-function RunCitation({ run, onOpen }: { run: RunSource; onOpen: (id: string) => void }) {
+/** A cited issue or run by id, as a chip; the raw id when the conversation cannot show it. */
+export function CitationChip({ id, kind }: { id: string; kind: CitationKind }) {
+  const citations = useAgentCitations()
+  const source = citations?.sources[id]
+  if (!citations || source?.kind !== kind) return <>{id}</>
+  return source.kind === 'issue'
+    ? <IssueCitation issue={source} onOpen={citations.onOpenIssue} />
+    : <RunCitation run={source} onOpen={citations.onOpenIssue} />
+}
+
+/** A cited web page as a chip with its link preview; a plain link outside a conversation that cites. */
+export function WebCitation({ url, label }: { url: string; label: string | null }) {
+  const citations = useAgentCitations()
+  if (!citations) return <a href={url} className="text-primary underline underline-offset-4" target="_blank" rel="noopener noreferrer">{label ?? url}</a>
+  return <LinkCitation url={url} label={label} preview={citations.previews[url]} />
+}
+
+export function RunCitation({ run, onOpen }: { run: RunSource; onOpen: (id: string) => void }) {
   const t = useTranslations('Coordinator.citation')
   const format = useFormatter()
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
@@ -145,7 +188,7 @@ function linkSource(url: string, label: string | null, preview: LinkPreview | nu
   return { name: preview?.title ?? link?.name ?? url, domain: link?.host ?? url, href: url, image: preview?.icon }
 }
 
-function LinkCitation({ url, label, preview }: { url: string; label: string | null; preview: LinkPreview | null | undefined }) {
+export function LinkCitation({ url, label, preview }: { url: string; label: string | null; preview: LinkPreview | null | undefined }) {
   const link = describeLink(url, label, preview)
   if (!link) return <>{url}</>
   return <InlineCitation>
