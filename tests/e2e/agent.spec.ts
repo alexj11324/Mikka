@@ -1,5 +1,5 @@
 import { test as apiTest } from '@playwright/test'
-import { test, expect, register, app } from './fixtures'
+import { test, expect, register, rail, app } from './fixtures'
 
 apiTest('开发预览验收入口不跳转到内部主机', async ({ request, baseURL }) => {
   const response = await request.get(app('/api/acceptance'), { maxRedirects: 0 })
@@ -35,7 +35,7 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
     if (new URL(request.url()).hostname.endsWith('openui.com')) externalRequests.push(request.url())
   })
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   await expect(panel).toBeVisible()
   await expect(panel.locator('iframe')).toHaveCount(0)
@@ -102,14 +102,14 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(send).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.setViewportSize({ width: 1159, height: 851 })
-  await page.getByRole('button', { name: '我的任务', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '我创建的任务', exact: true })).toBeVisible()
+  await rail(page, '看板').click()
+  await expect(page.getByRole('heading', { name: '全部任务', exact: true })).toBeVisible()
   await expect(panel).toHaveCount(0)
 })
 
 test('组件演示的 LaTeX 字体、复杂排版与窄屏滚动正确，返回后保留草稿', async ({ page }) => {
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区', exact: true })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   await input.fill('演示后保留的草稿')
@@ -161,7 +161,7 @@ test('组件演示的 LaTeX 字体、复杂排版与窄屏滚动正确，返回�
 
 test('Agent 输入完整显示单行文字，超过四行才显示自定义滚动条', async ({ page }) => {
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   const scroller = panel.locator('form [data-slot="scroll-area"]')
@@ -195,7 +195,7 @@ test('Agent 输入完整显示单行文字，超过四行才显示自定义滚�
 for (const stage of ['headers', 'body'] as const) {
   test(`停止生成在 ${stage} 阶段取消请求且不重新提交`, async ({ page }) => {
     await register(page)
-    await page.getByRole('button', { name: 'Agent', exact: true }).click()
+    await page.getByRole('button', { name: '新对话', exact: true }).click()
     const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
     const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
     await page.evaluate(stage => {
@@ -235,7 +235,7 @@ for (const stage of ['headers', 'body'] as const) {
 
 test('生成期间可新建和切换任务，独立保留草稿、回复与停止状态', async ({ page }) => {
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区', exact: true })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   await expect(input).toBeEditable()
@@ -308,7 +308,7 @@ test('生成期间可新建和切换任务，独立保留草稿、回复与停�
 
 test('标题下拉切换历史，右侧图标搜索和新建，桌面与手机均不占侧栏空间', async ({ page }) => {
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区', exact: true })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   const switcher = panel.getByRole('button', { name: /^切换会话：/ })
@@ -380,7 +380,7 @@ function openUIStream(response: string) {
 test('beUI 注册组件展示用户数字且动效按钮直���提问并保留草稿', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   let requests = 0
@@ -415,7 +415,7 @@ button = BeButton("继续细化", "请根据本周完成12.5项任务的数据�
 test('beUI 功能组展示回复与计划，审批和多步回答直接继续且不覆盖草稿', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   const submissions: { prompt: string; sessionId: string }[] = []
@@ -472,7 +472,7 @@ icon = AgentIcon("question", "等待你的意见")`) })
 test('beUI 内联回答失败与停止后���留选择，可在原卡片重试且不重复提交', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   const submissions: { prompt: string; sessionId: string }[] = []
@@ -531,7 +531,7 @@ test('beUI 内联回答失败与停止后���留选择，可在原卡片重
 test('旧按钮直接提问，纯文本在原卡片回答且失败可重试', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   const submissions: { prompt: string; sessionId: string }[] = []
@@ -580,7 +580,7 @@ button = BeButton("填入提问", "为 Orvilo 本周任务建议一个计划结�
 test('真实配图异步展示来源，支持放大缩放和 Escape 关闭，失败不影响正文', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   await page.route('**/api/agent', route => route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream('root = Stack([TextContent("正文不等待配图加载。"), BeImage("Hong Kong Victoria Harbour", "维多利亚港资料配图", "维多利亚港现代风光")])') }))
@@ -612,7 +612,7 @@ test('真实配图异步展示来源，支持放大缩放和 Escape 关闭，失
 
 test('紧凑图文卡片使用 beUI Card、来源可展开、无冗余等待文案', async ({ page }) => {
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   let releaseImage!: () => void
@@ -646,7 +646,7 @@ test('紧凑图文卡片使用 beUI Card、来源可展开、无冗余等待文�
 
 test('可恢复格式不报错，真正缺段可原位重试且不覆盖草稿', async ({ page }) => {
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   await page.route('**/api/agent', route => route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream('root = TextContent("格式已自动恢复的完整正文"') }))
@@ -686,7 +686,7 @@ note = TextContent("表单提交后直接继续提供建议，不会创建项目
 test('代码块按需高亮，正文和复制功能保持可用', async ({ page }) => {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const code = 'const answer = 42;'
   const response = `root = TextContent(${JSON.stringify(`代码示例：\n\n\`\`\`javascript\n${code}\n\`\`\``)})`
@@ -712,7 +712,7 @@ test('代码块按需高亮，正文和复制功能保持可用', async ({ page 
 
 test('OpenUI 表格、Tabs 和表单直接提交，兼容按钮续问且会话稳定', async ({ page }) => {
   await register(page)
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区' })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   const sessionIds: string[] = []

@@ -4,7 +4,7 @@
 
 ## The pre-history baseline
 
-The numbered migrations originally assumed that issue/editor/agent-session tables and Better Auth's core tables already existed. `20261023152232_application_baseline.sql` supplies those prerequisites on an empty database. Its timestamp follows the migration naming rule; `scripts/migration-order.mjs` explicitly puts this one named file before `0001`. Every other migration retains its filename and relative lexical ordering, including the frozen historical duplicates. The normal per-database `schema_migrations` ledger records the baseline like any other file.
+The numbered migrations originally assumed that issue/editor/agent-session tables and Better Auth's core tables already existed. `20261023221259_application_baseline.sql` supplies those prerequisites on an empty database. Its timestamp follows the migration naming rule; `scripts/migration-order.mjs` explicitly puts this one named file before `0001`. Every other migration retains its filename and relative lexical ordering, including the frozen historical duplicates. The normal per-database `schema_migrations` ledger records the baseline like any other file.
 
 On an existing database the baseline does not alter columns, rewrite rows or rebuild existing tables' indexes. Missing tables are created with their indexes; no table or column is dropped. A five-second transaction-local lock timeout bounds lock waiting. This is not a drift repair tool: an existing table with an incompatible shape still requires a separately reviewed migration. The transaction can be retried if lock acquisition times out. The baseline is idempotent even if its transaction commits before the runner records its filename.
 

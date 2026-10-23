@@ -70,8 +70,8 @@ create table if not exists issues (
   "userId" text not null,
   title varchar(200) not null,
   content jsonb not null,
-  status text not null,
-  priority text not null,
+  status text not null check (status in ('todo', 'doing', 'review', 'done')),
+  priority text not null check (priority in ('urgent', 'high', 'normal', 'low')),
   revision integer not null default 1,
   "createdAt" timestamptz not null default now(),
   "updatedAt" timestamptz not null default now()
@@ -101,7 +101,8 @@ create table if not exists issue_versions (
   content jsonb not null,
   status text not null,
   priority text not null,
-  "createdAt" timestamptz not null default now()
+  "createdAt" timestamptz not null default now(),
+  unique ("issueId", revision)
 );
 
 do $$ begin
