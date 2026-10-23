@@ -20,24 +20,29 @@ BEGIN
   INTO has_snake_type, has_snake_id, has_camel_type, has_camel_id
   FROM information_schema.columns
   WHERE table_schema = current_schema() AND table_name = 'issue_versions';
-  -- Only the snake column exists: rename it.
-  IF has_snake_type AND NOT has_camel_type THEN
-    ALTER TABLE issue_versions RENAME COLUMN actor_type TO "actorType";
-    has_snake_type := false; has_camel_type := true;
+  IF NOT (has_snake_type OR has_snake_id) THEN
+    RETURN;
   END IF;
-  IF has_snake_id AND NOT has_camel_id THEN
-    ALTER TABLE issue_versions RENAME COLUMN actor_id TO "actorId";
-    has_snake_id := false; has_camel_id := true;
-  END IF;
-  -- Both spellings exist: the actor is a (type, id) pair, so copy the snake pair over only on
-  -- rows where BOTH camel columns are NULL; never mix one camel value with one snake value.
-  IF has_snake_type OR has_snake_id THEN
+  -- Any camel column exists (fully or half migrated): merge first. Make sure both camel columns
+  -- exist, copy the snake pair only on rows where BOTH camel columns are NULL (never mix one camel
+  -- value with one snake value; the actor is a (type, id) pair), then drop the snake columns.
+  -- A snake id without a snake type is not copied: an id without a type is unreadable (see the
+  -- actor_id_needs_type check below).
+  -- Merging before any rename keeps a half-migrated table (e.g. "actorType" + actor_type +
+  -- actor_id) from renaming actor_id into place and then skipping those rows' actor_type.
+  IF has_camel_type OR has_camel_id THEN
+    ALTER TABLE issue_versions ADD COLUMN IF NOT EXISTS "actorType" text;
+    ALTER TABLE issue_versions ADD COLUMN IF NOT EXISTS "actorId" text;
     EXECUTE format(
-      'UPDATE issue_versions SET "actorType" = %s, "actorId" = %s WHERE "actorType" IS NULL AND "actorId" IS NULL',
+      'UPDATE issue_versions SET "actorType" = %1$s, "actorId" = %2$s WHERE "actorType" IS NULL AND "actorId" IS NULL AND %1$s IS NOT NULL',
       CASE WHEN has_snake_type THEN 'actor_type' ELSE 'NULL' END,
       CASE WHEN has_snake_id THEN 'actor_id' ELSE 'NULL' END);
     ALTER TABLE issue_versions DROP COLUMN IF EXISTS actor_type;
     ALTER TABLE issue_versions DROP COLUMN IF EXISTS actor_id;
+  ELSE
+    -- Only snake columns: rename them in place.
+    IF has_snake_type THEN ALTER TABLE issue_versions RENAME COLUMN actor_type TO "actorType"; END IF;
+    IF has_snake_id THEN ALTER TABLE issue_versions RENAME COLUMN actor_id TO "actorId"; END IF;
   END IF;
 END $$;
 ALTER TABLE issue_versions ADD COLUMN IF NOT EXISTS "actorType" text;

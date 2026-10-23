@@ -68,7 +68,7 @@ test('the migration is timestamp-named, later than 20261023040300, and idempoten
   assert.match(name, /^\d{14}_/)
   assert.ok(name.slice(0, 14) > '20261023040300')
   const sql = readFileSync(join('drizzle', name), 'utf8')
-  assert.equal((sql.match(/ADD COLUMN IF NOT EXISTS/g) ?? []).length, 2)
+  assert.equal((sql.match(/ADD COLUMN IF NOT EXISTS/g) ?? []).length, 4, 'two in the merge branch, two for a fresh table')
   assert.match(sql, /ADD COLUMN IF NOT EXISTS "actorType"/)
   assert.match(sql, /ADD COLUMN IF NOT EXISTS "actorId"/)
   assert.doesNotMatch(sql.replace(/^--.*$/gm, ''), /ADD COLUMN IF NOT EXISTS actor_/)
@@ -82,4 +82,47 @@ test('the migration is timestamp-named, later than 20261023040300, and idempoten
   assert.match(sql, /whole file runs in ONE transaction/)
   assert.doesNotMatch(sql, /no long lock/)
   assert.match(sql, /CHECK \("actorId" IS NULL OR "actorType" IS NOT NULL\)/)
+})
+
+// Dev-local DB test: the migration on every pre-existing column layout, run twice, in a scratch
+// schema inside a rolled-back transaction (SET LOCAL, so nothing leaks through the pooled bridge).
+const databaseUrl = process.env.MIKKA_DATABASE_URL
+if (!databaseUrl && process.env.REQUIRE_DB === '1') test('database required', () => assert.fail('REQUIRE_DB=1 but no MIKKA_DATABASE_URL'))
+test('actor migration: fresh, snake, both and half-migrated layouts', { skip: databaseUrl ? false : 'no database' }, async () => {
+  const { default: pg } = await import('pg')
+  const name = readdirSync('drizzle').find(file => file.endsWith('_activity_version_actor.sql'))!
+  const file = readFileSync(join('drizzle', name), 'utf8')
+  const client = new pg.Client({ connectionString: databaseUrl })
+  await client.connect()
+  const cases: [string, string, string[], unknown[]][] = [
+    ['fresh', '', [], []],
+    ['snake only', 'actor_type text, actor_id text', [`'user','u1'`, 'null,null'], [['user', 'u1'], [null, null]]],
+    ['both spellings', 'actor_type text, actor_id text, "actorType" text, "actorId" text', [`'user','u1',null,null`, `'user','u2','agent','a2'`], [['user', 'u1'], ['agent', 'a2']]],
+    // Half-migrated: merged first, so actor_id is not renamed into place ahead of actor_type.
+    ['camel type + snake pair', 'actor_type text, actor_id text, "actorType" text', [`'user','u1',null`, `'agent','a2','system'`], [['user', 'u1'], ['system', null]]],
+    ['camel id + snake pair', 'actor_type text, actor_id text, "actorId" text', [`'user','u1',null`], [['user', 'u1']]],
+    ['camel type + snake id', 'actor_id text, "actorType" text', [`'u1',null`, `'u2','user'`], [[null, null], ['user', null]]],
+  ]
+  try {
+    for (const [label, cols, rows, expected] of cases) {
+      await client.query('begin')
+      try {
+        const schema = `mik17_${process.pid}_${label.replace(/\W+/g, '_')}`
+        await client.query(`create schema ${schema}`)
+        await client.query(`set local search_path to ${schema}`)
+        await client.query(`create table issue_versions (id serial primary key${cols ? ', ' + cols : ''})`)
+        for (const row of rows) await client.query(`insert into issue_versions (${cols.replace(/ text/g, '')}) values (${row})`)
+        await client.query(file)
+        await client.query(file)
+        const { rows: out } = await client.query('select "actorType", "actorId" from issue_versions order by id')
+        assert.deepEqual(out.map(r => [r.actorType, r.actorId]), expected, label)
+        const { rows: snake } = await client.query(`select column_name from information_schema.columns where table_schema = $1 and column_name like 'actor\\_%'`, [schema])
+        assert.deepEqual(snake, [], `${label}: snake columns dropped`)
+      } finally {
+        await client.query('rollback')
+      }
+    }
+  } finally {
+    await client.end()
+  }
 })
