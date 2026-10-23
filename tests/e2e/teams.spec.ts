@@ -17,7 +17,8 @@ async function createTask(page: Page, title: string, team?: string) {
   await page.getByRole('button', { name: '新建任务', exact: true }).first().click()
   const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
   await dialog.getByLabel('任务标题', { exact: true }).fill(title)
-  await dialog.getByLabel('归属团队', { exact: true }).selectOption(team ? { label: team } : '')
+  // Create-issue dialog renders a NativeSelect: drive it with selectOption.
+  await dialog.getByRole('combobox', { name: '团队', exact: true }).selectOption(team ? { label: team } : '')
   await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
   await expect(dialog).not.toBeVisible()
 }
@@ -78,7 +79,13 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await createTask(page, publicTitle, 'PRODUCT · 产品团队')
   await showAllTasks(page)
   await page.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: publicTitle }).click()
-  await expect(page.getByLabel('归属团队', { exact: true })).toHaveValue(/.+/)
+  // Detail page renders a Base UI Select: open the trigger and check the selected option.
+  const teamSelect = page.getByRole('combobox', { name: '团队', exact: true })
+  await expect(teamSelect).toContainText('PRODUCT · 产品团队')
+  await teamSelect.click()
+  await expect(page.getByRole('option', { name: 'PRODUCT · 产品团队', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('listbox')).toHaveCount(0)
   await expect(page.getByText('对该工作区启用成员公开，可协作编辑。', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
   await page.getByRole('button', { name: '项目', exact: true }).first().click()
@@ -169,5 +176,85 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
   } finally {
     await memberContext.close()
     expect(runtime).toEqual([])
+  }
+})
+
+test('非创建者成员在他人公开任务上改父子关系，关系区与选择器立即刷新', async ({ page, browser, baseURL }) => {
+  test.setTimeout(180000)
+  await register(page, '/settings/teams')
+  await createTeam(page, '协作团队', 'COLLAB')
+  await page.getByRole('link', { name: '返回工作台', exact: true }).click()
+  const parentTitle = `他人父任务 ${randomUUID()}`
+  const childTitle = `他人子任务 ${randomUUID()}`
+  await createTask(page, parentTitle, 'COLLAB · 协作团队')
+  await createTask(page, childTitle, 'COLLAB · 协作团队')
+  await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '设置', exact: true }).click()
+  await page.getByRole('link', { name: '成员', exact: true }).click()
+  await page.getByRole('button', { name: '邀请成员', exact: true }).click()
+  const invitation = page.getByRole('dialog', { name: '邀请成员', exact: true })
+  const email = `relation-member-${randomUUID()}@example.com`
+  await invitation.getByLabel('邮箱地址', { exact: true }).fill(email)
+  await invitation.getByRole('button', { name: '创建邀请链接', exact: true }).click()
+  const inviteUrl = new URL(await invitation.getByLabel(`${email} 的邀请链接`, { exact: true }).inputValue()).pathname
+  const invitePath = inviteUrl.startsWith(BASE_PATH) ? inviteUrl.slice(BASE_PATH.length) || '/' : inviteUrl
+  await invitation.getByRole('button', { name: '完成', exact: true }).click()
+  const memberContext = await browser.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
+  try {
+    const member = await memberContext.newPage()
+    await register(member, invitePath, email)
+    await member.getByRole('button', { name: '接受邀请并加入', exact: true }).click()
+    await expect(member).toHaveURL(/\/settings\/members\?workspace=/)
+    // Relation edits by a non-owner require issue membership on both tasks; the owner adds it.
+    await page.goto(app('/'))
+    await showAllTasks(page)
+    for (const title of [parentTitle, childTitle]) {
+      await page.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: title }).click()
+      await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
+      await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
+      await page.getByRole('menuitem', { name: '管理协作成员…', exact: true }).click()
+      await page.getByPlaceholder('输入对方的注册邮箱', { exact: true }).fill(email)
+      await page.getByRole('button', { name: '添加成员', exact: true }).click()
+      await expect(page.getByText('成员已添加，对方登录后可在「协作任务」中访问此任务。', { exact: true })).toBeVisible()
+      await page.keyboard.press('Escape')
+      await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
+    }
+    await member.goto(app('/'))
+    await showAllTasks(member)
+    await member.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: parentTitle }).click()
+    await expect(member.getByLabel('任务标题', { exact: true })).toHaveValue(parentTitle)
+    // Non-owners cannot delete (owner-only menu item), so delete/undo is covered by the owner flow only.
+    await member.getByRole('button', { name: '更多任务操作', exact: true }).click()
+    await expect(member.getByRole('menuitem', { name: /^删除任务/ })).toHaveCount(0)
+    await member.keyboard.press('Escape')
+    const children = member.getByRole('region', { name: '子任务', exact: true })
+    const addExisting = async () => {
+      await children.getByRole('button', { name: '添加现有任务', exact: true }).click()
+      return member.getByRole('dialog', { name: '添加现有子任务', exact: true })
+    }
+    let picker = await addExisting()
+    await picker.getByRole('combobox', { name: '搜索关联任务', exact: true }).fill(childTitle)
+    await picker.getByRole('option').filter({ hasText: childTitle }).click()
+    await expect(picker).not.toBeVisible()
+    await expect(children.getByRole('button', { name: '子任务 0 / 1', exact: true })).toBeVisible()
+    await children.getByRole('button', { name: `移除子任务关系：${childTitle}`, exact: true }).click()
+    await expect(children.getByRole('button', { name: '子任务 0 / 0', exact: true })).toBeVisible()
+    // Hold server actions: the picker (keyed by the viewer) must show loading or fresh data, never the stale snapshot.
+    let release!: () => void
+    const held = new Promise<void>(resolve => { release = resolve })
+    let heldActions = 0
+    await member.route('**/*', async route => {
+      if (route.request().method() === 'POST' && route.request().headers()['next-action']) { heldActions++; await held }
+      await route.fallback()
+    })
+    picker = await addExisting()
+    await expect.poll(() => heldActions).toBeGreaterThan(0)
+    await expect(picker.getByText('正在读取任务…', { exact: true }).or(picker.getByRole('option').filter({ hasText: childTitle }))).toBeVisible()
+    release()
+    await member.unroute('**/*')
+    await expect(picker.getByRole('option').filter({ hasText: childTitle })).toBeVisible()
+    await picker.getByRole('button', { name: '关闭', exact: true }).click()
+  } finally {
+    await memberContext.close()
   }
 })

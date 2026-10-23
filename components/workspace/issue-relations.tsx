@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, ChevronRight, Circle, Flag, GitBranch, Link2, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -18,15 +18,20 @@ import { cn } from '@/lib/utils'
 
 type Issue = Awaited<ReturnType<typeof getIssue>>
 export type RelationKind = 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'
+// Picker-only cache key, keyed by the signed-in viewer like the board's ['issues', viewerId] (listIssues returns the viewer's visible issues); mutate it after any relation change.
+export const relationPickerKey = (userId: string) => ['issues', 'relation-picker', userId] as const
 const closed = (status: string) => ['done', 'canceled', 'duplicate'].includes(status)
 
-export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, onSelect, validationError }: { kind: RelationKind; task: Issue; open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; onSelect: (id: string) => void; validationError?: string }) {
+export function IssueRelationPicker({ viewerId, kind, task, open, onOpenChange, pending, onSelect, validationError }: { viewerId: string; kind: RelationKind; task: Issue; open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; onSelect: (id: string) => void; validationError?: string }) {
   const t = useTranslations('Metadata.relations')
   const relationTitle = (value: RelationKind) => t.has(`title.${value}` as never) ? t(`title.${value}` as never) : value
   const [query, setQuery] = useState('')
+  // Relations change between openings; never filter against a stale board snapshot.
   const { data: connections, error, mutate } = useSWR(open ? ['issue-connections', task.id] : null, () => listIssueConnections(task.id))
-  const { data: board } = useSWR(open ? ['issues', 'relation-picker', task.userId] : null, listIssues)
-  const source = board ?? connections
+  const { data: latestBoard, isValidating } = useSWR(open ? relationPickerKey(viewerId) : null, listIssues)
+  // While revalidating, the cached board may predate the last relation change; wait for fresh data instead of filtering against it.
+  const board = isValidating ? undefined : latestBoard
+  const source = board ?? (isValidating ? undefined : connections)
   const needle = query.trim().toLowerCase()
   const sameOwner = (source ?? []).filter(row => row.id !== task.id && row.ownerId === task.userId && (kind !== 'child' || row.metadata.parentId !== task.id))
   const otherOwner = (board ?? []).some(row => row.id !== task.id && row.ownerId !== task.userId)
@@ -35,13 +40,14 @@ export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, o
   return <Dialog open={open} onOpenChange={value => { if (!pending) onOpenChange(value) }}><DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg"><DialogHeader className="p-4 pr-10"><DialogTitle>{relationTitle(kind)}</DialogTitle><DialogDescription>{t('dialogDescription')}</DialogDescription></DialogHeader>{validationError && <p role="alert" className="px-4 pb-3 text-sm text-destructive">{validationError}</p>}<Command shouldFilter={false} className="[&_[cmdk-item]]:min-h-11 lg:[&_[cmdk-item]]:min-h-0"><CommandInput value={query} onValueChange={setQuery} placeholder={t('searchPlaceholder')} aria-label={t('searchAria')} disabled={pending} /><CommandList>{empty ? <CommandEmpty>{empty}</CommandEmpty> : null}<CommandGroup heading={t('group')}>{rows.map(row => { const Icon = ISSUE_STATUSES.find(status => status.value === row.status)?.icon ?? Circle; return <CommandItem key={row.id} value={`${row.id} ${issueIdentifier(row.metadata.number)} ${row.title}`} disabled={pending} onSelect={() => onSelect(row.id)}><Icon /><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row.metadata.number)}</span><span className="truncate">{row.title}</span></CommandItem> })}{error && <CommandItem onSelect={() => { void mutate() }}>{t('reload')}</CommandItem>}</CommandGroup></CommandList></Command></DialogContent></Dialog>
 }
 
-export function IssueRelations({ task, mode, onOpen, onCreate, onPick, getCurrent, onSaved, disabled }: { task: Issue; mode: 'subissues' | 'sidebar'; onOpen: (id: string) => void; onCreate: () => void; onPick: (kind: RelationKind) => void; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; disabled: boolean }) {
+export function IssueRelations({ viewerId, task, mode, onOpen, onCreate, onPick, getCurrent, onSaved, disabled }: { viewerId: string; task: Issue; mode: 'subissues' | 'sidebar'; onOpen: (id: string) => void; onCreate: () => void; onPick: (kind: RelationKind) => void; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; disabled: boolean }) {
   const t = useTranslations('Metadata.relations')
   const tIssue = useTranslations('Issue')
   const actionError = useActionError()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const groupLabel = (value: RelationKind) => t.has(`groupLabel.${value}` as never) ? t(`groupLabel.${value}` as never) : value
   const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
+  const { mutate: refresh } = useSWRConfig()
   const { data: rows, error, mutate } = useSWR(['issue-connections', task.id], () => listIssueConnections(task.id), { refreshInterval: 10000 })
   const [expanded, setExpanded] = useState(true)
   const [pending, setPending] = useState(false)
@@ -56,7 +62,7 @@ export function IssueRelations({ task, mode, onOpen, onCreate, onPick, getCurren
       if (!latest) return
       const result = await updateIssueRelation({ id: task.id, revision: latest.revision, kind, targetId, remove: true })
       if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error))
-      onSaved(result.issue); await mutate(); toast.success(t('removed'))
+      onSaved(result.issue); await Promise.all([mutate(), refresh(relationPickerKey(viewerId)), refresh(['issues', viewerId])]); toast.success(t('removed'))
     } catch (error) { toast.error(error instanceof Error ? error.message : t('removeFailed')) }
     finally { busy.current = false; setPending(false) }
   }
