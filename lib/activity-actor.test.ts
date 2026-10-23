@@ -69,5 +69,11 @@ test('the migration is timestamp-named, later than 20261023040300, and idempoten
   assert.ok(name.slice(0, 14) > '20261023040300')
   const sql = readFileSync(join('drizzle', name), 'utf8')
   assert.equal((sql.match(/ADD COLUMN IF NOT EXISTS/g) ?? []).length, 2)
-  assert.match(sql, /IF NOT EXISTS \(SELECT 1 FROM pg_constraint/)
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS "actorType"/)
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS "actorId"/)
+  assert.doesNotMatch(sql.replace(/^--.*$/gm, ''), /ADD COLUMN IF NOT EXISTS actor_/)
+  for (const check of ['issue_versions_actor_type_check', 'issue_versions_actor_id_needs_type_check']) {
+    assert.match(sql, new RegExp(`DROP CONSTRAINT IF EXISTS ${check};\\s*ALTER TABLE issue_versions ADD CONSTRAINT ${check}`))
+  }
+  assert.match(sql, /CHECK \("actorId" IS NULL OR "actorType" IS NOT NULL\)/)
 })
