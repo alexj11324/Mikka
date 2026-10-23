@@ -16,6 +16,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { linearCommentSync } from './comment-sync'
 import { encodedIssueDocument, loadIssueDocument, replaceIssueDescription } from './document'
 import { linearDescriptionChanged, shouldApplyLinearSnapshot } from './sync-guards'
+import { systemActor } from '@/lib/activity-actor'
 
 type IssueRow = typeof issues.$inferSelect
 type TeamRow = typeof linearTeamSyncs.$inferSelect
@@ -132,7 +133,7 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
       } finally { doc.destroy() }
     }
 
-    if (fieldsChanged) await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
+    if (fieldsChanged) await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...systemActor('linear') })
     await tx.update(linearIssueLinks).set({ appSyncedAt: saved.updatedAt, linearUpdatedAt: new Date(remote.updatedAt), linearDescriptionHash: hashValue(remote.description ?? ''), syncStatus: 'synced', lastError: null, updatedAt: new Date() }).where(eq(linearIssueLinks.id, link.link.id))
     return saved
   })
@@ -193,7 +194,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
       const state = encodedIssueDocument(doc)
       await tx.insert(issueDocuments).values({ issueId: id, userId: team.ownerId, state, updatedAt: now })
     } finally { doc.destroy() }
-    await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: team.ownerId, revision: 1, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
+    await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: team.ownerId, revision: 1, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...systemActor('linear') })
     await tx.insert(linearIssueLinks).values({
       id: crypto.randomUUID(), issueId: id, ownerId: team.ownerId, teamSyncId: team.id,
       linearIssueId: remote.id, linearIdentifier: remote.identifier, linearDescriptionHash: hashValue(remote.description ?? ''), syncStatus: 'synced',

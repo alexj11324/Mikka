@@ -8,6 +8,9 @@ export type ActivityVersion = {
   status: string
   priority: string
   content: JSONContent
+  /** Who made the change (server-set); null on rows from before MIK-17. */
+  actorType?: 'user' | 'agent' | 'system' | null
+  actorId?: string | null
   createdAt: Date | string
 }
 

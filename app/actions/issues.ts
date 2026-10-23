@@ -22,6 +22,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { issueDoneEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { after } from 'next/server'
+import { activityActor } from '@/lib/activity-actor'
 
 type IssueRow = typeof issues.$inferSelect
 type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata> }
@@ -94,7 +95,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
     try {
       const result = await db.transaction(async tx => {
         if (!id) {
-          const issue = await createIssueForUserInTransaction(tx, userId, parsed.data)
+          const issue = await createIssueForUserInTransaction(tx, userId, parsed.data, activityActor(userId))
           return issue ? { issue } : { error: 'issueCreateFailed' }
         }
         let issue
@@ -107,7 +108,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
           doneEvent = true
         }
         if (!issue) return { error: 'issueStale' }
-        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
+        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
         return { issue: issueWithMetadata(issue) }
       })
       if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)

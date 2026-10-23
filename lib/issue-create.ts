@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { issueVersions, issues } from '@/lib/db/schema'
 import { allocateIssueNumbers } from '@/lib/issue-numbering'
 import { issueWithMetadata, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import type { ActivityActor } from '@/lib/activity-actor'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -15,7 +16,8 @@ const createIssueSchema = z.object({
   priority: z.enum(ISSUE_PRIORITY_CODES),
 })
 
-export async function createIssueForUserInTransaction(tx: Transaction, userId: string, input: unknown) {
+/** `actor` is who issue history records as creating it, decided by the caller on the server. */
+export async function createIssueForUserInTransaction(tx: Transaction, userId: string, input: unknown, actor: ActivityActor) {
   const parsed = createIssueSchema.safeParse(input)
   if (!parsed.success) return null
   const id = crypto.randomUUID()
@@ -37,6 +39,7 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
     content: issue.content,
     status: issue.status,
     priority: issue.priority,
+    ...actor,
   })
   return issueWithMetadata(issue)
 }
