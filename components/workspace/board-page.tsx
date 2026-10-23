@@ -9,6 +9,7 @@ import { listAgents } from '@/app/actions/agents'
 import { listTaskRuns } from '@/app/actions/task-runs'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
+import { ConversationPill } from '@/components/nav/conversation-pill'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { AGENT_STATES, CARD_PROPERTIES, DEFAULT_CARD_PROPERTIES, DEFAULT_HIDDEN_COLUMNS, agentStateOf, type AgentState, type CardProperty } from '@/components/blocks/kanban-board-1/components/data'
 import { Button } from '@/components/ui/button'
@@ -228,6 +229,8 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
         : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
     {sidebar && <aside aria-label={tNav('coordinator')} className="relative hidden w-90 shrink-0 flex-col border-l lg:flex">
+      {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}
+      <ConversationPill name={tNav('coordinator')} tone="coordinator" />
       <div className="absolute top-3.5 right-3 z-20"><Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('collapse')} aria-expanded onClick={() => setSidebar(false)} />}><PanelRightClose data-icon="inline-start" /></TooltipTrigger><TooltipContent side="left">{t('collapse')}</TooltipContent></Tooltip></div>
       <div aria-hidden="true" className="h-14 shrink-0" />
       <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { onOpen(id) }} />
