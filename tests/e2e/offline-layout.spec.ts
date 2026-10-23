@@ -53,6 +53,13 @@ for (const width of [1280, 402]) {
       const notice = page.locator('[data-sonner-toast]').filter({ hasText: '列表更新失败' })
       try {
         await expect(notice).toBeVisible({ timeout: 30000 })
+        await expect(notice).toHaveAttribute('data-mounted', 'true')
+        // A visible DOM box can still be below the viewport during Sonner's
+        // entry transition. Capture the fully entered notice, not that frame.
+        await notice.evaluate(async element => {
+          await Promise.all(element.getAnimations().map(animation => animation.finished))
+        })
+        await expect(notice).toBeInViewport()
         await expect.poll(() => toolbar.boundingBox()).toEqual(before)
         await expect.poll(() => content.boundingBox()).toEqual(contentBefore)
         await capture('offline-notice')
