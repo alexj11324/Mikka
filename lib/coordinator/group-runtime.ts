@@ -1,10 +1,8 @@
 import 'server-only'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { generateText, Output } from 'ai'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '@/lib/db'
-import { agents } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { routeGroupMessage } from './route-group'
@@ -14,9 +12,11 @@ import type { GroupRuntime } from './group-turns'
  * credentials or device/issue execution. Group messages are quoted untrusted data.
  */
 export const groupRuntime: GroupRuntime = {
-  async agents(ownerId, ids) {
+  async agents(ownerId, ids, client) {
     if (!ids.length) return []
-    const rows = await db.select({ id: agents.id, name: agents.name, description: agents.description }).from(agents).where(and(eq(agents.userId, ownerId), inArray(agents.id, ids)))
+    // Reuse the execution connection: acquiring a second application-pool slot
+    // while every group holds a session lock can exhaust the shared pool.
+    const { rows } = await client.query<{ id: string; name: string; description: string }>('SELECT id,name,description FROM agents WHERE "userId"=$1 AND id=ANY($2::uuid[])', [ownerId, ids])
     return ids.flatMap(id => { const row = rows.find(a => a.id === id); return row ? [row] : [] })
   },
   async authorized(workspaceId, userId) {

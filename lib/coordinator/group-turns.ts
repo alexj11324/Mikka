@@ -6,7 +6,7 @@ export const GROUP_MAX_ROUNDS = 3
 export type GroupAgent = RoutingMember
 export type GroupReply = { text: string; mentions: string[] }
 export type GroupRuntime = {
-  agents(ownerId: string, ids: string[]): Promise<GroupAgent[]>
+  agents(ownerId: string, ids: string[], client: PoolClient): Promise<GroupAgent[]>
   authorized(workspaceId: string, userId: string): Promise<boolean>
   route(message: GroupMessage, members: GroupAgent[], leadId: string | null, corrections: RoutingCorrection[]): Promise<GroupRoute>
   generate(agent: GroupAgent, input: { message: GroupMessage; earlier: { author: string; text: string }[]; followUp: string; members: RoutingMember[]; ask?: string }): Promise<GroupReply>
@@ -44,7 +44,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     const eligible = async () => {
       if (!await authorized()) return []
       const members = await client.query(`SELECT "memberId" FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='agent' AND "leftAt" IS NULL ORDER BY "joinedAt","memberId"`, [conversationId])
-      return runtime.agents(root.createdBy, members.rows.map(m => m.memberId))
+      return runtime.agents(root.createdBy, members.rows.map(m => m.memberId), client)
     }
     const members = await eligible()
     const recent = await client.query(`SELECT "authorId" AS author,body AS text FROM conversation_messages m WHERE "conversationId"=$1 AND

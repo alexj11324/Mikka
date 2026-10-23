@@ -87,7 +87,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     assert.equal(configured.status,201); assert.equal((configured.body as {leadAgentId:string}).leadAgentId,b)
     const routeCalls: string[] = [], generated: string[] = []
     const runtime: GroupRuntime = {
-      async agents(_,ids) { return members.filter(a => ids.includes(a.id)) }, async authorized(w,u) { return directory(w,u) },
+      async agents(_,ids,client) { assert.ok(client); await client.query('SELECT 1'); return members.filter(a => ids.includes(a.id)) }, async authorized(w,u) { return directory(w,u) },
       async route(input,_,__,corrections) {
         routeCalls.push(input.text)
         if (input.text === 'later') {
@@ -201,6 +201,8 @@ test('expired execution budget cancels before generation/status publication', as
 test('production adapter does not select private standing instructions or sessions',async () => {
   const runtime = await readFile(new URL('./group-runtime.ts',import.meta.url),'utf8')
   assert.doesNotMatch(runtime,/agents\.instructions|agent_sessions|agent_turns|personalMemory|personal_memory/)
+  assert.match(runtime,/await client\.query/)
+  assert.doesNotMatch(runtime,/\bdb\./)
 })
 
 test('missing or ineligible lead never silently selects first-joined agent; confident routes need no lead', () => {
