@@ -17,6 +17,7 @@
     "lint:ui": "node scripts/lint-ui.mjs",
     "test:ui-policy": "node --test scripts/ui-policy.test.mjs scripts/interaction-policy.test.mjs",
     "test:motion": "node --import tsx --test lib/message-navigation.test.ts",
+    "test:unread": "node --import tsx --test lib/unread.test.ts",
     "test:i18n": "node --test scripts/check-i18n.test.mjs",
     "i18n:check": "node scripts/check-i18n.mjs",
     "test:ssh-target": "node --import tsx --test lib/ssh-target.test.ts",

@@ -2136,5 +2136,12 @@
     "cancel": "取消",
     "creating": "正在创建…",
     "createWorkspace": "创建工作区"
+  },
+  "Unread": {
+    "divider": "以下是新消息",
+    "newLabel": "新",
+    "jumpToUnread": "{count, plural, other {{display} 条新消息}}",
+    "jumpToLatest": "{count, plural, other {{display} 条新消息}}",
+    "dismiss": "关闭"
   }
 }
