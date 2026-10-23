@@ -23,6 +23,7 @@ const other = `agent-test-other-${randomUUID()}`
 const customId = randomUUID()
 const builtInId = randomUUID()
 const deviceId = randomUUID()
+const oldDeviceId = randomUUID()
 const repoId = randomUUID()
 const issueId = randomUUID()
 let actions: typeof import('@/app/actions/agents')
@@ -38,6 +39,8 @@ before(async () => {
   await pool.query(`insert into agents (id, "userId", role, name, description, instructions) values ($1, $3, 'custom', 'Mine', 'mine', 'mine'), ($2, $3, 'worker', 'Worker', 'edited', 'edited')`, [customId, builtInId, owner])
   const harnesses = [{ harness: 'claude_code', installed: true, models: [{ value: 'opus', displayName: 'Opus', efforts: ['low', 'high'] }], permissionModes: ['plan'] }]
   await pool.query(`insert into devices (id, "ownerId", name, harnesses, "lastSeenAt") values ($1, $2, 'Test Mac', $3, now())`, [deviceId, owner, JSON.stringify(harnesses)])
+  // An older daemon: the harness is installed but neither models nor permission modes are reported.
+  await pool.query(`insert into devices (id, "ownerId", name, harnesses, "lastSeenAt") values ($1, $2, 'Old Mac', $3, now())`, [oldDeviceId, owner, JSON.stringify([{ harness: 'claude_code', installed: true }])])
   await pool.query(`insert into device_repos (id, "deviceId", "userId", "repoPath") values ($1, $2, $3, '/tmp/repo')`, [repoId, deviceId, owner])
 })
 
@@ -92,4 +95,11 @@ test('a queued run keeps effort and mode on the pinned harness, and clears both 
   // Auto harness: the run lands on claude_code, which is not the agent's own pinned harness, so its values do not carry over.
   await pool.query(`update agents set harness = null where id = $1`, [customId])
   assert.deepEqual(await run(customId), { harness: 'claude_code', effort: null, permissionMode: null })
+})
+
+test('an older daemon that reports no lists skips the option check and keeps the values', { skip }, async () => {
+  actingUser = owner
+  const old = { ...draft, name: 'Mine', deviceId: oldDeviceId, harness: 'claude_code' as const, model: 'opus', effort: 'max', permissionMode: 'bypassPermissions' }
+  assert.deepEqual(await actions.updateAgent({ id: customId, ...old }), { success: true })
+  assert.deepEqual(await runtimeRow(customId), { deviceId: oldDeviceId, harness: 'claude_code', model: 'opus', effort: 'max', permissionMode: 'bypassPermissions' })
 })
