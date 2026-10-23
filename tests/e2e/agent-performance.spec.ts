@@ -3,7 +3,8 @@ import { Pool } from 'pg'
 import type { Page, TestInfo } from '@playwright/test'
 import { test, expect, register, app } from './fixtures'
 
-const budget = 1000
+// 本地目标 1000ms；GitHub Actions 共享机器抖动大，CI 上留 20% 余量（MIK-1）。
+const budget = process.env.CI ? 1200 : 1000
 
 async function seedHistory(page: Page, email: string) {
   const connectionString = process.env.E2E_DATABASE_URL
