@@ -1,10 +1,11 @@
-import { test, expect, register, app } from './fixtures'
+import { test, expect, register, app, openCreateIssue } from './fixtures'
 
 // Network failure is the action under test, not an ignored application exception.
 test.use({ trace: 'on', expectedConsoleErrors: [{ path: app('/'), message: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED' }] })
 
 for (const width of [1280, 402]) {
-  for (const layout of ['board', 'list'] as const) {
+  // The board is the only task layout since the Figma v3.1 shell (no list toggle).
+  for (const layout of ['board'] as const) {
     test(`offline refresh keeps ${layout} bounds stable at ${width}px`, async ({ page, context }, testInfo) => {
       await page.setViewportSize({ width, height: 900 })
       await register(page)
@@ -16,21 +17,16 @@ for (const width of [1280, 402]) {
         await page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name: '看板', exact: true }).click()
       }
       await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
-      // Use the visible board-column action on both breakpoints.
-      await page.getByRole('region', { name: '任务看板', exact: true }).getByRole('button', { name: '新建待整理任务', exact: true }).click()
-      const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
+      const dialog = await openCreateIssue(page)
       const title = `Offline layout ${width} ${layout}`
       await dialog.getByLabel('任务标题', { exact: true }).fill(title)
       await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
       await expect(dialog).not.toBeVisible()
-      await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true })).toBeVisible()
-      if (layout === 'list') await page.getByRole('button', { name: '列表视图', exact: true }).click()
+      await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
       // The toolbar and content fill the same bounds in empty and populated views.
-      const toolbar = page.getByRole('heading', { name: '全部任务', exact: true }).locator('..').locator('..')
-      const content = layout === 'board'
-        ? page.getByRole('region', { name: '任务看板', exact: true })
-        : page.getByLabel('任务列表', { exact: true })
-      await expect(content.getByText(title, { exact: true })).toBeVisible()
+      const toolbar = page.getByRole('heading', { name: '看板', exact: true }).locator('..').locator('..')
+      const content = page.getByRole('region', { name: '任务看板', exact: true })
+      await expect(content.getByRole('group', { name: title, exact: true })).toBeVisible()
       const contentBefore = await content.boundingBox()
       expect(contentBefore).not.toBeNull()
       const before = await toolbar.boundingBox()
@@ -63,7 +59,7 @@ for (const width of [1280, 402]) {
         await expect.poll(() => toolbar.boundingBox()).toEqual(before)
         await expect.poll(() => content.boundingBox()).toEqual(contentBefore)
         await capture('offline-notice')
-        if (layout === 'board') await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
+        await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
         await context.setOffline(false)
         await expect(notice).toHaveCount(0, { timeout: 20000 })
         await expect.poll(() => toolbar.boundingBox()).toEqual(before)

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Locator } from '@playwright/test'
-import { test, expect, rail, register } from './fixtures'
+import { test, expect, rail, register, openCreateIssue, openIssueFromSearch } from './fixtures'
 
 async function expectInsideViewport(locator: Locator, width: number, height: number) {
   await expect.poll(async () => locator.evaluate((element, viewport) => {
@@ -15,15 +15,11 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 1280, height: 900
     await register(page)
     await rail(page, '看板').click()
     const title = `菜单碰撞 ${randomUUID().slice(0, 8)}`
-    await page.getByRole('button', { name: '新建任务', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
+    const dialog = await openCreateIssue(page)
     await dialog.getByLabel('任务标题', { exact: true }).fill(title)
     await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
     await expect(dialog).not.toBeVisible()
-    await page.getByRole('button', { name: '打开全局搜索', exact: true }).click()
-    const search = page.getByRole('dialog', { name: '搜索任务', exact: true })
-    await search.getByRole('combobox', { name: '全局搜索任务', exact: true }).fill(title)
-    await search.getByRole('option').filter({ hasText: title }).click()
+    await openIssueFromSearch(page, title)
     await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
     await page.setViewportSize(viewport)
 

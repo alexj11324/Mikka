@@ -17,7 +17,8 @@ export function rail(page: Page, name: '对话' | '看板' | '插件') {
 
 /** Opens ⌘K from the top bar; returns the dialog. */
 export async function openSearch(page: Page) {
-  await page.getByRole('button', { name: '全局搜索', exact: true }).click()
+  // Desktop uses the top bar; phones keep the search icon in the page header.
+  await page.getByRole('button', { name: /^(打开)?全局搜索$/ }).click()
   const dialog = page.getByRole('dialog', { name: '全局搜索', exact: true })
   await expect(dialog).toBeVisible()
   return dialog
