@@ -2,8 +2,16 @@ import { test as apiTest } from '@playwright/test'
 import { test, expect, register, app } from './fixtures'
 
 // 图片只能走 /api/agent/images；请求旧地址 /api/agent?q= 直接失败，防止 #61 的回归。
+let legacyImageHits = 0
 test.beforeEach(async ({ page }) => {
-  await page.route('**/api/agent?q=*', route => route.abort())
+  legacyImageHits = 0
+  await page.route('**/api/agent?q=*', route => {
+    legacyImageHits++
+    return route.abort()
+  })
+})
+test.afterEach(() => {
+  expect(legacyImageHits, '不应再请求旧图片地址 /api/agent?q=').toBe(0)
 })
 
 apiTest('开发预览验收入口不跳转到内部主机', async ({ request, baseURL }) => {
