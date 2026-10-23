@@ -15,6 +15,14 @@
     "avatarLabel": "Avatar for {email}"
   },
   "Issue": {
+    "scope": {
+      "label": "Scope",
+      "workspace": "Workspace",
+      "personal": "Personal",
+      "judgedByAgent": "Set by agent",
+      "movedToWorkspace": "Now a workspace task; it will sync to Linear.",
+      "movedToPersonal": "Now a personal task; it stays in Mikka."
+    },
     "properties": "Task properties",
     "statusLabel": "Status",
     "priorityLabel": "Priority",
@@ -876,6 +884,9 @@
     "issueOperationInvalid": "The operation information is invalid.",
     "issueUnavailable": "This task is no longer available.",
     "issuePreferenceLimit": "This task has reached its follower limit.",
+    "issueScopeInvalid": "Scope must be workspace or personal.",
+    "issueScopeOwnerOnly": "Only the task owner can change its scope.",
+    "issueScopeInLinear": "This task is already in Linear, so it can't become personal again.",
     "issueOwnerOnly": "Only the task owner can delete or restore the task.",
     "issueRestoreWindow": "The 30-day restore window for this task has passed.",
     "issueDeleteFailed": "Could not delete or restore the task. Please try again shortly.",

@@ -15,6 +15,14 @@
     "avatarLabel": "{email} 的头像"
   },
   "Issue": {
+    "scope": {
+      "label": "归属",
+      "workspace": "工作区",
+      "personal": "个人",
+      "judgedByAgent": "Agent 判断",
+      "movedToWorkspace": "已改为工作区任务，会同步到 Linear。",
+      "movedToPersonal": "已改为个人任务，只留在 Mikka。"
+    },
     "properties": "任务属性",
     "statusLabel": "任务状态",
     "priorityLabel": "任务优先级",
@@ -876,6 +884,9 @@
     "issueOperationInvalid": "操作格式不正确。",
     "issueUnavailable": "任务已不可用。",
     "issuePreferenceLimit": "已达到此任务的关注人数上限。",
+    "issueScopeInvalid": "归属只能是工作区或个人。",
+    "issueScopeOwnerOnly": "只有任务所有者可以修改归属。",
+    "issueScopeInLinear": "这个任务已经写进 Linear，不能再改回个人任务。",
     "issueOwnerOnly": "只有任务所有者可以删除或恢复任务。",
     "issueRestoreWindow": "任务已超过 30 天恢复期限。",
     "issueDeleteFailed": "删除或恢复任务失败，请稍后重试。",

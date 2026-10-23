@@ -14,6 +14,8 @@ import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { issueTeamAccess } from '@/lib/issue-team-access'
 import { isIssueTeamAccessAllowed } from '@/lib/issue-team-access-policy'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
+import { judgeIssueScope } from '@/lib/issue-scope-judge'
+import { after } from 'next/server'
 import { parseTelegramCommand } from './commands'
 import { isPostgresUniqueViolation } from './unique-violation'
 
@@ -280,6 +282,7 @@ async function handleTelegramMessage(input: {
   })
   if (typeof result !== 'string') {
     dispatchLinearIssueSync(result.issueId)
+    after(() => judgeIssueScope(result.issueId, 'Telegram'))
     await input.post(result.reply)
     return
   }
