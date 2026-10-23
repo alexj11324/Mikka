@@ -28,7 +28,7 @@
     "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
     "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
     "test:analytics": "node --experimental-strip-types --test tests/analytics-policy.test.mjs",
-    "test:settings": "node --experimental-strip-types --test tests/settings-navigation.test.mjs tests/team-identifier.test.mjs",
+    "test:settings": "node --experimental-strip-types --test tests/settings-navigation.test.mjs tests/settings-sidebar-search.test.mjs tests/team-identifier.test.mjs",
     "test:auth-return": "node --import tsx --test lib/auth-return.test.ts",
     "test:agent": "node --import tsx --test tests/agent-fetch.test.mjs tests/agent-ui.test.mjs tests/agent-history.test.mjs tests/agent-web-tools.test.mjs",
     "test:acceptance": "node --import tsx --test tests/acceptance.test.mjs",

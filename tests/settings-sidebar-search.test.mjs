@@ -1,0 +1,25 @@
+import { strict as assert } from 'node:assert'
+import { readFileSync } from 'node:fs'
+import { test } from 'node:test'
+import { settingsItemVisible } from '../lib/settings-sidebar-search.ts'
+
+const zh = JSON.parse(readFileSync(new URL('../messages/zh-CN.json', import.meta.url), 'utf8')).Settings
+const billing = { groupTitle: 'Administration', groupLabel: zh.groups.administration, itemTitle: 'Billing', label: zh.nav.billing, routed: false }
+
+test('zh-CN 下「账单」与「Billing」都能搜到账单', () => {
+  assert.equal(zh.nav.billing, '账单')
+  for (const query of ['账单', 'Billing', 'billing', '  BILL ', '管理']) assert.equal(settingsItemVisible({ ...billing, query }), true, query)
+  assert.equal(settingsItemVisible({ ...billing, query: '团队' }), false)
+})
+
+test('团队、成员仅在路由设置页显示，搜索不改变该规则', () => {
+  for (const [section, itemTitle, label] of [['teams', 'Teams', zh.sections.teams.title], ['members', 'Members', zh.sections.members.title]]) {
+    const item = { groupTitle: 'Administration', groupLabel: zh.groups.administration, itemTitle, label, section }
+    for (const query of ['', label, itemTitle]) {
+      assert.equal(settingsItemVisible({ ...item, query, routed: false }), false, `${section} hidden: ${query}`)
+      assert.equal(settingsItemVisible({ ...item, query, routed: true }), true, `${section} routed: ${query}`)
+    }
+  }
+  const workspace = { groupTitle: 'Administration', groupLabel: zh.groups.administration, itemTitle: 'Workspace', label: zh.sections.workspace.title, section: 'workspace', query: '' }
+  assert.equal(settingsItemVisible({ ...workspace, routed: false }), true)
+})

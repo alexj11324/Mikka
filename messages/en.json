@@ -1372,7 +1372,31 @@
     "noResults": "No matching settings",
     "groups": {
       "personal": "Personal",
-      "workspace": "Workspace"
+      "workspace": "Workspace",
+      "features": "Features",
+      "integrations": "Integrations",
+      "administration": "Administration",
+      "yourTeams": "Your teams"
+    },
+    "nav": {
+      "aiAgents": "AI & agents",
+      "loops": "Loops",
+      "initiatives": "Initiatives",
+      "documents": "Documents",
+      "customerRequests": "Customer requests",
+      "releases": "Releases",
+      "pulse": "Pulse",
+      "asks": "Asks",
+      "emojis": "Emojis",
+      "allIntegrations": "All integrations",
+      "github": "GitHub",
+      "security": "Security",
+      "api": "API",
+      "applications": "Applications",
+      "billing": "Billing",
+      "usageLimits": "Usage & limits",
+      "importExport": "Import & export",
+      "createTeam": "Create a team"
     },
     "sections": {
       "members": {
