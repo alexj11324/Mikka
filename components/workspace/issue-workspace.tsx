@@ -223,7 +223,12 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   function open(id: string | null) {
     if (boardBusy || leaving.current) return false
     setPendingSelection(id)
-    void leave(() => showIssue(id, 'push')).finally(() => setPendingSelection(undefined))
+    void leave(() => {
+      // A directly opened/reloaded detail has no remembered in-memory section.
+      // Its Board breadcrumb must still return to issues, not the default Projects page.
+      if (id === null) changeSection(teamId ? 'team-issues' : 'all-issues')
+      showIssue(id, 'push')
+    }).finally(() => setPendingSelection(undefined))
     return true
   }
   function deleted() {
