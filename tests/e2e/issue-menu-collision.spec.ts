@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Locator } from '@playwright/test'
-import { test, expect, register } from './fixtures'
+import { test, expect, rail, register } from './fixtures'
 
 async function expectInsideViewport(locator: Locator, width: number, height: number) {
   await expect.poll(async () => locator.evaluate((element, viewport) => {
@@ -13,6 +13,7 @@ async function expectInsideViewport(locator: Locator, width: number, height: num
 for (const viewport of [{ width: 1280, height: 720 }, { width: 1280, height: 900 }, { width: 1280, height: 480 }]) {
   test(`任务操作菜单使用组件默认碰撞限高，首尾与状态子菜单可访问 ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
     await register(page)
+    await rail(page, '看板').click()
     const title = `菜单碰撞 ${randomUUID().slice(0, 8)}`
     await page.getByRole('button', { name: '新建任务', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
