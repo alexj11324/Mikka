@@ -1,4 +1,4 @@
-// PREPARED, NOT EXECUTED. Mikka-owned test; no upstream FSL source/bindings.
+// Isolated requested-service CI. Mikka-owned test; no upstream FSL source/bindings.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -9,7 +9,6 @@ import { executeDesktop } from '../../lib/cua/grpc-web.ts'
 import { desktopConfig, desktopFingerprint } from '../../lib/cua/operation.ts'
 
 assert.equal(process.env.CI, 'true')
-assert.equal(process.env.CUA_INTERNAL_CI_APPROVED, '1', 'Prepared service job requires its specific internal-use decision')
 const config = desktopConfig()
 assert.ok(config)
 assert.equal(config.url, 'http://127.0.0.1:3211')

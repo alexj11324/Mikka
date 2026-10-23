@@ -47,8 +47,9 @@ Checked upstream `trycua/cua` at commit
 `27d8da9fd94056bd73892183531579396aafb2f9` (2026-10-23).
 The parent [#147](https://github.com/alexj11324/Mikka/issues/147) explicitly says to use only cua-driver’s MIT parts and not install
 cua-perception. It does not state that every component of an external image must
-be MIT. The separately bundled spacesd service still requires an applicable
-component/use decision; the driver’s MIT license does not answer that question. A repository/image MIT label alone does not
+be MIT. The separately bundled spacesd service has its own FSL terms. Those expressly
+permit this bounded internal CI use, not a general commercial service; the
+driver’s MIT license does not replace that component license. A repository/image MIT label alone does not
 establish the bundled component's license. The component evidence below concerns
 copying/distributing it; connecting to an independently operated external service
 is a separate terms/deployment decision, not a legal conclusion or permission.
@@ -60,7 +61,7 @@ not claimed unavailable.
 
 | Artifact / protocol | Evidence | Status for this request |
 | --- | --- | --- |
-| Requested `trycua/cua-xfce:0.3.0` | Public registry index `sha256:e188a008084e1034f5ff003e7983c58596d9c0e47adf5c34078b362aad2a57e7`; Linux amd64 image `sha256:0ac954ee74d5a3878484ddf5e4df7e83a1fdeeef1ec9a8d8744b76afcd0187fb`; revision `5da241ac4b4ff2cb165f3c48401391674d7f1dbd`. Inspected registry config/history exposes 3211 and explicitly installs spacesd v0.1.0. | Image exists, but includes the separately FSL-licensed spacesd component despite an overall MIT image label. Not pulled/started: applicable FSL service use has not been resolved; this is not a claim that #147 requires a wholly MIT image. Real editor/input/screenshot E2E remains open. |
+| Requested `trycua/cua-xfce:0.3.0` | Public registry index `sha256:e188a008084e1034f5ff003e7983c58596d9c0e47adf5c34078b362aad2a57e7`; Linux amd64 image `sha256:0ac954ee74d5a3878484ddf5e4df7e83a1fdeeef1ec9a8d8744b76afcd0187fb`; revision `5da241ac4b4ff2cb165f3c48401391674d7f1dbd`. Inspected registry config/history exposes 3211 and explicitly installs spacesd v0.1.0. | Image exists, but includes the separately FSL-licensed spacesd component despite an overall MIT image label. Exact bundled FSL terms expressly permit internal use/access; the originally requested isolated CI job is enabled on that scope. Public commercial hosting/distribution is not authorized or certified. Actual endpoint acceptance requires exact-head service results. |
 | Current documented `trycua/xfce-cua` | `libs/xfce-cua/README.md`: driver-only runtime, no spacesd, no auto-start; example starts driver with bypass-approval flag. | Cannot supply the requested endpoint as documented. Not silently substituted or started with bypass approvals. |
 | `cua-spacesd` v0.7.0 / current | `libs/cua-spacesd/LICENSE` is FSL-1.1-MIT, copyright 2026 Cua AI, Inc. Current generated HTML5/TS bindings also component licensed. | No FSL source/generated bindings copied or bundled. A separate service's operation/terms are not granted by MIT driver licensing. |
 | First spacesd directory commit `9166817485ae53f3966935c13878a8196d79a399` (2026-10-01) | That exact `libs/cua-spacesd/LICENSE` is already FSL-1.1-MIT. Parent `93d0f7af24b1561f98f6a85cd20ca2b35f37db35` has no spacesd directory. | This checked history does not supply a pinned MIT-era spacesd. No claimed compatible MIT binary. |
@@ -95,7 +96,7 @@ migration runner/CI overlap with #84/#86 and #115 must be reconciled before merg
 
 ## Remaining acceptance
 
-1. Decide only the prepared isolated internal-CI service use described in
+1. Run only the reviewed isolated internal-CI service use described in
    `docs/ci-prepared/cua-service-terms.md`; FSL explicitly permits internal use,
    but public commercial service/distribution is a distinct factual question.
    Do not copy FSL source or change the requested endpoint/protocol.
@@ -110,21 +111,17 @@ migration runner/CI overlap with #84/#86 and #115 must be reconciled before merg
 5. Wire workspace controls through the protected settings UI's owner, not by editing
    those files here. The separate stacked #149 local-driver path is described below.
 
-## Exact remote-service decision (still open)
+## Exact remote-service CI scope
 
-The requested pinned image exists and installs spacesd v0.1.0 (provenance above).
-No FSL implementation or generated bindings are copied/distributed by this PR.
-Running that bundled service is a separate use of a non-MIT component; this PR
-has not made a legal/organizational eligibility decision or launched it. To finish
-actual CUA endpoint acceptance, the bounded prepared decision is only this exact pinned image's isolated
-internal-CI use. The terms expressly include internal use; owner approval does
-not establish license compliance or authorize public commercial hosting. A newer
-MIT local-driver MCP endpoint is not silently interchangeable with this gRPC-Web
-service. Meanwhile, all codec/model-loop tests remain clearly marked fixtures.
-
-The exact bundled v0.1.0 terms, image provenance and executable but disabled
-service job are recorded in `docs/ci-prepared/cua-service-terms.md`. Internal CI
-is expressly permitted in the FSL text; approval is not a legal exception.
+The requested pinned image contains spacesd v0.1.0. Its exact FSL terms expressly
+include internal use/access. The original #148 request covers a disposable
+loopback-only GitHub CI test with no provider, secrets, perception, image
+redistribution or public service. No concrete term preventing that test was
+identified; no second approval is required merely because spacesd is non-MIT.
+No FSL implementation/generated bindings are copied into Mikka. The exact terms,
+provenance and limits are in `docs/ci-prepared/cua-service-terms.md`. Future public
+commercial hosting is not certified by these CI results. Real service evidence
+must come from its exact-head CI job, not loopback fixture tests.
 
 ## Local driver (#149, stacked on #148)
 

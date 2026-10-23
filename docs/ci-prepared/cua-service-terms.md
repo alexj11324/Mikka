@@ -1,9 +1,8 @@
-# Exact isolated service test decision (prepared, not launched)
+# Exact isolated service CI terms and scope
 
 ## Bounded action
 
-Enable only `cua-remote-service` from `cua-remote-service.yml.disabled` in the
-existing CI workflow. It pulls the requested `trycua/cua-xfce:0.3.0` amd64 image
+The requested `cua-remote-service` job is enabled in the existing CI workflow. It pulls the requested `trycua/cua-xfce:0.3.0` amd64 image
 by immutable digest `sha256:0ac954ee74d5a3878484ddf5e4df7e83a1fdeeef1ec9a8d8744b76afcd0187fb`,
 runs it on one disposable GitHub Linux runner for at most ten minutes, binds
 only `127.0.0.1:3211`, and always removes the container. No host data mounts,
@@ -22,8 +21,8 @@ sentinel from that PNG with Tesseract. Wrong-token requests must fail. The only
 published artifact is this disposable editor screenshot, retained three days.
 No upstream FSL source/generated bindings are copied into Mikka. Existing
 real-Postgres owner/policy/race/cancel and rendered browser tests remain separate.
-The sample is syntax-checked, not service-validated: launch/protocol/GUI results
-must not be called passing until the service actually runs.
+Launch/protocol/GUI outcomes require actual exact-head CI evidence; enabling
+the job is not a passing service test.
 
 ## Exact bundled-version terms and provenance
 
@@ -64,17 +63,16 @@ must not be called passing until the service actually runs.
   every subscription provision to GitHub's hosted runner. Registry refusal/rate
   limiting must fail the job, not trigger login, a paid plan, or a mirror.
 
-## One specific decision, not legal authorization
+## Terms assessment and authority boundary
 
-Does the owner intend **only this isolated internal-CI use**, with no public
-service, distribution or commercial availability of the bundled spacesd, and
-want this exact prepared job enabled on that basis? That establishes intended
-scope, not license compliance by approval. The text expressly permits internal
-use; it does not establish all legal facts about a future Mikka product.
-If intended use includes providing the service to customers, stop at the
-prepared job and identify the concrete distribution/Competing Use issue with
-its licensor rather than treating an owner “approve” as a license exception.
+The exact text expressly includes internal use/access. This job makes no service
+available to others, distributes no image/software, and buys nothing or changes
+no account access. No concrete term preventing this bounded internal test was
+identified. The original #148 request expressly authorizes this isolated fake-model
+CI service job; no second owner approval is required simply because spacesd is
+not MIT. This is a scoped reading of the cited terms, not a legal determination
+about future Mikka commercial functionality. Future public/commercial service or
+image distribution remains outside this test and requires its own terms review.
 
-Neither answer blocks independent mock streaming, authenticated approval,
-PNG continuation, database/race, UI or local-driver acceptance. Alex's final
-real-model/real-Mac check remains his signoff, not a fake-model CI dependency.
+No perception is installed or used. Alex's real-model/real-Mac final check is
+separate and does not block these fake-model CI acceptance tests.
