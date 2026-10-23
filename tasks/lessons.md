@@ -141,6 +141,8 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
    `h-px bg-*`。分组用间距（`gap-*`）或背景（`bg-muted/*`）。
 2. 竖线（`border-l/r`、`orientation="vertical"`）和盒状边框（`border`）可以保留。
 3. 这条已经落在 `style/no-horizontal-rule`；先跑 `node scripts/lint-ui.mjs`，不要靠肉眼。
+4. 例外：`components/settings/` 里由 `SettingsSection` 提供的行分隔（`divide-y`）不算在内，
+   只限设置页；其他地方一律不加分割线。
 
 
 ---
@@ -174,4 +176,3 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 **规则**：顶层动态段下的 404 要加 `app/[locale]/[...rest]/page.tsx` 调 `notFound()`；
 验证时看 HTTP 状态（404）、浏览器 `document.documentElement.lang` 与页面文案三者是否一致。
 另外 `JSON.parse` 会静默丢掉重复 key，检查器应能发现重复键，或至少用 `jq`/脚本单独查一次。
-
