@@ -111,6 +111,7 @@ export const devices = pgTable('devices', {
   name: text('name').notNull(), hostname: text('hostname'),
   platform: text('platform'), arch: text('arch'),
   daemonVersion: text('daemonVersion'), protocolVersion: integer('protocolVersion'),
+  computerUse: jsonb('computerUse').$type<{ installed: boolean; version: string | null }>().notNull().default({ installed: false, version: null }),
   harnesses: jsonb('harnesses').$type<HarnessInfo[]>().notNull().default([]),
   /** Off: the device stays registered but the orchestrator gives it no runs. */
   enabled: boolean('enabled').notNull().default(true),

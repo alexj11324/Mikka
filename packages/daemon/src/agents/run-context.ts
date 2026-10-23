@@ -72,7 +72,13 @@ export interface McpServerSpec {
   env: Record<string, string>
 }
 
+export type ComputerSpecProvider = (
+  runId: string,
+  policy?: RunPolicy
+) => McpServerSpec | undefined
+
 export interface RunContextOptions {
+  computerMcp?: McpServerSpec
   harness: Exclude<Harness, "mock">
   /** What the run is for; `plan` runs are told to write a spec (ADR ORV-205). */
   kind?: RunKind
@@ -299,6 +305,15 @@ export class RunContext {
       args: [MCP_SERVER_SCRIPT, "--handoff", this.handoffFile],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.
       env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},
+    }
+  }
+
+  mcpServers(): Record<string, McpServerSpec> {
+    return {
+      [MCP_SERVER_NAME]: this.mcpServer(),
+      ...(this.options.computerMcp
+        ? { computer: this.options.computerMcp }
+        : {}),
     }
   }
 

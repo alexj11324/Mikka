@@ -58,7 +58,7 @@ not claimed unavailable.
 | Current documented `trycua/xfce-cua` | `libs/xfce-cua/README.md`: driver-only runtime, no spacesd, no auto-start; example starts driver with bypass-approval flag. | Cannot supply the requested endpoint as documented. Not silently substituted or started with bypass approvals. |
 | `cua-spacesd` v0.7.0 / current | `libs/cua-spacesd/LICENSE` is FSL-1.1-MIT, copyright 2026 Cua AI, Inc. Current generated HTML5/TS bindings also component licensed. | No FSL source/generated bindings copied or bundled. A separate service's operation/terms are not granted by MIT driver licensing. |
 | First spacesd directory commit `9166817485ae53f3966935c13878a8196d79a399` (2026-10-01) | That exact `libs/cua-spacesd/LICENSE` is already FSL-1.1-MIT. Parent `93d0f7af24b1561f98f6a85cd20ca2b35f37db35` has no spacesd directory. | This checked history does not supply a pinned MIT-era spacesd. No claimed compatible MIT binary. |
-| `cua-driver-rs-v0.38.0`, commit `85e2b1318bd77ccf3cfa88ccdf875a4bb7eaed19` | Rust workspace explicitly MIT; driver crate inherits workspace license. Root MIT copyright 2025 Cua AI, Inc. Published Linux/macOS binary assets exist. | Candidate for #149 only, not spacesd's gRPC-Web endpoint. Release archive SHA256SUMS checked; binary reports 0.38.0; MCP --help verified, including runtime ownership and standard/bounded/unrestricted modes. No GUI/runtime test yet. Never include cua-perception/OmniParser. |
+| `cua-driver-rs-v0.38.0`, commit `85e2b1318bd77ccf3cfa88ccdf875a4bb7eaed19` | Rust workspace explicitly MIT; driver crate inherits workspace license. Root MIT copyright 2025 Cua AI, Inc. Published Linux/macOS binary assets exist. | Candidate for #149 only, not spacesd's gRPC-Web endpoint. Release archive SHA256SUMS checked; binary reports 0.38.0; MCP --help verified, including runtime ownership and standard/bounded/unrestricted modes. Linux #149 Xvfb screenshot/click verified through the approval broker. Not spacesd compatibility. Never include cua-perception/OmniParser. |
 | Independent `lib/cua/grpc-web.ts` | Locally authored bounded unary codec with scripted local HTTP fixtures and explicit gRPC success/error handling; no upstream implementation dependency. | Compatibility candidate, not real CUA validation. Pin/test against an applicable service/protocol before production. |
 
 ## Database effect and CI
@@ -71,8 +71,8 @@ Rollback before use: drop the two new tables. Approval text should have a define
 retention/deletion policy before production enablement; this Draft adds no cron job.
 
 Only CI's existing Postgres 17 `mikka_e2e` may execute database tests. The added
-migration test uses an isolated transaction/schema, applies the migration twice,
-checks default settings/owner/session/target/replay and rollback cleanup. It does
+migration test uses an isolated transaction/schema, applies the remote migration twice,
+checks defaults, approval constraints and one-time claim conditions, then rolls back. The local-device migration test applies its additive migration three times and checks defaults and existing row retention. Unit/RPC tests, not this migration test, cover local replay, expiry and argument binding. It does
 not establish authenticated HTTP route or policy-race E2E coverage. Existing
 migration runner/CI overlap with #84/#86 and #115 must be reconciled before merge.
 
@@ -87,5 +87,17 @@ migration runner/CI overlap with #84/#86 and #115 must be reconciled before merg
 4. Add CI's actual container + editor input/screenshot assertions and real policy,
    membership, cancellation, concurrent approval and resumption route tests.
 5. Wire workspace controls through the protected settings UI's owner, not by editing
-   those files here. Keep separate #149 daemon integration incomplete until its
-   reported driver and CLI-specific MCP runtime work with the approval broker.
+   those files here. The separate #149 path uses a local authenticated review proxy;
+   real model-provider continuation acceptance remains distinct from its scripted MCP tests.
+
+## Local driver (#149, stacked on #148)
+
+The local path uses the MIT `cua-driver-rs v0.38.0` release, not spacesd or the remote image. Detection requires the pinned version and records the executable SHA-256. Device registration and heartbeat report `computerUse` separately from the model harness list. Existing clients/devices default to unavailable. The additive `devices.computerUse` JSONB migration has a constant false default and is idempotent; deployment runs it against the app database, with ordinary migration serialization required. No local/dev/production database was used for validation.
+
+Claude, Codex and Cursor receive a second `computer` MCP server only when detection succeeds and the run's explicit computer-use permission is ask/allow. They receive Mikka's request-only proxy, never raw driver MCP. This avoids treating their existing bypass/never native approval settings as authorization. The tool subset is deliberately screenshot, click and exact text input; arbitrary driver tools, output paths, scope changes and extra arguments fail closed.
+
+Each operation waits in the same MCP tool call for an owner decision. Use `mikka daemon computer pending` locally to inspect run, executable fingerprint, normalized operation, expiry and review digest, then `mikka daemon computer approve <id> <digest>` or `deny <id> <digest>`. These use the existing secret-handshaken owner RPC; the model-facing socket cannot list or approve. The run must remain live, the device signed in, the permission not denied/read-only, and binary bytes unchanged. A five-minute request is claimed before execution, never refunded after failure/uncertainty, and is discarded on daemon restart. After approval the actual driver result returns to the pending model call, not a textual "resume" instruction. Desktop output is untrusted data, not new authorization.
+
+The local Unix socket is scoped to the OS owner and the daemon's protected secret. This is not a new hardened multi-user OS boundary or a grant for a remote collaborator to operate the device. It does not implement a web approval card; the current review surface is the local owner CLI. Real signed-in Claude/Codex/Cursor reasoning after a desktop result and macOS accessibility/screen-recording acceptance remain unverified. Keep this PR Draft until full CI and those acceptance gaps are resolved.
+
+Linux validation starts isolated Xvfb and xmessage, asks for a screenshot through the broker, then separately approves a click on its OK button and asserts that the actual desktop process exits. It uses the checksum-pinned published driver, not a fake protocol implementation. Separate unit/RPC tests cover absence/version mismatch, permission denial, normalization, argument binding, replay, expiry, revocation, failed execution, request-only proxy and authenticated owner review.

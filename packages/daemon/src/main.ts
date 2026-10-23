@@ -19,6 +19,12 @@ import {
 } from "node:fs"
 import { arch, hostname, platform } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { ComputerBroker } from "./computer/broker.mjs"
+import {
+  detectComputerDriver,
+  type ComputerDriver,
+} from "./computer/driver.mjs"
 
 import {
   COMMANDS_MAX_SKIP,
@@ -176,6 +182,9 @@ export class Daemon {
   /** Run ids the server sent that were refused as unsafe (reported once). */
   private refusedRuns = new Set<string>()
   private quota: QuotaPoller | null = null
+  /** Exact-operation approvals for local computer use. */
+  private computer: ComputerBroker | null = null
+  private computerDriver: ComputerDriver | null = null
   /** Ends the commands long-poll when the daemon stops. */
   private commandsAbort = new AbortController()
   private commandsLoop: Promise<void> = Promise.resolve()
@@ -221,6 +230,25 @@ export class Daemon {
       (runId, _item, error) => this.supervisor.markUndeliverable(runId, error)
     )
     this.worktrees = new WorktreeManager(paths.worktrees)
+    this.computerDriver = await detectComputerDriver()
+    this.computer = new ComputerBroker({
+      driver: this.computerDriver,
+      socketPath: join(paths.dataDir, "computer.sock"),
+      permitted: (runId) => {
+        const entry = this.journal.get(runId)
+        return Boolean(
+          this.device.credential &&
+          entry &&
+          !isTerminalRunState(entry.state) &&
+          !this.stopped &&
+          !this.stopping.has(runId) &&
+          runPolicy(entry.assignment.policy).permissions.computer_use !==
+            "deny" &&
+          entry.assignment.policy?.readOnly !== true
+        )
+      },
+    })
+    await this.computer.listen()
     const adapters = (this.adapters = new Map<Harness, AgentAdapter>([
       [
         "mock",
@@ -526,10 +554,38 @@ export class Daemon {
     if (!sandbox) return []
     const stateDir = this.paths.adapterState
     const bin = this.options.harnessBinaries ?? {}
+    const computer: import("./agents/run-context").ComputerSpecProvider = (
+      runId,
+      policy
+    ) => {
+      if (policy?.readOnly) return undefined
+      const grant = this.computer?.spec(runId, policy?.permissions.computer_use)
+      if (!grant) return undefined
+      const env: Record<string, string> = {}
+      if (process.versions.electron) env.ELECTRON_RUN_AS_NODE = "1"
+      return {
+        command: process.execPath,
+        args: [
+          fileURLToPath(new URL("./computer/proxy.mjs", import.meta.url)),
+          grant.socketPath,
+          grant.token,
+        ],
+        env,
+      }
+    }
     return [
-      ["claude_code", new ClaudeAdapter({ stateDir, binary: bin.claude_code })],
-      ["codex", new CodexAdapter({ sandbox, stateDir, binary: bin.codex })],
-      ["cursor", new CursorAdapter({ sandbox, stateDir, binary: bin.cursor })],
+      [
+        "claude_code",
+        new ClaudeAdapter({ computer, stateDir, binary: bin.claude_code }),
+      ],
+      [
+        "codex",
+        new CodexAdapter({ computer, sandbox, stateDir, binary: bin.codex }),
+      ],
+      [
+        "cursor",
+        new CursorAdapter({ computer, sandbox, stateDir, binary: bin.cursor }),
+      ],
     ]
   }
 
@@ -576,6 +632,10 @@ export class Daemon {
         arch: arch(),
         daemonVersion: DAEMON_VERSION,
         protocolVersion: DAEMON_PROTOCOL_VERSION,
+        computerUse: {
+          installed: Boolean(this.computerDriver),
+          version: this.computerDriver?.version ?? null,
+        },
         harnesses: this.harnesses,
         ...(this.device.workspaceId
           ? { workspaceId: this.device.workspaceId }
@@ -619,6 +679,10 @@ export class Daemon {
       // Heartbeat first: lease renewal must not wait on anything else.
       const quotas = this.quota?.snapshot().quotas
       const { leases } = await link.heartbeat(deviceId, {
+        computerUse: {
+          installed: Boolean(this.computerDriver),
+          version: this.computerDriver?.version ?? null,
+        },
         harnesses: this.harnesses,
         runs: this.supervisor.heartbeatRuns(),
         worktreeDiskBytes: await this.worktrees.diskUsage(),
@@ -788,6 +852,13 @@ export class Daemon {
 
   private handlers(): RpcHandlers {
     return {
+      "computer.pending": () => this.computer?.list() ?? [],
+      "computer.decide": async (raw) => {
+        const { id, digest, approve } =
+          daemonRpc["computer.decide"].params.parse(raw)
+        if (!this.computer) throw new Error("Computer use unavailable")
+        return this.computer.decide(id, digest, approve)
+      },
       "daemon.status": () => this.status(),
       "quota.snapshot": () => this.quota?.snapshot() ?? unknownQuotaReport(),
       "daemon.drain": () => {
@@ -879,6 +950,7 @@ export class Daemon {
     await this.fsLoop.catch(() => undefined)
     await this.tick
     await this.rpc?.close()
+    await this.computer?.close()
     await this.supervisor?.stop()
     await this.outbox?.close()
     const release = this.releaseLock

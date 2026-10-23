@@ -168,6 +168,33 @@ const ok = z.object({ ok: z.literal(true) })
 /** Every method except `daemon.hello` requires a completed handshake. */
 export const daemonRpc = {
   "daemon.hello": { params: helloParams, result: helloResult },
+  /** Local owner review; never exposed on the model-facing request socket. */
+  "computer.pending": {
+    params: empty,
+    result: z.array(
+      z.object({
+        id: z.uuid(),
+        runId: z.string(),
+        target: z.string(),
+        call: z.object({
+          name: z.string(),
+          arguments: z.record(z.string(), z.unknown()),
+        }),
+        expiresAt: z.number(),
+        digest: z.string(),
+      })
+    ),
+  },
+  "computer.decide": {
+    params: z
+      .object({
+        id: z.uuid(),
+        digest: z.string().length(64),
+        approve: z.boolean(),
+      })
+      .strict(),
+    result: ok,
+  },
   "daemon.status": { params: empty, result: daemonStatusSchema },
   /** Cached subscription snapshots. Does not start a vendor request. */
   "quota.snapshot": { params: empty, result: quotaSnapshotReportSchema },

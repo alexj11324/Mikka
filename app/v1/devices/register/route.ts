@@ -22,6 +22,7 @@ export async function POST(request: Request) {
   const fields = {
     name: info.name, hostname: info.hostname ?? null, platform: info.platform, arch: info.arch,
     daemonVersion: info.daemonVersion, protocolVersion: info.protocolVersion,
+    computerUse: info.computerUse ?? { installed: false, version: null },
     harnesses: info.harnesses, lastSeenAt: now, updatedAt: now,
   }
   if (info.deviceId && await ownedDevice(info.deviceId, caller.userId)) {

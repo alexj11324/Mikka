@@ -29,6 +29,7 @@
 // worktree is this worktree's session store under `~/.claude/projects`, so
 // `resume` works after a daemon restart and for a follow-up run in the same
 // worktree (the store is keyed by the cwd).
+import type { ComputerSpecProvider } from "../agents/run-context"
 import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
@@ -51,12 +52,7 @@ import {
   errorMessage,
   EventQueue,
 } from "../agents/child"
-import {
-  MCP_SERVER_NAME,
-  RESUME_MESSAGE,
-  RunContext,
-  runPaths,
-} from "../agents/run-context"
+import { RESUME_MESSAGE, RunContext, runPaths } from "../agents/run-context"
 import type { SandboxPolicy } from "../agents/sandbox"
 import type { RunChunk } from "../chunks"
 import {
@@ -73,6 +69,8 @@ import type {
 } from "./types"
 
 export interface ClaudeAdapterOptions {
+  /** Request-only local computer proxy; never the raw driver. */
+  computer?: ComputerSpecProvider
   /** The daemon's adapter state dir (per-run dirs live under it). */
   stateDir: string
   /**
@@ -363,6 +361,7 @@ export class ClaudeAdapter implements AgentAdapter {
     const configDir = this.options.configDir ?? join(homedir(), ".claude")
     const paths = runPaths(this.options.stateDir, options.runId)
     const ctx = new RunContext({
+      computerMcp: this.options.computer?.(options.runId, options.policy),
       harness: "claude_code",
       kind: options.kind,
       worktree: options.cwd,
@@ -422,7 +421,12 @@ export class ClaudeAdapter implements AgentAdapter {
         settingSources: [],
         settings: claudeSettings(ctx.policy(), options.policy),
         mcpServers: {
-          [MCP_SERVER_NAME]: { type: "stdio", ...ctx.mcpServer() },
+          ...Object.fromEntries(
+            Object.entries(ctx.mcpServers()).map(([name, spec]) => [
+              name,
+              { type: "stdio" as const, ...spec },
+            ])
+          ),
         },
         strictMcpConfig: true,
         systemPrompt: {
