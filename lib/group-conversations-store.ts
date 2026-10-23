@@ -80,6 +80,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         result = { messages, nextBefore: more ? messages.at(-1)?.position : null }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)
+        if (!await directory(group.workspaceId, userId, input.mentions)) return fail(422)
         for (const m of input.mentions) {
           const { rowCount } = await q('SELECT 1 FROM conversation_members WHERE "conversationId"=$1 AND "memberType"=$2 AND "memberId"=$3 AND "leftAt" IS NULL', [req.id, m.memberType, m.memberId])
           if (!rowCount) return fail(422)

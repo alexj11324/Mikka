@@ -71,6 +71,9 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     assert.equal((await run({ id, resource: 'members', method: 'POST', body: JSON.stringify({ memberType: 'agent', memberId: privateAgent }) })).status, 404)
     const send = (body: string, extra: Record<string, unknown> = {}) => run({ id, resource: 'messages', method: 'POST', body: JSON.stringify({ body, ...extra }) })
     assert.equal((await send('bad mention', { mentions: [{ memberType: 'user', memberId: 'outsider' }] })).status, 422)
+    // A stale group member row must not make a removed workspace user mentionable.
+    await scoped.query(`INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,'user','removed-workspace','member')`, [id])
+    assert.equal((await send('stale workspace mention', { mentions: [{ memberType: 'user', memberId: 'removed-workspace' }] })).status, 422)
     assert.equal((await send('bad reply', { replyToId: randomUUID() })).status, 422)
     const first = await send('first', { mentions: [{ memberType: 'agent', memberId: ownAgent }] })
     assert.equal(first.status, 201)
@@ -107,9 +110,19 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     await removal.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [id])
     await removal.query('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberId"=$2', [id, 'member'])
     const waitingSend = run({ id, resource: 'messages', method: 'POST', userId: 'member', body: '{"body":"racing removal"}' })
-    await removal.query('COMMIT')
-    removal.release()
+    let observedWait = false
+    try {
+      for (let attempt = 0; attempt < 100 && !observedWait; attempt++) {
+        const { rows } = await scoped.query(`SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE 'SELECT * FROM conversations WHERE id=%'`)
+        observedWait = rows.length > 0
+        if (!observedWait) await new Promise(resolve => setTimeout(resolve, 10))
+      }
+    } finally {
+      await removal.query('COMMIT')
+      removal.release()
+    }
     assert.equal((await waitingSend).status, 404)
+    assert.equal(observedWait, true, 'the send actually waited for the removal lock')
     const suspendedDirectory = groupDirectory({ async activeUsers() { return [] }, async ownedAgents() { return [] } })
     for (const [resource, method] of [['messages','GET'],['messages','POST'],['members','POST'],['members','DELETE']] as const) {
       assert.equal((await handleGroup(scoped, suspendedDirectory, { ...base, id, resource, method, body: '{}' })).status, 404)
