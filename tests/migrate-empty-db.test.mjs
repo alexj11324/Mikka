@@ -103,7 +103,7 @@ for (const separateTargets of [false, true]) {
         values ('existing-owner', 'Existing owner', 'existing@example.invalid', false, now(), now())`)
       const issue = randomUUID()
       await app.query(`insert into issues (id, "userId", title, content, status, priority)
-        values ($1, 'existing-owner', 'Keep this issue', '{"type":"doc"}', 'todo', 'medium')`, [issue])
+        values ($1, 'existing-owner', 'Keep this issue', '{"type":"doc"}', 'todo', 'normal')`, [issue])
       const userBefore = (await app.query('select * from "user"')).rows
       const issueBefore = (await app.query('select * from issues')).rows
       const before = [await snapshot(app), await snapshot(workspace)]
