@@ -17,18 +17,32 @@ async function mockSessions(page: Page, initial: Status | null) {
   return state
 }
 
+const WORKING_FLAG = /"working"\s*:\s*(true|false)/
+const COORDINATOR_CHAT_SHAPE = /"items"\s*:\s*\[/
+
+/**
+ * Rewrites only the `getCoordinatorChat` server action. Its id is resolved at runtime:
+ * the first `Next-Action` POST that sends no arguments (`[]`) and answers with a chat
+ * view (`items` + `working`) pins `actionId`; after that only that id is rewritten and
+ * every other request (other actions, sendCoordinatorMessage with its text arg) passes through.
+ */
 async function mockCoordinatorWorking(page: Page, initial: boolean) {
-  const state = { working: initial, rewrites: 0 }
+  const state = { working: initial, rewrites: 0, actionId: null as string | null }
   await page.route('**/*', async route => {
     const request = route.request()
-    if (request.method() !== 'POST' || !request.headers()['next-action']) return route.fallback()
+    const actionId = request.headers()['next-action']
+    if (request.method() !== 'POST' || !actionId) return route.fallback()
+    if (state.actionId && actionId !== state.actionId) return route.fallback()
+    if (!state.actionId && (request.postData() ?? '').trim() !== '[]') return route.fallback()
     const response = await route.fetch()
     const body = await response.text()
-    // Flight text: match the flag anywhere in the body, tolerating whitespace.
-    if (!/"working"\s*:\s*(true|false)/.test(body)) return route.fulfill({ response, body })
+    if (!state.actionId) {
+      if (!(WORKING_FLAG.test(body) && COORDINATOR_CHAT_SHAPE.test(body))) return route.fulfill({ response, body })
+      state.actionId = actionId
+    }
     state.rewrites++
     const rewritten = body
-      .replace(/"working"\s*:\s*(true|false)/g, `"working":${state.working}`)
+      .replace(new RegExp(WORKING_FLAG.source, 'g'), `"working":${state.working}`)
       .replace(/"enabled"\s*:\s*(true|false)/g, '"enabled":true')
       .replace(/"error"\s*:\s*"(?:[^"\\]|\\.)*"/g, '"error":null')
     return route.fulfill({ response, body: rewritten })
