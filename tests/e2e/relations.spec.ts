@@ -201,8 +201,22 @@ test('402x400 短视口：关系选择器标题和关闭按钮不被裁切，列
   await page.getByRole('button', { name: '任务', exact: true }).click()
   await openIssue(page, current)
   await page.setViewportSize({ width: 402, height: 400 })
+  // Hold the picker's reads so the loading state is visible: its text is muted via an inner span, CommandEmpty keeps its default color.
+  let releaseReads!: () => void
+  const readsHeld = new Promise<void>(resolve => { releaseReads = resolve })
+  let holding = true
+  await page.route('**/*', async route => {
+    if (holding && route.request().method() === 'POST' && route.request().headers()['next-action']) await readsHeld
+    return route.fallback()
+  })
   await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
   await page.getByRole('menuitem', { name: '设置父任务…', exact: true }).click()
+  const loading = page.getByRole('dialog', { name: '设置父任务', exact: true }).locator('[cmdk-empty]')
+  await expect(loading.getByText('正在读取任务…', { exact: true })).toHaveClass(/text-muted-foreground/)
+  await expect(loading).not.toHaveClass(/text-muted-foreground/)
+  holding = false
+  releaseReads()
+  await page.unroute('**/*')
   // The dialog opens only after the menu has closed (no menu ghosting over it).
   const picker = page.getByRole('dialog', { name: '设置父任务', exact: true })
   await expect(picker).toBeVisible()
@@ -220,4 +234,13 @@ test('402x400 短视口：关系选择器标题和关闭按钮不被裁切，列
   await expect(picker.getByText('没有匹配的任务', { exact: false })).toBeVisible()
   expect((await list.boundingBox())!.height).toBeGreaterThanOrEqual(Math.min(listHeight, 144) - 1)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  // Closing the picker and dismissing a reopened menu without picking must not reopen a previously queued picker.
+  await page.keyboard.press('Escape')
+  await expect(picker).toHaveCount(0)
+  await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
+  await expect(page.getByRole('menu')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  await page.waitForTimeout(500)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 })
