@@ -72,8 +72,11 @@ test('the migration is timestamp-named, later than 20261023040300, and idempoten
   assert.match(sql, /ADD COLUMN IF NOT EXISTS "actorType"/)
   assert.match(sql, /ADD COLUMN IF NOT EXISTS "actorId"/)
   assert.doesNotMatch(sql.replace(/^--.*$/gm, ''), /ADD COLUMN IF NOT EXISTS actor_/)
+  assert.doesNotMatch(sql, /DROP CONSTRAINT/, 'constraints are added once, not dropped and re-added')
   for (const check of ['issue_versions_actor_type_check', 'issue_versions_actor_id_needs_type_check']) {
-    assert.match(sql, new RegExp(`DROP CONSTRAINT IF EXISTS ${check};\\s*ALTER TABLE issue_versions ADD CONSTRAINT ${check}`))
+    assert.match(sql, new RegExp(`IF NOT EXISTS \\(SELECT 1 FROM pg_constraint WHERE conrelid = 'issue_versions'::regclass AND conname = '${check}'\\) THEN\\s*ALTER TABLE issue_versions ADD CONSTRAINT ${check} CHECK .* NOT VALID;`))
+    assert.match(sql, new RegExp(`VALIDATE CONSTRAINT ${check};`))
   }
+  assert.match(sql, /coalesce\(/, 'both column spellings present: data merged before the snake column goes')
   assert.match(sql, /CHECK \("actorId" IS NULL OR "actorType" IS NOT NULL\)/)
 })
