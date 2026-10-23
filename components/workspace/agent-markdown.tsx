@@ -34,7 +34,7 @@ export function AgentMarkdownContent({ text, isStreaming = false, size = 'defaul
 }) {
   const agentCopy = useAgentCopy()
 
-  return <div data-agent-markdown className={cn('agent-markdown flex min-w-0 max-w-full flex-col gap-3 break-words text-sm leading-7 [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex_.cjk_fallback]:font-sans [&_.katex_.cjk_fallback]:text-[0.8264em]', {
+  return <div data-agent-markdown className={cn('agent-markdown flex min-w-0 max-w-full flex-col gap-3 break-words text-sm leading-7 [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex_.cjk_fallback]:font-sans', {
     'text-xs': size === 'small' || size === 'small-heavy',
     'text-base': size === 'large' || size === 'large-heavy',
     'font-semibold': size === 'small-heavy' || size === 'large-heavy',

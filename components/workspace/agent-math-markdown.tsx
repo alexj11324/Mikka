@@ -9,8 +9,7 @@ import { AgentMarkdownContent, type AgentMarkdownProps } from './agent-markdown'
 import 'katex/dist/katex.min.css'
 
 const mathRemarkPlugins = [remarkMath]
-// KaTeX 的 .katex 字号为 1.21em、字体栈以 serif 结尾，中文会回退成宋体并显得偏大；
-// agent-markdown 里给 .cjk_fallback 换回正文字体并按 1/1.21 缩回正文字号。
+// KaTeX 的字体栈以 serif 结尾，公式里的中文（.cjk_fallback）在 macOS 上会回退成宋体；agent-markdown 里把它换回正文字体。
 const rehypePlugins: NonNullable<ComponentProps<typeof Markdown>['rehypePlugins']> = [
   [rehypeKatex, { trust: false, strict: 'ignore', throwOnError: false, maxExpand: 1000, maxSize: 20 }],
 ]
