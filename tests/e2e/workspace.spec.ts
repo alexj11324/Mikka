@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, app } from './fixtures'
+import { test, expect, register, rail, app } from './fixtures'
 
 test('未登录访问受保护页面、注册和登录链接', async ({ page }) => {
   await page.goto(app('/settings/members'))
@@ -58,15 +58,15 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
   await page.getByRole('link', { name: '返回工作台', exact: true }).click()
   await workspaces()
   await page.getByRole('menuitem', { name: '回归测试成员的工作区', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '项目', exact: true })).toBeVisible()
+  await expect(page).toHaveURL(url => url.pathname === app('/'))
   await openSidebar()
   await expect(switcher).toContainText('回归测试成员的工作区')
 })
 
 test('注册、创建任务、菜单、搜索、视图切换和退出登录', async ({ page }) => {
   const account = await register(page)
-  await expect(page.getByRole('heading', { name: '项目', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '任务', exact: true }).click()
+  await expect(page.getByRole('button', { name: /^Coordinator/ })).toHaveAttribute('aria-current', 'page')
+  await rail(page, '看板').click()
   await expect(page.getByRole('heading', { name: '全部任务', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '新建任务', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
@@ -79,7 +79,7 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await expect(dialog).not.toBeVisible()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true })).toBeVisible()
   await page.reload()
-  await page.getByRole('button', { name: '任务', exact: true }).click()
+  await rail(page, '看板').click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '列表视图', exact: true }).click()
   await expect(page.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: title })).toBeVisible()
@@ -88,7 +88,8 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await page.getByRole('option').filter({ hasText: title }).click()
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
   await expect(page.getByRole('button', { name: '账户菜单', exact: true })).toHaveCount(0)
-  await expect(page.locator('[data-slot="sidebar-footer"]').getByRole('link')).toHaveAttribute('href', app('/devices'))
+  await rail(page, '插件').click()
+  await expect(page.locator('a', { hasText: '管理设备' })).toHaveAttribute('href', app('/devices'))
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '切换工作区', exact: true }).hover()
   const switcher = page.getByRole('menu', { name: '切换工作区', exact: true })
@@ -106,6 +107,6 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await page.getByLabel('密码', { exact: true }).fill(account.password)
   await page.getByRole('button', { name: '登录工作台', exact: true }).click()
   await expect(page).toHaveURL(url => url.pathname === app('/'))
-  await page.getByRole('button', { name: '任务', exact: true }).click()
+  await rail(page, '看板').click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true })).toBeVisible()
 })

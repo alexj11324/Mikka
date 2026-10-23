@@ -20,8 +20,16 @@ export const issues = pgTable('issues', {
   title: varchar('title', { length: 200 }).notNull(),
   content: jsonb('content').$type<JSONContent>().notNull(),
   status: text('status').notNull(), priority: text('priority').notNull(),
+  // Workspace issues sync with Linear; personal ones never leave Mikka (MIK-46).
+  scope: text('scope').$type<'workspace' | 'personal'>().notNull().default('personal'),
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+// The personal issue prefix someone chose; without a row it comes from their email (MIK-46).
+export const issuePrefixes = pgTable('issue_prefixes', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  prefix: varchar('prefix', { length: 4 }).notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 export const agentSessions = pgTable('agent_sessions', {

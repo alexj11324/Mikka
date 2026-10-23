@@ -2,8 +2,7 @@
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { fetchAgentHistory as fetchHistory, useAgentHistory } from '@/hooks/use-agent-history'
-import '@openuidev/react-ui/layered/styles/index.css'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -11,8 +10,8 @@ import type { AgentHistory } from '@/lib/agent-history'
 import type { ActionEvent } from '@openuidev/react-lang'
 import { toast } from 'sonner'
 import { useCompletion } from '@ai-sdk/react'
-import { createTheme, ThemeProvider } from '@openuidev/react-ui/ThemeProvider'
 import { AgentComposer } from './agent-composer'
+import { AgentThemeProvider } from './agent-theme'
 import dynamic from 'next/dynamic'
 
 import { AgentResponse } from './agent-response'
@@ -32,36 +31,18 @@ const fetchAgentWithImages: typeof fetch = async (input, options) => {
   })
 }
 
-const agentTheme = createTheme({
-  background: 'var(--background)',
-  foreground: 'var(--background)',
-  sunk: 'var(--muted)',
-  highlightSubtle: 'var(--background)',
-  highlight: 'var(--accent)',
-  textNeutralPrimary: 'var(--foreground)',
-  textNeutralSecondary: 'var(--muted-foreground)',
-  textNeutralTertiary: 'var(--muted-foreground)',
-  textAccentPrimary: 'var(--primary-foreground)',
-  interactiveAccentDefault: 'var(--primary)',
-  interactiveAccentHover: 'var(--primary)',
-  interactiveAccentDisabled: 'var(--muted)',
-  borderDefault: 'var(--border)',
-  borderInteractive: 'var(--input)',
-  borderInteractiveEmphasis: 'var(--ring)',
-  borderAccent: 'var(--primary)',
-  fontBody: 'var(--font-sans)',
-  fontHeading: 'var(--font-sans)',
-  fontLabel: 'var(--font-sans)',
-})
 
-export function AgentPanel({ userId, initialHistory }: { userId: string; initialHistory?: AgentHistory }) {
+/** `request` opens a session from outside (the conversation list): a session id, or null for a new conversation. */
+export type AgentSessionRequest = { sessionId: string | null; nonce: number }
+
+export function AgentPanel({ userId, initialHistory, request, onActive }: { userId: string; initialHistory?: AgentHistory; request?: AgentSessionRequest; onActive?: (sessionId: string | null) => void }) {
   const [demo, setDemo] = useState(false)
   const latest = useAgentHistory(userId, initialHistory)
   if (!latest.data) return <AgentHistoryLoading error={latest.error} onRetry={() => { void latest.mutate() }} />
-  return <ThemeProvider cssSelector=".orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
-    <div hidden={demo} className="h-full min-h-0"><AgentSessions userId={userId} initial={latest.data} onDemo={() => setDemo(true)} onSaved={async () => { await latest.mutate() }} /></div>
+  return <AgentThemeProvider>
+    <div hidden={demo} className="h-full min-h-0"><AgentSessions userId={userId} initial={latest.data} request={request} onActive={onActive} onDemo={() => setDemo(true)} onSaved={async () => { await latest.mutate() }} /></div>
     {demo && <AgentDemo onClose={() => setDemo(false)} />}
-  </ThemeProvider>
+  </AgentThemeProvider>
 }
 
 function AgentHistoryLoading({ error, onRetry }: { error?: Error; onRetry: () => void }) {
@@ -75,9 +56,10 @@ function AgentHistoryLoading({ error, onRetry }: { error?: Error; onRetry: () =>
 type OpenSession = { key: string; initial?: AgentHistory; sessionId?: string }
 type LiveSession = AgentChatSession & { key: string }
 
-function AgentSessions({ userId, initial, onSaved, onDemo }: { userId: string; initial: AgentHistory; onSaved: () => Promise<void>; onDemo: () => void }) {
-  const [opened, setOpened] = useState<OpenSession[]>([{ key: initial.sessionId ?? 'new', initial }])
-  const [activeKey, setActiveKey] = useState(initial.sessionId ?? 'new')
+function AgentSessions({ userId, initial, request, onActive, onSaved, onDemo }: { userId: string; initial: AgentHistory; request?: AgentSessionRequest; onActive?: (sessionId: string | null) => void; onSaved: () => Promise<void>; onDemo: () => void }) {
+  const firstKey = request ? request.sessionId ?? `new-${request.nonce}` : initial.sessionId ?? 'new'
+  const [opened, setOpened] = useState<OpenSession[]>(() => [request && request.sessionId !== initial.sessionId ? (request.sessionId ? { key: firstKey, sessionId: request.sessionId } : { key: firstKey, initial: { sessions: [], sessionId: null, turns: [] } }) : { key: firstKey, initial }])
+  const [activeKey, setActiveKey] = useState(firstKey)
   const [live, setLive] = useState<Record<string, LiveSession>>({})
   const sessions = new Map<string, AgentChatSession>(initial.sessions.map(session => [session.id, session]))
   for (const session of Object.values(live)) sessions.set(session.id, session)
@@ -95,6 +77,17 @@ function AgentSessions({ userId, initial, onSaved, onDemo }: { userId: string; i
     setOpened(entries => [...entries, { key, initial: { sessions: [], sessionId: null, turns: [] } }])
     setActiveKey(key)
   }
+
+  const handled = useRef(request?.nonce)
+  useEffect(() => {
+    if (!request || handled.current === request.nonce) return
+    handled.current = request.nonce
+    if (request.sessionId) select(request.sessionId)
+    else reset()
+  })
+  const activeEntry = opened.find(entry => entry.key === activeKey)
+  const activeId = activeEntry ? live[activeEntry.key]?.id ?? activeEntry.sessionId ?? activeEntry.initial?.sessionId ?? null : null
+  useEffect(() => { onActive?.(activeId) }, [activeId, onActive])
 
   return opened.map(entry => <div key={entry.key} hidden={entry.key !== activeKey} className="h-full min-h-0">
     <AgentSessionLoader entry={entry} userId={userId} sessions={history} onSelect={select} onReset={reset} onSaved={onSaved} onDemo={onDemo}

@@ -8,12 +8,11 @@ for (const width of [1280, 402]) {
     test(`offline refresh keeps ${layout} bounds stable at ${width}px`, async ({ page, context }, testInfo) => {
       await page.setViewportSize({ width, height: 900 })
       await register(page)
-      // Open the task view from the responsive navigation.
+      // Use main's responsive rail: phones expose it inside the sidebar.
       if (width < 768) await page.getByRole('button', { name: '展开或收起侧栏', exact: true }).click()
-      await page.getByRole('button', { name: '任务', exact: true }).click()
+      await page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name: '看板', exact: true }).click()
       await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
-      // The global create button lives in the closed mobile sidebar. Use the
-      // visible board-column action on both breakpoints instead.
+      // Use the visible board-column action on both breakpoints.
       await page.getByRole('region', { name: '任务看板', exact: true }).getByRole('button', { name: '新建待整理任务', exact: true }).click()
       const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
       const title = `Offline layout ${width} ${layout}`
