@@ -110,6 +110,10 @@ export const deviceRegistration = z.object({
   daemonVersion: z.string().max(50),
   protocolVersion: z.number().int(),
   harnesses: z.array(harnessInfoSchema).max(20),
+  /** Separate device capability, not a model harness; old clients omit it. */
+  computerUse: z
+    .object({ installed: z.boolean(), version: z.string().max(100).nullable() })
+    .optional(),
   /**
    * This machine's one device id, the same in every workspace (ADR ORV-284).
    * Registering with it in another workspace joins the same device there.
@@ -141,6 +145,10 @@ export type HeartbeatRun = z.infer<typeof heartbeatRunSchema>
 /** `POST /v1/devices/:deviceId/heartbeat` */
 export const deviceHeartbeatSchema = z.object({
   harnesses: z.array(harnessInfoSchema).max(20),
+  /** Separate device capability, not a model harness; old clients omit it. */
+  computerUse: z
+    .object({ installed: z.boolean(), version: z.string().max(100).nullable() })
+    .optional(),
   runs: z.array(heartbeatRunSchema).max(500),
   worktreeDiskBytes: z.number().int().nonnegative(),
   /**

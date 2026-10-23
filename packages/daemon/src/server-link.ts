@@ -56,6 +56,9 @@ export interface ChunkBatch {
  * the daemon keeps running and retries (offline tolerance, R13).
  */
 export interface ServerLink {
+  /** Owner decisions for immutable local computer requests. No screenshot/result uploaded. */
+  syncComputerReviews?(deviceId: string, requests: import('@mikka/protocol/computer').LocalComputerRequest[], signal?: AbortSignal): Promise<import('@mikka/protocol/computer').LocalComputerDecision[]>
+
   /**
    * `credential` is the session from `mikka daemon login` (Better Auth
    * device authorization, RFC 8628) or one the signed-in desktop handed

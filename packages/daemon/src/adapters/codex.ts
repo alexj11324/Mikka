@@ -5,6 +5,7 @@
 // `turn/steer`, one between turns starts the next turn. Threads live in the
 // run's `CODEX_HOME`, so a follow-up run copies the earlier run's
 // `sessions` into its own before `thread/resume`.
+import type { ComputerSpecProvider } from "../agents/run-context"
 import { isAbsolute, join, relative } from "node:path"
 
 import type { MessageConnection } from "vscode-jsonrpc/node"
@@ -23,12 +24,7 @@ import {
   prepareCodexHome,
 } from "../agents/harness-home"
 import { jsonlConnection } from "../agents/jsonl-rpc"
-import {
-  MCP_SERVER_NAME,
-  RESUME_MESSAGE,
-  RunContext,
-  runPaths,
-} from "../agents/run-context"
+import { RESUME_MESSAGE, RunContext, runPaths } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
@@ -52,6 +48,8 @@ import type {
 
 export interface CodexAdapterOptions {
   sandbox: AgentSandbox
+  /** Request-only local computer proxy; never the raw driver. */
+  computer?: ComputerSpecProvider
   /** The daemon's adapter state dir (per-run dirs and homes live under it). */
   stateDir: string
   binary?: string
@@ -236,6 +234,7 @@ export class CodexAdapter implements AgentAdapter {
       this.options.userHome
     )
     const ctx = new RunContext({
+      computerMcp: this.options.computer?.(options.runId, options.policy),
       harness: "codex",
       kind: options.kind,
       worktree: options.cwd,
@@ -250,17 +249,18 @@ export class CodexAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (threadId && earlier) return endedSession(threadId, earlier)
     ctx.clearHandoff()
-    const mcp = ctx.mcpServer()
     const argv = [
       this.options.binary ?? "codex",
       "app-server",
-      "-c",
-      `mcp_servers.${MCP_SERVER_NAME}.command=${toml(mcp.command)}`,
-      "-c",
-      `mcp_servers.${MCP_SERVER_NAME}.args=${toml(mcp.args)}`,
-      ...Object.entries(mcp.env).flatMap(([key, value]) => [
+      ...Object.entries(ctx.mcpServers()).flatMap(([name, mcp]) => [
         "-c",
-        `mcp_servers.${MCP_SERVER_NAME}.env.${key}=${toml(value)}`,
+        `mcp_servers.${name}.command=${toml(mcp.command)}`,
+        "-c",
+        `mcp_servers.${name}.args=${toml(mcp.args)}`,
+        ...Object.entries(mcp.env).flatMap(([key, value]) => [
+          "-c",
+          `mcp_servers.${name}.env.${key}=${toml(value)}`,
+        ]),
       ]),
       // Its shells get a filtered env; give them writable temp dirs.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [

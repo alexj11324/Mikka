@@ -17,7 +17,9 @@ import { HttpServerLink } from "./server-link-http"
 const USAGE = `Usage:
   mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>]
   mikka daemon login [--server <url>] [--workspace <id>] [--token <session>] [--dev] [--data-dir <dir>]
-  mikka daemon status [--dev] [--data-dir <dir>]`
+  mikka daemon status [--dev] [--data-dir <dir>]
+  mikka daemon computer pending [--dev] [--data-dir <dir>]
+  mikka daemon computer <approve|deny> <id> <review-digest> [--dev] [--data-dir <dir>]`
 
 const SERVER_URLS: Record<Flavor, string> = {
   prod: "https://app.aspectlylabs.com/mikka",
@@ -63,6 +65,38 @@ export async function runCli(
   }
   const flavor: Flavor = values.dev ? "dev" : "prod"
   const dataDir = values["data-dir"] ?? defaultDataDir(flavor)
+
+  if (sub === "computer") {
+    const client = await connectDaemonInDataDir(dataDir, CLIENT)
+    try {
+      const action = positionals[2]
+      if (action === "pending")
+        io.out(
+          JSON.stringify(await client.request("computer.pending"), null, 2)
+        )
+      else if (
+        (action === "approve" || action === "deny") &&
+        positionals[3] &&
+        positionals[4]
+      ) {
+        io.out(
+          JSON.stringify(
+            await client.request("computer.decide", {
+              id: positionals[3],
+              digest: positionals[4],
+              approve: action === "approve",
+            })
+          )
+        )
+      } else {
+        io.err(USAGE)
+        return 2
+      }
+      return 0
+    } finally {
+      client.close()
+    }
+  }
 
   if (sub === "status") {
     try {
@@ -142,8 +176,7 @@ export async function runCli(
     }
     memoryServer = new MemoryServer("dev-device")
     const seed = readJson(daemonPaths(dataDir).devRepos) as
-      | { repos?: DeviceRepo[] }
-      | undefined
+      { repos?: DeviceRepo[] } | undefined
     for (const repo of seed?.repos ?? [])
       memoryServer.addRepo("dev-device", repo)
     link = memoryServer.link()

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import useSWR from 'swr'
-import { useRouter } from '@/i18n/navigation'
+import { Link, useRouter } from '@/i18n/navigation'
 import { Laptop, RefreshCw, Sparkles, Terminal } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { authClient } from '@/lib/auth-client'
@@ -138,6 +138,7 @@ export function DevicesWorkspace({ user, localHostname, initialDevices }: {
 }) {
   const t = useTranslations('Devices')
   const tAccount = useTranslations('Workspace')
+  const tComputer = useTranslations('ComputerApprovals')
   const router = useRouter()
   const { data: devices = [], mutate, error } = useSWR('devices', listDevices, { fallbackData: initialDevices, refreshInterval: 5000 })
   const [signingOut, setSigningOut] = useState(false)
@@ -181,7 +182,7 @@ export function DevicesWorkspace({ user, localHostname, initialDevices }: {
                 <h1 className="text-sm font-semibold tracking-tight">{t('title')}</h1>
                 <p className="text-xs text-muted-foreground">{t('description')}</p>
               </div>
-              <ConnectDeviceDialog />
+              <div className="flex items-center gap-3"><Link href="/devices/approvals">{tComputer('title')}</Link><ConnectDeviceDialog /></div>
             </div>
 
             {devices.length > 0 && (

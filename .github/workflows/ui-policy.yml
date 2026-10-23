@@ -89,7 +89,7 @@ jobs:
       - run: pnpm test:settings
       - run: pnpm test:issues
       - name: Computer broker and gRPC-Web wire fixtures (no live desktop)
-        run: node --import tsx --test lib/cua/computer.test.ts
+        run: node --import tsx --test lib/cua/computer.test.ts lib/cua/local-review.test.ts
       - name: Audit business UI composition
         run: pnpm --silent lint:ui --json > ui-audit.json
       - name: Show audit summary
@@ -161,7 +161,7 @@ jobs:
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
       - name: Workspace computer approval migration, isolated CI database only
-        run: node --test tests/computer-request-migration.test.mjs
+        run: node --test tests/computer-request-migration.test.mjs tests/device-computer-migration.test.mjs tests/local-computer-review-migration.test.mjs
       - name: Computer policy, live claims and cancellation (CI ephemeral PG17 only)
         run: node --import tsx --test tests/computer-store-ci.test.ts
       - run: pnpm build
@@ -185,6 +185,76 @@ jobs:
             performance-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  local-computer-linux:
+    name: Local computer driver (Linux Xvfb, exact approval)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Pinned MIT cua-driver binary and X11 dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y xvfb x11-utils x11-apps xdotool libxdo3
+          mkdir -p "$RUNNER_TEMP/cua"
+          curl -fL --retry 2 https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-linux-x86_64-binary.tar.gz -o "$RUNNER_TEMP/cua/driver.tar.gz"
+          echo "31ab9709dd91ce73677e49b9f3e75c6f0d3e4d9625c286c9e58262bfbea698dd  $RUNNER_TEMP/cua/driver.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/cua/driver.tar.gz" -C "$RUNNER_TEMP/cua"
+      - name: Detection, permissions, proxy continuation and authenticated owner review
+        run: |
+          node --test packages/daemon/src/computer/broker.test.mjs
+          node --import tsx --test packages/daemon/src/computer/rpc.node.ts packages/daemon/src/computer/web-review.node.ts
+          pnpm --filter @mikka/daemon typecheck
+      - name: Real screenshot and click through exact-operation broker (no database)
+        run: |
+          MIKKA_CUA_TEST_BINARY="$RUNNER_TEMP/cua/cua-driver" MIKKA_CUA_TEST_SCREENSHOT="$RUNNER_TEMP/cua/desktop.png" node --import tsx --test packages/daemon/src/computer/xvfb.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: local-computer-linux-evidence
+          path: ${{ runner.temp }}/cua/desktop*.png
+          if-no-files-found: ignore
+
+  local-computer-macos:
+    name: Local computer driver (macOS, non-blocking permissions probe)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: macos-latest
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Pinned MIT driver (no automatic TCC grants)
+        run: |
+          mkdir -p "$RUNNER_TEMP/cua"
+          curl -fL --retry 2 https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-darwin-universal-binary.tar.gz -o "$RUNNER_TEMP/cua/driver.tar.gz"
+          echo "2bb8dc4a7e69185ffd04c4a9c0eab590bd2c54b72c2c1be13ab675be4f487732  $RUNNER_TEMP/cua/driver.tar.gz" | shasum -a 256 --check
+          tar -xzf "$RUNNER_TEMP/cua/driver.tar.gz" -C "$RUNNER_TEMP/cua"
+      - name: Scripted native dialog screenshot and approved click
+        run: |
+          MIKKA_CUA_TEST_BINARY="$RUNNER_TEMP/cua/cua-driver" MIKKA_CUA_TEST_SCREENSHOT="$RUNNER_TEMP/cua/desktop.png" node --import tsx --test packages/daemon/src/computer/xvfb.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: local-computer-macos-evidence
+          path: ${{ runner.temp }}/cua/desktop*.png
+          if-no-files-found: ignore
 
   cua-remote-service:
     name: Requested pinned CUA service, isolated internal CI only

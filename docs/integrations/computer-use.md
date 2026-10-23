@@ -109,8 +109,7 @@ migration runner/CI overlap with #84/#86 and #115 must be reconciled before merg
 4. Add CI's actual container + editor input/screenshot assertions and real policy,
    membership, cancellation, concurrent approval and resumption route tests.
 5. Wire workspace controls through the protected settings UI's owner, not by editing
-   those files here. Keep separate #149 daemon integration incomplete until its
-   reported driver and CLI-specific MCP runtime work with the approval broker.
+   those files here. The separate stacked #149 local-driver path is described below.
 
 ## Exact remote-service CI scope
 
@@ -123,3 +122,21 @@ No FSL implementation/generated bindings are copied into Mikka. The exact terms,
 provenance and limits are in `docs/ci-prepared/cua-service-terms.md`. Future public
 commercial hosting is not certified by these CI results. Real service evidence
 must come from its exact-head CI job, not loopback fixture tests.
+
+## Local driver (#149, stacked on #148)
+
+The local path uses the MIT `cua-driver-rs v0.38.0` release, not spacesd or the remote image. Detection requires the pinned version and records the executable SHA-256. Device registration and heartbeat report `computerUse` separately from the model harness list. Existing clients/devices default to unavailable. The additive `devices.computerUse` JSONB migration has a constant false default and is idempotent; deployment runs it against the app database, with ordinary migration serialization required. No local/dev/production database was used for validation.
+
+Claude, Codex and Cursor receive a second `computer` MCP server only when detection succeeds and the run's explicit computer-use permission is ask/allow. They receive Mikka's request-only proxy, never raw driver MCP. This avoids treating their existing bypass/never native approval settings as authorization. The tool subset is deliberately screenshot, click and exact text input; arbitrary driver tools, output paths, scope changes and extra arguments fail closed.
+
+Each operation waits in the same MCP tool call for an owner decision. Use `mikka daemon computer pending` locally to inspect run, executable fingerprint, normalized operation, expiry and review digest, then `mikka daemon computer approve <id> <digest>` or `deny <id> <digest>`. These use the existing secret-handshaken owner RPC; the model-facing socket cannot list or approve. The run must remain live, the device signed in, the permission not denied/read-only, and binary bytes unchanged. A five-minute request is claimed before execution, never refunded after failure/uncertainty, and is discarded on daemon restart. After approval the actual driver result returns to the pending model call, not a textual "resume" instruction. Desktop output is untrusted data, not new authorization.
+
+The local Unix socket is scoped to the OS owner and the daemon's protected secret. This is not a new hardened multi-user OS boundary or a grant for a remote collaborator to operate the device. The local owner CLI remains a fallback; a second owner web surface at `/devices/approvals` now reviews daemon snapshots through the existing authenticated device HTTP link. The page displays the exact call, executable fingerprint, run and expiry. The same-origin session decision queues only an ID, digest and approve/deny boolean; the daemon matches it to a still-pending request and rechecks run policy, expiry and binary bytes before execution. No screenshot or tool result is uploaded through the review endpoint. The owner sees “queued”, not an invented execution success. Real signed-in Claude/Codex/Cursor reasoning after a desktop result remains Alex's final check, not an implementation prerequisite. Prior-head macOS CI performed the real native-dialog screenshot/approved click/second screenshot; that runner evidence does not configure or certify another Mac’s OS permissions. Prior-head evidence does not certify the newly integrated parent; keep Draft until integrated-head CI/browser/native acceptance is complete.
+
+Linux validation starts isolated Xvfb and xmessage, asks for a screenshot through the broker, then separately approves a click on its OK button and asserts that the actual desktop process exits. It uses the checksum-pinned published driver, not a fake protocol implementation. Separate unit/RPC tests cover absence/version mismatch, permission denial, normalization, argument binding, replay, expiry, revocation, failed execution, request-only proxy and authenticated owner review.
+
+### Web review ledger (#149)
+
+`20261023185542_local_computer_reviews.sql` creates a new short-lived operation ledger. It references devices/runs with cascading deletes and has an owner/expiry index; no existing data rewrite or backfill. Rollback before use is dropping only this new table. Normal migration serialization/brief metadata locks apply. A five-minute daemon snapshot is hash-bound and never extended by the web. Device authentication must own the device and each live run. Browser authentication must own that run/device and have a fresh device snapshot. Replays, extra fields, changed arguments/digest, cross-owner requests and stopped/expired runs fail closed. Only pending operation text/metadata is stored, not screenshots, execution results or tokens; credential entry remains unsupported. Expired owner rows are deleted on review reads/sync, and a device's no-longer-pending snapshots are removed at next sync. There is no background cleanup job or production retention guarantee while offline.
+
+The browser regression uses only CI ephemeral Postgres to exercise real authenticated device and browser HTTP routes, owner decision rendering, changed arguments, replay and stopped-run rejection. A separate scripted MCP client verifies that the original blocked call receives a result and submits its next screenshot/click operation; this is not a signed-in model reasoning test. Linux/macOS native-driver evidence is a separate real-driver test, not proof those providers used this web route.

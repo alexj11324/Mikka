@@ -111,6 +111,7 @@ export const devices = pgTable('devices', {
   name: text('name').notNull(), hostname: text('hostname'),
   platform: text('platform'), arch: text('arch'),
   daemonVersion: text('daemonVersion'), protocolVersion: integer('protocolVersion'),
+  computerUse: jsonb('computerUse').$type<{ installed: boolean; version: string | null }>().notNull().default({ installed: false, version: null }),
   harnesses: jsonb('harnesses').$type<HarnessInfo[]>().notNull().default([]),
   /** Off: the device stays registered but the orchestrator gives it no runs. */
   enabled: boolean('enabled').notNull().default(true),
@@ -350,3 +351,14 @@ export const telegramConversations = pgTable('telegram_conversations', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('telegram_conversations_user_idx').on(table.userId)])
+
+/** Short-lived owner review snapshots; daemon is the sole executor/result recipient. */
+export const localComputerReviews = pgTable('local_computer_reviews', {
+  id: uuid('id').primaryKey(),
+  deviceId: uuid('deviceId').notNull().references(() => devices.id, { onDelete: 'cascade' }),
+  runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(), target: text('target').notNull(),
+  call: jsonb('call').$type<import('@mikka/protocol/computer').LocalComputerRequest['call']>().notNull(),
+  digest: text('digest').notNull(), expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  seenAt: timestamp('seenAt', { withTimezone: true }).notNull(), decision: boolean('decision'),
+}, table => [index('local_computer_reviews_owner_idx').on(table.userId, table.expiresAt)])

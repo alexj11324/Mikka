@@ -5,6 +5,7 @@
 // input, so a message sent during a prompt is delivered as the next prompt.
 // Chats live in the run's `CURSOR_DATA_DIR`, so a follow-up run copies the
 // earlier run's chats into its own before `session/load`.
+import type { ComputerSpecProvider } from "../agents/run-context"
 import { Readable, Writable } from "node:stream"
 
 import * as acp from "@agentclientprotocol/sdk"
@@ -19,12 +20,7 @@ import {
   untilReady,
 } from "../agents/child"
 import { carryHistory, prepareCursorHome } from "../agents/harness-home"
-import {
-  MCP_SERVER_NAME,
-  RESUME_MESSAGE,
-  RunContext,
-  runPaths,
-} from "../agents/run-context"
+import { RESUME_MESSAGE, RunContext, runPaths } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import type { RunChunk } from "../chunks"
 import {
@@ -43,6 +39,8 @@ import type {
 
 export interface CursorAdapterOptions {
   sandbox: AgentSandbox
+  /** Request-only local computer proxy; never the raw driver. */
+  computer?: ComputerSpecProvider
   /** The daemon's adapter state dir (per-run dirs and homes live under it). */
   stateDir: string
   /** `agent` (or `cursor-agent`) on PATH by default. */
@@ -250,6 +248,7 @@ export class CursorAdapter implements AgentAdapter {
     // 2026.09 stopped using CURSOR_DATA_DIR and wrote to `/tmp/.cursor`.
     const configDir = prepareCursorHome(join(paths.runDir, "cursor-home"))
     const ctx = new RunContext({
+      computerMcp: this.options.computer?.(options.runId, options.policy),
       harness: "cursor",
       kind: options.kind,
       worktree: options.cwd,
@@ -388,15 +387,14 @@ export class CursorAdapter implements AgentAdapter {
       })
     })
 
-    const mcp = ctx.mcpServer()
-    const mcpServers: acp.McpServer[] = [
-      {
-        name: MCP_SERVER_NAME,
+    const mcpServers: acp.McpServer[] = Object.entries(ctx.mcpServers()).map(
+      ([name, mcp]) => ({
+        name,
         command: mcp.command,
         args: mcp.args,
         env: Object.entries(mcp.env).map(([name, value]) => ({ name, value })),
-      },
-    ]
+      })
+    )
     const ready = <T>(step: Promise<T>, label: string) =>
       untilReady(child, step, `cursor ${label}`)
     try {
