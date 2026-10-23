@@ -24,7 +24,7 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
   const workspace = randomUUID(), otherWorkspace = randomUUID(), team = randomUUID(), otherTeam = randomUUID()
   const shared = randomUUID(), personal = randomUUID(), foreignIssue = randomUUID(), unlinked = randomUUID()
   const agent = randomUUID(), ownAgent = randomUUID(), sharedRun = randomUUID(), privateRun = randomUUID(), orphanRun = randomUUID(), foreignRun = randomUUID()
-  const doc = (label: string) => JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1, labels: [{ name: label, color: '#123456' }] } }, content: [] })
+  const doc = (label: string) => JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1, labels: [{ name: label, color: 'blue' }] } }, content: [] })
   try {
     for (const [id, name] of [[owner, 'Owner'], [member, 'Member'], [foreign, 'Foreign']]) await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$2,$3,true,now(),now())', [id, name, `${id}@example.invalid`])
     for (const [id, user] of [[workspace, owner], [otherWorkspace, foreign]]) await pool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,$3)', [id,user,`Visibility ${id}`])
