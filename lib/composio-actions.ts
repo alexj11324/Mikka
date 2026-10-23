@@ -33,6 +33,14 @@ export const COMPOSIO_ACTIONS = {
     slug: 'SLACK_FETCH_MESSAGE_THREAD_FROM_A_CONVERSATION',
     inputSchema: z.object({ channel: z.string().trim().min(1).max(255), ts: z.string().trim().min(1).max(64), limit: z.number().int().min(1).max(100).optional(), cursor: z.string().max(500).optional() }),
   },
+  // Read by the first briefing (lib/suggestions/sources.ts); not offered to agents.
+  fetch_recent_gmail: {
+    title: 'Fetch recent Gmail messages',
+    description: 'List recent Gmail messages matching a Gmail search query.',
+    toolkit: 'gmail',
+    slug: 'GMAIL_FETCH_EMAILS',
+    inputSchema: z.object({ query: z.string().trim().min(1).max(200), max_results: z.number().int().min(1).max(50).optional() }),
+  },
 } as const
 
 export type ComposioActionName = keyof typeof COMPOSIO_ACTIONS

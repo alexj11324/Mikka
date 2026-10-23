@@ -24,6 +24,7 @@ export type IssueView = 'all' | 'mine' | 'shared' | 'favorites' | 'following' | 
 export const WORKSPACE_NAME = 'Mikka'
 export const WORKSPACE_SLUG = 'mikka'
 
-export function issueIdentifier(number: number | undefined, pendingLabel = 'Unassigned') {
-  return number ? `ORV-${number}` : pendingLabel
+/** Shows the id the server resolved with `taskIdentifier` (lib/task-identifier.ts): `MIK-12` or `ALEX-12`. */
+export function issueIdentifier(task: { identifier: string | null } | null | undefined, pendingLabel = 'Unassigned') {
+  return task?.identifier ?? pendingLabel
 }

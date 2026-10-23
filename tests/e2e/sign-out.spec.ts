@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, app } from './fixtures'
+import { test, expect, register, rail, app } from './fixtures'
 
 test.use({ expectedConsoleErrors: [{ path: app('/api/auth/sign-out'), message: 'Failed to load resource: the server responded with a status of 400 (Bad Request)' }] })
 
@@ -84,6 +84,7 @@ for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
 test('sign-out waits for editor validation and preserves saved edits when revocation fails', async ({ page }) => {
   await register(page)
   const original = `退出保存 ${randomUUID()}`
+  await rail(page, '看板').click()
   await page.getByRole('button', { name: '新建任务', exact: true }).click()
   const create = page.getByRole('dialog', { name: '新建任务', exact: true })
   await create.getByLabel('任务标题', { exact: true }).fill(original)
@@ -129,6 +130,7 @@ test('sign-out waits for editor validation and preserves saved edits when revoca
 
 test('failed sign-out preserves an invalid project draft and its validation error', async ({ page }) => {
   await register(page)
+  await page.goto(app('/?section=projects'))
   await page.getByRole('button', { name: '新建项目', exact: true }).first().click()
   const create = page.getByRole('dialog', { name: '新建项目', exact: true })
   await create.getByLabel('项目名称', { exact: true }).fill(`退出项目 ${randomUUID()}`)

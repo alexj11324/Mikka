@@ -15,6 +15,14 @@
     "avatarLabel": "Avatar for {email}"
   },
   "Issue": {
+    "scope": {
+      "label": "Scope",
+      "workspace": "Workspace",
+      "personal": "Personal",
+      "judgedByAgent": "Set by agent",
+      "movedToWorkspace": "Now a workspace task; it will sync to Linear.",
+      "movedToPersonal": "Now a personal task; it stays in Mikka."
+    },
     "properties": "Task properties",
     "statusLabel": "Status",
     "priorityLabel": "Priority",
@@ -116,7 +124,14 @@
     "inviteMembers": "Invite members",
     "plugins": "Plugins",
     "toggleTeam": "Expand or collapse the {name} team",
-    "sidebarRail": "Expand or collapse the sidebar rail"
+    "sidebarRail": "Expand or collapse the sidebar rail",
+    "rail": "Main navigation",
+    "conversations": "Conversations",
+    "board": "Board",
+    "collapseList": "Collapse conversation list",
+    "newConversation": "New conversation",
+    "pinned": "Pinned",
+    "untitledConversation": "Untitled conversation"
   },
   "Plugins": {
     "title": "Plugins and skills",
@@ -876,6 +891,9 @@
     "issueOperationInvalid": "The operation information is invalid.",
     "issueUnavailable": "This task is no longer available.",
     "issuePreferenceLimit": "This task has reached its follower limit.",
+    "issueScopeInvalid": "Scope must be workspace or personal.",
+    "issueScopeOwnerOnly": "Only the task owner can change its scope.",
+    "issueScopeInLinear": "This task is already in Linear, so it can't become personal again.",
     "issueOwnerOnly": "Only the task owner can delete or restore the task.",
     "issueRestoreWindow": "The 30-day restore window for this task has passed.",
     "issueDeleteFailed": "Could not delete or restore the task. Please try again shortly.",
@@ -1435,6 +1453,19 @@
       "previewNote": "Form preview: workspace storage is not connected, so changes are not saved.",
       "previewLabel": "Workspace form preview"
     },
+    "issuePrefix": {
+      "title": "Personal task ids",
+      "description": "Personal tasks stay in Mikka and never go to Linear; they use your own four-letter prefix. Workspace tasks use their Linear id.",
+      "label": "Prefix",
+      "current": "Personal tasks show as {example}.",
+      "needsChoice": "No usable prefix yet: your email has fewer than four letters, or it matches a connected Linear team. Enter four letters.",
+      "save": "Save",
+      "saved": "Saved. Personal tasks now show as {example}.",
+      "invalid": "Enter four letters A–Z.",
+      "taken": "That matches a connected Linear team key. Choose another.",
+      "loadError": "Couldn't load your personal task ids.",
+      "saveError": "Couldn't save. Try again."
+    },
     "linear": {
       "title": "Linear",
       "description": "Connect a Linear account to sync issues and comments with Orvilo.",
@@ -1447,7 +1478,7 @@
       "oauthError": "Linear could not be connected. Try again.",
       "teamLabel": "Linear team",
       "teamPlaceholder": "Choose a team",
-      "teamDescription": "One team can sync with this Orvilo account at a time. New issues sync automatically; existing issues join after their next change.",
+      "teamDescription": "One team can sync with this Mikka account at a time. Only workspace tasks sync; personal tasks stay in Mikka.",
       "enable": "Enable two-way sync",
       "pause": "Pause sync",
       "syncActive": "Syncing {team}",
@@ -1474,6 +1505,8 @@
       "googleLinkFailed": "Could not start Google account linking.",
       "heading": "Connected apps",
       "description": "Authorize each account through Composio.",
+      "gmail": "Gmail",
+      "gmailDescription": "Connect Gmail so important new mail shows up in your suggestions.",
       "notion": "Notion",
       "notionDescription": "Connect a Notion workspace.",
       "slack": "Slack",
@@ -1541,7 +1574,7 @@
     "created": "Created {issue} in Backlog: {title}\nUse /status to view it.",
     "noTasks": "No tasks are available yet.",
     "finishDraft": "Finish or discard the current draft before linking a task.",
-    "linkUsage": "Use /link ORV-123 or /link <issue UUID>.",
+    "linkUsage": "Use /link MIK-12, /link ALEX-12 or /link <issue UUID>.",
     "taskUnavailable": "That task was not found or is not available to this account.",
     "ambiguous": "That task number is ambiguous. Use its full issue UUID.",
     "linked": "Linked this chat to {issue}: {title}",
