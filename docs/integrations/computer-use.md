@@ -1,7 +1,7 @@
 # Computer use: incomplete integration and compatibility boundary
 
 This branch is a Draft for #148, not a completed remote-desktop integration.
-The seven unit tests use scripted wire fixtures; they are not a real CUA
+The ten unit tests use scripted wire/model fixtures; they are not a real CUA
 container, actual GUI editor, live-model, or protocol compatibility test.
 No model API keys, production services, or local databases are used in those tests.
 
@@ -39,7 +39,7 @@ No model API keys, production services, or local databases are used in those tes
   Stop, deny, expiry and loss of membership fail closed; an uncertain network
   dispatch consumes the approval. Each approval wait is bounded to 120 seconds
   within the Agent route’s existing 270-second total. This is covered by a
-  scripted AI SDK model + HTTP wire fixture, not a real CUA desktop.
+  live-stream scripted AI SDK model + HTTP wire fixture, not a real CUA desktop.
 
 ## Compatibility and licenses checked
 
@@ -95,8 +95,10 @@ migration runner/CI overlap with #84/#86 and #115 must be reconciled before merg
 
 ## Remaining acceptance
 
-1. Resolve the requested pinned image's bundled FSL service versus MIT-only
-   scope, or identify an appropriately licensed endpoint service. Do not import FSL code or change image/protocol by accident.
+1. Decide only the prepared isolated internal-CI service use described in
+   `docs/ci-prepared/cua-service-terms.md`; FSL explicitly permits internal use,
+   but public commercial service/distribution is a distinct factual question.
+   Do not copy FSL source or change the requested endpoint/protocol.
 2. Verify the independent wire codec against that actual service, including auth,
    failure/trailer handling, scale/bounds and Unicode/chords.
 3. Live screenshot-to-scripted-model continuation is implemented and fixture-tested;
@@ -120,3 +122,7 @@ spacesd-containing image for isolated internal CI under its applicable terms, or
 supply an already-approved endpoint/artifact of the requested protocol. A newer
 MIT local-driver MCP endpoint is not silently interchangeable with this gRPC-Web
 service. Meanwhile, all codec/model-loop tests remain clearly marked fixtures.
+
+The exact bundled v0.1.0 terms, image provenance and executable but disabled
+service job are recorded in `docs/ci-prepared/cua-service-terms.md`. Internal CI
+is expressly permitted in the FSL text; approval is not a legal exception.

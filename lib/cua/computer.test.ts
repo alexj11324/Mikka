@@ -172,8 +172,8 @@ test('stopping pending/approved tools, expiry and tampering never execute', asyn
   }
 })
 
-test('AI SDK scripted model receives PNG content in original tool result before choosing click (no provider)', async () => {
-  const { generateText, isStepCount } = await import('ai')
+test('AI SDK live stream waits for approval and delivers PNG to scripted next model step (no provider)', async () => {
+  const { streamText, isStepCount } = await import('ai')
   const { MockLanguageModelV3 } = await import('ai/test')
   const { createComputerTools } = await import('./tools')
   const store = new Store(), controller = new AbortController()
@@ -189,7 +189,7 @@ test('AI SDK scripted model receives PNG content in original tool result before 
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address(); assert.ok(address && typeof address === 'object')
   const endpoint = { ...config, url: `http://127.0.0.1:${address.port}` }
-  const model = new MockLanguageModelV3({ doGenerate: async options => {
+  const model = new MockLanguageModelV3({ doStream: async options => {
     step++
     if (step === 2) {
       const output = options.prompt.find(message => message.role === 'tool')
@@ -197,18 +197,41 @@ test('AI SDK scripted model receives PNG content in original tool result before 
       assert.ok(JSON.stringify(output).includes(png.toString('base64')), 'PNG must reach model as image content')
       assert.ok(!JSON.stringify(output).includes('approvalRequired'))
     }
-    return {
-      content: step === 3 ? [{ type: 'text', text: 'Script observed the approved screenshot and completed an approved click.' }] : [{ type: 'tool-call', toolCallId: `call-${step}`, toolName: step === 1 ? 'computer_screenshot' : 'computer_click', input: step === 1 ? '{}' : '{"x":7,"y":9}' }],
-      finishReason: { unified: step === 3 ? 'stop' : 'tool-calls', raw: undefined },
-      usage: { inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 0, text: 0, reasoning: 0 } }, warnings: [],
-    }
+    const final = step === 3
+    return { stream: new ReadableStream({ start(controller) {
+      controller.enqueue({ type: 'stream-start', warnings: [] })
+      if (final) {
+        controller.enqueue({ type: 'text-start', id: 'final' })
+        controller.enqueue({ type: 'text-delta', id: 'final', delta: 'Script observed the approved screenshot and completed an approved click.' })
+        controller.enqueue({ type: 'text-end', id: 'final' })
+      } else controller.enqueue({ type: 'tool-call', toolCallId: `call-${step}`, toolName: step === 1 ? 'computer_screenshot' : 'computer_click', input: step === 1 ? '{}' : '{"x":7,"y":9}' })
+      controller.enqueue({ type: 'finish', finishReason: { unified: final ? 'stop' : 'tool-calls', raw: undefined }, usage: { inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 0, text: 0, reasoning: 0 } } })
+      controller.close()
+    } }) }
+
   } })
-  const interval = setInterval(() => { void (async () => {
-    for (const row of await store.pending('owner', 'session')) await store.approve(row.id, 'owner', 'session', desktopFingerprint(endpoint), new Date())
-  })() }, 5)
   try {
-    const result = await generateText({ model, tools: createComputerTools(endpoint, store, 'owner', 'session', controller.signal), prompt: 'Scripted screenshot then click fixture.', stopWhen: isStepCount(3) })
-    assert.match(result.text, /completed an approved click/)
+    const result = streamText({ model, tools: createComputerTools(endpoint, store, 'owner', 'session', controller.signal), prompt: 'Scripted screenshot then click fixture.', stopWhen: isStepCount(3), abortSignal: controller.signal })
+    const chunks: string[] = []
+    const consume = (async () => { for await (const part of result.stream) { assert.notEqual(part.type, 'error'); if (part.type === 'text-delta') chunks.push(part.text) } })()
+    for (const tool of ['screenshot', 'click']) {
+      const deadline = Date.now() + 5000
+      let row: ComputerRequest | undefined
+      while (!(row = (await store.pending('owner', 'session'))[0])) {
+        assert.ok(Date.now() < deadline, 'live stream must enqueue the model tool')
+        await new Promise(resolve => setTimeout(resolve, 5))
+      }
+      assert.equal(row.operation.tool, tool)
+      // Deliberately hold each operation pending while the same stream remains
+      // open. No RPC or next model step may escape before exact approval.
+      await new Promise(resolve => setTimeout(resolve, 20))
+      assert.equal(rpcCalls, tool === 'screenshot' ? 0 : 1)
+      assert.equal(step, tool === 'screenshot' ? 1 : 2)
+      await store.approve(row.id, 'owner', 'session', desktopFingerprint(endpoint), new Date())
+    }
+    await consume
+    assert.match(chunks.join(''), /completed an approved click/)
     assert.equal(step, 3); assert.equal(rpcCalls, 2)
-  } finally { clearInterval(interval); controller.abort(); await new Promise<void>(resolve => server.close(() => resolve())) }
+  } finally { controller.abort(); await new Promise<void>(resolve => server.close(() => resolve())) }
+
 })
