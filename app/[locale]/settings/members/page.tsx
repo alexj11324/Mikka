@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
 import { getLocale, getTranslations } from 'next-intl/server'
-import { auth, googleEnabled } from '@/lib/auth'
+import { googleEnabled } from '@/lib/auth'
+import { getSession } from '@/lib/session'
+import { loadWorkspaceSettings } from '@/lib/workspace-access'
 import { MembersPageView } from '@/components/settings/members-page'
 import { redirect } from '@/i18n/navigation'
 
@@ -12,9 +13,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function MembersPage({ searchParams }: { searchParams: Promise<{ workspace?: string; invite?: string }> }) {
-  const query = await searchParams
-  const locale = await getLocale()
-  const session = await auth.api.getSession({ headers: await headers() })
+  const [query, locale, session] = await Promise.all([searchParams, getLocale(), getSession()])
   if (!session?.user) return redirect({ href: '/sign-in?next=%2Fsettings%2Fmembers', locale })
-  return <MembersPageView user={session.user} workspaceId={query.workspace} inviteInitially={query.invite === '1'} googleEnabled={googleEnabled} />
+  const initialMembers = await loadWorkspaceSettings(query.workspace, session.user).catch(() => undefined)
+  return <MembersPageView user={session.user} workspaceId={query.workspace} inviteInitially={query.invite === '1'} googleEnabled={googleEnabled} initialMembers={initialMembers} />
 }

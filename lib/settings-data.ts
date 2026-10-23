@@ -1,4 +1,6 @@
 import type { listTeamMembers, loadTeamDirectory } from '@/app/actions/teams'
+import type { WorkspaceSettings } from '@/lib/workspace-access'
+import { preload } from 'swr'
 import { withBasePath } from '@/lib/base-path'
 
 export const settingsReadOptions = { revalidateIfStale: false, shouldRetryOnError: false } as const
@@ -19,6 +21,23 @@ export async function fetchSettingsData<T>(url: string): Promise<T> {
     throw new SettingsReadError(body?.error ?? 'Failed to load settings data.', response.status)
   }
   return response.json()
+}
+
+export function preloadWorkspaceSettings(workspaceId?: string) {
+  const membersKey = memberSettingsKey(workspaceId)
+  preload(membersKey, async (url: string) => {
+    const data = await fetchSettingsData<WorkspaceSettings>(url)
+    const resolved = memberSettingsKey(data.workspace.id)
+    if (resolved !== url) preload(resolved, async () => data)
+    return data
+  })
+  const directoryKey = teamDirectoryKey(workspaceId)
+  preload(directoryKey, async (key: ReturnType<typeof teamDirectoryKey>) => {
+    const data = await fetchTeamDirectory(key)
+    const resolved = teamDirectoryKey(data.workspace.id)
+    if (resolved[1] !== key[1]) preload(resolved, async () => data)
+    return data
+  })
 }
 
 export function isSettingsAccessError(error: unknown) {

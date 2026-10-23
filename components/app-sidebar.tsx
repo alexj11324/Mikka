@@ -1,10 +1,9 @@
 'use client'
 
 import * as React from 'react'
-import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
-import { listTeams } from '@/app/actions/teams'
+import type { listTeams } from '@/app/actions/teams'
 import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, MonitorSmartphone, Puzzle, Scan, Search, Send, SquarePen, SquareUserRound, Workflow } from 'lucide-react'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
@@ -16,9 +15,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { WorkspaceSection } from '@/components/workspace/workspace-navigation'
 
-export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, onSearch, onCreate, onSettings, onSignOut, signingOut, onBeforeChange, ...props }: React.ComponentProps<typeof Sidebar> & {
+export function AppSidebar({ user, section, teamId, teams, teamsError = false, onRefreshTeams, onTeamNavigate, onNavigate, onSearch, onCreate, onSettings, onSignOut, signingOut, onBeforeChange, ...props }: React.ComponentProps<typeof Sidebar> & {
   user: { name: string; email: string; image?: string | null }
   section: WorkspaceSection
+  teams: Awaited<ReturnType<typeof listTeams>>
+  teamsError?: boolean
+  onRefreshTeams: () => void
   onNavigate: (section: WorkspaceSection) => boolean
   onSearch: () => void
   onCreate: () => void
@@ -30,7 +32,6 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
   onTeamNavigate: (teamId: string, section: WorkspaceSection) => boolean
 }) {
   const i18nText = useTranslations();
-  const { data: teams = [], error: teamsError, mutate: refreshTeams } = useSWR('teams', listTeams)
   const { setOpenMobile, open, openMobile, isMobile } = useSidebar()
   function navigate(next: WorkspaceSection) { if (onNavigate(next)) setOpenMobile(false) }
   const personal = [{ id: 'inbox', title: i18nText("Overview.sections.inbox"), icon: Inbox }, { id: 'my-issues', title: i18nText("Overview.sections.myIssues"), icon: Scan }] as const
@@ -66,7 +67,7 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
           <Collapsible defaultOpen className="group/team"><CollapsibleTrigger render={<SidebarMenuButton aria-label={i18nText("FeatureCopy.c_3e984369", { value0: (team.name) })} />}><SquareUserRound className="text-info-foreground" /><span>{team.name}</span><ChevronDown className="ml-auto transition-transform group-data-closed/team:-rotate-90" /></CollapsibleTrigger>
             <CollapsibleContent><SidebarMenuSub className="mx-0 ml-4 border-0 px-0">{teamItems.map(item => <SidebarMenuSubItem key={item.id}><SidebarMenuSubButton render={<Button variant="ghost" />} className="h-8 w-full justify-start" isActive={teamId === team.id && section === item.id} onClick={() => { if (onTeamNavigate(team.id, item.id)) setOpenMobile(false) }}><item.icon /><span>{item.title}</span></SidebarMenuSubButton></SidebarMenuSubItem>)}</SidebarMenuSub></CollapsibleContent>
           </Collapsible>
-        </SidebarMenuItem>)}{teamsError && <SidebarMenuItem><SidebarMenuButton onClick={() => void refreshTeams()}>{i18nText("FeatureCopy.c_c401eee8")}</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></CollapsibleContent>
+        </SidebarMenuItem>)}{teamsError && <SidebarMenuItem><SidebarMenuButton onClick={onRefreshTeams}>{i18nText("FeatureCopy.c_c401eee8")}</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></CollapsibleContent>
       </SidebarGroup></Collapsible>
     </SidebarContent>
   <SidebarFooter>

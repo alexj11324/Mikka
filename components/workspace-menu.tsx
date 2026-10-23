@@ -7,7 +7,7 @@ import { Check, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { authClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'
-import { fetchSettingsData } from '@/lib/settings-data'
+import { fetchSettingsData, preloadWorkspaceSettings } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import { switchWorkspace } from '@/app/actions/workspace'
 import { ShortcutKeys } from '@/components/shortcut-keys'
@@ -89,8 +89,8 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
     })
   }
   return <>
-    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-      <DropdownMenuTrigger render={<SidebarMenuButton aria-label={i18nText("Nav.workspaceMenu")} className="h-10" />}>
+    <DropdownMenu open={menuOpen} onOpenChange={open => { setMenuOpen(open); if (open) preloadWorkspaceSettings(data?.workspace.id) }}>
+      <DropdownMenuTrigger render={<SidebarMenuButton aria-label={i18nText("Nav.workspaceMenu")} className="h-10" onPointerEnter={() => preloadWorkspaceSettings(data?.workspace.id)} onFocus={() => preloadWorkspaceSettings(data?.workspace.id)} />}>
         <WorkspaceAvatar name={workspaceName} />
         <span className="flex-1 truncate font-semibold">{workspaceName}</span>
         <ChevronDown />
