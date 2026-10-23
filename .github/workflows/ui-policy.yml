@@ -163,6 +163,8 @@ jobs:
       - name: Group conversation API and migrations (temporary Postgres 17 only)
         run: pnpm test:groups
       - run: pnpm test:e2e:setup
+      - name: Team task and run visibility (temporary Postgres 17 only)
+        run: REQUIRE_DB=1 pnpm test:visibility-db
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
       - run: pnpm build
