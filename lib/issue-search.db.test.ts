@@ -202,7 +202,7 @@ test('team visibility across workspaces and teams, through the real query (no is
   const inA = await linked('team A', teamA, wsA)
   const inA2 = await linked('team A2', teamA2, wsA)
   const inB = await linked('team B', teamB, wsB)
-  const inC = await linked('team C (suspended)', teamC, wsC)
+  await linked('team C (suspended)', teamC, wsC)
   const personal = await issue(tx, me, `${t} personal`)
   await issue(tx, alice, `${t} alice private`)
 
