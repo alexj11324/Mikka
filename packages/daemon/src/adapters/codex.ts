@@ -33,12 +33,14 @@ import type { AgentSandbox } from "../agents/sandbox"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import type {
+  AskForApproval,
   DeltaNotification,
   ErrorNotification,
   ItemNotification,
   ThreadItem,
   ThreadResponse,
   ThreadStartParams,
+  TurnStartParams,
   TokenUsageNotification,
   TurnNotification,
   UserInput,
@@ -306,10 +308,13 @@ export class CodexAdapter implements AgentAdapter {
       if (event) queue.exit(event)
     }
 
-    // Mikka's sandbox decides; inside it every action is allowed.
+    // Mikka's sandbox decides; inside it every action is allowed. Under an
+    // approval policy that asks there is no one to answer yet (approval
+    // cards are not built), so what Codex asks about is declined.
+    const approvalPolicy = options.permissionMode ?? "never"
     rpc.onRequest((method) => {
       if (method.endsWith("requestApproval") || method.endsWith("Approval"))
-        return { decision: "accept" }
+        return { decision: approvalPolicy === "never" ? "accept" : "decline" }
       log.warn({ method }, "unhandled codex request; declining")
       return { decision: "decline" }
     })
@@ -408,7 +413,11 @@ export class CodexAdapter implements AgentAdapter {
       lastError = undefined
       const { turn } = await rpc.sendRequest<{ turn: { id: string } }>(
         "turn/start",
-        { threadId: sessionId, input: text(message) }
+        {
+          threadId: sessionId,
+          input: text(message),
+          ...(options.effort ? { effort: options.effort } : {}),
+        } satisfies TurnStartParams
       )
       activeTurn ??= turn.id
     }
@@ -442,7 +451,7 @@ export class CodexAdapter implements AgentAdapter {
       await rpc.sendNotification("initialized")
       const thread: ThreadStartParams = {
         cwd: ctx.worktree,
-        approvalPolicy: "never",
+        approvalPolicy: approvalPolicy as AskForApproval,
         sandbox: "danger-full-access",
         developerInstructions: ctx.instructions(),
         ...(options.model ? { model: options.model } : {}),

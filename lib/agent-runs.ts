@@ -1,9 +1,11 @@
 import 'server-only'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db } from '@/lib/db'
-import { agents, agentRuns, deviceRepos, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { agents, agentRuns, deviceRepos, devices, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { resolveAgentPlacement } from '@/lib/agent-placement'
+import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
 
@@ -15,7 +17,8 @@ export interface RunView {
   issueId: string | null
   agentId: string
   agentName: string
-  harness: SupportedHarness
+  harness: SupportedHarness | null
+  model: string | null
   status: string
   kind: string
   stopReason: string | null
@@ -32,16 +35,21 @@ export interface RunDetail {
   messages: { id: string; text: string; createdAt: Date }[]
 }
 
+/** The harness a run used: stored on the run, or its agent's on older rows. */
+export const runHarness = sql<SupportedHarness | null>`coalesce(${agentRuns.harness}, ${agents.harness})`
+
 export const runViewColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: agents.name,
-  harness: agents.harness, status: agentRuns.status, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
+  harness: runHarness, model: agentRuns.model, status: agentRuns.status, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
   error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,
   startedAt: agentRuns.startedAt, finishedAt: agentRuns.finishedAt,
 }
 
 /**
- * Queues one run of one agent against one issue. The daemon picks it up on its
- * next poll, claims it, and reports back through `/v1/runs/:runId/complete`.
+ * Queues one run of one agent against one issue. The repository decides the
+ * device; anything the agent left on auto is resolved here and stored on the
+ * run. The daemon picks it up on its next poll, claims it, and reports back
+ * through `/v1/runs/:runId/complete`.
  * `note` is extra direction for this run only, after the issue.
  */
 export async function queueRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }): Promise<{ runId: string }> {
@@ -51,14 +59,26 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   if (!issue) throw new ActionFailureError('issueNotFound')
   const [agent] = await db.select().from(agents)
     .where(and(eq(agents.id, parsed.data.agentId), eq(agents.userId, userId))).limit(1)
-  if (!agent?.deviceId) throw new ActionFailureError('agentNoDevice')
+  if (!agent) throw new ActionFailureError('agentNotFound')
   const [repo] = await db.select().from(deviceRepos)
-    .where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.deviceId, agent.deviceId), eq(deviceRepos.userId, userId))).limit(1)
+    .where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.userId, userId))).limit(1)
   if (!repo) throw new ActionFailureError('agentRepoMissing')
+  const owned = await db.select().from(devices).where(eq(devices.ownerId, userId))
+  const placement = resolveAgentPlacement(
+    { deviceId: agent.deviceId, harness: agent.harness, model: agent.model },
+    owned.map(device => ({
+      id: device.id, enabled: device.enabled, lastSeenAt: device.lastSeenAt, harnesses: device.harnesses,
+      online: device.lastSeenAt ? Date.now() - device.lastSeenAt.getTime() < DEVICE_ONLINE_WINDOW_MS : false,
+    })),
+    repo.deviceId,
+  )
+  if (!placement.ok) throw new ActionFailureError(placement.reason === 'harnessMissing' ? 'agentHarnessMissing' : 'agentNoDevice')
+  // Mode and effort are the pinned harness's own values; another harness may not take them.
+  const sameHarness = placement.harness === agent.harness
   const runId = crypto.randomUUID()
   await db.insert(agentRuns).values({
-    id: runId, userId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
+    id: runId, userId, issueId: issue.id, agentId: agent.id, deviceId: placement.deviceId,
+    deviceRepoId: repo.id, harness: placement.harness, model: placement.model, effort: sameHarness ? agent.effort : null, permissionMode: sameHarness ? agent.permissionMode : null, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
     prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note),
   })
   return { runId }

@@ -85,6 +85,16 @@ export interface SessionOptions {
    * default. A harness that cannot express one ignores it.
    */
   model?: string
+  /**
+   * The reasoning effort level, one the harness reported for the model.
+   * Unset means the CLI's own default; a harness without levels ignores it.
+   */
+  effort?: string
+  /**
+   * The permission mode, one the harness reported. Unset means Mikka's
+   * default: everything allowed inside Mikka's sandbox.
+   */
+  permissionMode?: string
 }
 
 export interface StartOptions extends SessionOptions {

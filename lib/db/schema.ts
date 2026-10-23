@@ -2,6 +2,7 @@ import { pgTable, text, uuid, varchar, jsonb, integer, timestamp, primaryKey, in
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
+import type { AgentColor, AgentRole } from '../agent-roles'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
@@ -138,16 +139,34 @@ export const deviceRepos = pgTable('device_repos', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('device_repos_key').on(table.deviceId, table.repoPath)])
 
-/** A named role run by one harness on one device. */
+/**
+ * A named role (lib/agent-roles.ts). Device, harness and model may each be
+ * null, which means auto: resolved when a run is queued (lib/agent-placement.ts).
+ */
 export const agents = pgTable('agents', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
-  harness: text('harness').$type<SupportedHarness>().notNull(),
+  role: text('role').$type<AgentRole>().notNull().default('custom'),
+  harness: text('harness').$type<SupportedHarness>(),
+  model: text('model'),
+  /** Reasoning effort, one of the levels the harness reports for the model; null: the CLI's default. */
+  effort: text('effort'),
+  /** A permission mode the harness reports (Claude Code's mode, Codex's approval policy); null: Mikka's default. */
+  permissionMode: text('permissionMode'),
+  /** A lucide icon id from the avatar picker, or an emoji; null: the role's own icon. */
+  icon: text('icon'),
+  /** null: picked from the name. */
+  color: text('color').$type<AgentColor>(),
   name: text('name').notNull(), description: text('description').notNull().default(''),
   instructions: text('instructions').notNull().default(''),
   deviceId: uuid('deviceId').references(() => devices.id, { onDelete: 'set null' }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [uniqueIndex('agents_user_name_key').on(table.userId, sql`lower(${table.name})`), index('agents_device_idx').on(table.deviceId)])
+}, table => [
+  uniqueIndex('agents_user_name_key').on(table.userId, sql`lower(${table.name})`),
+  // One row per built-in role per person, so seeding them twice is a no-op.
+  uniqueIndex('agents_user_role_key').on(table.userId, table.role).where(sql`${table.role} <> 'custom'`),
+  index('agents_device_idx').on(table.deviceId),
+])
 
 export const RUN_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing', 'succeeded', 'stopped', 'failed', 'cancelled'] as const
 export type RunStatus = (typeof RUN_STATUSES)[number]
@@ -159,6 +178,9 @@ export const agentRuns = pgTable('agent_runs', {
   agentId: uuid('agentId').notNull().references(() => agents.id, { onDelete: 'cascade' }),
   deviceId: uuid('deviceId').references(() => devices.id, { onDelete: 'set null' }),
   deviceRepoId: uuid('deviceRepoId').references(() => deviceRepos.id, { onDelete: 'set null' }),
+  /** What auto resolved to when the run was queued; null on runs from older builds. */
+  harness: text('harness').$type<SupportedHarness>(), model: text('model'), effort: text('effort'),
+  permissionMode: text('permissionMode'),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),

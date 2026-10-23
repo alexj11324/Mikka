@@ -7,6 +7,7 @@ import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib
 import { eventsForInbox } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { runHarness } from '@/lib/agent-runs'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -162,13 +163,13 @@ export async function citationSources(userId: string, texts: readonly string[]):
     }
   }
   if (runIds.length) {
-    const rows = await db.select({ id: agentRuns.id, agentName: agents.name, harness: agents.harness, status: agentRuns.status, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, issueId: issues.id, issueTitle: issues.title, issueContent: issues.content })
+    const rows = await db.select({ id: agentRuns.id, agentName: agents.name, harness: runHarness, status: agentRuns.status, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, issueId: issues.id, issueTitle: issues.title, issueContent: issues.content })
       .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
       .where(and(inArray(agentRuns.id, runIds), eq(agentRuns.userId, userId)))
     for (const row of rows) {
       const issue = row.issueId && row.issueTitle && row.issueContent && !readIssueMetadata(row.issueContent).deletedAt
         ? { id: row.issueId, title: row.issueTitle, number: readIssueMetadata(row.issueContent).number ?? null } : null
-      sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
+      sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness ?? '', status: row.status, issue, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
     }
   }
   return sources

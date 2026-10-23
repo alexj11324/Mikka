@@ -843,12 +843,14 @@
     "deviceNameTooLong": "The name is too long.",
     "deviceNotFound": "This device does not exist.",
     "agentHarnessMissing": "The selected harness is not installed on this device.",
+    "agentPermissionModeInvalid": "The selected permission mode is not one this harness reports. Pick it again.",
+    "agentEffortInvalid": "The selected effort level is not one this model reports. Pick it again.",
     "agentDuplicateName": "An agent with this name already exists. Choose another name.",
     "agentInvalidInput": "Please check the information you entered.",
     "agentAddFailed": "Could not add the agent. Please try again.",
     "agentSaveFailed": "Could not save the agent. Please try again.",
     "agentNotFound": "This agent does not exist.",
-    "agentNoDevice": "This agent is not bound to a device yet.",
+    "agentNoDevice": "No machine is available to run this agent. Connect and enable one first.",
     "agentRepoMissing": "This repository is not available on the device.",
     "repoPathInvalid": "The repository path must be absolute.",
     "repoNotFound": "This repository does not exist.",
@@ -913,7 +915,9 @@
     "inviteExpired": "This invitation is no longer valid. Ask an admin for a new link.",
     "workspaceMembershipSuspended": "Your membership is suspended. Contact an admin to restore it.",
     "inviteInvalidEmails": "The email addresses are invalid, empty, or too many. Check them and try again.",
-    "workspaceReadFailed": "Could not read the workspace settings. Please try again."
+    "workspaceReadFailed": "Could not read the workspace settings. Please try again.",
+    "agentBuiltInDelete": "Built-in roles cannot be deleted. Edit it or reset its prompt instead.",
+    "agentNotBuiltIn": "Only built-in roles have a default prompt to reset to."
   },
   "Overview": {
     "sections": {
@@ -934,8 +938,6 @@
     "noFollowingTitle": "No followed tasks yet",
     "noFollowingDescription": "Choose “Follow task activity” in a task's more actions to track updates here.",
     "viewAllTasks": "View all tasks",
-    "agentDescription": "The Agent service is not connected yet; tasks do not run automatically.",
-    "viewTeamTasks": "View team tasks",
     "viewsTitle": "Workspace views",
     "viewsDescription": "View tasks by workflow status without changing the tasks.",
     "teamOverview": "Team work overview",
@@ -1375,9 +1377,6 @@
       "workspace": "Workspace"
     },
     "sections": {
-      "members": {
-        "description": "Manage members, roles, and invitations."
-      },
       "preferences": {
         "title": "Preferences",
         "description": "Make Mikka fit the way you work."
@@ -1393,6 +1392,10 @@
       "workspace": {
         "title": "Workspace",
         "description": "Basic information about the current workspace."
+      },
+      "agents": {
+        "title": "Agents",
+        "description": "Each agent is a role with its own prompt and runtime."
       },
       "teams": {
         "title": "Teams",
@@ -2136,5 +2139,160 @@
     "cancel": "Cancel",
     "creating": "Creating…",
     "createWorkspace": "Create workspace"
+  },
+  "Agents": {
+    "description": "Each agent is a role with its own prompt and runtime.",
+    "loadFailed": "Couldn't load agents. Try again in a moment.",
+    "addCustom": "Add a custom role, or start from a preset",
+    "groups": {
+      "default": "Default roles",
+      "custom": "Custom roles"
+    },
+    "status": {
+      "running": "Running",
+      "idle": "Idle",
+      "waiting": "Needs your approval",
+      "offline": "Device offline"
+    },
+    "roles": {
+      "coordinator": {
+        "summary": "Breaks work down, hands it to Workers and drives it to done."
+      },
+      "worker": {
+        "summary": "Completes one task in the repository and hands in a verified change."
+      },
+      "reviewer": {
+        "summary": "Reviews changes against the acceptance criteria and only blocks real problems."
+      }
+    },
+    "badges": {
+      "default": "Default",
+      "custom": "Custom"
+    },
+    "fields": {
+      "name": "Name",
+      "namePlaceholder": "Role name",
+      "summary": "Summary",
+      "summaryPlaceholder": "One line on what it does"
+    },
+    "tabs": {
+      "label": "Agent settings",
+      "prompt": "Prompt",
+      "runtime": "Runtime"
+    },
+    "prompt": {
+      "title": "System prompt",
+      "view": "View",
+      "preview": "Preview",
+      "edit": "Edit",
+      "empty": "No prompt yet.",
+      "placeholder": "# Role: …\n\nWhat this role does, how it works and what it hands in.",
+      "markdown": "Markdown supported"
+    },
+    "actions": {
+      "new": "New agent",
+      "more": "More actions",
+      "reset": "Restore default prompt",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "create": "Create"
+    },
+    "deleteDialog": {
+      "title": "Delete {name}?",
+      "description": "This removes the role and its run history. It can't be undone."
+    },
+    "runtime": {
+      "device": "Machine",
+      "pickDevice": "Choose a machine",
+      "noDevices": "No devices connected yet",
+      "online": "Online",
+      "offline": "Offline",
+      "pickHarness": "Choose a harness",
+      "noHarness": "No harness chosen",
+      "model": "Model",
+      "modelsUnreported": "This machine's daemon hasn't reported its models yet.",
+      "defaultModel": "Default",
+      "defaultEffort": "Default",
+      "noEffortLevels": "This model has no effort levels",
+      "effortNeedsModel": "Pick a machine and harness to see the levels",
+      "noDevice": "No machine",
+      "permissionMode": "Permission mode",
+      "defaultPermission": "Mikka default",
+      "permissionModesUnreported": "This machine's harness reported no permission modes",
+      "permissionAsks": "Actions that need approval are denied for now; approval cards are not built yet.",
+      "permissionModes": {
+        "default": "Ask every time",
+        "manual": "Ask every time",
+        "acceptEdits": "Accept edits",
+        "auto": "Auto",
+        "bypassPermissions": "Bypass permissions",
+        "dontAsk": "Don't ask, deny the rest",
+        "plan": "Plan only",
+        "on-request": "Ask when needed",
+        "never": "Never ask",
+        "untrusted": "Ask for untrusted commands",
+        "on-failure": "Ask on failure"
+      }
+    },
+    "picker": {
+      "title": "Choose avatar",
+      "open": "Change icon and colour",
+      "icons": "Icons",
+      "search": "Search",
+      "results": "Results",
+      "noResults": "Nothing matches",
+      "color": "Colour",
+      "colorAuto": "Auto",
+      "colorRole": "Role colour",
+      "categories": {
+        "work": "Work",
+        "code": "Code",
+        "writing": "Writing",
+        "quality": "Quality",
+        "faces": "People",
+        "animals": "Animals",
+        "objects": "Objects",
+        "symbols": "Symbols"
+      },
+      "colors": {
+        "violet": "Violet",
+        "sky": "Sky",
+        "teal": "Teal",
+        "orange": "Orange",
+        "pink": "Pink",
+        "slate": "Slate"
+      },
+      "none": "No icon"
+    },
+    "new": {
+      "title": "New agent",
+      "description": "Write one from scratch, or pick a preset whose prompt is already written. You can change it any time.",
+      "custom": "Custom role",
+      "customDescription": "Choose its name, icon and prompt: a role made for your own workflow.",
+      "fromPreset": "Or start from a preset"
+    },
+    "templates": {
+      "tester": {
+        "name": "Tester",
+        "summary": "Adds the missing tests and makes them pass, with repro steps for failures."
+      },
+      "frontend": {
+        "name": "Frontend",
+        "summary": "Builds the page from the design with the project's own components."
+      },
+      "security": {
+        "name": "Security review",
+        "summary": "Looks for injection, privilege and leaked-secret bugs; reports only what reproduces."
+      },
+      "docs": {
+        "name": "Docs writer",
+        "summary": "Keeps the README and change notes in step with the code."
+      },
+      "refactor": {
+        "name": "Refactorer",
+        "summary": "Tidies code without changing behaviour, each step covered by tests."
+      }
+    }
   }
 }

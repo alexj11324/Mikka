@@ -1,0 +1,21 @@
+                                        (shown in the prompt box, /resume
+                                        picker, and terminal title)
+  --no-chrome                           Disable Claude in Chrome integration
+  --no-session-persistence              Disable session persistence - sessions
+                                        will not be saved to disk and cannot be
+                                        resumed (only works with --print)
+  --output-format <format>              Output format (only works with --print):
+                                        "text" (default), "json" (single
+                                        result), or "stream-json" (realtime
+                                        streaming) (choices: "text", "json",
+                                        "stream-json")
+  --permission-mode <mode>              Permission mode to use for the session
+                                        (choices: "acceptEdits", "auto",
+                                        "bypassPermissions", "manual",
+                                        "dontAsk", "plan")
+  --permission-prompts <target>         Who answers permission prompts with
+                                        --print: "host" (the SDK host or
+                                        --permission-prompt-tool) or "none"
+                                        (nobody: anything that would prompt is
+                                        denied automatically; the permission
+                                        mode still decides everything else)

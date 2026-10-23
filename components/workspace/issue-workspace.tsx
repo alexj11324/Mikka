@@ -56,7 +56,7 @@ const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module
 const SettingsShell = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsShell))
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView))
 
-export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'projects', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations'; googleEnabled?: boolean }) {
+export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'projects', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'agents'; googleEnabled?: boolean }) {
   const i18nText = useTranslations()
   const { data: workspaceData } = useWorkspace(user.email)
   useAgentHistory(user.id, initialAgentHistory)
@@ -82,8 +82,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     plugins: tPlugins('title'),
   }
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
-  const [settingsOpen, setSettingsOpen] = useState(initialSettingsSection === 'integrations')
-  const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members' | 'integrations'; invite: boolean }>({ section: initialSettingsSection ?? 'preferences', invite: false })
+  const [settingsOpen, setSettingsOpen] = useState(initialSettingsSection !== undefined)
+  const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members' | 'integrations' | 'agents'; invite: boolean }>({ section: initialSettingsSection ?? 'preferences', invite: false })
   const [linearNotice, setLinearNotice] = useState<'connected' | 'error' | null>(null)
   useEffect(() => {
     const url = new URL(window.location.href)

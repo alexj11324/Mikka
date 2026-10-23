@@ -32,7 +32,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const [repo] = run.deviceRepoId
     ? await db.select().from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
     : []
-  if (!agent || !repo || !run.issueId) {
+  // Auto placement stores the resolved harness on the run; older runs used the agent's.
+  const harness = run.harness ?? agent?.harness
+  if (!agent || !harness || !repo || !run.issueId) {
     await db.update(agentRuns)
       .set({ status: 'failed', stopReason: 'error', error: 'Run is missing its agent, repository or issue.', finishedAt: new Date(), updatedAt: new Date() })
       .where(eq(agentRuns.id, runId))
@@ -52,8 +54,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     : undefined
   return NextResponse.json({
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
-    baseBranch: repo.baseBranch, harness: agent.harness, prompt: run.prompt,
+    baseBranch: repo.baseBranch, harness, prompt: run.prompt,
     kind: run.kind, leaseExpiresAt,
+    ...(run.model ? { model: run.model } : {}),
+    ...(run.effort ? { effort: run.effort } : {}),
+    ...(run.permissionMode ? { permissionMode: run.permissionMode } : {}),
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
   })

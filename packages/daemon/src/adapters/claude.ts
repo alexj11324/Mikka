@@ -39,6 +39,7 @@ import {
   query,
   type SDKMessage,
   type SDKResultMessage,
+  type PermissionMode,
   type SDKUserMessage,
   type Settings,
   type SpawnOptions,
@@ -320,6 +321,14 @@ async function untilSpoken(spoken: Promise<boolean>): Promise<boolean> {
 }
 
 /** Runs `binary` where the SDK would have started its own bundled CLI. */
+const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const
+
+function isClaudeEffort(
+  effort: string | undefined
+): effort is (typeof CLAUDE_EFFORTS)[number] {
+  return (CLAUDE_EFFORTS as readonly (string | undefined)[]).includes(effort)
+}
+
 function spawnBinary(binary: string) {
   return (options: SpawnOptions): SpawnedProcess =>
     spawn(binary, options.args, {
@@ -430,10 +439,18 @@ export class ClaudeAdapter implements AgentAdapter {
           preset: "claude_code",
           append: ctx.instructions(),
         },
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
+        // Mikka's default is bypass inside the sandbox. A mode that asks has
+        // no one to answer yet (approval cards are not built), so Claude
+        // Code denies what it would have asked about.
+        permissionMode: (options.permissionMode ??
+          "bypassPermissions") as PermissionMode,
+        ...((options.permissionMode ?? "bypassPermissions") ===
+        "bypassPermissions"
+          ? { allowDangerouslySkipPermissions: true }
+          : {}),
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
+        ...(isClaudeEffort(options.effort) ? { effort: options.effort } : {}),
         ...(this.options.binary
           ? { spawnClaudeCodeProcess: spawnBinary(this.options.binary) }
           : {}),

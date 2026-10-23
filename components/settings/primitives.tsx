@@ -16,22 +16,23 @@ export function SettingsSection({
   children,
 }: {
   id?: string
-  title: string
+  /** Optional when the section is the only thing on its surface (a tab panel, say). */
+  title?: string
   description?: string
   action?: ReactNode
   children: ReactNode
 }) {
   return (
     <section className="flex flex-col gap-1" aria-labelledby={id}>
-      <header className="flex items-baseline justify-between gap-3 px-1">
+      {(title || action) && <header className="flex items-baseline justify-between gap-3 px-1">
         <div className="flex flex-col gap-0.5">
-          <h2 id={id} className="text-sm font-medium">
+          {title && <h2 id={id} className="text-sm font-medium">
             {title}
-          </h2>
+          </h2>}
           {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </div>
         {action}
-      </header>
+      </header>}
       <div data-settings-card className="overflow-hidden rounded-2xl border bg-card">
         <div data-settings-rows className="divide-y divide-border">{children}</div>
       </div>
