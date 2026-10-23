@@ -96,14 +96,13 @@ test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 �
 
   await expect(panel.getByRole('button', { name: '运行记录', exact: true })).toHaveCount(0)
   const selectionStart = await page.evaluate(() => performance.now())
-  await panel.getByRole('button', { name: /^切换会话：/ }).click()
-  await page.getByRole('option', { name: /^较早性能验收会话/ }).click()
+  await page.getByRole('list', { name: '对话', exact: true }).getByRole('button', { name: '较早性能验收会话', exact: true }).click()
   panel = await assertInteractiveWithinBudget(page, info, '切换真实历史会话', selectionStart, '较早的一轮提问的已保存正文')
   expect(historyRequests).toHaveLength(3)
   expect(new URL(historyRequests[2]).searchParams.get('sessionId')).toBe(older)
 
   const resetStart = await page.evaluate(() => performance.now())
-  await panel.getByRole('button', { name: '新任务', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   panel = await assertInteractiveWithinBudget(page, info, '新任务', resetStart)
   await expect(panel.getByRole('region', { name: '推荐建议', exact: true })).toBeVisible()
   await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
