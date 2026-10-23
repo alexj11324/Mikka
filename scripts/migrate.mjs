@@ -9,7 +9,7 @@
 // transaction; see scripts/migration-steps.mjs for the rules.
 import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
-import { assertIndexValid, planMigration } from './migration-steps.mjs'
+import { applyMigration, planMigration } from './migration-steps.mjs'
 
 const shouldRun = process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production'
 if (!shouldRun) {
@@ -54,17 +54,7 @@ for (const [target, pending] of byTarget) {
       if (applied.has(name)) continue
       const client = await pool.connect()
       try {
-        // Files may manage their own transaction; the record is written after.
-        const query = (text, values) => client.query(text, values)
-        try {
-          await client.query(plan.sql)
-        } catch (error) {
-          // A failed concurrent build leaves an INVALID index behind; say how to clear it.
-          if (plan.concurrentIndex) await assertIndexValid(query, plan.concurrentIndex, name).catch((hint) => console.error(hint.message))
-          throw error
-        }
-        if (plan.concurrentIndex) await assertIndexValid(query, plan.concurrentIndex, name)
-        await client.query('insert into schema_migrations (name) values ($1)', [name])
+        await applyMigration(client, name, plan)
         console.log(`migrate: applied ${name} to ${target}`)
       } finally {
         client.release()

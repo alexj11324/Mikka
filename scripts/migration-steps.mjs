@@ -7,6 +7,9 @@
 //
 // A normal file is sent as one query, which Postgres runs in one implicit transaction.
 //
+// The file is always executed exactly as written; the comment-stripped text is used only for
+// the checks below (stripping is not string-aware, so it must never reach Postgres).
+//
 // A no-transaction file holds exactly ONE statement and is never split. After stripping
 // comments it is rejected if it has a second semicolon, any `$` (dollar quoting), or the words
 // BEGIN, COMMIT, END or ROLLBACK. Put each CONCURRENTLY index in its own file.
@@ -31,7 +34,12 @@ export function stripComments(sql) {
   return sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, '')
 }
 
-const CONCURRENT_INDEX = /^create\s+(?:unique\s+)?index\s+concurrently\s+(?:if\s+not\s+exists\s+)?("?)([A-Za-z_][\w$]*)\1\s+on\b/i
+const CONCURRENT_INDEX = /^create\s+(?:unique\s+)?index\s+concurrently\s+(?:if\s+not\s+exists\s+)?(?:"([^"]+)"|([A-Za-z_][\w]*))\s+on\b/i
+
+/** The name Postgres stores: unquoted identifiers fold to lower case, quoted ones are kept. */
+export function indexName(match) {
+  return match[1] !== undefined ? match[1] : match[2].toLowerCase()
+}
 
 /**
  * Reads one migration file. Returns { target, noTransaction, sql, concurrentIndex } or throws
@@ -56,7 +64,7 @@ export function planMigration(name, sql) {
   const concurrent = /\bconcurrently\b/i.test(statement)
   const index = CONCURRENT_INDEX.exec(statement)
   if (concurrent && !index) throw new Error(`migrate: ${name}: only CREATE [UNIQUE] INDEX CONCURRENTLY <name> ON ... is supported`)
-  return { target, noTransaction, sql: statement, concurrentIndex: index ? index[2] : null }
+  return { target, noTransaction, sql, concurrentIndex: index ? indexName(index) : null }
 }
 
 /** Throws unless the index exists and is valid. `query` is pg's client.query. */
@@ -64,4 +72,22 @@ export async function assertIndexValid(query, name, file) {
   const { rows } = await query('select i.indisvalid from pg_index i join pg_class c on c.oid = i.indexrelid where c.relname = $1 and pg_catalog.pg_table_is_visible(c.oid)', [name])
   if (rows.length === 0) throw new Error(`migrate: ${file}: index ${name} was not created`)
   if (!rows[0].indisvalid) throw new Error(`migrate: ${file}: index ${name} is INVALID (a concurrent build failed). Run "DROP INDEX CONCURRENTLY IF EXISTS ${name};" and deploy again. The migration was not recorded.`)
+}
+
+/**
+ * Runs one planned file on `client` and records it in schema_migrations. For a concurrent
+ * index the result is checked after execution; an INVALID index throws and nothing is recorded.
+ */
+export async function applyMigration(client, name, plan, log = console.error) {
+  const query = (text, values) => client.query(text, values)
+  try {
+    await client.query(plan.sql)
+  } catch (error) {
+    // A failed concurrent build leaves an INVALID index behind; say how to clear it.
+    if (plan.concurrentIndex) await assertIndexValid(query, plan.concurrentIndex, name).catch((hint) => log(hint.message))
+    throw error
+  }
+  // Post-execution check: IF NOT EXISTS succeeds silently over an existing INVALID index.
+  if (plan.concurrentIndex) await assertIndexValid(query, plan.concurrentIndex, name)
+  await client.query('insert into schema_migrations (name) values ($1)', [name])
 }
