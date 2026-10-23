@@ -110,7 +110,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   }
   const metadata = task.metadata
   // On board cards, empty "add" actions stay out of the way until the card is hovered/focused (always shown on touch).
-  const revealOnCard = section === 'properties' ? 'hidden group-hover/card:inline-flex group-focus-within/card:inline-flex group-focus-visible/card:inline-flex pointer-coarse:inline-flex' : undefined
+  const revealOnCard = section === 'properties' ? 'opacity-0 transition-opacity group-hover/card:opacity-100 group-focus-within/card:opacity-100 group-focus-visible/card:opacity-100 pointer-coarse:opacity-100' : undefined
   return <>
     {(section === 'all' || section === 'assignee') && <IssueAssigneeMenu request={request} id={task.id} assignee={metadata.assignee} compact={compact} disabled={busy} onChange={assignee => persist({ assignee })} onInvite={() => open('invite')} />}
     {section !== 'assignee' && <>
