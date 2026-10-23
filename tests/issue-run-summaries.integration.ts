@@ -6,15 +6,15 @@ import { Pool } from 'pg'
 // Explicitly refuse business databases. This executes the real server action and real SQL.
 const target = new URL(process.env.E2E_DATABASE_URL ?? 'http://invalid')
 if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || !target.pathname.endsWith('_e2e') || process.env.MIKKA_DATABASE_URL !== target.href || process.env.DATABASE_URL !== target.href) throw new Error('Run summary integration requires the same isolated loopback *_e2e database for both stores')
-const { listIssueRunSummaries } = await import('../app/actions/agents')
-const { actAs } = await import('../lib/acting-user')
-const { readRun, addRunMessage, requestRunStop } = await import('../lib/agent-runs')
 const pool = new Pool({ connectionString: target.href, max: 1 })
 const owner = randomUUID(), viewer = randomUUID(), outsider = randomUUID(), removed = randomUUID()
 const issue = randomUUID(), other = randomUUID(), workspace = randomUUID(), team = randomUUID(), agent = randomUUID()
 const run = randomUUID(), removedRun = randomUUID(), otherRun = randomUUID()
 const excessRuns = Array.from({ length: 21 }, () => randomUUID())
 test('real action enforces membership, issue boundaries, removal, bounded field whitelist and owner-only output/controls', async () => {
+  const { listIssueRunSummaries } = await import('../app/actions/agents')
+  const { actAs } = await import('../lib/acting-user')
+  const { readRun, addRunMessage, requestRunStop } = await import('../lib/agent-runs')
   try {
     for (const id of [owner, viewer, outsider, removed]) await pool.query('INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES ($1,$2,$3,false,now(),now())', [id, 'Isolated run test', `${id}@example.com`])
     for (const id of [issue, other]) await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,$3,'{"type":"doc","content":[]}','todo','normal')`, [id, owner, 'Isolated safe summary'])
