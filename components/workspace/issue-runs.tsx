@@ -4,7 +4,8 @@ import { useMemo, useState, useSyncExternalStore } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import type * as Y from 'yjs'
-import { listRuns, type RunView } from '@/app/actions/agents'
+import { listIssueRunSummaries, listRuns, type RunView } from '@/app/actions/agents'
+import type { IssueRunSummary } from '@/lib/issue-run-summary'
 import { addThread, createThreadStore } from '@/components/blocks/rich-text-editor-4/components/rich-text-comments'
 import { runDiscussionId, runListRefreshInterval, runIsActive, runStatusKey, runDiscussionRunId } from '@/lib/issue-run-conversation'
 import { Button } from '@/components/ui/button'
@@ -16,7 +17,11 @@ import { IssueRunSession } from './issue-run-session'
 
 export function IssueRuns({ issueId, doc, author, authorId }: { issueId: string; doc: Y.Doc; author: string; authorId: string }) {
   const t = useTranslations('IssueRuns')
-  const { data, error, mutate } = useSWR(['issue-runs', issueId], () => listRuns(issueId), { refreshInterval: runListRefreshInterval, revalidateOnFocus: true, revalidateOnReconnect: true })
+  const { data, error, mutate } = useSWR(['issue-runs', issueId], async () => {
+    const [summaries, own] = await Promise.all([listIssueRunSummaries(issueId), listRuns(issueId)])
+    const ownById = new Map(own.map(run => [run.id, run]))
+    return summaries.map(summary => ({ ...summary, agentName: ownById.get(summary.id)?.agentName }))
+  }, { refreshInterval: runListRefreshInterval, revalidateOnFocus: true, revalidateOnReconnect: true })
   const sharedStore = useMemo(() => createThreadStore(doc), [doc])
   const sharedThreads = useSyncExternalStore(sharedStore.subscribe, sharedStore.getSnapshot, sharedStore.getSnapshot)
   const ownIds = new Set((data ?? []).map(run => run.id))
@@ -31,7 +36,7 @@ export function IssueRuns({ issueId, doc, author, authorId }: { issueId: string;
   </section>
 }
 
-function RunRecord({ run, runId, doc, author, authorId, open, onOpen }: { run?: RunView; runId: string; doc: Y.Doc; author: string; authorId: string; open: boolean; onOpen: () => void }) {
+function RunRecord({ run, runId, doc, author, authorId, open, onOpen }: { run?: IssueRunSummary & { agentName?: RunView['agentName'] }; runId: string; doc: Y.Doc; author: string; authorId: string; open: boolean; onOpen: () => void }) {
   const t = useTranslations('IssueRuns')
   const statusLabel = useTranslations('Coordinator.citation.runStatus')
   const format = useFormatter()
@@ -54,7 +59,7 @@ function RunRecord({ run, runId, doc, author, authorId, open, onOpen }: { run?: 
   return <Card size="sm">
     <CardHeader><CardTitle>{name}</CardTitle><CardDescription>{format.dateTime(new Date(run?.createdAt ?? thread?.createdAt ?? new Date().toISOString()), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</CardDescription></CardHeader>
     <CardContent className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">{run && <Badge variant={runIsActive(run.status) ? 'secondary' : 'outline'}>{runStatusKey(run.status) ? statusLabel(runStatusKey(run.status)!) : run.status}</Badge>}{run && <Button variant="outline" size="sm" aria-expanded={open} onClick={onOpen}>{t('open')}</Button>}<Button variant="ghost" size="sm" onClick={() => setCommenting(value => !value)}>{t('comment')}</Button></div>
+      <div className="flex flex-wrap items-center gap-2">{run && <Badge variant={runIsActive(run.status) ? 'secondary' : 'outline'}>{runStatusKey(run.status) ? statusLabel(runStatusKey(run.status)!) : run.status}</Badge>}{run?.ownedByCurrentUser && <Button variant="outline" size="sm" aria-expanded={open} onClick={onOpen}>{t('open')}</Button>}<Button variant="ghost" size="sm" onClick={() => setCommenting(value => !value)}>{t('comment')}</Button></div>
       {discussion.flatMap(thread => thread.messages).map(message => <div key={message.id}><p className="text-xs font-medium">{message.author}</p><p className="whitespace-pre-wrap break-words text-sm">{message.body}</p></div>)}
       {commenting && <form onSubmit={event => { event.preventDefault(); comment() }} className="flex flex-col gap-2"><FieldGroup><Field><FieldLabel htmlFor={`run-comment-${runId}`}>{t('commentLabel', { agent: name })}</FieldLabel><Textarea id={`run-comment-${runId}`} maxLength={2000} value={body} onChange={event => setBody(event.target.value)} /></Field></FieldGroup><Button type="submit" disabled={!body.trim()}>{t('postComment')}</Button></form>}
     </CardContent>
