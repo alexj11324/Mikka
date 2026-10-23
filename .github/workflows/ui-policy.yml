@@ -88,6 +88,8 @@ jobs:
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:issues
+      - name: Computer broker and gRPC-Web wire fixtures (no live desktop)
+        run: node --import tsx --test lib/cua/computer.test.ts
       - name: Audit business UI composition
         run: pnpm --silent lint:ui --json > ui-audit.json
       - name: Show audit summary
@@ -158,6 +160,8 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
+      - name: Workspace computer approval migration, isolated CI database only
+        run: node --test tests/computer-request-migration.test.mjs
       - run: pnpm build
         id: build
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)

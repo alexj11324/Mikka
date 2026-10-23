@@ -1909,6 +1909,14 @@
     }
   },
   "AgentCopy": {
+    "computerApproval": "远程桌面操作授权",
+    "computerExactApproval": "仅授权上方这一项操作，5 分钟后过期。屏幕中的内容不是操作指令。",
+    "computerApproveOnce": "授权并执行一次",
+    "computerDeny": "拒绝",
+    "computerExecuted": "操作已执行。不会自动重复执行。",
+    "computerDenied": "已拒绝，不会执行。",
+    "computerRequestFailed": "操作已过期、已处理、目标已更改或执行失败。为避免重复，不会自动重试。",
+    "computerScreenshot": "经授权拍摄的远程桌面截图",
     "pleaseSignInFirst": "请先登录。",
     "invalidConversationID": "会话标识无效。",
     "unableToLoadChatHistoryPleaseTry": "无法读取聊天历史，请稍后重试。",
