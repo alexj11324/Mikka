@@ -161,10 +161,10 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     }
     await db.delete(telegramConversations).where(eq(telegramConversations.threadId, threadId))
     await db.delete(telegramLinks).where(eq(telegramLinks.userId, owner))
-    await pool.query('delete from orvilo_team_issues where \"teamId\"=$1', [teamId])
+    await pool.query('delete from orvilo_team_issues where "teamId"=$1', [teamId])
     await db.delete(issues).where(eq(issues.userId, owner))
     await pool.query('delete from orvilo_teams where id=$1', [teamId])
-    await pool.query('delete from mikka_workspace_members where \"workspaceId\"=$1', [workspace])
+    await pool.query('delete from mikka_workspace_members where "workspaceId"=$1', [workspace])
     await pool.query('delete from mikka_workspaces where id=$1', [workspace])
     await db.delete(linearTeamSyncs).where(eq(linearTeamSyncs.ownerId, owner))
     for (const id of [owner, member, stranger]) await db.delete(users).where(eq(users.id, id))
