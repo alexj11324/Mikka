@@ -51,15 +51,17 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       for (const m of input.members) await q('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,$2,$3,\'member\') ON CONFLICT DO NOTHING', [id, m.memberType, m.memberId])
       result = { id, title: input.title }; status = 201
     } else if (req.resource === 'conversations' && req.method === 'GET') {
-      if (!req.workspaceId || !z.uuid().safeParse(req.workspaceId).success || !await directory(req.workspaceId, userId, [])) return fail(404)
+      if (req.workspaceId && (!z.uuid().safeParse(req.workspaceId).success || !await directory(req.workspaceId, userId, []))) return fail(404)
       const { rows } = await q(`SELECT c.*, last.message AS "lastMessage",
         (SELECT count(*)::text FROM conversation_messages m WHERE m."conversationId"=c.id
           AND m.position > COALESCE(r."lastReadPosition",0) AND NOT (m."authorType"='user' AND m."authorId"=$1)) AS "unreadCount"
         FROM conversations c JOIN conversation_members cm ON cm."conversationId"=c.id AND cm."memberType"='user' AND cm."memberId"=$1 AND cm."leftAt" IS NULL
         LEFT JOIN conversation_reads r ON r."conversationId"=c.id::text AND r."userId"=$1
         LEFT JOIN LATERAL (SELECT to_jsonb(m) || jsonb_build_object('position', m.position::text) AS message FROM conversation_messages m WHERE m."conversationId"=c.id ORDER BY position DESC LIMIT 1) last ON true
-        WHERE c.kind='group' AND c."workspaceId"=$2 ORDER BY c."createdAt" DESC,c.id DESC`, [userId, req.workspaceId])
-      result = { conversations: rows }
+        WHERE c.kind='group' AND ($2::uuid IS NULL OR c."workspaceId"=$2) ORDER BY c."createdAt" DESC,c.id DESC`, [userId, req.workspaceId ?? null])
+      const accessible = []
+      for (const row of rows) if (await directory(row.workspaceId, userId, [])) accessible.push(row)
+      result = { conversations: accessible }
     } else {
       // Acquire the serialization lock before reading membership in a new statement.
       // A joined SELECT FOR UPDATE can retain a pre-wait membership snapshot.
@@ -69,10 +71,10 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       if (!group || !memberships.length || !await directory(group.workspaceId, userId, [])) return fail(404)
       group.role = memberships[0].role
       if (req.resource === 'messages' && req.method === 'GET') {
-        const before = decimal(req.before, '9223372036854775807')
+        const before = req.before == null ? null : decimal(req.before, '')
         const limit = Number(decimal(req.limit, '50'))
         if (limit > 100) return fail(422)
-        const { rows } = await q('SELECT * FROM conversation_messages WHERE "conversationId"=$1 AND position < $2 ORDER BY position DESC LIMIT $3', [req.id, before, limit + 1])
+        const { rows } = await q('SELECT * FROM conversation_messages WHERE "conversationId"=$1 AND ($2::bigint IS NULL OR position < $2) ORDER BY position DESC LIMIT $3', [req.id, before, limit + 1])
         const more = rows.length > limit
         const messages = rows.slice(0, limit)
         result = { messages, nextBefore: more ? messages.at(-1)?.position : null }

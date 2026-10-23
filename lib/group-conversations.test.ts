@@ -83,6 +83,7 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     const secondPage = (await run({ id, resource: 'messages', limit: '5', before: page.nextBefore })).body as typeof page
     assert.equal(secondPage.messages[0].position, '13')
     for (const limit of ['0', '-1', '101', 'NaN', '1.5']) assert.equal((await run({ id, resource: 'messages', limit })).status, 422)
+    assert.equal((await run({ workspaceId: undefined })).status, 200)
     const list = (await run({ userId: 'member' })).body as { conversations: { unreadCount: string; lastMessage: { position: string } }[] }
     assert.equal(list.conversations[0].unreadCount, '18'); assert.equal(list.conversations[0].lastMessage.position, '18')
     await scoped.query('INSERT INTO conversation_reads ("userId","conversationId","lastReadPosition") VALUES ($1,$2,10)', ['member', id])
@@ -97,6 +98,23 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     assert.equal((await run({ id, resource: 'members', method: 'DELETE', body: JSON.stringify({ memberType: 'user', memberId: 'owner' }) })).status, 422)
     assert.equal((await run({ id, resource: 'members', method: 'POST', body: JSON.stringify({ memberType: 'user', memberId: 'member' }) })).status, 200)
     assert.equal((await run({ id, resource: 'messages', userId: 'member' })).status, 200)
+    // Removal commits while a send waits on the conversation lock: sender must recheck.
+    const removal = await scoped.connect()
+    await removal.query('BEGIN')
+    await removal.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [id])
+    await removal.query('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberId"=$2', [id, 'member'])
+    const waitingSend = run({ id, resource: 'messages', method: 'POST', userId: 'member', body: '{"body":"racing removal"}' })
+    await removal.query('COMMIT')
+    removal.release()
+    assert.equal((await waitingSend).status, 404)
+    const suspendedDirectory = groupDirectory({ async activeUsers() { return [] }, async ownedAgents() { return [] } })
+    for (const [resource, method] of [['messages','GET'],['messages','POST'],['members','POST'],['members','DELETE']] as const) {
+      assert.equal((await handleGroup(scoped, suspendedDirectory, { ...base, id, resource, method, body: '{}' })).status, 404)
+    }
+    // Forged sender / elevated initial role are not accepted by the strict schemas.
+    assert.equal((await send('forged', { authorId: 'member' })).status, 422)
+    assert.equal((await run({ method: 'POST', body: JSON.stringify({ workspaceId, title: 'bad role', members: [{ memberType: 'user', memberId: 'member', role: 'owner' }] }) })).status, 422)
+
     const dm = randomUUID()
     await scoped.query('INSERT INTO conversations (id,"workspaceId",kind,title,"createdBy") VALUES ($1,$2,\'agent_dm\',\'private\',\'owner\')', [dm, workspaceId])
     assert.equal((await run({ id: dm, resource: 'messages' })).status, 404)
