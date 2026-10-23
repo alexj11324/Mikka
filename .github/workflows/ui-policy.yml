@@ -89,6 +89,7 @@ jobs:
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:issues
+      - run: pnpm test:issue-search
       - name: Audit business UI composition
         run: pnpm --silent lint:ui --json > ui-audit.json
       - name: Show audit summary
@@ -163,6 +164,10 @@ jobs:
       - name: Group conversation API and migrations (temporary Postgres 17 only)
         run: pnpm test:groups
       - run: pnpm test:e2e:setup
+      - name: Team task and run visibility (temporary Postgres 17 only)
+        run: REQUIRE_DB=1 pnpm test:visibility-db
+      - name: Issue search and indexed pagination (temporary Postgres 17 only)
+        run: REQUIRE_DB=1 pnpm test:issue-search-db
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
       - run: pnpm build
