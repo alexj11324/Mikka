@@ -76,8 +76,12 @@ test('QA string forms: the raw file is executed, never the stripped text', () =>
 })
 
 // Integration test for the post-execution check (migrate.mjs -> applyMigration).
-const databaseUrl = process.env.MIKKA_DATABASE_URL ?? process.env.ORVILO_DATABASE_URL
-if (!databaseUrl && process.env.REQUIRE_DB === '1') test('database required', () => assert.fail('REQUIRE_DB=1 but no MIKKA_DATABASE_URL'))
+// Only a real test database: dev-local's bridge (127.0.0.1:15432) or the CI service named by
+// MIKKA_TEST_DB_PORT. Jobs that set a placeholder MIKKA_DATABASE_URL without a server skip.
+const rawUrl = process.env.MIKKA_DATABASE_URL ?? process.env.ORVILO_DATABASE_URL
+const testHost = rawUrl ? new URL(rawUrl) : null
+const databaseUrl = testHost && testHost.hostname === '127.0.0.1' && testHost.port === (process.env.MIKKA_TEST_DB_PORT || '15432') ? rawUrl : undefined
+if (!databaseUrl && process.env.REQUIRE_DB === '1') test('database required', () => assert.fail('REQUIRE_DB=1 but MIKKA_DATABASE_URL is not the test database (127.0.0.1:MIKKA_TEST_DB_PORT, default 15432)'))
 const dbTest = databaseUrl ? test : test.skip
 
 dbTest('applyMigration: INVALID index after execution fails and is not recorded', async (t) => {
