@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, varchar, jsonb, integer, numeric, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, integer, numeric, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -253,6 +253,53 @@ export const decisionCalls = pgTable('decision_calls', {
   costUsd: numeric('costUsd', { precision: 12, scale: 8 }).notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('decision_calls_created_idx').on(table.createdAt)])
+
+// --- Suggestions (MIK-41) ---------------------------------------------------
+//
+// External notifications from connected apps, judged by fixed rules or the
+// decision model (lib/suggestions). Only `shown` rows reach the person; hidden
+// rows stay so a repeat delivery is not judged again. The Coordinator never
+// writes here.
+
+/** The connected apps a suggestion can come from. */
+export const SUGGESTION_SOURCES = ['gmail', 'slack', 'notion', 'github', 'linear'] as const
+export type SuggestionSource = (typeof SUGGESTION_SOURCES)[number]
+/** What the person would do with it: answer, review a PR, take on an assigned issue, or read. */
+export const SUGGESTION_ACTIONS = ['reply', 'review', 'handle', 'read'] as const
+export type SuggestionAction = (typeof SUGGESTION_ACTIONS)[number]
+/** Who decided: a fixed rule, the decision model, or the fallback when the model did not answer. */
+export type SuggestionDecider = 'rule' | 'model' | 'fallback'
+
+export const suggestions = pgTable('suggestions', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  source: text('source').$type<SuggestionSource>().notNull(),
+  externalId: text('externalId').notNull(),
+  action: text('action').$type<SuggestionAction>().notNull(),
+  /** The source's own text: the email subject, the Slack message, the PR title. */
+  title: text('title').notNull(), url: text('url'), actor: text('actor'),
+  shown: boolean('shown').notNull(),
+  decidedBy: text('decidedBy').$type<SuggestionDecider>().notNull(),
+  probability: real('probability'),
+  /** Assigned to the person or their review is requested. */
+  required: boolean('required').notNull().default(false),
+  occurredAt: timestamp('occurredAt', { withTimezone: true }).notNull(),
+  dismissedAt: timestamp('dismissedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('suggestions_external_key').on(table.userId, table.source, table.externalId), index('suggestions_user_shown_idx').on(table.userId, table.shown, table.createdAt)])
+
+/**
+ * The "早上好" briefing, one per person per local day. `first` is written
+ * right after the person connects an app; `daily` the first time the list is
+ * read on a new day. `highlights` are suggestion ids the briefing names.
+ */
+export const briefings = pgTable('briefings', {
+  userId: text('userId').notNull(), localDate: text('localDate').notNull(),
+  kind: text('kind').$type<'first' | 'daily'>().notNull(), timeZone: text('timeZone').notNull(),
+  highlights: jsonb('highlights').$type<string[]>().notNull(),
+  counts: jsonb('counts').$type<Partial<Record<SuggestionSource, number>>>().notNull(),
+  total: integer('total').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.localDate] })])
 
 /** The Coordinator's conversation, one AI SDK model message per row, in `position` order. */
 export const coordinatorMessages = pgTable('coordinator_messages', {

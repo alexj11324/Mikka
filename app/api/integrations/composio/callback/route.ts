@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { auth, authBaseURL } from '@/lib/auth'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { getComposio } from '@/lib/composio'
 import { isComposioCallbackVerifierConfigured } from '@/lib/composio-config'
 import { COMPOSIO_AUTH_CALLBACK_PATH } from '@/lib/auth-return'
+import { bootstrapSuggestions } from '@/lib/suggestions/sources'
 
 const SESSION_COOKIE = 'mikka_composio_session_uri'
 const CALLBACK_PATH = withBasePath(COMPOSIO_AUTH_CALLBACK_PATH)
@@ -55,6 +56,10 @@ export async function GET(request: NextRequest) {
 
   try {
     await composio.connectedAccounts.completeAuth({ userId: session.user.id, sessionUri })
+    // Subscribe the new account's triggers and write the first briefing from what is there now.
+    const userId = session.user.id
+    const timeZone = request.headers.get('x-vercel-ip-timezone')
+    after(() => bootstrapSuggestions(userId, 'composio', timeZone))
     const response = integrationRedirect(request, 'connected')
     clearSessionCookie(response)
     response.headers.set('Cache-Control', noStore['Cache-Control'])

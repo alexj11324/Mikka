@@ -1474,6 +1474,8 @@
       "googleLinkFailed": "无法开始关联 Google 账号。",
       "heading": "已连接的应用",
       "description": "通过 Composio 授权每个账户。",
+      "gmail": "Gmail",
+      "gmailDescription": "连接 Gmail，重要的新邮件会出现在建议里。",
       "notion": "Notion",
       "notionDescription": "连接一个 Notion 工作区。",
       "slack": "Slack",
