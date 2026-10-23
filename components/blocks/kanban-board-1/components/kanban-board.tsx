@@ -42,7 +42,8 @@ function TaskCard({ task, status, disabled, isOverlay = false, onOpen, onStatusC
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
   const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
-  const controlsDisabled = disabled || isOverlay
+  const optimistic = 'optimistic' in task && task.optimistic === true
+  const controlsDisabled = disabled || isOverlay || optimistic
   const card = <Card size="sm" className={cn('select-none gap-2 shadow-xs transition-shadow hover:ring-foreground/20 hover:shadow-sm', isOverlay && 'pointer-events-none shadow-lg')}>
     <CardHeader className="flex min-w-0 items-center justify-between gap-2">
       <CardDescription className="truncate tabular-nums">{issueIdentifier(task.metadata.number, tIssue('unassignedNumber'))}</CardDescription>
@@ -61,7 +62,7 @@ function TaskCard({ task, status, disabled, isOverlay = false, onOpen, onStatusC
     <CardFooter className="border-0 bg-transparent pt-0"><CardCreatedAt createdAt={task.createdAt} /></CardFooter>
   </Card>
 
-  return <KanbanItem value={task.id} disabled={disabled} className="shrink-0" role="group" tabIndex={-1} aria-label={task.title}>
+  return <KanbanItem value={task.id} disabled={disabled || optimistic} data-optimistic={optimistic ? '' : undefined} aria-busy={optimistic || undefined} className={cn('shrink-0', optimistic && 'max-h-64 overflow-hidden opacity-100 transition-[max-height,opacity] duration-200 ease-out starting:max-h-0 starting:opacity-0 motion-reduce:transition-none')} role="group" tabIndex={-1} aria-label={task.title}>
     {isOverlay ? card : <KanbanItemHandle cursor={false} role="group" tabIndex={disabled ? -1 : 0} className="block cursor-pointer touch-pan-y rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging=true]:cursor-grabbing" aria-label={t('openTask', { title: task.title })} aria-roledescription={t('openableDraggableTask')} aria-keyshortcuts="Enter Space" onClick={event => {
       if (disabled || event.defaultPrevented || (event.target as HTMLElement).closest('[data-card-control]')) return
       onOpen(task.id)

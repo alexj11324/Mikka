@@ -40,7 +40,7 @@ export function IssueList({ issues, searching, onOpen, onCreate }: {
           <span className="text-muted-foreground">{group.length}</span>
         </header>
         <ul>
-          {group.map(issue => <li key={issue.id}>
+          {group.map(issue => { const optimistic = 'optimistic' in issue && issue.optimistic === true; return <li key={issue.id} data-optimistic={optimistic ? '' : undefined} aria-busy={optimistic || undefined} className={cn(optimistic && 'max-h-64 overflow-hidden opacity-100 transition-[max-height,opacity] duration-200 ease-out starting:max-h-0 starting:opacity-0 motion-reduce:transition-none')}>
             <Button type="button" variant="ghost" onClick={() => onOpen(issue.id)} className="h-auto min-h-13 w-full justify-start p-0">
               <span className="flex w-full items-center gap-3 px-4 py-3 text-left sm:px-6">
                 <status.icon className={cn('size-3.5 shrink-0', indicatorClassName)} />
@@ -51,7 +51,7 @@ export function IssueList({ issues, searching, onOpen, onCreate }: {
                 <time dateTime={new Date(issue.updatedAt).toISOString()} className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground md:block">{format.dateTime(new Date(issue.updatedAt), { month: 'numeric', day: 'numeric', timeZone: 'UTC' })}</time>
               </span>
             </Button>
-          </li>)}
+          </li> })}
         </ul>
       </section>
     })}

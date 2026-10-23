@@ -45,6 +45,7 @@
       "discardTitle": "Discard this draft?",
       "discardAction": "Discard",
       "createFailed": "Could not create the task. Your draft has been kept.",
+      "titleRequired": "Please enter a title",
       "createdNotice": "Task created. You can add another one.",
       "createError": "Could not create the task. Your draft has been kept; please try again.",
       "collapse": "Collapse the create panel",

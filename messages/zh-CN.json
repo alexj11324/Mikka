@@ -45,6 +45,7 @@
       "discardTitle": "放弃这份草稿？",
       "discardAction": "放弃",
       "createFailed": "创建失败，草稿已保留。",
+      "titleRequired": "请输入标题",
       "createdNotice": "任务已创建，可以继续添加下一项。",
       "createError": "暂时无法创建，草稿已保留，请稍后重试。",
       "collapse": "收起创建卡片",

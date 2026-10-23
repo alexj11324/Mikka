@@ -1,4 +1,6 @@
 'use client'
+import { readIssueMetadata } from '@/lib/issue-metadata'
+import { issueChecklist } from '@/lib/issue-checklist'
 import { useTranslations } from 'next-intl'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -214,6 +216,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     applySelection(id, mode)
   }
   function open(id: string | null) {
+    if (id?.startsWith('optimistic-')) return false
     if (boardBusy || leaving.current) return false
     setPendingSelection(id)
     void leave(() => showIssue(id, 'push')).finally(() => setPendingSelection(undefined))
@@ -226,6 +229,17 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   const saved = useCallback((id: string) => { setSelected(id); void mutate() }, [mutate])
   function create(status: IssueStatus = ISSUE_STATUSES.some(item => item.value === view) ? view as IssueStatus : 'todo') { if (boardBusy) return; setTypedAhead(''); setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreateStatus(status); setCreating(true) }
+  // MIK-18: optimistic insert — the card appears (200ms expand + fade) while saveIssue runs; rollback + toast on failure.
+  function optimisticCreate(draft: { title: string; status: string; priority: string }) {
+    const now = new Date()
+    const tempId = `optimistic-${crypto.randomUUID()}`
+    const placeholder = { id: tempId, ownerId: user.id, ownerName: user.name ?? null, ownerImage: null, title: draft.title, status: draft.status, priority: draft.priority, revision: 1, createdAt: now, updatedAt: now, teamId: null, metadata: readIssueMetadata({ type: 'doc' }), checklist: issueChecklist({ type: 'doc' }), optimistic: true } as unknown as (typeof tasks)[number]
+    void mutate(current => [placeholder, ...(current ?? [])], { revalidate: false })
+    return {
+      rollback() { void mutate(current => (current ?? []).filter(item => item.id !== tempId), { revalidate: false }) },
+      commit(id: string) { void mutate(current => (current ?? []).map(item => item.id === tempId ? { ...item, id, optimistic: false } : item), { revalidate: false }) },
+    }
+  }
   async function issueCreated(id: string) {
     void mutate()
     if (!creationProject) return
@@ -289,7 +303,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       </>}
     </AppShellContent>
     </>}
-    {creating && <CreateIssueDialog initialTitle={typedAhead} initialTeamId={(creationProject ? projectTeams.find(link => link.projectId === creationProject && link.isPrimary)?.teamId : section.startsWith('team-') ? teamId : null) ?? ''} initialStatus={createStatus} open={creating} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} onCreated={id => { void issueCreated(id) }} author={user.name || user.email} />}
+    {creating && <CreateIssueDialog initialTitle={typedAhead} initialTeamId={(creationProject ? projectTeams.find(link => link.projectId === creationProject && link.isPrimary)?.teamId : section.startsWith('team-') ? teamId : null) ?? ''} initialStatus={createStatus} open={creating} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} onOptimisticCreate={optimisticCreate} onCreated={id => { void issueCreated(id) }} author={user.name || user.email} />}
     {searchOpen && <IssueSearch open={searchOpen} onOpenChange={setSearchOpen} issues={tasks} onOpen={open} onCreate={() => create()} />}
   </AppShell></SignOutBoundary>
 }
