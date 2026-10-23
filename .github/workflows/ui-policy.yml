@@ -89,7 +89,7 @@ jobs:
       - run: pnpm test:settings
       - run: pnpm test:issues
       - name: Computer broker and gRPC-Web wire fixtures (no live desktop)
-        run: node --import tsx --test lib/cua/computer.test.ts
+        run: node --import tsx --test lib/cua/computer.test.ts lib/cua/local-review.test.ts
       - name: Audit business UI composition
         run: pnpm --silent lint:ui --json > ui-audit.json
       - name: Show audit summary
@@ -161,7 +161,7 @@ jobs:
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
       - name: Workspace computer approval migration, isolated CI database only
-        run: node --test tests/computer-request-migration.test.mjs tests/device-computer-migration.test.mjs
+        run: node --test tests/computer-request-migration.test.mjs tests/device-computer-migration.test.mjs tests/local-computer-review-migration.test.mjs
       - run: pnpm build
         id: build
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
@@ -210,7 +210,7 @@ jobs:
       - name: Detection, permissions, proxy continuation and authenticated owner review
         run: |
           node --test packages/daemon/src/computer/broker.test.mjs
-          node --import tsx --test packages/daemon/src/computer/rpc.node.ts
+          node --import tsx --test packages/daemon/src/computer/rpc.node.ts packages/daemon/src/computer/web-review.node.ts
           pnpm --filter @mikka/daemon typecheck
       - name: Real screenshot and click through exact-operation broker (no database)
         run: |

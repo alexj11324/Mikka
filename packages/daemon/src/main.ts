@@ -1,3 +1,4 @@
+import { applyWebComputerDecisions, webComputerSnapshots } from "./computer/web-review"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
 //
@@ -188,6 +189,7 @@ export class Daemon {
   /** Ends the commands long-poll when the daemon stops. */
   private commandsAbort = new AbortController()
   private commandsLoop: Promise<void> = Promise.resolve()
+  private computerLoop: Promise<void> = Promise.resolve()
   private fsLoop: Promise<void> = Promise.resolve()
   /** Messages handed to an agent whose delivery the server has not taken yet. */
   private unacked = new Set<string>()
@@ -335,6 +337,7 @@ export class Daemon {
     this.schedule(0)
     this.commandsLoop = this.pollCommands()
     this.fsLoop = this.pollFolderRequests()
+    this.computerLoop = this.pollComputerReviews()
     return this
   }
 
@@ -391,6 +394,34 @@ export class Daemon {
    * a second long-poll next to the run commands, so a slow folder never
    * delays a stop.
    */
+  private async pollComputerReviews() {
+    const { link } = this.options
+    if (!link.syncComputerReviews) return
+    const signal = this.commandsAbort.signal
+    let hadPending = false
+    while (!this.stopped && !signal.aborted) {
+      const deviceId = this.device.deviceId
+      try {
+        if (this.registered && deviceId && this.computer) {
+          const requests = webComputerSnapshots(this.computer)
+          if (requests.length || hadPending) {
+            const decisions = await link.syncComputerReviews(deviceId, requests, signal)
+            await applyWebComputerDecisions(this.computer, decisions)
+            hadPending = requests.length > 0
+          }
+        }
+      } catch {
+        // Offline/revoked/old server: local owner RPC still works; never convert an error to approval.
+      }
+      await new Promise<void>(resolve => {
+        const done = () => { clearTimeout(timer); signal.removeEventListener("abort", done); resolve() }
+        const timer = setTimeout(done, 2000)
+        signal.addEventListener("abort", done, { once: true })
+        if (signal.aborted) done()
+      })
+    }
+  }
+
   private async pollFolderRequests() {
     const { link } = this.options
     if (!link.fetchFsRequests || !link.answerFsRequest) return
@@ -948,6 +979,7 @@ export class Daemon {
     this.commandsAbort.abort()
     await this.commandsLoop.catch(() => undefined)
     await this.fsLoop.catch(() => undefined)
+    await this.computerLoop.catch(() => undefined)
     await this.tick
     await this.rpc?.close()
     await this.computer?.close()

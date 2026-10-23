@@ -2146,5 +2146,16 @@
     "cancel": "取消",
     "creating": "正在创建…",
     "createWorkspace": "创建工作区"
+  },
+  "ComputerApprovals": {
+    "title": "本机操作审批",
+    "description": "核对你设备上运行中的确切操作。每次审批只用一次；桌面内容不可信，不要通过电脑工具输入秘密。",
+    "failed": "审批不可用、已过期、已变更或已处理。不会自动重试。",
+    "queued": "决定已排队等待设备接收，不代表已执行。结果会返回原来的 agent 工具调用。",
+    "empty": "暂无等待你审批的本机操作。",
+    "run": "运行 {id}",
+    "expires": "{time} 到期",
+    "approve": "批准这次操作",
+    "deny": "拒绝"
   }
 }

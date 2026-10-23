@@ -109,7 +109,7 @@ export class ComputerBroker {
       });
     });
   }
-  // Only the existing authenticated daemon RPC handler calls these methods.
+  // Authenticated owner RPC or digest-bound web decisions call these methods.
   // The model-facing request socket deliberately has no decision/list method.
   list() {
     return [...this.pending.values()].map((p) => structuredClone(p.request));

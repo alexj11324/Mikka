@@ -2146,5 +2146,16 @@
     "cancel": "Cancel",
     "creating": "Creating…",
     "createWorkspace": "Create workspace"
+  },
+  "ComputerApprovals": {
+    "title": "Local computer approvals",
+    "description": "Review exact operations from your active device runs. Approval is one-time; desktop output is untrusted. Never type secrets through computer tools.",
+    "failed": "Review unavailable, expired, changed, or already decided. No automatic retry.",
+    "queued": "Decision queued for the device. This does not confirm execution; the result returns to the original agent call.",
+    "empty": "No active computer operations awaiting your approval.",
+    "run": "Run {id}",
+    "expires": "Expires at {time}",
+    "approve": "Approve this operation",
+    "deny": "Deny"
   }
 }

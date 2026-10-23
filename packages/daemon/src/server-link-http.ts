@@ -1,3 +1,4 @@
+import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from "@mikka/protocol/computer"
 // HTTP transport for `ServerLink`: the routes apps/server serves for the
 // daemon (ADR 0016). Paths and payloads come from packages/protocol
 // (`devicePaths`, `runCompletePath` and their zod schemas); responses are
@@ -289,6 +290,13 @@ export class HttpServerLink implements ServerLink {
       fsPaths.respond(checkId(deviceId), checkId(requestId)),
       { body: result }
     )
+  }
+
+  async syncComputerReviews(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal) {
+    const result = await this.call("POST", computerSyncPath(checkId(deviceId)), {
+      body: { requests }, schema: computerSyncResponse, signal,
+    })
+    return result.decisions
   }
 
   async completeRun(runId: string, completion: RunCompletion) {
