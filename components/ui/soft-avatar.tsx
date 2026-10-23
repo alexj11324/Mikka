@@ -10,7 +10,7 @@ import { cn } from "cn"
  * `color` takes HeroUI's names; a custom tint goes on the fallback's className.
  */
 function SoftAvatar({ className, size = "md", ...props }: Omit<ComponentProps<typeof Avatar>, "variant">) {
-  return <Avatar data-slot="soft-avatar" variant="soft" size={size} className={cn("rounded-full", className)} {...props} />
+  return <Avatar data-slot="soft-avatar" variant="soft" size={size} className={className} {...props} />
 }
 
 function SoftAvatarFallback({ className, ...props }: ComponentProps<typeof Avatar.Fallback>) {
