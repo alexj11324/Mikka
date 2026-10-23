@@ -41,7 +41,7 @@ test('Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片
   const overview = await readFile(new URL('../components/workspace/workspace-overview.tsx', import.meta.url), 'utf8')
   const demo = await readFile(new URL('../components/workspace/agent-demo.tsx', import.meta.url), 'utf8')
   assert.match(workspace, /if \(typeof window !== 'undefined'\) \{?\s*void import\('\.\/agent-panel'\)/)
-  assert.match(workspace, /if \(typeof window !== 'undefined'\) \{[^}]*void import\('\.\/create-issue-dialog'\)/)
+  assert.match(workspace, /if \(typeof window !== 'undefined'\) \{\s*void import\('\.\/agent-panel'\)\.catch\(\(\) => \{\}\)\s*void import\('\.\/create-issue-dialog'\)/)
   assert.match(overview, /dynamic\(\(\) => import\('\.\/agent-panel'\)/)
   assert.match(demo, /src: withBasePath\('\/placeholder\.svg/)
   const tools = await readFile(new URL('../components/workspace/agent-demo-tools.tsx', import.meta.url), 'utf8')
