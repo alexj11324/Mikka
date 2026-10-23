@@ -77,6 +77,9 @@ test('the migration is timestamp-named, later than 20261023040300, and idempoten
     assert.match(sql, new RegExp(`IF NOT EXISTS \\(SELECT 1 FROM pg_constraint WHERE conrelid = 'issue_versions'::regclass AND conname = '${check}'\\) THEN\\s*ALTER TABLE issue_versions ADD CONSTRAINT ${check} CHECK .* NOT VALID;`))
     assert.match(sql, new RegExp(`VALIDATE CONSTRAINT ${check};`))
   }
-  assert.match(sql, /coalesce\(/, 'both column spellings present: data merged before the snake column goes')
+  assert.doesNotMatch(sql, /coalesce\(/, 'never mix a camel value with a snake value')
+  assert.match(sql, /WHERE "actorType" IS NULL AND "actorId" IS NULL/, 'snake pair copied only where both camel columns are NULL')
+  assert.match(sql, /whole file runs in ONE transaction/)
+  assert.doesNotMatch(sql, /no long lock/)
   assert.match(sql, /CHECK \("actorId" IS NULL OR "actorType" IS NOT NULL\)/)
 })
