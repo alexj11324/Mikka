@@ -21,3 +21,15 @@ export function activityActor(userId: string): ActivityActor {
   const context = actingContext.getStore()
   return context?.actor && context.userId === userId ? context.actor : userActor(userId)
 }
+
+/**
+ * The actor for an MCP write from verified auth info. A run token carries the
+ * run's agent (`extra.agentId`, joined from agent_runs when the token is
+ * checked), so the actor is that agents.id. An OAuth client with no run keeps
+ * its client id.
+ */
+export function mcpAuthActor(authInfo: { clientId?: unknown; extra?: Record<string, unknown> } | undefined): ActivityActor {
+  const agentId = authInfo?.extra?.agentId
+  if (typeof agentId === 'string' && agentId) return agentActor(agentId)
+  return agentActor(typeof authInfo?.clientId === 'string' && authInfo.clientId ? authInfo.clientId : null)
+}
