@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import systemPrompt from '@/lib/agent-system-prompt.json'
 import { validateAgentStream } from '@/lib/agent-fetch'
+import { agentStatusStream } from '@/lib/agent-status'
 import { persistAgentStream } from '@/lib/agent-history'
 import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
 
@@ -110,8 +111,8 @@ export async function POST(request: Request) {
       ...createAgentWebTools({ signal: request.signal }),
       ...createComposioAITools((action, input) => runComposioAction(session.user.id, action, input)),
     },
-    stopWhen: isStepCount(5),
-    prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
+    stopWhen: isStepCount(3),
+    prepareStep: ({ stepNumber }) => stepNumber >= 2 ? { toolChoice: 'none' } : {},
     maxRetries: 1,
     timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
     abortSignal: request.signal,
@@ -128,6 +129,6 @@ export async function POST(request: Request) {
       stream: result.stream,
       sendReasoning: false,
       onError: agentErrorMessage,
-    }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),
+    }).pipeThrough(agentStatusStream({ startedAt, turnId })).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),
   })
 }
