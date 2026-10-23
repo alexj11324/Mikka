@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { ArrowUp, Send } from 'lucide-react'
@@ -13,7 +13,10 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } fro
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from '@/components/ui/message-scroller'
 import { Spinner } from '@/components/ui/spinner'
-import { CitedText } from './cited-text'
+import { useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
+import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
+import { AgentThemeProvider } from '@/components/workspace/agent-theme'
+import { CoordinatorReply } from './coordinator-reply'
 
 /** The person's conversation with their Coordinator, which dispatches agents to issues. */
 export function CoordinatorChat({ onOpenIssue }: { onOpenIssue: (id: string) => void }) {
@@ -26,19 +29,26 @@ export function CoordinatorChat({ onOpenIssue }: { onOpenIssue: (id: string) => 
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const items = data?.items ?? []
+  const previews = useLinkPreviews(items.filter(item => item.from === 'coordinator').map(item => item.text))
+  const sources = data?.sources
+  const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue }), [sources, previews, onOpenIssue])
 
-  async function send(event?: FormEvent) {
-    event?.preventDefault()
-    const text = draft.trim()
-    if (!text || sending) return
+  /** Sends `text` to the Coordinator; false if it did not go. */
+  async function post(text: string) {
+    if (!text || sending) return false
     setSending(true)
     setSendError(null)
     try {
       const result = await sendCoordinatorMessage(text)
-      if (result.error) { setSendError(actionError(result.error)); return }
-      setDraft('')
+      if (result.error) { setSendError(actionError(result.error)); return false }
       await mutate()
-    } catch { setSendError(actionError()) } finally { setSending(false) }
+      return true
+    } catch { setSendError(actionError()); return false } finally { setSending(false) }
+  }
+  async function send(event?: FormEvent) {
+    event?.preventDefault()
+    const text = draft.trim()
+    if (await post(text)) setDraft(current => current.trim() === text ? '' : current)
   }
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
@@ -46,7 +56,8 @@ export function CoordinatorChat({ onOpenIssue }: { onOpenIssue: (id: string) => 
     void send()
   }
 
-  return <section aria-label={t('label')} className="flex min-h-0 flex-1 flex-col">
+  return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
+  <section aria-label={t('label')} className="orvilo-agent flex min-h-0 flex-1 flex-col">
     <MessageScrollerProvider defaultScrollPosition="end">
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={t('conversation')}>
@@ -56,7 +67,9 @@ export function CoordinatorChat({ onOpenIssue }: { onOpenIssue: (id: string) => 
               {item.from === 'event'
                 ? <p className="text-center text-xs text-muted-foreground">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
-                    {item.text && <Bubble variant={item.from === 'person' ? 'secondary' : 'ghost'} align={item.from === 'person' ? 'end' : 'start'}><BubbleContent className="whitespace-pre-wrap">{item.from === 'coordinator' ? <CitedText text={item.text} sources={data?.sources ?? {}} onOpenIssue={onOpenIssue} /> : item.text}</BubbleContent></Bubble>}
+                    {item.text && (item.from === 'coordinator'
+                      ? <Bubble variant="ghost" align="start" className="w-full min-w-0"><BubbleContent className="w-full min-w-0"><CoordinatorReply text={item.text} citations={citations} /></BubbleContent></Bubble>
+                      : <Bubble variant="secondary" align="end"><BubbleContent className="whitespace-pre-wrap">{item.text}</BubbleContent></Bubble>)}
                     {item.tools.length > 0 && <MessageFooter>{t('usedTools', { tools: [...new Set(item.tools)].join(', ') })}</MessageFooter>}
                   </MessageContent></Message>}
             </MessageScrollerItem>)}
@@ -81,4 +94,5 @@ export function CoordinatorChat({ onOpenIssue }: { onOpenIssue: (id: string) => 
       </form>
     </div>
   </section>
+  </AgentInteractionContext></AgentThemeProvider>
 }
