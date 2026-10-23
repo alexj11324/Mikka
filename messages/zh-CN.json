@@ -2269,6 +2269,16 @@
       "knowledgePrompt": "帮我把常用的资料整理进知识库：",
       "schedulesPrompt": "帮我设一个定时任务："
     },
+    "newTaskDialog": {
+      "title": "新建任务",
+      "description": "用一句话描述要做的事，Coordinator 会帮你建好任务。",
+      "label": "任务描述",
+      "placeholder": "要它做什么？",
+      "prompt": "帮我新建一个任务：{text}",
+      "create": "创建任务",
+      "sending": "正在发送…",
+      "failed": "没发出去，请重试。"
+    },
     "board": {
       "toolbar": "看板工具栏",
       "scopeLabel": "任务范围",
@@ -2308,7 +2318,7 @@
         "labels": "标签",
         "project": "项目",
         "linkPr": "关联 PR",
-        "discuss": "在 Coordinator 中讨论",
+        "discuss": "讨论",
         "delete": "删除",
         "agent": { "running": "运行中", "waiting": "等你审批", "failed": "运行失败" }
       },

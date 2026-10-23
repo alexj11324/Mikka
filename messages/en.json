@@ -2269,6 +2269,16 @@
       "knowledgePrompt": "Help me put the documents I use often into the knowledge base: ",
       "schedulesPrompt": "Help me set up a scheduled task: "
     },
+    "newTaskDialog": {
+      "title": "New task",
+      "description": "Describe what needs doing and the Coordinator will create the task.",
+      "label": "Task description",
+      "placeholder": "What should it do?",
+      "prompt": "Create a task for me: {text}",
+      "create": "Create task",
+      "sending": "Sending…",
+      "failed": "Couldn't send. Try again."
+    },
     "board": {
       "toolbar": "Board toolbar",
       "scopeLabel": "Task scope",
@@ -2308,7 +2318,7 @@
         "labels": "Labels",
         "project": "Project",
         "linkPr": "Link PR",
-        "discuss": "Discuss with Coordinator",
+        "discuss": "Discuss",
         "delete": "Delete",
         "agent": { "running": "Running", "waiting": "Needs approval", "failed": "Run failed" }
       },

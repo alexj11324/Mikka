@@ -8,6 +8,7 @@ import type { listIssues } from '@/app/actions/issues'
 import { listAgents } from '@/app/actions/agents'
 import { listTaskRuns } from '@/app/actions/task-runs'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
+import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { ConversationPill } from '@/components/nav/conversation-pill'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { AGENT_STATES, CARD_PROPERTIES, DEFAULT_CARD_PROPERTIES, DEFAULT_HIDDEN_COLUMNS, agentStateOf, type AgentState, type CardProperty } from '@/components/blocks/kanban-board-1/components/data'
@@ -84,14 +85,14 @@ function useStoredFlag(key: string, fallback: boolean) {
 
 /**
  * The board page, v2 (Figma 77:2): scope segment, filters, Linear sync, board
- * or list, 显示 options and 新建任务 over five status columns, with the
+ * or list, 显示 options and 新建任务 (described in a sentence, created by the
+ * Coordinator) over five status columns, with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
-export function BoardPage({ issues, userId, onOpen, onCreateIssue, onUpdated, onBusyChange }: {
+export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   issues: Issue[]
   userId: string
   onOpen: (id: string) => boolean | void
-  onCreateIssue: () => void
   onUpdated: () => Promise<unknown>
   onBusyChange: (busy: boolean) => void
 }) {
@@ -105,6 +106,7 @@ export function BoardPage({ issues, userId, onOpen, onCreateIssue, onUpdated, on
   const { scope, view, filters, display } = settings
   const [sidebar, setSidebar] = useStoredFlag(SIDEBAR_KEY, true)
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
+  const [newTask, setNewTask] = useState(false)
   const { data: agents } = useSWR('agents', () => listAgents(), { revalidateOnFocus: false })
   const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000, revalidateOnFocus: false })
   const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
@@ -225,12 +227,12 @@ export function BoardPage({ issues, userId, onOpen, onCreateIssue, onUpdated, on
               </div>
             </PopoverContent>
           </Popover>
-          <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={onCreateIssue}><Plus data-icon="inline-start" />{t('newTask')}</Button>
+          <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setNewTask(true)}><Plus data-icon="inline-start" />{t('newTask')}</Button>
         </div>
       </div>
       {view === 'board'
         ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} context={{ properties: new Set(display.properties), agentStates, subtasks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { setSidebar(true); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
-        : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={onCreateIssue} /></div>}
+        : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
     {sidebar && <aside aria-label={tNav('coordinator')} className="relative hidden w-90 shrink-0 flex-col border-l lg:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}
@@ -239,5 +241,6 @@ export function BoardPage({ issues, userId, onOpen, onCreateIssue, onUpdated, on
       <div aria-hidden="true" className="h-14 shrink-0" />
       <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { onOpen(id) }} />
     </aside>}
+    <NewTaskDialog open={newTask} onOpenChange={setNewTask} onSent={() => setSidebar(true)} />
   </div>
 }
