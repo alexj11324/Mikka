@@ -2198,6 +2198,21 @@
     "send": "Send to agent",
     "sending": "Sending…",
     "sendFailed": "Could not send your message. Your draft is preserved.",
-    "ended": "This run has ended. You can still read it and comment on its run record."
+    "ended": "This run has ended. You can still read it and comment on its run record.",
+    "sharedRun": "Shared run discussion",
+    "sharedPrivacy": "These comments are shared through this Issue. Private run output and status are only available to the run owner.",
+    "refresh": "Refresh runs",
+    "summary": "Summary",
+    "filesChanged": "Changed files",
+    "verify": "Verification",
+    "openQuestions": "Open questions",
+    "nextStep": "Next step",
+    "blockedOn": "Blocked on",
+    "knownIssues": "Known issues",
+    "notesForNext": "Handoff notes",
+    "otherReport": "Other report data",
+    "command": "Command",
+    "status": "Status",
+    "verifyOutput": "Output"
   }
 }

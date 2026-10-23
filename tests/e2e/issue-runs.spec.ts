@@ -23,7 +23,7 @@ async function seedRuns(email: string, title: string) {
   } finally { await pool.end() }
 }
 
-test('Issue full-page navigation, run discussion persistence and independent session sidebar', async ({ page }) => {
+test('Issue full-page navigation, run discussion persistence and independent session sidebar', async ({ page }, testInfo) => {
   const { email } = await register(page)
   await page.getByRole('button', { name: '任务', exact: true }).click()
   await page.getByRole('button', { name: '新建任务', exact: true }).click()
@@ -54,6 +54,11 @@ test('Issue full-page navigation, run discussion persistence and independent ses
     await expect(session).not.toBeVisible()
   }
   await openers.first().click()
+  // Non-modal sidebar: editing the underlying detail remains possible while it is open.
+  const editedTitle = `${title} edited`
+  await page.getByLabel('任务标题', { exact: true }).fill(editedTitle)
+  await page.getByLabel('任务标题', { exact: true }).blur()
+  await testInfo.attach('independent-sidebar', { body: await page.screenshot(), contentType: 'image/png' })
   await expect(page.getByRole('dialog', { name: 'Issue sidebar agent 的会话', exact: true })).toBeVisible()
   await page.keyboard.press('Escape')
   await records.getByRole('button', { name: '评论', exact: true }).first().click()
@@ -62,8 +67,9 @@ test('Issue full-page navigation, run discussion persistence and independent ses
   await expect(records.getByText('Saved run discussion', { exact: true })).toBeVisible()
   // Board navigation uses the existing document flush before unmounting the editor.
   await page.getByRole('button', { name: '看板', exact: true }).click()
-  await page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true }).click()
+  await page.getByRole('region', { name: '任务看板', exact: true }).getByText(editedTitle, { exact: true }).click()
   await page.reload()
+  await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(editedTitle)
   await expect(records.getByText('Saved run discussion', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '看板', exact: true }).click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
