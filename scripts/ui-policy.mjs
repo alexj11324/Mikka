@@ -57,7 +57,7 @@ const groupRules = new Map([
 ])
 const overlays = /^(?:Dialog|AlertDialog|Sheet|Drawer|DropdownMenu|ContextMenu|Menubar|Popover|Tooltip|HoverCard).*(?:Content|Overlay)$/
 
-function checkUtility(token, policy, report, options = {}) {
+function checkUtility(token, policy, report) {
   const base = utilityBase(token)
   const arbitraryTextColor = /^text-(?:\[(?:color:|#|(?:rgb|rgba|hsl|hsla|hwb|lab|lch|oklab|oklch|color|color-mix)\(|(?:Canvas|CanvasText|LinkText|VisitedText|ActiveText|ButtonFace|ButtonText|ButtonBorder|Field|FieldText|Highlight|HighlightText|SelectedItem|SelectedItemText|Mark|MarkText|GrayText|AccentColor|AccentColorText|transparent|currentColor)\])|\(color:)/i.test(base)
   if ((/^text-(?:\[|\()/.test(base) && !arbitraryTextColor) || /^(?:font|leading|tracking)-(?:\[|\()/.test(base) || /^\[(?:font|line-height|letter-spacing)/.test(base)) {
@@ -71,26 +71,32 @@ function checkUtility(token, policy, report, options = {}) {
     const slash = base.match(/^text-(xs|sm|base|lg|xl|\d+xl)\/(.+)$/)
     if (slash && !policy.typography.leading.includes(slash[2])) report('typography/preset-only', `未批准的行高 ${token}。`)
   }
-  // 用户偏好无分割线：全宽水平长线一律用留白 / 背景分组替代。
-  // 竖线（border-l/r、orientation="vertical"）不在此列；0 宽与 transparent 不构成可见线。
-  // 设置页按 Comma 的分组卡片采用 0.5px 行分隔线；其余界面保持无分割线。
-  if (!options.allowHorizontalRule) {
-    const horizontalBorder = base.match(/^border-([tby])(?:-(.+))?$/)
-    if (horizontalBorder && !['0', '0px', '[0px]', 'transparent', '[transparent]'].includes(horizontalBorder[2])) report('style/no-horizontal-rule', `禁止全宽水平长线 ${token}；用间距或背景分组。`)
-    const divide = base.match(/^divide-y(?:-(.+))?$/)
-    if (divide && !['0', 'reverse'].includes(divide[1])) report('style/no-horizontal-rule', `禁止全宽水平长线 ${token}；用间距或背景分组。`)
-  }
+  // MIK-4 分隔线规范（Design Lead 定稿，见 AGENTS.md「Dividers」）：divide-* 只用默认粗细与默认 border 颜色 token。
+  // divide-y / divide-x / divide-y-0 / divide-*-reverse 合法；粗细、颜色、线型、透明度一律禁止。
+  const divide = base.match(/^divide-(.+)$/)
+  if (divide && !/^(?:[xy]|[xy]-0|[xy]-reverse)$/.test(divide[1])) report('style/divider-default', `分隔线只用默认样式：${token} 指定了粗细、颜色或线型（包括显式写默认的 divide-border，颜色已由全局 border-border 提供）；去掉它，只写 divide-y / divide-x。`)
   if (palette.test(base) || arbitraryTextColor || /^(?:bg|border|ring|fill|stroke|outline)-(?:\[|\()/.test(base)) report('style/semantic-colors', `颜色必须使用语义 token：${token}。`)
   if (/^space-[xy]-/.test(base)) report('style/gap', `使用 flex/grid + gap，不使用 ${token}。`)
   if (/(?:^|:)dark:/.test(token) && /^(?:bg|text|border|ring|fill|stroke|outline)-/.test(base) && !base.endsWith('-transparent')) report('style/no-dark-color-override', `用语义 token 处理明暗主题，不单独覆盖 ${token}。`)
 }
 
+// 分隔线豁免：文件级（规范明确保留的组件）+ 代码注释级（`ui-policy-allow divider: 理由`，PR 需 @Design Lead）。
+export const DIVIDER_EXEMPT_FILES = ['components/chat/unread-divider.tsx']
+const DIVIDER_RULES = new Set(['style/divider-list-item', 'style/divider-default', 'style/divider-element', 'style/divider-between-bordered', 'style/divider-edge'])
+const DIVIDER_ALLOW_COMMENT = /ui-policy-allow\s+divider\s*:\s*\S/
+
 export function auditSource(file, text, policy) {
-  const allowHorizontalRule = file.startsWith('components/settings/')
+  const dividerExemptFile = DIVIDER_EXEMPT_FILES.includes(file)
+  const lines = text.split('\n')
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), variables = new Map(), seen = new Set()
   const add = (node, rule, message) => {
     const start = node.getStart(source)
+    if (DIVIDER_RULES.has(rule)) {
+      if (dividerExemptFile) return
+      const at = source.getLineAndCharacterOfPosition(start).line
+      if (lines.slice(Math.max(0, at - 2), at + 1).some(line => DIVIDER_ALLOW_COMMENT.test(line))) return
+    }
     const key = `${start}:${rule}:${message}`
     if (seen.has(key)) return
     seen.add(key)
@@ -186,10 +192,63 @@ export function auditSource(file, text, policy) {
     if (ts.isJsxElement(node.parent)) node.parent.children.forEach(visit)
     return found
   }
+  const classTokens = element => {
+    const o = opening(element)
+    const initializer = o && attr(o, 'className')?.initializer
+    const expression = initializer && (ts.isJsxExpression(initializer) ? initializer.expression : initializer)
+    return expression ? resolve(expression).strings.flatMap(value => splitUtilities(value)) : []
+  }
+  // 已有边框 / 背景 / 卡片：Card，或 className 带整框 border、bg-*（不含 transparent）、ring。
+  const isBordered = element => {
+    const o = opening(element)
+    if (!o) return false
+    if (['Card', 'Alert', 'Item'].includes(canonical(o)) && (canonical(o) === 'Card' || /outline|muted/.test(attr(o, 'variant')?.initializer?.getText(source) ?? ''))) return true
+    return classTokens(element).some(token => {
+      if (/(?:^|:)(?:hover|focus|focus-visible|active|data-|aria-|group-|peer-|dark)/.test(token.slice(0, token.lastIndexOf(':') + 1))) return false
+      const base = utilityBase(token)
+      return /^border(?:-\d+|-\[\d+px\])?$/.test(base) || /^ring(?:-\d+)?$/.test(base) || (base.startsWith('bg-') && !/^bg-(?:transparent|none|clip-|origin-|cover|contain|center|repeat|no-repeat|fixed|local|scroll|auto|blend-)/.test(base))
+    })
+  }
+  // 直接 JSX 子项；子项是 {list.map(x => <Row />)} 时取回调返回的元素。
+  const jsxChildren = node => {
+    if (!ts.isJsxOpeningElement(node) || !ts.isJsxElement(node.parent)) return []
+    const out = []
+    const collect = expression => {
+      if (!expression) return
+      if (ts.isParenthesizedExpression(expression)) return collect(expression.expression)
+      if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) return out.push(expression)
+      if (ts.isConditionalExpression(expression)) { collect(expression.whenTrue); collect(expression.whenFalse); return }
+      if (ts.isBinaryExpression(expression)) return collect(expression.right)
+      if (ts.isCallExpression(expression) && ts.isPropertyAccessExpression(expression.expression) && expression.expression.name.text === 'map') {
+        const callback = expression.arguments[0]
+        if (callback && (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback))) {
+          if (!ts.isBlock(callback.body)) collect(callback.body)
+          else ts.forEachChild(callback.body, function walk(n) { if (ts.isReturnStatement(n)) collect(n.expression); else if (!ts.isFunctionLike(n)) ts.forEachChild(n, walk) })
+        }
+      }
+    }
+    for (const child of node.parent.children) {
+      if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) out.push(child)
+      else if (ts.isJsxExpression(child)) collect(child.expression)
+    }
+    return out
+  }
+  // 元素是否为 .map() 回调直接返回的根元素（即重复的列表项）。
+  const isMapItem = node => {
+    let element = ts.isJsxSelfClosingElement(node) ? node : node.parent
+    let p = element.parent
+    while (p && ts.isParenthesizedExpression(p)) p = p.parent
+    let fn = null
+    if (p && (ts.isArrowFunction(p) || ts.isFunctionExpression(p))) fn = p
+    else if (p && ts.isReturnStatement(p)) { for (let q = p.parent; q; q = q.parent) if (ts.isFunctionLike(q)) { fn = q; break } }
+    if (!fn || !(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))) return false
+    const call = fn.parent
+    return !!call && ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression) && ['map', 'flatMap'].includes(call.expression.name.text)
+  }
   function visit(node) {
     const cssAssertionProperty = /\.spec\.[jt]sx?$/.test(file) && !!node.parent && ts.isCallExpression(node.parent) && ts.isPropertyAccessExpression(node.parent.expression) && node.parent.expression.name.text === 'toHaveCSS' && node.parent.arguments[0] === node
     if (ts.isStringLiteralLike(node) && !cssAssertionProperty) {
-      for (const token of splitUtilities(node.text)) if (/^(?:text-|font-|leading-|tracking-|bg-|border-|divide-|ring-|outline-|fill-|stroke-|space-[xy]-|\[(?:font|line-height|letter-spacing))/.test(utilityBase(token))) checkUtility(token, policy, (rule, message) => add(node, rule, message), { allowHorizontalRule })
+      for (const token of splitUtilities(node.text)) if (/^(?:text-|font-|leading-|tracking-|bg-|border-|divide-|ring-|outline-|fill-|stroke-|space-[xy]-|\[(?:font|line-height|letter-spacing))/.test(utilityBase(token))) checkUtility(token, policy, (rule, message) => add(node, rule, message))
     }
     if (ts.isPropertyAssignment(node) && /^(?:fontSize|fontFamily|fontWeight|lineHeight|letterSpacing|fontVariant|fontStyle)$/.test(node.name.getText(source).replaceAll(/['"]/g, ''))) add(node, 'typography/no-inline-values', '排版只能通过预设档位；不允许 style/配置对象手写字体值。')
     if (ts.isCallExpression(node)) {
@@ -228,8 +287,16 @@ export function auditSource(file, text, policy) {
           if (tokens.includes('overflow-hidden') && tokens.includes('text-ellipsis') && tokens.includes('whitespace-nowrap')) add(classAttr, 'style/truncate', '使用 truncate 简写。')
           const bases = tokens.map(utilityBase)
           if (['FieldLabel', 'FieldTitle'].includes(name) && bases.some(base => base === 'font-normal' || /^text-(?:muted-foreground|secondary-foreground)(?:\/|$)/.test(base))) add(classAttr, 'forms/label-hierarchy', '字段主标题使用 FieldLabel / FieldTitle 默认的 foreground + medium；辅助说明使用 FieldDescription，不降低标题层级。')
-          const drawnRule = bases.some(base => /^h-(?:px|0\.5)$/.test(base)) && bases.some(base => /^bg-(?!transparent|none$|clip-|origin-|cover|contain|center|left|right|top|bottom|repeat|no-repeat|fixed|local|scroll|auto|blend-)/.test(base))
-          if (drawnRule) add(classAttr, 'style/no-horizontal-rule', '禁止用 h-px/0.5 + bg-* 手画水平细线；用间距或背景分组。')
+          const filled = bases.some(base => /^bg-(?!transparent|none$|clip-|origin-|cover|contain|center|left|right|top|bottom|repeat|no-repeat|fixed|local|scroll|auto|blend-)/.test(base))
+          const drawnRule = filled && bases.some(base => /^[hw]-(?:px|0\.5|\[(?:0\.5|1|2)px\])$/.test(base))
+          if (drawnRule && name !== 'Separator') add(classAttr, 'style/divider-element', '不要用 h-px / w-px + bg-* 手画分隔线；改用 <Separator />（列表行用父容器 divide-y）。')
+          const sideRule = bases.some(base => /^border-[tby](?:-(?!0$|0px$|\[0px\]$|transparent$|\[transparent\]$).+)?$/.test(base))
+          const edgeReset = tokens.some(token => /(?:^|:)(?:last|first|last-of-type|first-of-type):!?border-(?:[tby]-)?0!?$/.test(token))
+          if (sideRule && (edgeReset || isMapItem(node))) add(classAttr, 'style/divider-list-item', '列表项之间不写 border-b / border-t（含 last:border-0 写法）；在父容器上用 divide-y。border-b 只用于页面顶栏、面板标题栏等布局边界。')
+          if (bases.some(base => /^divide-[xy](?:-reverse)?$/.test(base))) {
+            const bordered = jsxChildren(node).find(child => isBordered(child))
+            if (bordered) add(classAttr, 'style/divider-between-bordered', `divide-* 的子项（<${canonical(bordered)}>）已有边框/背景/卡片，不再加分隔线；改用 gap。`)
+          }
           for (const token of tokens) {
             const base = utilityBase(token)
             // 组件调用处的视觉 class 不做限制。Mikka 的规则集里没有这一条，
@@ -254,7 +321,24 @@ export function auditSource(file, text, policy) {
         const expression = orientation?.initializer && (ts.isJsxExpression(orientation.initializer) ? orientation.initializer.expression : orientation.initializer)
         const value = expression ? resolve(expression) : { strings: [], known: true }
         const vertical = value.known && value.strings.length > 0 && value.strings.every(item => item === 'vertical')
-        if (!vertical) add(node, 'style/no-horizontal-rule', '禁止水平 <Separator />；用间距或背景分组，只保留竖线分隔。')
+        const custom = (() => {
+          const initializer = attr(node, 'className')?.initializer
+          const expression = initializer && (ts.isJsxExpression(initializer) ? initializer.expression : initializer)
+          return resolve(expression).strings.flatMap(value => splitUtilities(value)).filter(token => {
+            const base = utilityBase(token)
+            return /^(?:bg|border|opacity|divide)-/.test(base) || base.startsWith(vertical ? 'w-' : 'h-')
+          })
+        })()
+        if (custom.length) add(node, 'style/divider-default', `<Separator /> 只用默认颜色和粗细，去掉 ${custom.join(' ')}。`)
+        const self = ts.isJsxSelfClosingElement(node) ? node : node.parent
+        const siblings = ts.isJsxElement(self.parent) ? self.parent.children : []
+        const elements = siblings.filter(child => !(ts.isJsxText(child) && !child.text.trim()))
+        const index = elements.indexOf(self)
+        if (index !== -1) {
+          if (index === 0 || index === elements.length - 1) add(node, 'style/divider-edge', '容器第一项前、最后一项后不加分隔线。')
+          const neighbours = [elements[index - 1], elements[index + 1]].filter(Boolean)
+          if (neighbours.some(child => isBordered(child))) add(node, 'style/divider-between-bordered', '已有边框/背景/卡片的元素之间不再加 <Separator />；改用 gap。')
+        }
       }
       if (name === 'Button' && (attr(node, 'isLoading') || attr(node, 'isPending'))) add(node, 'composition/button-loading', 'Button 使用 Spinner + disabled，不存在 isLoading/isPending。')
       if (['Input', 'Textarea'].includes(name) && parents.includes('InputGroup')) add(node, 'forms/input-group', 'InputGroup 内使用 InputGroupInput/InputGroupTextarea。')

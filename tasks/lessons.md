@@ -130,18 +130,10 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 ---
 
 
-## 2026-10-20 用户偏好：不要全宽水平长线
+## 2026-10-20 用户偏好：不要全宽水平长线（已被 MIK-4 取代）
 
-**发生了什么**：截图指出表格头下方那条贯穿整行的分割线，明确说「agent 很喜欢用这种长线，
-我喜欢不带线的」。
-
-**规则**：
-
-1. 业务 UI 不做全宽水平分割线：不用 `border-t/b/y`、`divide-y`、水平 `<Separator />`、
-   `h-px bg-*`。分组用间距（`gap-*`）或背景（`bg-muted/*`）。
-2. 竖线（`border-l/r`、`orientation="vertical"`）和盒状边框（`border`）可以保留。
-3. 这条已经落在 `style/no-horizontal-rule`；先跑 `node scripts/lint-ui.mjs`，不要靠肉眼。
-
+原规则「业务 UI 一律不做水平分割线」已由 Design Lead 的 MIK-4 分隔线规范取代，现行规则只写在 AGENTS.md 的「Dividers (MIK-4)」一节，这里不再重复。
+当时的教训仍然有效：不要随手加贯穿整行的长线；先跑 `node scripts/lint-ui.mjs`，不要靠肉眼。
 
 ---
 

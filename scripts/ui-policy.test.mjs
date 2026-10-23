@@ -46,13 +46,25 @@ for (const [label, source, rule] of [
   ['dark color override', '<Button className="dark:bg-muted" />', 'style/no-dark-color-override'],
   ['conditional classes', '<Button className={active ? "flex" : "grid"} />', 'style/use-cn'],
   ['equal dimensions', '<Button className="h-4 w-4" />', 'style/size-shorthand'],
-  ['horizontal bottom rule', '<div className="border-b" />', 'style/no-horizontal-rule'],
-  ['horizontal top rule', '<div className="lg:border-t-2" />', 'style/no-horizontal-rule'],
-  ['horizontal both rule', '<div className="border-y" />', 'style/no-horizontal-rule'],
-  ['row divider rule', '<div className="divide-y" />', 'style/no-horizontal-rule'],
-  ['hand-drawn rule', '<div className="h-px w-full bg-border" />', 'style/no-horizontal-rule'],
-  ['horizontal separator', 'import { Separator } from "@/components/ui/separator"; const ui = <Separator />', 'style/no-horizontal-rule'],
-  ['dynamic separator orientation', 'import { Separator } from "@/components/ui/separator"; const ui = <Separator orientation={vertical ? "vertical" : "horizontal"} />', 'style/no-horizontal-rule'],
+  ['list item bottom rule with last reset', '<div className="border-b last:border-0" />', 'style/divider-list-item'],
+  ['list item top rule with first reset', '<div className="border-t first:border-t-0" />', 'style/divider-list-item'],
+  ['mapped list item bottom rule', 'const ui = items.map(item => <div key={item} className="border-b py-2" />)', 'style/divider-list-item'],
+  ['mapped list item via return', 'const ui = items.map(item => { return (<div key={item} className="border-y" />) })', 'style/divider-list-item'],
+  ['divide custom color', '<div className="divide-y divide-muted" />', 'style/divider-default'],
+  ['divide explicit default token', '<div className="divide-y divide-border" />', 'style/divider-default'],
+  ['divide custom width', '<div className="divide-y-2" />', 'style/divider-default'],
+  ['divide arbitrary color', '<div className="divide-y divide-[#eee]" />', 'style/divider-default'],
+  ['divide dashed', '<div className="divide-y divide-dashed" />', 'style/divider-default'],
+  ['separator custom color', 'import { Separator } from "@/components/ui/separator"; import { Card, CardHeader, CardContent } from "@/components/ui/card"; const ui = <div><span /><Separator className="bg-border/50" /><span /></div>', 'style/divider-default'],
+  ['separator custom thickness', 'import { Separator } from "@/components/ui/separator"; import { Card, CardHeader, CardContent } from "@/components/ui/card"; const ui = <div><span /><Separator className="h-0.5" /><span /></div>', 'style/divider-default'],
+  ['hand-drawn horizontal rule', '<div className="h-px w-full bg-border" />', 'style/divider-element'],
+  ['hand-drawn vertical rule', '<div className="h-4 w-px bg-border" />', 'style/divider-element'],
+  ['divide between cards', 'import { Separator } from "@/components/ui/separator"; import { Card, CardHeader, CardContent } from "@/components/ui/card"; const ui = <div className="divide-y"><Card><CardHeader /><CardContent /></Card></div>', 'style/divider-between-bordered'],
+  ['divide between bordered mapped items', 'const ui = <div className="divide-y">{items.map(i => <div key={i} className="rounded-lg border p-3" />)}</div>', 'style/divider-between-bordered'],
+  ['divide between filled items', '<div className="divide-y"><div className="bg-muted" /></div>', 'style/divider-between-bordered'],
+  ['separator next to card', 'import { Separator } from "@/components/ui/separator"; import { Card, CardHeader, CardContent } from "@/components/ui/card"; const ui = <div><span /><Separator /><Card><CardHeader /><CardContent /></Card></div>', 'style/divider-between-bordered'],
+  ['separator as first item', 'import { Separator } from "@/components/ui/separator"; import { Card, CardHeader, CardContent } from "@/components/ui/card"; const ui = <div><Separator /><span /></div>', 'style/divider-edge'],
+  ['separator as last item', 'import { Separator } from "@/components/ui/separator"; import { Card, CardHeader, CardContent } from "@/components/ui/card"; const ui = <div><span /><Separator /></div>', 'style/divider-edge'],
   ['truncate shorthand', '<Button className="overflow-hidden text-ellipsis whitespace-nowrap" />', 'style/truncate'],
   ['overlay stacking', 'import { DialogContent } from "@/components/ui/dialog"; const ui = <DialogContent className="z-50" />', 'style/overlay-stacking'],
   ['aliased menu grouping', 'import { SelectItem as Option } from "@/components/ui/select"; const ui = <Option />', 'composition/group'],
@@ -99,19 +111,39 @@ test('valid grouped items + title + avatar', () => {
   assert.deepEqual(rules(source), [])
 })
 
-test('vertical separators, box borders and spacing-based grouping stay legal', () => {
+test('spec-approved dividers stay legal', () => {
   const source = `${prefix}
     import { Separator } from '@/components/ui/separator';
     const orientation = 'vertical';
     const ui = <div className="flex flex-col gap-6 rounded-lg border p-4">
-      <Separator orientation="vertical" />
-      <Separator orientation={'vertical'} />
-      <Separator orientation={\`vertical\`} />
-      <Separator orientation={orientation} />
+      <header className="sticky top-0 border-b px-4">title</header>
+      <div className="divide-y">{rows.map(row => <div key={row.id} className="flex h-10 items-center px-3">{row.name}</div>)}</div>
+      <div className="flex items-center gap-2"><span /><Separator orientation="vertical" /><span /><Separator orientation={orientation} className="data-vertical:h-4" /><span /></div>
+      <section>a</section>
+      <Separator />
+      <section>b</section>
       <div className="border-l border-t-0 border-t-transparent divide-y-0 divide-x" />
       <div className="h-px w-8 bg-transparent" />
+      <footer className="border-t p-3">footer</footer>
     </div>`
   assert.deepEqual(rules(source), [])
+})
+
+test('divider exemptions: code comment with a reason, and the unread divider file', () => {
+  const source = `${prefix}
+    const ui = items.map(item => (
+      // ui-policy-allow divider: sticky table header row needs its own rule
+      <div key={item} className="border-b last:border-0" />
+    ))`
+  assert.deepEqual(rules(source), [])
+  const noReason = `${prefix}
+    const ui = items.map(item => (
+      // ui-policy-allow divider:
+      <div key={item} className="border-b last:border-0" />
+    ))`
+  assert.ok(rules(noReason).includes('style/divider-list-item'), 'exemption without a reason must not count')
+  const unread = `import { Separator } from '@/components/ui/separator'; const ui = <div><Separator className="bg-primary" /></div>`
+  assert.deepEqual(auditSource('components/chat/unread-divider.tsx', unread, policy).filter(d => d.rule.startsWith('style/divider')), [])
 })
 
 test('business code cannot bypass typography presets', () => {
