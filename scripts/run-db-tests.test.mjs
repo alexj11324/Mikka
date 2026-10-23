@@ -51,6 +51,14 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(plan.scripts.includes('test:groups'))
   assert.ok(plan.scripts.includes('test:workspace-migration-db'))
   const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
+  const pinned = workflow.match(/DB_TEST_EXPECTED: ([^\n]+)/)?.[1].split(',').sort()
+  assert.deepEqual(pinned, plan.scripts, 'workflow explicitly pins every suite expected on this tree')
+  for (const script of ['test:active-agents', 'test:group-turns', 'test:issue-search']) {
+    if (pkg[script]) {
+      assert.ok(workflow.includes(`pnpm ${script}`), `${script} strict pure gate retained`)
+      assert.ok(pkg.check.includes(`pnpm ${script}`), `${script} pure gate in check`)
+    }
+  }
   assert.ok(workflow.includes(BOOTSTRAP))
   assert.ok(workflow.indexOf(BOOTSTRAP) < workflow.indexOf('- run: pnpm test:e2e:setup'))
   assert.ok(workflow.indexOf('- run: pnpm test:e2e:setup') < workflow.indexOf('run: pnpm test:db\n'))
