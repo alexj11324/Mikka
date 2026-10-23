@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm'
 import type { AuthInfo } from '@modelcontextprotocol/server'
 import { db } from '@/lib/db'
 import { MCP_SCOPE } from '@/lib/mcp/resource'
+import { agentActor, type ActivityActor } from '@/lib/activity-actor'
 
 /** Prefix the OAuth provider puts on access tokens (lib/auth.ts); it is not stored. */
 const ACCESS_TOKEN_PREFIX = 'mka_'
@@ -13,6 +14,11 @@ export function mcpUserId(authInfo: AuthInfo | undefined): string {
   const userId = authInfo?.extra?.userId
   if (typeof userId !== 'string') throw new Error('MCP request is not authenticated')
   return userId
+}
+
+/** Who issue history records for an MCP write: the agent behind the verified token (its OAuth client id, or `run:<id>` for a run token). */
+export function mcpActor(authInfo: AuthInfo | undefined): ActivityActor {
+  return agentActor(typeof authInfo?.clientId === 'string' && authInfo.clientId ? authInfo.clientId : null)
 }
 
 /**
