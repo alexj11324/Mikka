@@ -381,7 +381,6 @@
     "draggableTask": "Draggable task",
     "horizontalScroll": "Scroll the task board horizontally",
     "columnLabel": "{status} task column",
-    "newTaskIn": "New {status} task",
     "columnContent": "{status} column",
     "dropHere": "Drop tasks here",
     "savingProperties": "Saving task properties…",
@@ -2271,11 +2270,14 @@
     },
     "newTaskDialog": {
       "title": "New task",
-      "description": "Describe what needs doing and the Coordinator will create the task.",
+      "description": "Describe what needs doing and the task is created for you.",
       "label": "Task description",
       "placeholder": "What should it do?",
       "promptWithContext": "Create a task for me ({context}): {text}",
-      "contextStatus": "status: {status}",
+      "contextDevice": "run it on {device}",
+      "device": "Machine",
+      "noDevice": "No machine connected",
+      "offline": "Offline",
       "contextProject": "project: {project}",
       "contextSeparator": ", ",
       "prompt": "Create a task for me: {text}",
@@ -2330,8 +2332,8 @@
       "synced": "Synced with Linear",
       "onlyMine": "Only mine",
       "coordinatorPlaceholder": "Tell the Coordinator what to arrange…",
-      "collapse": "Collapse Coordinator",
-      "expand": "Expand Coordinator",
+      "collapse": "Hide conversation",
+      "expand": "Show conversation",
       "unassigned": "Unassigned"
     }
   }

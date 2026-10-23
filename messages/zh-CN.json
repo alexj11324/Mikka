@@ -381,7 +381,6 @@
     "draggableTask": "可拖动任务",
     "horizontalScroll": "横向滚动任务看板",
     "columnLabel": "{status}任务列",
-    "newTaskIn": "新建{status}任务",
     "columnContent": "{status}列",
     "dropHere": "拖动任务到这里",
     "savingProperties": "正在保存任务属性…",
@@ -2271,11 +2270,14 @@
     },
     "newTaskDialog": {
       "title": "新建任务",
-      "description": "用一句话描述要做的事，Coordinator 会帮你建好任务。",
+      "description": "用一句话描述要做的事，会自动建好任务。",
       "label": "任务描述",
       "placeholder": "要它做什么？",
       "promptWithContext": "帮我新建一个任务（{context}）：{text}",
-      "contextStatus": "状态：{status}",
+      "contextDevice": "在 {device} 上做",
+      "device": "运行的机器",
+      "noDevice": "未连接机器",
+      "offline": "离线",
       "contextProject": "项目：{project}",
       "contextSeparator": "，",
       "prompt": "帮我新建一个任务：{text}",
@@ -2330,8 +2332,8 @@
       "synced": "已与 Linear 同步",
       "onlyMine": "只看我的",
       "coordinatorPlaceholder": "告诉 Coordinator 怎么安排…",
-      "collapse": "收起 Coordinator",
-      "expand": "展开 Coordinator",
+      "collapse": "收起对话",
+      "expand": "展开对话",
       "unassigned": "未分配"
     }
   }

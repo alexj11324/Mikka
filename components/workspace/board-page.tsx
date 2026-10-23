@@ -106,7 +106,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const { scope, view, filters, display } = settings
   const [sidebar, setSidebar] = useStoredFlag(SIDEBAR_KEY, true)
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
-  const [newTask, setNewTask] = useState<{ status?: IssueStatus } | null>(null)
+  const [newTask, setNewTask] = useState(false)
   const { data: agents } = useSWR('agents', () => listAgents(), { revalidateOnFocus: false })
   const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000, revalidateOnFocus: false })
   const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
@@ -220,15 +220,13 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
               </div>
             </PopoverContent>
           </Popover>
-          <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setNewTask({})}><Plus data-icon="inline-start" />{t('newTask')}</Button>
-          {!sidebar && <Button variant="secondary" size="sm" className="ml-1 gap-2 rounded-full pr-3 pl-1 font-semibold" aria-expanded={false} aria-label={t('expand')} onClick={() => setSidebar(true)}>
-            <LetterAvatar name="Coordinator" tone="coordinator" size="pill" />{tNav('coordinator')}<PanelRightOpen data-icon="inline-end" />
-          </Button>}
+          <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setNewTask(true)}><Plus data-icon="inline-start" />{t('newTask')}</Button>
+          {!sidebar && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-expanded={false} aria-label={t('expand')} onClick={() => setSidebar(true)} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}</TooltipContent></Tooltip>}
         </div>
       </div>
       {view === 'board'
-        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} onCreate={status => setNewTask({ status })} columns={columns} hidden={hidden} context={{ properties: new Set(display.properties), agentStates, subtasks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { setSidebar(true); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
-        : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask({})} /></div>}
+        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} context={{ properties: new Set(display.properties), agentStates, subtasks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { setSidebar(true); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
+        : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
     {sidebar && <aside aria-label={tNav('coordinator')} className="relative hidden w-90 shrink-0 flex-col border-l lg:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}
@@ -237,6 +235,6 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
       <div aria-hidden="true" className="h-14 shrink-0" />
       <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { onOpen(id) }} />
     </aside>}
-    <NewTaskDialog open={!!newTask} status={newTask?.status} onOpenChange={open => { if (!open) setNewTask(null) }} onSent={() => setSidebar(true)} />
+    <NewTaskDialog open={newTask} onOpenChange={setNewTask} onSent={() => setSidebar(true)} />
   </div>
 }

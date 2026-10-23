@@ -18,12 +18,11 @@ function groupIssues(issues: Issue[]): Columns {
   return Object.fromEntries(BOARD_COLUMNS.map(column => [column.value, issues.filter(issue => boardColumnOf(issue.status) === column.value)]))
 }
 
-export function IssueBoard({ issues, columns: visibleColumns, hidden, context, onCreate, onOpen, onDiscuss, onHideColumn, onShowColumn, onUpdated, onBusyChange }: {
+export function IssueBoard({ issues, columns: visibleColumns, hidden, context, onOpen, onDiscuss, onHideColumn, onShowColumn, onUpdated, onBusyChange }: {
   issues: Issue[]
   columns: IssueStatus[]
   hidden: { status: IssueStatus; count: number }[]
   context: CardContext
-  onCreate: (status: IssueStatus) => void
   onOpen: (id: string) => void
   onDiscuss: (issue: Issue) => void
   onHideColumn: (status: IssueStatus) => void
@@ -146,7 +145,7 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, context, o
   return <section aria-label={t('label')} className="flex min-h-0 min-w-0 flex-1 flex-col">
     <p role="status" aria-live="polite" className="sr-only">{message}</p>
     <p id={instructionsId} className="sr-only">{t('keyboardHint')}</p>
-    <KanbanBoard value={columns} columns={visibleColumns} hiddenColumns={hidden} context={context} onCreate={onCreate} onDelete={issue => { void remove(issue) }} onDiscuss={onDiscuss} onHideColumn={onHideColumn} onShowColumn={onShowColumn} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
+    <KanbanBoard value={columns} columns={visibleColumns} hiddenColumns={hidden} context={context} onDelete={issue => { void remove(issue) }} onDiscuss={onDiscuss} onHideColumn={onHideColumn} onShowColumn={onShowColumn} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
       setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
       setMessage(t('propertiesSaved'))
       void onUpdated().catch(() => {})

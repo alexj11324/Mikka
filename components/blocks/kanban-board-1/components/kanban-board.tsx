@@ -3,7 +3,7 @@
 import { useState, type ComponentProps, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useTranslations } from 'next-intl'
-import { Box, CalendarDays, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, GitMerge, GitPullRequest, Link2, ListChecks, Lock, MessageSquare, Plus, Tag, Trash2, X } from 'lucide-react'
+import { Box, CalendarDays, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, GitMerge, GitPullRequest, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
@@ -149,12 +149,11 @@ type KanbanBoardProps = Omit<ComponentProps<typeof Kanban<BoardTask>>, 'children
   viewportId: string
   instructionsId: string
   onViewportKeyDown: ComponentProps<'div'>['onKeyDown']
-  onCreate: (status: IssueStatus) => void
   onHideColumn: (status: IssueStatus) => void
   onShowColumn: (status: IssueStatus) => void
 } & CardHandlers
 
-export function KanbanBoard({ columns, hiddenColumns: hidden, context, pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onCreate, onHideColumn, onShowColumn, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, ...props }: KanbanBoardProps) {
+export function KanbanBoard({ columns, hiddenColumns: hidden, context, pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onHideColumn, onShowColumn, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, ...props }: KanbanBoardProps) {
   const handlers = { onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss }
   const t = useTranslations('Board')
   const tBoard = useTranslations('Shell.board')
@@ -175,15 +174,12 @@ export function KanbanBoard({ columns, hiddenColumns: hidden, context, pending =
                 <DropdownMenu>
                   <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" className="ml-auto text-muted-foreground" aria-label={tBoard('columnMenu', { status: statusLabel(column.value) })} />}><Ellipsis /></DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => onCreate(column.value)}><Plus />{tBoard('newTask')}</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onHideColumn(column.value)}><EyeOff />{tBoard('hideColumn')}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button variant="ghost" size="icon-xs" className="text-muted-foreground" aria-label={t('newTaskIn', { status: statusLabel(column.value) })} disabled={pending} onClick={() => onCreate(column.value)}><Plus /></Button>
               </div>
               <KanbanColumnContent value={column.value} className="min-h-0 flex-1 gap-1.5 overflow-y-auto overscroll-y-contain p-0.5" aria-label={t('columnContent', { status: statusLabel(column.value) })}>
                 {tasks.map(task => <TaskCard key={task.id} task={task} disabled={pending} context={context} {...handlers} />)}
-                {!tasks.length && <Button variant="ghost" aria-label={t('newTaskIn', { status: statusLabel(column.value) })} disabled={pending} onClick={() => onCreate(column.value)} className="h-28 w-full rounded-lg border border-dashed border-foreground/15 text-muted-foreground hover:bg-background/60"><Plus /></Button>}
               </KanbanColumnContent>
             </section>
           </KanbanColumn>
