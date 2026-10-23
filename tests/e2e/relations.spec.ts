@@ -149,4 +149,42 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await expect(children.getByRole('button', { name: '子任务 1 / 1', exact: true })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   })
+
+  test(`关系选择器读取失败时显示错误和重新读取 ${viewport.width}`, async ({ page }) => {
+    test.setTimeout(120000)
+    await register(page)
+    const suffix = randomUUID().slice(0, 8)
+    const current = `读取失败当前任务 ${suffix}`
+    const target = `读取失败目标任务 ${suffix}`
+    await createIssue(page, current)
+    await createIssue(page, target)
+    await page.getByRole('button', { name: '任务', exact: true }).click()
+    await openIssue(page, current)
+    await page.setViewportSize(viewport)
+    // Start from an empty SWR cache so the picker has no stale board to fall back on.
+    await page.reload()
+    await expect(page.getByRole('button', { name: '更多任务操作', exact: true })).toBeEnabled()
+
+    // Fail every server action while the picker loads (listIssueConnections + listIssues). A non-RSC 200 body makes the action promise reject
+    // without a browser 'Failed to load resource' console error, which the runtime guard would flag.
+    let failing = true
+    await page.route('**/*', route => {
+      const request = route.request()
+      if (failing && request.method() === 'POST' && request.headers()['next-action']) return route.fulfill({ status: 200, contentType: 'text/plain', body: 'mocked failure' })
+      return route.fallback()
+    })
+    await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: '设置父任务…', exact: true }).click()
+    const picker = page.getByRole('dialog', { name: '设置父任务', exact: true })
+    await expect(picker.getByText('任务读取失败', { exact: true })).toBeVisible()
+    const reload = picker.getByRole('option', { name: '重新读取任务', exact: true })
+    await expect(reload).toBeVisible()
+
+    failing = false
+    await reload.click()
+    await expect(picker.getByRole('option').filter({ hasText: target })).toBeVisible()
+    await expect(picker.getByText('任务读取失败', { exact: true })).toHaveCount(0)
+    await expect(reload).toHaveCount(0)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  })
 }
