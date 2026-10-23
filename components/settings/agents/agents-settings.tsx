@@ -80,11 +80,18 @@ function AgentRow({ agent, devices, onOpen }: { agent: AgentView; devices: Devic
   const t = useTranslations('Agents')
   const summary = agent.description || (isBuiltInAgentRole(agent.role) ? t(`roles.${agent.role}.summary`) : '')
   const models = reportedModels(devices, agent.deviceId, agent.harness)
-  return <Button variant="ghost" className="h-auto w-full justify-start gap-3 rounded-none px-4 py-3.5 text-left font-normal whitespace-normal" onClick={onOpen}>
+  const deviceName = agent.deviceName ?? t('runtime.noDevice')
+  // The device tooltip opens on hover over the name, and also while the row has keyboard focus.
+  const [hovered, setHovered] = useState(false)
+  const [keyboardFocus, setKeyboardFocus] = useState(false)
+  return <Button variant="ghost" className="h-auto w-full justify-start gap-3 rounded-none px-4 py-3.5 text-left font-normal whitespace-normal" onClick={onOpen}
+    onFocus={event => setKeyboardFocus(event.currentTarget.matches(':focus-visible'))} onBlur={() => setKeyboardFocus(false)}>
     <AgentAvatar role={agent.role} name={agent.name} icon={agent.icon} color={agent.color} />
     <span className="flex min-w-0 flex-1 flex-col">
       <span className="flex items-center gap-2"><span className="truncate font-medium">{agent.name}</span><AgentStatusBadge status={agent.status} /></span>
       {summary && <span className="truncate text-muted-foreground">{summary}</span>}
+      {/* The device column is hidden on narrow screens; its name stays in the row's accessible name. */}
+      <span className="sr-only sm:hidden">{deviceName}</span>
     </span>
     <span className="hidden w-36 shrink-0 items-center gap-1.5 truncate text-xs text-muted-foreground sm:flex">
       {agent.harness && <HarnessIcon harness={agent.harness} />}
@@ -92,8 +99,8 @@ function AgentRow({ agent, devices, onOpen }: { agent: AgentView; devices: Devic
     </span>
     <span className="hidden w-20 shrink-0 items-center gap-1.5 text-xs text-muted-foreground sm:flex">
       <Laptop data-icon="inline-start" className="size-3.5" />
-      {/* The full name on hover when the column cuts it short. */}
-      <Tooltip><TooltipTrigger render={<span className="truncate" />}>{agent.deviceName ?? t('runtime.noDevice')}</TooltipTrigger><TooltipContent>{agent.deviceName ?? t('runtime.noDevice')}</TooltipContent></Tooltip>
+      {/* The full name when the column cuts it short. */}
+      <Tooltip open={hovered || keyboardFocus} onOpenChange={setHovered}><TooltipTrigger render={<span className="truncate" />}>{deviceName}</TooltipTrigger><TooltipContent>{deviceName}</TooltipContent></Tooltip>
     </span>
     <ChevronRight data-icon="inline-end" className="text-muted-foreground" />
   </Button>

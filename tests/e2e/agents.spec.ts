@@ -32,11 +32,11 @@ test('Agent 设置：默认角色、详情两个标签、从预置创建并删�
   await expect(page.getByRole('button', { name: /^安全审查/ })).toHaveCount(0)
 })
 
-async function seedDevice(email: string) {
+async function seedDevice(email: string, name = 'Studio Mac') {
   const client = new pg.Client({ connectionString: process.env.E2E_DATABASE_URL })
   await client.connect()
   const harnesses = [{ harness: 'claude_code', installed: true, version: '2.0', models: [{ value: 'opus', displayName: 'Opus', efforts: ['low', 'medium', 'high'] }, { value: 'haiku', displayName: 'Haiku', efforts: [] }], permissionModes: ['plan'] }]
-  await client.query(`insert into devices (id, "ownerId", name, harnesses, "lastSeenAt") select $1, id, 'Studio Mac', $2, now() from "user" where email = $3`, [randomUUID(), JSON.stringify(harnesses), email])
+  await client.query(`insert into devices (id, "ownerId", name, harnesses, "lastSeenAt") select $1, id, $4, $2, now() from "user" where email = $3`, [randomUUID(), JSON.stringify(harnesses), email, name])
   await client.end()
 }
 
@@ -101,6 +101,9 @@ for (const width of [1280, 402]) test(`布局：切换到没有档位的模型�
   const withoutLevels = await permission.boundingBox()
   expect(withLevels?.y).toBe(before?.y)
   expect(withoutLevels?.y).toBe(withLevels?.y)
+  // No sideways jump either (a scrollbar appearing or going away).
+  expect(withLevels?.x).toBe(before?.x)
+  expect(withoutLevels?.x).toBe(withLevels?.x)
 })
 
 test('布局：402px 下选择 Harness 后标题区高度不变', async ({ page }) => {
@@ -113,4 +116,22 @@ test('布局：402px 下选择 Harness 后标题区高度不变', async ({ page 
   await pickModel(page)
   await expect(page.locator('[data-slot="agent-chips"]')).toContainText('Opus')
   expect((await tabs.boundingBox())?.y).toBe(before?.y)
+})
+
+test('列表：键盘聚焦一行时能读到完整的机器名', async ({ page }) => {
+  const name = 'Studio Mac Pro Workstation'
+  const { email } = await register(page)
+  await seedDevice(email, name)
+  await openRuntime(page)
+  await pickModel(page)
+  await page.waitForLoadState('networkidle')
+  await page.goto(app('/?settings=agents'))
+  const row = page.getByRole('button', { name: /^Worker/ })
+  await expect(row).toHaveAccessibleName(new RegExp(name))
+  await page.getByRole('button', { name: /^Coordinator/ }).focus()
+  await page.keyboard.press('Tab')
+  await expect(row).toBeFocused()
+  await expect(page.locator('[data-slot="tooltip-content"]', { hasText: name })).toBeVisible()
+  await page.keyboard.press('Tab')
+  await expect(page.locator('[data-slot="tooltip-content"]', { hasText: name })).toBeHidden()
 })
