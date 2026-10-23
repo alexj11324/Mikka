@@ -1,7 +1,7 @@
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model"
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state"
 import { Decoration, DecorationSet } from "@tiptap/pm/view"
-import { Extension, Mark, mergeAttributes, type Editor } from "@tiptap/react"
+import { Extension, type Editor } from "@tiptap/core"
 import {
   absolutePositionToRelativePosition,
   defaultDeleteFilter,
@@ -13,9 +13,9 @@ import { cn } from "cn"
 import * as Y from "yjs"
 
 import { useRichTextSelector } from "./rich-text-state"
+import { COMMENT_MARK, THREADS_FIELD } from "./comment-mark"
+export { CommentMark, COMMENT_MARK, THREADS_FIELD } from "./comment-mark"
 
-export const COMMENT_MARK = "comment"
-export const THREADS_FIELD = "threads"
 /** Replies and resolves carry this origin, which the editor's undo skips. */
 export const THREAD_ORIGIN = "threads"
 /** A new thread's record; undo reverts it together with its anchor mark. */
@@ -24,6 +24,7 @@ export const THREAD_CREATE_ORIGIN = "thread-create"
 export interface ThreadMessage {
   id: string
   author: string
+  authorUserId?: string
   body: string
   at: string
 }
@@ -39,32 +40,10 @@ export interface ThreadRecord {
 export interface ThreadSeed {
   id: string
   author: string
+  authorUserId?: string
   createdAt: string
   messages: Omit<ThreadMessage, "id">[]
 }
-
-/** The anchor text; one comment per character, so marks never overlap. */
-export const CommentMark = Mark.create({
-  name: COMMENT_MARK,
-  // Typing at either edge never grows a thread.
-  inclusive: false,
-  addAttributes() {
-    return {
-      id: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-comment-id"),
-        renderHTML: (attributes) =>
-          attributes.id ? { "data-comment-id": attributes.id } : {},
-      },
-    }
-  },
-  parseHTML() {
-    return [{ tag: "span[data-comment-id]" }]
-  },
-  renderHTML({ HTMLAttributes }) {
-    return ["span", mergeAttributes(HTMLAttributes), 0]
-  },
-})
 
 // Open anchors read as a soft underline, the one under the caret as a fill; a
 // teammate's selection over an anchor keeps its own hue.
@@ -195,10 +174,32 @@ export const CommentPaint = Extension.create<CommentPaintOptions>({
   },
 })
 
-/** Re-reads isOpen after a thread resolves or reopens on any client. */
+/** Re-reads isOpen after a thread resolves or reopens on any client.
+ * Content edits already repaint in the plugin. A second transaction from a
+ * Yjs update crashes Enter, Backspace and Delete, so failures stay local. */
 export function repaintComments(editor: Editor) {
   if (editor.isDestroyed) return
-  editor.view.dispatch(editor.state.tr.setMeta(COMMENT_PAINT_KEY, true))
+  try {
+    const view = editor.view
+    if (view.isDestroyed) return
+    view.dispatch(view.state.tr.setMeta(COMMENT_PAINT_KEY, true))
+  } catch {
+    // Decorations can wait for the next edit. Letting this escape blanks the page.
+  }
+}
+
+/** Paints again when thread records change and the document itself does not. */
+export function bindThreadRepaint(editor: Editor, subscribe: (onStoreChange: () => void) => () => void) {
+  let cancelled = false
+  const stop = subscribe(() => {
+    queueMicrotask(() => {
+      if (!cancelled) repaintComments(editor)
+    })
+  })
+  return () => {
+    cancelled = true
+    stop()
+  }
 }
 
 interface CommentShortcutOptions {
@@ -289,6 +290,7 @@ function createThread(seed: ThreadSeed) {
   const thread = new Y.Map<unknown>()
   thread.set("id", seed.id)
   thread.set("author", seed.author)
+  if (seed.authorUserId) thread.set("authorUserId", seed.authorUserId)
   thread.set("createdAt", seed.createdAt)
   thread.set("resolved", false)
   const messages = new Y.Array<ThreadMessage>()

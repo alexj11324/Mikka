@@ -21,6 +21,41 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  cloud-secret-access:
+    name: Cloud credential access (OIDC)
+    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Read one credential through Infisical workload identity
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: staging
+          secret-path: /vercel
+          secret-name: COMPOSIO_API_KEY
+          include-imports: false
+      - name: Verify cloud credential against its issuer
+        run: |
+          node --input-type=module <<'JS'
+          if (!process.env.COMPOSIO_API_KEY) throw new Error('Cloud credential was not injected')
+          const response = await fetch('https://backend.composio.dev/api/v3.1/webhook_subscriptions', {
+            headers: { 'x-api-key': process.env.COMPOSIO_API_KEY },
+            signal: AbortSignal.timeout(15000),
+          })
+          if (!response.ok) throw new Error(`Issuer rejected cloud credential: HTTP ${response.status}`)
+          console.log('Infisical OIDC and issuer credential validation succeeded')
+          JS
+
   ui-policy:
     name: UI policy (strict)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
@@ -42,12 +77,16 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:ui-policy
+      - run: pnpm test:motion
       - run: pnpm test:i18n
       - run: pnpm i18n:check
       - run: pnpm test:ssh-target
+      - run: pnpm test:linear-sync
+      - run: pnpm test:coordinator-events
       - run: pnpm test:auth-composio
       - run: pnpm test:integrations
       - run: pnpm test:csv
+      - run: pnpm test:settings
       - run: pnpm test:issues
       - name: Audit business UI composition
         run: pnpm --silent lint:ui --json > ui-audit.json
@@ -81,7 +120,7 @@ jobs:
     name: Production build and browser interactions
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17
@@ -117,12 +156,16 @@ jobs:
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:setup
+      - name: Verify legacy workspace migration and idempotency
+        run: node --test tests/workspace-migration.test.mjs
       - run: pnpm build
+        id: build
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
         run: pnpm test:performance --output=performance-results
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
       - name: Browser functionality regression
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: pnpm test:e2e --grep-invert @performance
       - name: Upload browser failure evidence
         if: always()

@@ -27,7 +27,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { usePopoverPortalPosition } from "@/components/motion/popover-position";
-import { EASE_OUT } from "@/lib/ease";
+import { EASE_OUT, MOTION_DURATION } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 
 type Side = "top" | "bottom";
@@ -210,8 +210,8 @@ export function MorphPopoverTrigger({ children }: MorphPopoverTriggerProps) {
 
 // Full-distance clip travel needs a shorter curve than SPRING_PANEL's slow
 // overdamped tail. A non-bouncing spring reaches its rest within 260 ms.
-const MORPH_ENTER = { type: "spring", duration: 0.26, bounce: 0 } as const;
-const MORPH_EXIT = { duration: 0.2, ease: EASE_OUT } as const;
+const MORPH_ENTER = { type: "spring", duration: MOTION_DURATION.panelEnter, bounce: 0 } as const;
+const MORPH_EXIT = { duration: MOTION_DURATION.panelExit, ease: EASE_OUT } as const;
 
 // Keep the panel and content at their final size. An inset clip reveals the
 // nearest corner without scaling borders, shadows or keyboard-focus geometry.

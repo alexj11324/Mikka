@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useMemo, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { Copy, FileSpreadsheet, Loader2, Mail, Upload, X } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { createWorkspaceInvitation } from "@/app/actions/workspace";
@@ -74,10 +74,12 @@ export function InviteMembersDialog({
   const fileRef = useRef<HTMLInputElement>(null);
   const busy = pending || importing;
   const recipients = invitationEmails(emails);
-  const roleItems = [
-    { value: "member", label: t("roles.member") },
-    { value: "admin", label: t("roles.admin") },
-  ];
+  const memberRole = t("roles.member")
+  const adminRole = t("roles.admin")
+  const roleItems = useMemo(() => [
+    { value: "member", label: memberRole },
+    { value: "admin", label: adminRole },
+  ], [memberRole, adminRole])
 
   function csvErrorMessage(cause: unknown) {
     if (!(cause instanceof InvitationCsvError)) return t("errors.readFailed");
@@ -189,12 +191,12 @@ export function InviteMembersDialog({
         emails: recipients,
         role,
       });
-      if (!Array.isArray(result)) {
+      if (!result.ok) {
         setError(translateError(result.error));
         return;
       }
       setLinks(
-        result.map((link) => ({
+        result.data.map((link) => ({
           email: link.email,
           url: new URL(withBasePath(link.path), window.location.origin).href,
         })),

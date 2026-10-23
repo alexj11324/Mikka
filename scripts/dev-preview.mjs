@@ -4,17 +4,23 @@ import { pathToFileURL } from 'node:url'
 import { stripVTControlCharacters } from 'node:util'
 import { basePath as appBasePath } from '../lib/base-path-config.mjs'
 
-export const previewWarmupPaths = ['/api/agent', '/api/agent/sessions', '/api/workspace']
+export const previewWarmupPaths = ['/', '/api/agent', '/api/agent/sessions', '/api/workspace']
 
-export async function warmPreview(origin, { basePath = appBasePath, fetcher = fetch, log = console.info, timeout = 15000 } = {}) {
-  for (const path of previewWarmupPaths) {
-    // Unauthorized HEAD requests compile real routes without invoking models or creating data.
-    const response = await fetcher(new URL(`${basePath}${path}`, origin), {
+export function isPreviewWarmupEnabled(env = process.env) {
+  return env.PREVIEW_WARMUP !== '0'
+}
+
+export async function warmPreview(origin, { basePath = appBasePath, fetcher = fetch, log = console.info, timeout = 120000 } = {}) {
+  await Promise.all(previewWarmupPaths.map(async path => {
+    // HEAD compiles the page's split client chunks and API routes without invoking models or creating data.
+    const pathname = path === '/' ? basePath || '/' : `${basePath}${path}`
+    const response = await fetcher(new URL(pathname, origin), {
       method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(timeout),
     })
-    if (![200, 204, 401, 403].includes(response.status)) throw new Error(`${path}: HTTP ${response.status}`)
+    const expectedSignInRedirect = path === '/' && response.status === 307
+    if (![200, 204, 401, 403].includes(response.status) && !expectedSignInRedirect) throw new Error(`${path}: HTTP ${response.status}`)
     log(`[preview] 已预编译 ${path}`)
-  }
+  }))
 }
 
 export function startPreview() {
@@ -28,7 +34,7 @@ export function startPreview() {
     const text = chunk.toString()
     process.stdout.write(text)
     output = (output + stripVTControlCharacters(text)).slice(-8192)
-    if (process.env.PREVIEW_WARMUP !== '1' || warming || !/Ready in/.test(output)) return
+    if (!isPreviewWarmupEnabled() || warming || !/Ready in/.test(output)) return
     warming = true
     const local = output.match(/Local:\s+http:\/\/[^\s:]+:(\d+)/)
     const port = local?.[1] ?? process.env.PORT ?? '3000'

@@ -11,12 +11,13 @@ import { issueOwnerScope } from '@/lib/issue-owner-scope'
 import { issueWithMetadata, readIssueMetadata, withIssueMetadata, type IssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers } from '@/lib/issue-numbering'
 import { createsIssueCycle } from '@/lib/issue-relations'
+import { dispatchLinearIssueSync, dispatchLinearWork } from '@/lib/linear-sync/dispatch'
 
 const relationSchema = z.object({ id: z.uuid(), revision: z.number().int().positive(), targetId: z.uuid().nullable(), kind: z.enum(['parent', 'child', 'related', 'blockedBy', 'blocks', 'duplicate']), remove: z.boolean().default(false) })
 
 export async function listIssueConnections(id: string) {
   const { issue, user } = await requireIssueAccess(id)
-  const rows = await db.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, content: issues.content }).from(issues)
+  const rows = await db.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, content: issues.content, createdAt: issues.createdAt }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, user.id)))
     .where(issueOwnerScope(user.id, issue.userId)).orderBy(desc(issues.updatedAt))
   return rows.filter(row => !readIssueMetadata(row.content).deletedAt).map(({ content, ...row }) => ({ ...row, metadata: readIssueMetadata(content) }))
@@ -33,7 +34,7 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
     if (target && target.userId !== issue.userId) return { error: 'issueCrossOwner' }
     if (!target && value.kind !== 'parent') return { error: 'issueTargetRequired' }
     try {
-      return await db.transaction(async tx => {
+      const result = await db.transaction(async tx => {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${issue.userId}, 0))`)
         const rows = await tx.select().from(issues).where(eq(issues.userId, issue.userId)).orderBy(issues.id).for('update')
         const current = rows.find(row => row.id === issue.id)
@@ -84,6 +85,8 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
         }
         return { issue: issueWithMetadata(savedCurrent) }
       })
+      if ('issue' in result) dispatchLinearWork()
+      return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
       return { error: 'issueRelationSaveFailed' }
@@ -99,7 +102,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
     const { issue, user } = await requireIssueAccess(input.id)
     const accessible = input.includeSubissues ? await listIssueConnections(issue.id) : []
     try {
-      return await db.transaction(async tx => {
+      const result = await db.transaction(async tx => {
         for (const owner of [...new Set([issue.userId, user.id])].sort()) await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${owner}, 0))`)
         const [source] = await tx.select().from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
         if (!source || source.revision !== input.revision || readIssueMetadata(source.content).deletedAt) return { error: 'issueOutdated' }
@@ -136,6 +139,8 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
         }
         return { issue: issueWithMetadata(created) }
       })
+      if ('issue' in result) dispatchLinearWork()
+      return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
       return { error: 'issueCreateFailed' }
@@ -182,7 +187,7 @@ export async function setIssueDeleted(input: { id: string; revision?: number; re
     const { issue, user } = await requireIssueAccess(input.id, Boolean(input.restore))
     if (issue.userId !== user.id) return { error: 'issueOwnerOnly' }
     try {
-      return await db.transaction(async tx => {
+      const result = await db.transaction(async tx => {
         const [latest] = await tx.select().from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, user.id))).for('update')
         if (!latest || (!input.restore && latest.revision !== input.revision)) return { error: 'issueOutdated' }
         const metadata = readIssueMetadata(latest.content)
@@ -190,6 +195,8 @@ export async function setIssueDeleted(input: { id: string; revision?: number; re
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, deletedAt: input.restore ? null : new Date().toISOString() }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, user.id))).returning()
         return { issue: issueWithMetadata(saved) }
       })
+      if (input.restore && 'issue' in result) dispatchLinearIssueSync(issue.id)
+      return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
       return { error: 'issueDeleteFailed' }

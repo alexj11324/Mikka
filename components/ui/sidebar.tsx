@@ -94,8 +94,10 @@ function SidebarProvider({
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
     if (!isReady) return
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
-  }, [isMobile, isReady, setOpen, setOpenMobile])
+    // Read the current viewport at interaction time to avoid stale mobile state.
+    const mobile = window.matchMedia("(max-width: 767px)").matches
+    return mobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
+  }, [isReady, setOpen, setOpenMobile])
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
@@ -291,13 +293,14 @@ function SidebarTrigger({
 }
 
 function SidebarRail({ className, label = "Toggle Sidebar", ...props }: React.ComponentProps<"button"> & { label?: string }) {
-  const { toggleSidebar } = useSidebar()
+  const { state, toggleSidebar } = useSidebar()
 
   return (
     <button
       data-sidebar="rail"
       data-slot="sidebar-rail"
       aria-label={label}
+      aria-expanded={state === "expanded"}
       tabIndex={-1}
       onClick={toggleSidebar}
       title={label}

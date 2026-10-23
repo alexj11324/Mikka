@@ -1,11 +1,13 @@
 import { Pool } from 'pg'
 import { getMigrations } from 'better-auth/db/migration'
 import { oauthProvider } from '@better-auth/oauth-provider'
+import { postgresSchemaStatements } from '@chat-adapter/state-pg'
 import { SQL, is, sql } from 'drizzle-orm'
 import { getTableConfig, PgDialect, PgTable } from 'drizzle-orm/pg-core'
 import * as issueSchema from '../lib/db/schema.ts'
 import * as workspaceSchema from '../lib/db/workspace-schema.ts'
 import * as projectSchema from '../lib/db/project-schema.ts'
+import * as teamSchema from '../lib/db/team-schema.ts'
 
 const connectionString = process.env.E2E_DATABASE_URL
 if (!connectionString) throw new Error('必须设置独立的 E2E_DATABASE_URL，禁止回退到业务数据库。')
@@ -39,7 +41,8 @@ function defaultValue(value, dataType) {
 }
 
 try {
-  for (const table of [...Object.values(issueSchema), ...Object.values(workspaceSchema), ...Object.values(projectSchema)].filter(value => is(value, PgTable))) {
+  const tables = [...Object.values(issueSchema), ...Object.values(workspaceSchema), ...Object.values(projectSchema), ...Object.values(teamSchema)]
+  for (const table of tables.filter(value => is(value, PgTable))) {
     const config = getTableConfig(table)
     if (config.name === 'user') continue
     const columns = config.columns.map(column => [
@@ -55,6 +58,7 @@ try {
     ]
     await pool.query(`CREATE TABLE IF NOT EXISTS ${identifier(config.name)} (${[...columns, ...constraints].join(', ')})`)
   }
+  for (const statement of postgresSchemaStatements) await pool.query(statement)
   console.log('独立 E2E 数据库已就绪；认证表使用 Better Auth 迁移，业务表来自现有 Drizzle schema。')
 } finally {
   await pool.end()

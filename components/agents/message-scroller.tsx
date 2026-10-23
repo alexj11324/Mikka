@@ -15,6 +15,7 @@ import {
   PreviewRail,
   type PreviewRailItem,
 } from "@/components/motion/preview-rail";
+import { closestSortedIndex, nextAssistantIndices } from "@/lib/message-navigation";
 import { cn } from "@/lib/utils";
 
 const PREVIEW_TITLE_LENGTH = 56;
@@ -38,15 +39,16 @@ function getMessageText(message: HTMLElement) {
 function getMessagePreview(
   message: HTMLElement,
   assistantResponse?: HTMLElement,
+  readText: (message: HTMLElement) => string = getMessageText,
 ) {
-  const text = getMessageText(message);
+  const text = readText(message);
   if (!text) {
     return { label: "Message", description: undefined };
   }
 
   if (text.length <= PREVIEW_TITLE_LENGTH) {
     const responseText = assistantResponse
-      ? getMessageText(assistantResponse)
+      ? readText(assistantResponse)
       : "";
     return {
       label: text,
@@ -64,7 +66,7 @@ function getMessagePreview(
       : PREVIEW_TITLE_LENGTH;
   const label = `${text.slice(0, titleEnd).trim()}…`;
   const responseText = assistantResponse
-    ? getMessageText(assistantResponse)
+    ? readText(assistantResponse)
     : text.slice(titleEnd).trim();
   return {
     label,
@@ -132,6 +134,7 @@ export function MessageScroller({
   const scrollTimerRef = useRef<number | undefined>(undefined);
   const frameRef = useRef<number | undefined>(undefined);
   const railFrameRef = useRef<number | undefined>(undefined);
+  const railActiveFrameRef = useRef<number | undefined>(undefined);
   const railIdRef = useRef(new WeakMap<HTMLElement, string>());
   const railIdCounterRef = useRef(0);
   const railTargetsRef = useRef(new Map<string, HTMLElement>());
@@ -189,19 +192,13 @@ export function MessageScroller({
     }
 
     const viewportCenter = viewportRect.top + viewportRect.height / 2;
-    let nearestId = targets[0]?.[0] ?? "";
-    let nearestDistance = Number.POSITIVE_INFINITY;
-
-    for (const [id, element] of targets) {
-      const rect = element.getBoundingClientRect();
-      const messageCenter = rect.top + rect.height / 2;
-      const distance = Math.abs(messageCenter - viewportCenter);
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestId = id;
-      }
-    }
-
+    // Transcript rows are ordered top-to-bottom; only measure O(log n)
+    // centers, rather than forcing layout reads for every row on scroll.
+    const nearestIndex = closestSortedIndex(targets.length, viewportCenter, (index) => {
+      const rect = targets[index]![1].getBoundingClientRect();
+      return rect.top + rect.height / 2;
+    });
+    const nearestId = targets[nearestIndex]?.[0] ?? "";
     setActiveRailId((current) =>
       current === nearestId ? current : nearestId,
     );
@@ -217,6 +214,18 @@ export function MessageScroller({
       content.querySelectorAll<HTMLElement>('[data-slot="message"]'),
     );
     const targets = new Map<string, HTMLElement>();
+    // A reverse pass replaces a repeated scan of all later messages for
+    // every user message (quadratic work on long conversations).
+    const responseIndices = nextAssistantIndices(messages.map((message) => message.dataset.from ?? ""));
+    const previewText = new Map<HTMLElement, string>();
+    const readText = (element: HTMLElement) => {
+      let value = previewText.get(element);
+      if (value === undefined) {
+        value = getMessageText(element);
+        previewText.set(element, value);
+      }
+      return value;
+    };
     const nextItems = messages.map((message, index) => {
       let id = railIdRef.current.get(message);
       if (!id) {
@@ -227,12 +236,10 @@ export function MessageScroller({
       targets.set(id, message);
       const sender = message.dataset.from ?? "conversation";
       const assistantResponse =
-        sender === "user"
-          ? messages
-              .slice(index + 1)
-              .find((candidate) => candidate.dataset.from === "assistant")
+        sender === "user" && responseIndices[index] !== undefined
+          ? messages[responseIndices[index]!]
           : undefined;
-      const preview = getMessagePreview(message, assistantResponse);
+      const preview = getMessagePreview(message, assistantResponse, readText);
 
       return {
         id,
@@ -261,13 +268,22 @@ export function MessageScroller({
   }, [navigation]);
 
   const scheduleRailSync = useCallback(() => {
-    if (navigation !== "rail") return;
-    if (railFrameRef.current) cancelAnimationFrame(railFrameRef.current);
+    if (navigation !== "rail" || railFrameRef.current !== undefined) return;
+    // Coalesce resize and streaming text mutations into one sync per paint.
     railFrameRef.current = requestAnimationFrame(() => {
+      railFrameRef.current = undefined;
       syncRailItems();
       updateActiveRailItem();
     });
   }, [navigation, syncRailItems, updateActiveRailItem]);
+
+  const scheduleActiveRailUpdate = useCallback(() => {
+    if (navigation !== "rail" || railActiveFrameRef.current !== undefined) return;
+    railActiveFrameRef.current = requestAnimationFrame(() => {
+      railActiveFrameRef.current = undefined;
+      updateActiveRailItem();
+    });
+  }, [navigation, updateActiveRailItem]);
 
   const scrollToEnd = useCallback((behavior: ScrollBehavior) => {
     const viewport = viewportRef.current;
@@ -292,8 +308,8 @@ export function MessageScroller({
     const distance =
       viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
     setFollowing(distance <= followThreshold);
-    updateActiveRailItem();
-  }, [followThreshold, setFollowing, updateActiveRailItem]);
+    scheduleActiveRailUpdate();
+  }, [followThreshold, scheduleActiveRailUpdate, setFollowing]);
 
   const leaveLiveEdge = useCallback(() => {
     programmaticScrollRef.current = false;
@@ -316,15 +332,25 @@ export function MessageScroller({
     const observer = new ResizeObserver(() => {
       scheduleRailSync();
       if (!followOutput || !followingRef.current) return;
-      scrollToEnd(reduce || !smooth ? "auto" : "smooth");
+      // Never enqueue overlapping smooth scrolls while tokens are streaming.
+      // The live edge must keep pace with content; animated navigation stays smooth.
+      scrollToEnd(busy || reduce || !smooth ? "auto" : "smooth");
     });
     observer.observe(content);
 
     return () => observer.disconnect();
-  }, [followOutput, reduce, scheduleRailSync, scrollToEnd, smooth]);
+  }, [busy, followOutput, reduce, scheduleRailSync, scrollToEnd, smooth]);
 
   useEffect(() => {
     if (navigation !== "rail") {
+      if (railFrameRef.current !== undefined) {
+        cancelAnimationFrame(railFrameRef.current);
+        railFrameRef.current = undefined;
+      }
+      if (railActiveFrameRef.current !== undefined) {
+        cancelAnimationFrame(railActiveFrameRef.current);
+        railActiveFrameRef.current = undefined;
+      }
       railTargetsRef.current.clear();
       setRailItems([]);
       setRailOverflowing(false);
@@ -363,7 +389,8 @@ export function MessageScroller({
     () => () => {
       if (scrollTimerRef.current) window.clearTimeout(scrollTimerRef.current);
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
-      if (railFrameRef.current) cancelAnimationFrame(railFrameRef.current);
+      if (railFrameRef.current !== undefined) cancelAnimationFrame(railFrameRef.current);
+      if (railActiveFrameRef.current !== undefined) cancelAnimationFrame(railActiveFrameRef.current);
     },
     [],
   );

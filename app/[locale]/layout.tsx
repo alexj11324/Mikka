@@ -6,6 +6,7 @@ import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { routing } from "@/i18n/routing";
 
 import "../globals.css";
@@ -45,11 +46,13 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning className={fontSans.variable}>
-      {/* OpenUI 1.0.1 has no public opt-out; claim its bootstrap guard before imports run. */}
-      {process.env.NODE_ENV === 'development' && <Script id="disable-openui-devtools" strategy="beforeInteractive">{'globalThis[Symbol.for("openui.devtools.autoMount")] = true;'}</Script>}
+      <head>
+        {/* OpenUI 1.0.1 has no public opt-out; claim its bootstrap guard before imports run. */}
+        {process.env.NODE_ENV === 'development' && <Script id="disable-openui-devtools" strategy="beforeInteractive">{'globalThis[Symbol.for("openui.devtools.autoMount")] = true;'}</Script>}
+      </head>
       <body className="antialiased">
         <NextIntlClientProvider messages={messages}>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>{children}<Toaster /></ThemeProvider>
         </NextIntlClientProvider>
       </body>
     </html>

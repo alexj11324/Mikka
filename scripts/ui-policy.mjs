@@ -320,7 +320,7 @@ export function auditCss(file, text, policy) {
     }
     if (node.name.endsWith('keyframes') || node.name === 'utility' || node.name === 'font-face') add(node, 'style/no-custom-css', '不手写动画、字体或 utility 来绕过 registry 预设。')
     // HeroUI's Avatar styles: the agent avatars use HeroUI's Avatar (decided 2026-10-22), and only its own stylesheet is imported.
-    if (node.name === 'import' && !['"tailwindcss"', '"tw-animate-css"', '"shadcn/tailwind.css"', '"@heroui/styles/components/avatar.css" layer(components)'].includes(node.params)) add(node, 'style/no-custom-css', '全局样式导入需要显式审核，不能引入自绘 CSS。')
+    if (node.name === 'import' && !['"tailwindcss"', '"tw-animate-css"', '"shadcn/tailwind.css"', '"@heroui/styles/components/calendar.css"', '"@heroui/styles/utilities"', '"@heroui/styles/components/avatar.css" layer(components)'].includes(node.params)) add(node, 'style/no-custom-css', '全局样式导入需要显式审核，不能引入自绘 CSS。')
   })
   return diagnostics
 }

@@ -9,7 +9,7 @@ export function SettingsPreview() {
   const t = useTranslations('Settings')
   const router = useRouter()
   return (
-    <AppShell>
+    <AppShell variant="settings">
         <SettingsView
           user={{ name: t('preview.userName'), email: 'preview@example.com' }}
           googleEnabled={false}
@@ -17,6 +17,7 @@ export function SettingsPreview() {
           onSignOut={() => router.push('/sign-in')}
           signingOut={false}
           accountError=""
+          preview
         />
     </AppShell>
   )
