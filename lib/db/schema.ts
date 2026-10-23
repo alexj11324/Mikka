@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, varchar, jsonb, integer, numeric, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, integer, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -256,14 +256,6 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
-
-/** One call to the decision model, with what it cost, so the month's spend can be capped. */
-export const decisionCalls = pgTable('decision_calls', {
-  id: uuid('id').primaryKey(), purpose: text('purpose').notNull(), model: text('model').notNull(),
-  inputTokens: integer('inputTokens').notNull().default(0),
-  costUsd: numeric('costUsd', { precision: 12, scale: 8 }).notNull(),
-  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('decision_calls_created_idx').on(table.createdAt)])
 
 // --- Suggestions (MIK-41) ---------------------------------------------------
 //
