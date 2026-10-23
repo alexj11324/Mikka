@@ -400,7 +400,7 @@ export const groupTurns = pgTable('group_turns', {
   conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
   userId: text('userId').notNull(),
   status: text('status').$type<'queued' | 'running' | 'complete' | 'failed'>().notNull().default('queued'),
-  agentId: uuid('agentId'), route: jsonb('route'), error: text('error'),
+  agentId: uuid('agentId'), activeRunId: uuid('activeRunId'), route: jsonb('route'), error: text('error'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [index('group_turns_queue_idx').on(t.conversationId, t.status, t.createdAt)])

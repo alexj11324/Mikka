@@ -36,12 +36,12 @@ test('nothing-to-add is not posted; removed members never generate; unknown peer
   assert.equal(posted, 0)
 })
 test('failure clears generating status and does not synthesize a response', async () => {
-  const statuses: (string|null)[] = []
+  const statuses: (string|null)[] = [], outcomes: (string|undefined)[] = []
   await assert.rejects(runGroupRounds({ by: 'mention', responders: [a] }, message, {
-    async eligible() { return members }, async status(id) { statuses.push(id) },
+    async eligible() { return members }, async status(id,outcome) { statuses.push(id); outcomes.push(outcome) },
     async generate() { throw new Error('provider failed') }, async publish() { assert.fail('must not publish') },
   }), /provider failed/)
-  assert.deepEqual(statuses, [a,null])
+  assert.deepEqual(statuses, [a,null]); assert.deepEqual(outcomes,[undefined,'failed'])
 })
 
 // Enforce the authorized ephemeral DB boundary, even if REQUIRE_DB is accidentally set locally.
@@ -61,6 +61,9 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await scoped.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql', import.meta.url),'utf8'))
     const migration = await readFile(new URL('../../drizzle/20261023222000_group_turns.sql', import.meta.url),'utf8')
     await Promise.all([scoped.query(migration),scoped.query(migration)]); await scoped.query(migration)
+    // Minimal real agent_runs columns used by the bridge; full tracked schema
+    // bootstrap is an independent gate in the same ephemeral-PG17 CI job.
+    await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now())`)
     const workspaceId = randomUUID()
     const base: GroupRequest = { userId: 'owner', method: 'POST', resource: 'conversations', origin: 'http://localhost:3100', host: 'localhost:3100' }
     const directory = async (w: string,u: string, selected: { memberType: string; memberId: string }[] = []) => w === workspaceId && ['owner','member'].includes(u) && selected.every(m => m.memberType === 'user' ? ['owner','member'].includes(m.memberId) : u === 'owner' && members.some(a => a.id === m.memberId))
@@ -104,6 +107,12 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const blocked: GroupRuntime = {...runtime,async generate(agent,input) { entered(); await release; return runtime.generate(agent,input) }}
     releasePending = unblock
     const running = processGroupTurn(scoped,id,blocked); await waiting
+    // Match #79 9760e912's existing owner + working + live lease predicate.
+    const activeRuns = async (owner = 'owner', now = new Date()) => (await scoped.query(`SELECT id,"agentId","userId",kind FROM agent_runs WHERE "userId"=$1 AND status IN ('preparing','running','waiting_input','finishing') AND "leaseExpiresAt">$2`, [owner,now])).rows
+    const active = await activeRuns()
+    assert.equal(active.length,1); assert.equal(active[0].agentId,a); assert.equal(active[0].kind,'group_chat')
+    assert.equal((await activeRuns('member')).length,0); assert.equal((await activeRuns('outsider')).length,0)
+    assert.equal((await activeRuns('owner',new Date(Date.now()+61000))).length,0) // crash cannot leave perpetual active status
     const laterRoot = await send(id,'not you',[b])
     assert.equal(await processGroupTurn(scoped,id,runtime),false) // same-conversation contender cannot generate
     const status = await handleGroup(scoped,directory,{...base,method:'GET',resource:'messages',id},true)
@@ -111,6 +120,8 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     assert.equal((await handleGroup(scoped,directory,{...base,userId:'outsider',method:'GET',resource:'messages',id},true)).status,404)
     await send(other,'independent',[a]); assert.equal(await processGroupTurn(scoped,other,runtime),true)
     unblock(); assert.equal(await running,true)
+    assert.equal((await activeRuns()).length,0)
+    assert.equal((await scoped.query('SELECT status FROM agent_runs WHERE id=$1',[active[0].id])).rows[0].status,'succeeded')
     assert.equal(await processGroupTurn(scoped,id,runtime),true)
     assert.deepEqual(routeCalls,['first']) // direct mention never routes
     await send(id,'later'); assert.equal(await processGroupTurn(scoped,id,{...runtime}),true) // new runtime loads persisted correction
@@ -135,12 +146,21 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await assert.rejects(processGroupTurn(scoped,id,{...runtime,async generate() {throw new Error('private provider detail must not persist')}}), /private provider detail/)
     const failure = (await scoped.query('SELECT status,error,"agentId" FROM group_turns WHERE "messageId"=$1',[failed])).rows[0]
     assert.deepEqual(failure,{status:'failed',error:'generation_failed_not_replayed',agentId:null})
+    assert.equal((await activeRuns()).length,0)
+    assert.equal((await scoped.query('SELECT status FROM agent_runs ORDER BY "startedAt" DESC LIMIT 1')).rows[0].status,'failed')
     const recovery = await send(id,'after error',[a])
     assert.equal(await processGroupTurn(scoped,id,runtime),true) // error released the session lock
     assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[recovery])).rows[0].status,'complete')
     const interrupted = await send(id,'interrupted',[a])
-    await scoped.query(`UPDATE group_turns SET status='running',"agentId"=$2 WHERE "messageId"=$1`,[interrupted,a])
+    const unrelated = randomUUID()
+    await scoped.query(`INSERT INTO agent_runs (id,"userId","agentId",kind,status,"startedAt","leaseExpiresAt") VALUES ($1,'owner',$2,'implement','running',now(),now()-interval '1 second')`,[unrelated,a])
+    const interruptedRun = randomUUID()
+    await scoped.query(`INSERT INTO agent_runs (id,"userId","agentId",kind,status,"startedAt","leaseExpiresAt") VALUES ($1,'owner',$2,'group_chat','running',now(),now()+interval '60 seconds')`,[interruptedRun,a])
+    await scoped.query(`UPDATE group_turns SET status='running',"agentId"=$2,"activeRunId"=$3 WHERE "messageId"=$1`,[interrupted,a,interruptedRun])
     assert.equal(await processGroupTurn(scoped,id,runtime),false)
+    assert.equal((await activeRuns()).length,0)
+    assert.equal((await scoped.query('SELECT status FROM agent_runs WHERE id=$1',[interruptedRun])).rows[0].status,'failed')
+    assert.equal((await scoped.query('SELECT status FROM agent_runs WHERE id=$1',[unrelated])).rows[0].status,'running')
     assert.equal((await scoped.query('SELECT error,"agentId" FROM group_turns WHERE "messageId"=$1',[interrupted])).rows[0].error,'interrupted_generation_not_replayed')
     // Missing/ineligible lead is actionable; direct mentions still bypass routing.
     const fallbackRuntime: GroupRuntime = {...runtime,async route(_,current,leadId) {return routeFromAnswers(null,current,leadId)}}

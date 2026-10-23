@@ -15,8 +15,9 @@ CREATE TABLE IF NOT EXISTS group_turns (
  "conversationId" uuid NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
  "userId" text NOT NULL,
  status text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','complete','failed')),
- "agentId" uuid, route jsonb, error text, "createdAt" timestamptz NOT NULL DEFAULT now(), "updatedAt" timestamptz NOT NULL DEFAULT now()
+ "agentId" uuid, "activeRunId" uuid, route jsonb, error text, "createdAt" timestamptz NOT NULL DEFAULT now(), "updatedAt" timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE group_turns ADD COLUMN IF NOT EXISTS "activeRunId" uuid;
 CREATE INDEX IF NOT EXISTS group_turns_queue_idx ON group_turns ("conversationId",status,"createdAt");
 CREATE TABLE IF NOT EXISTS group_routing_corrections (
  "messageId" uuid PRIMARY KEY REFERENCES conversation_messages(id) ON DELETE CASCADE,

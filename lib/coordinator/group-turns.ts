@@ -27,7 +27,9 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     const acquired = await client.query(`SELECT pg_try_advisory_lock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0)) AS acquired`, [conversationId])
     if (!acquired.rows[0].acquired) return false
     locked = true
-    await client.query(`UPDATE group_turns SET status='failed',"agentId"=NULL,error='interrupted_generation_not_replayed',"updatedAt"=now() WHERE "conversationId"=$1 AND status='running'`, [conversationId])
+    // Recover only this group's linked chat runs; never alter daemon/issue runs.
+    await client.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id IN (SELECT "activeRunId" FROM group_turns WHERE "conversationId"=$1 AND status='running') AND kind='group_chat' AND status='running'`, [conversationId])
+    await client.query(`UPDATE group_turns SET "activeRunId"=NULL,status='failed',"agentId"=NULL,error='interrupted_generation_not_replayed',"updatedAt"=now() WHERE "conversationId"=$1 AND status='running'`, [conversationId])
     const { rows } = await client.query(`SELECT t.*, m.body,m.mentions,m.position,c."workspaceId",c."createdBy",c."leadAgentId" FROM group_turns t
       JOIN conversation_messages m ON m.id=t."messageId" JOIN conversations c ON c.id=t."conversationId"
       WHERE t."conversationId"=$1 AND t.status='queued' ORDER BY m.position LIMIT 1`, [conversationId])
@@ -68,7 +70,24 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       await runGroupRounds(route, input, {
         eligible,
         generate: runtime.generate,
-        async status(id) { await client.query('UPDATE group_turns SET "agentId"=$2,"updatedAt"=now() WHERE "messageId"=$1', [messageId, id]) },
+        async status(id, outcome = 'succeeded') {
+          await client.query('BEGIN')
+          try {
+            if (id) {
+              const runId = randomUUID()
+              // #102 reads owner-filtered, live agent_runs. No device, prompt,
+              // transcript or group/member IDs enter that shared status contract.
+              // Provider calls time out after 20s; the 60s lease bounds stale UI
+              // status if the process dies before its finally/recovery path.
+              await client.query(`INSERT INTO agent_runs (id,"userId","agentId",kind,status,"startedAt","leaseExpiresAt") VALUES ($1,$2,$3,'group_chat','running',now(),now()+interval '60 seconds')`, [runId, root.createdBy, id])
+              await client.query('UPDATE group_turns SET "agentId"=$2,"activeRunId"=$3,"updatedAt"=now() WHERE "messageId"=$1', [messageId, id, runId])
+            } else {
+              await client.query(`UPDATE agent_runs SET status=$2,"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id=(SELECT "activeRunId" FROM group_turns WHERE "messageId"=$1) AND kind='group_chat' AND "userId"=$3`, [messageId, outcome, root.createdBy])
+              await client.query('UPDATE group_turns SET "agentId"=NULL,"activeRunId"=NULL,"updatedAt"=now() WHERE "messageId"=$1', [messageId])
+            }
+            await client.query('COMMIT')
+          } catch (error) { await client.query('ROLLBACK'); throw error }
+        },
         async publish(id, reply) {
           await client.query('BEGIN')
           try {
@@ -103,7 +122,7 @@ export async function runGroupRounds(route: GroupRoute, message: GroupMessage, i
   eligible(): Promise<GroupAgent[]>
   generate: GroupRuntime['generate']
   publish(id: string, reply: GroupReply): Promise<boolean>
-  status(id: string | null): Promise<void>
+  status(id: string | null, outcome?: 'succeeded' | 'failed'): Promise<void>
 }, deadline = Date.now() + 220000) {
   let next = route.responders
   const earlier: { author: string; text: string }[] = []
@@ -116,8 +135,9 @@ export async function runGroupRounds(route: GroupRoute, message: GroupMessage, i
       if (!agent) continue
       await io.status(id)
       let reply: GroupReply
-      try { reply = await io.generate(agent, { message, earlier: [...earlier], members: current.map(({ id, name, description }) => ({ id, name, description })), followUp: followUpInstructions(earlier), ask: route.by === 'lead' ? route.ask : undefined }) }
-      finally { await io.status(null) }
+      let outcome: 'succeeded' | 'failed' = 'failed'
+      try { reply = await io.generate(agent, { message, earlier: [...earlier], members: current.map(({ id, name, description }) => ({ id, name, description })), followUp: followUpInstructions(earlier), ask: route.by === 'lead' ? route.ask : undefined }); outcome = 'succeeded' }
+      finally { await io.status(null, outcome) }
       const known = new Set(current.map(a => a.id))
       if (reply.mentions.some(mention => !known.has(mention))) throw new UnknownMentionError(reply.mentions.filter(mention => !known.has(mention)))
       if (!reply.text.trim() || addsNothing(reply.text)) continue
