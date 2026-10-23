@@ -1,0 +1,46 @@
+# 代码负责人（见 dev 分支流程方案第 3 节）。所有 agent 共用 @alexj11324 账号，
+# 这里只用于提示 review，main 的保护规则没有开启「需要 CODEOWNERS review」。
+# 负责人：[owner:frontend] [owner:design] [owner:backend] [owner:qa] [owner:techlead]
+*                         @alexj11324
+# Frontend
+/app/[[]locale]/           @alexj11324
+/components/              @alexj11324
+/hooks/                   @alexj11324
+/messages/                @alexj11324
+/i18n/                    @alexj11324
+/app/globals.css          @alexj11324
+/public/                  @alexj11324
+# Design Lead（视觉规范）
+/ui-policy.json           @alexj11324
+/components.json          @alexj11324
+/scripts/ui-policy.mjs    @alexj11324
+/scripts/lint-ui.mjs      @alexj11324
+/scripts/interaction-policy.mjs @alexj11324
+/scripts/settings-policy.mjs    @alexj11324
+# Backend & Infra
+/app/api/                 @alexj11324
+/app/actions/             @alexj11324
+/app/v1/                  @alexj11324
+/app/w/                   @alexj11324
+/lib/                     @alexj11324
+/packages/                @alexj11324
+/workflows/               @alexj11324
+/cloudflare/              @alexj11324
+/proxy.ts                 @alexj11324
+/drizzle/                 @alexj11324
+/scripts/migrate.mjs      @alexj11324
+/scripts/check-migrations*.mjs @alexj11324
+/.github/workflows/       @alexj11324
+/vercel.json              @alexj11324
+/next.config.mjs          @alexj11324
+/package.json             @alexj11324
+/pnpm-lock.yaml           @alexj11324
+# QA
+/tests/                   @alexj11324
+/playwright.config.ts     @alexj11324
+/scripts/setup-e2e-db.mjs @alexj11324
+# Tech Lead
+/AGENTS.md                @alexj11324
+/docs/                    @alexj11324
+/tasks/                   @alexj11324
+/.github/CODEOWNERS       @alexj11324
