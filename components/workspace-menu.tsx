@@ -24,13 +24,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenuButton, useSidebar } from '@/components/ui/sidebar'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
-function WorkspaceAvatar({ name }: { name: string }) {
-  return <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">{name.slice(0, 1)}</span>
+function WorkspaceAvatar({ name, large = false }: { name: string; large?: boolean }) {
+  return <span aria-hidden="true" className={cn('flex shrink-0 items-center justify-center rounded-md bg-sidebar-primary font-semibold text-sidebar-primary-foreground', large ? 'size-8 text-sm' : 'size-6 text-xs')}>{name.slice(0, 1)}</span>
 }
 
-export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBeforeChange }: {
+export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBeforeChange, compact = false }: {
   user: { name: string; email: string; image?: string | null }
+  /** Avatar only, for the icon rail. */
+  compact?: boolean
   onSettings: (href?: string) => void
   onSignOut: () => void
   signingOut: boolean
@@ -90,12 +94,15 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
   }
   return <>
     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-      <DropdownMenuTrigger render={<SidebarMenuButton aria-label={i18nText("Nav.workspaceMenu")} className="h-10" />}>
+      {compact ? <DropdownMenuTrigger render={<Button variant="ghost" size="icon-lg" aria-label={i18nText("Nav.workspaceMenu")} title={workspaceName} />}>
+        <WorkspaceAvatar name={workspaceName} large />
+        <span className="sr-only">{workspaceName}</span>
+      </DropdownMenuTrigger> : <DropdownMenuTrigger render={<SidebarMenuButton aria-label={i18nText("Nav.workspaceMenu")} className="h-10" />}>
         <WorkspaceAvatar name={workspaceName} />
         <span className="flex-1 truncate font-semibold">{workspaceName}</span>
         <ChevronDown />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-1rem)]">
+      </DropdownMenuTrigger>}
+      <DropdownMenuContent align="start" side={compact ? 'right' : undefined} className="w-64 max-w-[calc(100vw-1rem)]">
         <DropdownMenuGroup>
           <DropdownMenuItem className="min-h-9" aria-label={i18nText("Settings.title")} aria-keyshortcuts="Control+, Meta+," onClick={() => settings()}><span className="flex-1">{i18nText("Settings.title")}</span><ShortcutKeys keys={['mod', ',']} aria-hidden="true" /></DropdownMenuItem>
         </DropdownMenuGroup>

@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register } from './fixtures'
+import { test, expect, register, rail } from './fixtures'
 
 async function createIssue(page: Page, title: string) {
+  if (await rail(page, '看板').getAttribute('aria-current') !== 'page') await rail(page, '看板').click()
   await page.getByRole('button', { name: '新建任务', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
   await dialog.getByLabel('任务标题', { exact: true }).fill(title)
@@ -45,7 +46,7 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     const blocker = `前置阻塞任务 ${suffix}`
     await createIssue(page, parent)
     await createIssue(page, blocker)
-    await page.getByRole('button', { name: '任务', exact: true }).click()
+    await rail(page, '看板').click()
     await openIssue(page, parent)
     const parentUrl = page.url()
     await page.setViewportSize(viewport)

@@ -116,7 +116,14 @@
     "inviteMembers": "Invite members",
     "plugins": "Plugins",
     "toggleTeam": "Expand or collapse the {name} team",
-    "sidebarRail": "Expand or collapse the sidebar rail"
+    "sidebarRail": "Expand or collapse the sidebar rail",
+    "rail": "Main navigation",
+    "conversations": "Conversations",
+    "board": "Board",
+    "collapseList": "Collapse conversation list",
+    "newConversation": "New conversation",
+    "pinned": "Pinned",
+    "untitledConversation": "Untitled conversation"
   },
   "Plugins": {
     "title": "Plugins and skills",

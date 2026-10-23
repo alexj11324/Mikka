@@ -116,7 +116,14 @@
     "inviteMembers": "邀请成员",
     "plugins": "插件",
     "toggleTeam": "展开或收起 {name} 团队",
-    "sidebarRail": "展开或收起侧栏边轨"
+    "sidebarRail": "展开或收起侧栏边轨",
+    "rail": "主导航",
+    "conversations": "对话",
+    "board": "看板",
+    "collapseList": "收起对话列表",
+    "newConversation": "新对话",
+    "pinned": "已置顶",
+    "untitledConversation": "未命名对话"
   },
   "Plugins": {
     "title": "插件与技能",
