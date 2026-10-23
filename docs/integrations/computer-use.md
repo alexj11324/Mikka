@@ -63,7 +63,7 @@ not claimed unavailable.
 
 ## Database effect and CI
 
-`20261023160000_computer_requests.sql` targets `DATABASE_URL`, the workspace DB.
+`20261023163933_computer_requests.sql` targets `DATABASE_URL`, the workspace DB.
 It creates new small `agent_settings` and `computer_requests` tables and a new
 owner/session index. It is idempotent, uses no rewrite of existing tables, stores
 no endpoint credentials or screenshots, and cascades on workspace deletion.
