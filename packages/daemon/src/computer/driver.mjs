@@ -88,6 +88,16 @@ export function normalizeCall(value) {
     return { name, arguments: { text: args.text } };
   throw new Error("Unsupported tool or arguments");
 }
+// The pinned release exposes different strict click schemas by platform.
+// Both use top-left desktop coordinates; macOS rejects coordinate_frame.
+export function driverArguments(input, platform = process.platform) {
+  const call = normalizeCall(input);
+  return call.name === "click"
+    ? { ...call.arguments, scope: "desktop",
+        ...(platform === "darwin" ? {} : { coordinate_frame: "desktop" }),
+        delivery_mode: "foreground" }
+    : call.arguments;
+}
 // Owned by the daemon, never by a harness. No shell, auto-update, host
 // credentials, arbitrary tool names, output paths or browser attachment tools.
 export async function executeDriver(driver, input) {
@@ -97,15 +107,7 @@ export async function executeDriver(driver, input) {
     .digest("hex");
   if (fingerprint !== driver.fingerprint)
     throw new Error("Driver changed; restart and approve a new request");
-  const args =
-    call.name === "click"
-      ? {
-          ...call.arguments,
-          scope: "desktop",
-          coordinate_frame: "desktop",
-          delivery_mode: "foreground",
-        }
-      : call.arguments;
+  const args = driverArguments(call);
   const env = Object.fromEntries(
     [
       "PATH",

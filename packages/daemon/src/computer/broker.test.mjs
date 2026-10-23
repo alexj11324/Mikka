@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { ComputerBroker } from "./broker.mjs";
-import { normalizeCall, detectComputerDriver } from "./driver.mjs";
+import { normalizeCall, detectComputerDriver, driverArguments } from "./driver.mjs";
 const driver = {
   installed: true,
   path: "/test/driver",
@@ -192,4 +192,11 @@ test("replaced run session and disconnected model discard pending execution", as
   abort.abort();
   await cancelled;
   await assert.rejects(() => b.decide(next.id, next.digest, true));
+});
+
+test("pinned platform click schemas preserve desktop coordinates without unsupported macOS fields", () => {
+  const call = { name: "click", arguments: { x: 216, y: 326 } };
+  assert.deepEqual(driverArguments(call, "linux"), { x: 216, y: 326, scope: "desktop", coordinate_frame: "desktop", delivery_mode: "foreground" });
+  assert.deepEqual(driverArguments(call, "darwin"), { x: 216, y: 326, scope: "desktop", delivery_mode: "foreground" });
+  assert.throws(() => driverArguments({ name: "click", arguments: { x: 1, y: 2, scope: "window" } }, "darwin"));
 });
