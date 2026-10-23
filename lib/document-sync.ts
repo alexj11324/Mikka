@@ -2,6 +2,7 @@
 
 import * as Y from 'yjs'
 import { exchangeDocument } from '@/app/actions/collaboration'
+import { nextSyncSnapshot, type SyncSnapshot } from '@/lib/document-sync-snapshot'
 
 function encode(bytes: Uint8Array) {
   let binary = ''
@@ -12,7 +13,6 @@ function decode(value: string) {
   return Uint8Array.from(atob(value), char => char.charCodeAt(0))
 }
 
-type SyncSnapshot = { ready: boolean; pending: boolean; error: boolean; syncing: boolean }
 export class DocumentSync {
   readonly doc = new Y.Doc()
   private id: string | undefined
@@ -39,7 +39,12 @@ export class DocumentSync {
   }
   getSnapshot = () => this.snapshot
   private publish(patch: Partial<SyncSnapshot>) {
-    this.snapshot = { ...this.snapshot, ...patch }
+    // A paragraph split writes Yjs twice (the edit, then y-sync's position migration).
+    // Notifying React when pending/ready/error/syncing did not change makes useEditor
+    // call setOptions, which writes Yjs again, until React hits its update limit.
+    const next = nextSyncSnapshot(this.snapshot, patch)
+    if (!next) return
+    this.snapshot = next
     this.listeners.forEach(listener => listener())
   }
   async exchange(id = this.id) {

@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Window } from 'happy-dom'
-import { typingOrDialog } from './shortcut-guard'
+import { bufferTypeAhead, typingOrDialog } from './shortcut-guard'
+
+test('keys typed before the new-task dialog mounts are kept', () => {
+  assert.equal(bufferTypeAhead('', 'd', false), 'd')
+  assert.equal(bufferTypeAhead('dcdc', ' ', false), 'dcdc ')
+  assert.equal(bufferTypeAhead('dcdc ', 't', false), 'dcdc t')
+  assert.equal(bufferTypeAhead('dcdc test', 'x', true), null)
+  assert.equal(bufferTypeAhead('title', 'Enter', false), null)
+  assert.equal(bufferTypeAhead('x'.repeat(200), 'y', false), 'x'.repeat(200))
+})
 
 test('single-key shortcuts stay quiet while a dialog or field is focused', () => {
   const window = new Window()

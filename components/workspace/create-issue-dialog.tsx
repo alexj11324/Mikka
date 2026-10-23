@@ -1,7 +1,7 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { JSONContent } from '@tiptap/react'
 import { ChartNoAxesColumnIncreasing, ChevronRight, CircleDashed, LockKeyhole, Maximize2, Minimize2, SquareUserRound, X } from 'lucide-react'
 import { saveIssue } from '@/app/actions/issues'
@@ -26,18 +26,20 @@ import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 
 const EMPTY: JSONContent = { type: 'doc', content: [{ type: 'paragraph' }] }
 
-export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initialTeamId = '', initialStatus = 'todo' }: {
+export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initialTeamId = '', initialStatus = 'todo', initialTitle = '' }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: (id: string) => void
   author: string
   initialStatus?: string
   initialTeamId?: string
+  initialTitle?: string
 }) {
   const i18nText = useTranslations();
   const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
   const [teamId, setTeamId] = useState(initialTeamId)
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState(initialTitle)
+  const seenAhead = useRef(initialTitle)
   const [content, setContent] = useState<JSONContent>(EMPTY)
   const [status, setStatus] = useState(initialStatus)
   const [priority, setPriority] = useState('normal')
@@ -47,6 +49,13 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   const [notice, setNotice] = useState('')
   const [editorKey, setEditorKey] = useState(0)
   const titleRef = useRef<HTMLInputElement>(null)
+  const focusTitle = useCallback(() => {
+    const field = titleRef.current
+    if (!field) return null
+    const end = field.value.length
+    field.setSelectionRange(end, end)
+    return field
+  }, [])
   const submitting = useRef(false)
   const [defaults, setDefaults] = useState({ status: initialStatus, priority: 'normal' })
   const dirty = !!title.trim() || JSON.stringify(content) !== JSON.stringify(EMPTY) || status !== defaults.status || priority !== defaults.priority || teamId !== initialTeamId
@@ -54,10 +63,27 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   const [discardOpen, setDiscardOpen] = useState(false)
 
   useEffect(() => {
+    if (!initialTitle.startsWith(seenAhead.current)) return
+    const extra = initialTitle.slice(seenAhead.current.length)
+    seenAhead.current = initialTitle
+    if (extra) setTitle(current => current + extra)
+  }, [initialTitle])
+  useLayoutEffect(() => {
     if (!open) return
-    const frame = requestAnimationFrame(() => titleRef.current?.focus())
+    let frame = 0
+    const place = () => {
+      const field = titleRef.current
+      if (!field) return
+      field.focus()
+      const end = field.value.length
+      field.setSelectionRange(end, end)
+    }
+    place()
+    // The dialog focus manager focuses again on the next frame. Place the caret
+    // after that so characters typed ahead stay in front of the cursor.
+    queueMicrotask(() => { frame = requestAnimationFrame(place) })
     return () => cancelAnimationFrame(frame)
-  }, [open, editorKey])
+  }, [open, editorKey, initialTitle])
   useEffect(() => { if (notice && !pending) titleRef.current?.focus() }, [notice, pending])
   useEffect(() => {
     if (!open || !dirty) return
@@ -115,7 +141,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   }
 
   return <><Dialog open={open} onOpenChange={value => { if (!value) close() }}>
-    <DialogContent showCloseButton={false} initialFocus={() => titleRef.current} className={cn('max-h-[calc(100svh-2rem)] gap-0 overflow-y-auto p-0 sm:top-[20svh] sm:max-h-[76svh] sm:max-w-3xl sm:translate-y-0', expanded && 'sm:max-w-5xl')}>
+    <DialogContent showCloseButton={false} initialFocus={focusTitle} className={cn('max-h-[calc(100svh-2rem)] gap-0 overflow-y-auto p-0 sm:top-[20svh] sm:max-h-[76svh] sm:max-w-3xl sm:translate-y-0', expanded && 'sm:max-w-5xl')}>
       <form onSubmit={event => { event.preventDefault(); void create() }} onKeyDown={event => {
         if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
         if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void create() }

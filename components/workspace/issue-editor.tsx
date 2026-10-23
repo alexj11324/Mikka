@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
+import type { EditorView } from "@tiptap/pm/view"
 import { useTranslations } from "next-intl"
 import { IssueActivity } from './issue-activity'
 import { useEditor, getSchema, type JSONContent } from "@tiptap/react"
@@ -80,24 +81,27 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
     ...createEditorExtensions(threadStore.isOpen, author, !!sharedDoc, compact, placeholder),
     ...(sharedDoc ? [Collaboration.configure({ document: sharedDoc })] : []),
   ], [threadStore, author, sharedDoc, compact, placeholder])
+  // useEditor calls setOptions whenever editorProps is a new object. setOptions
+  // re-runs the Yjs binding, so a fresh object on every parent render loops.
+  const editorProps = useMemo(() => ({
+    attributes: { role: "textbox", "aria-label": label, "aria-multiline": "true" },
+    handleKeyDown: (view: EditorView, event: KeyboardEvent) => {
+      if (event.key !== "End" || event.shiftKey || event.altKey || !(event.ctrlKey || event.metaKey) || !view.editable) return false
+      event.preventDefault()
+      try {
+        const end = TextSelection.atEnd(view.state.doc)
+        if (!view.state.selection.eq(end)) view.dispatch(view.state.tr.setSelection(end).scrollIntoView())
+      } catch {
+        return false
+      }
+      return true
+    },
+  }), [label])
   const editor = useEditor({
     extensions,
     content: sharedDoc ? undefined : content ?? EMPTY_DOCUMENT,
     immediatelyRender: false,
-    editorProps: {
-      attributes: { role: "textbox", "aria-label": label, "aria-multiline": "true" },
-      handleKeyDown: (view, event) => {
-        if (event.key !== "End" || event.shiftKey || event.altKey || !(event.ctrlKey || event.metaKey) || !view.editable) return false
-        event.preventDefault()
-        try {
-          const end = TextSelection.atEnd(view.state.doc)
-          if (!view.state.selection.eq(end)) view.dispatch(view.state.tr.setSelection(end).scrollIntoView())
-        } catch {
-          return false
-        }
-        return true
-      },
-    },
+    editorProps,
     onUpdate: ({ editor: current, transaction }) => {
       if (!transaction.docChanged || !current.isFocused) return
       if (transaction.getMeta(ySyncPluginKey)?.isChangeOrigin) return

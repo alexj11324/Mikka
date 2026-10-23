@@ -29,7 +29,7 @@ import { WorkspaceOverview } from './workspace-overview'
 import { PluginsSkillsView } from '@/components/plugins/plugins-skills-view'
 import type { WorkspaceSection } from './workspace-navigation'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
-import { typingOrDialog } from '@/lib/shortcut-guard'
+import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
 import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import type { AgentHistory } from '@/lib/agent-history'
@@ -37,7 +37,10 @@ import { useAgentHistory } from '@/hooks/use-agent-history'
 import { useWorkspace } from '@/hooks/use-workspace'
 
 // Start the chunk download during module evaluation, before hydration and its effects.
-if (typeof window !== 'undefined') void import('./agent-panel').catch(() => {})
+if (typeof window !== 'undefined') {
+  void import('./agent-panel').catch(() => {})
+  void import('./create-issue-dialog').catch(() => {})
+}
 
 function DetailLoading() {
   const t = useTranslations('Workspace')
@@ -141,6 +144,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const [query, setQuery] = useState('')
   const [view, setView] = useState<IssueView>('all')
   const [creating, setCreating] = useState(false)
+  const [typedAhead, setTypedAhead] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
@@ -149,12 +153,27 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
         if (document.querySelector('[role="dialog"][data-open]') && !searchOpen) return
         event.preventDefault(); setSearchOpen(value => !value)
       } else if (event.key.toLowerCase() === 'c' && !event.metaKey && !event.ctrlKey && !event.altKey && !creating && !searchOpen && !typingOrDialog(event.target)) {
-        event.preventDefault(); setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreateStatus(ISSUE_STATUSES.some(status => status.value === view) ? view as IssueStatus : 'todo'); setCreating(true)
+        event.preventDefault(); setTypedAhead(''); setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreateStatus(ISSUE_STATUSES.some(status => status.value === view) ? view as IssueStatus : 'todo'); setCreating(true)
       }
     }
     window.addEventListener('keydown', shortcut)
     return () => window.removeEventListener('keydown', shortcut)
   }, [creating, searchOpen, view, boardBusy, section, projectId])
+  useEffect(() => {
+    if (!creating) return
+    function capture(event: KeyboardEvent) {
+      if (event.isComposing || event.keyCode === 229 || event.metaKey || event.ctrlKey || event.altKey) return
+      const titleField = document.getElementById('new-issue-title')
+      const dialog = titleField?.closest('[role="dialog"], [role="alertdialog"]')
+      const dialogReady = !!dialog && (document.activeElement === titleField || dialog.contains(document.activeElement))
+      if (bufferTypeAhead('', event.key, dialogReady) === null) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      setTypedAhead(current => bufferTypeAhead(current, event.key, false) ?? current)
+    }
+    window.addEventListener('keydown', capture, true)
+    return () => window.removeEventListener('keydown', capture, true)
+  }, [creating])
   const [signingOut, setSigningOut] = useState(false)
   const [accountError, setAccountError] = useState('')
   const onDirty = useCallback((value: boolean) => { dirtyRef.current = value }, [])
@@ -206,7 +225,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     showIssue(null, 'replace')
   }
   const saved = useCallback((id: string) => { setSelected(id); void mutate() }, [mutate])
-  function create(status: IssueStatus = ISSUE_STATUSES.some(item => item.value === view) ? view as IssueStatus : 'todo') { if (boardBusy) return; setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreateStatus(status); setCreating(true) }
+  function create(status: IssueStatus = ISSUE_STATUSES.some(item => item.value === view) ? view as IssueStatus : 'todo') { if (boardBusy) return; setTypedAhead(''); setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreateStatus(status); setCreating(true) }
   async function issueCreated(id: string) {
     void mutate()
     if (!creationProject) return
@@ -270,7 +289,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       </>}
     </AppShellContent>
     </>}
-    {creating && <CreateIssueDialog initialTeamId={(creationProject ? projectTeams.find(link => link.projectId === creationProject && link.isPrimary)?.teamId : section.startsWith('team-') ? teamId : null) ?? ''} initialStatus={createStatus} open={creating} onOpenChange={setCreating} onCreated={id => { void issueCreated(id) }} author={user.name || user.email} />}
+    {creating && <CreateIssueDialog initialTitle={typedAhead} initialTeamId={(creationProject ? projectTeams.find(link => link.projectId === creationProject && link.isPrimary)?.teamId : section.startsWith('team-') ? teamId : null) ?? ''} initialStatus={createStatus} open={creating} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} onCreated={id => { void issueCreated(id) }} author={user.name || user.email} />}
     {searchOpen && <IssueSearch open={searchOpen} onOpenChange={setSearchOpen} issues={tasks} onOpen={open} onCreate={() => create()} />}
   </AppShell></SignOutBoundary>
 }

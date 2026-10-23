@@ -5,14 +5,17 @@ import { useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { listTeams } from '@/app/actions/teams'
 import { getIssueTeam, setIssueTeam } from '@/app/actions/team-relations'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useTeamChoices } from './team-choices'
+
+const NO_TEAMS: Awaited<ReturnType<typeof listTeams>> = []
 
 export function IssueTeamControl({ issueId, disabled }: { issueId: string; disabled: boolean }) {
   const i18nText = useTranslations();
-  const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
+  const { data: teams = NO_TEAMS, error: teamsError } = useSWR('teams', listTeams)
   const { data, error: readError, mutate } = useSWR(['issue-team', issueId], () => getIssueTeam(issueId))
   const { mutate: refresh } = useSWRConfig()
   const [next, setNext] = useState<string | undefined>()
@@ -20,7 +23,7 @@ export function IssueTeamControl({ issueId, disabled }: { issueId: string; disab
   const [error, setError] = useState('')
   const selected = next ?? data ?? ''
   const noTeam = i18nText("FeatureCopy.c_2114e0a1")
-  const choices = [{ value: 'none', label: noTeam }, ...teams.map(team => ({ value: team.id, label: `${team.identifier} · ${team.name}` }))]
+  const choices = useTeamChoices(teams, noTeam)
   const currentLabel = choices.find(item => item.value === (selected || 'none'))?.label ?? noTeam
   async function save() {
     if (data === undefined || pending || disabled) return
