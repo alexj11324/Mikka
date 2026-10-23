@@ -297,18 +297,59 @@ export function auditSource(file, text, policy) {
     if (!fn || !(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))) return false
     return repeatCallback(fn.parent) === fn
   }
-  // sticky 只对“分组标题”豁免：标题类标签 / role，或作为 Fragment/容器的第一个子元素且后面还有内容（标题 + 该组的行）。
-  const GROUP_HEADER_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'thead', 'th'])
-  const isGroupHeader = node => {
+  // sticky 豁免只给分组标题：标题元素（h1–h6 / header / th / role=heading|columnheader），
+  // 不是 .map() 直接返回的重复项，且同一父元素里紧跟着该组的列表。
+  const GROUP_HEADER_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'th'])
+  const isHeadingElement = node => {
     if (GROUP_HEADER_TAGS.has(canonical(node))) return true
     const role = attr(node, 'role')?.initializer
-    if (role && ts.isStringLiteral(role) && ['heading', 'rowgroup', 'columnheader'].includes(role.text)) return true
+    return !!role && ts.isStringLiteral(role) && ['heading', 'columnheader'].includes(role.text)
+  }
+  const unwrap = expression => {
+    while (expression && ts.isParenthesizedExpression(expression)) expression = expression.expression
+    return expression
+  }
+  // .map() 回调直接返回的根元素（不经 Fragment 展开）。
+  const isMapRoot = node => {
+    const element = ts.isJsxSelfClosingElement(node) ? node : node.parent
+    let p = element.parent
+    while (p && ts.isParenthesizedExpression(p)) p = p.parent
+    let fn = null
+    if (p && (ts.isArrowFunction(p) || ts.isFunctionExpression(p))) fn = p
+    else if (p && ts.isReturnStatement(p)) { for (let q = p.parent; q; q = q.parent) if (ts.isFunctionLike(q)) { fn = q; break } }
+    return !!fn && (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) && repeatCallback(fn.parent) === fn
+  }
+  const isListExpression = expression => {
+    expression = unwrap(expression)
+    if (!expression) return false
+    if (ts.isCallExpression(expression)) return !!repeatCallback(expression)
+    if (ts.isBinaryExpression(expression)) return isListExpression(expression.right)
+    if (ts.isConditionalExpression(expression)) return isListExpression(expression.whenTrue) || isListExpression(expression.whenFalse)
+    return false
+  }
+  const isListElement = element => {
+    const opening = ts.isJsxElement(element) ? element.openingElement : element
+    if (['ul', 'ol', 'tbody'].includes(canonical(opening))) return true
+    const role = attr(opening, 'role')?.initializer
+    if (role && ts.isStringLiteral(role) && ['list', 'rowgroup', 'listbox'].includes(role.text)) return true
+    const classAttr = attr(opening, 'className')
+    if (classAttr?.initializer) {
+      const expression = ts.isJsxExpression(classAttr.initializer) ? classAttr.initializer.expression : classAttr.initializer
+      if (resolve(expression).strings.flatMap(value => splitUtilities(value)).map(utilityBase).some(base => /^divide-[xy]$/.test(base))) return true
+    }
+    return ts.isJsxElement(element) && element.children.some(child => ts.isJsxExpression(child) && isListExpression(child.expression))
+  }
+  const followedByList = node => {
     const element = ts.isJsxSelfClosingElement(node) ? node : node.parent
     const container = element.parent
-    if (!container || !(isFragment(container) || ts.isJsxElement(container))) return false
-    const siblings = container.children.filter(child => ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child) || (ts.isJsxExpression(child) && child.expression))
-    return siblings[0] === element && siblings.length > 1
+    if (!container || !(ts.isJsxFragment(container) || ts.isJsxElement(container))) return false
+    const siblings = container.children.filter(child => !(ts.isJsxText(child) && !child.text.trim()) && !(ts.isJsxExpression(child) && !child.expression))
+    const next = siblings[siblings.indexOf(element) + 1]
+    if (!next) return false
+    if (ts.isJsxExpression(next)) return isListExpression(next.expression)
+    return (ts.isJsxElement(next) || ts.isJsxSelfClosingElement(next)) && isListElement(next)
   }
+  const isGroupHeader = node => isHeadingElement(node) && !isMapRoot(node) && followedByList(node)
   function visit(node) {
     const cssAssertionProperty = /\.spec\.[jt]sx?$/.test(file) && !!node.parent && ts.isCallExpression(node.parent) && ts.isPropertyAccessExpression(node.parent.expression) && node.parent.expression.name.text === 'toHaveCSS' && node.parent.arguments[0] === node
     if (ts.isStringLiteralLike(node) && !cssAssertionProperty) {
@@ -352,7 +393,8 @@ export function auditSource(file, text, policy) {
           const allBases = allTokens.map(utilityBase)
           const sideRule = allBases.some(base => /^border-[tby](?:-(?!0$|0px$|\[0px\]$|transparent$|\[transparent\]$).+)?$/.test(base))
           const edgeReset = allTokens.some(token => /(?:^|:)(?:last|first|last-of-type|first-of-type):!?border-(?:[tby]-)?0!?$/.test(token))
-          if (sideRule && !(allBases.includes('sticky') && isGroupHeader(node)) && (edgeReset || isMapItem(node))) add(classAttr, 'style/divider-list-item', '列表项之间不写 border-b / border-t（含 last:border-0 写法）；在父容器上用 divide-y。border-b 只用于页面顶栏、面板标题栏等布局边界。')
+          // last:/first:border-0 永远报错；sticky 分组标题只豁免“列表项”判定。
+          if (sideRule && (edgeReset || (isMapItem(node) && !(allBases.includes('sticky') && isGroupHeader(node))))) add(classAttr, 'style/divider-list-item', '列表项之间不写 border-b / border-t（含 last:border-0 写法）；在父容器上用 divide-y。border-b 只用于页面顶栏、面板标题栏等布局边界。')
           if (allBases.some(base => /^divide-[xy](?:-reverse)?$/.test(base))) {
             const bordered = jsxChildren(node).find(child => isBordered(child))
             if (bordered) add(classAttr, 'style/divider-between-bordered', `divide-* 的子项（<${canonical(bordered)}>）已有边框/背景/卡片，不再加分隔线；改用 gap。`)
