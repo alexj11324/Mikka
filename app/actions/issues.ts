@@ -9,7 +9,7 @@ import { accessibleTeams } from '@/lib/team-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
-import { issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
+import { issues, issueVersions, issueMembers, linearIssueLinks, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { issueChecklist } from '@/lib/issue-checklist'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
@@ -23,6 +23,8 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { issueDoneEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { after } from 'next/server'
+import { judgeIssueScope } from '@/lib/issue-scope-judge'
+import { TASK_SCOPES } from '@/lib/task-identifier'
 
 type IssueRow = typeof issues.$inferSelect
 type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null }
@@ -114,6 +116,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         return { issue: await issueView(issue, tx) }
       })
       if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
+      if (!id && 'issue' in result && result.issue) { const created = result.issue.id; after(() => judgeIssueScope(created, 'the Mikka app')) }
       if (doneEvent && 'issue' in result) after(() => wakeCoordinator(ownerId))
       return result
     } catch (error) {
@@ -150,4 +153,31 @@ export async function listIssueVersions(id: string) {
   const { issue } = await requireIssueAccess(id)
   const userId = issue.userId
   return db.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
+}
+
+/**
+ * The one-click scope change (MIK-47). The person's choice wins over the
+ * agent's and becomes an example for its next judgment. A task already in
+ * Linear stays a workspace task: it cannot be taken back out.
+ */
+export async function setIssueScope(input: { id: string; revision: number; scope: string }): Promise<ActionResult<{ issue: IssueView }>> {
+  return runAction(async () => {
+    const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), scope: z.enum(TASK_SCOPES) }).safeParse(input)
+    if (!parsed.success) return { error: 'issueScopeInvalid' }
+    const userId = await getUserId()
+    const { issue } = await requireIssueAccess(parsed.data.id)
+    if (issue.userId !== userId) return { error: 'issueScopeOwnerOnly' }
+    if (parsed.data.scope === 'personal') {
+      const [link] = await db.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(eq(linearIssueLinks.issueId, issue.id)).limit(1)
+      if (link) return { error: 'issueScopeInLinear' }
+    }
+    const result = await db.transaction(async tx => {
+      const [saved] = await tx.update(issues).set({ scope: parsed.data.scope, scopeSetBy: 'user', scopeConfidence: null, revision: parsed.data.revision + 1, updatedAt: new Date() })
+        .where(and(eq(issues.id, issue.id), eq(issues.userId, userId), eq(issues.revision, parsed.data.revision))).returning()
+      if (!saved) return { error: 'issueStale' as const }
+      return { issue: await issueView(saved, tx) }
+    })
+    if ('issue' in result && parsed.data.scope === 'workspace') dispatchLinearIssueSync(issue.id)
+    return result
+  })
 }
