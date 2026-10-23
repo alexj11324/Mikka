@@ -17,3 +17,4 @@
 ## Merge flow for frontend changes
 
 - Every PR that touches the frontend passes QA review first. Then post its Preview link to the design group for the UI Designer's design review. Only after the design review passes is the PR reported to Alex for merge approval. List the pages and states to review in the PR description.
+- For any change with animation, the design review also includes a motion review. The bar is smooth and elegant. Check four things: no dropped frames or stutter on the Preview; no jumps on state changes, with natural easing; motion stays tidy at small sizes and when elements stack; reduced-motion degrades correctly.
