@@ -81,6 +81,21 @@
 --color-hover-2: var(--hover-2);
 --color-ink: var(--ink);
 --color-ink-2: var(--ink-2);
+--color-tag-amber: var(--tag-amber);
+--color-tag-amber-foreground: var(--tag-amber-foreground);
+--color-tag-amber-border: var(--tag-amber-border);
+--color-tag-blue: var(--tag-blue);
+--color-tag-blue-foreground: var(--tag-blue-foreground);
+--color-tag-blue-border: var(--tag-blue-border);
+--color-tag-emerald: var(--tag-emerald);
+--color-tag-emerald-foreground: var(--tag-emerald-foreground);
+--color-tag-emerald-border: var(--tag-emerald-border);
+--color-tag-red: var(--tag-red);
+--color-tag-red-foreground: var(--tag-red-foreground);
+--color-tag-red-border: var(--tag-red-border);
+--color-tag-violet: var(--tag-violet);
+--color-tag-violet-foreground: var(--tag-violet-foreground);
+--color-tag-violet-border: var(--tag-violet-border);
 --color-ink-3: var(--ink-3);
 --color-line: var(--line);
 --color-line-strong: var(--line-strong);
@@ -181,6 +196,21 @@
 --warning: var(--color-yellow-500);
 --warning-foreground: var(--color-yellow-900);
 --invert: var(--color-zinc-900);
+--tag-amber: var(--color-amber-50);
+--tag-amber-foreground: var(--color-amber-700);
+--tag-amber-border: var(--color-amber-200);
+--tag-blue: var(--color-blue-50);
+--tag-blue-foreground: var(--color-blue-700);
+--tag-blue-border: var(--color-blue-200);
+--tag-emerald: var(--color-emerald-50);
+--tag-emerald-foreground: var(--color-emerald-700);
+--tag-emerald-border: var(--color-emerald-200);
+--tag-red: var(--color-red-50);
+--tag-red-foreground: var(--color-red-700);
+--tag-red-border: var(--color-red-200);
+--tag-violet: var(--color-violet-50);
+--tag-violet-foreground: var(--color-violet-700);
+--tag-violet-border: var(--color-violet-200);
 --invert-foreground: var(--color-zinc-50);
 }
 
@@ -236,6 +266,21 @@
 --warning: var(--color-yellow-500);
 --warning-foreground: var(--color-yellow-600);
 --invert: var(--color-zinc-700);
+--tag-amber: color-mix(in oklch, var(--color-amber-500) 12%, transparent);
+--tag-amber-foreground: var(--color-amber-300);
+--tag-amber-border: color-mix(in oklch, var(--color-amber-500) 30%, transparent);
+--tag-blue: color-mix(in oklch, var(--color-blue-500) 12%, transparent);
+--tag-blue-foreground: var(--color-blue-300);
+--tag-blue-border: color-mix(in oklch, var(--color-blue-500) 30%, transparent);
+--tag-emerald: color-mix(in oklch, var(--color-emerald-500) 12%, transparent);
+--tag-emerald-foreground: var(--color-emerald-300);
+--tag-emerald-border: color-mix(in oklch, var(--color-emerald-500) 30%, transparent);
+--tag-red: color-mix(in oklch, var(--color-red-500) 12%, transparent);
+--tag-red-foreground: var(--color-red-300);
+--tag-red-border: color-mix(in oklch, var(--color-red-500) 30%, transparent);
+--tag-violet: color-mix(in oklch, var(--color-violet-500) 12%, transparent);
+--tag-violet-foreground: var(--color-violet-300);
+--tag-violet-border: color-mix(in oklch, var(--color-violet-500) 30%, transparent);
 --invert-foreground: var(--color-zinc-50);
 }
 

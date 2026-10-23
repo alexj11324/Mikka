@@ -1,10 +1,11 @@
+// Comma-style tags: light tint, dark text, hairline border. Never a solid saturated fill.
 export const statusTones = {
-  neutral: 'border-muted-foreground/20 bg-muted/50 text-muted-foreground',
-  warning: 'border-warning/25 bg-warning/10 text-warning-foreground',
-  info: 'border-info/25 bg-info/10 text-info-foreground',
-  success: 'border-success/25 bg-success/10 text-success-foreground',
-  destructive: 'border-destructive/25 bg-destructive/10 text-destructive',
-  focus: 'border-info/25 bg-info/10 text-info-foreground',
+  neutral: 'border-border bg-background text-ink-2',
+  warning: 'border-tag-amber-border bg-tag-amber text-tag-amber-foreground',
+  info: 'border-tag-blue-border bg-tag-blue text-tag-blue-foreground',
+  success: 'border-tag-emerald-border bg-tag-emerald text-tag-emerald-foreground',
+  destructive: 'border-tag-red-border bg-tag-red text-tag-red-foreground',
+  focus: 'border-tag-violet-border bg-tag-violet text-tag-violet-foreground',
 } as const
 
 export type StatusTone = keyof typeof statusTones
@@ -12,7 +13,7 @@ export type StatusTone = keyof typeof statusTones
 export const statusDots: Record<StatusTone, string> = {
   neutral: 'bg-muted-foreground',
   warning: 'bg-warning',
-  info: 'bg-info',
+  info: 'bg-tag-blue-foreground',
   success: 'bg-success',
   destructive: 'bg-destructive',
   focus: 'bg-info',
@@ -20,11 +21,11 @@ export const statusDots: Record<StatusTone, string> = {
 
 export function statusTone(value: string): StatusTone {
   switch (value) {
-    case 'doing': case 'started': case 'paused': case 'atRisk': case 'normal': return 'warning'
+    case 'doing': case 'started': case 'paused': case 'atRisk': case 'high': return 'warning'
     case 'review': return 'info'
-    case 'done': case 'completed': case 'onTrack': case 'low': case 'open': return 'success'
+    case 'done': case 'completed': case 'onTrack': case 'open': return 'success'
     case 'urgent': case 'canceled': case 'offTrack': case 'closed': return 'destructive'
-    case 'high': case 'merged': return 'focus'
+    case 'merged': return 'focus'
     default: return 'neutral'
   }
 }

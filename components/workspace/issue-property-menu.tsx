@@ -11,7 +11,7 @@ import { statusDots, statusTones, type StatusTone } from '@/lib/status-appearanc
 export function IssuePropertyMenu({ label, value, options, disabled, onChange }: {
   label: string
   value: string
-  options: readonly { value: string; label: string; icon?: LucideIcon; iconProps?: Pick<LucideProps, 'viewBox' | 'strokeWidth'>; indicatorClassName?: string; tone?: StatusTone }[]
+  options: readonly { value: string; label: string; icon?: LucideIcon; iconProps?: Pick<LucideProps, 'viewBox'>; indicatorClassName?: string; tone?: StatusTone }[]
   icon: LucideIcon
   disabled?: boolean
   pill?: boolean

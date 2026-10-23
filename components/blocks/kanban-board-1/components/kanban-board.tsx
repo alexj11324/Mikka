@@ -62,7 +62,7 @@ function TaskCard({ task, status, disabled, isOverlay = false, onOpen, onStatusC
   </Card>
 
   return <KanbanItem value={task.id} disabled={disabled} className="shrink-0" role="group" tabIndex={-1} aria-label={task.title}>
-    {isOverlay ? card : <KanbanItemHandle cursor={false} role="group" tabIndex={disabled ? -1 : 0} className="block cursor-pointer touch-pan-y rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging=true]:cursor-grabbing" aria-label={t('openTask', { title: task.title })} aria-roledescription={t('openableDraggableTask')} aria-keyshortcuts="Enter Space" onClick={event => {
+    {isOverlay ? card : <KanbanItemHandle cursor={false} role="group" tabIndex={disabled ? -1 : 0} className="group/card block cursor-pointer touch-pan-y rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging=true]:cursor-grabbing" aria-label={t('openTask', { title: task.title })} aria-roledescription={t('openableDraggableTask')} aria-keyshortcuts="Enter Space" onClick={event => {
       if (disabled || event.defaultPrevented || (event.target as HTMLElement).closest('[data-card-control]')) return
       onOpen(task.id)
     }} onKeyDownCapture={event => {
