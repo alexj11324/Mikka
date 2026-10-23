@@ -20,29 +20,31 @@ if (enabled) {
 test('actor migration: legacy rows stay NULL, reruns preserve identity, new rows enforce type', { skip: !enabled }, async () => {
   const pool = new Pool({ connectionString: connection, max: 1 })
   const schema = `actor_${randomUUID().replaceAll('-', '')}`
+  const client = await pool.connect()
   try {
-    assert.equal((await pool.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
-    await pool.query(`create schema "${schema}"`)
-    await pool.query('begin')
-    await pool.query(`set local search_path to "${schema}"`)
-    await pool.query('create table issue_versions(id text primary key)')
-    await pool.query("insert into issue_versions(id) values ('legacy')")
+    assert.equal((await client.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+    await client.query(`create schema "${schema}"`)
+    await client.query('begin')
+    await client.query(`set local search_path to "${schema}"`)
+    await client.query('create table issue_versions(id text primary key)')
+    await client.query("insert into issue_versions(id) values ('legacy')")
     const file = readdirSync('drizzle').find(file => file.endsWith('_activity_version_actor.sql'))!
     const migration = readFileSync(`drizzle/${file}`, 'utf8')
-    await pool.query(migration)
-    await pool.query("insert into issue_versions values ('person','user','member'),('agent','agent','verified-agent'),('job','system','linear')")
-    await pool.query(migration)
-    assert.deepEqual((await pool.query("select actor_type,actor_id from issue_versions where id='legacy'")).rows, [{ actor_type: null, actor_id: null }])
-    assert.deepEqual((await pool.query("select actor_type,actor_id from issue_versions where id='person'")).rows, [{ actor_type: 'user', actor_id: 'member' }])
+    await client.query(migration)
+    await client.query("insert into issue_versions values ('person','user','member'),('agent','agent','verified-agent'),('job','system','linear')")
+    await client.query(migration)
+    assert.deepEqual((await client.query("select actor_type,actor_id from issue_versions where id='legacy'")).rows, [{ actor_type: null, actor_id: null }])
+    assert.deepEqual((await client.query("select actor_type,actor_id from issue_versions where id='person'")).rows, [{ actor_type: 'user', actor_id: 'member' }])
     for (const values of ["('bad','forged','x')", "('bad',null,'x')"]) {
-      await pool.query('savepoint invalid_actor')
-      await assert.rejects(pool.query(`insert into issue_versions values ${values}`), { code: '23514' })
-      await pool.query('rollback to savepoint invalid_actor')
+      await client.query('savepoint invalid_actor')
+      await assert.rejects(client.query(`insert into issue_versions values ${values}`), { code: '23514' })
+      await client.query('rollback to savepoint invalid_actor')
     }
-    await pool.query('commit')
+    await client.query('commit')
   } finally {
-    await pool.query('rollback')
-    await pool.query(`drop schema if exists "${schema}" cascade`)
+    await client.query('rollback')
+    await client.query(`drop schema if exists "${schema}" cascade`)
+    client.release()
     await pool.end()
   }
 })
