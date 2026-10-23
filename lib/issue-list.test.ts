@@ -15,8 +15,8 @@ test('merged issue lists keep one row per id and the newest page', () => {
 })
 
 test('list index migrations are idempotent and cover the list filters', () => {
-  const issueSql = readFileSync(new URL('../drizzle/0015_issue_list_indexes.sql', import.meta.url), 'utf8')
-  const workspaceSql = readFileSync(new URL('../drizzle/0016_workspace_list_indexes.sql', import.meta.url), 'utf8')
+  const issueSql = readFileSync(new URL('../drizzle/20261023040000_issue_list_indexes.sql', import.meta.url), 'utf8')
+  const workspaceSql = readFileSync(new URL('../drizzle/20261023040001_workspace_list_indexes.sql', import.meta.url), 'utf8')
   assert.match(workspaceSql, /^--\s*target:\s*DATABASE_URL/m)
   const statements = `${issueSql}\n${workspaceSql}`.split(';').map(part => part.split('\n').filter(line => line.trim() && !line.trim().startsWith('--')).join('\n').trim()).filter(Boolean)
   for (const statement of statements) assert.match(statement, /^create index if not exists/i)
