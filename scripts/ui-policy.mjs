@@ -139,7 +139,7 @@ export function auditSource(file, text, policy) {
     if (!element) return null
     for (const range of commentsBefore(element)) {
       const match = text.slice(range.pos, range.end).replace(/^\/\/|^\/\*|\*\/$/g, '').match(DIVIDER_ALLOW_COMMENT)
-      if (match && [...match[1].trim()].length >= DIVIDER_REASON_MIN) return { pos: range.pos, reason: match[1].trim() }
+      if (match && [...match[1].trim()].length >= DIVIDER_REASON_MIN && /\p{L}/u.test(match[1])) return { pos: range.pos, reason: match[1].trim() }
     }
     return null
   }
@@ -153,6 +153,7 @@ export function auditSource(file, text, policy) {
         const name = spec.propertyName?.text ?? spec.name.text
         if (!policy.typography.googleFonts.includes(name)) add(spec, 'typography/font-family', `字体 ${name} 不在批准的字体集合中。`)
       }
+      if (from === 'class-variance-authority' || from.startsWith('class-variance-authority/')) add(node, 'components/no-custom-implementation', '业务代码不允许从 class-variance-authority 引入任何内容；variants 只在组件库里定义。')
       if (from === 'next/font/local') add(node, 'typography/font-family', '本地字体也必须先进入统一字体策略，不允许临时引入。')
       if (/^(?:@base-ui\/|@radix-ui\/|radix-ui$|react\/jsx-runtime|react\/jsx-dev-runtime)/.test(from)) add(node, 'components/no-primitive-bypass', '业务代码只组合已下载组件，不直接使用底层 primitives 或 JSX runtime。')
       if (/^(?:@tabler\/icons|@heroicons\/|react-icons\/|@phosphor-icons\/)/.test(from) && from !== policy.iconLibrary) add(node, 'icons/library', `仅使用配置的 ${policy.iconLibrary}。`)
@@ -296,6 +297,18 @@ export function auditSource(file, text, policy) {
     if (!fn || !(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))) return false
     return repeatCallback(fn.parent) === fn
   }
+  // sticky 只对“分组标题”豁免：标题类标签 / role，或作为 Fragment/容器的第一个子元素且后面还有内容（标题 + 该组的行）。
+  const GROUP_HEADER_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'thead', 'th'])
+  const isGroupHeader = node => {
+    if (GROUP_HEADER_TAGS.has(canonical(node))) return true
+    const role = attr(node, 'role')?.initializer
+    if (role && ts.isStringLiteral(role) && ['heading', 'rowgroup', 'columnheader'].includes(role.text)) return true
+    const element = ts.isJsxSelfClosingElement(node) ? node : node.parent
+    const container = element.parent
+    if (!container || !(isFragment(container) || ts.isJsxElement(container))) return false
+    const siblings = container.children.filter(child => ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child) || (ts.isJsxExpression(child) && child.expression))
+    return siblings[0] === element && siblings.length > 1
+  }
   function visit(node) {
     const cssAssertionProperty = /\.spec\.[jt]sx?$/.test(file) && !!node.parent && ts.isCallExpression(node.parent) && ts.isPropertyAccessExpression(node.parent.expression) && node.parent.expression.name.text === 'toHaveCSS' && node.parent.arguments[0] === node
     if (ts.isStringLiteralLike(node) && !cssAssertionProperty) {
@@ -339,7 +352,7 @@ export function auditSource(file, text, policy) {
           const allBases = allTokens.map(utilityBase)
           const sideRule = allBases.some(base => /^border-[tby](?:-(?!0$|0px$|\[0px\]$|transparent$|\[transparent\]$).+)?$/.test(base))
           const edgeReset = allTokens.some(token => /(?:^|:)(?:last|first|last-of-type|first-of-type):!?border-(?:[tby]-)?0!?$/.test(token))
-          if (sideRule && !allBases.includes('sticky') && (edgeReset || isMapItem(node))) add(classAttr, 'style/divider-list-item', '列表项之间不写 border-b / border-t（含 last:border-0 写法）；在父容器上用 divide-y。border-b 只用于页面顶栏、面板标题栏等布局边界。')
+          if (sideRule && !(allBases.includes('sticky') && isGroupHeader(node)) && (edgeReset || isMapItem(node))) add(classAttr, 'style/divider-list-item', '列表项之间不写 border-b / border-t（含 last:border-0 写法）；在父容器上用 divide-y。border-b 只用于页面顶栏、面板标题栏等布局边界。')
           if (allBases.some(base => /^divide-[xy](?:-reverse)?$/.test(base))) {
             const bordered = jsxChildren(node).find(child => isBordered(child))
             if (bordered) add(classAttr, 'style/divider-between-bordered', `divide-* 的子项（<${canonical(bordered)}>）已有边框/背景/卡片，不再加分隔线；改用 gap。`)

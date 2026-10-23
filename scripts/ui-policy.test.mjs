@@ -162,11 +162,37 @@ test('QA #78: list items returned via Fragment and Array.from', () => {
   clean('const ui = items.map(i => <Fragment key={i}><div className="py-2" /></Fragment>)')
 })
 
-test('QA #78: sticky group headers inside map are layout boundaries', () => {
-  clean('const ui = groups.map(g => <div key={g} className="sticky top-0 border-b bg-background px-3 py-1" />)')
+test('QA #78: sticky exemption applies only to group headers', () => {
   clean('const ui = groups.map(g => <Fragment key={g}><div className="sticky top-0 border-b" /><Rows /></Fragment>)')
-  clean('const ui = groups.map(g => <div key={g} className={cn("sticky top-0", "border-b")} />)')
+  clean('const ui = groups.map(g => <section key={g}><div className={cn("sticky top-0", "border-b")} />{g.rows}</section>)')
+  clean('const ui = groups.map(g => <h3 key={g} className="sticky top-0 border-b bg-background px-3 py-1" />)')
+  clean('const ui = groups.map(g => <div key={g} role="heading" className="sticky top-0 border-b" />)')
+  // a sticky list item that is not a group header is still a row divider
+  flags('const ui = groups.map(g => <div key={g} className="sticky top-0 border-b bg-background px-3 py-1" />)', 'style/divider-list-item')
+  flags('const ui = groups.map(g => <Fragment key={g}><Rows /><div className="sticky top-0 border-b" /></Fragment>)', 'style/divider-list-item')
+  flags('const ui = groups.map(g => <div key={g} role="listitem" className="sticky border-b last:border-0" />)', 'style/divider-list-item')
   flags('const ui = groups.map(g => <div key={g} className="relative border-b" />)', 'style/divider-list-item')
+})
+
+test('QA #78: exemption reason must contain a letter or CJK character', () => {
+  for (const reason of ['1234567890', '----------', '!!!!!!!!!!!!', '..........  ...']) flags(`const ui = items.map(item => (
+      // ui-policy-allow divider: ${reason}
+      <div key={item} className="border-b" />
+    ))`, 'style/divider-list-item')
+  clean(`const ui = items.map(item => (
+      // ui-policy-allow divider: 打印报表的每一行需要行线分隔
+      <div key={item} className="border-b" />
+    ))`)
+})
+
+test('QA #78: any import from class-variance-authority is an error', () => {
+  for (const code of [
+    'import { cva } from "class-variance-authority"',
+    'import type { VariantProps } from "class-variance-authority"',
+    'import * as cvaLib from "class-variance-authority"',
+    'import "class-variance-authority"',
+    'import { cx } from "class-variance-authority/dist/index"',
+  ]) assert.ok(rules(code).includes('components/no-custom-implementation'), code)
 })
 
 test('QA #78: exemption comments are real comments for the next element only', () => {
