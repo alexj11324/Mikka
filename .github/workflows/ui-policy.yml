@@ -76,6 +76,9 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Migration file names and no-transaction splitting; pure Node, no database.
+      - run: pnpm check:migrations
+      - run: pnpm test:migrations
       - run: pnpm test:ui-policy
       - run: pnpm test:motion
       - run: pnpm test:i18n

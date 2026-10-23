@@ -1,36 +1,67 @@
-// How migrate.mjs runs one drizzle/*.sql file.
+// How migrate.mjs reads one drizzle/*.sql file. Deliberately no SQL lexer: the rules are
+// strict enough that plain text checks are safe.
 //
-// Normally the whole file goes to Postgres as one query, which runs it in a
-// single implicit transaction. A file whose first lines contain
-//   -- migrate: no-transaction
-// is instead run one statement at a time, outside any transaction, for
-// statements Postgres refuses inside one (CREATE INDEX CONCURRENTLY,
-// ALTER TYPE ... ADD VALUE on old servers, ...).
+// Header = the leading lines that are blank or `--` comments. Directives count only there:
+//   -- target: DATABASE_URL       run against the workspace database (default MIKKA_DATABASE_URL)
+//   -- migrate: no-transaction    run outside a transaction (CREATE INDEX CONCURRENTLY, ...)
 //
-// Rules for such a file, enforced here:
-// - every statement ends with `;` at the end of a line (that is the split point);
-// - no dollar-quoted bodies ($$ ... $$) and no BEGIN/COMMIT, since a naive split
-//   would cut them apart;
-// - every statement is idempotent (IF NOT EXISTS / IF EXISTS): a failure part
-//   way leaves earlier statements applied and the file unrecorded, so the next
-//   deploy runs it again. A failed CREATE INDEX CONCURRENTLY leaves an INVALID
-//   index that IF NOT EXISTS would then skip; drop it before retrying.
+// A normal file is sent as one query, which Postgres runs in one implicit transaction.
+//
+// A no-transaction file holds exactly ONE statement and is never split. After stripping
+// comments it is rejected if it has a second semicolon, any `$` (dollar quoting), or the words
+// BEGIN, COMMIT, END or ROLLBACK. Put each CONCURRENTLY index in its own file.
+// For CREATE INDEX CONCURRENTLY, migrate.mjs then checks pg_index.indisvalid; a failed build
+// leaves an INVALID index (which IF NOT EXISTS would silently skip next time), so an invalid
+// index fails the deploy and the file is not recorded.
 
-const MARKER = /^--\s*migrate:\s*no-transaction\s*$/m
-const HEADER_LINES = 10
+const DIRECTIVE_TARGET = /^--\s*target:\s*(\w+)\s*$/
+const DIRECTIVE_NO_TX = /^--\s*migrate:\s*no-transaction\s*$/
 
-export function isNonTransactional(sql) {
-  return MARKER.test(sql.split('\n').slice(0, HEADER_LINES).join('\n'))
+export function headerLines(sql) {
+  const lines = []
+  for (const line of sql.split('\n')) {
+    const trimmed = line.trim()
+    if (trimmed !== '' && !trimmed.startsWith('--')) break
+    lines.push(trimmed)
+  }
+  return lines
 }
 
-/** The queries to send for one migration file, in order. */
-export function migrationSteps(name, sql) {
-  if (!isNonTransactional(sql)) return [sql]
-  if (sql.includes('$$')) throw new Error(`migrate: ${name} is no-transaction and cannot contain $$ bodies`)
-  if (/^\s*(begin|commit|start\s+transaction)\b/im.test(sql)) throw new Error(`migrate: ${name} is no-transaction and cannot manage a transaction`)
-  const statements = sql.split(/;[ \t]*(?:--[^\n]*)?$/m)
-    .map(chunk => chunk.replace(/^\s*--.*$/gm, '').trim())
-    .filter(Boolean)
-  if (statements.length === 0) throw new Error(`migrate: ${name} has no statements`)
-  return statements
+export function stripComments(sql) {
+  return sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, '')
+}
+
+const CONCURRENT_INDEX = /^create\s+(?:unique\s+)?index\s+concurrently\s+(?:if\s+not\s+exists\s+)?("?)([A-Za-z_][\w$]*)\1\s+on\b/i
+
+/**
+ * Reads one migration file. Returns { target, noTransaction, sql, concurrentIndex } or throws
+ * with a message naming the file.
+ */
+export function planMigration(name, sql) {
+  const header = headerLines(sql)
+  const targetLine = header.map(line => DIRECTIVE_TARGET.exec(line)).find(Boolean)
+  const target = targetLine?.[1] ?? 'MIKKA_DATABASE_URL'
+  const noTransaction = header.some(line => DIRECTIVE_NO_TX.test(line))
+  const body = stripComments(sql).trim()
+  if (!body) throw new Error(`migrate: ${name} has no statements`)
+  if (!noTransaction) {
+    if (/\bconcurrently\b/i.test(body)) throw new Error(`migrate: ${name} uses CONCURRENTLY; put it alone in a file marked "-- migrate: no-transaction"`)
+    return { target, noTransaction, sql, concurrentIndex: null }
+  }
+  const statement = body.replace(/;\s*$/, '').trim()
+  if (statement.includes(';')) throw new Error(`migrate: ${name} is no-transaction and must contain exactly one statement`)
+  if (statement.includes('$')) throw new Error(`migrate: ${name} is no-transaction and cannot use $ quoting`)
+  const word = /\b(begin|commit|end|rollback)\b/i.exec(statement)
+  if (word) throw new Error(`migrate: ${name} is no-transaction and cannot contain ${word[1].toUpperCase()}`)
+  const concurrent = /\bconcurrently\b/i.test(statement)
+  const index = CONCURRENT_INDEX.exec(statement)
+  if (concurrent && !index) throw new Error(`migrate: ${name}: only CREATE [UNIQUE] INDEX CONCURRENTLY <name> ON ... is supported`)
+  return { target, noTransaction, sql: statement, concurrentIndex: index ? index[2] : null }
+}
+
+/** Throws unless the index exists and is valid. `query` is pg's client.query. */
+export async function assertIndexValid(query, name, file) {
+  const { rows } = await query('select i.indisvalid from pg_index i join pg_class c on c.oid = i.indexrelid where c.relname = $1 and pg_catalog.pg_table_is_visible(c.oid)', [name])
+  if (rows.length === 0) throw new Error(`migrate: ${file}: index ${name} was not created`)
+  if (!rows[0].indisvalid) throw new Error(`migrate: ${file}: index ${name} is INVALID (a concurrent build failed). Run "DROP INDEX CONCURRENTLY IF EXISTS ${name};" and deploy again. The migration was not recorded.`)
 }

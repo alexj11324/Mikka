@@ -3,13 +3,13 @@
 // Vercel production builds unless MIGRATE=1 is set; preview and local builds
 // skip it.
 //
-// A file targets MIKKA_DATABASE_URL unless its first lines contain
-// `-- target: DATABASE_URL` (the workspace database). A file with
-// `-- migrate: no-transaction` in its header runs statement by statement,
-// outside a transaction; see scripts/migration-steps.mjs for its rules.
+// A file targets MIKKA_DATABASE_URL unless its header (leading comment lines)
+// contains `-- target: DATABASE_URL` (the workspace database). A file with
+// `-- migrate: no-transaction` in its header holds one statement run outside a
+// transaction; see scripts/migration-steps.mjs for the rules.
 import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
-import { migrationSteps } from './migration-steps.mjs'
+import { assertIndexValid, planMigration } from './migration-steps.mjs'
 
 const shouldRun = process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production'
 if (!shouldRun) {
@@ -34,11 +34,12 @@ const files = sqlFiles.sort()
 const byTarget = new Map()
 for (const name of files) {
   const sql = readFileSync(new URL(name, dir), 'utf8')
-  const target = /^--\s*target:\s*(\w+)/m.exec(sql)?.[1] ?? 'MIKKA_DATABASE_URL'
+  // Validated up front so a bad file fails before anything is applied.
+  const plan = planMigration(name, sql)
+  const target = plan.target
   if (!(target in targets)) throw new Error(`migrate: ${name} names unknown target ${target}`)
   if (!byTarget.has(target)) byTarget.set(target, [])
-  // Validated up front so a bad file fails before anything is applied.
-  byTarget.get(target).push({ name, steps: migrationSteps(name, sql) })
+  byTarget.get(target).push({ name, plan })
 }
 
 for (const [target, pending] of byTarget) {
@@ -49,13 +50,20 @@ for (const [target, pending] of byTarget) {
     await pool.query('create table if not exists schema_migrations (name text primary key, "appliedAt" timestamptz not null default now())')
     const { rows } = await pool.query('select name from schema_migrations')
     const applied = new Set(rows.map((row) => row.name))
-    for (const { name, steps } of pending) {
+    for (const { name, plan } of pending) {
       if (applied.has(name)) continue
       const client = await pool.connect()
       try {
         // Files may manage their own transaction; the record is written after.
-        // No-transaction files arrive as several steps, each its own autocommit query.
-        for (const step of steps) await client.query(step)
+        const query = (text, values) => client.query(text, values)
+        try {
+          await client.query(plan.sql)
+        } catch (error) {
+          // A failed concurrent build leaves an INVALID index behind; say how to clear it.
+          if (plan.concurrentIndex) await assertIndexValid(query, plan.concurrentIndex, name).catch((hint) => console.error(hint.message))
+          throw error
+        }
+        if (plan.concurrentIndex) await assertIndexValid(query, plan.concurrentIndex, name)
         await client.query('insert into schema_migrations (name) values ($1)', [name])
         console.log(`migrate: applied ${name} to ${target}`)
       } finally {
