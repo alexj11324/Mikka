@@ -57,13 +57,9 @@ export function AgentsSettings() {
   const builtIn = agents?.filter(agent => isBuiltInAgentRole(agent.role)) ?? []
   const custom = agents?.filter(agent => !isBuiltInAgentRole(agent.role)) ?? []
   return <div className="flex flex-col gap-8">
-    <header className="flex flex-wrap items-end justify-between gap-4">
-      <div className="flex min-w-0 flex-col gap-1">
-        <h1 className="text-2xl font-medium tracking-tight">Agent</h1>
-        <p className="text-sm text-muted-foreground">{t('description')}</p>
-      </div>
-      <Button className={ACCENT_BUTTON} onClick={() => setView({ kind: 'new' })}><Plus data-icon="inline-start" />{t('actions.new')}</Button>
-    </header>
+    <div className="flex justify-end">
+      <Button onClick={() => setView({ kind: 'new' })}><Plus data-icon="inline-start" />{t('actions.new')}</Button>
+    </div>
     {error && <p role="alert" className="text-sm text-destructive">{t('loadFailed')}</p>}
     <SettingsSection id="agents-default" title={t('groups.default')}>
       {agents ? builtIn.map(agent => <AgentRow key={agent.id} agent={agent} devices={devices} onOpen={() => setView({ kind: 'agent', id: agent.id })} />)
