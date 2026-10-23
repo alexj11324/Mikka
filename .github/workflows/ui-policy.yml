@@ -89,6 +89,7 @@ jobs:
           MIKKA_DATABASE_URL: ""
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
+      - run: pnpm test:group-turns
       - run: pnpm test:integrations
       - run: pnpm test:csv
       - run: pnpm test:settings
@@ -166,7 +167,9 @@ jobs:
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
       - name: Group conversation API and migrations (temporary Postgres 17 only)
-        run: pnpm test:groups
+        run: |
+          pnpm test:groups
+          REQUIRE_DB=1 pnpm test:group-turns
       - run: pnpm test:e2e:setup
       - name: Team task and run visibility (temporary Postgres 17 only)
         run: REQUIRE_DB=1 pnpm test:visibility-db
