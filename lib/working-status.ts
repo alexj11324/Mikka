@@ -1,6 +1,14 @@
 import type { AgentHistory } from '@/lib/agent-history'
 
-export type Worker = { id: string; name: string; image?: string | null }
+/** Matches an entry of MIK-7 `GET /api/agent/sessions/active` → `{ agents: Worker[] }`. */
+export type Worker = { id: string; name: string; avatarUrl?: string | null; startedAt?: string }
+export type ActiveAgentsResponse = { agents: Worker[] }
+
+/** Adapter for the MIK-7 active-agents response; drops malformed entries. */
+export function workersFromActiveAgents(body: ActiveAgentsResponse | undefined): Worker[] {
+  return (body?.agents ?? []).filter(agent => agent && typeof agent.id === 'string' && typeof agent.name === 'string')
+    .map(({ id, name, avatarUrl, startedAt }) => ({ id, name, avatarUrl: avatarUrl ?? null, startedAt }))
+}
 export type WorkingLabel =
   | { key: 'one'; values: { a: string } }
   | { key: 'two'; values: { a: string; b: string } }
@@ -32,4 +40,22 @@ export function agentIsWorking(history: Pick<AgentHistory, 'turns'> | undefined)
 /** Stable identity for a set of workers, so equal polls do not replay the roll. */
 export function workersKey(workers: Worker[]) {
   return workers.map(worker => worker.id).join('|')
+}
+
+export type TrackedWorker = Worker & { misses: number }
+
+/**
+ * Applies removal hysteresis to one poll: new workers appear at once, and a
+ * worker only leaves after `confirmations` consecutive polls without it.
+ */
+export function nextTrackedWorkers(previous: TrackedWorker[], current: Worker[], confirmations = 2): TrackedWorker[] {
+  const now = new Map(current.map(worker => [worker.id, worker]))
+  const kept = previous.flatMap(worker => {
+    const fresh = now.get(worker.id)
+    if (fresh) return [{ ...fresh, misses: 0 }]
+    const misses = worker.misses + 1
+    return misses >= confirmations ? [] : [{ ...worker, misses }]
+  })
+  const known = new Set(previous.map(worker => worker.id))
+  return [...kept, ...current.filter(worker => !known.has(worker.id)).map(worker => ({ ...worker, misses: 0 }))]
 }

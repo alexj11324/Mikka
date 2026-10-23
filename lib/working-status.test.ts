@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { agentIsWorking, workersKey, workingAvatars, workingLabel } from './working-status'
+import { agentIsWorking, workersFromActiveAgents, nextTrackedWorkers, workersKey, workingAvatars, workingLabel } from './working-status'
 
 test('workingLabel picks the key and params by count', () => {
   assert.equal(workingLabel([]), null)
@@ -26,4 +26,29 @@ test('agentIsWorking reads pending turns', () => {
 test('workersKey is order sensitive and stable', () => {
   assert.equal(workersKey([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }]), 'a|b')
   assert.equal(workersKey([]), '')
+})
+
+test('nextTrackedWorkers adds at once and removes after two missing polls', () => {
+  const a = { id: 'a', name: 'A' }
+  const b = { id: 'b', name: 'B' }
+  let state = nextTrackedWorkers([], [a])
+  assert.deepEqual(state.map(w => w.id), ['a'])
+  state = nextTrackedWorkers(state, [a, b])
+  assert.deepEqual(state.map(w => w.id), ['a', 'b'])
+  state = nextTrackedWorkers(state, [b])
+  assert.deepEqual(state.map(w => [w.id, w.misses]), [['a', 1], ['b', 0]])
+  state = nextTrackedWorkers(state, [a, b])
+  assert.deepEqual(state.map(w => [w.id, w.misses]), [['a', 0], ['b', 0]], 'a reappearing resets its misses')
+  state = nextTrackedWorkers(state, [b])
+  state = nextTrackedWorkers(state, [b])
+  assert.deepEqual(state.map(w => w.id), ['b'])
+  state = nextTrackedWorkers(state, [])
+  state = nextTrackedWorkers(state, [])
+  assert.deepEqual(state, [])
+})
+
+test('workersFromActiveAgents adapts the MIK-7 shape', () => {
+  assert.deepEqual(workersFromActiveAgents(undefined), [])
+  assert.deepEqual(workersFromActiveAgents({ agents: [{ id: 'x', name: 'X', avatarUrl: '/a.png', startedAt: '2026-10-22T00:00:00Z' }] }),
+    [{ id: 'x', name: 'X', avatarUrl: '/a.png', startedAt: '2026-10-22T00:00:00Z' }])
 })
