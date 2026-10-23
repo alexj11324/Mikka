@@ -843,6 +843,8 @@
     "deviceNameTooLong": "The name is too long.",
     "deviceNotFound": "This device does not exist.",
     "agentHarnessMissing": "The selected harness is not installed on this device.",
+    "agentPermissionModeInvalid": "The selected permission mode is not one this harness reports. Pick it again.",
+    "agentEffortInvalid": "The selected effort level is not one this model reports. Pick it again.",
     "agentDuplicateName": "An agent with this name already exists. Choose another name.",
     "agentInvalidInput": "Please check the information you entered.",
     "agentAddFailed": "Could not add the agent. Please try again.",

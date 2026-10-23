@@ -843,6 +843,8 @@
     "deviceNameTooLong": "设备名称过长。",
     "deviceNotFound": "设备不存在。",
     "agentHarnessMissing": "这台设备上没有检测到该 harness。",
+    "agentPermissionModeInvalid": "该 harness 未提供所选的权限模式，请重新选择。",
+    "agentEffortInvalid": "该模型未提供所选的推理强度，请重新选择。",
     "agentDuplicateName": "已有同名 Agent，请换一个名称。",
     "agentInvalidInput": "请检查填写内容。",
     "agentAddFailed": "添加失败，请重试。",

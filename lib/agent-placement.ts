@@ -80,3 +80,27 @@ export const SUGGESTED_MODELS: Record<AgentHarness, readonly string[]> = {
   claude_code: ['opus', 'sonnet', 'haiku'],
   codex: ['gpt-5-codex', 'gpt-5'],
 }
+
+/** What one harness on one device reported it accepts; absent lists come from older daemons. */
+export interface ReportedHarnessOptions {
+  models?: { value: string; efforts: string[] }[]
+  permissionModes?: string[]
+}
+
+/**
+ * A pinned permission mode or effort must be one the device's own harness
+ * reported: the mode from the CLI's help, the effort from the pinned model's
+ * levels. Either needs a pinned device and harness (and, for effort, a model),
+ * exactly as the editor offers them; null always passes (the CLI default).
+ */
+export function runtimeOptionsError(
+  reported: ReportedHarnessOptions | null,
+  choice: { model: string | null; effort: string | null; permissionMode: string | null },
+): 'agentPermissionModeInvalid' | 'agentEffortInvalid' | null {
+  if (choice.permissionMode !== null && !(reported?.permissionModes ?? []).includes(choice.permissionMode)) return 'agentPermissionModeInvalid'
+  if (choice.effort !== null) {
+    const model = choice.model === null ? undefined : reported?.models?.find(item => item.value === choice.model)
+    if (!model?.efforts.includes(choice.effort)) return 'agentEffortInvalid'
+  }
+  return null
+}

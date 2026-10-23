@@ -15,6 +15,7 @@ import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/
 import { listSshHosts } from '@/lib/ssh'
 import { modelNameSchema } from '@mikka/protocol/agent-policy'
 import { addRunMessage, queueRun, readRun, requestRunStop, runViewColumns, type RunDetail, type RunView } from '@/lib/agent-runs'
+import { runtimeOptionsError } from '@/lib/agent-placement'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import {
   AGENT_COLORS, AGENT_ROLES, BUILT_IN_AGENT_PRESETS, BUILT_IN_AGENT_ROLES, MAX_AGENT_INSTRUCTIONS_LENGTH,
@@ -240,16 +241,23 @@ function agentValidationCode(error: z.ZodError): 'validationNameRequired' | 'val
 /**
  * A pinned device must be this person's; a pinned device and harness together
  * must be a harness that device reports as installed — the daemon's own
- * detection decides. Anything left on auto is checked when a run is queued.
+ * detection decides. A pinned permission mode or effort must be one that
+ * device's harness reported (see runtimeOptionsError). Anything left on auto
+ * is checked when a run is queued.
  */
-async function checkPlacement(input: { deviceId: string | null; harness: SupportedHarness | null }, userId: string): Promise<void> {
-  if (!input.deviceId) return
+async function checkPlacement(input: { deviceId: string | null; harness: SupportedHarness | null; model: string | null; effort: string | null; permissionMode: string | null }, userId: string): Promise<void> {
+  if (!input.deviceId) {
+    const invalid = runtimeOptionsError(null, input)
+    if (invalid) throw new ActionFailureError(invalid)
+    return
+  }
   const [device] = await db.select().from(devices)
     .where(and(eq(devices.id, input.deviceId), eq(devices.ownerId, userId))).limit(1)
   if (!device) throw new ActionFailureError('deviceNotFound')
-  if (input.harness && !device.harnesses.some(info => info.harness === input.harness && info.installed)) {
-    throw new ActionFailureError('agentHarnessMissing')
-  }
+  const info = input.harness ? device.harnesses.find(item => item.harness === input.harness && item.installed) : undefined
+  if (input.harness && !info) throw new ActionFailureError('agentHarnessMissing')
+  const invalid = runtimeOptionsError(info ?? null, input)
+  if (invalid) throw new ActionFailureError(invalid)
 }
 
 /** A custom role. Built-in roles are seeded, never created here. */

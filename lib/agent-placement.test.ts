@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveAgentPlacement, type PlacementDevice } from './agent-placement'
+import { resolveAgentPlacement, runtimeOptionsError, type PlacementDevice } from './agent-placement'
 
 const laptop: PlacementDevice = {
   id: 'laptop', online: true, enabled: true, lastSeenAt: new Date('2026-10-21T10:00:00Z'),
@@ -46,4 +46,31 @@ test('the repository device decides an auto device and must match a pinned one',
 test('no device with any harness reports what is missing', () => {
   assert.deepEqual(resolveAgentPlacement(auto, []), { ok: false, reason: 'noDevice' })
   assert.deepEqual(resolveAgentPlacement({ ...auto, harness: 'codex' }, [laptop]), { ok: false, reason: 'harnessMissing' })
+})
+
+const reported = {
+  models: [{ value: 'opus', efforts: ['low', 'medium', 'high'] }, { value: 'haiku', efforts: [] }],
+  permissionModes: ['default', 'acceptEdits', 'plan'],
+}
+const none = { model: null, effort: null, permissionMode: null }
+
+test('runtime options: null mode and effort always pass, even with nothing reported', () => {
+  assert.equal(runtimeOptionsError(null, none), null)
+  assert.equal(runtimeOptionsError({}, { ...none, model: 'opus' }), null)
+})
+
+test('runtime options: a permission mode must be on the reported list', () => {
+  assert.equal(runtimeOptionsError(reported, { ...none, permissionMode: 'plan' }), null)
+  assert.equal(runtimeOptionsError(reported, { ...none, permissionMode: 'bypassPermissions' }), 'agentPermissionModeInvalid')
+  assert.equal(runtimeOptionsError({ models: reported.models }, { ...none, permissionMode: 'plan' }), 'agentPermissionModeInvalid')
+  assert.equal(runtimeOptionsError(null, { ...none, permissionMode: 'plan' }), 'agentPermissionModeInvalid')
+})
+
+test('runtime options: an effort must be one of the pinned model\'s levels', () => {
+  assert.equal(runtimeOptionsError(reported, { ...none, model: 'opus', effort: 'high' }), null)
+  assert.equal(runtimeOptionsError(reported, { ...none, model: 'opus', effort: 'max' }), 'agentEffortInvalid')
+  assert.equal(runtimeOptionsError(reported, { ...none, model: 'haiku', effort: 'low' }), 'agentEffortInvalid')
+  assert.equal(runtimeOptionsError(reported, { ...none, model: 'unknown', effort: 'low' }), 'agentEffortInvalid')
+  assert.equal(runtimeOptionsError(reported, { ...none, effort: 'low' }), 'agentEffortInvalid')
+  assert.equal(runtimeOptionsError(null, { ...none, model: 'opus', effort: 'low' }), 'agentEffortInvalid')
 })
