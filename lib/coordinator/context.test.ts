@@ -70,6 +70,10 @@ test('memory notes are added as list lines, removed by text, and capped', () => 
 test('events read as messages from Mikka', () => {
   assert.equal(eventPrompt({ kind: 'user_message', issueId: null, runId: null, payload: { text: 'start issue 4' } }), 'start issue 4')
   assert.equal(
+    eventPrompt({ kind: 'user_message', issueId: 'i1', runId: null, payload: { text: 'mark this done' } }),
+    'This chat is linked to issue i1.\n\nmark this done',
+  )
+  assert.equal(
     eventPrompt({ kind: 'run_finished', issueId: 'i1', runId: 'r1', payload: { status: 'succeeded', stopReason: 'submitted', summary: 'Fixed it' } }),
     '[Event] Run r1 ended with status succeeded (submitted).\nIssue: i1.\nThe agent\'s summary: Fixed it',
   )

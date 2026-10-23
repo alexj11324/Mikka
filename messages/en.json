@@ -1526,7 +1526,7 @@
     }
   },
   "TelegramBot": {
-    "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nSend details, then /confirm to create it in Backlog\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
+    "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
     "connect": "Connect Telegram from Mikka Settings → Integrations, then open the link here.",
     "alreadyConnected": "Your Telegram account is already connected. Send /help for commands.",
     "paired": "Telegram is connected to Mikka. Send /help to see commands.",
@@ -1555,6 +1555,11 @@
     "detailsAdded": "Details added. Send more, or use /confirm to create the Backlog task.",
     "linkedChat": "This chat is linked to a task. Use /status, /unlink, or /new <title>.",
     "startDraftMessage": "Start a task draft with /new <title>. Send details, then /confirm.",
+    "coordinatorQueued": "Sent to the Orchestrator. I’ll reply here when it answers.",
+    "coordinatorUnavailable": "The Orchestrator is not available right now. Try again shortly.",
+    "coordinatorMessageRequired": "Send a text message to the Orchestrator.",
+    "coordinatorMessageTooLong": "That message is too long. Shorten it and try again.",
+    "messageUnavailable": "I couldn’t read that Telegram message. Please send it again.",
     "status": {
       "backlog": "Backlog",
       "todo": "Todo",

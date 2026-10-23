@@ -33,6 +33,7 @@ export async function coordinatorTurn(userId: string) {
       const { instructions, messages } = await steps.preparePrompt(userId)
       const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS) })
       await steps.appendMessages(userId, holder, result.response.messages)
+      if (inbox.telegramTargets.length && result.text.trim()) await steps.sendTelegramReply(userId, inbox.telegramTargets, result.text)
     } catch (error) {
       // The messages stay in the conversation; the next wake answers them.
       await steps.failTurn(userId, holder, error instanceof Error ? error.message : String(error))
