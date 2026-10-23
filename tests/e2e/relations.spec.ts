@@ -65,13 +65,13 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await expect(children.getByRole('button', { name: '子任务 1 / 1', exact: true })).toBeVisible()
 
     // The parent picker hides this task's descendants (the server still rejects parent cycles with issueParentCycle),
-    // so searching for the child yields the query-specific empty state, under the group label.
+    // so searching for the child yields the query-specific CommandEmpty state.
     await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
     await page.getByRole('menuitem', { name: '设置父任务…', exact: true }).click()
     const parentPicker = page.getByRole('dialog', { name: '设置父任务', exact: true })
     await expect(parentPicker.getByRole('option').filter({ hasText: blocker })).toBeVisible()
     await parentPicker.getByRole('combobox', { name: '搜索关联任务', exact: true }).fill(child)
-    await expect(parentPicker.getByRole('status').filter({ hasText: '没有匹配的任务' })).toBeVisible()
+    await expect(parentPicker.getByText('没有匹配的任务', { exact: true })).toBeVisible()
     await expect(parentPicker.getByRole('option')).toHaveCount(0)
     await parentPicker.getByRole('button', { name: '关闭', exact: true }).click()
     await children.getByRole('button', { name: `移除子任务关系：${child}`, exact: true }).click()
