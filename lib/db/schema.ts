@@ -22,6 +22,9 @@ export const issues = pgTable('issues', {
   status: text('status').notNull(), priority: text('priority').notNull(),
   // Workspace issues sync with Linear; personal ones never leave Mikka (MIK-46).
   scope: text('scope').$type<'workspace' | 'personal'>().notNull().default('personal'),
+  // The agent judges scope at creation; a person's change wins and teaches the next judgment (MIK-47).
+  scopeSetBy: text('scopeSetBy').$type<'agent' | 'user'>().notNull().default('agent'),
+  scopeConfidence: real('scopeConfidence'),
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
