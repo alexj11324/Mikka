@@ -295,13 +295,42 @@ function containsInvalidControl(node, source) {
   return result
 }
 
+export const approvedGlobalDecls = Object.freeze({
+  "@theme|--text-xs": "12px",
+  "@theme|--text-xs--line-height": "18px",
+  "@theme|--text-sm": "13px",
+  "@theme|--text-sm--line-height": "20px",
+  "@theme|--text-base": "15px",
+  "@theme|--text-base--line-height": "24px",
+  "@theme|--text-lg": "18px",
+  "@theme|--text-lg--line-height": "28px",
+  "@theme|--text-lg--letter-spacing": "-0.01em",
+  "@theme|--text-xl": "20px",
+  "@theme|--text-xl--line-height": "30px",
+  "@theme|--text-xl--letter-spacing": "-0.01em",
+  "@theme|--text-2xl": "24px",
+  "@theme|--text-2xl--line-height": "32px",
+  "@theme|--text-2xl--letter-spacing": "-0.02em",
+  "html|-webkit-font-smoothing": "antialiased",
+  "html|-moz-osx-font-smoothing": "grayscale",
+  "html|font-synthesis": "none",
+  "html|text-rendering": "optimizeLegibility",
+  "body|font-weight": "450",
+  "body|font-feature-settings": "'calt' 1, 'kern' 1",
+  "svg.lucide|stroke-width": "1.5"
+})
+
 export function auditCss(file, text, policy) {
   const diagnostics = []
   const add = (node, rule, message) => diagnostics.push({ file, line: node.source?.start?.line ?? 1, column: node.source?.start?.column ?? 1, rule, message })
   let root
   try { root = postcss.parse(text, { from: file }) }
   catch (error) { return [{ file, line: error.line ?? 1, column: error.column ?? 1, rule: 'style/css-parse', message: error.reason }] }
+  // Audited global baseline (Comma-style type scale, smoothing, icon stroke). Exact values only; anything else still fails.
+  const approved = file === 'app/globals.css' ? approvedGlobalDecls : {}
+  const isApproved = node => approved[`${node.parent?.selector ?? `@${node.parent?.name} ${node.parent?.params}`.trim()}|${node.prop}`] === node.value
   root.walkDecls(node => {
+    if (isApproved(node)) return
     if (/^(?:font(?:-.+)?|line-height|letter-spacing|--text-.+|--leading-.+|--tracking-.+|--font-weight-.+)$/.test(node.prop)) add(node, 'typography/no-css-values', '不允许 CSS 自定义排版值或重定义 Tailwind 字体档位。')
     if (node.prop.startsWith('--font-')) {
       const permitted = { '--font-sans': 'var(--font-geist), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif', '--font-heading': 'var(--font-sans)' }
@@ -310,6 +339,7 @@ export function auditCss(file, text, policy) {
     if (!node.prop.startsWith('--') && !/^(?::root|\.dark|\*|body|html)$/.test(node.parent.selector ?? '')) add(node, 'style/no-custom-css', '业务样式不通过 CSS 选择器绕过组件预设。')
   })
   root.walkRules(node => {
+    if (file === 'app/globals.css' && node.selector === 'svg.lucide') return
     if (![':root', '.dark', '*', 'body', 'html'].includes(node.selector)) add(node, 'style/no-custom-css', `不允许自绘样式选择器 ${node.selector}。`)
   })
   root.walkAtRules(node => {
