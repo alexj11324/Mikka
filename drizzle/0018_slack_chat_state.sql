@@ -1,4 +1,4 @@
--- Chat SDK state uses the Mikka application database. Apply to the matching Preview DB too.
+-- Chat SDK state uses the Mikka application database.
 -- Renumbered from 0015 to 0018 (merge order: 0018 #51, 0019 MIK-8, 0020 MIK-17).
 -- Idempotent: every table and index uses IF NOT EXISTS. These are the same
 -- Chat SDK tables 0004_telegram_chat.sql creates, so on a database that

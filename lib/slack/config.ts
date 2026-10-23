@@ -27,5 +27,6 @@ export function slackOwner(config: NonNullable<ReturnType<typeof slackConfig>>, 
   const event = envelope.event as Record<string, unknown> | undefined
   if (envelope.type !== 'event_callback' || !event || event.type !== 'app_mention' || event.bot_id || event.subtype) return null
   if (typeof event.user !== 'string' || typeof event.text !== 'string') return null
-  return config.SLACK_USER_BINDINGS[event.user] ?? null
+  // Own keys only: a sender id like `constructor` must not reach Object.prototype.
+  return Object.hasOwn(config.SLACK_USER_BINDINGS, event.user) ? config.SLACK_USER_BINDINGS[event.user] : null
 }

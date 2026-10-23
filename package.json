@@ -41,7 +41,7 @@
     "typecheck": "tsgo --noEmit",
     "daemon": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon --server http://localhost:3000",
     "daemon:login": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon login --server http://localhost:3000",
-    "test:slack": "node --import tsx --test lib/slack/webhook.test.ts"
+    "test:slack": "node --import tsx --test lib/slack/webhook.test.ts lib/slack/owner.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",
