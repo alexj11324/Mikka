@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { test, expect, register, watchRuntime } from './fixtures'
+import { test, expect, register, rail, watchRuntime } from './fixtures'
 
 // This fixture only touches CI's isolated disposable database, never a Preview or production DB.
 async function seedRuns(email: string, title: string) {
@@ -25,7 +25,7 @@ async function seedRuns(email: string, title: string) {
 
 test('Issue full-page navigation, run discussion persistence and independent session sidebar', async ({ page, browser }, testInfo) => {
   const { email } = await register(page)
-  await page.getByRole('button', { name: '任务', exact: true }).click()
+  await rail(page, '看板').click()
   await page.getByRole('button', { name: '新建任务', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
   const title = `Run detail ${randomUUID()}`
@@ -35,7 +35,7 @@ test('Issue full-page navigation, run discussion persistence and independent ses
   await seedRuns(email, title)
   await page.getByRole('region', { name: '任务看板', exact: true }).getByText(title, { exact: true }).click()
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
-  await expect(page.getByRole('button', { name: '看板', exact: true })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: '当前位置', exact: true }).getByRole('button', { name: '看板', exact: true })).toBeVisible()
   const records = page.getByRole('region', { name: 'Agent 运行记录', exact: true })
   await expect(records.getByRole('button', { name: '打开会话', exact: true })).toHaveCount(2)
   // Completed and active runs both open; close/reopen must not start/stop a run.
@@ -66,7 +66,7 @@ test('Issue full-page navigation, run discussion persistence and independent ses
   await records.getByRole('button', { name: '发表评论', exact: true }).click()
   await expect(records.getByText('Saved run discussion', { exact: true })).toBeVisible()
   // Board navigation uses the existing document flush before unmounting the editor.
-  await page.getByRole('button', { name: '看板', exact: true }).click()
+  await page.getByRole('navigation', { name: '当前位置', exact: true }).getByRole('button', { name: '看板', exact: true }).click()
   await page.getByRole('region', { name: '任务看板', exact: true }).getByText(editedTitle, { exact: true }).click()
   await page.reload()
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(editedTitle)
@@ -86,7 +86,7 @@ test('Issue full-page navigation, run discussion persistence and independent ses
       await pool.query('INSERT INTO issue_members ("issueId","userId","memberId") VALUES ($1,$2,$3)', [issue.id,owner.id,member.id])
     } finally { await pool.end() }
     await teammatePage.reload()
-    await teammatePage.getByRole('button', { name: '任务', exact: true }).click()
+    await rail(teammatePage, '看板').click()
     await teammatePage.getByRole('region', { name: '任务看板', exact: true }).getByText(editedTitle, { exact: true }).click()
     const sharedRecords = teammatePage.getByRole('region', { name: 'Agent 运行记录', exact: true })
     await expect(sharedRecords.getByRole('button', { name: '评论', exact: true })).toHaveCount(2)
@@ -98,13 +98,13 @@ test('Issue full-page navigation, run discussion persistence and independent ses
     await sharedRecords.getByRole('button', { name: '发表评论', exact: true }).click()
     await expect(sharedRecords.getByText('Teammate run discussion', { exact: true })).toBeVisible()
     await testInfo.attach('teammate-safe-run-cards', { body: await teammatePage.screenshot(), contentType: 'image/png' })
-    await teammatePage.getByRole('button', { name: '看板', exact: true }).click()
+    await teammatePage.getByRole('navigation', { name: '当前位置', exact: true }).getByRole('button', { name: '看板', exact: true }).click()
     await page.reload()
     await expect(records.getByText('Teammate run discussion', { exact: true })).toBeVisible()
   } finally {
     await colleague.close()
     expect(colleagueErrors).toEqual([])
   }
-  await page.getByRole('button', { name: '看板', exact: true }).click()
+  await page.getByRole('navigation', { name: '当前位置', exact: true }).getByRole('button', { name: '看板', exact: true }).click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
 })
