@@ -92,13 +92,15 @@ export interface ReportedHarnessOptions {
  * reported: the mode from the CLI's help, the effort from the pinned model's
  * levels. Either needs a pinned device and harness (and, for effort, a model),
  * exactly as the editor offers them; null always passes (the CLI default).
+ * A list the daemon did not report at all (older daemons) skips that check.
  */
 export function runtimeOptionsError(
   reported: ReportedHarnessOptions | null,
   choice: { model: string | null; effort: string | null; permissionMode: string | null },
 ): 'agentPermissionModeInvalid' | 'agentEffortInvalid' | null {
-  if (choice.permissionMode !== null && !(reported?.permissionModes ?? []).includes(choice.permissionMode)) return 'agentPermissionModeInvalid'
-  if (choice.effort !== null) {
+  // A daemon too old to report a list (undefined, not []) is not checked: the stored value is kept as is.
+  if (choice.permissionMode !== null && (reported === null || reported.permissionModes !== undefined) && !(reported?.permissionModes ?? []).includes(choice.permissionMode)) return 'agentPermissionModeInvalid'
+  if (choice.effort !== null && (reported === null || reported.models !== undefined)) {
     const model = choice.model === null ? undefined : reported?.models?.find(item => item.value === choice.model)
     if (!model?.efforts.includes(choice.effort)) return 'agentEffortInvalid'
   }

@@ -62,7 +62,7 @@ test('runtime options: null mode and effort always pass, even with nothing repor
 test('runtime options: a permission mode must be on the reported list', () => {
   assert.equal(runtimeOptionsError(reported, { ...none, permissionMode: 'plan' }), null)
   assert.equal(runtimeOptionsError(reported, { ...none, permissionMode: 'bypassPermissions' }), 'agentPermissionModeInvalid')
-  assert.equal(runtimeOptionsError({ models: reported.models }, { ...none, permissionMode: 'plan' }), 'agentPermissionModeInvalid')
+  assert.equal(runtimeOptionsError({ models: reported.models, permissionModes: [] }, { ...none, permissionMode: 'plan' }), 'agentPermissionModeInvalid')
   assert.equal(runtimeOptionsError(null, { ...none, permissionMode: 'plan' }), 'agentPermissionModeInvalid')
 })
 
@@ -73,4 +73,14 @@ test('runtime options: an effort must be one of the pinned model\'s levels', () 
   assert.equal(runtimeOptionsError(reported, { ...none, model: 'unknown', effort: 'low' }), 'agentEffortInvalid')
   assert.equal(runtimeOptionsError(reported, { ...none, effort: 'low' }), 'agentEffortInvalid')
   assert.equal(runtimeOptionsError(null, { ...none, model: 'opus', effort: 'low' }), 'agentEffortInvalid')
+})
+
+test('runtime options: an older daemon that reports no lists keeps the stored values', () => {
+  assert.equal(runtimeOptionsError({}, { model: 'opus', effort: 'max', permissionMode: 'bypassPermissions' }), null)
+  assert.equal(runtimeOptionsError({}, { ...none, effort: 'low' }), null)
+  assert.equal(runtimeOptionsError({ models: reported.models }, { ...none, permissionMode: 'anything' }), null)
+  assert.equal(runtimeOptionsError({ permissionModes: ['plan'] }, { ...none, model: 'opus', effort: 'max' }), null)
+  // Reported lists are still enforced.
+  assert.equal(runtimeOptionsError({ models: reported.models }, { ...none, model: 'opus', effort: 'max' }), 'agentEffortInvalid')
+  assert.equal(runtimeOptionsError({ permissionModes: ['plan'] }, { ...none, permissionMode: 'anything' }), 'agentPermissionModeInvalid')
 })
