@@ -1,21 +1,19 @@
 import 'server-only'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, isNull, lt } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
-import { linearConnections, linearIssueLinks } from '@/lib/db/schema'
+import { linearConnections, linearIssueLinks, suggestionTriggerChecks } from '@/lib/db/schema'
 import { getComposio, runComposioAction } from '@/lib/composio'
 import { listComposioPages } from '@/lib/composio-pagination'
 import { linearGraphQL } from '@/lib/linear-sync/graphql'
 import { linearAccessToken } from '@/lib/linear-sync/tokens'
 import { githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, type ExternalNotification } from './notification'
 import { ingestNotifications, writeFirstBriefing } from './store'
+import { missingTriggers, TRIGGER_CHECK_INTERVAL_MS, TRIGGER_PATTERNS, triggerSlugs } from './triggers'
 
 // Where notifications come from. Linear and GitHub webhooks carry full
-// payloads; Gmail and Slack arrive as Composio trigger events, which Composio
+// payloads; Gmail, Slack and Notion arrive as Composio trigger events, which Composio
 // polls for us. Right after the person connects an app, its current data is
 // read once so the first briefing has something in it.
-
-/** Composio triggers subscribed per toolkit when the person connects it. */
-const COMPOSIO_TRIGGERS: Record<string, string> = { gmail: 'GMAIL_NEW_GMAIL_MESSAGE', slack: 'SLACK_RECEIVE_MESSAGE' }
 
 /** Notifications for everyone a Linear webhook concerns. */
 export async function linearWebhookNotifications(organizationId: string, payload: Record<string, unknown>): Promise<ExternalNotification[]> {
@@ -44,24 +42,43 @@ export async function githubWebhookNotifications(event: string, payload: Record<
   return rows.flatMap(row => githubNotification({ userId: row.userId, githubId: row.accountId }, event, payload) ?? [])
 }
 
-/** Subscribes the person's active Gmail and Slack accounts to their Composio triggers; returns the toolkits connected. */
-async function subscribeComposioTriggers(userId: string): Promise<string[]> {
+/**
+ * Makes sure each of the person's active Gmail, Slack and Notion accounts has
+ * its Composio triggers, creating only the missing ones, so it is safe to run
+ * again. Unless `force`, it runs at most once per TRIGGER_CHECK_INTERVAL_MS.
+ * Returns the toolkits the person has connected.
+ */
+export async function ensureComposioTriggers(userId: string, { force = false } = {}): Promise<string[]> {
   const composio = getComposio()
   if (!composio) return []
-  const accounts = await listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [userId], statuses: ['ACTIVE'], cursor }))
-  const toolkits = new Set<string>()
-  for (const account of accounts) {
-    if (account.status !== 'ACTIVE' || account.isDisabled) continue
-    toolkits.add(account.toolkit.slug)
-    const slug = COMPOSIO_TRIGGERS[account.toolkit.slug]
-    if (!slug) continue
+  const now = new Date()
+  if (!force) {
+    // Claim the check first, so concurrent reads do not all call Composio.
+    const claimed = await db.insert(suggestionTriggerChecks).values({ userId, checkedAt: now })
+      .onConflictDoUpdate({ target: suggestionTriggerChecks.userId, set: { checkedAt: now }, setWhere: lt(suggestionTriggerChecks.checkedAt, new Date(now.getTime() - TRIGGER_CHECK_INTERVAL_MS)) })
+      .returning({ userId: suggestionTriggerChecks.userId })
+    if (!claimed.length) return []
+  } else {
+    await db.insert(suggestionTriggerChecks).values({ userId, checkedAt: now }).onConflictDoUpdate({ target: suggestionTriggerChecks.userId, set: { checkedAt: now } })
+  }
+  const accounts = (await listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [userId], statuses: ['ACTIVE'], cursor })))
+    .filter(account => account.status === 'ACTIVE' && !account.isDisabled)
+  const toolkits = [...new Set(accounts.map(account => account.toolkit.slug))]
+  const watched = toolkits.filter(toolkit => TRIGGER_PATTERNS[toolkit])
+  if (!watched.length) return toolkits
+  const [catalog, active] = await Promise.all([
+    listComposioPages(cursor => composio.triggers.listTypes({ toolkits: watched, cursor })),
+    listComposioPages(cursor => composio.triggers.listActive({ connectedAccountIds: accounts.map(account => account.id), cursor })),
+  ])
+  const wanted = accounts.flatMap(account => triggerSlugs(account.toolkit.slug, catalog.filter(type => type.toolkit.slug.toLowerCase() === account.toolkit.slug.toLowerCase())).map(slug => ({ connectedAccountId: account.id, slug })))
+  for (const { connectedAccountId, slug } of missingTriggers(wanted, active)) {
     try {
-      await composio.triggers.create(userId, slug, { connectedAccountId: account.id })
+      await composio.triggers.create(userId, slug, { connectedAccountId })
     } catch (error) {
       console.error('Composio trigger subscription failed', { trigger: slug, error: error instanceof Error ? error.name : 'unknown' })
     }
   }
-  return [...toolkits]
+  return toolkits
 }
 
 /** Important mail from the last two days, as Gmail sees it now. */
@@ -102,7 +119,7 @@ export async function bootstrapSuggestions(userId: string, app: 'composio' | 'li
   try {
     const notifications = app === 'linear'
       ? await read('Linear', () => currentLinear(userId))
-      : (await read('Composio', () => subscribeComposioTriggers(userId))).includes('gmail') ? await read('Gmail', () => currentGmail(userId)) : []
+      : (await read('Composio', () => ensureComposioTriggers(userId, { force: true }))).includes('gmail') ? await read('Gmail', () => currentGmail(userId)) : []
     await ingestNotifications(notifications)
     await writeFirstBriefing(userId, timeZone)
   } catch (error) {

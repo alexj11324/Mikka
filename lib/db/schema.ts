@@ -312,6 +312,12 @@ export const briefings = pgTable('briefings', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.userId, table.localDate] })])
 
+/** When the person's Composio trigger subscriptions were last checked (lib/suggestions/sources.ts). */
+export const suggestionTriggerChecks = pgTable('suggestion_trigger_checks', {
+  userId: text('userId').primaryKey(),
+  checkedAt: timestamp('checkedAt', { withTimezone: true }).notNull(),
+})
+
 /** The Coordinator's conversation, one AI SDK model message per row, in `position` order. */
 export const coordinatorMessages = pgTable('coordinator_messages', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),

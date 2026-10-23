@@ -4,6 +4,7 @@ import { createHmac } from 'node:crypto'
 import { briefingContent, localDate, safeTimeZone } from './briefing'
 import { verifyGitHubSignature } from './github-webhook'
 import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, slackNotification, type ExternalNotification } from './notification'
+import { missingTriggers, needsConfig, triggerSlugs } from './triggers'
 import { fallbackVerdict, modelVerdict, ruleVerdict, SHOW_THRESHOLD, suggestionState } from './rules'
 
 const me = 'user-1'
@@ -101,4 +102,23 @@ test('local dates follow the person\'s time zone', () => {
   assert.equal(localDate('Asia/Shanghai', now), '2026-10-23')
   assert.equal(safeTimeZone('Not/AZone'), 'UTC')
   assert.equal(safeTimeZone(null), 'UTC')
+})
+
+test('triggers are picked from Composio\'s catalog', () => {
+  const catalog = [
+    { slug: 'NOTION_PAGE_ADDED_TRIGGER', config: { properties: {}, required: [] } },
+    { slug: 'NOTION_PAGE_UPDATED_TRIGGER', config: { properties: { page_id: { type: 'string' } }, required: ['page_id'] } },
+    { slug: 'NOTION_COMMENTS_ADDED_TRIGGER', config: { properties: { interval: { default: 1 } }, required: ['interval'] } },
+    { slug: 'NOTION_DATA_SOURCE_SCHEMA_UPDATED', config: {} },
+  ]
+  assert.deepEqual(triggerSlugs('notion', catalog), ['NOTION_PAGE_ADDED_TRIGGER', 'NOTION_COMMENTS_ADDED_TRIGGER'])
+  assert.deepEqual(triggerSlugs('gmail', [{ slug: 'GMAIL_NEW_GMAIL_MESSAGE' }, { slug: 'GMAIL_EMAIL_SENT_TRIGGER' }]), ['GMAIL_NEW_GMAIL_MESSAGE'])
+  assert.deepEqual(triggerSlugs('github', [{ slug: 'GITHUB_COMMIT_EVENT' }]), [])
+  assert.equal(needsConfig({ slug: 'x', config: { required: ['page_id'], properties: {} } }), true)
+})
+
+test('only missing triggers are created, so a re-check is safe', () => {
+  const wanted = [{ connectedAccountId: 'a1', slug: 'GMAIL_NEW_GMAIL_MESSAGE' }, { connectedAccountId: 'a2', slug: 'NOTION_PAGE_ADDED_TRIGGER' }]
+  assert.deepEqual(missingTriggers(wanted, [{ connectedAccountId: 'a1', triggerName: 'GMAIL_NEW_GMAIL_MESSAGE', disabledAt: null }]), [wanted[1]])
+  assert.deepEqual(missingTriggers(wanted, [{ connectedAccountId: 'a1', triggerName: 'GMAIL_NEW_GMAIL_MESSAGE', disabledAt: '2026-10-23T00:00:00Z' }]), wanted)
 })
