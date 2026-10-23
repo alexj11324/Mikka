@@ -248,7 +248,7 @@ test('visibility ignores other users\' memberships and teams I cannot access', {
   const inSusp = await linked('suspended', tSusp, suspended)
 
   const { publicIds, isVisible } = await issueSearchVisibility(tx, me, mine)
-  const ours = new Set([inMine, inBob, inSusp])
+  const ours = new Set<string>([inMine, inBob, inSusp])
   assert.deepEqual(new Set(publicIds.filter(id => ours.has(id))), new Set([inMine]), 'publicIds: only teams where I am an active member')
   // Rows from outside this test's fixtures (dev-local data) must not leak in either.
   const { rows } = await tx.execute(sql`select ti."issueId" from orvilo_team_issues ti join mikka_workspace_members m on m."workspaceId" = ti."workspaceId" and m."userId" = ${me} and m.status = 'active'`)
