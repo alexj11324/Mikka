@@ -56,6 +56,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
   const schema = `turns_${randomUUID().replaceAll('-','')}`
   await pool.query(`CREATE SCHEMA "${schema}"`)
   const scoped = new Pool({ connectionString: dbURL, max: 12, options: `-c search_path=${schema}` })
+  let releasePending = () => {}
   try {
     await scoped.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql', import.meta.url),'utf8'))
     const migration = await readFile(new URL('../../drizzle/20261023222000_group_turns.sql', import.meta.url),'utf8')
@@ -101,6 +102,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     let unblock!: () => void, entered!: () => void
     const waiting = new Promise<void>(r => { entered=r }), release = new Promise<void>(r => { unblock=r })
     const blocked: GroupRuntime = {...runtime,async generate(agent,input) { entered(); await release; return runtime.generate(agent,input) }}
+    releasePending = unblock
     const running = processGroupTurn(scoped,id,blocked); await waiting
     const laterRoot = await send(id,'not you',[b])
     assert.equal(await processGroupTurn(scoped,id,runtime),false) // same-conversation contender cannot generate
@@ -165,7 +167,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await assert.rejects(processGroupTurn(scoped,id,{...runtime,async authorized() {return false},async generate() {assert.fail('revoked actor must not generate')}}),/no_longer_authorized/)
     assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[revoked])).rows[0].status,'failed')
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
-  } finally { await scoped.end(); await pool.query(`DROP SCHEMA "${schema}" CASCADE`); await pool.end() }
+  } finally { releasePending(); await scoped.end(); await pool.query(`DROP SCHEMA "${schema}" CASCADE`); await pool.end() }
 })
 test('expired execution budget cancels before generation/status publication', async () => {
   await assert.rejects(runGroupRounds({by:'mention',responders:[a]},message,{
@@ -181,5 +183,5 @@ test('missing or ineligible lead never silently selects first-joined agent; conf
   assert.throws(()=>routeFromAnswers(null,members,null),MissingGroupLeadError)
   assert.throws(()=>routeFromAnswers(null,members,outsider),MissingGroupLeadError)
   assert.equal(routeFromAnswers(null,members,b).responders[0],b)
-  assert.equal(routeFromAnswers(new Map([['responder',{type:'choice' as const,choice:a,confidence:1}]]),members,null).responders[0],a)
+  assert.equal(routeFromAnswers(new Map([['responder',{type:'choice' as const,name:'responder',choice:a,confidence:1}]]),members,null).responders[0],a)
 })
