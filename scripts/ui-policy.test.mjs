@@ -163,29 +163,35 @@ test('QA #78: list items returned via Fragment and Array.from', () => {
 })
 
 test('QA #78: sticky exemption applies only to group headers', () => {
-  // exempt: a sticky heading inside the group wrapper, followed by that group's list in the same parent
-  clean('const ui = groups.map(g => <Fragment key={g.id}><h3 className="sticky top-0 border-b" />{g.rows.map(r => <Row key={r} />)}</Fragment>)')
-  clean('const ui = groups.map(g => <><div role="heading" className={cn("sticky top-0", "border-b")} /><div className="divide-y">{g.rows}</div></>)')
-  clean('const ui = groups.map(g => <Fragment key={g.id}><header className="sticky top-0 border-b" /><ul>{g.rows}</ul></Fragment>)')
-  // still a row divider: the item itself, not a heading
-  flags('const ui = groups.map(g => <div key={g} className="sticky top-0 border-b bg-background px-3 py-1" />)', 'style/divider-list-item')
+  // exempt: a static sticky heading followed by its list in the same parent
+  clean('const ui = <><h3 className="sticky top-0 border-b" />{rows.map(r => <Row key={r} />)}</>')
+  clean('const ui = <section><div role="heading" className={cn("sticky top-0", "border-b")} /><div className="divide-y">{rows}</div></section>')
+  clean('const ui = <ul><li role="heading" className="sticky top-0 border-b">group</li>{rows.map(r => <li key={r}>{r}</li>)}</ul>')
   flags('const ui = groups.map(g => <div key={g} className="relative border-b" />)', 'style/divider-list-item')
 })
 
-test('QA #78 round 2: missed cases (constructed from the Tech Lead rules)', () => {
-  // 1. first child of a Fragment with siblings, but not a heading element
-  flags('const ui = groups.map(g => <Fragment key={g}><div className="sticky top-0 border-b" />{g.rows.map(r => <Row key={r} />)}</Fragment>)', 'style/divider-list-item')
-  // 2. a heading that is itself the repeated .map() item
+test('QA #78 round 2: original QA fixtures (all must error)', () => {
+  flags('const ui = groups.map(g => <Fragment key={g.id}><div className="sticky top-0 border-b" />{g.rows.map(r => <Row key={r} />)}</Fragment>)', 'style/divider-list-item') // b
+  flags('const ui = groups.map(g => <section key={g.id}><div className="sticky top-0 border-b last:border-0" /><p>{g.note}</p></section>)', 'style/divider-list-item') // c
+  flags('const ui = <ul><li className="sticky top-0 border-b">first</li>{rows.map(r => <li key={r}>{r}</li>)}</ul>', 'style/divider-list-item') // d
+  flags('const ui = <ul><li className="border-b">first</li>{rows.map(r => <li key={r}>{r}</li>)}</ul>', 'style/divider-list-item') // d, without sticky
+  flags('const ui = groups.map(g => <header key={g} className="sticky top-0 border-b" />)', 'style/divider-list-item') // e
+  flags('const ui = groups.map(g => <li key={g} role="heading" className="sticky top-0 border-b" />)', 'style/divider-list-item') // g
+})
+
+test('QA #78 round 2: constructed cases from the Tech Lead rules', () => {
+  // a heading repeated inside a Fragment returned by map is never exempt
+  flags('const ui = groups.map(g => <Fragment key={g.id}><h3 className="sticky top-0 border-b" />{g.rows.map(r => <Row key={r} />)}</Fragment>)', 'style/divider-list-item')
   flags('const ui = groups.map(g => <h3 key={g} className="sticky top-0 border-b bg-background px-3 py-1" />)', 'style/divider-list-item')
-  flags('const ui = groups.map(g => <div key={g} role="heading" className="sticky top-0 border-b" />)', 'style/divider-list-item')
-  // 3. a heading in the group wrapper that is not followed by a list
-  flags('const ui = groups.map(g => <Fragment key={g}><h3 className="sticky top-0 border-b" /><p>{g.note}</p></Fragment>)', 'style/divider-list-item')
+  // a heading not followed by a list
   flags('const ui = groups.map(g => <Fragment key={g}><Rows /><h3 className="sticky top-0 border-b" /></Fragment>)', 'style/divider-list-item')
-  // 4. last:/first:border-0 is always an error, even on a sticky group heading
+  // last:/first:border-0 is always an error
   flags('const ui = <><h3 className="sticky top-0 border-b last:border-0" />{rows.map(r => <Row key={r} />)}</>', 'style/divider-list-item')
   flags('const ui = <table><thead><tr><th className="sticky top-0 border-b first:border-0" /></tr></thead></table>', 'style/divider-list-item')
-  // 5. thead / role=rowgroup are not heading elements
-  flags('const ui = groups.map(g => <Fragment key={g}><div role="rowgroup" className="sticky top-0 border-b" />{g.rows.map(r => <Row key={r} />)}</Fragment>)', 'style/divider-list-item')
+  // static role=listitem next to a mapped list
+  flags('const ui = <div role="list"><div role="listitem" className="border-t" />{rows.map(r => <div role="listitem" key={r} />)}</div>', 'style/divider-list-item')
+  // a static li without a mapped sibling list is not judged as a list item
+  clean('const ui = <ul><li className="border-b">only</li></ul>')
 })
 
 test('QA #78: exemption reason must contain a letter or CJK character', () => {

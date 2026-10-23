@@ -309,16 +309,6 @@ export function auditSource(file, text, policy) {
     while (expression && ts.isParenthesizedExpression(expression)) expression = expression.expression
     return expression
   }
-  // .map() 回调直接返回的根元素（不经 Fragment 展开）。
-  const isMapRoot = node => {
-    const element = ts.isJsxSelfClosingElement(node) ? node : node.parent
-    let p = element.parent
-    while (p && ts.isParenthesizedExpression(p)) p = p.parent
-    let fn = null
-    if (p && (ts.isArrowFunction(p) || ts.isFunctionExpression(p))) fn = p
-    else if (p && ts.isReturnStatement(p)) { for (let q = p.parent; q; q = q.parent) if (ts.isFunctionLike(q)) { fn = q; break } }
-    return !!fn && (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) && repeatCallback(fn.parent) === fn
-  }
   const isListExpression = expression => {
     expression = unwrap(expression)
     if (!expression) return false
@@ -349,7 +339,17 @@ export function auditSource(file, text, policy) {
     if (ts.isJsxExpression(next)) return isListExpression(next.expression)
     return (ts.isJsxElement(next) || ts.isJsxSelfClosingElement(next)) && isListElement(next)
   }
-  const isGroupHeader = node => isHeadingElement(node) && !isMapRoot(node) && followedByList(node)
+  // 静态 <li> / role=listitem 与同一父元素下的 .map() 列表并列时，同样是列表项。
+  const isStaticListSibling = node => {
+    const role = attr(node, 'role')?.initializer
+    if (canonical(node) !== 'li' && !(role && ts.isStringLiteral(role) && role.text === 'listitem')) return false
+    const element = ts.isJsxSelfClosingElement(node) ? node : node.parent
+    const container = element.parent
+    if (!container || !(ts.isJsxFragment(container) || ts.isJsxElement(container))) return false
+    return container.children.some(child => ts.isJsxExpression(child) && isListExpression(child.expression))
+  }
+  // 豁免元素不能是 .map() 返回的重复项，包括 map 返回的 Fragment 里的元素。
+  const isGroupHeader = node => isHeadingElement(node) && !isMapItem(node) && followedByList(node)
   function visit(node) {
     const cssAssertionProperty = /\.spec\.[jt]sx?$/.test(file) && !!node.parent && ts.isCallExpression(node.parent) && ts.isPropertyAccessExpression(node.parent.expression) && node.parent.expression.name.text === 'toHaveCSS' && node.parent.arguments[0] === node
     if (ts.isStringLiteralLike(node) && !cssAssertionProperty) {
@@ -394,7 +394,7 @@ export function auditSource(file, text, policy) {
           const sideRule = allBases.some(base => /^border-[tby](?:-(?!0$|0px$|\[0px\]$|transparent$|\[transparent\]$).+)?$/.test(base))
           const edgeReset = allTokens.some(token => /(?:^|:)(?:last|first|last-of-type|first-of-type):!?border-(?:[tby]-)?0!?$/.test(token))
           // last:/first:border-0 永远报错；sticky 分组标题只豁免“列表项”判定。
-          if (sideRule && (edgeReset || (isMapItem(node) && !(allBases.includes('sticky') && isGroupHeader(node))))) add(classAttr, 'style/divider-list-item', '列表项之间不写 border-b / border-t（含 last:border-0 写法）；在父容器上用 divide-y。border-b 只用于页面顶栏、面板标题栏等布局边界。')
+          if (sideRule && (edgeReset || ((isMapItem(node) || isStaticListSibling(node)) && !(allBases.includes('sticky') && isGroupHeader(node))))) add(classAttr, 'style/divider-list-item', '列表项之间不写 border-b / border-t（含 last:border-0 写法）；在父容器上用 divide-y。border-b 只用于页面顶栏、面板标题栏等布局边界。')
           if (allBases.some(base => /^divide-[xy](?:-reverse)?$/.test(base))) {
             const bordered = jsxChildren(node).find(child => isBordered(child))
             if (bordered) add(classAttr, 'style/divider-between-bordered', `divide-* 的子项（<${canonical(bordered)}>）已有边框/背景/卡片，不再加分隔线；改用 gap。`)
