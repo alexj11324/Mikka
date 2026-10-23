@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
-import { actingContext, activityActor, agentActor, systemActor, userActor } from './activity-actor'
+import { actingContext, activityActor, agentActor, mcpAuthActor, systemActor, userActor } from './activity-actor'
 
 test('a signed-in write records the person as the actor', () => {
   assert.deepEqual(activityActor('u1'), { actorType: 'user', actorId: 'u1' })
@@ -22,6 +22,21 @@ test('actAs without an actor still records the person', async () => {
 
 test('the agent actor only applies to the user it acts for', async () => {
   await actingContext.run({ userId: 'u1', actor: agentActor('client-1') }, async () => assert.deepEqual(activityActor('u2'), userActor('u2')))
+})
+
+test('an MCP write with a run token records the run\'s agents.id', () => {
+  assert.deepEqual(mcpAuthActor({ clientId: 'run:r1', extra: { userId: 'u1', runId: 'r1', agentId: 'agent-uuid' } }), agentActor('agent-uuid'))
+})
+
+test('an OAuth client with no run keeps its client id', () => {
+  assert.deepEqual(mcpAuthActor({ clientId: 'client-1', extra: { userId: 'u1' } }), agentActor('client-1'))
+  assert.deepEqual(mcpAuthActor(undefined), agentActor(null))
+})
+
+test('verifyRunToken joins agent_runs.agentId into the auth info', () => {
+  const source = readFileSync('lib/mcp/worker.ts', 'utf8')
+  assert.match(source, /agentId: agentRuns\.agentId/)
+  assert.match(source, /extra: \{[^}]*agentId: row\.agentId/)
 })
 
 test('system actor', () => {
