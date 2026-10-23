@@ -1378,6 +1378,26 @@
       "administration": "管理",
       "yourTeams": "你的团队"
     },
+    "nav": {
+      "aiAgents": "AI 与 Agent",
+      "loops": "Loops",
+      "initiatives": "计划",
+      "documents": "文档",
+      "customerRequests": "客户需求",
+      "releases": "发布",
+      "pulse": "Pulse",
+      "asks": "Asks",
+      "emojis": "表情",
+      "allIntegrations": "全部集成",
+      "github": "GitHub",
+      "security": "安全",
+      "api": "API",
+      "applications": "应用",
+      "billing": "账单",
+      "usageLimits": "用量与限额",
+      "importExport": "导入与导出",
+      "createTeam": "创建团队"
+    },
     "sections": {
       "members": {
         "description": "管理成员、角色与邀请。"

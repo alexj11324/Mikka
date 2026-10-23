@@ -23,30 +23,30 @@ const navigation = [
     { title: 'Integrations', section: 'integrations', icon: Plug },
   ] },
   { title: 'Features', key: 'features', items: [
-    { title: 'AI & agents', icon: Sparkles },
-    { title: 'Loops', icon: Orbit },
-    { title: 'Initiatives', icon: Flag },
-    { title: 'Documents', icon: FileText },
-    { title: 'Customer requests', icon: ContactRound },
-    { title: 'Releases', icon: PackageCheck },
-    { title: 'Pulse', icon: Activity },
-    { title: 'Asks', icon: HandHelping },
-    { title: 'Emojis', icon: Smile },
+    { title: 'AI & agents', key: 'aiAgents', icon: Sparkles },
+    { title: 'Loops', key: 'loops', icon: Orbit },
+    { title: 'Initiatives', key: 'initiatives', icon: Flag },
+    { title: 'Documents', key: 'documents', icon: FileText },
+    { title: 'Customer requests', key: 'customerRequests', icon: ContactRound },
+    { title: 'Releases', key: 'releases', icon: PackageCheck },
+    { title: 'Pulse', key: 'pulse', icon: Activity },
+    { title: 'Asks', key: 'asks', icon: HandHelping },
+    { title: 'Emojis', key: 'emojis', icon: Smile },
   ] },
   { title: 'Integrations', key: 'integrations', items: [
-    { title: 'All integrations', icon: Blocks },
-    { title: 'GitHub', icon: GithubIcon },
+    { title: 'All integrations', key: 'allIntegrations', icon: Blocks },
+    { title: 'GitHub', key: 'github', icon: GithubIcon },
   ] },
   { title: 'Administration', key: 'administration', items: [
     { title: 'Workspace', section: 'workspace', icon: Building2 },
     { title: 'Teams', section: 'teams', icon: SquareUserRound },
     { title: 'Members', section: 'members', icon: Users },
-    { title: 'Security', icon: ShieldCheck },
-    { title: 'API', icon: CodeXml },
-    { title: 'Applications', icon: Grid2X2 },
-    { title: 'Billing', icon: CreditCard },
-    { title: 'Usage & limits', icon: ChartNoAxesCombined },
-    { title: 'Import & export', icon: ArrowLeftRight },
+    { title: 'Security', key: 'security', icon: ShieldCheck },
+    { title: 'API', key: 'api', icon: CodeXml },
+    { title: 'Applications', key: 'applications', icon: Grid2X2 },
+    { title: 'Billing', key: 'billing', icon: CreditCard },
+    { title: 'Usage & limits', key: 'usageLimits', icon: ChartNoAxesCombined },
+    { title: 'Import & export', key: 'importExport', icon: ArrowLeftRight },
   ] },
 ] as const
 
@@ -94,18 +94,18 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
   return <Sidebar variant="sidebar" aria-label={i18nText("FeatureCopy.c_a8c7ae4f")}>
     <SidebarHeader className="px-4 pt-3 pb-2">
       <SidebarMenu><SidebarMenuItem><WorkspaceMenu user={user} onSettings={openSettings} onSignOut={onSignOut} signingOut={signingOut} /></SidebarMenuItem></SidebarMenu>
-      <SidebarMenu><SidebarMenuItem><SidebarMenuButton aria-label={i18nText("Invite.backToWorkspace")} render={activeSection ? <Link href={selectedTeamId ? `/?team=${encodeURIComponent(selectedTeamId)}` : '/'} /> : undefined} onClick={() => { setOpenMobile(false); if (!activeSection) onBack() }}><ArrowLeft /><span lang="en">Back to app</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>
-      <div className="relative mt-3"><Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" aria-hidden="true" /><SidebarInput className="pl-8" aria-label={i18nText("Settings.searchLabel")} placeholder="Search…" value={query} onChange={event => setQuery(event.target.value)} /></div>
+      <SidebarMenu><SidebarMenuItem><SidebarMenuButton aria-label={i18nText("Invite.backToWorkspace")} render={activeSection ? <Link href={selectedTeamId ? `/?team=${encodeURIComponent(selectedTeamId)}` : '/'} /> : undefined} onClick={() => { setOpenMobile(false); if (!activeSection) onBack() }}><ArrowLeft /><span>{i18nText("Settings.backToApp")}</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>
+      <div className="relative mt-3"><Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" aria-hidden="true" /><SidebarInput className="pl-8" aria-label={i18nText("Settings.searchLabel")} placeholder={i18nText("Settings.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} /></div>
     </SidebarHeader>
     <SidebarContent ref={contentRef} className="px-2 pb-6">
       {navigation.map(group => {
         const items = group.items.filter(item => {
-          const label = 'section' in item ? i18nText(`Settings.sections.${item.section}.title` as never) : item.title
+          const label = 'section' in item ? i18nText(`Settings.sections.${item.section}.title` as never) : i18nText(`Settings.nav.${item.key}`)
           return `${group.title} ${i18nText(`Settings.groups.${group.key}`)} ${item.title} ${label}`.toLowerCase().includes(normalizedQuery) && (activeSection || !('section' in item) || (item.section !== 'teams' && item.section !== 'members'))
         })
         return items.length > 0 && <SidebarGroup key={group.title} className="py-2"><SidebarGroupLabel>{i18nText(`Settings.groups.${group.key}`)}</SidebarGroupLabel><SidebarMenu>{items.map(item => {
           const id = 'section' in item ? item.section : undefined
-          const label = id ? i18nText(`Settings.sections.${id}.title` as never) : item.title
+          const label = id ? i18nText(`Settings.sections.${id}.title` as never) : 'key' in item ? i18nText(`Settings.nav.${item.key}`) : item.title
           const selected = id === section && !selectedTeamId && !creating
           const release = id ? undefined : group.title === 'Features' ? productRelease : group.title === 'Integrations' ? integrationsRelease : administrationRelease
           return <SidebarMenuItem key={item.title}><SidebarMenuButton aria-label={label} disabled={!id || !!release && !release.enabled} data-feature-flag={release?.key} title={release?.reason} render={id && activeSection ? <Link href={href(id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => { if (id && !activeSection) onSectionChange(id); setOpenMobile(false) }}><item.icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
@@ -115,7 +115,7 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
         const selected = selectedTeamId === team.id
         const teamHref = `/settings/teams?workspace=${encodeURIComponent(team.workspaceId)}&team=${encodeURIComponent(team.id)}`
         return <SidebarMenuItem key={team.id}><SidebarMenuButton render={<Link href={teamHref} />} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => setOpenMobile(false)}><SquareUserRound className="text-info" /><span>{team.name}</span></SidebarMenuButton></SidebarMenuItem>
-      })}<SidebarMenuItem><SidebarMenuButton render={<Link href={`${href('teams')}&create=1`} />} aria-label={i18nText("FeatureCopy.c_cb11190c")} isActive={creating} aria-current={creating ? 'page' : undefined} onClick={() => setOpenMobile(false)}><Plus /><span lang="en">Create a team</span></SidebarMenuButton></SidebarMenuItem>{error && <SidebarMenuItem><SidebarMenuButton onClick={() => void mutate()}>{i18nText("FeatureCopy.c_c401eee8")}</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></SidebarGroup>}
+      })}<SidebarMenuItem><SidebarMenuButton render={<Link href={`${href('teams')}&create=1`} />} aria-label={i18nText("FeatureCopy.c_cb11190c")} isActive={creating} aria-current={creating ? 'page' : undefined} onClick={() => setOpenMobile(false)}><Plus /><span>{i18nText("Settings.nav.createTeam")}</span></SidebarMenuButton></SidebarMenuItem>{error && <SidebarMenuItem><SidebarMenuButton onClick={() => void mutate()}>{i18nText("FeatureCopy.c_c401eee8")}</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></SidebarGroup>}
     </SidebarContent>
     <SidebarRail />
   </Sidebar>
