@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, varchar, jsonb, integer, numeric, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, integer, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -257,14 +257,6 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
-/** One call to the decision model, with what it cost, so the month's spend can be capped. */
-export const decisionCalls = pgTable('decision_calls', {
-  id: uuid('id').primaryKey(), purpose: text('purpose').notNull(), model: text('model').notNull(),
-  inputTokens: integer('inputTokens').notNull().default(0),
-  costUsd: numeric('costUsd', { precision: 12, scale: 8 }).notNull(),
-  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('decision_calls_created_idx').on(table.createdAt)])
-
 // --- Suggestions (MIK-41) ---------------------------------------------------
 //
 // External notifications from connected apps, judged by fixed rules or the
@@ -311,6 +303,12 @@ export const briefings = pgTable('briefings', {
   total: integer('total').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.userId, table.localDate] })])
+
+/** When the person's Composio trigger subscriptions were last checked (lib/suggestions/sources.ts). */
+export const suggestionTriggerChecks = pgTable('suggestion_trigger_checks', {
+  userId: text('userId').primaryKey(),
+  checkedAt: timestamp('checkedAt', { withTimezone: true }).notNull(),
+})
 
 /** The Coordinator's conversation, one AI SDK model message per row, in `position` order. */
 export const coordinatorMessages = pgTable('coordinator_messages', {
