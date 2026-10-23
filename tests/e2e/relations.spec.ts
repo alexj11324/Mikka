@@ -176,15 +176,48 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
     await page.getByRole('menuitem', { name: '设置父任务…', exact: true }).click()
     const picker = page.getByRole('dialog', { name: '设置父任务', exact: true })
-    await expect(picker.getByText('任务读取失败', { exact: true })).toBeVisible()
+    await expect(picker.getByRole('alert').filter({ hasText: '任务读取失败' })).toBeVisible()
+    // The alert sits outside the Command list; the reload option stays in the list.
+    await expect(picker.getByRole('listbox').getByText('任务读取失败', { exact: true })).toHaveCount(0)
     const reload = picker.getByRole('option', { name: '重新读取任务', exact: true })
     await expect(reload).toBeVisible()
 
     failing = false
     await reload.click()
     await expect(picker.getByRole('option').filter({ hasText: target })).toBeVisible()
-    await expect(picker.getByText('任务读取失败', { exact: true })).toHaveCount(0)
+    await expect(picker.getByRole('alert').filter({ hasText: '任务读取失败' })).toHaveCount(0)
     await expect(reload).toHaveCount(0)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   })
 }
+
+test('402x400 短视口：关系选择器标题和关闭按钮不被裁切，列表在内部滚动，状态高度不跳', async ({ page }) => {
+  test.setTimeout(120000)
+  await register(page)
+  const suffix = randomUUID().slice(0, 8)
+  const current = `短视口当前任务 ${suffix}`
+  await createIssue(page, current)
+  for (let i = 0; i < 8; i++) await createIssue(page, `短视口候选 ${i} ${suffix}`)
+  await page.getByRole('button', { name: '任务', exact: true }).click()
+  await openIssue(page, current)
+  await page.setViewportSize({ width: 402, height: 400 })
+  await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
+  await page.getByRole('menuitem', { name: '设置父任务…', exact: true }).click()
+  // The dialog opens only after the menu has closed (no menu ghosting over it).
+  const picker = page.getByRole('dialog', { name: '设置父任务', exact: true })
+  await expect(picker).toBeVisible()
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  await expect(picker.getByRole('option').filter({ hasText: `短视口候选 7 ${suffix}` })).toBeVisible()
+  const inViewport = async (box: { y: number; height: number } | null) => { expect(box).not.toBeNull(); expect(box!.y).toBeGreaterThanOrEqual(0); expect(box!.y + box!.height).toBeLessThanOrEqual(400) }
+  await inViewport(await picker.boundingBox())
+  await inViewport(await picker.getByRole('heading', { name: '设置父任务', exact: true }).boundingBox())
+  await inViewport(await picker.locator('[data-slot="dialog-close"]').first().boundingBox())
+  const list = picker.locator('[data-slot="command-list"]')
+  expect(await list.evaluate(el => el.scrollHeight > el.clientHeight && getComputedStyle(el).overflowY === 'auto')).toBe(true)
+  const listHeight = (await list.boundingBox())!.height
+  // Empty state keeps the list's minimum height instead of collapsing.
+  await picker.getByRole('combobox', { name: '搜索关联任务', exact: true }).fill(`不存在 ${suffix}`)
+  await expect(picker.getByText('没有匹配的任务', { exact: false })).toBeVisible()
+  expect((await list.boundingBox())!.height).toBeGreaterThanOrEqual(Math.min(listHeight, 144) - 1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
