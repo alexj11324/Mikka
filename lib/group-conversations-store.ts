@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
+import { enqueueGroupTurn } from './coordinator/group-turns'
 
 const member = z.object({ memberType: z.enum(['user', 'agent']), memberId: z.string().min(1).max(256) }).strict()
 const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]) }).strict()
@@ -26,7 +27,7 @@ function decimal(value: string | null | undefined, fallback: string) {
  * Lock the conversation before membership changes and messages: removal cannot race a send.
  * bigint positions are JSON strings (never lossy JS numbers).
  */
-export async function handleGroup(pool: Pool, directory: Directory, req: GroupRequest): Promise<{ status: number; body: unknown }> {
+export async function handleGroup(pool: Pool, directory: Directory, req: GroupRequest, queueAgents = false): Promise<{ status: number; body: unknown }> {
   let client: PoolClient | undefined
   try {
     const userId = req.userId
@@ -77,7 +78,8 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const { rows } = await q('SELECT * FROM conversation_messages WHERE "conversationId"=$1 AND ($2::bigint IS NULL OR position < $2) ORDER BY position DESC LIMIT $3', [req.id, before, limit + 1])
         const more = rows.length > limit
         const messages = rows.slice(0, limit)
-        result = { messages, nextBefore: more ? messages.at(-1)?.position : null }
+        const active = queueAgents ? await q(`SELECT "agentId",status,"updatedAt" FROM group_turns WHERE "conversationId"=$1 AND status IN ('queued','running') ORDER BY "createdAt" LIMIT 1`, [req.id]) : { rows: [] }
+        result = { messages, nextBefore: more ? messages.at(-1)?.position : null, agentStatus: active.rows[0] ?? null }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)
         if (!await directory(group.workspaceId, userId, input.mentions)) return fail(422)
@@ -92,6 +94,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const { rows: positions } = await q('UPDATE conversations SET "lastPosition"="lastPosition"+1 WHERE id=$1 RETURNING "lastPosition"::text AS position', [req.id])
         const id = randomUUID(), position = positions[0].position
         const { rows } = await q('INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body,mentions,"replyToId") VALUES ($1,$2,$3,\'user\',$4,$5,$6,$7) RETURNING *', [id, req.id, position, userId, input.body, JSON.stringify(input.mentions), input.replyToId ?? null])
+        if (queueAgents) await enqueueGroupTurn(client, req.id!, id, userId)
         result = rows[0]; status = 201
       } else if (req.resource === 'members' && ['POST', 'DELETE'].includes(req.method)) {
         if (group.role !== 'owner') return fail(403)
