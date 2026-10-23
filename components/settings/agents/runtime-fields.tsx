@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { Laptop } from 'lucide-react'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { EffortSlider } from '@/components/motion/effort-slider'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import type { DeviceView } from '@/app/actions/agents'
 import { SUPPORTED_HARNESSES, type SupportedHarness } from '@/lib/db/schema'
@@ -36,6 +36,7 @@ export function reportedPermissionModes(devices: DeviceView[], deviceId: string 
 
 /** The picker's value for Mikka's default (a null mode): no harness uses it as a mode name. */
 const DEFAULT_PERMISSION = 'mikka:default'
+const DEFAULT_EFFORT = 'mikka:default'
 
 /**
  * The model entry the runtime points at. A null model is the CLI's default;
@@ -131,7 +132,18 @@ export function RuntimeFields({ devices, runtime, onChange }: { devices: DeviceV
         options={models.map(item => ({ value: item.value, label: item.displayName || item.value }))} />
     </SettingRow>
     {levels.length > 0
-      ? <EffortSlider key={model?.value} levels={levels} value={runtime.effort} onChange={effort => onChange({ ...runtime, effort })} formatLabel={effortLabel} placeholder={t('defaultEffort')} />
+      ? <SettingRow title="Effort">
+        {/* Levels as a toggle group where they fit; a Select on narrow screens. DEFAULT_EFFORT is the CLI's own default (null). */}
+        <ToggleGroup aria-label="Effort" className="hidden sm:flex" value={[runtime.effort ?? DEFAULT_EFFORT]}
+          onValueChange={next => { if (next[0]) onChange({ ...runtime, effort: next[0] === DEFAULT_EFFORT ? null : next[0] }) }}>
+          {[DEFAULT_EFFORT, ...levels].map(level => <ToggleGroupItem key={level} value={level}>{level === DEFAULT_EFFORT ? t('defaultEffort') : effortLabel(level)}</ToggleGroupItem>)}
+        </ToggleGroup>
+        <div className="w-full sm:hidden">
+          <Picker label="Effort" value={runtime.effort ?? DEFAULT_EFFORT} placeholder={t('defaultEffort')}
+            onChange={level => onChange({ ...runtime, effort: level === DEFAULT_EFFORT ? null : level })}
+            options={[DEFAULT_EFFORT, ...levels].map(level => ({ value: level, label: level === DEFAULT_EFFORT ? t('defaultEffort') : effortLabel(level) }))} />
+        </div>
+      </SettingRow>
       : <SettingRow title="Effort" description={models.length ? t('noEffortLevels') : t('effortNeedsModel')} />}
     <SettingRow title={t('permissionMode')} description={runtime.harness && !permissionModes.length ? t('permissionModesUnreported') : runtime.permissionMode ? t('permissionAsks') : undefined}>
       <Picker label={t('permissionMode')} value={runtime.permissionMode ?? DEFAULT_PERMISSION} placeholder={t('defaultPermission')} disabled={!permissionModes.length}
