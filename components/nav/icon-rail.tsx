@@ -4,7 +4,8 @@ import { useTranslations } from 'next-intl'
 import { Columns3, MessageSquare, Puzzle, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Sidebar } from '@/components/ui/sidebar'
+import { Sidebar, useSidebar } from '@/components/ui/sidebar'
+import { MikkaMark } from '@/components/brand/mikka-mark'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 
 export type RailDestination = 'conversations' | 'board' | 'plugins'
@@ -28,8 +29,11 @@ type RailProps = {
 /** The fixed 56px column at the far left (Codex style). It never collapses; the conversation list beside it does. */
 export function IconRail({ active, onNavigate, ...menu }: RailProps) {
   const i18nText = useTranslations()
+  const { open } = useSidebar()
   // A non-collapsing Sidebar, as in shadcn's nested icon-rail pattern; phones get these items in the list footer.
   return <Sidebar collapsible="none" role="navigation" aria-label={i18nText('Nav.rail')} className="sticky top-0 z-20 hidden h-svh w-14 shrink-0 items-center gap-2 py-3 md:flex">
+    {/* The mark lives in the list header; while the list is collapsed the rail carries it. */}
+    {!open && <div className="flex h-10 items-center"><MikkaMark /></div>}
     {RAIL_ITEMS.map(item => <Tooltip key={item.id}>
       <TooltipTrigger render={<Button variant={active === item.id ? 'secondary' : 'ghost'} size="icon-lg" aria-label={i18nText(item.label)} aria-current={active === item.id ? 'page' : undefined} onClick={() => onNavigate(item.id)} />}><item.icon data-icon="inline-start" /></TooltipTrigger>
       <TooltipContent side="right">{i18nText(item.label)}</TooltipContent>
