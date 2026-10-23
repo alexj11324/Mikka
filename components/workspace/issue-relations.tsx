@@ -24,8 +24,9 @@ export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, o
   const t = useTranslations('Metadata.relations')
   const relationTitle = (value: RelationKind) => t.has(`title.${value}` as never) ? t(`title.${value}` as never) : value
   const [query, setQuery] = useState('')
+  // Relations change between openings; never filter against a stale board snapshot.
   const { data: connections, error, mutate } = useSWR(open ? ['issue-connections', task.id] : null, () => listIssueConnections(task.id))
-  const { data: board } = useSWR(open ? ['issues', 'relation-picker', task.userId] : null, listIssues)
+  const { data: board } = useSWR(open ? ['issues', 'relation-picker', task.userId] : null, listIssues, { revalidateOnMount: true, dedupingInterval: 0 })
   const source = board ?? connections
   const needle = query.trim().toLowerCase()
   const sameOwner = (source ?? []).filter(row => row.id !== task.id && row.ownerId === task.userId && (kind !== 'child' || row.metadata.parentId !== task.id))

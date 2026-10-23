@@ -47,7 +47,13 @@ for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
         await expect(pendingDialog).toBeFocused()
       }
       await expect(page.getByRole('dialog')).toHaveCount(1)
-      expect(await pendingDialog.boundingBox()).toEqual({ x: 0, y: 0, ...page.viewportSize()! })
+      // html reserves a stable scrollbar gutter, so a fixed overlay may be up to one scrollbar narrower than the viewport.
+      const box = (await pendingDialog.boundingBox())!
+      const viewport = page.viewportSize()!
+      const scrollbar = 17 // widest classic desktop scrollbar (Chromium 15, Firefox/Windows 17)
+      expect({ x: box.x, y: box.y, height: box.height }).toEqual({ x: 0, y: 0, height: viewport.height })
+      expect(box.width).toBeGreaterThanOrEqual(viewport.width - scrollbar)
+      expect(box.width).toBeLessThanOrEqual(viewport.width)
       await expect(accountMenu).toHaveCount(0)
       await expect(page.getByRole('heading').filter({ hasNotText: english ? 'Signing out…' : '正在退出…' })).toHaveCount(0)
       for (const name of await page.locator('[hidden][inert]').getByText('回归测试成员', { exact: true }).all()) await expect(name).not.toBeVisible()
