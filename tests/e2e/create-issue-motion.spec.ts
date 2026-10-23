@@ -91,3 +91,57 @@ test('创建时卡片乐观插入；保存失败时回滚并提示', async ({ pa
   await page.unroute('**/*')
 })
 })
+
+test('保存期间发生一次看板刷新，乐观卡片不被覆盖', async ({ page }) => {
+  await register(page)
+  await page.getByRole('button', { name: '任务', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '全部任务', exact: true })).toBeVisible()
+  const board = page.getByRole('region', { name: '任务看板', exact: true })
+  const dialog = await openDialog(page)
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/*', async route => {
+    const request = route.request()
+    if (request.method() === 'POST' && request.headers()['next-action'] && request.postData()?.includes('刷新中的任务')) { await held; return route.continue() }
+    return route.fallback()
+  })
+  await dialog.getByLabel('任务标题', { exact: true }).fill('刷新中的任务')
+  await dialog.getByLabel('任务标题', { exact: true }).press('Control+Enter')
+  const card = board.locator('[data-optimistic]').filter({ hasText: '刷新中的任务' })
+  await expect(card).toHaveCount(1)
+  // Next.js runs server actions one at a time, so a board refresh triggered now queues behind the held save
+  // and lands right after it. The card must survive that refresh: never dropped, never duplicated.
+  const refresh = page.waitForResponse(response => response.request().method() === 'POST' && !!response.request().headers()['next-action'] && !response.request().postData()?.includes('刷新中的任务'), { timeout: 25000 })
+  await page.evaluate(() => { window.dispatchEvent(new Event('focus')) })
+  await page.waitForTimeout(300)
+  await expect(card).toHaveCount(1)
+  release()
+  await refresh
+  await expect(dialog).not.toBeVisible()
+  await expect(page.locator('[data-optimistic]')).toHaveCount(0)
+  await expect(board.getByText('刷新中的任务', { exact: true })).toHaveCount(1)
+  await page.unroute('**/*')
+})
+
+test('服务端返回错误时显示 createFailed，卡片回滚且草稿保留', async ({ page }) => {
+  await register(page)
+  await page.getByRole('button', { name: '任务', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '全部任务', exact: true })).toBeVisible()
+  const board = page.getByRole('region', { name: '任务看板', exact: true })
+  const dialog = await openDialog(page)
+  // Rewrite the title past the 200-char limit so the real server action answers { error } instead of an issue.
+  await page.route('**/*', route => {
+    const request = route.request()
+    const body = request.postData()
+    if (request.method() === 'POST' && request.headers()['next-action'] && body?.includes('会被拒绝的任务')) return route.continue({ postData: body.replace('会被拒绝的任务', 'x'.repeat(201)) })
+    return route.fallback()
+  })
+  await dialog.getByLabel('任务标题', { exact: true }).fill('会被拒绝的任务')
+  await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
+  await expect(dialog.getByRole('alert').filter({ hasText: '创建失败，草稿已保留。' })).toBeVisible()
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '创建失败，草稿已保留。' })).toBeVisible()
+  await expect(page.locator('[data-optimistic]')).toHaveCount(0)
+  await expect(board.getByText('会被拒绝的任务', { exact: true })).toHaveCount(0)
+  await expect(dialog.getByLabel('任务标题', { exact: true })).toHaveValue('会被拒绝的任务')
+  await page.unroute('**/*')
+})

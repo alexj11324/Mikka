@@ -229,16 +229,32 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   const saved = useCallback((id: string) => { setSelected(id); void mutate() }, [mutate])
   function create(status: IssueStatus = ISSUE_STATUSES.some(item => item.value === view) ? view as IssueStatus : 'todo') { if (boardBusy) return; setTypedAhead(''); setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreateStatus(status); setCreating(true) }
-  // MIK-18: optimistic insert — the card appears (200ms expand + fade) while saveIssue runs; rollback + toast on failure.
-  function optimisticCreate(draft: { title: string; status: string; priority: string }) {
+  // MIK-18: optimistic insert through SWR's mutate(promise) — polling/focus revalidations that start during the save
+  // can't overwrite the placeholder, and rollbackOnError restores the board if the save fails (the dialog shows the toast).
+  async function optimisticCreate<T extends object>(draft: { title: string; status: string; priority: string; teamId: string | null }, save: () => Promise<T>) {
     const now = new Date()
     const tempId = `optimistic-${crypto.randomUUID()}`
-    const placeholder = { id: tempId, ownerId: user.id, ownerName: user.name ?? null, ownerImage: null, title: draft.title, status: draft.status, priority: draft.priority, revision: 1, createdAt: now, updatedAt: now, teamId: null, metadata: readIssueMetadata({ type: 'doc' }), checklist: issueChecklist({ type: 'doc' }), optimistic: true } as unknown as (typeof tasks)[number]
-    void mutate(current => [placeholder, ...(current ?? [])], { revalidate: false })
-    return {
-      rollback() { void mutate(current => (current ?? []).filter(item => item.id !== tempId), { revalidate: false }) },
-      commit(id: string) { void mutate(current => (current ?? []).map(item => item.id === tempId ? { ...item, id, optimistic: false } : item), { revalidate: false }) },
+    // teamId matches the dialog's team so team views keep showing the card until setIssueTeam + onCreated's refetch land.
+    const placeholder = { id: tempId, ownerId: user.id, ownerName: user.name ?? null, ownerImage: null, title: draft.title, status: draft.status, priority: draft.priority, revision: 1, createdAt: now, updatedAt: now, teamId: draft.teamId, metadata: readIssueMetadata({ type: 'doc' }), checklist: issueChecklist({ type: 'doc' }), optimistic: true } as unknown as (typeof tasks)[number]
+    let result: T | undefined
+    try {
+      // With optimisticData, the callback receives the committed (pre-placeholder) board.
+      await mutate(async current => {
+        result = await save()
+        const issue = 'issue' in result ? (result.issue as { id: string } | null | undefined) : null
+        if (!issue) throw new Error('create failed')
+        // Keep the card (now with its real id) until issueCreated's revalidation brings the server row.
+        return [{ ...placeholder, id: issue.id, optimistic: false }, ...(current ?? [])]
+      }, {
+        optimisticData: current => [placeholder, ...(current ?? [])],
+        rollbackOnError: true,
+        revalidate: false,
+      })
+    } catch (error) {
+      if (result) return result
+      throw error
     }
+    return result!
   }
   async function issueCreated(id: string) {
     void mutate()

@@ -30,7 +30,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, onOptimisticC
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: (id: string) => void
-  onOptimisticCreate?: (draft: { title: string; status: string; priority: string }) => { commit: (id: string) => void; rollback: () => void }
+  onOptimisticCreate?: <T extends object>(draft: { title: string; status: string; priority: string; teamId: string | null }, save: () => Promise<T>) => Promise<T>
   author: string
   initialStatus?: string
   initialTeamId?: string
@@ -117,20 +117,18 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, onOptimisticC
     setPending(true)
     setError('')
     setNotice('')
-    // MIK-18 #1: optimistic card insert; rolled back with a toast if the save fails.
-    const optimistic = onOptimisticCreate?.({ title: currentTitle.trim(), status, priority })
+    // MIK-18 #1: the board shows an optimistic card while saveIssue runs; SWR rolls it back if the save fails.
     const fail = (message: string) => {
-      optimistic?.rollback()
       setError(message)
       toast.error(message)
     }
     try {
-      const result = await saveIssue({ title: currentTitle, content, status, priority })
+      const save = () => saveIssue({ title: currentTitle, content, status, priority })
+      const result = onOptimisticCreate ? await onOptimisticCreate({ title: currentTitle.trim(), status, priority, teamId: teamId || null }, save) : await save()
       if (!('issue' in result) || !result.issue) {
-        fail(result.error ?? i18nText("Issue.create.createFailed"))
+        fail(i18nText("Issue.create.createFailed"))
         return
       }
-      optimistic?.commit(result.issue.id)
       if (teamId) {
         try {
           const relation = await setIssueTeam({ issueId: result.issue.id, teamId, expectedTeamId: null })
@@ -157,7 +155,9 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, onOptimisticC
   }
 
   return <><Dialog open={open} onOpenChange={value => { if (!value) close() }}>
-    <DialogContent showCloseButton={false} initialFocus={focusTitle} className={cn('flex max-h-[calc(100svh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:top-[20svh] sm:max-h-[76svh] sm:max-w-3xl sm:translate-y-0', expanded && 'sm:max-w-5xl')}>
+    <DialogContent showCloseButton={false} initialFocus={focusTitle} className={cn('gap-0 p-0 sm:top-[20svh] sm:max-w-3xl sm:translate-y-0', expanded && 'sm:max-w-5xl')}>
+      {/* Our own layout container: DialogContent keeps its default grid; this bounds the height so header/footer stay visible. */}
+      <div className="flex max-h-[calc(100svh-2rem)] min-h-0 flex-col overflow-hidden sm:max-h-[76svh]">
       <form className="flex min-h-0 flex-1 flex-col" onSubmit={event => { event.preventDefault(); void create() }} onKeyDown={event => {
         if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
         if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void create() }
@@ -200,6 +200,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, onOptimisticC
           </div>
         </footer>
       </form>
+      </div>
     </DialogContent>
   </Dialog>
   <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
