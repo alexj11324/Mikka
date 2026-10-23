@@ -17,6 +17,7 @@ export function SettingsPreview() {
           onSignOut={() => router.push('/sign-in')}
           signingOut={false}
           accountError=""
+          preview
         />
     </AppShell>
   )
