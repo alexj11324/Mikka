@@ -8,6 +8,7 @@ import { AgentCodeContent, AgentContent, AgentStatusIcon, AgentTasks, AgentTextC
 import { AgentImage } from './agent-image'
 import { AgentFollowUps } from './agent-follow-ups'
 import { AgentImageCard } from './agent-image-card'
+import { CitationChip, WebCitation } from './agent-citations'
 import { Button as BeButton } from '@/components/motion/button/base'
 import { AnimatedBadge } from '@/components/motion/animated-badge'
 import { AnimatedNumber } from '@/components/motion/animated-number'
@@ -61,6 +62,10 @@ const renderers = {
   BeQuestions: AgentQuestions,
   BeTodoList: AgentTasks,
   AgentIcon: AgentStatusIcon,
+  InlineText: ({ props, renderNode }) => <p className="min-w-0 break-words text-sm leading-7">{renderNode(props.parts)}</p>,
+  TaskChip: ({ props }) => <CitationChip id={props.id.toLowerCase()} kind="issue" />,
+  RunChip: ({ props }) => <CitationChip id={props.id.toLowerCase()} kind="run" />,
+  SourceChip: ({ props }) => <WebCitation url={props.url} label={props.label ?? null} />,
   ShadcnCard: ({ props, renderNode }) => <Card size="sm" className="min-w-0">
     <CardHeader><CardTitle>{props.title}</CardTitle>{props.description && <CardDescription>{props.description}</CardDescription>}</CardHeader>
     <CardContent className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</CardContent>

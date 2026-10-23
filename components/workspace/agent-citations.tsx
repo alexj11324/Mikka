@@ -20,6 +20,10 @@ const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destructive-l
   succeeded: 'success-light', stopped: 'secondary', failed: 'destructive-light', cancelled: 'secondary',
 }
 
+/** A task chip is wider than a source chip: it carries the title too. */
+const TASK_CHIP = 'max-w-72 pl-1.5'
+const STATUS_DOT = 'size-1.5 shrink-0 rounded-full bg-current'
+
 export type LinkPreviews = Record<string, LinkPreview | null>
 
 /**
@@ -56,14 +60,9 @@ export function CitationAnchor({ href, children, className: _className, ...props
     const [kind, id] = href.slice(CITATION_HREF.length).split('/') as [CitationKind | 'any', string]
     const source = citations.sources[id]
     if (!source || (kind !== 'any' && kind !== source.kind)) return <>{children}</>
-    return source.kind === 'issue'
-      ? <IssueCitation issue={source} onOpen={citations.onOpenIssue} />
-      : <RunCitation run={source} onOpen={citations.onOpenIssue} />
+    return <CitationChip id={id} kind={source.kind} />
   }
-  if (citations && href && /^https?:\/\//i.test(href)) {
-    const label = typeof children === 'string' && children !== href ? children : null
-    return <LinkCitation url={href} label={label} preview={citations.previews[href]} />
-  }
+  if (citations && href && /^https?:\/\//i.test(href)) return <WebCitation url={href} label={typeof children === 'string' && children !== href ? children : null} />
   return <a {...props} href={href} className="text-primary underline underline-offset-4" target="_blank" rel="noopener noreferrer">{children}</a>
 }
 
@@ -94,17 +93,19 @@ export function CitationSources({ text }: { text: string }) {
   </div>
 }
 
+/** A task mentioned in a reply: status dot, number and title, inline with the text. */
 export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: string) => void }) {
   const t = useTranslations('Coordinator.citation')
   const tIssue = useTranslations('Issue')
   const status = ISSUE_STATUSES.find(item => item.value === issue.status) ?? ISSUE_STATUSES[1]
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
-  const tone = status.value === 'doing' ? 'text-warning-foreground' : status.value === 'review' ? 'text-success-foreground' : status.value === 'done' ? 'text-info-foreground' : 'text-muted-foreground'
+  const tone = status.value === 'doing' ? 'text-warning-foreground' : status.value === 'review' ? 'text-info-foreground' : status.value === 'done' ? 'text-success-foreground' : 'text-muted-foreground'
   const identifier = issue.number ? issueIdentifier(issue.number) : null
   return <InlineCitation>
-    <InlineCitationTrigger aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)}>
-      <SourceAvatar source={{ name: issue.title, domain: 'Mikka', icon: <Mikka /> }} />
-      <InlineCitationLabel>{identifier ?? issue.title}</InlineCitationLabel>
+    <InlineCitationTrigger aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)} className={TASK_CHIP}>
+      <span aria-hidden="true" className={cn(STATUS_DOT, tone)} />
+      {identifier && <span className="shrink-0">{identifier}</span>}
+      <InlineCitationLabel className="font-sans">{issue.title}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
@@ -117,6 +118,23 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
       </InlineCitationBody>
     </InlineCitationContent>
   </InlineCitation>
+}
+
+/** A cited issue or run by id, as a chip; the raw id when the conversation cannot show it. */
+export function CitationChip({ id, kind }: { id: string; kind: CitationKind }) {
+  const citations = useAgentCitations()
+  const source = citations?.sources[id]
+  if (!citations || source?.kind !== kind) return <>{id}</>
+  return source.kind === 'issue'
+    ? <IssueCitation issue={source} onOpen={citations.onOpenIssue} />
+    : <RunCitation run={source} onOpen={citations.onOpenIssue} />
+}
+
+/** A cited web page as a chip with its link preview; a plain link outside a conversation that cites. */
+export function WebCitation({ url, label }: { url: string; label: string | null }) {
+  const citations = useAgentCitations()
+  if (!citations) return <a href={url} className="text-primary underline underline-offset-4" target="_blank" rel="noopener noreferrer">{label ?? url}</a>
+  return <LinkCitation url={url} label={label} preview={citations.previews[url]} />
 }
 
 export function RunCitation({ run, onOpen }: { run: RunSource; onOpen: (id: string) => void }) {

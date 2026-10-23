@@ -355,7 +355,7 @@ test('功能分组完整且每个本地组件仅属于一个功能组', () => {
   const names = agentComponentGroups.flatMap(group => group.components)
   assert.deepEqual([...names].sort(), Object.keys(agentComponentCatalog).sort())
   assert.equal(new Set(names).size, names.length)
-  assert.equal(agentComponentGroups.length, 5)
+  assert.equal(agentComponentGroups.length, 6)
 })
 
 test('审批、问题、回复和任务计划均可解析', () => {
