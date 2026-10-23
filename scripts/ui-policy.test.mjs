@@ -248,3 +248,12 @@ test('utility parser respects bracket expressions and variants', () => {
   assert.deepEqual(splitUtilities('flex [&_svg]:size-4 text-[length:var(--size)]'), ['flex', '[&_svg]:size-4', 'text-[length:var(--size)]'])
   assert.equal(utilityBase('dark:hover:text-[length:var(--size)]'), 'text-[length:var(--size)]')
 })
+
+test('MIK-8: only UnreadDivider may draw a horizontal Separator', () => {
+  const source = 'import { Separator } from "@/components/ui/separator"; const ui = <Separator />'
+  const rules = file => auditSource(file, source, policy).map(item => item.rule)
+  assert.ok(!rules('components/chat/unread-divider.tsx').includes('style/no-horizontal-rule'))
+  assert.ok(rules('components/chat/unread-pill.tsx').includes('style/no-horizontal-rule'))
+  assert.ok(rules('components/coordinator/coordinator-chat.tsx').includes('style/no-horizontal-rule'))
+  assert.ok(rules('components/settings/members.tsx').includes('style/no-horizontal-rule'))
+})
