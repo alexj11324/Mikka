@@ -116,7 +116,10 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const [teamId, setTeamId] = useState<string | null>(params.get('team'))
   const activeTeam = teams.find(team => team.id === teamId)
   const [section, setSection] = useState<WorkspaceSection>(params.get('team') ? 'team-home' : initialSection)
+  // True only while the detail was loaded directly and no section has been chosen since.
+  const directDetail = useRef(initialSelected !== null)
   function changeSection(next: WorkspaceSection) {
+    directDetail.current = false
     setSection(next)
     const url = new URL(window.location.href)
     if (next === 'agent' || next === 'coordinator') url.searchParams.set('section', next)
@@ -235,7 +238,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     void leave(() => {
       // A directly opened/reloaded detail has no remembered in-memory section.
       // Its Board breadcrumb must still return to issues, not the default Projects page.
-      if (id === null) changeSection(teamId ? 'team-issues' : 'all-issues')
+      if (id === null && directDetail.current) changeSection(teamId ? 'team-issues' : 'all-issues')
       showIssue(id, 'push')
     }).finally(() => setPendingSelection(undefined))
     return true
