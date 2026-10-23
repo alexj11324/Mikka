@@ -18,18 +18,19 @@ async function mockSessions(page: Page, initial: Status | null) {
 }
 
 async function mockCoordinatorWorking(page: Page, initial: boolean) {
-  const state = { working: initial }
+  const state = { working: initial, rewrites: 0 }
   await page.route('**/*', async route => {
     const request = route.request()
     if (request.method() !== 'POST' || !request.headers()['next-action']) return route.fallback()
     const response = await route.fetch()
     const body = await response.text()
-    // Only the Coordinator chat view carries items + working + enabled.
-    if (!(body.includes('"items":') && body.includes('"working":') && body.includes('"enabled":'))) return route.fulfill({ response, body })
+    // Flight text: match the flag anywhere in the body, tolerating whitespace.
+    if (!/"working"\s*:\s*(true|false)/.test(body)) return route.fulfill({ response, body })
+    state.rewrites++
     const rewritten = body
-      .replace(/"working":(true|false)/g, `"working":${state.working}`)
-      .replace(/"enabled":(true|false)/g, '"enabled":true')
-      .replace(/"error":"[^"]*"/g, '"error":null')
+      .replace(/"working"\s*:\s*(true|false)/g, `"working":${state.working}`)
+      .replace(/"enabled"\s*:\s*(true|false)/g, '"enabled":true')
+      .replace(/"error"\s*:\s*"(?:[^"\\]|\\.)*"/g, '"error":null')
     return route.fulfill({ response, body: rewritten })
   })
   return state
@@ -96,17 +97,19 @@ test('谁正在工作：减弱动效时没有滚动和流光', async ({ page }) 
 
 test('谁正在工作：仅 Coordinator 工作时显示单人文案', async ({ page }) => {
   await mockSessions(page, null)
-  await mockCoordinatorWorking(page, true)
+  const coordinator = await mockCoordinatorWorking(page, true)
   await register(page)
   await openCoordinator(page)
+  await expect.poll(() => coordinator.rewrites, { message: 'Coordinator chat response was never rewritten; the mock did not match the flight payload' }).toBeGreaterThan(0)
   await expect(bar(page).locator('[data-working-text]').first()).toContainText('Coordinator 正在工作…')
 })
 
 test('谁正在工作：Coordinator 与 Agent 同时工作时显示双人文案', async ({ page }) => {
   await mockSessions(page, 'pending')
-  await mockCoordinatorWorking(page, true)
+  const coordinator = await mockCoordinatorWorking(page, true)
   await register(page)
   await openCoordinator(page)
+  await expect.poll(() => coordinator.rewrites, { message: 'Coordinator chat response was never rewritten; the mock did not match the flight payload' }).toBeGreaterThan(0)
   await expect(bar(page).locator('[data-working-text]').first()).toContainText('Coordinator 和 Agent 正在工作…')
   await expect(bar(page).locator('[data-slot="avatar"]')).toHaveCount(2)
 })
