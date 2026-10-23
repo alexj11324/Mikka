@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register, browserClientHeaders, watchRuntime, app, BASE_PATH } from './fixtures'
+import { test, expect, register, rail, browserClientHeaders, watchRuntime, app, BASE_PATH } from './fixtures'
 
 async function createTeam(page: Page, name: string, identifier: string) {
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
@@ -14,6 +14,7 @@ async function createTeam(page: Page, name: string, identifier: string) {
   await expect(page.getByRole('row').filter({ hasText: name })).toBeVisible()
 }
 async function createTask(page: Page, title: string, team?: string) {
+  if (await rail(page, '看板').getAttribute('aria-current') !== 'page') await rail(page, '看板').click()
   await page.getByRole('button', { name: '新建任务', exact: true }).first().click()
   const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
   await dialog.getByLabel('任务标题', { exact: true }).fill(title)
@@ -23,30 +24,9 @@ async function createTask(page: Page, title: string, team?: string) {
   await expect(dialog).not.toBeVisible()
 }
 async function showAllTasks(page: Page) {
-  await page.getByRole('button', { name: '更多', exact: true }).click()
-  await page.getByRole('menuitem', { name: '全部任务', exact: true }).click()
+  await rail(page, '看板').click()
   await page.getByRole('button', { name: '列表视图', exact: true }).click()
 }
-
-test('团队主页、任务和项目菜单右侧空白区域均可点击导航', async ({ page }) => {
-  await register(page, '/settings/teams')
-  await createTeam(page, '导航团队', 'NAV')
-  await page.getByRole('link', { name: '返回工作台', exact: true }).click()
-  const submenu = page.locator('[data-sidebar="menu-sub"]').first()
-  const breadcrumb = page.getByRole('navigation', { name: '当前位置', exact: true })
-
-  for (const [title, heading] of [['主页', '团队主页'], ['任务', '团队任务'], ['项目', '团队项目']]) {
-    const button = submenu.getByRole('button', { name: title, exact: true })
-    const row = button.locator('..')
-    await expect(row).toBeVisible()
-    const bounds = await row.boundingBox()
-    if (!bounds) throw new Error('团队导航行不可见')
-    await row.click({ position: { x: bounds.width - 12, y: bounds.height / 2 } })
-    await expect(button).toHaveAttribute('data-active')
-    await expect(breadcrumb).toContainText('导航团队')
-    await expect(breadcrumb.getByText(heading, { exact: true })).toBeVisible()
-  }
-})
 
 test('公开团队创建、搜索、编辑、负责人保护、任务归属和项目多团队关联', async ({ page }) => {
   test.setTimeout(180000)
@@ -88,7 +68,8 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await expect(page.getByRole('listbox')).toHaveCount(0)
   await expect(page.getByText('对该工作区启用成员公开，可协作编辑。', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
-  await page.getByRole('button', { name: '项目', exact: true }).first().click()
+  // Nav v3 keeps projects out of the left column; they stay reachable by link.
+  await page.goto(app('/?section=projects'))
   await page.getByRole('button', { name: '新建项目', exact: true }).first().click()
   const projectDialog = page.getByRole('dialog', { name: '新建项目', exact: true })
   await projectDialog.getByLabel('项目名称', { exact: true }).fill('跨团队交付项目')
