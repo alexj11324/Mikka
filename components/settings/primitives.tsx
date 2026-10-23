@@ -33,7 +33,7 @@ export function SettingsSection({
         {action}
       </header>
       <div data-settings-card className="overflow-hidden rounded-2xl border bg-card">
-        <div data-settings-rows className="divide-y divide-border">{children}</div>
+        <div data-settings-rows className="divide-y">{children}</div>
       </div>
     </section>
   )

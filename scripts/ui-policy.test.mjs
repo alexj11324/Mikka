@@ -46,13 +46,25 @@ for (const [label, source, rule] of [
   ['dark color override', '<Button className="dark:bg-muted" />', 'style/no-dark-color-override'],
   ['conditional classes', '<Button className={active ? "flex" : "grid"} />', 'style/use-cn'],
   ['equal dimensions', '<Button className="h-4 w-4" />', 'style/size-shorthand'],
-  ['horizontal bottom rule', '<div className="border-b" />', 'style/no-horizontal-rule'],
-  ['horizontal top rule', '<div className="lg:border-t-2" />', 'style/no-horizontal-rule'],
-  ['horizontal both rule', '<div className="border-y" />', 'style/no-horizontal-rule'],
-  ['row divider rule', '<div className="divide-y" />', 'style/no-horizontal-rule'],
-  ['hand-drawn rule', '<div className="h-px w-full bg-border" />', 'style/no-horizontal-rule'],
-  ['horizontal separator', 'import { Separator } from "@/components/ui/separator"; const ui = <Separator />', 'style/no-horizontal-rule'],
-  ['dynamic separator orientation', 'import { Separator } from "@/components/ui/separator"; const ui = <Separator orientation={vertical ? "vertical" : "horizontal"} />', 'style/no-horizontal-rule'],
+  ['list item bottom rule with last reset', '<div className="border-b last:border-0" />', 'style/divider-list-item'],
+  ['list item top rule with first reset', '<div className="border-t first:border-t-0" />', 'style/divider-list-item'],
+  ['mapped list item bottom rule', 'const ui = items.map(item => <div key={item} className="border-b py-2" />)', 'style/divider-list-item'],
+  ['mapped list item via return', 'const ui = items.map(item => { return (<div key={item} className="border-y" />) })', 'style/divider-list-item'],
+  ['divide custom color', '<div className="divide-y divide-muted" />', 'style/divider-default'],
+  ['divide explicit default token', '<div className="divide-y divide-border" />', 'style/divider-default'],
+  ['divide custom width', '<div className="divide-y-2" />', 'style/divider-default'],
+  ['divide arbitrary color', '<div className="divide-y divide-[#eee]" />', 'style/divider-default'],
+  ['divide dashed', '<div className="divide-y divide-dashed" />', 'style/divider-default'],
+  ['separator custom color', 'import { Separator } from "@/components/ui/separator"; import { Card, CardHeader, CardContent } from "@/components/ui/card"; const ui = <div><span /><Separator className="bg-border/50" /><span /></div>', 'style/divider-default'],
+  ['separator custom thickness', 'import { Separator } from "@/components/ui/separator"; import { Card, CardHeader, CardContent } from "@/components/ui/card"; const ui = <div><span /><Separator className="h-0.5" /><span /></div>', 'style/divider-default'],
+  ['hand-drawn horizontal rule', '<div className="h-px w-full bg-border" />', 'style/divider-element'],
+  ['hand-drawn vertical rule', '<div className="h-4 w-px bg-border" />', 'style/divider-element'],
+  ['divide between cards', 'import { Separator } from "@/components/ui/separator"; import { Card, CardHeader, CardContent } from "@/components/ui/card"; const ui = <div className="divide-y"><Card><CardHeader /><CardContent /></Card></div>', 'style/divider-between-bordered'],
+  ['divide between bordered mapped items', 'const ui = <div className="divide-y">{items.map(i => <div key={i} className="rounded-lg border p-3" />)}</div>', 'style/divider-between-bordered'],
+  ['divide between filled items', '<div className="divide-y"><div className="bg-muted" /></div>', 'style/divider-between-bordered'],
+  ['separator next to card', 'import { Separator } from "@/components/ui/separator"; import { Card, CardHeader, CardContent } from "@/components/ui/card"; const ui = <div><span /><Separator /><Card><CardHeader /><CardContent /></Card></div>', 'style/divider-between-bordered'],
+  ['separator as first item', 'import { Separator } from "@/components/ui/separator"; import { Card, CardHeader, CardContent } from "@/components/ui/card"; const ui = <div><Separator /><span /></div>', 'style/divider-edge'],
+  ['separator as last item', 'import { Separator } from "@/components/ui/separator"; import { Card, CardHeader, CardContent } from "@/components/ui/card"; const ui = <div><span /><Separator /></div>', 'style/divider-edge'],
   ['truncate shorthand', '<Button className="overflow-hidden text-ellipsis whitespace-nowrap" />', 'style/truncate'],
   ['overlay stacking', 'import { DialogContent } from "@/components/ui/dialog"; const ui = <DialogContent className="z-50" />', 'style/overlay-stacking'],
   ['aliased menu grouping', 'import { SelectItem as Option } from "@/components/ui/select"; const ui = <Option />', 'composition/group'],
@@ -99,19 +111,170 @@ test('valid grouped items + title + avatar', () => {
   assert.deepEqual(rules(source), [])
 })
 
-test('vertical separators, box borders and spacing-based grouping stay legal', () => {
+test('spec-approved dividers stay legal', () => {
   const source = `${prefix}
     import { Separator } from '@/components/ui/separator';
     const orientation = 'vertical';
     const ui = <div className="flex flex-col gap-6 rounded-lg border p-4">
-      <Separator orientation="vertical" />
-      <Separator orientation={'vertical'} />
-      <Separator orientation={\`vertical\`} />
-      <Separator orientation={orientation} />
+      <header className="sticky top-0 border-b px-4">title</header>
+      <div className="divide-y">{rows.map(row => <div key={row.id} className="flex h-10 items-center px-3">{row.name}</div>)}</div>
+      <div className="flex items-center gap-2"><span /><Separator orientation="vertical" /><span /><Separator orientation={orientation} className="data-vertical:h-4" /><span /></div>
+      <section>a</section>
+      <Separator />
+      <section>b</section>
       <div className="border-l border-t-0 border-t-transparent divide-y-0 divide-x" />
       <div className="h-px w-8 bg-transparent" />
+      <footer className="border-t p-3">footer</footer>
     </div>`
   assert.deepEqual(rules(source), [])
+})
+
+const dividerRules = source => auditSource('components/example.tsx', `${prefix}\n${source}`, policy).filter(d => d.rule.startsWith('style/divider')).map(d => d.rule)
+const flags = (source, rule) => assert.ok(dividerRules(source).includes(rule), `expected ${rule}: ${source}`)
+const clean = source => assert.deepEqual(dividerRules(source), [], source)
+
+test('QA #78: list-item borders through class helpers', () => {
+  flags('const ui = <div className={cn("border-b", "last:border-0")} />', 'style/divider-list-item')
+  flags('const ui = <div className={cn("py-2", active && "border-b last:border-b-0")} />', 'style/divider-list-item')
+  flags('const ui = items.map(i => <div key={i} className={cn("flex", "border-b")} />)', 'style/divider-list-item')
+  flags('import clsx from "clsx"; const ui = <div className={clsx("border-t", "first:border-t-0")} />', 'style/divider-list-item')
+  flags('import { clsx } from "clsx"; const ui = items.map(i => <div key={i} className={clsx("border-b")} />)', 'style/divider-list-item')
+  flags('import { twMerge } from "tailwind-merge"; const ui = <div className={twMerge("border-b", "last:border-0")} />', 'style/divider-list-item')
+  flags('const row = "border-b py-2"; const ui = items.map(i => <div key={i} className={row} />)', 'style/divider-list-item')
+  assert.ok(rules('import { cva } from "class-variance-authority"; const row = cva("border-b last:border-0")').includes('components/no-custom-implementation'), 'cva stays banned outright')
+  clean('const ui = <header className={cn("sticky top-0", "border-b")} />')
+  clean('const ui = <div className={cn("border-b-0", "last:border-0")} />')
+  clean('const ui = <div className={cn("divide-y")}>{items.map(i => <div key={i} className={cn("py-2")} />)}</div>')
+})
+
+test('QA #78: list items returned via Fragment and Array.from', () => {
+  flags('import { Fragment } from "react"; const ui = items.map(i => <Fragment key={i}><div className="border-b py-2" /></Fragment>)', 'style/divider-list-item')
+  flags('const ui = items.map(i => <><div className="border-b" /></>)', 'style/divider-list-item')
+  flags('const ui = items.map(i => (<React.Fragment key={i}><dt className="border-t" /><dd /></React.Fragment>))', 'style/divider-list-item')
+  flags('const ui = Array.from(items, i => <div key={i} className="border-b" />)', 'style/divider-list-item')
+  flags('const ui = Array.from({ length: 3 }, (_, i) => { return <div key={i} className="border-y" /> })', 'style/divider-list-item')
+  flags('const ui = <div className="divide-y">{items.map(i => <><div key={i} className="rounded border" /></>)}</div>', 'style/divider-between-bordered')
+  flags('const ui = <div className="divide-y">{Array.from(items, i => <div key={i} className="bg-muted" />)}</div>', 'style/divider-between-bordered')
+  clean('const ui = Array.from(items, i => <div key={i} className="py-2" />)')
+  clean('const ui = Array.from(items)')
+  clean('const ui = items.forEach(i => <div className="border-b" />)')
+  clean('const ui = <><header className="border-b" /><main /></>')
+  clean('const ui = items.map(i => <Fragment key={i}><div className="py-2" /></Fragment>)')
+})
+
+test('QA #78: sticky exemption applies only to group headers', () => {
+  // exempt: a static sticky heading followed by its list in the same parent
+  clean('const ui = <><h3 className="sticky top-0 border-b" />{rows.map(r => <Row key={r} />)}</>')
+  clean('const ui = <section><div role="heading" className={cn("sticky top-0", "border-b")} /><div className="divide-y">{rows}</div></section>')
+  clean('const ui = <ul><li role="heading" className="sticky top-0 border-b">group</li>{rows.map(r => <li key={r}>{r}</li>)}</ul>')
+  flags('const ui = groups.map(g => <div key={g} className="relative border-b" />)', 'style/divider-list-item')
+})
+
+test('QA #78 round 2: original QA fixtures (all must error)', () => {
+  flags('const ui = groups.map(g => <Fragment key={g.id}><div className="sticky top-0 border-b" />{g.rows.map(r => <Row key={r} />)}</Fragment>)', 'style/divider-list-item') // b
+  flags('const ui = groups.map(g => <section key={g.id}><div className="sticky top-0 border-b last:border-0" /><p>{g.note}</p></section>)', 'style/divider-list-item') // c
+  flags('const ui = <ul><li className="sticky top-0 border-b">first</li>{rows.map(r => <li key={r}>{r}</li>)}</ul>', 'style/divider-list-item') // d
+  flags('const ui = <ul><li className="border-b">first</li>{rows.map(r => <li key={r}>{r}</li>)}</ul>', 'style/divider-list-item') // d, without sticky
+  flags('const ui = groups.map(g => <header key={g} className="sticky top-0 border-b" />)', 'style/divider-list-item') // e
+  flags('const ui = groups.map(g => <li key={g} role="heading" className="sticky top-0 border-b" />)', 'style/divider-list-item') // g
+})
+
+test('QA #78 round 2: constructed cases from the Tech Lead rules', () => {
+  // a heading repeated inside a Fragment returned by map is never exempt
+  flags('const ui = groups.map(g => <Fragment key={g.id}><h3 className="sticky top-0 border-b" />{g.rows.map(r => <Row key={r} />)}</Fragment>)', 'style/divider-list-item')
+  flags('const ui = groups.map(g => <h3 key={g} className="sticky top-0 border-b bg-background px-3 py-1" />)', 'style/divider-list-item')
+  // a heading not followed by a list
+  flags('const ui = groups.map(g => <Fragment key={g}><Rows /><h3 className="sticky top-0 border-b" /></Fragment>)', 'style/divider-list-item')
+  // last:/first:border-0 is always an error
+  flags('const ui = <><h3 className="sticky top-0 border-b last:border-0" />{rows.map(r => <Row key={r} />)}</>', 'style/divider-list-item')
+  flags('const ui = <table><thead><tr><th className="sticky top-0 border-b first:border-0" /></tr></thead></table>', 'style/divider-list-item')
+  // static role=listitem next to a mapped list
+  flags('const ui = <div role="list"><div role="listitem" className="border-t" />{rows.map(r => <div role="listitem" key={r} />)}</div>', 'style/divider-list-item')
+  // a static li without a mapped sibling list is not judged as a list item
+  clean('const ui = <ul><li className="border-b">only</li></ul>')
+})
+
+test('QA #78: exemption reason must contain a letter or CJK character', () => {
+  for (const reason of ['1234567890', '----------', '!!!!!!!!!!!!', '..........  ...']) flags(`const ui = items.map(item => (
+      // ui-policy-allow divider: ${reason}
+      <div key={item} className="border-b" />
+    ))`, 'style/divider-list-item')
+  clean(`const ui = items.map(item => (
+      // ui-policy-allow divider: 打印报表的每一行需要行线分隔
+      <div key={item} className="border-b" />
+    ))`)
+})
+
+test('QA #78: any import from class-variance-authority is an error', () => {
+  for (const code of [
+    'import { cva } from "class-variance-authority"',
+    'import type { VariantProps } from "class-variance-authority"',
+    'import * as cvaLib from "class-variance-authority"',
+    'import "class-variance-authority"',
+    'import { cx } from "class-variance-authority/dist/index"',
+  ]) assert.ok(rules(code).includes('components/no-custom-implementation'), code)
+})
+
+test('QA #78: exemption comments are real comments for the next element only', () => {
+  clean(`const ui = items.map(item => (
+      // ui-policy-allow divider: sticky table header row needs its own rule
+      <div key={item} className="border-b last:border-0" />
+    ))`)
+  clean(`const ui = <div>
+      {/* ui-policy-allow divider: legacy audit table keeps row rules */}
+      <div
+        key="a"
+        data-x="1"
+        className="border-b last:border-0"
+      />
+    </div>`)
+  clean(`const ui = items.map(item => (
+      /* ui-policy-allow divider: printed report rows need row rules */
+      <div key={item} className="border-b" />
+    ))`)
+  // reason too short (< 10 characters)
+  flags(`const ui = items.map(item => (
+      // ui-policy-allow divider: legacy
+      <div key={item} className="border-b last:border-0" />
+    ))`, 'style/divider-list-item')
+  flags(`const ui = items.map(item => (
+      // ui-policy-allow divider:
+      <div key={item} className="border-b last:border-0" />
+    ))`, 'style/divider-list-item')
+  // a string literal with the same text is not a comment
+  flags(`const note = "ui-policy-allow divider: this is only a string literal"
+    const ui = items.map(item => <div key={item} className="border-b" />)`, 'style/divider-list-item')
+  flags(`const ui = <div><span title="ui-policy-allow divider: this is only an attribute" />
+      <div className="border-b last:border-0" /></div>`, 'style/divider-list-item')
+  // the comment covers only the immediately following element
+  const both = dividerRules(`const ui = <div>
+      {/* ui-policy-allow divider: only the first row is exempt here */}
+      <div className="border-b last:border-0" />
+      <div className="border-b last:border-0" />
+    </div>`)
+  assert.deepEqual(both, ['style/divider-list-item'])
+  // a comment far above (not leading the element) does not apply
+  flags(`// ui-policy-allow divider: file-level comment should not apply
+    const x = 1
+    const ui = <div className="border-b last:border-0" />`, 'style/divider-list-item')
+})
+
+test('QA #78: exemptions are reported with location and reason', () => {
+  const result = auditSource('components/example.tsx', `${prefix}
+    const ui = <div>
+      {/* ui-policy-allow divider: legacy audit table keeps row rules */}
+      <div className="border-b last:border-0" />
+    </div>`, policy)
+  assert.equal(result.filter(d => d.rule.startsWith('style/divider')).length, 0)
+  assert.equal(result.exemptions.length, 1)
+  assert.equal(result.exemptions[0].line, 3) // the comment's own line
+  assert.deepEqual(result.exemptions[0].rules, ['style/divider-list-item'])
+  assert.equal(result.exemptions[0].reason, 'legacy audit table keeps row rules')
+})
+
+test('unread divider file stays exempt', () => {
+  const unread = `import { Separator } from '@/components/ui/separator'; const ui = <div><Separator className="bg-primary" /></div>`
+  assert.deepEqual(auditSource('components/chat/unread-divider.tsx', unread, policy).filter(d => d.rule.startsWith('style/divider')), [])
 })
 
 test('business code cannot bypass typography presets', () => {
