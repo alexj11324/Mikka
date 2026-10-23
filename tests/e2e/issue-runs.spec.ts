@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { test, expect, register } from './fixtures'
+import { test, expect, register, watchRuntime } from './fixtures'
 
 // This fixture only touches CI's isolated disposable database, never a Preview or production DB.
 async function seedRuns(email: string, title: string) {
@@ -23,7 +23,7 @@ async function seedRuns(email: string, title: string) {
   } finally { await pool.end() }
 }
 
-test('Issue full-page navigation, run discussion persistence and independent session sidebar', async ({ page }, testInfo) => {
+test('Issue full-page navigation, run discussion persistence and independent session sidebar', async ({ page, browser }, testInfo) => {
   const { email } = await register(page)
   await page.getByRole('button', { name: '任务', exact: true }).click()
   await page.getByRole('button', { name: '新建任务', exact: true }).click()
@@ -71,6 +71,40 @@ test('Issue full-page navigation, run discussion persistence and independent ses
   await page.reload()
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(editedTitle)
   await expect(records.getByText('Saved run discussion', { exact: true })).toBeVisible()
+  // A distinct member sees the same issue-linked lifecycle cards and can discuss them,
+  // but never receives the owner's private output or agent-control entry point.
+  const colleague = await browser.newContext({ locale: 'zh-CN' })
+  const colleagueErrors = watchRuntime(colleague)
+  try {
+    const teammatePage = await colleague.newPage()
+    const teammate = await register(teammatePage)
+    const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 1 })
+    try {
+      const { rows: [owner] } = await pool.query('SELECT id FROM "user" WHERE email=$1', [email])
+      const { rows: [member] } = await pool.query('SELECT id FROM "user" WHERE email=$1', [teammate.email])
+      const { rows: [issue] } = await pool.query('SELECT id FROM issues WHERE "userId"=$1 AND title=$2', [owner.id, editedTitle])
+      await pool.query('INSERT INTO issue_members ("issueId","userId","memberId") VALUES ($1,$2,$3)', [issue.id,owner.id,member.id])
+    } finally { await pool.end() }
+    await teammatePage.reload()
+    await teammatePage.getByRole('button', { name: '任务', exact: true }).click()
+    await teammatePage.getByRole('region', { name: '任务看板', exact: true }).getByText(editedTitle, { exact: true }).click()
+    const sharedRecords = teammatePage.getByRole('region', { name: 'Agent 运行记录', exact: true })
+    await expect(sharedRecords.getByRole('button', { name: '评论', exact: true })).toHaveCount(2)
+    await expect(sharedRecords.getByRole('button', { name: '打开会话', exact: true })).toHaveCount(0)
+    await expect(teammatePage.getByText('Saved output', { exact: false })).toHaveCount(0)
+    await expect(sharedRecords.getByText('Saved run discussion', { exact: true })).toBeVisible()
+    await sharedRecords.getByRole('button', { name: '评论', exact: true }).first().click()
+    await sharedRecords.locator('textarea').fill('Teammate run discussion')
+    await sharedRecords.getByRole('button', { name: '发表评论', exact: true }).click()
+    await expect(sharedRecords.getByText('Teammate run discussion', { exact: true })).toBeVisible()
+    await testInfo.attach('teammate-safe-run-cards', { body: await teammatePage.screenshot(), contentType: 'image/png' })
+    await teammatePage.getByRole('button', { name: '看板', exact: true }).click()
+    await page.reload()
+    await expect(records.getByText('Teammate run discussion', { exact: true })).toBeVisible()
+  } finally {
+    await colleague.close()
+    expect(colleagueErrors).toEqual([])
+  }
   await page.getByRole('button', { name: '看板', exact: true }).click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
 })

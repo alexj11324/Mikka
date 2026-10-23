@@ -156,6 +156,8 @@ jobs:
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:setup
+      - name: Verify run summary membership and privacy against isolated database
+        run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-run-summaries.integration.ts
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
       - run: pnpm build
