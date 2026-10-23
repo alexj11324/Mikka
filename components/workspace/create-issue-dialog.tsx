@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { cn } from '@/lib/utils'
+import { useActionError } from '@/lib/use-action-error'
 import { IssueEditor } from './issue-editor'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
@@ -37,6 +38,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, onOptimisticC
   initialTitle?: string
 }) {
   const i18nText = useTranslations();
+  const actionError = useActionError()
   const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
   const [teamId, setTeamId] = useState(initialTeamId)
   const [title, setTitle] = useState(initialTitle)
@@ -126,7 +128,9 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, onOptimisticC
       const save = () => saveIssue({ title: currentTitle, content, status, priority })
       const result = onOptimisticCreate ? await onOptimisticCreate({ title: currentTitle.trim(), status, priority, teamId: teamId || null }, save) : await save()
       if (!('issue' in result) || !result.issue) {
-        fail(i18nText("Issue.create.createFailed"))
+        // Keep the server's specific error (translated from its code); fall back to createFailed only when none came back.
+        const code = 'error' in result && typeof result.error === 'string' ? result.error : null
+        fail(code ? actionError(code) : i18nText("Issue.create.createFailed"))
         return
       }
       if (teamId) {

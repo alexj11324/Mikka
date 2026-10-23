@@ -98,38 +98,68 @@ test('保存期间发生一次看板刷新，乐观卡片不被覆盖', async ({
   await expect(page.getByRole('heading', { name: '全部任务', exact: true })).toBeVisible()
   const board = page.getByRole('region', { name: '任务看板', exact: true })
   const dialog = await openDialog(page)
-  let release!: () => void
-  const held = new Promise<void>(resolve => { release = resolve })
+  const title = '刷新中的任务'
+  const isAction = (request: import('@playwright/test').Request) => request.method() === 'POST' && !!request.headers()['next-action']
+  // holdReads: refresh actions (listIssues etc.) reach the server, but their responses are held so the board receives them late (stale).
+  let holdReads = false
+  let releaseReads!: () => void
+  let readsHeld = new Promise<void>(resolve => { releaseReads = resolve })
+  let readHeld!: () => void
+  let readSeen = new Promise<void>(resolve => { readHeld = resolve })
+  let releaseSave!: () => void
+  const saveHeld = new Promise<void>(resolve => { releaseSave = resolve })
+  let saveSent!: () => void
+  const saveSeen = new Promise<void>(resolve => { saveSent = resolve })
   await page.route('**/*', async route => {
     const request = route.request()
-    if (request.method() === 'POST' && request.headers()['next-action'] && request.postData()?.includes('刷新中的任务')) { await held; return route.continue() }
-    return route.fallback()
+    if (!isAction(request)) return route.fallback()
+    if (request.postData()?.includes(title)) { saveSent(); await saveHeld; return route.continue() }
+    if (!holdReads) return route.fallback()
+    const gate = readsHeld
+    const response = await route.fetch()
+    readHeld()
+    await gate
+    return route.fulfill({ response })
   })
-  await dialog.getByLabel('任务标题', { exact: true }).fill('刷新中的任务')
-  await dialog.getByLabel('任务标题', { exact: true }).press('Control+Enter')
-  const card = board.locator('[data-optimistic]').filter({ hasText: '刷新中的任务' })
-  await expect(card).toHaveCount(1)
-  // Next.js runs server actions one at a time, so a board refresh triggered now queues behind the held save
-  // and lands right after it. The card must survive that refresh: never dropped, never duplicated.
-  const refresh = page.waitForResponse(response => response.request().method() === 'POST' && !!response.request().headers()['next-action'] && !response.request().postData()?.includes('刷新中的任务'), { timeout: 25000 })
+  // (1) A board refresh starts before the create and its (stale, card-less) response is held.
+  holdReads = true
   await page.evaluate(() => { window.dispatchEvent(new Event('focus')) })
+  await readSeen
+  // (2) Submit the create; the optimistic card appears while the stale refresh is still pending.
+  await dialog.getByLabel('任务标题', { exact: true }).fill(title)
+  await dialog.getByLabel('任务标题', { exact: true }).press('Control+Enter')
+  const card = board.locator('[data-optimistic]').filter({ hasText: title })
+  await expect(card).toHaveCount(1)
+  // (3) Release the stale refresh first. Next.js serializes server actions, so the save is sent only after it.
+  holdReads = false
+  releaseReads()
+  await saveSeen
   await page.waitForTimeout(300)
   await expect(card).toHaveCount(1)
-  release()
-  await refresh
+  // (4) Release the save while holding the follow-up refetch: the card must already be the real one, from the mutate result.
+  readsHeld = new Promise<void>(resolve => { releaseReads = resolve })
+  readSeen = new Promise<void>(resolve => { readHeld = resolve })
+  holdReads = true
+  releaseSave()
   await expect(dialog).not.toBeVisible()
+  await expect(board.getByText(title, { exact: true })).toHaveCount(1)
   await expect(page.locator('[data-optimistic]')).toHaveCount(0)
-  await expect(board.getByText('刷新中的任务', { exact: true })).toHaveCount(1)
+  await page.waitForTimeout(300)
+  await expect(board.getByText(title, { exact: true })).toHaveCount(1)
+  holdReads = false
+  releaseReads()
+  await expect(board.getByText(title, { exact: true })).toHaveCount(1)
+  await expect(page.locator('[data-optimistic]')).toHaveCount(0)
   await page.unroute('**/*')
 })
 
-test('服务端返回错误时显示 createFailed，卡片回滚且草稿保留', async ({ page }) => {
+test('服务端返回错误时显示服务端的具体错误，卡片回滚且草稿保留', async ({ page }) => {
   await register(page)
   await page.getByRole('button', { name: '任务', exact: true }).click()
   await expect(page.getByRole('heading', { name: '全部任务', exact: true })).toBeVisible()
   const board = page.getByRole('region', { name: '任务看板', exact: true })
   const dialog = await openDialog(page)
-  // Rewrite the title past the 200-char limit so the real server action answers { error } instead of an issue.
+  // Rewrite the title past the 200-char limit so the real server action answers { error: 'validationTitleRequired' } instead of an issue.
   await page.route('**/*', route => {
     const request = route.request()
     const body = request.postData()
@@ -138,8 +168,8 @@ test('服务端返回错误时显示 createFailed，卡片回滚且草稿保留'
   })
   await dialog.getByLabel('任务标题', { exact: true }).fill('会被拒绝的任务')
   await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
-  await expect(dialog.getByRole('alert').filter({ hasText: '创建失败，草稿已保留。' })).toBeVisible()
-  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '创建失败，草稿已保留。' })).toBeVisible()
+  await expect(dialog.getByRole('alert').filter({ hasText: '请填写任务标题。' })).toBeVisible()
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '请填写任务标题。' })).toBeVisible()
   await expect(page.locator('[data-optimistic]')).toHaveCount(0)
   await expect(board.getByText('会被拒绝的任务', { exact: true })).toHaveCount(0)
   await expect(dialog.getByLabel('任务标题', { exact: true })).toHaveValue('会被拒绝的任务')
