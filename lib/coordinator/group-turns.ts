@@ -73,7 +73,10 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
           await client.query('BEGIN')
           try {
             await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [conversationId])
-            if (!(await eligible()).some(a => a.id === id)) { await client.query('ROLLBACK'); return false }
+            const current = await eligible()
+            if (!current.some(a => a.id === id)) { await client.query('ROLLBACK'); return false }
+            const unknown = reply.mentions.filter(mention => !current.some(a => a.id === mention))
+            if (unknown.length) throw new UnknownMentionError(unknown)
             const { rows: positions } = await client.query('UPDATE conversations SET "lastPosition"="lastPosition"+1 WHERE id=$1 RETURNING "lastPosition"::text AS position', [conversationId])
             await client.query(`INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body,mentions,"replyToId") VALUES ($1,$2,$3,'agent',$4,$5,$6,$7)`, [randomUUID(), conversationId, positions[0].position, id, reply.text, JSON.stringify(reply.mentions.map(memberId => ({ memberType: 'agent', memberId }))), messageId])
             await client.query('COMMIT')

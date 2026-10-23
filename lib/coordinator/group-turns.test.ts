@@ -174,6 +174,14 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const revokedDuring = await send(id,'removed during generation',[a])
     await processGroupTurn(scoped,id,{...runtime,async authorized(w,u) {return live && runtime.authorized(w,u)},async generate() {live=false;return {text:'must not publish',mentions:[]}}})
     assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[revokedDuring])).rows[0].n,0)
+    // A peer removed during generation is not a valid mention at publication.
+    const departedPeer = await send(id,'peer removed during generation',[a])
+    await assert.rejects(processGroupTurn(scoped,id,{...runtime,async generate() {
+      await handleGroup(scoped,directory,{...base,resource:'members',method:'DELETE',id,body:JSON.stringify({memberType:'agent',memberId:b})},true)
+      return {text:'reply to departed peer',mentions:[b]}
+    }}),UnknownMentionError)
+    assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[departedPeer])).rows[0].n,0)
+    await handleGroup(scoped,directory,{...base,resource:'members',method:'POST',id,body:JSON.stringify({memberType:'agent',memberId:b})},true)
     // Provider cancellation clears status/releases session lock; a new root proceeds.
     const canceled = await send(id,'cancelled provider',[a])
     await assert.rejects(processGroupTurn(scoped,id,{...runtime,async generate() {throw new DOMException('cancelled','AbortError')}}),{name:'AbortError'})
