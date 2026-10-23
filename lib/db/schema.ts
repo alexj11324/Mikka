@@ -9,7 +9,7 @@ export const users = pgTable('user', {
 export const issueMembers = pgTable('issue_members', {
   issueId: uuid('issueId').notNull(), userId: text('userId').notNull(), memberId: text('memberId').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [primaryKey({ columns: [table.issueId, table.memberId] })])
+}, table => [primaryKey({ columns: [table.issueId, table.memberId] }), index('issue_members_member_idx').on(table.memberId, table.issueId)])
 export const issueDocuments = pgTable('issue_documents', {
   issueId: uuid('issueId').primaryKey(), userId: text('userId').notNull(), state: text('state').notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
@@ -23,7 +23,7 @@ export const issues = pgTable('issues', {
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-})
+}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc())])
 export const agentSessions = pgTable('agent_sessions', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(), title: varchar('title', { length: 200 }).notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
@@ -44,7 +44,7 @@ export const issueVersions = pgTable('issue_versions', {
   revision: integer('revision').notNull(), title: varchar('title', { length: 200 }).notNull(),
   content: jsonb('content').$type<JSONContent>().notNull(), status: text('status').notNull(), priority: text('priority').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-})
+}, table => [index('issue_versions_issue_revision_idx').on(table.issueId, table.userId, table.revision.desc())])
 
 /** OAuth grants and sync state live beside issues so webhook inbox/outbox writes are atomic. */
 export const linearOAuthStates = pgTable('linear_oauth_states', {

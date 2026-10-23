@@ -1,13 +1,15 @@
 'use server'
 
-import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
 import { currentUser } from '@/lib/acting-user'
 import { accessibleTeams } from '@/lib/team-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
-import { issueTeamScope } from '@/lib/issue-team-access'
+import { workspaceDb } from '@/lib/workspace-db'
+import { teamIssues } from '@/lib/db/team-schema'
+import { mergeIssueRows } from '@/lib/issue-list'
 import { db } from '@/lib/db'
 import { issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
@@ -51,21 +53,48 @@ function validationCode(error: z.ZodError): ActionErrorCode {
   return 'validationGeneric'
 }
 
+const notDeleted = sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`
+const issueListColumns = { id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }
+type IssueListRow = Awaited<ReturnType<typeof ownedIssues>>[number]
+
+function ownedIssues(userId: string) {
+  return db.select(issueListColumns).from(issues).leftJoin(users, eq(users.id, issues.userId)).where(and(eq(issues.userId, userId), notDeleted)).orderBy(desc(issues.updatedAt)).limit(100)
+}
+function memberIssues(userId: string) {
+  return db.select(issueListColumns).from(issues).innerJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).leftJoin(users, eq(users.id, issues.userId)).where(notDeleted).orderBy(desc(issues.updatedAt)).limit(100)
+}
+function publishedIssues(ids: string[]) {
+  return db.select(issueListColumns).from(issues).leftJoin(users, eq(users.id, issues.userId)).where(and(inArray(issues.id, ids), notDeleted)).orderBy(desc(issues.updatedAt)).limit(100)
+}
+
+async function assembleIssueList(userId: string, teams: Awaited<ReturnType<typeof accessibleTeams>>, earlyRows: Promise<[IssueListRow[], IssueListRow[]]> | null, renumbered: boolean) {
+  const teamIds = teams.map(team => team.id)
+  const publicLinks = teamIds.length ? await workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId }).from(teamIssues).where(inArray(teamIssues.teamId, teamIds)) : []
+  const [owned, member] = earlyRows ? await earlyRows : await Promise.all([ownedIssues(userId), memberIssues(userId)])
+  const published = publicLinks.length ? await publishedIssues(publicLinks.map(link => link.issueId)) : []
+  const rows = mergeIssueRows([owned, member, published])
+  const linkByIssue = new Map(publicLinks.map(link => [link.issueId, link.teamId]))
+  const missing = rows.filter(row => !linkByIssue.has(row.id)).map(row => row.id)
+  if (missing.length) {
+    const extra = await workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId }).from(teamIssues).where(inArray(teamIssues.issueId, missing))
+    for (const link of extra) linkByIssue.set(link.issueId, link.teamId)
+  }
+  const allowed = new Set(teamIds)
+  const visibleRows = rows.filter(row => { const teamId = linkByIssue.get(row.id); return !teamId || allowed.has(teamId) })
+  const ownersWithoutNumbers = [...new Set(visibleRows.filter(row => !readIssueMetadata(row.content).number).map(row => row.ownerId))]
+  if (ownersWithoutNumbers.length && !renumbered) {
+    await Promise.all(ownersWithoutNumbers.map(ownerId => ensureIssueNumbers(ownerId)))
+    return assembleIssueList(userId, teams, null, true)
+  }
+  return visibleRows.filter(row => !readIssueMetadata(row.content).deletedAt).map(({ content, ...issue }) => ({ ...issue, teamId: linkByIssue.get(issue.id) ?? null, metadata: readIssueMetadata(content), checklist: issueChecklist(content) }))
+}
+
 export async function listIssues() {
   const userId = await getUserId()
+  const earlyRows = Promise.all([ownedIssues(userId), memberIssues(userId)])
   const context = await loadWorkspaceContext()
   const teams = await accessibleTeams(userId, context.workspace.id)
-  const publicLinks = await issueTeamScope(userId)
-  const publicIds = publicLinks.map(link => link.issueId)
-  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId), publicIds.length ? inArray(issues.id, publicIds) : undefined), sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
-  const links = await issueTeamScope(userId, rows.map(row => row.id))
-  const visibleRows = rows.filter(row => { const link = links.find(item => item.issueId === row.id); return !link || teams.some(team => team.id === link.teamId) })
-  const ownersWithoutNumbers = [...new Set(visibleRows.filter(row => !readIssueMetadata(row.content).number).map(row => row.ownerId))]
-  if (ownersWithoutNumbers.length) {
-    for (const ownerId of ownersWithoutNumbers) await ensureIssueNumbers(ownerId)
-    return listIssues()
-  }
-  return visibleRows.filter(row => !readIssueMetadata(row.content).deletedAt).map(({ content, ...issue }) => ({ ...issue, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: issueChecklist(content) }))
+  return assembleIssueList(userId, teams, earlyRows, false)
 }
 
 export async function getIssue(id: string) {

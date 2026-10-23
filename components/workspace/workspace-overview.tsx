@@ -10,16 +10,16 @@ import { Button } from '@/components/ui/button'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
 import { ISSUE_STATUSES, WORKSPACE_NAME, type IssueView } from './issue-properties'
 import type { WorkspaceSection } from './workspace-navigation'
-import type { AgentHistory } from '@/lib/agent-history'
+import type { AgentHistoryQuery } from './agent-panel'
 
 const AgentPanel = dynamic(() => import('./agent-panel').then(module => module.AgentPanel), { loading: WorkspaceContentLoading })
 const CoordinatorChat = dynamic(() => import('@/components/coordinator/coordinator-chat').then(module => module.CoordinatorChat), { loading: WorkspaceContentLoading })
 
-export function WorkspaceOverview({ section, teamName, counts, projectCount, onView, onProjects, tasks, userId, onOpen, initialAgentHistory }: { section: WorkspaceSection; teamName?: string; counts: Record<IssueView, number>; projectCount: number; onView: (view: IssueView) => void; onProjects: () => void; tasks: Awaited<ReturnType<typeof listIssues>>; userId: string; onOpen: (id: string) => void; initialAgentHistory?: AgentHistory }) {
+export function WorkspaceOverview({ section, teamName, counts, projectCount, onView, onProjects, tasks, userId, onOpen, agentHistory }: { section: WorkspaceSection; teamName?: string; counts: Record<IssueView, number>; projectCount: number; onView: (view: IssueView) => void; onProjects: () => void; tasks: Awaited<ReturnType<typeof listIssues>>; userId: string; onOpen: (id: string) => void; agentHistory: AgentHistoryQuery }) {
   const i18nText = useTranslations()
   const tIssue = useTranslations('Issue')
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
-  if (section === 'agent') return <AgentPanel key={userId} userId={userId} initialHistory={initialAgentHistory} />
+  if (section === 'agent') return <AgentPanel key={userId} userId={userId} history={agentHistory} />
   if (section === 'inbox') {
     const following = tasks.filter(task => task.metadata.subscriberUserIds.includes(userId))
     return <section aria-label={i18nText("IssueDetail.menu.subscribe")} className="flex flex-col gap-6 px-5 py-8"><header className="flex flex-col gap-2"><h1 className="text-lg font-semibold">{i18nText("Overview.followingTitle")}</h1><p className="text-sm text-muted-foreground">{i18nText("Overview.followingDescription")}</p></header>{following.length ? <IssueList issues={following} searching onOpen={onOpen} onCreate={() => onView('all')} /> : <Empty><EmptyHeader><EmptyMedia variant="icon"><Inbox /></EmptyMedia><EmptyTitle>{i18nText("Overview.noFollowingTitle")}</EmptyTitle><EmptyDescription>{i18nText("Overview.noFollowingDescription")}</EmptyDescription></EmptyHeader><Button variant="outline" onClick={() => onView('all')}>{i18nText("Overview.viewAllTasks")}</Button></Empty>}</section>

@@ -54,12 +54,14 @@ const agentTheme = createTheme({
   fontLabel: 'var(--font-sans)',
 })
 
-export function AgentPanel({ userId, initialHistory }: { userId: string; initialHistory?: AgentHistory }) {
+export type AgentHistoryQuery = Pick<ReturnType<typeof useAgentHistory>, 'data' | 'error' | 'mutate'>
+
+export function AgentPanel({ userId, history }: { userId: string; history: AgentHistoryQuery }) {
   const [demo, setDemo] = useState(false)
-  const latest = useAgentHistory(userId, initialHistory)
-  if (!latest.data) return <AgentHistoryLoading error={latest.error} onRetry={() => { void latest.mutate() }} />
+  const historyError = history.error instanceof Error ? history.error : history.error ? new Error('history') : undefined
+  if (!history.data) return <AgentHistoryLoading error={historyError} onRetry={() => { void history.mutate() }} />
   return <ThemeProvider cssSelector=".orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>
-    <div hidden={demo} className="h-full min-h-0"><AgentSessions userId={userId} initial={latest.data} onDemo={() => setDemo(true)} onSaved={async () => { await latest.mutate() }} /></div>
+    <div hidden={demo} className="h-full min-h-0"><AgentSessions userId={userId} initial={history.data} onDemo={() => setDemo(true)} onSaved={async () => { await history.mutate() }} /></div>
     {demo && <AgentDemo onClose={() => setDemo(false)} />}
   </ThemeProvider>
 }

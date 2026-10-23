@@ -9,12 +9,8 @@ import dynamic from 'next/dynamic'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Columns3, List, Search } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { IssueBoard } from './issue-board'
 import { AppSidebar } from '@/components/app-sidebar'
-import { TeamHome } from '@/components/teams/team-home'
 import { AppShell, AppShellContent, SignOutBoundary } from '@/components/app-shell'
-import { IssueList } from './issue-list'
-import { IssueSearch } from './issue-search'
 import { ISSUE_STATUSES, issueIdentifier, type IssueStatus, type IssueView } from './issue-properties'
 import { listIssues } from '@/app/actions/issues'
 import { authClient } from '@/lib/auth-client'
@@ -26,21 +22,18 @@ import { listProjects, setProjectIssues } from '@/app/actions/projects'
 import { listTeams } from '@/app/actions/teams'
 import { listProjectTeams } from '@/app/actions/team-relations'
 import { WorkspaceOverview } from './workspace-overview'
-import { PluginsSkillsView } from '@/components/plugins/plugins-skills-view'
 import type { WorkspaceSection } from './workspace-navigation'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
-import { fetchSettingsData } from '@/lib/settings-data'
+import { fetchSettingsData, preloadWorkspaceSettings } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import type { AgentHistory } from '@/lib/agent-history'
 import { useAgentHistory } from '@/hooks/use-agent-history'
 import { useWorkspace } from '@/hooks/use-workspace'
 
 // Start the chunk download during module evaluation, before hydration and its effects.
-if (typeof window !== 'undefined') {
-  void import('./agent-panel').catch(() => {})
-  void import('./create-issue-dialog').catch(() => {})
-}
+if (typeof window !== 'undefined') void import('./agent-panel').catch(() => {})
+if (typeof window !== 'undefined') void import('./create-issue-dialog').catch(() => {})
 
 function DetailLoading() {
   const t = useTranslations('Workspace')
@@ -53,20 +46,26 @@ function CreateLoading() {
 const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })
 const CreateIssueDialog = dynamic(() => import('./create-issue-dialog').then(module => module.CreateIssueDialog), { loading: CreateLoading })
 const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module => module.ProjectWorkspace), { loading: DetailLoading })
+const IssueBoard = dynamic(() => import('./issue-board').then(module => module.IssueBoard), { loading: DetailLoading })
+const IssueList = dynamic(() => import('./issue-list').then(module => module.IssueList), { loading: DetailLoading })
+const IssueSearch = dynamic(() => import('./issue-search').then(module => module.IssueSearch))
+const TeamHome = dynamic(() => import('@/components/teams/team-home').then(module => module.TeamHome), { loading: DetailLoading })
+const PluginsSkillsView = dynamic(() => import('@/components/plugins/plugins-skills-view').then(module => module.PluginsSkillsView), { loading: DetailLoading })
 const SettingsShell = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsShell))
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView))
 
-export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'projects', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations'; googleEnabled?: boolean }) {
+export function IssueWorkspace({ user, initialIssues, initialProjects, initialTeams, initialSelected = null, initialAgentHistory, initialSection = 'projects', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialProjects?: Awaited<ReturnType<typeof listProjects>>; initialTeams?: Awaited<ReturnType<typeof listTeams>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations'; googleEnabled?: boolean }) {
   const i18nText = useTranslations()
-  const { data: workspaceData } = useWorkspace(user.email)
-  useAgentHistory(user.id, initialAgentHistory)
+  const pathname = usePathname()
+  const { data: workspaceContext } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false, dedupingInterval: 15000 })
+  const onSettingsRoute = pathname.startsWith('/settings')
+  const { data: workspaceData } = useWorkspace(user.id, workspaceContext?.workspace.id, onSettingsRoute)
+  const agentHistory = useAgentHistory(user.id, initialAgentHistory)
   const t = useTranslations('Workspace')
   const tIssue = useTranslations('Issue')
   const tPlugins = useTranslations('Plugins')
   const params = useSearchParams()
-  const pathname = usePathname()
   const router = useRouter()
-  const { data: workspaceContext } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
   const { mutate: clearCache } = useSWRConfig()
   const sectionTitles: Record<WorkspaceSection, string> = {
     inbox: i18nText('Overview.sections.inbox'),
@@ -95,14 +94,33 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     url.searchParams.delete('linear')
     window.history.replaceState(null, '', url)
   }, [])
+  useEffect(() => {
+    if (!workspaceContext?.workspace.id) return
+    preloadWorkspaceSettings(workspaceContext.workspace.id)
+  }, [workspaceContext?.workspace.id])
+  useEffect(() => {
+    const preloadChunks = () => {
+      void import('./issue-board').catch(() => {})
+      void import('./issue-list').catch(() => {})
+      void import('./issue-search').catch(() => {})
+      void import('./project-workspace').catch(() => {})
+    }
+    if (typeof window.requestIdleCallback === 'function') {
+      const idle = window.requestIdleCallback(preloadChunks, { timeout: 1500 })
+      return () => window.cancelIdleCallback(idle)
+    }
+    const timer = window.setTimeout(preloadChunks, 400)
+    return () => window.clearTimeout(timer)
+  }, [])
   const [boardBusy, setBoardBusy] = useState(false)
-  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], listIssues, { fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
-  const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)
-  const { data: teams = [] } = useSWR('teams', listTeams)
-  const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams)
   const [teamId, setTeamId] = useState<string | null>(params.get('team'))
-  const activeTeam = teams.find(team => team.id === teamId)
   const [section, setSection] = useState<WorkspaceSection>(params.get('team') ? 'team-home' : initialSection)
+  const boardReady = (section !== 'agent' && section !== 'coordinator' && section !== 'plugins') || initialIssues !== undefined || initialProjects !== undefined
+  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(boardReady ? ['issues', user.id] as const : null, listIssues, { fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
+  const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(boardReady ? ['projects', user.id] as const : null, listProjects, { fallbackData: initialProjects, revalidateOnMount: initialProjects === undefined, dedupingInterval: 15000 })
+  const { data: teams = [], error: teamsError, mutate: refreshTeams } = useSWR('teams', listTeams, { fallbackData: initialTeams, revalidateOnMount: initialTeams === undefined, dedupingInterval: 15000 })
+  const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR(section.startsWith('team-') ? 'project-teams' : null, listProjectTeams, { dedupingInterval: 15000 })
+  const activeTeam = teams.find(team => team.id === teamId)
   function changeSection(next: WorkspaceSection) {
     setSection(next)
     const url = new URL(window.location.href)
@@ -276,11 +294,11 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   if (pathname.startsWith('/settings')) return <SettingsShell user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onBack={() => { const href = teamId ? `/?team=${encodeURIComponent(teamId)}` : '/'; if (!pushSettingsHistory(href)) router.push(href) }} />
   return <SignOutBoundary pending={signingOut}><AppShell fixed={!settingsOpen && !selected && (!isProjects && ((!isOverview && layout === 'board') || section === 'coordinator' || section === 'agent'))}>
     {settingsOpen ? <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} googleEnabled={googleEnabled} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} /> : <>
-    <AppSidebar onBeforeChange={action => { if (!boardBusy && !leaving.current) void leave(action) }} onSettings={(href = '/settings') => { if (!boardBusy && !leaving.current) void leave(() => { if (!pushSettingsHistory(href)) router.push(href) }) }} user={user} section={section} teamId={teamId} onTeamNavigate={(id, next) => { if (boardBusy || leaving.current) return false; void leave(() => { setTeamId(id); applySelection(null, 'replace'); changeSection(next); setProjectId(null); setView('all'); setQuery('') }); return true }} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
+    <AppSidebar teams={teams} teamsError={!!teamsError} onRefreshTeams={() => void refreshTeams()} onBeforeChange={action => { if (!boardBusy && !leaving.current) void leave(action) }} onSettings={(href = '/settings') => { if (!boardBusy && !leaving.current) void leave(() => { if (!pushSettingsHistory(href)) router.push(href) }) }} user={user} section={section} teamId={teamId} onTeamNavigate={(id, next) => { if (boardBusy || leaving.current) return false; void leave(() => { setTeamId(id); applySelection(null, 'replace'); changeSection(next); setProjectId(null); setView('all'); setQuery('') }); return true }} onNavigate={navigateSection} onSearch={() => { if (!boardBusy) setSearchOpen(true) }} onCreate={() => create()} onSignOut={signOut} signingOut={signingOut} />
     <AppShellContent hideHeader={!!selected || section === 'agent'} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : workspaceContext?.workspace.name ?? i18nText("Settings.sections.workspace.title")} title={sectionTitles[section]} actions={section === 'plugins' ? undefined : <Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} disabled={boardBusy} onClick={() => setSearchOpen(true)}><Search data-icon="inline-start" /></Button>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {error && <p role="alert" className="px-6 py-2 text-xs text-destructive">{i18nText('Workspace.listError')}</p>}
-      {selected ? <TaskDetail key={draftKey} id={selected} workspaceName={workspaceContext?.workspace.name ?? i18nText('Settings.sections.workspace.title')} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create('todo')} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null, 'replace'); changeSection('team-projects'); setProjectId(id) }) }} /> : isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsSkillsView googleEnabled={googleEnabled} /> : tasksLoading ? <DetailLoading /> : <>
+      {selected ? <TaskDetail key={draftKey} id={selected} workspaceName={workspaceContext?.workspace.name ?? i18nText('Settings.sections.workspace.title')} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create('todo')} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null, 'replace'); changeSection('team-projects'); setProjectId(id) }) }} /> : isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} agentHistory={agentHistory} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsSkillsView googleEnabled={googleEnabled} /> : tasksLoading ? <DetailLoading /> : <>
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <div className="flex flex-wrap items-center gap-2"><h1 className="text-sm font-semibold">{section === 'my-issues' ? i18nText("Workspace.myCreatedTasks") : viewTitle}</h1><Badge variant="secondary">{filtered.length}</Badge>{section !== 'my-issues' && <NativeSelect aria-label={i18nText("Workspace.filterStatus")} value={view} disabled={boardBusy} onChange={event => navigate(event.target.value as IssueView)}><NativeSelectOption value="all">{i18nText("Projects.allStatuses")}</NativeSelectOption><NativeSelectOption value="favorites">{i18nText("Overview.favorites")}</NativeSelectOption><NativeSelectOption value="following">{i18nText("Overview.following")}</NativeSelectOption>{ISSUE_STATUSES.map(status => <NativeSelectOption key={status.value} value={status.value}>{statusLabel(status.value)}</NativeSelectOption>)}</NativeSelect>}</div>
           <div className="flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto"><div className="flex min-w-0 items-center gap-2 sm:w-48"><span className="inline-flex shrink-0 text-muted-foreground"><Search className="size-3.5" aria-hidden="true" /></span><Input aria-label={i18nText("Workspace.search.title")} placeholder={i18nText("Projects.issuePicker.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} disabled={boardBusy} /></div><ToggleGroup aria-label={i18nText("Workspace.taskView")} size="sm" variant="outline" spacing={0} disabled={boardBusy} value={[layout]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') setLayout(next) }}><ToggleGroupItem value="list" aria-label={i18nText("Workspace.listView")}><List /></ToggleGroupItem><ToggleGroupItem value="board" aria-label={i18nText("Workspace.boardView")}><Columns3 /></ToggleGroupItem></ToggleGroup></div>
