@@ -1,12 +1,20 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import test, { after, before } from 'node:test'
+import test, { after, before, type TestContext } from 'node:test'
 import { Pool } from 'pg'
-import { handleRead, originAllowed, type ReadRequest } from './conversation-reads-store'
+import { handleRead, originAllowed, requestHost, type ReadRequest } from './conversation-reads-store'
 
-// Pure checks always run; DB checks need MIKKA_DATABASE_URL (dev-local via
-// ~/.mikka/local-run.sh) and skip without it.
+// Pure checks always run. DB checks need a reachable MIKKA_DATABASE_URL whose
+// schema already has conversation_reads (applied by scripts/migrate.mjs; the
+// test never creates tables) and skip otherwise, e.g. in the UI policy CI job.
+// Locally: ~/.mikka/local-run.sh pnpm test:conversation-reads
+
+test('request host: first x-forwarded-host value wins, Host is the fallback', () => {
+  assert.equal(requestHost('mikka.app, internal:3000', 'internal:3000'), 'mikka.app')
+  assert.equal(requestHost(null, 'localhost:3000'), 'localhost:3000')
+  assert.equal(requestHost('', 'localhost:3000'), 'localhost:3000')
+  assert.equal(requestHost(null, null), null)
+})
 
 test('origin: missing allowed, same host allowed, cross host and garbage rejected', () => {
   assert.equal(originAllowed(null, 'mikka.app'), true)
@@ -17,9 +25,23 @@ test('origin: missing allowed, same host allowed, cross host and garbage rejecte
   assert.equal(originAllowed('null', 'mikka.app'), false)
 })
 
-const url = process.env.MIKKA_DATABASE_URL
-const skip = url ? false : 'MIKKA_DATABASE_URL not set (run via ~/.mikka/local-run.sh)'
-const pool = url ? new Pool({ connectionString: url, max: 10 }) : null
+async function probe(url: string | undefined): Promise<Pool | string> {
+  if (!url) return 'MIKKA_DATABASE_URL not set (run via ~/.mikka/local-run.sh)'
+  const candidate = new Pool({ connectionString: url, max: 10, connectionTimeoutMillis: 5000 })
+  try {
+    const { rows } = await candidate.query("select to_regclass('conversation_reads') is not null as ok")
+    if (rows[0]?.ok) return candidate
+    await candidate.end()
+    return 'conversation_reads missing: apply migrations with scripts/migrate.mjs first'
+  } catch (error) {
+    await candidate.end().catch(() => {})
+    return `database unreachable (${(error as Error).message})`
+  }
+}
+let pool: Pool | null = null
+let skipReason = ''
+/** Skips the calling test when there is no database; else returns true. */
+const needDb = (t: TestContext) => { if (!pool) t.skip(skipReason); return Boolean(pool) }
 const alice = `test-reads-${randomUUID()}`
 const bob = `test-reads-${randomUUID()}`
 const ids: Record<string, string> = {}
@@ -28,8 +50,9 @@ const req = (over: Partial<ReadRequest>): ReadRequest => ({ method: 'GET', userI
 const post = (messageId: unknown, over: Partial<ReadRequest> = {}) => handleRead(pool!, req({ method: 'POST', body: JSON.stringify({ messageId }), ...over }))
 
 before(async () => {
-  if (!pool) return
-  await pool.query(readFileSync(new URL('../drizzle/0019_conversation_reads.sql', import.meta.url), 'utf8'))
+  const probed = await probe(process.env.MIKKA_DATABASE_URL)
+  if (typeof probed === 'string') { skipReason = probed; return }
+  pool = probed
   // alice: 1 user, 2 assistant(+tool)+3 assistant = one reply, 4 user, 5 assistant, 6 event (user) ; bob: 1 assistant
   const rows: [string, string, number, object][] = [
     ['a1', alice, 1, { role: 'user', content: 'hi' }],
@@ -53,7 +76,8 @@ after(async () => {
   await pool.end()
 })
 
-test('auth, membership and origin status codes', { skip }, async () => {
+test('auth, membership and origin status codes', async t => {
+  if (!needDb(t)) return
   assert.equal((await handleRead(pool!, req({ userId: null }))).status, 401)
   assert.equal((await handleRead(pool!, req({ conversationId: 'someone-elses' }))).status, 404)
   assert.equal((await post('1', { conversationId: 'group-123' })).status, 404)
@@ -63,12 +87,14 @@ test('auth, membership and origin status codes', { skip }, async () => {
   assert.equal((await handleRead(pool!, req({ origin: null }))).status, 200)
 })
 
-test('GET before any read: nothing read, every reply unread', { skip }, async () => {
+test('GET before any read: nothing read, every reply unread', async t => {
+  if (!needDb(t)) return
   const result = await handleRead(pool!, req({}))
   assert.deepEqual(result, { status: 200, body: { lastReadMessageId: null, lastReadPosition: null, unreadCount: 2 } })
 })
 
-test('422: missing, malformed, unknown and cross-conversation ids', { skip }, async () => {
+test('422: missing, malformed, unknown and cross-conversation ids', async t => {
+  if (!needDb(t)) return
   assert.equal((await handleRead(pool!, req({ method: 'POST', body: '' }))).status, 422)
   assert.equal((await handleRead(pool!, req({ method: 'POST', body: '{}' }))).status, 422)
   assert.equal((await handleRead(pool!, req({ method: 'POST', body: 'not json' }))).status, 422)
@@ -79,9 +105,12 @@ test('422: missing, malformed, unknown and cross-conversation ids', { skip }, as
   assert.equal((await post(ids.b1)).status, 422, "bob's message id in alice's conversation")
 })
 
-test('position string and uuid both accepted; older position ignored', { skip }, async () => {
+test('position string and uuid both accepted; older position ignored', async t => {
+  if (!needDb(t)) return
   const first = await post('4')
-  assert.deepEqual(first, { status: 200, body: { lastReadMessageId: '4', lastReadPosition: 4, unreadCount: 1 } })
+  assert.deepEqual(first, { status: 200, body: { lastReadMessageId: ids.a3, lastReadPosition: 4, unreadCount: 1 } }, 'position string is stored as the uuid')
+  const stored = await pool!.query('select "lastReadMessageId" from conversation_reads where "userId" = $1', [alice])
+  assert.equal(stored.rows[0].lastReadMessageId, ids.a3)
   const older = await post(ids.a1)
   assert.deepEqual(older, first, 'older read returns current state, no error')
   const byUuid = await post(ids.a5)
@@ -90,7 +119,8 @@ test('position string and uuid both accepted; older position ignored', { skip },
   // text/plain beacon body is the same JSON string; handleRead never looks at Content-Type.
 })
 
-test('concurrent writes never move backward', { skip }, async () => {
+test('concurrent writes never move backward', async t => {
+  if (!needDb(t)) return
   await pool!.query('delete from conversation_reads where "userId" = $1', [alice])
   const positions = [6, 2, 5, 1, 4, 3, 6, 2, 1, 5, 4, 3]
   const all = await Promise.all(positions.map(p => post(String(p))))
@@ -98,7 +128,7 @@ test('concurrent writes never move backward', { skip }, async () => {
   const final = await handleRead(pool!, req({}))
   assert.equal(final.status, 200)
   assert.equal((final.body as { lastReadPosition: number }).lastReadPosition, 6)
-  assert.equal((final.body as { lastReadMessageId: string }).lastReadMessageId, '6')
+  assert.equal((final.body as { lastReadMessageId: string }).lastReadMessageId, ids.a5)
   // Every response reflects a monotonic state: no response is below the position it asked for.
   all.forEach((r, i) => assert.ok((r.body as { lastReadPosition: number }).lastReadPosition >= positions[i]))
 })

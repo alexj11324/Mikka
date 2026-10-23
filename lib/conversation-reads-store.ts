@@ -3,12 +3,14 @@
 // dev-local with a plain pg Pool; the route passes the app pool.
 //
 // Contract (GET/POST /api/conversations/:id/read → ConversationRead):
-// - 401 not signed in; 403 Origin present and its host differs from Host
-//   (a missing Origin is allowed: same-origin GETs and some beacons omit it);
+// - 401 not signed in; 403 Origin present and its host differs from the
+//   request host (first x-forwarded-host value, else Host; a missing Origin
+//   is allowed: same-origin GETs and some beacons omit it);
 //   404 unknown conversation or not a member; 422 messageId missing, malformed,
 //   not found, or in another conversation.
 // - messageId is a coordinator_messages.id (uuid) or a numeric position
-//   string (what PR #68's frontend sends: String(position)).
+//   string (what PR #68's frontend sends: String(position)). Either way the
+//   stored and returned lastReadMessageId is the uuid.
 // - Forward-only: an older position is ignored and the current state returned.
 // - unreadCount: Coordinator replies after lastReadPosition, counted the way
 //   the chat shows them (consecutive assistant rows, with tool rows between
@@ -39,7 +41,12 @@ export function conversationOwner(conversationId: string, userId: string): strin
   return conversationId === COORDINATOR_CONVERSATION ? userId : null
 }
 
-/** Origin check: allowed when absent; otherwise its host must equal the request Host. */
+/** The host the browser addressed: the first x-forwarded-host value when a proxy set one, else Host. */
+export function requestHost(forwardedHost: string | null, host: string | null): string | null {
+  return forwardedHost?.split(',')[0]?.trim() || host?.trim() || null
+}
+
+/** Origin check: allowed when absent; otherwise its host must equal the request host. */
 export function originAllowed(origin: string | null, host: string | null): boolean {
   if (!origin) return true
   if (!host) return false
@@ -100,6 +107,7 @@ export interface ReadRequest {
   userId: string | null
   conversationId: string
   origin: string | null
+  /** The request host; see requestHost. */
   host: string | null
   /** Raw POST body text; parsed as JSON whatever the Content-Type (sendBeacon sends text/plain). */
   body?: string
@@ -120,6 +128,5 @@ export async function handleRead(q: Queryable, request: ReadRequest): Promise<Re
   }
   const message = await resolveMessage(q, ownerId, messageId)
   if (!message) return { status: 422, body: { error: 'messageNotFound' } }
-  // Echo the id form the client used, so String(position) round-trips for PR #68.
-  return { status: 200, body: await markRead(q, request.userId, request.conversationId, ownerId, messageId as string, message.position) }
+  return { status: 200, body: await markRead(q, request.userId, request.conversationId, ownerId, message.id, message.position) }
 }

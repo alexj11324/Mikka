@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { pool } from '@/lib/db'
-import { handleRead, type ReadRequest } from '@/lib/conversation-reads-store'
+import { handleRead, requestHost, type ReadRequest } from '@/lib/conversation-reads-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +12,7 @@ async function respond(request: Request, id: string, method: ReadRequest['method
     userId: session?.user?.id ?? null,
     conversationId: id,
     origin: request.headers.get('origin'),
-    host: request.headers.get('host') ?? new URL(request.url).host,
+    host: requestHost(request.headers.get('x-forwarded-host'), request.headers.get('host') ?? new URL(request.url).host),
     body: method === 'POST' ? await request.text().catch(() => '') : undefined,
   })
   return NextResponse.json(result.body, { status: result.status, headers: { 'Cache-Control': 'private, no-store' } })
