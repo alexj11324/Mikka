@@ -166,7 +166,7 @@ export type RunStatus = (typeof RUN_STATUSES)[number]
 /** Logical address and owner policy; execution attempts and role configs are separate. */
 export const sessionMailboxes = pgTable('session_mailboxes', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(), workspaceId: text('workspaceId').notNull(),
-  kind: text('kind').$type<'run' | 'coordinator' | 'bot'>().notNull(), sessionKey: text('sessionKey').notNull(),
+  kind: text('kind').$type<'run' | 'coordinator' | 'bot' | 'group'>().notNull(), sessionKey: text('sessionKey').notNull(),
   harness: text('harness'), latestRunId: uuid('latestRunId'), wakeBudget: integer('wakeBudget').notNull().default(0),
   disabled: boolean('disabled').notNull().default(false),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),

@@ -218,3 +218,15 @@ describe("mikka daemon login (device authorization)", () => {
     }
   })
 })
+
+describe('isolated group review transport',()=>{
+  it('uses the existing device credential and dedicated endpoint without peer owner/workspace fields',async()=>{
+    const {fetch,calls}=scripted(call=>call.path.endsWith('/register')?json({deviceId:'dev-1',workspaceId:'00000000-0000-4000-8000-000000000001'}):json({runIds:[]}))
+    const link=new HttpServerLink('https://mikka.example/mikka',fetch)
+    await link.registerDevice('session-1',INFO)
+    calls.length=0
+    await link.groupReviews('dev-1').poll()
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toMatchObject({path:'/mikka/v1/devices/dev-1/group-reviews',method:'POST',auth:'Bearer session-1',body:{action:'poll'}})
+  })
+})

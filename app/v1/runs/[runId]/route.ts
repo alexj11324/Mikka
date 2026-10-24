@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, ne } from 'drizzle-orm'
 import { runPatchSchema } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, devices } from '@/lib/db/schema'
@@ -15,7 +15,7 @@ async function ownedRun(runId: string, userId: string): Promise<boolean> {
     .select({ id: agentRuns.id })
     .from(agentRuns)
     .innerJoin(devices, eq(devices.id, agentRuns.deviceId))
-    .where(and(eq(agentRuns.id, runId), eq(devices.ownerId, userId)))
+    .where(and(eq(agentRuns.id, runId), eq(devices.ownerId, userId), ne(agentRuns.kind, 'group_review')))
     .limit(1)
   return Boolean(row)
 }

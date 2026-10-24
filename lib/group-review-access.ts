@@ -50,7 +50,7 @@ export async function cancelWork(client: PoolClient, conversationId: string, fil
   await client.query(`UPDATE conversation_work w SET status='cancelled' WHERE "conversationId"=$1 AND status IN ('pending','dispatched')
     AND ($2::uuid IS NULL OR "agentId"=$2) AND ($3::text IS NULL OR "requestedBy"=$3 OR EXISTS (SELECT 1 FROM conversation_agent_grants g WHERE g.id=w."grantId" AND g."ownerId"=$3)) AND ($4::uuid IS NULL OR id=$4)`, [conversationId, filter.agentId ?? null, filter.userId ?? null, filter.workId ?? null])
   // Stop only a bound dedicated run. Never touch an owner's private session.
-  await client.query(`UPDATE agent_runs r SET "stopRequestedAt"=COALESCE(r."stopRequestedAt",now()) FROM conversation_work w
+  await client.query(`UPDATE agent_runs r SET "stopRequestedAt"=COALESCE(r."stopRequestedAt",now()), status='cancelled', "finishedAt"=COALESCE(r."finishedAt",now()) FROM conversation_work w
     WHERE w."conversationId"=$1 AND w.status='cancelled' AND r.id=w."runId" AND r.kind='group_review'`, [conversationId])
   await client.query(`DELETE FROM run_messages m USING conversation_work w, agent_runs r
     WHERE w."conversationId"=$1 AND w.status='cancelled' AND r.id=w."runId" AND r.kind='group_review'

@@ -75,10 +75,16 @@ import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
 
+import { runGroupReviewBatch, type GroupReviewAssignment, type GroupReviewOutput } from './runs/group-review-worker'
+
 export * from "./server-link"
 export { DAEMON_VERSION, daemonPaths, defaultDataDir } from "./paths"
 
 export interface DaemonOptions {
+  /** Explicit isolated processor only. Omitted: group work stays queued; no
+   * inherited repository adapters, native CLI credentials or provider calls. */
+  groupReviewProcessor?: (input: GroupReviewAssignment, signal: AbortSignal) => Promise<GroupReviewOutput>
+
   dataDir: string
   flavor: Flavor
   link: ServerLink
@@ -169,6 +175,8 @@ export class Daemon {
   private timer: NodeJS.Timeout | null = null
   private tick: Promise<void> = Promise.resolve()
   private draining = false
+  private groupReviewTask: Promise<unknown> | null = null
+  private groupReviewAbort = new AbortController()
   private stopped = false
   private adapters = new Map<Harness, AgentAdapter>()
   /** Registered (or re-registered) with the server since this start. */
@@ -629,6 +637,11 @@ export class Daemon {
       this.server = "online"
       await this.outbox.flushAll()
       if (!this.draining) {
+        if (this.options.groupReviewProcessor && link.groupReviews && !this.groupReviewTask) {
+          this.groupReviewTask = runGroupReviewBatch(link.groupReviews(deviceId,this.groupReviewAbort.signal),this.options.groupReviewProcessor,this.groupReviewAbort.signal)
+            .catch((error:unknown)=>this.log.warn({err:error},'group review worker stopped'))
+            .finally(()=>{this.groupReviewTask=null})
+        }
         for (const runId of await link.pendingRuns(deviceId)) {
           if (this.refusedRuns.has(runId)) continue
           await this.claimAndStart(runId).catch((error: unknown) =>
@@ -872,6 +885,8 @@ export class Daemon {
   async stop() {
     if (this.stopped) return
     this.stopped = true
+    this.groupReviewAbort.abort()
+    await this.groupReviewTask
     if (this.timer) clearTimeout(this.timer)
     await this.quota?.stop()
     this.commandsAbort.abort()

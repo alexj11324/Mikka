@@ -12,6 +12,7 @@ import { appendGroupMessage, reject, requireAgent, requireGroup, ReviewFailure, 
  */
 export interface GroupRuntimeAdapter {
   enqueue(client: PoolClient, input: { workId: string; runId: string; agentId: string; ownerId: string; conversationId: string; data: string }): Promise<void>
+  finish?(client: PoolClient, input: { runId: string; conversationId: string; status: string }): Promise<void>
   /** Lock run identity/state until this transaction ends, serializing stops with replies. */
   live(client: PoolClient, runId: string, agentId: string): Promise<boolean>
 }
@@ -24,15 +25,16 @@ export function runMessagesAdapter(prepare: GroupRuntimeAdapter['enqueue']): Gro
   return {
     async enqueue(client, input) {
       await prepare(client, input)
-      const run = (await client.query(`SELECT 1 FROM agent_runs WHERE id=$1 AND "agentId"=$2 AND "userId"=$3
+      const run = (await client.query(`SELECT to_jsonb(agent_runs)->>'mailboxId' AS "mailboxId" FROM agent_runs WHERE id=$1 AND "agentId"=$2 AND "userId"=$3
         AND kind='group_review' AND "issueId" IS NULL AND "deviceRepoId" IS NULL AND "sessionId" IS NULL AND prompt=''
-        AND status='queued' AND "stopRequestedAt" IS NULL`, [input.runId, input.agentId, input.ownerId])).rowCount
+        AND status='queued' AND "stopRequestedAt" IS NULL`, [input.runId, input.agentId, input.ownerId])).rows[0]
       if (!run) return reject(409, 'isolated_runtime_required')
       // New run and message in one transaction. A private session cannot satisfy
       // this contract, and replay of a dispatched work never calls prepare.
       if ((await client.query('SELECT 1 FROM run_messages WHERE "runId"=$1', [input.runId])).rowCount ||
         (await client.query('SELECT 1 FROM run_chunks WHERE "runId"=$1', [input.runId])).rowCount) return reject(409, 'isolated_runtime_required')
-      await client.query('INSERT INTO run_messages (id,"runId","userId",text) VALUES ($1,$1,$2,$3)', [input.runId, input.ownerId, input.data])
+      if (run.mailboxId) await client.query('INSERT INTO run_messages (id,"runId","userId",text,"mailboxId") VALUES ($1,$1,$2,$3,$4)', [input.runId, input.ownerId, input.data, run.mailboxId])
+      else await client.query('INSERT INTO run_messages (id,"runId","userId",text) VALUES ($1,$1,$2,$3)', [input.runId,input.ownerId,input.data])
     },
     async live(client, runId, agentId) {
       return Boolean((await client.query(`SELECT 1 FROM agent_runs WHERE id=$1 AND "agentId"=$2 AND kind='group_review'
@@ -41,16 +43,13 @@ export function runMessagesAdapter(prepare: GroupRuntimeAdapter['enqueue']): Gro
     },
   }
 }
-// Live check without provisioning a run. Used by the authenticated runtime route.
-export const existingGroupRuntime = runMessagesAdapter(async () => reject(409, 'mailbox_adapter_required'))
-
-async function lockedWork(client: PoolClient, workId: string) {
+export async function lockedWork(client: PoolClient, workId: string) {
   const source = (await client.query('SELECT "conversationId" FROM conversation_work WHERE id=$1', [workId])).rows[0]
   if (!source) return reject(404, 'not_found')
   await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [source.conversationId])
   return (await client.query('SELECT * FROM conversation_work WHERE id=$1 FOR UPDATE', [workId])).rows[0]
 }
-async function authorizedWork(client: PoolClient, directory: Directory, work: Record<string, string>) {
+export async function authorizedWork(client: PoolClient, directory: Directory, work: Record<string, string>) {
   const { group } = await requireGroup(client, directory, work.conversationId, work.requestedBy)
   const grant = await requireAgent(client, directory, work.conversationId, group.workspaceId, work.agentId)
   if (grant.id !== work.grantId) return reject(403, 'grant_revoked')
@@ -86,7 +85,7 @@ export async function dispatchReviewWork(pool: Pool, directory: Directory, adapt
     return { status: 'dispatched', runId: work.id }
   })
 }
-const runtimeReply = z.object({ workId: z.uuid(), triggerMessageId: z.uuid(), body: z.string().trim().min(1).max(32000), proposal: z.object({ artifactId: z.uuid(), baseVersionId: z.uuid(), baseHash: z.string().regex(/^[a-f0-9]{64}$/), content: z.string().max(1_000_000) }).strict().optional() }).strict()
+const runtimeReply = z.object({ workId: z.uuid(), triggerMessageId: z.uuid(), claimEpoch: z.number().int().positive().optional(), body: z.string().trim().min(1).max(32000), proposal: z.object({ artifactId: z.uuid(), baseVersionId: z.uuid(), baseHash: z.string().regex(/^[a-f0-9]{64}$/), content: z.string().max(1_000_000) }).strict().optional() }).strict()
 /** INTERNAL trusted boundary. runId must come from authenticated runtime identity,
  * never the browser body. One terminal reply per intent; zero automatic agent
  * reply hops. A reply cannot mention/dispatch another agent.
@@ -99,7 +98,9 @@ export async function completeReviewWork(pool: Pool, directory: Directory, adapt
     const work = await lockedWork(client, reply.workId)
     if (work.runId !== authenticatedRunId || work.triggerMessageId !== reply.triggerMessageId) return reject(403, 'runtime_binding_mismatch')
     if (work.status === 'completed' || work.status === 'conflict') return { status: work.status, replyMessageId: work.replyMessageId }
+    if (work.claimEpoch !== undefined && (work.claimEpoch < 1 || reply.claimEpoch !== work.claimEpoch)) return reject(409, 'claim_epoch_mismatch')
     if (work.status !== 'dispatched') return reject(409, 'work_not_live')
+    if (work.claimEpoch > 0 && !(await client.query('SELECT 1 FROM agent_runs WHERE id=$1 AND "leaseExpiresAt">now() FOR UPDATE',[authenticatedRunId])).rowCount) return reject(409,'claim_expired')
     try {
       await authorizedWork(client, directory, work)
       if (!await adapter.live(client, authenticatedRunId, work.agentId)) return reject(409, 'runtime_not_live')
@@ -117,6 +118,7 @@ export async function completeReviewWork(pool: Pool, directory: Directory, adapt
       status === 'conflict' ? `${reply.body}\n\n[Revision conflict: the base version changed; no revision was applied.]` : reply.body, work.triggerMessageId)
     if (request) await client.query(`INSERT INTO artifact_comments (id,"threadId","authorType","authorId",body,"workId") VALUES ($1,$2,'agent',$3,$4,$5)`, [work.id, request.threadId, work.agentId, status === 'conflict' ? `${reply.body}\n\n[Revision conflict]` : reply.body, work.id])
     await client.query('UPDATE conversation_work SET status=$2,"replyMessageId"=$3 WHERE id=$1', [work.id, status, message?.id ?? null])
+    await adapter.finish?.(client, { runId: authenticatedRunId, conversationId: work.conversationId, status })
     return { status, replyMessageId: message?.id ?? null, version }
   })
 }

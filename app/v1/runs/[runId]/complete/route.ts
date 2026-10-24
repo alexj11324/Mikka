@@ -31,6 +31,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     .where(and(eq(agentRuns.id, runId), eq(devices.ownerId, caller.userId)))
     .limit(1)
   if (!run) return NextResponse.json({ error: 'Unknown run.' }, { status: 404 })
+  if (run.kind === 'group_review') return NextResponse.json({ error: 'Use bound group-review completion.' }, { status: 409 })
   // A run ends once: a repeated completion is accepted and ignored.
   if (!(LIVE_STATUSES as readonly string[]).includes(run.status)) return new NextResponse(null, { status: 204 })
   const parsed = runCompleteRequest.safeParse(await request.json().catch(() => null))

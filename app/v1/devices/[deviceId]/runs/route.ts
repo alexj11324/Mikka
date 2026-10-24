@@ -1,6 +1,6 @@
 import { mailboxes } from '@/lib/mailbox-runtime'
 import { NextResponse } from 'next/server'
-import { and, eq, isNull, or } from 'drizzle-orm'
+import { and, eq, isNull, or, ne } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { agentRuns, sessionMailboxes } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
@@ -20,6 +20,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ devi
   const rows = await db
     .select({ id: agentRuns.id })
     .from(agentRuns).leftJoin(sessionMailboxes, eq(sessionMailboxes.id, agentRuns.mailboxId))
-    .where(and(eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt), or(isNull(agentRuns.mailboxId), eq(sessionMailboxes.disabled, false))))
+    .where(and(eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued'), ne(agentRuns.kind, 'group_review'), isNull(agentRuns.stopRequestedAt), or(isNull(agentRuns.mailboxId), eq(sessionMailboxes.disabled, false))))
   return NextResponse.json({ runIds: rows.map(row => row.id) })
 }

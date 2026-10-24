@@ -4,7 +4,7 @@ import type { Pool, PoolClient } from 'pg'
 // Deliberately no global database: the caller supplies its request-scoped pool.
 // A peer never supplies userId/workspaceId or its own sender identity over HTTP.
 export interface MailboxActor { userId: string; workspaceId: string; mailboxId: string; runId?: string }
-export interface Mailbox { id: string; userId: string; workspaceId: string; kind: 'run' | 'coordinator' | 'bot'; sessionKey: string; latestRunId: string | null; disabled: boolean; wakeBudget: number; harness: string | null }
+export interface Mailbox { id: string; userId: string; workspaceId: string; kind: 'run' | 'coordinator' | 'bot' | 'group'; sessionKey: string; latestRunId: string | null; disabled: boolean; wakeBudget: number; harness: string | null }
 export interface MailboxReceipt { id: string; queued: true; duplicate: boolean; failure: string | null; continuationRunId?: string }
 export class MailboxError extends Error { constructor(message: string, public status = 403) { super(message) } }
 const LIVE = ['queued', 'preparing', 'running', 'waiting_input', 'finishing']
@@ -33,10 +33,10 @@ export class SessionMailbox {
   async run(userId: string, runId: string): Promise<MailboxActor> {
     return this.transaction(async client => {
       // Mailbox before attempt: the same lock order as stop/scheduling.
-      const { rows: [identity] } = await client.query('select "mailboxId" from agent_runs where id=$1 and "userId"=$2', [runId, userId])
+      const { rows: [identity] } = await client.query('select "mailboxId" from agent_runs where id=$1 and "userId"=$2 and kind<>\'group_review\'', [runId, userId])
       if (identity?.mailboxId) await client.query('select id from session_mailboxes where id=$1 for update', [identity.mailboxId])
       const { rows: [run] } = await client.query(`select r.*,a.harness from agent_runs r join agents a on a.id=r."agentId" and a."userId"=r."userId" join devices d on d.id=r."deviceId" where r.id=$1 and r."userId"=$2 and d."ownerId"=$2 and d.enabled for update of r`, [runId, userId])
-      if (!run || !LIVE.includes(run.status) || run.stopRequestedAt) throw new MailboxError('Run is not authorized to use a mailbox')
+      if (!run || run.kind === 'group_review' || !LIVE.includes(run.status) || run.stopRequestedAt) throw new MailboxError('Run is not authorized to use a mailbox')
       let mailboxId = run.mailboxId
       if (!mailboxId) {
         const box = await this.ensure(client, userId, 'run', runId)
@@ -51,7 +51,7 @@ export class SessionMailbox {
   }
   private async authorize(client: PoolClient, actor: MailboxActor): Promise<Mailbox> {
     const { rows: [box] } = await client.query<Mailbox>('select * from session_mailboxes where id=$1 and "userId"=$2 and "workspaceId"=$3', [actor.mailboxId, actor.userId, this.workspaceId])
-    if (!box || actor.workspaceId !== this.workspaceId || box.disabled) throw new MailboxError('Mailbox unavailable')
+    if (!box || box.kind === 'group' || actor.workspaceId !== this.workspaceId || box.disabled) throw new MailboxError('Mailbox unavailable')
     if (box.kind === 'run') {
       const { rows: [run] } = await client.query(`select r.status,r."stopRequestedAt",d.enabled from agent_runs r join devices d on d.id=r."deviceId" where r.id=$1 and r."mailboxId"=$2 and r."userId"=$3 and d."ownerId"=$3`, [actor.runId, box.id, actor.userId])
       if (!run || !LIVE.includes(run.status) || run.stopRequestedAt || !run.enabled) throw new MailboxError('Run is no longer authorized')
@@ -62,7 +62,7 @@ export class SessionMailbox {
     return this.transaction(async client => {
       await this.authorize(client, actor)
       // No transcripts, role configuration or repository paths are disclosed.
-      const { rows } = await client.query(`select id,kind,"sessionKey","latestRunId",disabled,"wakeBudget" from session_mailboxes where "userId"=$1 and "workspaceId"=$2 order by "createdAt",id limit 100`, [actor.userId, this.workspaceId])
+      const { rows } = await client.query(`select id,kind,"sessionKey","latestRunId",disabled,"wakeBudget" from session_mailboxes where "userId"=$1 and "workspaceId"=$2 and kind<>'group' order by "createdAt",id limit 100`, [actor.userId, this.workspaceId])
       return { self: actor.mailboxId, recipients: rows }
     })
   }
@@ -81,7 +81,7 @@ export class SessionMailbox {
       // index alone would turn cross-recipient races into an unhandled 23505.
       await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))', [`${actor.mailboxId}:${input.key}`])
       const { rows: [target] } = await client.query<Mailbox>('select * from session_mailboxes where id=$1 and "userId"=$2 and "workspaceId"=$3 for update', [input.to, actor.userId, this.workspaceId])
-      if (!target) throw new MailboxError('Recipient unavailable')
+      if (!target || target.kind === 'group') throw new MailboxError('Recipient unavailable')
       const { rows: [prior] } = await client.query('select * from run_messages where "senderMailboxId"=$1 and "dedupeKey"=$2', [actor.mailboxId, input.key])
       if (prior) {
         if (prior.mailboxId !== input.to || prior.text !== input.text || (prior.replyTo ?? undefined) !== input.replyTo || prior.origin !== (owner ? 'owner' : 'peer')) throw new MailboxError('Idempotency key already used for another message', 409)
@@ -137,7 +137,7 @@ export class SessionMailbox {
     })
   }
   async ownerView(userId: string, id?: string) {
-    const { rows: mailboxes } = await this.pool.query('select * from session_mailboxes where "userId"=$1 and "workspaceId"=$2 and ($3::uuid is null or id=$3) order by "createdAt",id limit 100', [userId, this.workspaceId, id ?? null])
+    const { rows: mailboxes } = await this.pool.query('select * from session_mailboxes where "userId"=$1 and "workspaceId"=$2 and kind<>\'group\' and ($3::uuid is null or id=$3) order by "createdAt",id limit 100', [userId, this.workspaceId, id ?? null])
     if (id && !mailboxes.length) throw new MailboxError('Mailbox unavailable', 404)
     const messages = id ? (await this.pool.query('select id,text,origin,"senderMailboxId","replyTo",sequence,"deliveredAt","acknowledgedAt",failure from run_messages where "mailboxId"=$1 order by sequence desc limit 100', [id])).rows : []
     return { mailboxes, messages }
@@ -146,7 +146,7 @@ export class SessionMailbox {
   async policy(userId: string, id: string, wakeBudget: number, disabled: boolean) {
     return this.transaction(async client => {
       if (!Number.isInteger(wakeBudget) || wakeBudget < 0 || wakeBudget > 10) throw new MailboxError('Invalid wake budget', 400)
-      const { rows: [box] } = await client.query<Mailbox>('update session_mailboxes set "wakeBudget"=$1,disabled=$2 where id=$3 and "userId"=$4 and "workspaceId"=$5 returning *', [wakeBudget, disabled, id, userId, this.workspaceId])
+      const { rows: [box] } = await client.query<Mailbox>('update session_mailboxes set "wakeBudget"=$1,disabled=$2 where id=$3 and "userId"=$4 and "workspaceId"=$5 and kind<>\'group\' returning *', [wakeBudget, disabled, id, userId, this.workspaceId])
       if (!box) throw new MailboxError('Mailbox unavailable')
       return { mailbox: box, continuationRunId: await this.schedule(client, box) }
     })
@@ -154,8 +154,8 @@ export class SessionMailbox {
   /** Owner stop fences this logical session, including a racing queued continuation. */
   async stop(userId: string, runId: string) {
     return this.transaction(async client => {
-      const { rows: [run] } = await client.query('select "mailboxId" from agent_runs where id=$1 and "userId"=$2', [runId, userId])
-      if (!run) throw new MailboxError('Unknown run', 404)
+      const { rows: [run] } = await client.query('select "mailboxId" from agent_runs where id=$1 and "userId"=$2 and kind<>\'group_review\'', [runId, userId])
+      if (!run || run.kind === 'group_review') throw new MailboxError('Unknown run', 404)
       if (run.mailboxId) {
         const fenced = await client.query('update session_mailboxes set disabled=true,"wakeBudget"=0 where id=$1 and "userId"=$2 and "workspaceId"=$3', [run.mailboxId, userId, this.workspaceId])
         if (!fenced.rowCount) throw new MailboxError('Mailbox unavailable')
@@ -170,7 +170,7 @@ export class SessionMailbox {
   async complete(userId: string, runId: string, status: string, stopReason: string, report: Record<string, unknown> | null) {
     return this.transaction(async client => {
       const { rows: [run] } = await client.query(`select r.* from agent_runs r join devices d on d.id=r."deviceId" left join session_mailboxes m on m.id=r."mailboxId" where r.id=$1 and r."userId"=$2 and d."ownerId"=$2 and (r."mailboxId" is null or (m."workspaceId"=$3 and m."userId"=$2)) for update of r`, [runId, userId, this.workspaceId])
-      if (!run) throw new MailboxError('Unknown run', 404)
+      if (!run || run.kind === 'group_review') throw new MailboxError('Unknown run', 404)
       if (!LIVE.includes(run.status)) return false
       await this.recordCompletion(client, run, status, stopReason, report)
       return true
@@ -185,6 +185,22 @@ export class SessionMailbox {
     await client.query('update agent_runs set status=$1,"stopReason"=$2,report=$3,"finishedAt"=now(),"updatedAt"=now() where id=$4', [status, stopReason, report, run.id])
     await client.query('update run_tokens set "revokedAt"=now() where "runId"=$1 and "revokedAt" is null', [run.id])
     await client.query(`insert into coordinator_events (id,"userId",kind,"dedupeKey","issueId","runId",payload) values ($1,$2,'run_finished',$3,$4,$5,$6) on conflict ("dedupeKey") do nothing`, [randomUUID(), run.userId, `run_finished:${run.id}`, run.issueId, run.id, JSON.stringify({ status, stopReason, runKind: run.kind, summary: report?.summary ?? null })])
+  }
+  /** Internal group adapter only: caller holds conversation/work locks and has
+   * verified ownership, grant, membership and device. Never exposed to peers. */
+  async prepareGroup(client: PoolClient, input: { runId: string; ownerId: string; agentId: string; deviceId: string; harness: string }) {
+    const box = await this.ensure(client, input.ownerId, 'group', input.runId)
+    await client.query(`insert into agent_runs (id,"userId","agentId","deviceId",kind,status,prompt,"mailboxId") values ($1,$2,$3,$4,'group_review','queued','',$5)`, [input.runId,input.ownerId,input.agentId,input.deviceId,box.id])
+    await client.query('update session_mailboxes set "latestRunId"=$1,harness=$2 where id=$3', [input.runId,input.harness,box.id])
+  }
+  async groupInbox(client: PoolClient, runId: string, ownerId: string) {
+    const box = (await client.query(`select m.id from session_mailboxes m join agent_runs r on r."mailboxId"=m.id where r.id=$1 and r."userId"=$2 and m."userId"=$2 and m."workspaceId"=$3 and m.kind='group' and r.kind='group_review' and not m.disabled`, [runId,ownerId,this.workspaceId])).rows[0]
+    if (!box) throw new MailboxError('Group mailbox unavailable')
+    return (await client.query(`update run_messages set "deliveredAt"=coalesce("deliveredAt",now()) where "mailboxId"=$1 and "runId"=$2 and "acknowledgedAt" is null and failure is null returning id,text`, [box.id,runId])).rows
+  }
+  async completeGroup(client: PoolClient, runId: string, status: 'succeeded' | 'stopped') {
+    await client.query(`update run_messages set "acknowledgedAt"=coalesce("acknowledgedAt",now()) where "runId"=$1 and "deliveredAt" is not null and "mailboxId" in (select id from session_mailboxes where kind='group' and "workspaceId"=$2)`, [runId,this.workspaceId])
+    await client.query(`update agent_runs set status=$2,"stopReason"='turn_ended',"finishedAt"=now(),"leaseExpiresAt"=null,"updatedAt"=now() where id=$1 and kind='group_review'`, [runId,status])
   }
   /** Called after a completion committed, and on device scheduler polls. */
   async flush(userId: string) {

@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, ne } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { agentRuns, deviceTokens, devices, runMessages } from '@/lib/db/schema'
 import type { RunCommand } from '@mikka/protocol/device'
@@ -83,7 +83,7 @@ export async function pendingCommands(deviceId: string, skip: readonly string[])
   const runs = await db
     .select({ id: agentRuns.id, stopRequestedAt: agentRuns.stopRequestedAt })
     .from(agentRuns)
-    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LIVE_RUN_STATUSES])))
+    .where(and(eq(agentRuns.deviceId, deviceId), ne(agentRuns.kind, 'group_review'), inArray(agentRuns.status, [...LIVE_RUN_STATUSES])))
   const skipped = new Set(skip)
   const live = runs.filter(run => !skipped.has(run.id))
   if (live.length === 0) return []

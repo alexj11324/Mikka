@@ -3,7 +3,7 @@
 Backend baseline: `efce5c812e06d20d86e993eb6554e6d91c3c4a3b`, based on main `5a0e1c411f487fee433c48414f7130d0d58dad92`.
 Integration branch: `integrate/group-artifact-mailbox` in a separate cloud Linux worktree. Frontend remains paused and unchanged in the original worktree.
 
-Source prerequisite: reviewed mailbox candidate `8cb80b11276b6314a6e15077b39506237790c305` from base `5a0e1c4`. Its Git object is currently absent. Internal source transfer is pending; no mailbox API names, behavior or compatibility are assumed in this plan. Do not implement a competing transport or adapt against an imagined interface.
+Source prerequisite: reviewed mailbox candidate `8cb80b11276b6314a6e15077b39506237790c305` from base `5a0e1c4`. The source-only transfer is now verified and imported as `e77e0f8`; original Git object remains absent. The plan below records the pre-integration checklist; see group-artifact-runtime.md for implementation and acceptance. Previously, internal transfer was pending; no mailbox API names, behavior or compatibility are assumed in this plan. Do not implement a competing transport or adapt against an imagined interface.
 
 ## Existing concrete contracts
 

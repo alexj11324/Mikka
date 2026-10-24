@@ -29,6 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
     .limit(1)
   if (!run) return NextResponse.json({ error: 'Run is not queued for this device.' }, { status: 409 })
+  if (run.kind === 'group_review') return NextResponse.json({ error: 'Use the isolated group-review worker.' }, { status: 409 })
   const [agent] = await db.select().from(agents).where(eq(agents.id, run.agentId)).limit(1)
   const [repo] = run.deviceRepoId
     ? await db.select().from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)

@@ -16,7 +16,8 @@
     "./http-link": "./src/server-link-http.ts",
     "./login": "./src/login.ts",
     "./log": "./src/log.ts",
-    "./sandbox": "./src/agents/sandbox.ts"
+    "./sandbox": "./src/agents/sandbox.ts",
+    "./group-review-worker": "./src/runs/group-review-worker.ts"
   },
   "scripts": {
     "daemon": "tsx bin/mikka.ts daemon",
