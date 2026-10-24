@@ -27,10 +27,13 @@ Current project membership metadata finds only admin machine identities; a
 separate restricted access-reader policy/delivery remains unconfigured. Existing
 custody can write both paths, but cannot be sent to inference as a shortcut.
 
-Separating authorization custody from later execution is architecturally
-possible. It is not currently implemented: OAuth attempts, canonical bundles
+The independent server custody receiver is now implemented in source; see
+[server enrollment](byos-server-enrollment.md) for its private route, exact
+configuration and activation gaps. Users require no Infisical installation or
+login. Its pending-unbound envelopes remain unusable by tasks. In the original
+bound execution path, OAuth attempts, canonical bundles
 and publication checks require owner/workspace/connection/session scope. A
-pending-unbound route needs its own persistent record, one-use binding proof,
+pending-unbound to bound transfer still needs a one-use binding proof,
 verified provider subject and an atomic transfer confirmed by a real Mikka
 session. It must deny quota/model/task use before binding. Fabricated scope IDs,
 plain-email claiming or bypassing `subscriptionRuntime` are not substitutes.

@@ -47,6 +47,7 @@ const nextConfig = {
     '/api/subscriptions/callback': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
     '/api/cron/subscriptions': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
     '/v1/devices/**/subscription': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
+    '/api/subscriptions/enrollments': ['./packages/subscription-worker/bin/mikka-subscription-enrollment'],
   },
   async headers() {
     return [{ source: '/(.*)', headers: [
