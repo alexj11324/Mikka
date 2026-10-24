@@ -1,6 +1,33 @@
 # Infisical cloud migration
 
-Verified on 2026-10-22. Organization: Aspectly Labs. Project: Mikka (`89850d6a-f020-4936-863e-df77380dfe40`). This inventory contains names and migration status only.
+Storage/distribution inventory verified on 2026-10-22. Organization: Aspectly Labs. Project: Mikka (`89850d6a-f020-4936-863e-df77380dfe40`). Current cloud-agent identity permissions were separately verified online on 2026-10-24 below. Historical CI identity permissions do not describe the current identity. This inventory contains names and migration status only.
+
+## Current cloud-agent identity: online metadata, 2026-10-24
+
+The existing Universal Auth machine identity is named `token`, ID
+`264e0674-6468-4731-a57d-7bb1957f735b`. Its Mikka project membership is
+non-temporary `admin`; additional identity privileges are empty. The project
+metadata confirms `dev`, `staging` and `prod` environments.
+
+Read-only authenticated metadata checks returned:
+
+| Endpoint | Result |
+| --- | --- |
+| `GET /api/v1/projects/89850d6a-f020-4936-863e-df77380dfe40/identity-memberships/264e0674-6468-4731-a57d-7bb1957f735b` | 200; identity name/ID and non-temporary admin membership |
+| `GET /api/v2/identity-project-additional-privilege?identityId=264e0674-6468-4731-a57d-7bb1957f735b&projectId=89850d6a-f020-4936-863e-df77380dfe40` | 200; empty privileges |
+| `GET /api/v1/projects/89850d6a-f020-4936-863e-df77380dfe40/roles/slug/admin` | 200; secrets: `describeSecret/read/readValue/create/edit/delete`; secret-folders: `edit/create/delete/manage-access` |
+| `GET /api/v1/identities/264e0674-6468-4731-a57d-7bb1957f735b` | 403 for organization-level identity details; not retried or bypassed |
+
+The returned admin rules have no environment/path conditions, so this metadata
+supports write/delete authority in dev and staging. A 403 on organization identity
+details does not imply read-only project access. No secret values were requested,
+no test write/delete was made, and no IAM policy or identity was changed.
+
+This existing project-wide identity can be a controlled custody operator for
+specifically authorized operations. Do not send it to an inference worker, native
+CLI, sandbox, model, another thread or logs. BYOS execution still needs a verified
+access-only reader/broker boundary; project admin authority does not establish
+production runtime safety or authorize unrelated secret access.
 
 ## Verified storage
 
@@ -39,7 +66,7 @@ Neon integration-managed `DATABASE_URL` and `DATABASE_URL_UNPOOLED` are snapshot
 | Worker `mikka-linear-sync` | Native sync `mikka-workers-prod` succeeded and automatic sync is enabled. Deployed signature checks returned 401 for an invalid signature and 200 for a valid signature. |
 | Worker `mikka-linear-sync-preview` | Native sync `mikka-workers-staging` succeeded and automatic sync is enabled. Deployed signature checks returned 401 for an invalid signature and 200 for a valid signature. |
 | Cloudflare Pages | No existing Mikka Pages project; no destination was invented. |
-| Cloud workload | GitHub OIDC identity `mikka-github-cloud` configured with 900-second tokens, no organization access and read-only Mikka project membership. Existing CI successfully verified one injected Composio credential against its issuer on a GitHub-hosted runner, without a Mac service. The old local MCP credential belongs to the deleted organization. |
+| Historical GitHub CI workload (2026-10-22) | GitHub OIDC identity `mikka-github-cloud` was configured with 900-second tokens, no organization access and read-only Mikka project membership. CI verified one injected Composio credential against its issuer on a GitHub-hosted runner, without a Mac service. This historical identity is distinct from the current Universal Auth `token` identity above; do not infer current write permissions from this row. The old local MCP credential belonged to the deleted organization. |
 
 Each Worker source `/cloudflare` contains only `CRON_SECRET`, `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`, `LINEAR_TOKEN_ENCRYPTION_KEY` and `LINEAR_WEBHOOK_SECRET`, referencing the matching environment in `/vercel`. Expanded references were compared to their base values. The existing Linear branch also references the default Preview credentials instead of owning duplicate shared values. Sync options prevent secret deletion. Worker settings were read before and after sync; unmanaged bindings, including Hyperdrive, were verified unchanged. No custom dispatch workflow was created.
 

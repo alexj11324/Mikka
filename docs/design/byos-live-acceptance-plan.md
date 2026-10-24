@@ -37,6 +37,19 @@ nonproduction paths are `/byos-acceptance/grants` and `/byos-acceptance/access`;
 the actual project ID/environment/path must first be resolved from metadata and
 approved. These are proposed names, not existing configured resources.
 
+Online metadata update, 2026-10-24: the Mikka project is
+`89850d6a-f020-4936-863e-df77380dfe40`, and staging exists. The current Universal
+Auth identity `token` (`264e0674-6468-4731-a57d-7bb1957f735b`) has non-temporary
+project admin membership and secrets read/create/edit/delete plus folder
+permissions, with no environment/path conditions in its returned rules. This is
+not the historical read-only `mikka-github-cloud` identity. It supplies existing
+custody authority; no new writer identity is needed merely to gain write access.
+The proposed BYOS paths and a distinct restricted execution reader remain
+unverified. Do not pass the admin identity into the runtime. See
+[the online metadata receipt](../infisical-cloud.md#current-cloud-agent-identity-online-metadata-2026-10-24)
+for the exact successful queries and organization-details 403. No values, trial
+writes/deletes or IAM changes were involved.
+
 Infisical is controlled platform custody: authorized Mikka custody processes can
 read full bundles; the inference process receives only the access-reader identity
 and access projection. Provider requests necessarily use access tokens in the
