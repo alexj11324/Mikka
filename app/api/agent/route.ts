@@ -10,13 +10,15 @@ import systemPrompt from '@/lib/agent-system-prompt.json'
 import { validateAgentStream } from '@/lib/agent-fetch'
 import { persistAgentStream } from '@/lib/agent-history'
 import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
+import { agentModelSourceSchema, resolveAgentModel } from '@/lib/agent-model'
+import { SubscriptionRefusal } from '@mikka/protocol/subscription'
 
 export const maxDuration = 300
 
 // Reuse the POST bundle: image lookup must not trigger a second cold route compilation.
 export { GET } from './images/route'
 
-const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional(), turnId: z.uuid().optional(), retry: z.boolean().optional() }).strict()
+const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional(), turnId: z.uuid().optional(), retry: z.boolean().optional(), modelSource: agentModelSourceSchema.optional() }).strict()
 const errorHeaders = { 'Cache-Control': 'private, no-store', 'Content-Type': 'text/plain; charset=utf-8' }
 
 function agentErrorMessage(error: unknown) {
@@ -73,11 +75,27 @@ export async function POST(request: Request) {
   })())
   if (!parsed.success) return new Response(agentCopy.enterAQuestionBetween1And8000, { status: 400, headers: errorHeaders })
 
-  const apiKey = process.env.OPENCODE_API_KEY
-  if (!apiKey) return new Response(agentCopy.opencodeapikeyIsNotConfiguredOnTheServer, { status: 503, headers: errorHeaders })
-
   const sessionId = parsed.data.sessionId ?? crypto.randomUUID()
   const turnId = parsed.data.turnId ?? crypto.randomUUID()
+  let model: Awaited<ReturnType<typeof resolveAgentModel>>
+  try {
+    model = await resolveAgentModel(parsed.data.modelSource, {
+      // BYOS backend is deliberately unregistered until provider eligibility,
+      // durable account binding and credential isolation have been validated.
+      defaultModel: () => {
+        const apiKey = process.env.OPENCODE_API_KEY
+        if (!apiKey) throw new Error('default_model_unavailable')
+        const opencode = createOpenAICompatible({
+          name: 'opencode', apiKey, baseURL: 'https://opencode.ai/zen/go/v1',
+          headers: { 'User-Agent': 'Orvilo-UI-Agent/1.0', 'x-opencode-session': sessionId },
+        })
+        return opencode('deepseek-v4.1-flash')
+      },
+    })
+  } catch (error) {
+    if (error instanceof SubscriptionRefusal) return Response.json({ error: error.code }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } })
+    return new Response(agentCopy.opencodeapikeyIsNotConfiguredOnTheServer, { status: 503, headers: errorHeaders })
+  }
   let turn: Awaited<ReturnType<typeof beginAgentTurn>>
   try {
     turn = await beginAgentTurn(session.user.id, sessionId, turnId, parsed.data.prompt, parsed.data.retry)
@@ -95,14 +113,8 @@ export async function POST(request: Request) {
   }
   messages.push({ role: 'user', content: parsed.data.prompt })
 
-  const opencode = createOpenAICompatible({
-    name: 'opencode',
-    apiKey,
-    baseURL: 'https://opencode.ai/zen/go/v1',
-    headers: { 'User-Agent': 'Orvilo-UI-Agent/1.0', 'x-opencode-session': sessionId },
-  })
   const result = streamText({
-    model: opencode('deepseek-v4.1-flash'),
+    model,
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
     system: `${systemPrompt}\n\n${agentWebInstructions()}`,
     messages,

@@ -4,17 +4,13 @@
 >
 > 为大事而生的 AI lead：从本地到云端，所有 Agent 协作如一。
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+Mikka uses Next.js, with shared agent protocols and a daemon for native coding harnesses.
 
-## Built with v0
+## Cloud Linux development
 
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
+Cloud Agents run builds, type checks, isolated databases and relevant runtime/browser acceptance on their own Linux environment. Do not use the developer's Mac for these checks. v0 Preview is no longer used for development or acceptance. Follow [docs/acceptance.md](docs/acceptance.md) and report the branch, commit and check results.
 
-[Continue working on v0 →](https://v0.app/chat/projects/prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH)
-
-## Cloud Preview development
-
-Develop and test on cloud Preview deployments. Vercel previews, v0 previews and Cloudflare-hosted previews use their own HTTPS origin and an isolated Preview database. Set `BETTER_AUTH_URL` to the current origin without `/mikka`; if omitted, Vercel Preview prefers its deployment URL, and v0/Cloudflare Pages use their supplied preview URL. Vercel Preview uses the Neon integration's branch-specific `DATABASE_URL` ahead of global `MIKKA_DATABASE_URL` or `ORVILO_DATABASE_URL` overrides. Other environments retain their existing database selection.
+Separately authorized Vercel or Cloudflare deployments use their exact HTTPS origin and isolated database. Set `BETTER_AUTH_URL` to that origin without `/mikka`. Vercel Preview uses the Neon integration's branch-specific `DATABASE_URL` ahead of global `MIKKA_DATABASE_URL` or `ORVILO_DATABASE_URL` overrides. Other environments retain their existing database selection. Legacy v0 origin variables remain supported for existing configurations; they are not an instruction to use v0.
 
 ### Google and GitHub login
 
@@ -53,7 +49,6 @@ To learn more, take a look at the following resources:
 
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
 
 ## Telegram
 

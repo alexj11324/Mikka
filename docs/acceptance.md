@@ -1,15 +1,15 @@
 # Runtime acceptance
 
-Run acceptance on a deployed cloud Preview. Builds and type checks run in remote CI; do not start a local server, database, build or `tsgo` on the developer's Mac.
+Cloud Agents run builds, type checks, isolated Postgres and relevant browser/runtime acceptance on their own cloud Linux environment. Do not use the developer's Mac. v0 Preview is no longer an acceptance path. Run provider authentication and paid infrastructure checks only when separately authorized; distinguish mocks, local integration, deployed acceptance and checks never run.
 
 ## Freeze the version under review
 
-- Each Agent hands off its branch, commit SHA and unique deployment URL. Keep using that deployment during acceptance so another Agent's publish or branch update cannot replace the reviewed code. A moving branch alias, v0 `Latest`, and the shared production domain are not a frozen acceptance version.
-- In a GitHub-backed v0 project, open the working branch menu next to Publish and use its Preview Deployment. v0 documents separate working branches and previews for parallel chats sharing one repository and Vercel project. Publish merges into the base branch and updates production; it is not required to review a branch.
-- The embedded v0 sandbox Preview is useful during iteration. OAuth acceptance there remains a separate runtime gate: open the actual preview in a top-level tab and verify its origin, callback return, session and reviewed version. A passing Vercel Preview does not establish that the embedded sandbox passed.
+- Each Agent hands off its branch, commit SHA, Linux check commands/results and remaining blockers. Keep the reviewed version fixed.
+- When a deployment is separately authorized, include its unique URL. A moving branch alias and the shared production domain are not a frozen acceptance version.
+- For Linux database tests, explicitly inject an isolated loopback test URL; never inherit a production database URL. Keep test credentials synthetic. Provider sign-in remains a separate integration gate.
 - The stable OAuth callback hub routes authentication back to the originating Preview; it must not switch the code version under review to production or another Agent's Preview.
 
-References: [v0 branches and previews](https://v0.app/docs/github), [v0 deployment behavior](https://v0.app/docs/deployments), [Better Auth OAuth proxy](https://better-auth.com/docs/plugins/oauth-proxy).
+Reference: [Better Auth OAuth proxy](https://better-auth.com/docs/plugins/oauth-proxy).
 
 ## Authentication
 
