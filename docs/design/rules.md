@@ -23,8 +23,10 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-05** Bots run only on Mikka's own AI SDK harness. The 新建 Bot dialog
   has a big live preview, a shape grid, colours and a name. It has no machine
   picker, no harness picker and no 说明 field (instructions are edited in chat).
-- **R-06** The Coordinator is a bot. Its avatar is a bloub (ink with an orange
-  star), never the letter C.
+- **R-06** The Coordinator has no special UI; it is a normal bot (Alex
+  2026-10-24). Its role is coordinating, not looking different: the same
+  bloub avatar with no star or badge, the same row, the same chat, the
+  same empty state as any other bot. Never the letter C.
 - **R-07** Action entry points (buttons, menu items, the collapsed sidebar
   toggle, the 新建任务 dialog header) never say "Coordinator". Conversation
   headers keep the centred Coordinator pill.
@@ -113,8 +115,11 @@ source wins in a conflict is in [`README.md`](README.md).
 
 ## Copy
 
-- **R-40** No explanatory or filler copy in the UI (口水话). If a sentence only
-  explains the screen, remove it.
+- **R-40** No filler or explanatory copy in the UI (口水话; Alex repeated
+  this on 2026-10-23 and 2026-10-24). If a sentence only explains the screen
+  or narrates state, remove it. Examples that were removed: 「谁在工作 · 1 个
+  agent 正在处理任务」 above the composer, 「和你的 Coordinator 聊聊」,
+  「有值得看的会第一时间放到这里」.
 - **R-41** An empty state is one colloquial line plus one button (often
   "send to a bot"). Never "这里是空的" or "Check back later".
 - **R-42** Every visible string lives in `messages/zh-CN.json` and

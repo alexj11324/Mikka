@@ -46,7 +46,8 @@ more than once.
 
 ### Copy
 
-- [ ] No explanatory copy (R-40); empty states follow R-41.
+- [ ] No filler or explanatory copy (R-40); empty states follow R-41.
+- [ ] The Coordinator looks like every other bot: no star, badge or special copy (R-06).
 - [ ] All strings in `messages/*.json`; `pnpm i18n:check` passes (R-42).
 - [ ] Glossary words only (R-43).
 
