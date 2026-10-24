@@ -1,4 +1,5 @@
 import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
+import { WELCOME_PROMPT } from '@/lib/agent-welcome'
 import type { UIMessageChunk } from 'ai'
 
 /** `botId` is the bot the chat is with, or null for an older chat with no bot. */
@@ -18,7 +19,7 @@ export function sessionPreview(completion: string | null | undefined, prompt: st
     } catch { /* not a JSON string literal */ }
   }
   if (reply && !/^\w+\s*=/.test(reply)) return reply.replace(/[#*`>_]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120)
-  return (prompt ?? '').replace(/\s+/g, ' ').trim().slice(0, 120)
+  return prompt === WELCOME_PROMPT ? '' : (prompt ?? '').replace(/\s+/g, ' ').trim().slice(0, 120)
 }
 
 export type SavedAgentTurn = { id: string; prompt: string; completion: string; status: 'pending' | 'complete' | 'failed' | 'stopped'; error: string | null }

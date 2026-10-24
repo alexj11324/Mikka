@@ -131,6 +131,8 @@
     "collapseList": "Collapse bot list",
     "bots": "Bots",
     "newBot": "New bot",
+    "writingWelcome": "Writing a welcome…",
+    "answerBot": "Type your answer, or ask anything",
     "messageBot": "Message {name}",
     "newConversation": "New conversation",
     "pinned": "Pinned",

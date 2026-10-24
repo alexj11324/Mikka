@@ -7,6 +7,7 @@ import { runComposioAction } from '@/lib/composio'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import systemPrompt from '@/lib/agent-system-prompt.json'
+import { WELCOME_PROMPT, welcomeInstruction } from '@/lib/agent-welcome'
 import { validateAgentStream } from '@/lib/agent-fetch'
 import { persistAgentStream } from '@/lib/agent-history'
 import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
@@ -91,14 +92,17 @@ export async function POST(request: Request) {
       status: error instanceof AgentStoreError ? error.status : 503, headers: errorHeaders,
     })
   }
+  // A bot's first turn is its own welcome, not a question of the person's.
+  const locale = /(?:^|;\s*)NEXT_LOCALE=([^;]+)/.exec(request.headers.get('cookie') ?? '')?.[1] ?? 'zh-CN'
+  const asked = (prompt: string) => prompt === WELCOME_PROMPT ? welcomeInstruction(session.user.name ?? '', decodeURIComponent(locale)) : prompt
   const messages: { role: 'user' | 'assistant'; content: string }[] = []
   let historySize = 0
   for (const previous of [...turn.history].reverse()) {
     historySize += previous.prompt.length + previous.completion.length
     if (historySize > 80000) break
-    messages.unshift({ role: 'user', content: previous.prompt }, { role: 'assistant', content: previous.completion })
+    messages.unshift({ role: 'user', content: asked(previous.prompt) }, { role: 'assistant', content: previous.completion })
   }
-  messages.push({ role: 'user', content: parsed.data.prompt })
+  messages.push({ role: 'user', content: asked(parsed.data.prompt) })
 
   const opencode = createOpenAICompatible({
     name: 'opencode',

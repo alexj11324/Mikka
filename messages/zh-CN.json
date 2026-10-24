@@ -131,6 +131,8 @@
     "collapseList": "收起 Bot 列表",
     "bots": "Bot",
     "newBot": "新建 Bot",
+    "writingWelcome": "正在写欢迎语…",
+    "answerBot": "输入你的回答，或聊点别的",
     "messageBot": "给 {name} 发消息",
     "newConversation": "新对话",
     "pinned": "已置顶",

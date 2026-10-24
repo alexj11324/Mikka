@@ -12,6 +12,8 @@ import type { ActionEvent } from '@openuidev/react-lang'
 import { toast } from 'sonner'
 import { useCompletion } from '@ai-sdk/react'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
+import { BotAvatar } from '@/components/nav/bot-avatar'
+import { WELCOME_PROMPT } from '@/lib/agent-welcome'
 import { AgentThemeProvider } from './agent-theme'
 import dynamic from 'next/dynamic'
 
@@ -173,7 +175,7 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
     submittingRef.current = true
     try {
       sessionIdRef.current ??= crypto.randomUUID()
-      titleRef.current ??= prompt.trim().slice(0, 200)
+      titleRef.current ??= prompt === WELCOME_PROMPT && bot ? bot.name : prompt.trim().slice(0, 200)
       onState({ id: sessionIdRef.current, title: titleRef.current, botId: bot?.id ?? null, updatedAt: new Date().toISOString(), running: true })
       const retrying = lastRequestRef.current?.failed && lastRequestRef.current.prompt === prompt.trim()
       const turnId = retrying && generation ? generation : crypto.randomUUID()
@@ -197,11 +199,19 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
     }
   }
 
+  // A bot with no chat yet speaks first (Grok style): its welcome and a question.
+  const welcomed = useRef(false)
+  useEffect(() => {
+    if (!bot || welcomed.current || initial.sessionId || initial.turns.length) return
+    welcomed.current = true
+    void request(WELCOME_PROMPT, 'inline')
+  })
+
   return <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt, 'inline') }}><ComputerConversation id={sessionIdRef.current}>
       <AgentChat
         turns={[
           ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse completion={turn.completion} error={turn.error} stopped={turn.stopped} isLoading={false} onAction={handleUIAction} /> })),
-          ...(question ? [{ id: generation, question, response: <AgentResponse completion={completion} error={error ?? restoredError} stopped={stopped} isLoading={isLoading} onAction={handleUIAction} onRetry={() => { if (lastRequestRef.current) lastRequestRef.current.failed = true; void request(question, 'inline') }} /> }] : []),
+          ...(question ? [{ id: generation, question, response: <AgentResponse waiting={question === WELCOME_PROMPT && bot ? <p className="flex items-center gap-2 text-sm text-muted-foreground"><BotAvatar color={bot.color} shape={bot.shape} size="pill" mood="thinking" />{tNav('writingWelcome')}</p> : undefined} completion={completion} error={error ?? restoredError} stopped={stopped} isLoading={isLoading} onAction={handleUIAction} onRetry={() => { if (lastRequestRef.current) lastRequestRef.current.failed = true; void request(question, 'inline') }} /> }] : []),
         ]}
         streaming={isLoading}
         bot={bot}
@@ -211,7 +221,7 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
         onReset={onReset}
         onDemo={onDemo}
         onSuggestion={prompt => { updateDraft(prompt); inputRef.current?.focus() }}
-        composer={<ChatComposer ref={inputRef} label={bot ? tNav('messageBot', { name: bot.name }) : agentCopy.askAgent} value={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} sending={isLoading} onStop={() => { setStopped(true); stop() }} />}
+        composer={<ChatComposer ref={inputRef} label={bot ? tNav('messageBot', { name: bot.name }) : agentCopy.askAgent} placeholder={bot && question === WELCOME_PROMPT ? tNav('answerBot') : undefined} value={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} sending={isLoading} onStop={() => { setStopped(true); stop() }} />}
       />
     </ComputerConversation></AgentInteractionContext>
 }
