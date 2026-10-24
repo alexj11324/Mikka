@@ -254,11 +254,12 @@ export function ContextPanel({ userName, issues, runs, threads, conversation, on
       <TabsContent value="tasks" className="flex min-h-0 flex-col">
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-3">
           <Suggestions name={userName} />
-          {/* With a bot, its threads take the place of 我的任务. */}
-          {botId ? <section aria-label={tThreads('title')} className="flex flex-col gap-2">
+          {/* With a bot, its threads sit between 建议 and 我的任务. */}
+          {botId && <section aria-label={tThreads('title')} className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold">{tThreads('title')}</h2>
             <ThreadList threads={botThreads} issues={issues} current={thread?.id ?? null} onPick={id => { setPicked(id); setTab('details') }} />
-          </section> : <MyTasks issues={issues} runs={runs} onOpenIssue={onOpenIssue} />}
+          </section>}
+          <MyTasks issues={issues} runs={runs} onOpenIssue={onOpenIssue} />
         </div>
         <CommandComposer />
       </TabsContent>
