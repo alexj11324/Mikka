@@ -1,5 +1,7 @@
 import { groupDirectory } from '@/lib/group-conversations-directory'
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
+import { processGroupTurn } from '@/lib/coordinator/group-turns'
+import { groupRuntime } from '@/lib/coordinator/group-runtime'
 import { and, eq, inArray } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { db, pool } from '@/lib/db'
@@ -34,6 +36,17 @@ export async function respondGroup(request: Request, resource: GroupRequest['res
     host: request.headers.get('host') ?? url.host,
     body: request.method !== 'GET' ? await request.text().catch(() => '') : undefined,
     before: url.searchParams.get('before'), limit: url.searchParams.get('limit'), workspaceId: url.searchParams.get('workspaceId'),
-  })
+  }, true)
+  if (resource === 'messages' && id && result.status < 300) {
+    after(async () => {
+      // Bounded request lifetime. Durable queued roots resume on the next history poll/send.
+      try {
+        const deadline = Date.now() + 220000
+        while (Date.now() < deadline - 20000) {
+          if (!await processGroupTurn(pool, id, groupRuntime, deadline)) break
+        }
+      } catch { console.error('Group turn failed; retained in group_turns without automatic replay') }
+    })
+  }
   return NextResponse.json(result.body, { status: result.status, headers: { 'Cache-Control': 'private, no-store' } })
 }

@@ -365,6 +365,8 @@ export const conversations = pgTable('conversations', {
   id: uuid('id').primaryKey(), workspaceId: uuid('workspaceId').notNull(),
   kind: text('kind').$type<'group' | 'agent_dm'>().notNull(), title: text('title').notNull(),
   createdBy: text('createdBy').notNull(), lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull().default(sql`0`),
+  // Optional owner-designated current group agent; never inferred or backfilled.
+  leadAgentId: uuid('leadAgentId'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 export const conversationMembers = pgTable('conversation_members', {
@@ -391,3 +393,20 @@ export const conversationLinks = pgTable('conversation_links', {
   anchorPosition: bigint('anchorPosition', { mode: 'bigint' }).notNull(), firstPosition: bigint('firstPosition', { mode: 'bigint' }).notNull(),
   lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull(), messageCount: bigint('messageCount', { mode: 'bigint' }).notNull(),
 }, t => [index('conversation_links_source_idx').on(t.sourceConversationId, t.anchorPosition)])
+
+/** Group execution queue/corrections are scoped through conversation membership. */
+export const groupTurns = pgTable('group_turns', {
+  messageId: uuid('messageId').primaryKey().references(() => conversationMessages.id, { onDelete: 'cascade' }),
+  conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  status: text('status').$type<'queued' | 'running' | 'complete' | 'failed'>().notNull().default('queued'),
+  agentId: uuid('agentId'), activeRunId: uuid('activeRunId'), route: jsonb('route'), error: text('error'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('group_turns_queue_idx').on(t.conversationId, t.status, t.createdAt)])
+export const groupRoutingCorrections = pgTable('group_routing_corrections', {
+  messageId: uuid('messageId').primaryKey().references(() => conversationMessages.id, { onDelete: 'cascade' }),
+  conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  message: text('message').notNull(), wrongId: uuid('wrongId').notNull(), rightId: uuid('rightId'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('group_routing_corrections_recent_idx').on(t.conversationId, t.createdAt.desc())])

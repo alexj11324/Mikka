@@ -85,6 +85,7 @@ jobs:
       - run: pnpm test:coordinator-events
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
+      - run: pnpm test:group-turns
       - run: pnpm test:integrations
       - run: pnpm test:csv
       - run: pnpm test:settings
@@ -161,7 +162,9 @@ jobs:
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
       - name: Group conversation API and migrations (temporary Postgres 17 only)
-        run: pnpm test:groups
+        run: |
+          pnpm test:groups
+          REQUIRE_DB=1 pnpm test:group-turns
       - run: pnpm test:e2e:setup
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
