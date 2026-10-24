@@ -5,6 +5,10 @@ import { agentWebInstructions, createAgentWebTools } from '@/lib/agent-web-tools
 import { createComposioAITools } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
 import { z } from 'zod'
+import { workspaceComputerAccess } from '@/lib/cua/policy'
+import { createComputerTools } from '@/lib/cua/tools'
+import { desktopConfig, SCREEN_DATA_WARNING } from '@/lib/cua/operation'
+import { computerRequestStore } from '@/lib/cua/store'
 import { auth } from '@/lib/auth'
 import systemPrompt from '@/lib/agent-system-prompt.json'
 import { validateAgentStream } from '@/lib/agent-fetch'
@@ -101,20 +105,28 @@ export async function POST(request: Request) {
     baseURL: 'https://opencode.ai/zen/go/v1',
     headers: { 'User-Agent': 'Orvilo-UI-Agent/1.0', 'x-opencode-session': sessionId },
   })
+  let computerConfig = desktopConfig()
+  if (computerConfig) {
+    try { if (await workspaceComputerAccess(session.user.id, computerConfig) === 'deny') computerConfig = null }
+    catch { computerConfig = null } // Unknown membership/policy source never permits tools.
+  }
+  const liveController = new AbortController()
+  const liveSignal = AbortSignal.any([request.signal, liveController.signal])
   const result = streamText({
     model: opencode('deepseek-v4.1-flash'),
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
-    system: `${systemPrompt}\n\n${agentWebInstructions()}`,
+    system: `${systemPrompt}\n\n${agentWebInstructions()}\n\n${SCREEN_DATA_WARNING}`,
     messages,
     tools: {
       ...createAgentWebTools({ signal: request.signal }),
+      ...createComputerTools(computerConfig, computerRequestStore, session.user.id, sessionId, liveSignal),
       ...createComposioAITools((action, input) => runComposioAction(session.user.id, action, input)),
     },
     stopWhen: isStepCount(5),
     prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
     maxRetries: 1,
     timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
-    abortSignal: request.signal,
+    abortSignal: liveSignal,
     onError: ({ error }) => {
       if (!request.signal.aborted) console.error('Agent generation failed:', agentErrorMessage(error))
     },
@@ -128,6 +140,6 @@ export async function POST(request: Request) {
       stream: result.stream,
       sendReasoning: false,
       onError: agentErrorMessage,
-    }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),
+    }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), liveSignal, () => liveController.abort()),
   })
 }

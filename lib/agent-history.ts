@@ -24,7 +24,7 @@ export type SavedAgentTurn = { id: string; prompt: string; completion: string; s
 export type AgentHistory = { sessions: SavedAgentSession[]; sessionId: string | null; turns: SavedAgentTurn[] }
 export type AgentCheckpoint = Pick<SavedAgentTurn, 'completion' | 'status' | 'error'>
 
-export function persistAgentStream(stream: ReadableStream<UIMessageChunk>, save: (checkpoint: AgentCheckpoint) => Promise<void>, signal?: AbortSignal) {
+export function persistAgentStream(stream: ReadableStream<UIMessageChunk>, save: (checkpoint: AgentCheckpoint) => Promise<void>, signal?: AbortSignal, onCancel?: () => void) {
   const reader = stream.getReader()
   let completion = ''
   let failure: string | null = null
@@ -80,6 +80,7 @@ export function persistAgentStream(stream: ReadableStream<UIMessageChunk>, save:
     },
     async cancel(reason) {
       cancelled = true
+      onCancel?.()
       try { await reader.cancel(reason) } finally { await checkpoint('stopped') }
     },
   })

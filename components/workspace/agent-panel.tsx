@@ -15,6 +15,7 @@ import { AgentThemeProvider } from './agent-theme'
 import dynamic from 'next/dynamic'
 
 import { AgentResponse } from './agent-response'
+import { ComputerRequests } from './computer-requests'
 import { AgentChat, type AgentChatSession } from './agent-chat'
 import { AgentInteractionContext } from './agent-interaction'
 import { fetchAgentResponse, observeAgentImages } from '@/lib/agent-fetch'
@@ -193,7 +194,7 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
         onReset={onReset}
         onDemo={onDemo}
         onSuggestion={prompt => { updateDraft(prompt); inputRef.current?.focus() }}
-        composer={<AgentComposer ref={inputRef} isEmpty={!question} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} />}
+        composer={<><ComputerRequests sessionId={sessionIdRef.current} loading={isLoading} generation={generation} /><AgentComposer ref={inputRef} isEmpty={!question} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} /></>}
       />
     </AgentInteractionContext>
 }
