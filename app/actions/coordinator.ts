@@ -1,6 +1,6 @@
 'use server'
 
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { after } from 'next/server'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
@@ -11,6 +11,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import { chatView, type ChatView } from '@/lib/coordinator/store'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
+import { coordinatorWelcome } from '@/lib/agent-welcome'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -38,5 +39,24 @@ export async function sendCoordinatorMessage(text: string): Promise<ActionResult
     await recordCoordinatorEvent(db, userMessageEvent(userId, parsed.data))
     after(() => wakeCoordinator(userId))
     return { queued: true as const }
+  })
+}
+
+/**
+ * An empty Coordinator chat asks for its welcome, as every bot's does: a
+ * greeting and one question about where to start. Once only: nothing happens
+ * when the chat already has messages or anything waiting.
+ */
+export async function welcomeCoordinator(): Promise<ActionResult<{ queued: boolean }>> {
+  return runAction(async () => {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) throw new ActionFailureError('authRequired')
+    if (!coordinatorEnabled()) return { queued: false }
+    const chat = await chatView(session.user.id, 1)
+    if (chat.items.length || chat.working) return { queued: false }
+    const locale = (await cookies()).get('NEXT_LOCALE')?.value ?? 'zh-CN'
+    await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale)))
+    after(() => wakeCoordinator(session.user.id))
+    return { queued: true }
   })
 }

@@ -1,4 +1,5 @@
 import { pruneMessages, type ModelMessage } from 'ai'
+import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema'
 
 // What the Coordinator's model sees. Everything here depends only on the
@@ -155,6 +156,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date })[]
   for (const { position, message, createdAt } of rows) {
     if (message.role === 'user') {
       const text = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
+      // The request for its welcome is for the Coordinator only.
+      if (text.startsWith(COORDINATOR_WELCOME_MARK)) continue
       const event = text.startsWith('[Event]')
       // The triage line is for the Coordinator, not the person.
       items.push({ position, from: event ? 'event' : 'person', text: event ? text.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') : text, tools: [], createdAt: createdAt.toISOString() })

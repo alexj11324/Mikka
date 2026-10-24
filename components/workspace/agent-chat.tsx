@@ -2,6 +2,7 @@
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import type { ReactNode } from 'react'
+import { useTranslations } from 'next-intl'
 import { MessageSquarePlus } from 'lucide-react'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { AgentWelcome } from './agent-welcome'
@@ -30,6 +31,7 @@ export function AgentChat({ turns, composer, streaming, sessions, sessionId, onS
   onSuggestion: (prompt: string) => void
 }) {
   const agentCopy = useAgentCopy()
+  const tNav = useTranslations('Nav')
 
   const title = bot?.name || sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || agentCopy.newConversation
 
@@ -37,9 +39,9 @@ export function AgentChat({ turns, composer, streaming, sessions, sessionId, onS
     <AgentChatHeader title={title} bot={bot} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} onDemo={onDemo} />
     <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
     {turns.length === 0 && !bot ? <AgentWelcome composer={composer} sessions={sessions} onSelect={onSelect} onSuggestion={onSuggestion} /> : <>
-      {/* A bot chat is just a conversation: the composer stays at the bottom, as in the Coordinator's. */}
+      {/* A bot chat is just a conversation, never empty: the bot writes its welcome first. */}
       {turns.length === 0 && bot
-        ? <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3"><BotAvatar color={bot.color} shape={bot.shape} size="profile" /><p className="text-sm font-medium">{bot.name}</p></div>
+        ? <div className="mx-auto w-full max-w-3xl flex-1 px-3 py-5 sm:px-5"><p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><BotAvatar color={bot.color} shape={bot.shape} size="pill" mood="thinking" />{tNav('writingWelcome')}</p></div>
         : <AgentConversation turns={turns} streaming={streaming} />}
       <footer className="shrink-0 px-4 pb-4 pt-2 sm:px-8 sm:pb-6">
         <div className="mx-auto w-full max-w-3xl">{composer}</div>
