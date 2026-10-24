@@ -31,10 +31,14 @@ async function createTask(page: Page, title: string, team?: string) {
 }
 async function showAllTasks(page: Page) {
   await rail(page, '看板').click()
+  // The board mounts after the section switch settles; check its filters only once it is there.
+  await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
   // The board opens filtered to 负责人 = 我; teammates' public tasks need it off.
   const clear = page.getByRole('button', { name: '移除负责人筛选', exact: true })
-  if (await clear.isVisible()) await clear.click()
-  await expect(clear).toHaveCount(0)
+  await expect(async () => {
+    if (await clear.isVisible()) await clear.click({ timeout: 1000 })
+    await expect(clear).toHaveCount(0, { timeout: 1000 })
+  }).toPass()
 }
 function boardCard(page: Page, title: string) {
   return page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })
