@@ -86,3 +86,19 @@ The OIDC trust pins the current numeric GitHub repository and owner IDs and immu
 - No local development server, build or typecheck was run. The current application changes passed remote CI before PR #46 was merged; the branch-alias follow-up requires its own remote CI and Preview validation.
 
 Official references: [Vercel integration](https://vercel.com/marketplace/infisical), [Worker native sync](https://infisical.com/docs/integrations/secret-syncs/cloudflare-workers), [secret references](https://infisical.com/docs/documentation/platform/secret-reference), [Better Auth OAuth proxy](https://www.better-auth.com/docs/plugins/oauth-proxy).
+# BYOS reader inventory, 2026-10-24 21:06 UTC
+
+Read-only online `GET /api/v1/projects/89850d6a-f020-4936-863e-df77380dfe40/identity-memberships`
+returned four machine identities: `claude-cloud-agent-vault`, `token`,
+`mikka-github-cloud`, and `team-secret-management-broker`. All four currently
+have a non-temporary `admin` project role. The roles-list GET returned the four
+built-in roles and no custom reader role. This is current metadata; it does not
+retroactively change historical CI-role evidence below.
+
+No reusable access-only BYOS reader was found among these project memberships.
+The minimum missing runtime policy is secret read/readValue (and describe only
+if required) in staging `/byos/access`, with no grants-path access or writes.
+Authentication delivery and a synthetic allow/deny policy probe must also be
+verified. Existing admin custody authority must not be passed to inference or
+native containers. Both metadata GETs returned 200; no secret values, trial
+writes, IAM mutations or denied-endpoint retries were performed.

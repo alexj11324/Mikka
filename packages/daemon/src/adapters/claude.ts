@@ -34,6 +34,7 @@ import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import type { Writable } from "node:stream"
 
 import {
   query,
@@ -60,6 +61,7 @@ import {
 import type { SandboxPolicy } from "../agents/sandbox"
 import { ownDir } from "../agents/harness-home"
 import { buildChildEnv } from "../env"
+import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
 import type { RunChunk } from "../chunks"
 import {
   claudePermissionRules,
@@ -82,10 +84,15 @@ export interface ClaudeAdapterOptions {
    * drive fake CLIs through it; unset, the SDK starts the build it ships.
    */
   binary?: string
+  /** Trusted hosted transport; ordinary local sessions retain SDK spawning. */
+  spawnHosted?: (options: SpawnOptions, oauthPlaceholder: string) => SpawnedProcess
+  onHostedSession?(sessionId:string):Promise<void>
   /** `~/.claude` of the user whose login the CLI uses. */
   configDir?: string
   /** Trusted owner-bound broker; the CLI receives no refresh grant. */
   subscriptionAuth?: {
+    /** Only with the trusted hosted transport and the public socket marker. */
+    brokered?: true
     accountId: string
     verify?(): Promise<void>
     token(): Promise<{
@@ -334,15 +341,30 @@ async function untilSpoken(spoken: Promise<boolean>): Promise<boolean> {
   }
 }
 
-/** Runs `binary` where the SDK would have started its own bundled CLI. */
-function spawnBinary(binary: string) {
-  return (options: SpawnOptions): SpawnedProcess =>
-    spawn(binary, options.args, {
+/** Preserve the SDK's executable selection; a native lease uses a one-shot pipe.
+ * No access token enters argv, the process environment or an auth-cache file.
+ * This transport alone does not attest a safe tool/owner runtime boundary. */
+function spawnBinary(binary?: string, oauthToken?: string) {
+  return (options: SpawnOptions): SpawnedProcess => {
+    if (oauthToken === undefined) return spawn(binary ?? options.command, options.args, {
       cwd: options.cwd,
       env: options.env,
       stdio: ["pipe", "pipe", "pipe"],
       signal: options.signal,
     })
+    const env: NodeJS.ProcessEnv = { ...options.env, CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR: "3" }
+    delete env.CLAUDE_CODE_OAUTH_TOKEN
+    const child = spawn(binary ?? options.command, options.args, {
+      cwd: options.cwd,
+      env,
+      stdio: ["pipe", "pipe", "pipe", "pipe"],
+      signal: options.signal,
+    })
+    const pipe = child.stdio[3] as Writable
+    pipe.on("error", () => child.kill("SIGTERM"))
+    pipe.end(oauthToken)
+    return child
+  }
 }
 
 export class ClaudeAdapter implements AgentAdapter {
@@ -381,6 +403,7 @@ export class ClaudeAdapter implements AgentAdapter {
     let nativeToken: string | undefined
     let expiresAt = 0
     if (externalAuth) {
+      if(externalAuth.brokered && !this.options.spawnHosted)throw new Error(SUBSCRIPTION_ERROR)
       const clean = buildChildEnv({
         host: options.env,
         runId:
@@ -407,6 +430,7 @@ export class ClaudeAdapter implements AgentAdapter {
         )
           throw new Error(SUBSCRIPTION_ERROR)
         nativeToken = token.accessToken
+        if(externalAuth.brokered && nativeToken!==NATIVE_AUTH_PLACEHOLDER)throw new Error(SUBSCRIPTION_ERROR)
       } catch {
         throw new Error(SUBSCRIPTION_ERROR)
       }
@@ -465,6 +489,9 @@ export class ClaudeAdapter implements AgentAdapter {
     let finished: () => void = () => undefined
     const gone = new Promise<void>((resolve) => (finished = resolve))
 
+    if(externalAuth && this.options.onHostedSession) {
+      try{await this.options.onHostedSession(sessionId)}catch{throw new Error(SUBSCRIPTION_ERROR)}
+    }
     const session = query({
       prompt: prompts,
       options: {
@@ -479,7 +506,6 @@ export class ClaudeAdapter implements AgentAdapter {
             ? {
                 HOME: nativeHome,
                 CLAUDE_CONFIG_DIR: configDir,
-                CLAUDE_CODE_OAUTH_TOKEN: nativeToken
               }
             : {})
         },
@@ -501,8 +527,10 @@ export class ClaudeAdapter implements AgentAdapter {
         allowDangerouslySkipPermissions: true,
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
-        ...(this.options.binary
-          ? { spawnClaudeCodeProcess: spawnBinary(this.options.binary) }
+        ...(this.options.spawnHosted && externalAuth
+          ? { spawnClaudeCodeProcess: (options:SpawnOptions) => this.options.spawnHosted!(options,nativeToken!) }
+          : this.options.binary || externalAuth
+          ? { spawnClaudeCodeProcess: spawnBinary(this.options.binary, nativeToken) }
           : {}),
         stderr: (data: string) => {
           if (!externalAuth) stderr = (stderr + data).slice(-STDERR_TAIL * 4)
@@ -588,7 +616,7 @@ export class ClaudeAdapter implements AgentAdapter {
     // This SDK exposes no documented host token-refresh callback. End at the
     // access lease boundary; the broker refreshes once before the next start.
     // Never hand the rotating grant to a second refresh writer.
-    authTimer = externalAuth
+    authTimer = externalAuth && !externalAuth.brokered
       ? setTimeout(
           () => {
             void end({ outcome: "failed", error: SUBSCRIPTION_ERROR })
@@ -647,7 +675,7 @@ export class ClaudeAdapter implements AgentAdapter {
         if (externalAuth?.verify) {
           try { await externalAuth.verify() } catch { await end({ outcome: 'failed', error: SUBSCRIPTION_ERROR }); throw new Error(SUBSCRIPTION_ERROR) }
         }
-        if (externalAuth && Date.now() >= expiresAt) {
+        if (externalAuth && !externalAuth.brokered && Date.now() >= expiresAt) {
           await end({ outcome: "failed", error: SUBSCRIPTION_ERROR })
           throw new Error(SUBSCRIPTION_ERROR)
         }

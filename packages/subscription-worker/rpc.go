@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"time"
@@ -36,16 +37,31 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 			err = ErrUnsupported
 		} else {
 			timeout := 30 * time.Second
-			if request.Method == "executeStream" {
+			if request.Method == "executeStream" || request.Method == "nativeStream" {
 				timeout = 270 * time.Second
 			}
 			callCtx, cancel := context.WithTimeout(ctx, timeout)
-			if w.ExecutionOnly && request.Method != "executeStream" && request.Method != "execute" && request.Method != "quota" {
+			if w.ExecutionOnly && request.Method != "executeStream" && request.Method != "execute" && request.Method != "quota" && request.Method != "nativeContext" && request.Method != "nativeStream" {
 				cancel()
 				_ = encoder.Encode(map[string]any{"id": request.ID, "error": string(ErrUnsupported)})
 				continue
 			}
 			switch request.Method {
+			case "nativeContext":
+				result, err = w.NativeContext(callCtx, request.Revision)
+			case "nativeStream":
+				var native NativeRequest
+				decoder := json.NewDecoder(bytes.NewReader(request.Payload))
+				decoder.DisallowUnknownFields()
+				if decoder.Decode(&native) != nil || decoder.Decode(new(any)) != io.EOF {
+					err = ErrUnsupported
+				} else {
+					err = w.NativeStream(callCtx, request.Revision, native, func(contentType string) error {
+						return encoder.Encode(map[string]any{"id": request.ID, "head": map[string]any{"contentType": contentType}})
+					}, func(chunk []byte) error {
+						return encoder.Encode(map[string]any{"id": request.ID, "binaryChunk": base64.StdEncoding.EncodeToString(chunk)})
+					})
+				}
 			case "prepare":
 				result, err = w.PrepareRuntime(callCtx, request.Revision)
 			case "quota":

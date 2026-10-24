@@ -57,6 +57,10 @@ export interface CodexAdapterOptions {
   /** The daemon's adapter state dir (per-run dirs and homes live under it). */
   stateDir: string
   binary?: string
+  /** Trusted hosted transport, retaining the existing app-server adapter. */
+  spawnCli?: typeof spawnCli
+  /** Persist an owner-bound session before any prompt can execute. */
+  onHostedSession?(sessionId:string):Promise<void>
   /** The user's own `CODEX_HOME` (for the auth link); `~/.codex` by default. */
   userHome?: string
   /** Trusted, owner-bound broker only; never a task/model-supplied credential. */
@@ -321,7 +325,7 @@ export class CodexAdapter implements AgentAdapter {
       ]),
     ]
     const checkAuth = guardCodexAuth(codexHome.authFile, log)
-    const child = await spawnCli(this.options.sandbox, argv, {
+    const child = await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, {
       cwd: ctx.worktree,
       env: { ...options.env, ...ctx.tempEnv(), CODEX_HOME: codexHome.home },
       policy: ctx.policy(),
@@ -585,6 +589,7 @@ export class CodexAdapter implements AgentAdapter {
         }
       }
       sessionId = response.thread.id
+      if(externalAuth)await this.options.onHostedSession?.(sessionId)
       await ready(startTurn(firstMessage), "turn/start")
     } catch (error) {
       await finish(null)

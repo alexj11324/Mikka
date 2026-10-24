@@ -15,6 +15,7 @@ import {createInterface} from 'node:readline';import{appendFileSync}from'node:fs
 let config;const lines=createInterface({input:process.stdin});lines.on('line',line=>{const value=JSON.parse(line);if(!config){config=value;return};const request=value;appendFileSync(${JSON.stringify(journal)},request.method+'\\n');
 const result={fullAuthority:Boolean(config.workloadToken||config.path),accessAuthority:config.accessToken==='fixture-access-reader',binding:config.use?.bindingId,consumer:config.use?.consumerId};
 if(request.method==='prepare'){setTimeout(()=>{console.log(JSON.stringify({id:request.id,result:{ready:true}}));lines.close()},${hold ? 500 : 0});return}
+if(request.method==='nativeStream'){console.log(JSON.stringify({id:request.id,head:{contentType:'application/json'}}));for(const byte of Buffer.from(JSON.stringify({...result,text:'汉字🙂'})))console.log(JSON.stringify({id:request.id,binaryChunk:Buffer.from([byte]).toString('base64')}));console.log(JSON.stringify({id:request.id,result:{done:true}}));lines.close();return}
 if(request.method==='executeStream'){console.log(JSON.stringify({id:request.id,chunk:JSON.stringify(result)}));console.log(JSON.stringify({id:request.id,result:{done:true}}))}else console.log(JSON.stringify({id:request.id,result}));lines.close()})
 `)
   chmodSync(binary, 0o700)
@@ -38,4 +39,11 @@ it('cancelling during preparation cannot start inference afterward', async () =>
   await reader.cancel()
   await new Promise(resolve => setTimeout(resolve, 650))
   expect(readFileSync(journal, 'utf8')).not.toContain('executeStream')
+})
+it('native broker requests retain the task and access-reader boundary and preserve split UTF-8 bytes', async () => {
+  const { client } = fixture()
+  const response = await client.nativeRequest(2, {path:'/responses',headers:{},body:{model:'fixture-model'}})
+  expect(response.contentType).toBe('application/json')
+  expect(await new Response(response.body).json()).toMatchObject({fullAuthority:false,accessAuthority:true,consumer:'fixture-task',text:'汉字🙂'})
+  expect(await client.call('nativeContext', {revision:2})).toMatchObject({fullAuthority:false,accessAuthority:true})
 })

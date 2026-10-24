@@ -11,11 +11,21 @@ import (
 type RuntimeUse struct {
 	BindingID  string `json:"bindingId"`
 	ConsumerID string `json:"consumerId"`
+	RunID      string `json:"runId,omitempty"`
 }
 
 func (w *Worker) authorizeRuntime(ctx context.Context, epoch int64, execution, model string) error {
 	if w.Use == nil || !uuidPattern.MatchString(w.Use.BindingID) || w.Use.ConsumerID == "" || len(w.Use.ConsumerID) > 128 {
 		return ErrUnavailable
+	}
+	if w.Use.RunID != "" {
+		if !uuidPattern.MatchString(w.Use.RunID) {
+			return ErrUnavailable
+		}
+		var active bool
+		if w.Repo.DB.QueryRowContext(ctx, `select exists(select 1 from agent_runs r join byos_native_runs n on n."runId"=r.id where r.id=$1 and r."userId"=$2 and r."agentId"::text=$3 and n."bindingId"=$4 and r.status in ('preparing','running','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null)`, w.Use.RunID, w.Scope.OwnerID, w.Use.ConsumerID, w.Use.BindingID).Scan(&active) != nil || !active {
+			return ErrUnavailable
+		}
 	}
 	var route, boundModel, state string
 	var current int64
@@ -25,7 +35,7 @@ func (w *Worker) authorizeRuntime(ctx context.Context, epoch int64, execution, m
 		return ErrUnavailable
 	}
 	expected := w.Scope.Provider + "_cpa"
-	if execution == "native" {
+	if execution == "native" || execution == "native_active" {
 		expected = "codex_cli"
 		if w.Scope.Provider == "claude" {
 			expected = "claude_code_cli"

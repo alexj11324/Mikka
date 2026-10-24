@@ -16,6 +16,7 @@ import { z } from 'zod'
 import { SubscriptionRepository } from '../lib/subscription-repository.ts'
 import { SubscriptionService } from '../lib/subscription-service.ts'
 import { subscriptionHTTP, subscriptionCallback, subscriptionList } from '../lib/subscription-http.ts'
+import { subscriptionNativeHTTP } from '../lib/subscription-native-http.ts'
 import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-worker-client.ts'
 import { resolveAgentSubscription } from '../lib/agent-subscription.ts'
 import { resolveAgentModel } from '../lib/agent-model.ts'
@@ -228,6 +229,37 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       await assert.rejects(service.model({ ...use, ownerId: 'bob' }), { code: 'binding_required' })
 
       const nativeRoute = provider === 'codex' ? 'codex_cli' : 'claude_code_cli'
+      // The actual hosted-device HTTP boundary uses the immutable run ledger,
+      // actual service/private worker and real Postgres, not nativeAuth export.
+      const deviceId=randomUUID(),agentId=randomUUID()
+      await pool.query('insert into devices(id,"ownerId",name) values($1,\'alice\',\'native fixture\')',[deviceId])
+      await pool.query('insert into agents(id,"userId",harness,name,"deviceId") values($1,\'alice\',$2,$3,$4)',[agentId,provider==='codex'?'codex':'claude_code',`native-${agentId}`,deviceId])
+      const agentBinding=await post({action:'bind',connectionId,revision,consumerId:agentId,route:nativeRoute,modelId:'fixture-model'})
+      assert.equal(agentBinding.status,200)
+      assert.equal((await repository.nativeBinding('alice',agentId,provider==='codex'?'codex':'claude_code')).id,agentBinding.body.bindingId)
+      const nativeHTTP=subscriptionNativeHTTP({authorize:async request=>request.headers.get('authorization')==='Bearer fixture-device'?'alice':request.headers.get('authorization')==='Bearer fixture-other'?'bob':null,service:()=>service})
+      const nativePost=(runId,body,token='fixture-device',targetDevice=deviceId)=>nativeHTTP(new Request('http://localhost/v1/native',{method:'POST',headers:{'content-type':'application/json',authorization:`Bearer ${token}`},body:JSON.stringify(body)}),{params:Promise.resolve({deviceId:targetDevice,runId})})
+      const noLoginCreates=secretMethods.filter(method=>method==='POST').length
+      for(let task=0;task<2;task++){
+        const runId=randomUUID()
+        await pool.query('insert into agent_runs(id,"userId","agentId","deviceId",status,"leaseExpiresAt") values($1,\'alice\',$2,$3,\'running\',now()+interval \'1 minute\')',[runId,agentId,deviceId])
+        await pool.query('insert into byos_native_runs("runId","bindingId") values($1,$2)',[runId,agentBinding.body.bindingId])
+        const contextResponse=await nativePost(runId,{action:'context'})
+        assert.equal(contextResponse.status,200)
+        const metadata=await contextResponse.json();assert.equal(metadata.route,nativeRoute);assert.equal(metadata.revision,revision);assert.ok(!JSON.stringify(metadata).includes('accessToken'));assert.ok(!JSON.stringify(metadata).includes('fixture-access'))
+        const payload={path:provider==='codex'?'/responses':'/v1/messages',headers:{'user-agent':'Mikka/1.0',originator:'Mikka',authorization:'Bearer caller-placeholder'},body:provider==='codex'?{model:'fixture-model',stream:true,store:false,input:[{role:'user',content:'HELLO'}]}:{model:'fixture-model',stream:true,max_tokens:16,messages:[{role:'user',content:'HELLO'}]}}
+        const nativeResponse=await nativePost(runId,{action:'request',payload});assert.equal(nativeResponse.status,200);const output=await nativeResponse.text();assert.ok(output.includes('subscription fixture'));assert.ok(!output.includes('fixture-access'))
+        const before=providerCalls
+        assert.equal((await nativePost(runId,{action:'context'},'fixture-other')).status,409)
+        assert.equal((await nativePost(runId,{action:'context'},'fixture-device',randomUUID())).status,409)
+        assert.equal((await nativePost(runId,{action:'request',payload:{...payload,body:{...payload.body,model:'another-model'}}})).status,409)
+        await pool.query('update agent_runs set "stopRequestedAt"=now() where id=$1',[runId])
+        assert.equal((await nativePost(runId,{action:'context'})).status,409)
+        assert.equal(providerCalls,before)
+        await pool.query('delete from agent_runs where id=$1',[runId])
+      }
+      assert.equal(secretMethods.filter(method=>method==='POST').length,noLoginCreates,'hosted tasks must reuse the original OAuth connection')
+      await pool.query('delete from agents where id=$1',[agentId]);await pool.query('delete from devices where id=$1',[deviceId])
       const native = await post({ action: 'bind', connectionId, revision, consumerId, route: nativeRoute, modelId: 'fixture-model' })
       const runtime = join(directory, `native-${provider}`); await mkdir(runtime)
       const cwd = join(runtime, 'project'); await mkdir(cwd)

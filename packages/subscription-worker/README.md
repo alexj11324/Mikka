@@ -8,7 +8,7 @@ Run on the Agent's cloud Linux machine:
     pnpm test:byos-worker
 
 This verifies the exact official CPA commit, starts disposable loopback Postgres,
-applies all 31 migrations, builds the production and acceptance-only executables,
+applies all 32 migrations, builds the production and acceptance-only executables,
 runs Go race tests and vet, then runs application/native/browser acceptance and
 migration replay. No real grant, account credentials, Infisical write, provider
 inference or E2B sandbox is used. Docker images and Go module sums are pinned.
@@ -36,11 +36,11 @@ inference or E2B sandbox is used. Docker images and Go module sums are pinned.
    CPA converters run through a separate ordinary Mikka HTTP model adapter;
    native identity metadata is removed, no native fingerprint executor is used.
    Errors, retries, cancellation and revocation fail closed without paid fallback.
-7. The native launcher seam can use the same connection through access-only leases and
-   existing daemon adapters. Codex has host-managed login/refresh callbacks.
-   Claude uses its documented OAuth environment input and ends at access expiry;
-   its SDK has no documented host refresh callback. A later start reuses the
-   platform connection and refresh authority without login.
+7. Bot claims pin a native binding to the run. The opt-in hosted Linux daemon
+   uses the existing adapters in a network-isolated Docker runtime. Its external
+   Unix-socket broker injects credentials in Go; the CLI receives only a public
+   placeholder. CPA remains the refresh authority. See the current hosted broker
+   section in the integration document for boundaries and unverified gates.
 
 The worker is permanently scoped to one owner connection. No global tenant store
 switch or account pool is used. Refresh claims serialize across processes;
@@ -67,10 +67,12 @@ access. Source checks do not establish actual IAM policy. No identities, grants
 or permissions were configured during synthetic validation. Ordinary trusted
 platform custody remains readable to its authorized runtime/operators.
 
-The production executable now refuses native credential export unconditionally;
-a configuration flag cannot attest isolation. Library/fake-CLI seams remain for
-compatibility tests. Real Codex/Claude tool/process/file boundaries and safe
-external credential delivery are still activation gates, not shipped guarantees.
+The production executable refuses raw native credential export unconditionally.
+Its nativeContext/nativeStream RPCs return metadata and brokered protocol bytes,
+never the bearer token. They require a live owner-bound run and exact model.
+The device route additionally requires an operator allow-list and advertised
+hosted-broker capability. Fake CLI integration and real Claude offline shell
+acceptance passed; actual vendor compatibility and E2B delivery remain unverified.
 
 ## Credential deletion
 

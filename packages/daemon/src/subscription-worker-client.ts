@@ -19,7 +19,7 @@ export interface WorkerConfiguration {
   workloadToken: string
   accessPath?: string
   accessToken?: string
-  use?: { bindingId: string; consumerId: string }
+  use?: { bindingId: string; consumerId: string; runId?: string }
   executionOnly?: boolean
   enableCodexOAuth?: boolean
   enableRuntime?: boolean
@@ -38,11 +38,11 @@ const safeCode = (value: unknown) => typeof value === "string" && /^[a-z_]{1,64}
 
 export class SubscriptionWorkerClient {
   constructor(private readonly launch: { binary: string; args?: string[]; env?: Record<string, string> }, private readonly config: WorkerConfiguration) {}
-  forUse(use: { bindingId: string; consumerId: string }): SubscriptionWorkerClient {
-    return new SubscriptionWorkerClient(this.launch, { ...this.config, use: { bindingId: use.bindingId, consumerId: use.consumerId } })
+  forUse(use: { bindingId: string; consumerId: string; runId?: string }): SubscriptionWorkerClient {
+    return new SubscriptionWorkerClient(this.launch, { ...this.config, use: { bindingId: use.bindingId, consumerId: use.consumerId, ...(use.runId ? {runId:use.runId} : {}) } })
   }
 
-  private start(request: Record<string, unknown>, signal?: AbortSignal, chunk?: (value: string) => void) {
+  private start(request: Record<string, unknown>, signal?: AbortSignal, chunk?: (value: string) => void, head?: (value: { contentType: string }) => void, binary?: (value: Uint8Array) => void) {
     if (signal?.aborted) throw new WorkerRefusal("subscription_cancelled")
     const id = randomUUID()
     const child = spawn(this.launch.binary, this.launch.args ?? [], {
@@ -75,14 +75,20 @@ export class SubscriptionWorkerClient {
         error ? reject(error) : resolve(value)
       }
       rejectPending = error => finish(error)
-      const timer = setTimeout(() => finish(new WorkerRefusal("subscription_timeout")), chunk ? 275_000 : 35_000)
+      const timer = setTimeout(() => finish(new WorkerRefusal("subscription_timeout")), chunk || binary ? 275_000 : 35_000)
       timer.unref()
       lines.on("line", line => {
         if (line.length > 262144) return finish(new WorkerRefusal())
         try {
           const frame = JSON.parse(line)
           if (frame.id !== id) return finish(new WorkerRefusal())
-          if (typeof frame.chunk === "string" && chunk) chunk(frame.chunk)
+          if (frame.head && head && (frame.head.contentType === 'text/event-stream' || frame.head.contentType === 'application/json')) head(frame.head)
+          else if (typeof frame.binaryChunk === 'string' && binary) {
+            const value = Buffer.from(frame.binaryChunk, 'base64')
+            if (value.toString('base64') !== frame.binaryChunk) throw new WorkerRefusal()
+            binary(value)
+          }
+          else if (typeof frame.chunk === "string" && chunk) chunk(frame.chunk)
           else if (frame.error) finish(new WorkerRefusal(safeCode(frame.error)))
           else if (Object.hasOwn(frame, "result")) finish(undefined, frame.result)
           else finish(new WorkerRefusal())
@@ -93,16 +99,47 @@ export class SubscriptionWorkerClient {
       child.stdin.on("error", () => finish(new WorkerRefusal()))
       signal?.addEventListener("abort", abort, { once: true })
       // The first frame is private host configuration, never a process argument.
-      const executionOnly = request.method === 'executeStream' || request.method === 'execute' || request.method === 'quota'
+      const executionOnly = ['executeStream', 'execute', 'quota', 'nativeContext', 'nativeStream'].includes(String(request.method))
       // Execution children receive the access-store identity only. Refresh and
       // OAuth stay in custody children, with no token material in their results.
       const config = executionOnly ? { ...this.config, executionOnly: true, path: '', workloadToken: '', enableCodexOAuth: false, enableClaudeOAuth: false } : this.config
       child.stdin.write(`${JSON.stringify(config)}\n${JSON.stringify({ ...request, id })}\n`)
     })
-    return { result, stop: abort }
+    return { result, stop: abort, pause: () => child.stdout.pause(), resume: () => child.stdout.resume() }
   }
-  async call<T>(method: "status" | "oauthStart" | "oauthComplete" | "oauthPoll" | "oauthHandoff" | "refresh" | "recover" | "disconnect" | "nativeAuth" | "prepare" | "quota" | "cleanup", input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
+  async call<T>(method: "status" | "oauthStart" | "oauthComplete" | "oauthPoll" | "oauthHandoff" | "refresh" | "recover" | "disconnect" | "nativeAuth" | "nativeContext" | "prepare" | "quota" | "cleanup", input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
     return await this.start({ ...input, method }, signal).result as T
+  }
+  async nativeRequest(revision: number, payload: {path: string; headers: Record<string, string>; body: unknown}, signal?: AbortSignal): Promise<{contentType: string; body: ReadableStream<Uint8Array>}> {
+    await this.call('prepare', { revision }, signal)
+    let resolveHead!: (head: {contentType: string}) => void
+    let rejectHead!: (error: Error) => void
+    const ready = new Promise<{contentType: string}>((resolve, reject) => { resolveHead = resolve; rejectHead = reject })
+    let closed = false
+    let receivedHead = false
+    let stop: (() => void) | undefined
+    let resume: (() => void) | undefined
+    const body = new ReadableStream<Uint8Array>({
+      start: controller => {
+        try {
+          const run = this.start({ method: 'nativeStream', revision, payload }, signal, undefined,
+          head => { if (receivedHead) throw new WorkerRefusal(); receivedHead = true; resolveHead(head) }, chunk => {
+            if (!receivedHead) throw new WorkerRefusal()
+            if (!closed) { controller.enqueue(chunk); if ((controller.desiredSize ?? 0) <= 0) run.pause() }
+          })
+          stop = run.stop
+          resume = run.resume
+          void run.result.then(() => {
+            if (!receivedHead) rejectHead(new WorkerRefusal())
+            if (!closed) { closed = true; controller.close() }
+          }, error => { rejectHead(error); if (!closed) { closed = true; controller.error(error) } })
+        } catch (error) { rejectHead(error instanceof Error ? error : new WorkerRefusal()); closed = true; controller.error(new WorkerRefusal()) }
+      },
+      pull: () => resume?.(),
+      cancel: () => { closed = true; stop?.() }
+    })
+    try { const head = await ready; return { ...head, body } }
+    catch (error) { await body.cancel().catch(() => undefined); throw error }
   }
   stream(revision: number, model: string, payload: unknown, signal?: AbortSignal): ReadableStream<Uint8Array> {
     const encoder = new TextEncoder()

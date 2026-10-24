@@ -74,6 +74,7 @@ import {
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
+import { createHostedBotRunner } from "./subscription-hosted-runner"
 
 export * from "./server-link"
 export { DAEMON_VERSION, daemonPaths, defaultDataDir } from "./paths"
@@ -110,6 +111,8 @@ export interface DaemonOptions {
   agentSandbox?: AgentSandbox | null
   /** Override a harness CLI binary (tests use fake CLIs). */
   harnessBinaries?: Partial<Record<"claude_code" | "codex" | "cursor", string>>
+  /** Linux-only operator mode; no native/local credential source is opened. */
+  hostedSubscriptions?: boolean
   /** Long-poll wait for run commands, seconds (default 25; tests shorten). */
   commandsWaitSeconds?: number
   /** Called once the daemon stopped after `daemon.drain`. */
@@ -221,6 +224,13 @@ export class Daemon {
       (runId, _item, error) => this.supervisor.markUndeliverable(runId, error)
     )
     this.worktrees = new WorktreeManager(paths.worktrees)
+    const hosted = this.options.hostedSubscriptions
+      ? await createHostedBotRunner({
+          stateDir: paths.adapterState,
+          link: this.options.link,
+          binaries: this.options.harnessBinaries,
+        })
+      : undefined
     const adapters = (this.adapters = new Map<Harness, AgentAdapter>([
       [
         "mock",
@@ -230,17 +240,75 @@ export class Daemon {
           speed: this.options.mockSpeed,
         }),
       ],
-      ...this.realAdapters(),
+      ...(hosted
+        ? hosted.harnesses.map(
+            (harness) =>
+              [
+                harness,
+                {
+                  harness,
+                  capabilities: {
+                    supportsInterject: true,
+                    supportsResume: false,
+                  },
+                  envAllow: [],
+                  async start() {
+                    throw new Error("subscription_binding_required")
+                  },
+                  async resume() {
+                    throw new Error("subscription_binding_required")
+                  },
+                },
+              ] as [Harness, AgentAdapter]
+          )
+        : this.realAdapters()),
     ]))
     this.supervisor = new RunSupervisor({
       journal: this.journal,
       outbox: this.outbox,
       worktrees: this.worktrees,
       adapters,
+      startSubscription: hosted?.start,
+      bootstrap: hosted
+        ? async (worktree, repo) => {
+            if (
+              repo.setup?.copyFiles.some((path) =>
+                /(^|\/)(\.git|\.codex\/auth\.json|\.claude\/\.credentials\.json)(\/|$)/.test(
+                  path
+                )
+              )
+            )
+              throw new Error("native_credential_import_refused")
+            const result = await this.worktrees.bootstrap(
+              worktree,
+              repo.path,
+              repo.setup ? { ...repo.setup, command: undefined } : undefined
+            )
+            if (repo.setup?.approved && repo.setup.command) {
+              const checked = await hosted.command(
+                worktree,
+                repo.setup.command,
+                false,
+                30 * 60_000
+              )
+              if (checked.exitCode !== 0) throw new Error("hosted_setup_failed")
+            }
+            return result
+          }
+        : undefined,
       repos: () => this.device.repos ?? [],
       log: this.log,
       stallMs: this.options.stallMs,
-      verify: this.verifier(),
+      verify: hosted
+        ? (run) =>
+            hosted.command(
+              run.worktree,
+              run.command,
+              run.readOnly,
+              run.timeoutMs,
+              run.signal
+            )
+        : this.verifier(),
       publisher: {
         snapshot: ({ worktree, repo }) => snapshotTree(repo.path, worktree),
         publish: ({ runId, worktree, repo, assignment, report, tree }) =>
@@ -284,11 +352,18 @@ export class Daemon {
     // Only harnesses this daemon can drive are advertised: the server must
     // never pin a run here that no adapter would take. (A detected CLI
     // without an adapter yet is left out; the schema has no "unsupported".)
-    const detected = this.options.harnesses ?? (await detectHarnesses())
+    const detected = hosted
+      ? hosted.harnesses.map((harness) => ({
+          harness,
+          installed: true,
+          version: null,
+          subscriptionBroker: true as const,
+        }))
+      : (this.options.harnesses ?? (await detectHarnesses()))
     this.harnesses = detected.filter((info) => this.adapters.has(info.harness))
     // Runs survive restarts: pick up what the journal says was active.
     this.supervisor.resumeAll()
-    if (this.options.quotaSource !== null) {
+    if (!hosted && this.options.quotaSource !== null) {
       this.quota = new QuotaPoller(
         this.options.quotaSource ??
           new LocalCredentialsSource({ log: this.log }),

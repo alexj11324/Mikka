@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Synthetic native-auth process only; no provider/network requests.
-import { existsSync } from "node:fs"
+import { closeSync, existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 
@@ -10,7 +10,9 @@ const flag = (key) => {
   if (inline) return inline.slice(key.length + 1)
   return args[args.indexOf(key) + 1]
 }
-const token = process.env.CLAUDE_CODE_OAUTH_TOKEN
+if (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR !== "3") process.exit(2)
+const token = readFileSync(3, "utf8")
+closeSync(3)
 const config = process.env.CLAUDE_CONFIG_DIR
 if (
   !token ||
@@ -50,6 +52,10 @@ lines.on("line", (line) => {
   }
   const text = frame.message?.content?.[0]?.text
   if (typeof text !== "string") return
+  if(text==='PROBE_GIT') {
+    const target=lstatSync('.git').isFile()?'.git':'.git/guard'
+    try{writeFileSync(target,'synthetic metadata mutation');process.exit(2)}catch(error){if(!['EROFS','EBUSY','EACCES'].includes(error.code))process.exit(2)}
+  }
   out({ type: "system", subtype: "init", session_id: sessionId })
   if (text === "CRASH") {
     process.stderr.write(`private upstream diagnostic ${token}`)

@@ -10,7 +10,7 @@ import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-wo
 export async function authorizeSubscriptionWorkspace(userId: string, workspaceId: string) {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, userId))
 }
-export function subscriptionRuntime(): SubscriptionService {
+export function subscriptionRuntime(nativeBroker = false): SubscriptionService {
   if (process.env.MIKKA_BYOS_ENABLED !== '1') throw new SubscriptionRefusal('backend_unavailable')
   const binary = process.env.MIKKA_BYOS_WORKER_BINARY
   // pool is request-scoped; never send a preview worker to the production DB.
@@ -34,6 +34,8 @@ export function subscriptionRuntime(): SubscriptionService {
     ready: (route: SubscriptionRoute) => ready.has(route) || modelRoutes.has(route),
     oauth: { codex: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', claude: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1' },
     // Only a verified runner supplies native isolation; Vercel is not the runner.
-    nativeIsolation: 'none'
+    // The private device route also requires a server allow-list and the hosted
+    // runner capability. This never enables raw nativeAuth credential export.
+    nativeIsolation: nativeBroker ? 'verified_runtime' : 'none'
   }, undefined, authorizeSubscriptionWorkspace)
 }

@@ -87,7 +87,20 @@ export interface SubscriptionUse {
   consumerId: string
   bindingId: string
   execution: "native" | "model"
+  /** Server-derived run ledger ID, never chosen by the model. */
+  runId?: string
 }
+
+export const nativeBrokerContextSchema = z.object({
+  route: z.enum(['codex_cli', 'claude_code_cli']),
+  modelId: z.string().min(1).max(128),
+  revision: z.number().int().positive(),
+  accountId: z.string().min(1).max(512),
+  plan: z.string().max(40).optional(),
+  expiresAt: z.iso.datetime(),
+}).strict()
+export type NativeBrokerContext = z.infer<typeof nativeBrokerContextSchema>
+export interface NativeBrokerRequest { path: string; headers: Record<string,string>; body: unknown }
 
 /** A trusted backend's account boundary, never an attestation from a browser. */
 export interface SubscriptionBackend {

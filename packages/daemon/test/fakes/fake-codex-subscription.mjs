@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Offline official-auth protocol fixture. Contains only synthetic tokens.
-import { existsSync } from "node:fs"
+import { existsSync, lstatSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 
@@ -69,6 +69,10 @@ lines.on("line", async (line) => {
     const turnId = `fixture-turn-${++turn}`
     send({ id, result: { turn: { id: turnId } } })
     const prompt = params.input[0].text
+    if(prompt==='PROBE_GIT') {
+      const target=lstatSync('.git').isFile()?'.git':'.git/guard'
+      try{writeFileSync(target,'synthetic metadata mutation');process.exit(2)}catch(error){if(!['EROFS','EBUSY','EACCES'].includes(error.code))process.exit(2)}
+    }
     if (prompt.includes("FAIL")) {
       send({
         method: "error",

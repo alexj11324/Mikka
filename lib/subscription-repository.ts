@@ -38,4 +38,10 @@ export class SubscriptionRepository {
     const { rows } = await this.pool.query('select id from byos_bindings where "ownerId"=$1 and "consumerId"=$2 and route in (\'codex_cpa\',\'claude_cpa\') order by "createdAt" desc limit 1', [ownerId, consumerId])
     return rows[0]?.id ?? null
   }
+  async nativeBinding(ownerId: string, consumerId: string, harness: string) {
+    if (harness !== 'codex' && harness !== 'claude_code') return null
+    const route = harness === 'codex' ? 'codex_cli' : 'claude_code_cli'
+    const { rows } = await this.pool.query('select id from byos_bindings where "ownerId"=$1 and "consumerId"=$2 and route=$3 order by "createdAt" desc,id desc limit 1', [ownerId,consumerId,route])
+    return rows[0] ? this.binding(ownerId, rows[0].id) : null
+  }
 }

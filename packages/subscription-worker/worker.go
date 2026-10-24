@@ -35,6 +35,7 @@ type Worker struct {
 	AllowNativeAuth bool
 	ExecutionOnly   bool
 	QuotaClient     *http.Client
+	NativeClient    *http.Client
 	Scope           Scope
 	Authenticator   sdkauth.Authenticator
 	Executor        core.ProviderExecutor

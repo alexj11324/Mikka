@@ -115,7 +115,7 @@ func run() error {
 		return w.ErrUnsupported
 	}
 	client := &http.Client{Transport: fixtureTransport(func(request *http.Request) (*http.Response, error) {
-		model := request.URL.String() == "https://api.anthropic.com/v1/messages" || request.URL.String() == "https://chatgpt.com/backend-api/codex/responses"
+		model := request.URL.String() == "https://api.anthropic.com/v1/messages" || request.URL.String() == "https://api.anthropic.com/v1/messages?beta=true" || request.URL.String() == "https://chatgpt.com/backend-api/codex/responses"
 		quota := request.URL.String() == "https://chatgpt.com/backend-api/wham/usage" || request.URL.String() == "https://api.anthropic.com/api/oauth/usage"
 		oauth := request.URL.String() == "https://auth.openai.com/api/accounts/deviceauth/usercode" || request.URL.String() == "https://auth.openai.com/api/accounts/deviceauth/token" || request.URL.String() == "https://auth.openai.com/oauth/token" || request.URL.String() == "https://platform.claude.com/v1/oauth/token"
 		if !model && !oauth && !quota {
@@ -140,6 +140,7 @@ func run() error {
 		worker.OAuth = w.CPAClaudeOAuth{Client: client}
 	}
 	worker.QuotaClient = client
+	worker.NativeClient = client
 	if c.ExecutionOnly {
 		worker.Secrets = nil
 	}

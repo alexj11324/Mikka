@@ -5,6 +5,7 @@ import type { SubscriptionWorkerClient, WorkerMetadata } from '../packages/daemo
 import { readSubscriptionQuota } from '../packages/daemon/src/subscription-quota'
 import { SubscriptionRepository } from './subscription-repository'
 import { resolveSubscriptionModel } from './subscription-model'
+import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 
 export interface SubscriptionCapabilities {
   ready(route: SubscriptionRoute): boolean
@@ -90,6 +91,29 @@ export class SubscriptionService {
     })
   }
   async check(use: SubscriptionUse, signal?: AbortSignal) { return authorizeSubscriptionUse(use, await this.access(use, signal)) }
+  async nativeRun(ownerId: string, deviceId: string, runId: string) {
+    const { rows } = await this.repository.pool.query(`select b.id,b."workspaceId",b."consumerId",b.route from byos_native_runs n join agent_runs r on r.id=n."runId" join agents a on a.id=r."agentId" join byos_bindings b on b.id=n."bindingId" where r.id=$1 and r."userId"=$2 and r."deviceId"=$3 and a."userId"=$2 and a."deviceId"=$3 and b."ownerId"=$2 and b."consumerId"=a.id::text and b.route=case a.harness when 'codex' then 'codex_cli' when 'claude_code' then 'claude_code_cli' else '' end and r.status in ('preparing','running','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, [runId,ownerId,deviceId])
+    if (!rows[0]) throw new SubscriptionRefusal('account_unavailable')
+    const row=rows[0]
+    return {ownerId,workspaceId:row.workspaceId,consumerId:row.consumerId,bindingId:row.id,execution:'native',runId} as const
+  }
+  async nativeContext(use: SubscriptionUse, signal?: AbortSignal) {
+    const authorized=await this.check(use,signal)
+    const binding=await this.repository.binding(use.ownerId,use.bindingId)
+    const row=await this.repository.connection(use.ownerId,binding.connectionId)
+    const client=this.worker(this.repository.scope(row)).forUse(use)
+    await client.call('prepare',{revision:authorized.binding.connectionRevision},signal)
+    const info=await client.call<{accountId:string;plan?:string;expiresAt:string}>('nativeContext',{revision:authorized.binding.connectionRevision},signal)
+    return nativeBrokerContextSchema.parse({...info,route:binding.route,modelId:binding.modelId,revision:authorized.binding.connectionRevision})
+  }
+  async nativeRequest(use: SubscriptionUse, request: NativeBrokerRequest, signal?: AbortSignal) {
+    const binding=await this.repository.binding(use.ownerId,use.bindingId)
+    if(!request.body || typeof request.body!=='object' || Array.isArray(request.body) || !('model' in request.body) || request.body.model!==binding.modelId)throw new SubscriptionRefusal('binding_mismatch')
+    if(binding.route==='codex_cli'?request.path!=='/responses':binding.route!=='claude_code_cli'||!['/v1/messages','/v1/messages?beta=true'].includes(request.path))throw new SubscriptionRefusal('backend_unavailable')
+    const authorized=await this.check(use,signal)
+    const row=await this.repository.connection(use.ownerId,binding.connectionId)
+    return this.worker(this.repository.scope(row)).forUse(use).nativeRequest(authorized.binding.connectionRevision,request,signal)
+  }
   async launchNative<T>(ownerId: string, consumerId: string, bindingId: string, run: (context: { use: SubscriptionUse; modelId: string; worker: Pick<SubscriptionWorkerClient, 'call'>; access(): Promise<SubscriptionAccess> }) => Promise<T>) {
     const binding = await this.repository.binding(ownerId, bindingId)
     const use: SubscriptionUse = { ownerId, consumerId, bindingId, workspaceId: binding.workspaceId, execution: 'native' }

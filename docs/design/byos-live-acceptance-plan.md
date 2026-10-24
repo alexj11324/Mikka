@@ -1,5 +1,48 @@
 # BYOS real-provider acceptance proposal
 
+## Current authorization and preparation status
+
+The owner approved new official Codex/ChatGPT and Claude authorization on
+2026-10-24, and explicitly requested persistent Infisical custody for reuse,
+automatic refresh and later tasks. This supersedes the temporary-retention and
+disconnect-after-test proposal below. Real connections must not be enrolled in
+synthetic-test cleanup. Normal owner-requested disconnect and rotation cleanup
+still apply. No real OAuth attempt or provider inference has been started here.
+
+The bounded call budget is at most two calls per provider, each at most 256
+output tokens, after user confirmation on the official provider page. No API
+credit fallback, E2B resource or deployment is authorized. Codex consent must
+match the actual official page; Claude scopes remain the explicit set below.
+
+The immediate target is a real Mikka app on cloud Linux and a persistent
+nonproduction database, rather than a new Vercel deployment. Existing Neon
+development branches contain cloned data and cannot be treated as empty test
+databases. A verified authenticated owner/workspace/session and a selected
+database are still required before the current connection route can be used.
+Do not invent these IDs or import existing local CLI credentials.
+
+Proposed persistent staging paths are `/byos/grants` and `/byos/access` in the
+existing Mikka project. These paths have not been created or configured here.
+Current project membership metadata finds only admin machine identities; a
+separate restricted access-reader policy/delivery remains unconfigured. Existing
+custody can write both paths, but cannot be sent to inference as a shortcut.
+
+Separating authorization custody from later execution is architecturally
+possible. It is not currently implemented: OAuth attempts, canonical bundles
+and publication checks require owner/workspace/connection/session scope. A
+pending-unbound route needs its own persistent record, one-use binding proof,
+verified provider subject and an atomic transfer confirmed by a real Mikka
+session. It must deny quota/model/task use before binding. Fabricated scope IDs,
+plain-email claiming or bypassing `subscriptionRuntime` are not substitutes.
+No device code should be generated without a running poller and durable save
+path ready to finish that same attempt.
+
+Hosted native Bot dispatch and external broker source wiring now exist; see the
+current integration document. They do not establish live vendor acceptance.
+The remainder of this file is the historical bounded proposal, retained as
+scope evidence; its temporary cleanup/deployment requirements are superseded
+by this section.
+
 Source inspected at `9dba8b0a9de80f5221ce6f69ebdd62a23d4db6ab`.
 This is a proposal, not authorization or a record of live success. No provider
 request, OAuth grant, secret read/write/delete, deployment or E2B operation was

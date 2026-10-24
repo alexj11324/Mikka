@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { RUN_LEASE_MS } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
@@ -7,6 +7,7 @@ import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 import { withBasePath } from '@/lib/base-path'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
+import { subscriptionRuntime } from '@/lib/subscription-runtime'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,11 +39,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       .where(eq(agentRuns.id, runId))
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
+  const subscription = process.env.MIKKA_BYOS_ENABLED === '1'
+    ? await subscriptionRuntime().repository.nativeBinding(caller.userId, agent.id, agent.harness) : null
+  if(subscription && (run.userId!==caller.userId || agent.userId!==caller.userId || repo.userId!==caller.userId)) return NextResponse.json({error:'Run owner mismatch.'},{status:409})
+  if (subscription && !device.harnesses.some(harness => harness.harness === agent.harness && harness.subscriptionBroker)) {
+    return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
+  }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
-  const claimed = await db.update(agentRuns)
+  const claimed = await db.transaction(async tx => {
+    const claimed = await tx.update(agentRuns)
     .set({ status: 'preparing', startedAt: new Date(), leaseExpiresAt: new Date(leaseExpiresAt), updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
     .returning({ id: agentRuns.id })
+    if (claimed.length && subscription) await tx.execute(sql`insert into byos_native_runs ("runId","bindingId") values (${runId}::uuid,${subscription.id}::uuid)`)
+    return claimed
+  })
+  if (!claimed.length) return NextResponse.json({ error: 'Run is no longer queued.' }, { status: 409 })
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
   const mcp = claimed.length
@@ -56,5 +68,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     kind: run.kind, leaseExpiresAt,
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
+    ...(subscription ? { model:subscription.modelId, subscriptionBinding:{bindingId:subscription.id,ownerId:subscription.ownerId,workspaceId:subscription.workspaceId,consumerId:subscription.consumerId,route:subscription.route} } : {}),
   })
 }

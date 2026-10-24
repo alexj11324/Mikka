@@ -1,5 +1,50 @@
 # BYOS: source integration and live-validation handoff
 
+## Hosted broker update, 2026-10-24
+
+This section supersedes the earlier native access-lease descriptions below.
+The Bot claim route now pins a native binding in `byos_native_runs`, in the
+same transaction that claims the run. The private device subscription route
+checks the authenticated device, owner, harness capability, server allow-list,
+run status, stop flag and live lease. Go repeats run/binding/model authorization
+before credential-store access and while streaming. The additive migration is
+`20261024201500_byos_native_runs.sql` (32 migrations total).
+
+The opt-in Linux daemon `--hosted-subscriptions` reuses the existing supervisor
+and Claude/Codex adapters. It suppresses local credential detection/quota reads,
+does not import native auth files, and refuses a missing subscription binding.
+Each task runs in a constrained Docker container with no external network,
+read-only Git metadata, a separate home and one private broker socket. Setup and
+verification commands use the same container boundary. Container creation and
+command execution have separate budgets; a timed-out command remains a failure.
+Durable resource receipts fence uncertain creation/cleanup. A session ledger
+outside the worktree binds resumption to its exact owner/account/binding epoch.
+
+The official CLI receives a public placeholder, not a provider token. Its local
+HTTP shim sends protocol requests over the private socket. The external Go
+broker injects the real access token at a fixed provider destination; neither
+the CLI nor its shell tools receive an Infisical identity or refresh/access
+grant. The socket itself is task-scoped model authority. Same-container parent
+memory is not isolated from its tools, so placing a real token there would be
+unsafe. An actual installed Claude Code 2.1.305 Bash probe reproduced that
+negative boundary; the subsequent external-broker probe passed with synthetic
+credentials and no external network. This is real CLI/offline acceptance, not
+real Anthropic account acceptance. Codex real offline managed-login validation
+and fake app-server broker tests do not establish real Codex inference support.
+
+Raw production `nativeAuth` export remains disabled. Routine CPA refresh stays
+outside the CLI and can be reused by later native requests; reconnect,
+disconnect, stop and lease expiry halt use. No provider-side revocation endpoint
+is implemented. The new Docker transport does not implement E2B, browser/CUA or
+choose a multi-owner sandbox topology. Native vendor compatibility, actual
+Infisical reader policy and real system acceptance remain release gates.
+
+The fresh independent native review reported a writable Git-metadata boundary;
+the patch protects that mount and disables host Git helpers on the relevant
+status/create calls. The review agent then stopped with a safety flag before
+completing its remaining work. No complete independent review pass is claimed,
+and the blocked validation was not retried through another agent.
+
 Current implementation record, 2026-10-24. Backend security hardening now adds
 access-only storage/execution identities, worker task authorization, token-free
 quota results and durable fair cleanup. See the subscription worker README for
