@@ -49,7 +49,7 @@ function HostRow({ host, selected, onPick }: { host: KnownHost; selected: boolea
  * from the user's Tailnet and ~/.ssh/config, then 设置 turns the same dialog
  * into the five setup steps. It keeps its width and gets shorter.
  */
-export function AddDeviceDialog({ open, onOpenChange, onAdded }: { open: boolean; onOpenChange: (open: boolean) => void; onAdded: () => void }) {
+export function AddDeviceDialog({ open, onOpenChange, onAdded, initialHost = '' }: { open: boolean; onOpenChange: (open: boolean) => void; onAdded: () => void; /** 重新连接 opens it on the device's host. */ initialHost?: string }) {
   const t = useTranslations('Devices.add')
   const tSteps = useTranslations('Devices.connect.steps')
   const locale = useLocale()
@@ -66,6 +66,7 @@ export function AddDeviceDialog({ open, onOpenChange, onAdded }: { open: boolean
   const failed = SETUP_STEPS.some(step => steps[step].state === 'failed')
 
   useEffect(() => () => abort.current?.abort(), [])
+  useEffect(() => { if (open && initialHost) setHost(initialHost) }, [open, initialHost])
 
   function close() {
     abort.current?.abort()

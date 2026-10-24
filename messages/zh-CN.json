@@ -652,7 +652,7 @@
     "editorAria": "{label}编辑器"
   },
   "Devices": {
-    "otherDevices": "其他设备",
+    "otherDevices": "Remote control",
     "menu": "{name} 的更多操作",
     "add": {
       "title": "添加设备",
@@ -679,6 +679,8 @@
       "emptyDescription": "添加一台能用 SSH 登录的机器。"
     },
     "neverOnline": "从未上线",
+    "lastOnline": "最后在线 {time}",
+    "reconnect": "重新连接",
     "lastHeartbeat": "最后心跳 {time}",
     "installedWithVersion": "已安装 · {version}",
     "installed": "已安装",
@@ -2212,6 +2214,7 @@
     "screenOf": "{name} 的屏幕",
     "screen": "屏幕",
     "computerOf": "{name} 的电脑",
+    "cloud": "Mikka Cloud",
     "card": "电脑任务",
     "cardTitle": "电脑",
     "openScreen": "全屏查看 {name} 的屏幕",
@@ -2353,6 +2356,7 @@
       "noDevice": "未连接机器",
       "offline": "离线",
       "online": "在线",
+      "cloud": "Mikka Cloud",
       "contextProject": "项目：{project}",
       "contextSeparator": "，",
       "prompt": "帮我新建一个任务：{text}",

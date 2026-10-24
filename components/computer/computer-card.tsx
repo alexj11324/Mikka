@@ -52,7 +52,7 @@ export function ComputerCard({ agentId, agentName, runId, task, thread, state = 
   const approval = status === 'approval' && computer?.pendingApproval?.runId === runId ? computer.pendingApproval : undefined
   if (status === 'sleeping' || status === 'waking') return <span className="inline-flex w-fit max-w-full items-center gap-2 rounded-lg border bg-card py-1 pr-1 pl-2.5 text-sm">
     <Cloud aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-    <span className="truncate">{t('computerOf', { name })}</span>
+    <span className="truncate">{t('cloud')}</span>
     <ComputerStatusBadge status={status} />
   </span>
   return <section aria-label={t('card')} className={cn('flex w-full min-w-0 flex-col gap-3 rounded-xl border p-3', approval ? 'bg-muted/60' : 'bg-card')}>

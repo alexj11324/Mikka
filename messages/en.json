@@ -652,7 +652,7 @@
     "editorAria": "{label} editor"
   },
   "Devices": {
-    "otherDevices": "Other devices",
+    "otherDevices": "Remote control",
     "menu": "More for {name}",
     "add": {
       "title": "Add device",
@@ -679,6 +679,8 @@
       "emptyDescription": "Add a machine you can SSH into."
     },
     "neverOnline": "Never online",
+    "lastOnline": "Last online {time}",
+    "reconnect": "Reconnect",
     "lastHeartbeat": "Last heartbeat {time}",
     "installedWithVersion": "Installed · {version}",
     "installed": "Installed",
@@ -2212,6 +2214,7 @@
     "screenOf": "{name}'s screen",
     "screen": "Screen",
     "computerOf": "{name}'s computer",
+    "cloud": "Mikka Cloud",
     "card": "Computer task",
     "cardTitle": "Computer",
     "openScreen": "Open {name}'s screen full window",
@@ -2353,6 +2356,7 @@
       "noDevice": "No machine connected",
       "offline": "Offline",
       "online": "Online",
+      "cloud": "Mikka Cloud",
       "contextProject": "project: {project}",
       "contextSeparator": ", ",
       "prompt": "Create a task for me: {text}",

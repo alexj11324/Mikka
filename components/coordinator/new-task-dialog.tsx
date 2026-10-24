@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useId } from 'react'
 import { useTranslations } from 'next-intl'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { ChevronRight, Laptop, Paperclip, Terminal } from 'lucide-react'
+import { ChevronRight, Laptop, Paperclip } from 'lucide-react'
 import { listAgents, listDevices } from '@/app/actions/agents'
 import { sendCoordinatorMessage } from '@/app/actions/coordinator'
 import { useActionError } from '@/lib/use-action-error'
@@ -13,23 +13,26 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
-import { Badge } from '@/components/reui/badge'
-import { ComputerStatusBadge } from '@/components/computer/computer-status'
+import { DeviceIcon } from '@/components/devices/device-icon'
 import { useComputer } from '@/hooks/use-computer'
-import { BotAvatar } from '@/components/nav/bot-avatar'
 
 const MAX_LENGTH = 8000
 
-type Machine = { value: string; label: string; agentId?: string; online?: boolean; server?: boolean }
+type Machine = { value: string; label: string; cloud?: boolean; online?: boolean; server?: boolean }
 
-/** A bot's own cloud computer: 运行中 / 休眠中 / 唤醒中 (Figma 110:735). */
-function CloudMachineStatus({ agentId }: { agentId: string }) {
-  const { data: state } = useComputer(agentId)
-  if (!state) return null
-  return <ComputerStatusBadge status={state.machine === 'error' ? 'failed' : state.machine} end />
+/** A machine's icon with its state dot. Mikka Cloud stays green asleep, since picking it wakes it; red only when it failed (the workspace has one, so any bot's computer reports it). */
+function MachineIcon({ machine, cloudAgentId }: { machine: Machine; cloudAgentId: string | undefined }) {
+  const t = useTranslations('Shell.newTaskDialog')
+  const tStatus = useTranslations('Computer.status')
+  const { data: state } = useComputer(machine.cloud ? cloudAgentId : null)
+  if (machine.cloud) return <DeviceIcon kind="cloud" state={state?.machine === 'error' ? 'error' : 'online'} label={state ? tStatus(state.machine === 'error' ? 'failed' : state.machine) : t('cloud')} />
+  return <DeviceIcon kind={machine.server ? 'server' : 'personal'} state={machine.online ? 'online' : 'offline'} label={machine.online ? t('online') : t('offline')} />
+}
+
+function MachineLabel({ machine, cloudAgentId }: { machine: Machine; cloudAgentId: string | undefined }) {
+  return <><MachineIcon machine={machine} cloudAgentId={cloudAgentId} /><span className="min-w-0 flex-1 truncate pr-3">{machine.label}</span></>
 }
 
 /**
@@ -48,6 +51,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
 }) {
   const t = useTranslations('Shell.newTaskDialog')
   const tShell = useTranslations('Shell')
+  const tDevices = useTranslations('Devices')
   const tCommon = useTranslations('Common')
   const actionError = useActionError()
   const { mutate } = useSWRConfig()
@@ -56,16 +60,17 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const fileRef = useRef<HTMLInputElement>(null)
   const fileId = useId()
 
-  const tComputer = useTranslations('Computer')
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
   const { data: bots = [] } = useSWR(open ? 'agents' : null, listAgents)
-  // The user's own machines, then each bot's cloud computer.
-  const machines: Machine[] = [
-    ...devices.filter(item => (item as typeof item & { kind?: string }).kind !== 'cloud').map(item => ({ value: item.id, label: item.name, online: item.online, server: item.platform !== 'darwin' && item.platform !== 'win32' })),
-    ...bots.map(bot => ({ value: `cloud:${bot.id}`, label: tComputer('computerOf', { name: bot.name }), agentId: bot.id })),
-  ]
+  // Mikka Cloud first and by default: there the Coordinator picks the bot, so no bot is named.
+  // Then 本机 (the user's own computers), then Remote control (servers such as a VPS), as in 设置 › 设备.
+  const cloud: Machine = { value: 'cloud', label: t('cloud'), cloud: true }
+  const own: Machine[] = devices.filter(item => (item as typeof item & { kind?: string }).kind !== 'cloud').map(item => ({ value: item.id, label: item.name, online: item.online, server: item.platform !== 'darwin' && item.platform !== 'win32' }))
+  const local = own.filter(item => !item.server)
+  const remote = own.filter(item => item.server)
+  const machines = [cloud, ...local, ...remote]
   const [picked, setPicked] = useState<string | null>(null)
-  const device = machines.find(item => item.value === picked) ?? machines.find(item => devices.some(own => own.id === item.value && own.online && own.enabled)) ?? machines[0]
+  const device = machines.find(item => item.value === picked) ?? cloud
   useEffect(() => { if (open && initialText) setDraft(current => current || initialText) }, [open, initialText])
 
   async function attach(files: File[]) {
@@ -98,17 +103,16 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   }
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="gap-3 p-4 sm:max-w-xl" closeLabel={tCommon('close')}>
+    <DialogContent className="gap-3 p-5 sm:max-w-2xl" closeLabel={tCommon('close')}>
       <div className="flex items-center gap-2 pr-8 text-sm">
         {device
           ? <Select value={device.value} onValueChange={value => setPicked(value)} items={machines.map(({ value, label }) => ({ value, label }))}>
-            <SelectTrigger size="sm" className="h-7 gap-1.5 rounded-full px-2.5" aria-label={t('device')}>{device.agentId ? <BotAvatar id={device.agentId} size="byline" /> : device.server ? <Terminal aria-hidden="true" className="text-muted-foreground" /> : <Laptop aria-hidden="true" className="text-muted-foreground" />}<SelectValue /></SelectTrigger>
-            <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-72"><SelectGroup>
-              {machines.map(item => <SelectItem key={item.value} value={item.value}>
-                {item.agentId ? <BotAvatar id={item.agentId} size="byline" /> : item.server ? <Terminal aria-hidden="true" /> : <Laptop aria-hidden="true" />}<span className="min-w-0 flex-1 truncate pr-3">{item.label}</span>
-                {item.agentId ? <CloudMachineStatus agentId={item.agentId} /> : <Badge radius="full" size="lg" variant="outline" className={cn('ml-auto shrink-0 border-transparent px-2 font-normal', item.online ? 'bg-success/10 text-success-foreground' : 'bg-muted text-muted-foreground')}><span aria-hidden="true" className="size-1.5 rounded-full bg-current" />{item.online ? t('online') : t('offline')}</Badge>}
-              </SelectItem>)}
-            </SelectGroup></SelectContent>
+            <SelectTrigger size="sm" className="h-7 gap-1.5 rounded-full px-2.5" aria-label={t('device')}><MachineIcon machine={device} cloudAgentId={bots[0]?.id} /><SelectValue /></SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-60">
+              <SelectGroup><SelectItem value={cloud.value}><MachineLabel machine={cloud} cloudAgentId={bots[0]?.id} /></SelectItem></SelectGroup>
+              {local.length > 0 && <><SelectGroup><SelectLabel>{tDevices('thisMachine')}</SelectLabel>{local.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudAgentId={bots[0]?.id} /></SelectItem>)}</SelectGroup></>}
+              {remote.length > 0 && <><SelectGroup><SelectLabel>{tDevices('otherDevices')}</SelectLabel>{remote.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudAgentId={bots[0]?.id} /></SelectItem>)}</SelectGroup></>}
+            </SelectContent>
           </Select>
           : <span className="flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{t('noDevice')}</span>}
         <ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
@@ -119,7 +123,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="new-issue-title" className="sr-only">{t('label')}</FieldLabel>
-          <Textarea id="new-issue-title" autoFocus value={draft} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-24 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 dark:bg-transparent" onChange={event => setDraft(event.target.value)} onKeyDown={event => {
+          <Textarea id="new-issue-title" autoFocus value={draft} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-32 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 dark:bg-transparent" onChange={event => setDraft(event.target.value)} onKeyDown={event => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) { event.preventDefault(); void submit() }
           }} />
         </Field>
