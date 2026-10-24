@@ -70,10 +70,11 @@ func createArtifact(ctx context.Context, r *Repository, secrets SecretStore, op 
 }
 
 type CleanupStatus struct {
-	Pending            int    `json:"pending"`
-	Failed             int    `json:"failed"`
-	ProviderRevocation string `json:"providerRevocation"`
-	Uncertain          int    `json:"uncertainCreates"`
+	Pending            int                      `json:"pending"`
+	Failed             int                      `json:"failed"`
+	ProviderRevocation string                   `json:"providerRevocation"`
+	Uncertain          int                      `json:"uncertainCreates"`
+	Enrollment         *EnrollmentCleanupStatus `json:"enrollment,omitempty"`
 }
 
 // No verified provider-specific revocation adapter is installed. Deleting a
@@ -83,6 +84,16 @@ func (w *Worker) CleanupStatus(ctx context.Context) (CleanupStatus, error) {
 	err := w.Repo.DB.QueryRowContext(ctx, `select count(*) filter(where "deletedAt" is null),count(*) filter(where "deletedAt" is null and "lastError"='deletion_failed'),count(*) filter(where "deletedAt" is null and ("createUncertain" or ("createStarted" and not "createSettled"))) from byos_secret_artifacts a where "connectionId"=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and not exists(select 1 from byos_connections c where c.id=a."connectionId" and a.name in(c."secretName",c."accessSecretName",c."stagedSecretName",c."stagedAccessName")) and not exists(select 1 from byos_oauth_attempts o join byos_connections c on c.id=o."connectionId" where o."secretName"=a.name and o."consumedAt" is null and o."expiresAt">now() and o."operationId"=c."operationId" and c.state='pending')`, w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID, w.Scope.Provider).Scan(&result.Pending, &result.Failed, &result.Uncertain)
 	if err != nil {
 		return result, ErrDatabase
+	}
+	source, sourceErr := w.enrollmentCleanupStatus(ctx)
+	if sourceErr != nil {
+		return result, sourceErr
+	}
+	result.Enrollment = source
+	if source != nil {
+		result.Pending += source.Pending
+		result.Failed += source.Failed
+		result.Uncertain += source.Uncertain
 	}
 	return result, nil
 }
@@ -128,6 +139,9 @@ func (w *Worker) Cleanup(ctx context.Context) (CleanupStatus, error) {
 	_, err = w.Repo.DB.ExecContext(ctx, `delete from byos_oauth_attempts o using byos_secret_artifacts a where o."secretName"=a.name and a."connectionId"=$1 and a."deletedAt" is not null`, w.Scope.ConnectionID)
 	if err != nil {
 		return CleanupStatus{}, ErrDatabase
+	}
+	if err = w.cleanupEnrollment(ctx); err != nil {
+		return CleanupStatus{}, err
 	}
 	return w.CleanupStatus(ctx)
 }

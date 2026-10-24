@@ -37,7 +37,9 @@ export class EnrollmentClient {
     return this.invoke(principal, { method: body.action, ...('id' in body ? { id: body.id } : {}), ...('callbackUrl' in body ? { callbackUrl: body.callbackUrl } : {}) }, body.action === 'start' ? started : status)
   }
   async bind(principal: string, id: string, ownerId: string, workspaceId: string) {
-    return this.invoke(principal, { method: 'bind', id, ownerId, workspaceId }, z.object({ id: z.uuid(), provider: z.literal('claude'), state: z.literal('connected'), revision: z.number().int().positive(), credentialVersion: z.number().int().positive() }).strict())
+    const sourceCleanup = z.object({ pending: z.number().int().nonnegative(), failed: z.number().int().nonnegative(), protected: z.number().int().nonnegative(), uncertainCreates: z.number().int().nonnegative(), state: z.enum(['complete', 'awaiting_publication', 'configuration_required', 'ownership_unconfirmed', 'creation_outcome_unknown', 'deletion_failed', 'pending']) }).strict()
+    const cleanup = z.object({ pending: z.number().int().nonnegative(), failed: z.number().int().nonnegative(), providerRevocation: z.literal('not_implemented'), uncertainCreates: z.number().int().nonnegative(), enrollment: sourceCleanup.optional() }).strict()
+    return this.invoke(principal, { method: 'bind', id, ownerId, workspaceId }, z.object({ id: z.uuid(), provider: z.literal('claude'), state: z.literal('connected'), revision: z.number().int().positive(), credentialVersion: z.number().int().positive(), cleanup: cleanup.optional() }).strict())
   }
   private async invoke(principal: string, request: Record<string, string>, schema: z.ZodType) {
     const { binary, ...config } = this.config

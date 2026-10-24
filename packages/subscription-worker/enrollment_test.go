@@ -39,11 +39,11 @@ func TestEnrollmentActualPlainClaudeAdapterWithoutSQL(t *testing.T) {
 }
 
 type enrollmentMemory struct {
-	mu                    sync.Mutex
-	values                map[string][]byte
-	writes, reads         int
-	fail, commitThenFail  bool
-	uncertainBeforeCommit int
+	mu                               sync.Mutex
+	values                           map[string][]byte
+	writes, reads, deletes           int
+	fail, commitThenFail, deleteFail bool
+	uncertainBeforeCommit            int
 }
 
 func (s *enrollmentMemory) Create(_ context.Context, name string, raw []byte) error {
@@ -79,6 +79,10 @@ func (s *enrollmentMemory) Read(_ context.Context, name string) ([]byte, error) 
 func (s *enrollmentMemory) Delete(_ context.Context, name string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.deletes++
+	if s.deleteFail {
+		return ErrStore
+	}
 	delete(s.values, name)
 	return nil
 }
@@ -121,7 +125,7 @@ func TestEnrollmentPersistsStateAndFullCPAStorageWithoutDatabaseOrExecution(t *t
 	if err != nil || result.State != "pending_unbound" || result.TaskUseAllowed {
 		t.Fatal("custody failed", err)
 	}
-	if len(a.values) != 0 || len(c.values) != 1 || len(g.values) != 1 || o.calls.Load() != 1 {
+	if len(a.values) != 0 || len(c.values) != 2 || len(g.values) != 1 || o.calls.Load() != 1 {
 		t.Fatal("lifecycle incorrect")
 	}
 	var stored enrollmentGrant

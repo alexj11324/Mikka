@@ -42,21 +42,24 @@ func run() error {
 		return worker.ErrUnsupported
 	}
 	var config struct {
-		Scope             worker.Scope       `json:"scope"`
-		Use               *worker.RuntimeUse `json:"use"`
-		ExecutionOnly     bool               `json:"executionOnly"`
-		AccessPath        string             `json:"accessPath"`
-		AccessToken       string             `json:"accessToken"`
-		DatabaseURL       string             `json:"databaseUrl"`
-		Origin            string             `json:"infisicalOrigin"`
-		Project           string             `json:"project"`
-		Environment       string             `json:"environment"`
-		Path              string             `json:"path"`
-		Token             string             `json:"workloadToken"`
-		EnableCodexOAuth  bool               `json:"enableCodexOAuth"`
-		EnableRuntime     bool               `json:"enableRuntime"`
-		EnablePlainModels bool               `json:"enablePlainModels"`
-		EnableClaudeOAuth bool               `json:"enableClaudeOAuth"`
+		Scope                 worker.Scope       `json:"scope"`
+		Use                   *worker.RuntimeUse `json:"use"`
+		ExecutionOnly         bool               `json:"executionOnly"`
+		AccessPath            string             `json:"accessPath"`
+		AccessToken           string             `json:"accessToken"`
+		DatabaseURL           string             `json:"databaseUrl"`
+		Origin                string             `json:"infisicalOrigin"`
+		Project               string             `json:"project"`
+		Environment           string             `json:"environment"`
+		Path                  string             `json:"path"`
+		Token                 string             `json:"workloadToken"`
+		EnableCodexOAuth      bool               `json:"enableCodexOAuth"`
+		EnableRuntime         bool               `json:"enableRuntime"`
+		EnablePlainModels     bool               `json:"enablePlainModels"`
+		EnableClaudeOAuth     bool               `json:"enableClaudeOAuth"`
+		EnrollmentAttemptPath string             `json:"enrollmentAttemptPath"`
+		EnrollmentClaimPath   string             `json:"enrollmentClaimPath"`
+		EnrollmentGrantPath   string             `json:"enrollmentGrantPath"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(frame))
 	decoder.DisallowUnknownFields()
@@ -79,7 +82,7 @@ func run() error {
 	}
 	var grants worker.SecretStore
 	if config.ExecutionOnly {
-		if config.Token != "" || config.Path != "" || config.EnableCodexOAuth || config.EnableClaudeOAuth {
+		if config.Token != "" || config.Path != "" || config.EnableCodexOAuth || config.EnableClaudeOAuth || config.EnrollmentAttemptPath != "" || config.EnrollmentClaimPath != "" || config.EnrollmentGrantPath != "" {
 			return worker.ErrUnsupported
 		}
 	} else {
@@ -90,8 +93,8 @@ func run() error {
 		grants = secrets
 	}
 	var access worker.SecretStore
-	if config.EnableRuntime || config.EnableCodexOAuth || config.EnableClaudeOAuth {
-		if config.AccessPath == "" || config.AccessToken == "" || (!config.ExecutionOnly && (config.AccessPath == config.Path || config.AccessToken == config.Token)) {
+	if config.AccessPath != "" || config.EnableRuntime || config.EnableCodexOAuth || config.EnableClaudeOAuth {
+		if config.AccessPath == "" || (config.ExecutionOnly && config.AccessToken == "") || (!config.ExecutionOnly && (config.AccessPath == config.Path || (config.AccessToken != "" && config.AccessToken == config.Token))) {
 			return worker.ErrUnsupported
 		}
 		credential := config.AccessToken
@@ -107,6 +110,43 @@ func run() error {
 	// No production native credential export until a verified runner/broker path
 	// avoids exposing tokens to untrusted tools. Config flags cannot attest that.
 	w := worker.Worker{Repo: &worker.Repository{DB: db}, Secrets: grants, AccessSecrets: access, Scope: config.Scope, Use: config.Use, ExecutionOnly: config.ExecutionOnly}
+	if !config.ExecutionOnly {
+		// Source custody is optional for canonical status/disconnect. Invalid or
+		// incomplete source configuration must never prevent the epoch fence;
+		// the journal reports configuration_required and remains retryable.
+		makeEnrollment := func() *worker.Enrollment {
+			paths := map[string]bool{}
+			for _, path := range []string{config.Path, config.AccessPath, config.EnrollmentAttemptPath, config.EnrollmentClaimPath, config.EnrollmentGrantPath} {
+				if path == "" || paths[path] {
+					return nil
+				}
+				paths[path] = true
+			}
+			makeStore := func(path string) (worker.SecretStore, error) {
+				return worker.NewInfisical(worker.InfisicalConfig{Origin: config.Origin, ProjectID: config.Project, Environment: config.Environment, Path: path, Token: func(context.Context) (string, error) { return config.Token, nil }})
+			}
+			a, err := makeStore(config.EnrollmentAttemptPath)
+			if err != nil {
+				return nil
+			}
+			c, err := makeStore(config.EnrollmentClaimPath)
+			if err != nil {
+				return nil
+			}
+			g, err := makeStore(config.EnrollmentGrantPath)
+			if err != nil {
+				return nil
+			}
+			return &worker.Enrollment{Attempts: a, Claims: c, Grants: g}
+		}
+		w.Enrollment = makeEnrollment()
+		if w.Enrollment != nil {
+			identity, err := worker.EnrollmentDatabaseIdentity(config.DatabaseURL)
+			if err == nil {
+				w.DatabaseIdentity = identity
+			}
+		}
+	}
 
 	if config.EnableRuntime {
 		if config.Scope.Provider == "codex" {

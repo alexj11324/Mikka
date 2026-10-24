@@ -8,7 +8,7 @@ Run on the Agent's cloud Linux machine:
     pnpm test:byos-worker
 
 This verifies the exact official CPA commit, starts disposable loopback Postgres,
-applies all 33 migrations, builds the production and acceptance-only executables,
+applies all 34 migrations, builds the production and acceptance-only executables,
 runs Go race tests and vet, then runs application/native/browser acceptance and
 migration replay. No real grant, account credentials, Infisical write, provider
 inference or E2B sandbox is used. Docker images and Go module sums are pinned.
@@ -19,9 +19,11 @@ The independent [server enrollment receiver](../../docs/design/byos-server-enrol
 can receive consent before SQL/reader/native setup. Its private bind route then
 requires actual Mikka session/workspace authorization plus source operator
 authority, publishes through the same Store lifecycle and fences one-time source
-ownership globally. No user-side Infisical install/login is needed. Retained
-escrow recovery copies and live account/provider/deployment acceptance remain
-explicitly separate from synthetic canonical publication tests.
+ownership globally. No user-side Infisical install/login is needed. Redundant escrow/PKCE copies
+are deleted after canonical publication; owner-directed disconnect and the shared
+retry queue cover all recorded copies. Unknown remote writes remain explicitly
+pending. Live account/provider/deployment acceptance remains separate from
+synthetic canonical publication and deletion tests.
 
 1. Settings Connect starts a NEW provider OAuth attempt through Mikka's authenticated
    subscription API. No native CLI auth file, Keychain or browser-cookie import exists.
@@ -92,6 +94,16 @@ after 404 rather than being declared permanently deleted. Per-artifact and
 per-connection retries rotate fairly. The authenticated BYOS cron drains bounded
 batches daily; preparing another task also drains its connection. Scheduling is
 source configuration only until an authorized deployment.
+
+Enrollment source copies have their own path-aware journal. Canonical publication
+records evidence atomically; before that point the sole recovery copy is protected
+unless explicit disconnect/reconnect advances the epoch. Fresh global claim and
+database identity checks prevent a losing preview from deleting the shared source.
+Source-only failures are eligible for the same bounded cron. Token-free immutable
+claims remain for replay protection; unknown/uncertain creates stay pending after
+404 to catch late commits. Status exposes missing configuration, ownership proof
+and deletion failures. Cleanup/status/disconnect custody works without an inference
+reader; execution children receive none of the enrollment paths.
 
 Provider revocation is explicitly `not_implemented`; no undocumented endpoint
 is invented. Historical artifacts whose references were already lost before the

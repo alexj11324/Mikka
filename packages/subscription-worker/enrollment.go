@@ -33,6 +33,19 @@ type enrollmentGrant struct {
 	CreatedAt    time.Time      `json:"createdAt"`
 	Payload      map[string]any `json:"payload"`
 }
+type enrollmentCreation struct {
+	Schema         string `json:"schema"`
+	Principal      string `json:"principal"`
+	ID             string `json:"id"`
+	Digest         string `json:"digest"`
+	GrantUncertain bool   `json:"grantUncertain"`
+	AttemptSettled bool   `json:"attemptSettled"`
+}
+
+func enrollmentCreationName(id string) string {
+	return derivedEnrollmentName("mikka.byos.creation-result.v1:", id)
+}
+
 type EnrollmentStatus struct {
 	ID             string `json:"id"`
 	Provider       string `json:"provider"`
@@ -122,7 +135,9 @@ func (e *Enrollment) Complete(ctx context.Context, principal, id, callback strin
 	encoded, _ := json.Marshal(escrow)
 	persist, persistCancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	defer persistCancel()
+	uncertain := false
 	if err = e.Grants.Create(persist, name, encoded); err != nil {
+		uncertain = err == ErrCreateUncertain
 		// Recover an uncertain committed create without exchanging the code twice.
 		stored, readErr := e.Grants.Read(persist, name)
 		// Retry only an uncertain create that still reads missing, using the same
@@ -137,6 +152,15 @@ func (e *Enrollment) Complete(ctx context.Context, principal, id, callback strin
 		}
 		want, got := sha256.Sum256(encoded), sha256.Sum256(stored)
 		if readErr != nil || want != got {
+			return EnrollmentStatus{}, ErrStore
+		}
+	}
+	// Token-free immutable evidence distinguishes known-complete creates from
+	// requests that may still commit after a later delete/404.
+	creation, _ := json.Marshal(enrollmentCreation{"mikka.byos.creation-result.v1", principal, id, hashText(string(encoded)), uncertain, true})
+	if err = e.Claims.Create(persist, enrollmentCreationName(id), creation); err != nil {
+		stored, readErr := e.Claims.Read(persist, enrollmentCreationName(id))
+		if readErr != nil || hashText(string(stored)) != hashText(string(creation)) {
 			return EnrollmentStatus{}, ErrStore
 		}
 	}

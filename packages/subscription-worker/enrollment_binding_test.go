@@ -66,8 +66,8 @@ func TestEnrollmentBindingPublishesOneOwnedConnectionAndReusesRefresh(t *testing
 			t.Fatal("refresh grant entered access projection")
 		}
 	}
-	if _, err = b.Enrollment.Grants.Read(ctx, "mikka-byos-"+id); err != nil {
-		t.Fatal("sole escrow was deleted")
+	if _, err = b.Enrollment.Grants.Read(ctx, "mikka-byos-"+id); err != ErrMissing {
+		t.Fatal("redundant escrow was retained")
 	}
 	if repeated, err := b.Bind(ctx, "operator:fixture-principal", id, owner, workspace); err != nil || repeated.ID != meta.ID || len(canonical.values) != 1 {
 		t.Fatal("idempotent binding changed connection", err)
@@ -210,8 +210,8 @@ func TestEnrollmentBindingRecoversExactStagedGrantAndProjection(t *testing.T) {
 			if after.SecretName != before.StagedName || after.AccessName != before.StagedAccessName || o.calls.Load() != 1 {
 				t.Fatal("recovery changed staged names or OAuth")
 			}
-			if _, err = b.Enrollment.Grants.Read(ctx, "mikka-byos-"+id); err != nil {
-				t.Fatal("recovery lost escrow")
+			if _, err = b.Enrollment.Grants.Read(ctx, "mikka-byos-"+id); err != ErrMissing {
+				t.Fatal("recovery retained redundant escrow")
 			}
 		})
 	}

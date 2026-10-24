@@ -28,18 +28,20 @@ func public(r Record) Metadata {
 // Each worker is permanently bound to one authenticated owner's connection.
 // Registrations are trusted host objects, never input-supplied executables.
 type Worker struct {
-	Repo            *Repository
-	Secrets         SecretStore
-	AccessSecrets   SecretStore
-	Use             *RuntimeUse
-	AllowNativeAuth bool
-	ExecutionOnly   bool
-	QuotaClient     *http.Client
-	NativeClient    *http.Client
-	Scope           Scope
-	Authenticator   sdkauth.Authenticator
-	Executor        core.ProviderExecutor
-	OAuth           OAuthProvider
+	Repo             *Repository
+	Secrets          SecretStore
+	AccessSecrets    SecretStore
+	Use              *RuntimeUse
+	AllowNativeAuth  bool
+	ExecutionOnly    bool
+	QuotaClient      *http.Client
+	NativeClient     *http.Client
+	Scope            Scope
+	Authenticator    sdkauth.Authenticator
+	Executor         core.ProviderExecutor
+	OAuth            OAuthProvider
+	Enrollment       *Enrollment
+	DatabaseIdentity string
 }
 
 func (w *Worker) store(operation *Operation) *Store {

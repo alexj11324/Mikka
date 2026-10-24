@@ -9,5 +9,5 @@ export const subscriptionHTTPDependencies: SubscriptionHTTPDependencies = {
     return session ? { userId: session.user.id, sessionId: session.session.id } : null
   },
   workspace: authorizeSubscriptionWorkspace,
-  service: subscriptionRuntime
+  service: custodyOnly => subscriptionRuntime(false, custodyOnly)
 }

@@ -10,6 +10,7 @@ import (
 	core "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // Binding requires an authenticated Mikka owner/workspace supplied by the host,
@@ -47,7 +48,10 @@ type enrollmentTransfer struct {
 }
 
 func bindingClaimName(id string) string {
-	digest := sha256.Sum256([]byte("mikka.byos.binding-claim.v1:" + id))
+	return derivedEnrollmentName("mikka.byos.binding-claim.v1:", id)
+}
+func derivedEnrollmentName(namespace, id string) string {
+	digest := sha256.Sum256([]byte(namespace + id))
 	digest[6] = (digest[6] & 15) | 0x40
 	digest[8] = (digest[8] & 63) | 0x80
 	h := hex.EncodeToString(digest[:16])
@@ -84,6 +88,9 @@ func (b *EnrollmentBinder) reserve(ctx context.Context, id, principal, owner, wo
 		if err != nil {
 			return t, ErrDatabase
 		}
+		if _, err = tx.ExecContext(ctx, `insert into byos_enrollment_sources ("enrollmentId",kind,"connectionId") values ($1,'escrow',$2),($1,'attempt',$2)`, id, t.Scope.ConnectionID); err != nil {
+			return t, ErrDatabase
+		}
 	} else if err != nil {
 		return t, ErrDatabase
 	} else {
@@ -102,6 +109,30 @@ func (b *EnrollmentBinder) reserve(ctx context.Context, id, principal, owner, wo
 func (b *EnrollmentBinder) Bind(ctx context.Context, principal, id, owner, workspace string) (Metadata, error) {
 	if b.Enrollment == nil || b.Repo == nil || b.Secrets == nil || b.AccessSecrets == nil || !uuidPattern.MatchString(id) || !validPrincipal(principal) || !scopePattern.MatchString(owner) || !scopePattern.MatchString(workspace) || len(b.DatabaseIdentity) != 64 {
 		return Metadata{}, ErrUnsupported
+	}
+	// Completed bindings remain idempotent after redundant escrow is purged.
+	// Verify actual target ownership and immutable claim before reading secrets.
+	existing, found, lookupErr := b.existing(ctx, id, principal, owner, workspace)
+	if lookupErr != nil {
+		return Metadata{}, lookupErr
+	}
+	if found {
+		current, readErr := b.Repo.Lookup(ctx, existing.Scope)
+		if readErr != nil {
+			return Metadata{}, readErr
+		}
+		if current.Epoch != existing.Epoch {
+			return Metadata{}, ErrStale
+		}
+		if existing.Bound || current.State == "connected" {
+			if verifyEnrollmentClaim(ctx, b.Enrollment, existing) != nil {
+				return Metadata{}, ErrStale
+			}
+			if current.State != "connected" {
+				return Metadata{}, ErrBusy
+			}
+			return b.finish(ctx, existing, current)
+		}
 	}
 	// Check the source principal receipt before reading any full escrow payload.
 	state, err := b.Enrollment.Status(ctx, principal, id)
@@ -209,5 +240,19 @@ func (b *EnrollmentBinder) finish(ctx context.Context, t enrollmentTransfer, r R
 	if n != 1 {
 		return Metadata{}, ErrStale
 	}
-	return public(r), nil
+	// Queue registration predates publication. Attempt bounded deletion now;
+	// failures remain durable and visible to the shared cleanup RPC/cron.
+	w := Worker{Repo: b.Repo, Scope: t.Scope, Secrets: b.Secrets, AccessSecrets: b.AccessSecrets, Enrollment: b.Enrollment, DatabaseIdentity: b.DatabaseIdentity}
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	_ = w.cleanupEnrollment(cleanup)
+	cancel()
+	statusCtx, statusCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer statusCancel()
+	status, err := w.CleanupStatus(statusCtx)
+	if err != nil {
+		return Metadata{}, err
+	}
+	meta := public(r)
+	meta.Cleanup = &status
+	return meta, nil
 }

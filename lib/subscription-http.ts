@@ -15,7 +15,7 @@ const headers = { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-r
 export interface SubscriptionHTTPDependencies {
   session(request: Request): Promise<{ userId: string; sessionId: string } | null>
   workspace(userId: string, workspaceId: string): Promise<void>
-  service(): SubscriptionService
+  service(custodyOnly?: boolean): SubscriptionService
 }
 export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
   return async (request: Request): Promise<Response> => {
@@ -32,7 +32,7 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
       const parsed = input.safeParse(JSON.parse(new TextDecoder().decode(bytes)))
       if (!parsed.success) throw new Error('invalid_request')
       const body = parsed.data
-      const service = deps.service()
+      const service = deps.service(['status', 'disconnect', 'recover'].includes(body.action))
       if (body.action === 'connect') {
         await deps.workspace(session.userId, body.workspaceId)
         if (!service.capabilities.oauth?.[body.provider]) throw new SubscriptionRefusal('backend_unavailable')
@@ -64,7 +64,7 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
   const session = await deps.session(request)
   if (!session) return Response.json({ error: 'auth_required' }, { status: 401, headers })
   try {
-    const service = deps.service()
+    const service = deps.service(true)
     const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
     await deps.workspace(session.userId, workspaceId)
     const { rows } = await service.repository.pool.query('select id,provider,state,epoch from byos_connections where "ownerId"=$1 and "workspaceId"=$2 order by "createdAt" desc limit 50', [session.userId, workspaceId])

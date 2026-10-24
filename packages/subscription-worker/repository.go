@@ -137,6 +137,11 @@ func (r *Repository) Publish(ctx context.Context, o Operation, name, digest, acc
 	if _, err = tx.ExecContext(ctx, `update byos_secret_artifacts set "publishedAt"=now() where "connectionId"=$1 and "operationId"=$2`, o.ConnectionID, o.OperationID); err != nil {
 		return ErrDatabase
 	}
+	// Persist evidence in the same publication transaction. Disconnect may win
+	// before the bind HTTP handler can finalize its own response.
+	if _, err = tx.ExecContext(ctx, `update byos_enrollment_transfers set "canonicalPublishedAt"=coalesce("canonicalPublishedAt",now()) where "connectionId"=$1 and epoch=$2 and "operationId"=$3`, o.ConnectionID, o.Epoch, o.OperationID); err != nil {
+		return ErrDatabase
+	}
 	if tx.Commit() != nil {
 		return ErrDatabase
 	}

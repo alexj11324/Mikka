@@ -10,6 +10,10 @@ import { join, resolve } from 'node:path'
 import { createServer } from 'node:https'
 import { Pool } from 'pg'
 import { EnrollmentClient, enrollmentOperator } from '../lib/subscription-enrollment.ts'
+import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-worker-client.ts'
+import { SubscriptionRepository } from '../lib/subscription-repository.ts'
+import { SubscriptionService } from '../lib/subscription-service.ts'
+import { subscriptionHTTP } from '../lib/subscription-http.ts'
 import { enrollmentBindHTTP } from '../lib/subscription-enrollment-bind.ts'
 
 test('authenticated binding migrates one escrow through actual canonical publication and recovers projection failure', { timeout: 30000 }, async () => {
@@ -26,7 +30,12 @@ test('authenticated binding migrates one escrow through actual canonical publica
     [`/claims/mikka-byos-${id}`, JSON.stringify({ schema: 'mikka.byos.claim.v1', principal, id })],
     [`/pending/mikka-byos-${id}`, JSON.stringify({ schema: 'mikka.byos.unbound-grant.v1', principal, id, bindingState: 'pending_unbound', provider: 'claude', createdAt: new Date().toISOString(), payload: { type: 'claude', access_token: 'fixture-access-only', refresh_token: 'fixture-retained-refresh', expired: new Date(Date.now() + 3600000).toISOString(), account_uuid: 'fixture-account', organization_uuid: 'fixture-org' } })],
   ])
-  let failProjection = true
+  const receiptDigest = createHash('sha256').update(`mikka.byos.creation-result.v1:${id}`).digest()
+  receiptDigest[6] = (receiptDigest[6] & 15) | 0x40; receiptDigest[8] = (receiptDigest[8] & 63) | 0x80
+  const h = receiptDigest.subarray(0,16).toString('hex')
+  const receiptName = `mikka-byos-${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`
+  values.set(`/claims/${receiptName}`, JSON.stringify({schema:'mikka.byos.creation-result.v1',principal,id,digest:createHash('sha256').update(values.get(`/pending/mikka-byos-${id}`)).digest('hex'),grantUncertain:false,attemptSettled:true}))
+  let failProjection = true, failSourceDeletes = true
   const vault = createServer({ key: await readFile(key), cert: await readFile(certificate) }, async (request, response) => {
     assert.equal(request.headers.authorization, 'Bearer fixture-custody')
     const url = new URL(request.url, 'https://127.0.0.1'), name = url.pathname.split('/').at(-1)
@@ -37,7 +46,7 @@ test('authenticated binding migrates one escrow through actual canonical publica
       if (failProjection && path === '/access') { response.writeHead(503).end(); return }
       if (values.has(lookup)) { response.writeHead(409).end(); return }
       values.set(lookup, body.secretValue)
-    } else assert.equal(request.method, 'GET')
+    } else if (request.method === 'DELETE') { if (failSourceDeletes && ['/pending','/attempts'].includes(path)) { response.writeHead(503).end(); return }; values.delete(lookup); response.writeHead(200).end('{}'); return } else assert.equal(request.method, 'GET')
     if (!values.has(lookup)) { response.writeHead(404).end(); return }
     response.setHeader('content-type', 'application/json')
     response.end(JSON.stringify({ secret: { secretKey: name, secretValue: values.get(lookup), version: 1 } }))
@@ -64,11 +73,57 @@ test('authenticated binding migrates one escrow through actual canonical publica
     const canonical = JSON.parse(values.get(`/canonical/${before.stagedSecretName}`)), access = JSON.parse(values.get(`/access/${before.stagedAccessName}`))
     assert.equal(canonical.ownerId, owner); assert.equal(canonical.workspaceId, workspace); assert.equal(canonical.payload.refresh_token, 'fixture-retained-refresh')
     assert.equal(access.payload.refresh_token, undefined)
-    assert.ok(values.has(`/pending/mikka-byos-${id}`))
+    assert.ok(values.has(`/pending/mikka-byos-${id}`)); assert.equal(bound.cleanup.enrollment.state, 'deletion_failed'); assert.equal(bound.cleanup.failed, 2)
     const repeated = await post({ id, workspaceId: workspace }); assert.equal(repeated.status, 200); assert.equal((await repeated.json()).id, bound.id)
+    // The cron/service selector must find source-only leftovers, with no
+    // inference reader and no retired canonical artifacts to select instead.
+    let invalidCleanupConfig = false
+    const service = new SubscriptionService(new SubscriptionRepository(pool), scope => new SubscriptionWorkerClient({binary:resolve('packages/subscription-worker/bin/mikka-subscription-worker'),env:{SSL_CERT_FILE:certificate}}, {scope,databaseUrl,infisicalOrigin:`https://127.0.0.1:${vault.address().port}`,project:'fixture-project',environment:'staging',path:'/canonical',workloadToken:'fixture-custody',accessPath:'/access',enrollmentAttemptPath:'/attempts',enrollmentClaimPath:'/claims',enrollmentGrantPath:invalidCleanupConfig ? '/attempts' : '/pending',enableRuntime:false}), {ready:()=>false,nativeIsolation:'none'}, undefined, async (user, workspaceId) => {assert.equal(user,owner);assert.equal(workspaceId,workspace)})
+    invalidCleanupConfig = true
+    const misconfigured = await service.status(owner,bound.id);assert.equal(misconfigured.state,'connected');assert.equal(misconfigured.cleanup.enrollment.state,'configuration_required')
+    invalidCleanupConfig = false
+    failSourceDeletes = false
+    // Other integration cases share this disposable database. Drain bounded
+    // fair batches until this connection is reached rather than assuming it is
+    // the only queued connection.
+    for (let attempt=0; attempt<24 && values.has(`/pending/mikka-byos-${id}`); attempt++) {
+      const batch = await service.cleanupBatch(); assert.ok(batch.processed>0 && batch.processed<=2)
+    }
+    const cleaned = await service.status(owner,bound.id);assert.equal(cleaned.cleanup.pending,0);assert.equal(cleaned.cleanup.enrollment.state,'complete')
+    assert.ok(!values.has(`/pending/mikka-byos-${id}`))
+    const afterPurge = await post({id,workspaceId:workspace});assert.equal(afterPurge.status,200);assert.equal((await afterPurge.json()).id,bound.id)
+    invalidCleanupConfig = true // Canonical disconnect must still fence with partial/duplicate source paths.
+    const control = subscriptionHTTP({session:async()=>({userId:owner,sessionId:'synthetic-session'}),workspace:async()=>{},service:custodyOnly=>{assert.equal(custodyOnly,true);return service}})
+    const disconnected = await control(new Request('https://mikka.example/api/subscriptions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'disconnect',connectionId:bound.id,revision:bound.revision})}))
+    assert.equal(disconnected.status,200)
+    const result = await disconnected.json();assert.equal(result.state,'disconnected');assert.equal(result.cleanup.pending,1);assert.equal(result.cleanup.uncertainCreates,1);assert.equal(result.cleanup.providerRevocation,'not_implemented')
+    // Initial projection POST returned 503: DELETE removed the active value,
+    // but a late remote commit remains possible and must stay visibly queued.
+    assert.ok(!values.has(`/canonical/${before.stagedSecretName}`));assert.ok(!values.has(`/access/${before.stagedAccessName}`))
+    assert.equal((await post({id,workspaceId:workspace})).status,409)
+
   } finally {
     if (oldCA === undefined) delete process.env.SSL_CERT_FILE; else process.env.SSL_CERT_FILE = oldCA
     if (oldNoProxy === undefined) delete process.env.NO_PROXY; else process.env.NO_PROXY = oldNoProxy
     vault.closeAllConnections(); await new Promise(resolve => vault.close(resolve)); await pool.end(); await rm(directory, { recursive: true, force: true })
   }
+})
+
+test('source cleanup migration backfills legacy published transfers and replays without erasing history', async () => {
+  const databaseUrl = process.env.MIKKA_BYOS_TEST_DATABASE_URL
+  assert.ok(databaseUrl && new URL(databaseUrl).hostname === '127.0.0.1' && new URL(databaseUrl).pathname.endsWith('_e2e'))
+  const pool = new Pool({connectionString:databaseUrl,max:1})
+  const client = await pool.connect(), schema = `escrow_migration_${randomUUID().replaceAll('-','')}`
+  try {
+    await client.query(`create schema ${schema}`);await client.query(`set search_path to ${schema}`)
+    await client.query('create table byos_connections(id uuid primary key); create table byos_enrollment_transfers("enrollmentId" uuid primary key,"connectionId" uuid references byos_connections(id),"boundAt" timestamptz)')
+    const connected=randomUUID(), pending=randomUUID()
+    await client.query('insert into byos_connections values($1),($2)',[connected,pending])
+    await client.query('insert into byos_enrollment_transfers values($1,$2,now()),($3,$4,null)',[randomUUID(),connected,randomUUID(),pending])
+    const sql = await readFile(new URL('../drizzle/20261024230000_byos_enrollment_cleanup.sql',import.meta.url),'utf8')
+    await client.query(sql);await client.query(sql)
+    const {rows} = await client.query('select t."connectionId",t."boundAt",t."canonicalPublishedAt",t."sourceCreationState",count(s.*)::int copies from byos_enrollment_transfers t join byos_enrollment_sources s using("enrollmentId") group by t."enrollmentId"')
+    assert.equal(rows.length,2)
+    for(const row of rows){assert.equal(row.copies,2);assert.equal(row.sourceCreationState,'unknown');assert.equal(row.canonicalPublishedAt?.toISOString(),row.boundAt?.toISOString())}
+  } finally {await client.query('rollback');await client.query('set search_path to public');await client.query(`drop schema if exists ${schema} cascade`);client.release();await pool.end()}
 })

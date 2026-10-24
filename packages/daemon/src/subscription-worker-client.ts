@@ -19,6 +19,9 @@ export interface WorkerConfiguration {
   workloadToken: string
   accessPath?: string
   accessToken?: string
+  enrollmentAttemptPath?: string
+  enrollmentClaimPath?: string
+  enrollmentGrantPath?: string
   use?: { bindingId: string; consumerId: string; runId?: string }
   executionOnly?: boolean
   enableCodexOAuth?: boolean
@@ -102,7 +105,7 @@ export class SubscriptionWorkerClient {
       const executionOnly = ['executeStream', 'execute', 'quota', 'nativeContext', 'nativeStream'].includes(String(request.method))
       // Execution children receive the access-store identity only. Refresh and
       // OAuth stay in custody children, with no token material in their results.
-      const config = executionOnly ? { ...this.config, executionOnly: true, path: '', workloadToken: '', enableCodexOAuth: false, enableClaudeOAuth: false } : this.config
+      const config = executionOnly ? { ...this.config, executionOnly: true, path: '', workloadToken: '', enrollmentAttemptPath: '', enrollmentClaimPath: '', enrollmentGrantPath: '', enableCodexOAuth: false, enableClaudeOAuth: false } : this.config
       child.stdin.write(`${JSON.stringify(config)}\n${JSON.stringify({ ...request, id })}\n`)
     })
     return { result, stop: abort, pause: () => child.stdout.pause(), resume: () => child.stdout.resume() }

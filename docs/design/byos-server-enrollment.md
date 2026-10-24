@@ -57,12 +57,43 @@ reconnect/disconnect advances epoch and permanently fences the old transfer.
 Repeated successful bind requests return the same connection and do not replace
 a refreshed grant with the escrow snapshot. No provider calls are made to bind.
 
-The source escrow remains a controlled recovery copy outside ordinary canonical
-artifact cleanup; this transfer does not delete it, including on publication
-failure. The immutable claim prevents rebinding after disconnect, and normal
-runtime checks refuse its old epoch. A complete owner-directed purge of that
-retained copy is separate lifecycle work; canonical disconnect/cleanup must not
-be described as having deleted every escrow copy or revoked upstream access.
+The source escrow is a recovery copy until canonical publication succeeds.
+Migration `20261024230000_byos_enrollment_cleanup.sql` journals its grant and
+PKCE attempt paths before publication. The canonical publication transaction
+records durable publication evidence, so disconnect between publication and the
+HTTP bind response cannot strand the copy. Successful bind immediately attempts
+bounded deletion of both source records. Repeated bind verifies the existing
+owner/workspace/database ledger and global immutable claim before returning the
+canonical connection; it does not reread a deleted escrow or overwrite refreshed
+credentials with the old snapshot.
+
+Explicit owner disconnect fences the connection epoch and clears usable
+references before deletion. The shared cleanup RPC and authenticated daily cron
+retry canonical and escrow/attempt deletion, including source-only leftovers.
+An unpublished sole recovery copy stays protected unless the owner explicitly
+disconnects/reconnects (advancing the epoch). Deletion requires fresh verification
+of the exact global claim and database identity; a losing preview reservation
+cannot delete another database's grant. Missing custody configuration or proof
+leaves a visible pending state rather than claiming success. Cleanup/status and
+disconnect do not require an inference reader identity.
+
+Immutable token-free creation receipts identify acknowledged source writes.
+A legacy missing receipt or any uncertain create remains repeat-delete eligible,
+even after successful DELETE/404, because a late commit may still recreate the
+record. Cleanup reports `creation_outcome_unknown` until that uncertainty is
+resolved; it never reports every copy deleted. Missing source configuration,
+ownership proof failures and remote deletion failures are reported distinctly.
+The immutable code-use, binding and creation claims retain only replay/ownership
+metadata; they are not provider credentials and are intentionally not removed.
+No refresh/access tokens or PKCE verifier belong in these claims.
+
+Provider revocation remains `not_implemented`. Local fencing/deletion does not
+revoke an upstream grant or undo an already transmitted provider request. No
+real account, source deletion or deployment has been validated by the synthetic
+lifecycle tests. After binding, use authenticated subscription status for the
+canonical connection; the DB-free custody status only describes whether an
+unbound source copy is available and cannot attest canonical runtime state. Pending grants without a confirmed authenticated binding remain
+persistent custody records and are not selected by the bound-connection cron.
 
 The one-use latch requires the vault's exclusive POST-create contract for a
 secret name/path; no CAS or mutable lock is invented. Verify duplicate-create
@@ -74,7 +105,9 @@ repeated. A consumed claim with no confirmed grant reports `custody_unconfirmed`
 If every durable write fails or the process crashes between provider exchange
 and vault commit, a fresh consent may be required. This distributed transaction
 has no absolute zero-loss guarantee and no plaintext local retry file. Confirmed
-real grants remain persistent; only completed temporary PKCE attempts are deleted.
+real pending grants remain persistent until explicitly bound. After canonical
+publication, only the canonical lifecycle retains the usable grant; redundant
+source copies follow the cleanup rules above.
 Synthetic acceptance cleanup must never delete real pending grants.
 
 ## Claude callback compatibility
@@ -162,8 +195,48 @@ It has no database, execution-reader or provider account configuration. The
 synthetic authorization link is never opened or passed to a user.
 
 `MIKKA_BYOS_BACKEND_ONLY=1 node scripts/test-subscription-worker.mjs` also runs
-binding tests with real disposable Postgres, all 33 additive migrations/replay,
+binding tests with real disposable Postgres, all 34 migrations/replay,
 the production custody process and TLS vault fixtures. Session inputs in that
 synthetic integration are test dependencies, not proof of a real Mikka account.
 Actual account creation/session, provider consent and deployed Infisical policy
 still require the approved persistent preview acceptance.
+
+## Escrow cleanup Linux verification (2026-10-24)
+
+Source-only checks use synthetic credentials, loopback TLS fixtures and disposable
+Postgres 17. No Infisical account, real token, provider request, IAM change or
+external deployment was used.
+
+- `MIKKA_BYOS_BACKEND_ONLY=1 node scripts/test-subscription-worker.mjs` passed:
+  50 top-level Go tests, race detector, vet, production/fixture executable builds,
+  authenticated app/stream/native fixture and production custody bind/cleanup
+  fixture; 34 migrations and migration-ledger replay. Source fixtures cover
+  deletion failure and retry, missing/foreign claim or database identity,
+  publication-before-bind disconnect, protected recovery, late uncertain creates,
+  post-purge idempotence, normal refresh and old-epoch refusal. Backend-only mode
+  intentionally skips browser CLI execution in the older composite fixture.
+- The added legacy source migration test passed separately on a fresh disposable
+  Postgres: two recorded copies per old transfer, publication-proof backfill,
+  unknown creation state, retained history and direct SQL replay.
+- 12 enrollment/binding/model/production-custody Node tests and four daemon
+  private-process tests passed. Execution frames strip every source path;
+  custody retains them. Root and daemon type checks, lint, migration policy and
+  11 migration tests passed.
+- Actual Next startup/private route to the production custody executable and
+  loopback TLS fixture passed without SQL, inference reader, native runtime or
+  external OAuth. Full original-config webpack production build passed in an
+  isolated Linux Docker snapshot; all seven BYOS route traces include their
+  intended production worker binary. The build emitted known next-intl cache
+  parsing and missing live Better Auth configuration diagnostics. This is a
+  build check, not a live login/deployed result.
+- An independent read-only review found missing-config cleanup starvation and
+  partial source configuration blocking canonical disconnect. Both were fixed
+  and covered by the repeated Go/application acceptance. No security check was
+  weakened to make a test pass.
+
+A projection POST returning 503 is deliberately kept in the canonical unknown-
+creation queue after disconnect, even when DELETE removes its active value.
+The application test checks this pending count instead of falsely asserting all
+copies are gone. Real OAuth, provider compatibility/revocation and deployment
+acceptance remain separate, unrun gates. Current Preview/team configuration
+approval is pending; no real authorization link has been generated.
