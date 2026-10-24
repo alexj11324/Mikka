@@ -83,6 +83,10 @@ jobs:
       - run: pnpm test:ssh-target
       - run: pnpm test:linear-sync
       - run: pnpm test:coordinator-events
+      - run: pnpm test:active-agents
+        env:
+          # Database regressions run against ephemeral Postgres in browser-tests below.
+          MIKKA_DATABASE_URL: ""
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
       - run: pnpm test:integrations
@@ -163,6 +167,10 @@ jobs:
       - name: Group conversation API and migrations (temporary Postgres 17 only)
         run: pnpm test:groups
       - run: pnpm test:e2e:setup
+      - name: Active-agent isolation and heartbeat lease renewal (temporary Postgres 17 only)
+        run: pnpm test:active-agents
+        env:
+          REQUIRE_DB: '1'
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
       - run: pnpm build

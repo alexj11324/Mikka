@@ -1941,6 +1941,7 @@
     "pleaseSignInFirst": "请先登录。",
     "invalidConversationID": "会话标识无效。",
     "unableToLoadChatHistoryPleaseTry": "无法读取聊天历史，请稍后重试。",
+    "activeAgentsNoParameters": "此接口不接受任何参数。",
     "conversationNotFound": "找不到此会话。",
     "aResponseIsStillGeneratingPleaseTry": "此会话仍有回复正在生成，请稍后重试。",
     "thisMessageWasAlreadySubmittedPleaseAsk": "此轮消息不能重复提交，请新建一轮提问。",
