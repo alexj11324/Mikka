@@ -6,7 +6,7 @@ import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { ArrowUp, BookOpen, ChevronRight, CircleCheck, Clock, Globe, Info, Maximize2, Minimize2, RotateCw, Search, X, type LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import type { listIssues } from '@/app/actions/issues'
-import type { TaskRun } from '@/app/actions/task-runs'
+import type { TaskRun, Thread } from '@/app/actions/task-runs'
 import { sendCoordinatorMessage } from '@/app/actions/coordinator'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -22,6 +22,8 @@ import { LetterAvatar } from './letter-avatar'
 import { StatusDot } from './status-dot'
 import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
+import { BotAvatar } from './bot-avatar'
+import { ThreadList, ThreadMark, threadName } from './thread-list'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type PanelTab = 'details' | 'tasks' | 'browser' | 'knowledge' | 'schedules'
@@ -171,17 +173,21 @@ function EmptyTab({ title, onArrange, arrangeLabel }: { title: string; onArrange
   </div>
 }
 
-export type PanelConversation = { id?: string | null; name: string; kind: 'coordinator' | 'agent'; updatedAt?: string }
+/** Who the center chat is with. For a bot, `id` is the bot's id; for an older chat, the chat's id. */
+export type PanelConversation = { id?: string | null; name: string; color?: string; shape?: string; kind: 'coordinator' | 'bot' | 'agent'; updatedAt?: string }
 
 /**
- * The right column beside a conversation (MIK-37, Figma 48:3): 详情 / 任务 /
+ * The right column beside a chat (MIK-37, Figma 48:3): 详情 / 任务 /
  * 浏览器 / 知识库 / 定时任务. The current tab shows its name, the others only
- * their icons; ⤢ widens just this column.
+ * their icons; ⤢ widens just this column. With a bot (Figma 188:3115), 任务
+ * becomes that bot's thread list and 详情 shows the picked thread (newest
+ * first) on the bot's computer; picking another bot switches both.
  */
-export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue, onArrange, onSearch, onClose }: {
+export function ContextPanel({ userName, issues, runs, threads, conversation, onOpenIssue, onArrange, onSearch, onClose }: {
   userName: string
   issues: Issue[]
   runs: TaskRun[]
+  threads: Thread[]
   conversation: PanelConversation
   onOpenIssue: (id: string) => void
   onArrange: (prompt: string) => void
@@ -195,19 +201,33 @@ export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue
   const now = useNow({ updateInterval: 60_000 })
   const [tab, setTab] = useState<PanelTab>('tasks')
   const [wide, setWide] = useState(false)
-  const thread = useConversationThread(conversation.kind === 'agent' ? conversation.id : null)
+  const tThreads = useTranslations('Shell.threads')
+  const botId = conversation.kind === 'bot' ? conversation.id ?? null : null
+  const botThreads = botId ? threads.filter(thread => thread.botId === botId) : []
+  const [picked, setPicked] = useState<string | null>(null)
+  const thread = botThreads.find(item => item.id === picked) ?? botThreads[0]
+  // Another bot: back to its 详情 and its newest thread.
+  useEffect(() => { if (botId) { setTab('details'); setPicked(null) } }, [botId])
+  // With a bot, the badge counts its threads waiting on you; otherwise every task's.
+  const waiting = botId ? botThreads.filter(item => item.status === 'waiting_input').length : runs.filter(run => run.status === 'waiting_input' && issues.some(issue => issue.id === run.issueId)).length
+  // An older chat without a bot learns its thread from the 电脑 cards in it.
+  const registered = useConversationThread(conversation.kind === 'agent' ? conversation.id : null)
+  const computer = botId ?? registered?.botId
   // A conversation whose bot works on its computer opens on that thread's 详情, where the screen is (Figma 103:64).
-  useEffect(() => { if (thread?.runId) setTab('details') }, [thread?.runId])
-  const waiting = runs.filter(run => run.status === 'waiting_input' && issues.some(issue => issue.id === run.issueId)).length
+  useEffect(() => { if (registered?.runId) setTab('details') }, [registered?.runId])
+
   return <aside aria-label={t('label')} className={cn('hidden min-h-0 shrink-0 flex-col border-l transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90')}>
     <Tabs value={tab} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
       <div className="flex h-11 shrink-0 items-center gap-1 px-2">
         <TabsList aria-label={t('tabs')} className="gap-0.5 bg-transparent p-0">
-          {TABS.map(item => <TabsTrigger key={item.id} value={item.id} aria-label={t(item.id)} className={cn('h-7 flex-none rounded-md px-1.5 data-active:bg-muted! data-active:shadow-none', tab === item.id && 'px-2')}>
+          {TABS.map(item => {
+            const label = botId && item.id === 'tasks' ? tThreads('title') : t(item.id)
+            return <TabsTrigger key={item.id} value={item.id} aria-label={label} className={cn('h-7 flex-none rounded-md px-1.5 data-active:bg-muted! data-active:shadow-none', tab === item.id && 'px-2')}>
             <item.icon />
-            {tab === item.id && <span>{t(item.id)}</span>}
+            {tab === item.id && <span>{label}</span>}
             {item.id === 'tasks' && waiting > 0 && <span className="flex size-4 items-center justify-center rounded-full bg-sidebar-primary text-xs leading-none text-sidebar-primary-foreground tabular-nums">{waiting}</span>}
-          </TabsTrigger>)}
+          </TabsTrigger>
+          })}
         </TabsList>
         <div className="ml-auto flex items-center">
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('search')} onClick={onSearch} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('search')}</TooltipContent></Tooltip>
@@ -215,9 +235,12 @@ export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('close')} onClick={onClose} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('close')}</TooltipContent></Tooltip>
         </div>
       </div>
-      <TabsContent value="details" className={cn('min-h-0', thread ? 'flex flex-col' : 'overflow-y-auto px-4 py-3')}>
-        {thread ? <>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3"><AgentComputer key={thread.runId} thread={thread} /></div>
+      <TabsContent value="details" className={cn('min-h-0', computer ? 'flex flex-col' : 'overflow-y-auto px-4 py-3')}>
+        {computer ? <>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{botId
+            ? <AgentComputer botId={botId} name={conversation.name} caption={tThreads('screen')}
+              head={thread ? { avatar: <ThreadMark />, title: threadName(thread, issues, tThreads('untitled')) } : { avatar: <BotAvatar color={conversation.color} shape={conversation.shape} size="profile" />, title: conversation.name }} />
+            : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} head={{ avatar: <ThreadMark />, title: registered.name }} />}</div>
           <CommandComposer />
         </> : <>
         <h2 className="text-xs font-medium text-muted-foreground">{tDetails('conversation')}</h2>
@@ -230,8 +253,13 @@ export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue
       </TabsContent>
       <TabsContent value="tasks" className="flex min-h-0 flex-col">
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-3">
-          <Suggestions name={userName} />
-          <MyTasks issues={issues} runs={runs} onOpenIssue={onOpenIssue} />
+          {botId ? <section aria-label={tThreads('title')} className="flex flex-col gap-2">
+            <h2 className="text-sm font-semibold">{tThreads('title')}</h2>
+            <ThreadList threads={botThreads} issues={issues} current={thread?.id ?? null} onPick={id => { setPicked(id); setTab('details') }} />
+          </section> : <>
+            <Suggestions name={userName} />
+            <MyTasks issues={issues} runs={runs} onOpenIssue={onOpenIssue} />
+          </>}
         </div>
         <CommandComposer />
       </TabsContent>

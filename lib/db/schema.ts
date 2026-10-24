@@ -35,11 +35,26 @@ export const issuePrefixes = pgTable('issue_prefixes', {
   prefix: varchar('prefix', { length: 4 }).notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
-export const agentSessions = pgTable('agent_sessions', {
-  id: uuid('id').primaryKey(), userId: text('userId').notNull(), title: varchar('title', { length: 200 }).notNull(),
+/**
+ * A bot: what a person chats with in the left column. It runs only on Mikka's
+ * own harness (AI SDK), never on a coding agent, so it is not a row in `agents`.
+ */
+export const bots = pgTable('bots', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(), name: text('name').notNull(),
+  /** A bloub colour id, see components/nav/bot-avatar.tsx. */
+  color: text('color').notNull().default('encre'),
+  shape: text('shape').notNull().default('cercle'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('agent_sessions_user_updated_idx').on(table.userId, table.updatedAt.desc())])
+}, table => [uniqueIndex('bots_user_name_key').on(table.userId, sql`lower(${table.name})`)])
+
+/** One chat. `botId` is the bot it is with; null for chats from before bots. */
+export const agentSessions = pgTable('agent_sessions', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(), title: varchar('title', { length: 200 }).notNull(),
+  botId: uuid('botId'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('agent_sessions_user_updated_idx').on(table.userId, table.updatedAt.desc()), index('agent_sessions_user_bot_updated_idx').on(table.userId, table.botId, table.updatedAt.desc()).where(sql`${table.botId} is not null`)])
 
 export const agentTurns = pgTable('agent_turns', {
   id: uuid('id').primaryKey(), sessionId: uuid('sessionId').notNull(), userId: text('userId').notNull(),
@@ -168,6 +183,8 @@ export const agentRuns = pgTable('agent_runs', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
   agentId: uuid('agentId').notNull().references(() => agents.id, { onDelete: 'cascade' }),
+  /** The bot that started this thread; null for runs started from a task directly. */
+  botId: uuid('botId').references(() => bots.id, { onDelete: 'set null' }),
   deviceId: uuid('deviceId').references(() => devices.id, { onDelete: 'set null' }),
   deviceRepoId: uuid('deviceRepoId').references(() => deviceRepos.id, { onDelete: 'set null' }),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
@@ -183,7 +200,7 @@ export const agentRuns = pgTable('agent_runs', {
   finishedAt: timestamp('finishedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt)])
+}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`)])
 
 /** The run's event stream, one row per chunk; `seq` dedupes re-sent batches. */
 export const runChunks = pgTable('run_chunks', {

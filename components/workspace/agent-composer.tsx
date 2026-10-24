@@ -14,8 +14,10 @@ import { getAgentStarters } from './agent-starters'
 const MAX_LENGTH = 8000
 const ATTACH = 'attach-file'
 
-export function AgentComposer({ ref, draft, onChange, onSubmit, isLoading, onStop, isEmpty = false }: {
+export function AgentComposer({ ref, draft, onChange, onSubmit, isLoading, onStop, isEmpty = false, placeholder }: {
   ref: Ref<HTMLTextAreaElement>
+  /** 给 X 发消息 when the chat is with a bot. */
+  placeholder?: string
   isEmpty?: boolean
   draft: string
   onChange: (value: string) => void
@@ -46,7 +48,7 @@ export function AgentComposer({ ref, draft, onChange, onSubmit, isLoading, onSto
     <PromptInput
       ref={ref}
       aria-label={agentCopy.askAgent}
-      placeholder={isEmpty ? agentCopy.askAgent2 : agentCopy.enterAMessage}
+      placeholder={placeholder ?? (isEmpty ? agentCopy.askAgent2 : agentCopy.enterAMessage)}
       minRows={isEmpty ? 2 : 1}
       maxRows={4}
       models={[{ value: 'deepseek-v4.1-flash', label: 'DS 4.1 Flash' }]}

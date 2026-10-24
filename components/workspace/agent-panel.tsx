@@ -3,6 +3,7 @@
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { fetchAgentHistory as fetchHistory, useAgentHistory } from '@/hooks/use-agent-history'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import useSWR from 'swr'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -33,8 +34,11 @@ const fetchAgentWithImages: typeof fetch = async (input, options) => {
 }
 
 
-/** `request` opens a session from outside (the conversation list): a session id, or null for a new conversation. */
-export type AgentSessionRequest = { sessionId: string | null; nonce: number }
+/**
+ * `request` opens a chat from outside (the bot list or ⌘K): a bot's chat
+ * (`bot`), an older chat by id, or a new chat with no bot (`sessionId: null`).
+ */
+export type AgentSessionRequest = { sessionId: string | null; bot?: { id: string; name: string; color: string; shape: string }; nonce: number }
 
 export function AgentPanel({ userId, initialHistory, request, onActive, onSessions }: { userId: string; initialHistory?: AgentHistory; request?: AgentSessionRequest; onActive?: (sessionId: string | null) => void; onSessions?: (sessions: AgentChatSession[]) => void }) {
   const [demo, setDemo] = useState(false)
@@ -54,12 +58,12 @@ function AgentHistoryLoading({ error, onRetry }: { error?: Error; onRetry: () =>
   </section>
 }
 
-type OpenSession = { key: string; initial?: AgentHistory; sessionId?: string }
+type OpenSession = { key: string; initial?: AgentHistory; sessionId?: string; bot?: { id: string; name: string; color: string; shape: string } }
 type LiveSession = AgentChatSession & { key: string }
 
 function AgentSessions({ userId, initial, request, onActive, onSessions, onSaved, onDemo }: { userId: string; initial: AgentHistory; request?: AgentSessionRequest; onActive?: (sessionId: string | null) => void; onSessions?: (sessions: AgentChatSession[]) => void; onSaved: () => Promise<void>; onDemo: () => void }) {
-  const firstKey = request ? request.sessionId ?? `new-${request.nonce}` : initial.sessionId ?? 'new'
-  const [opened, setOpened] = useState<OpenSession[]>(() => [request && request.sessionId !== initial.sessionId ? (request.sessionId ? { key: firstKey, sessionId: request.sessionId } : { key: firstKey, initial: { sessions: [], sessionId: null, turns: [] } }) : { key: firstKey, initial }])
+  const firstKey = request?.bot ? `bot:${request.bot.id}` : request ? request.sessionId ?? `new-${request.nonce}` : initial.sessionId ?? 'new'
+  const [opened, setOpened] = useState<OpenSession[]>(() => [request?.bot ? { key: firstKey, bot: request.bot } : request && request.sessionId !== initial.sessionId ? (request.sessionId ? { key: firstKey, sessionId: request.sessionId } : { key: firstKey, initial: { sessions: [], sessionId: null, turns: [] } }) : { key: firstKey, initial }])
   const [activeKey, setActiveKey] = useState(firstKey)
   const [live, setLive] = useState<Record<string, LiveSession>>({})
   const sessions = new Map<string, AgentChatSession>(initial.sessions.map(session => [session.id, session]))
@@ -73,6 +77,13 @@ function AgentSessions({ userId, initial, request, onActive, onSessions, onSaved
     setActiveKey(sessionId)
   }
 
+  // One ongoing chat per bot: picking the bot again returns to it.
+  function openBot(bot: { id: string; name: string; color: string; shape: string }) {
+    const key = `bot:${bot.id}`
+    if (!opened.some(entry => entry.key === key)) setOpened(entries => [...entries, { key, bot }])
+    setActiveKey(key)
+  }
+
   function reset() {
     const key = crypto.randomUUID()
     setOpened(entries => [...entries, { key, initial: { sessions: [], sessionId: null, turns: [] } }])
@@ -83,7 +94,8 @@ function AgentSessions({ userId, initial, request, onActive, onSessions, onSaved
   useEffect(() => {
     if (!request || handled.current === request.nonce) return
     handled.current = request.nonce
-    if (request.sessionId) select(request.sessionId)
+    if (request.bot) openBot(request.bot)
+    else if (request.sessionId) select(request.sessionId)
     else reset()
   })
   const activeEntry = opened.find(entry => entry.key === activeKey)
@@ -103,21 +115,25 @@ function AgentSessions({ userId, initial, request, onActive, onSessions, onSaved
 }
 
 function AgentSessionLoader({ entry, userId, ...props }: Omit<AgentSessionProps, 'initial' | 'completionId'> & { entry: OpenSession; userId: string }) {
-  const selected = useSWR<AgentHistory>(!entry.initial && entry.sessionId ? [`/api/agent/sessions?sessionId=${entry.sessionId}`, userId] : null,
+  const url = entry.bot ? `/api/agent/sessions?botId=${entry.bot.id}` : `/api/agent/sessions?sessionId=${entry.sessionId}`
+  const selected = useSWR<AgentHistory>(!entry.initial && (entry.sessionId || entry.bot) ? [url, userId] : null,
     ([url]: [string, string]) => fetchHistory(url), { revalidateOnFocus: false, revalidateIfStale: false })
   const data = entry.initial ?? selected.data
   if (!data) return <AgentHistoryLoading error={selected.error} onRetry={() => { void selected.mutate() }} />
-  return <AgentSession {...props} initial={data} completionId={`${userId}:${entry.key}`} />
+  // A bot's chat restores its latest conversation; with none yet, it starts empty.
+  const own = entry.bot && data.sessionId && data.sessions.find(session => session.id === data.sessionId)?.botId !== entry.bot.id ? { ...data, sessionId: null, turns: [] } : data
+  return <AgentSession {...props} bot={entry.bot} initial={own} completionId={`${userId}:${entry.key}`} />
 }
 
 type DisplayTurn = { id: string; question: string; completion: string; error?: Error; stopped: boolean }
 type AgentSessionProps = {
   onReset: () => void; onSelect: (id: string) => void; onSaved: () => Promise<void>; onDemo: () => void; initial: AgentHistory; sessions: AgentChatSession[]
-  completionId: string; onState: (session: AgentChatSession) => void
+  completionId: string; onState: (session: AgentChatSession) => void; bot?: { id: string; name: string; color: string; shape: string }
 }
 
-function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, sessions, completionId }: AgentSessionProps) {
+function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, sessions, completionId, bot }: AgentSessionProps) {
   const agentCopy = useAgentCopy()
+  const tNav = useTranslations('Nav')
 
   const restored = initial.turns.at(-1)
   const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ id: completionId, api: withBasePath('/api/agent'), credentials: 'same-origin', fetch: fetchAgentWithImages, initialCompletion: restored?.completion ?? '' })
@@ -158,7 +174,7 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
     try {
       sessionIdRef.current ??= crypto.randomUUID()
       titleRef.current ??= prompt.trim().slice(0, 200)
-      onState({ id: sessionIdRef.current, title: titleRef.current, updatedAt: new Date().toISOString(), running: true })
+      onState({ id: sessionIdRef.current, title: titleRef.current, botId: bot?.id ?? null, updatedAt: new Date().toISOString(), running: true })
       const retrying = lastRequestRef.current?.failed && lastRequestRef.current.prompt === prompt.trim()
       const turnId = retrying && generation ? generation : crypto.randomUUID()
       if (!retrying) {
@@ -170,13 +186,13 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
       setStopped(false)
       setRestoredError(undefined)
       lastRequestRef.current = { prompt: prompt.trim(), failed: true }
-      const result = await complete(prompt.trim(), { body: { sessionId: sessionIdRef.current, turnId, retry: Boolean(retrying) } })
+      const result = await complete(prompt.trim(), { body: { sessionId: sessionIdRef.current, ...(bot ? { botId: bot.id } : {}), turnId, retry: Boolean(retrying) } })
       lastRequestRef.current.failed = !result?.trim()
       if (result && source === 'composer') updateDraft(current => current === prompt ? '' : current)
       return Boolean(result?.trim())
     } finally {
       submittingRef.current = false
-      if (sessionIdRef.current && titleRef.current) onState({ id: sessionIdRef.current, title: titleRef.current, updatedAt: new Date().toISOString(), running: false })
+      if (sessionIdRef.current && titleRef.current) onState({ id: sessionIdRef.current, title: titleRef.current, botId: bot?.id ?? null, updatedAt: new Date().toISOString(), running: false })
       void onSaved().catch(() => toast.error(agentCopy.unableToRefreshConversationsPleaseReloadThe))
     }
   }
@@ -184,17 +200,18 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
   return <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt, 'inline') }}><ComputerConversation id={sessionIdRef.current}>
       <AgentChat
         turns={[
-          ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse completion={turn.completion} error={turn.error} stopped={turn.stopped} isLoading={false} onAction={handleUIAction} /> })),
-          ...(question ? [{ id: generation, question, response: <AgentResponse completion={completion} error={error ?? restoredError} stopped={stopped} isLoading={isLoading} onAction={handleUIAction} onRetry={() => { if (lastRequestRef.current) lastRequestRef.current.failed = true; void request(question, 'inline') }} /> }] : []),
+          ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse bot={bot} completion={turn.completion} error={turn.error} stopped={turn.stopped} isLoading={false} onAction={handleUIAction} /> })),
+          ...(question ? [{ id: generation, question, response: <AgentResponse bot={bot} completion={completion} error={error ?? restoredError} stopped={stopped} isLoading={isLoading} onAction={handleUIAction} onRetry={() => { if (lastRequestRef.current) lastRequestRef.current.failed = true; void request(question, 'inline') }} /> }] : []),
         ]}
         streaming={isLoading}
+        bot={bot}
         sessions={sessions}
         sessionId={sessionIdRef.current}
         onSelect={onSelect}
         onReset={onReset}
         onDemo={onDemo}
         onSuggestion={prompt => { updateDraft(prompt); inputRef.current?.focus() }}
-        composer={<AgentComposer ref={inputRef} isEmpty={!question} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} />}
+        composer={<AgentComposer ref={inputRef} isEmpty={!question} placeholder={bot ? tNav('messageBot', { name: bot.name }) : undefined} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} />}
       />
     </ComputerConversation></AgentInteractionContext>
 }

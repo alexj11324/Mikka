@@ -1,7 +1,8 @@
 import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import type { UIMessageChunk } from 'ai'
 
-export type SavedAgentSession = { id: string; title: string; updatedAt: string; preview?: string }
+/** `botId` is the bot the chat is with, or null for an older chat with no bot. */
+export type SavedAgentSession = { id: string; title: string; updatedAt: string; preview?: string; botId?: string | null }
 
 /**
  * One line of plain text for the conversation list: the first sentence-sized

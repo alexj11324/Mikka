@@ -28,3 +28,28 @@ export async function listTaskRuns(): Promise<TaskRun[]> {
     .orderBy(agentRuns.issueId, desc(agentRuns.createdAt)).limit(200)
   return rows.map(row => ({ ...row, issueId: row.issueId!, finishedAt: row.finishedAt?.toISOString() ?? null }))
 }
+
+/** A thread: one run of one bot, newest first. Its name comes from its task, else its prompt. */
+export interface Thread {
+  id: string
+  /** The bot that started it. */
+  botId: string
+  issueId: string | null
+  prompt: string
+  status: RunStatus
+  error: string | null
+  createdAt: string
+}
+
+/** The right column's thread lists: every run a bot started in the last 30 days. */
+export async function listThreads(): Promise<Thread[]> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) throw new ActionFailureError('authRequired')
+  const rows = await db.select({
+    id: agentRuns.id, botId: agentRuns.botId, issueId: agentRuns.issueId, prompt: sql<string>`left(${agentRuns.prompt}, 200)`,
+    status: agentRuns.status, error: agentRuns.error, createdAt: agentRuns.createdAt,
+  }).from(agentRuns)
+    .where(and(eq(agentRuns.userId, session.user.id), isNotNull(agentRuns.botId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+    .orderBy(desc(agentRuns.createdAt)).limit(200)
+  return rows.map(row => ({ ...row, botId: row.botId!, createdAt: row.createdAt.toISOString() }))
+}

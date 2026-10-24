@@ -11,16 +11,18 @@ import { ReasoningText } from '@/components/agents/loading-states/reasoning-text
 import { StreamingResponse } from '@/components/agents/streaming-response'
 
 import { AgentGenerativeUI } from './agent-generative-ui'
+import { BotAvatar } from '@/components/nav/bot-avatar'
 
-export function AgentResponse({ completion, error, isLoading, stopped = false, onAction, onRetry }: { completion: string; error?: Error; isLoading: boolean; stopped?: boolean; onAction: (event: ActionEvent) => void; onRetry?: () => void }) {
+/** `bot` signs the reply with the bot's blob and name instead of a generic Agent. */
+export function AgentResponse({ completion, error, isLoading, stopped = false, onAction, onRetry, bot }: { bot?: { id: string; name: string; color: string; shape: string }; completion: string; error?: Error; isLoading: boolean; stopped?: boolean; onAction: (event: ActionEvent) => void; onRetry?: () => void }) {
   const agentCopy = useAgentCopy()
 
   if (!completion && !error && !isLoading) return null
 
   return <Message from="assistant" aria-label={agentCopy.agentResponse} animateIn={isLoading}>
-    <MessageAvatar><Bot aria-hidden="true" /></MessageAvatar>
+    {bot ? <BotAvatar color={bot.color} shape={bot.shape} size="pill" /> : <MessageAvatar><Bot aria-hidden="true" /></MessageAvatar>}
     <MessageContent className="gap-3">
-      <MessageHeader>Agent</MessageHeader>
+      <MessageHeader>{bot?.name ?? 'Agent'}</MessageHeader>
       <Bubble variant="ghost" className="w-full min-w-0">
         <BubbleContent className="flex w-full min-w-0 flex-col gap-4">
           {isLoading && <ReasoningText variant="cascade" phrases={completion ? [agentCopy.continuingTheResponse, agentCopy.organizingResponseContent] : [agentCopy.preparingAResponse, agentCopy.waitingForAResponse]} />}

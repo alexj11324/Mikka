@@ -9,9 +9,10 @@ export async function GET(request: Request) {
   if (!session?.user) return Response.json({ error: agentCopy.pleaseSignInFirst }, { status: 401, headers })
   const params = new URL(request.url).searchParams
   const id = params.get('sessionId')
-  if (id && !z.uuid().safeParse(id).success) return Response.json({ error: agentCopy.invalidConversationID }, { status: 400, headers })
+  const botId = params.get('botId')
+  if ((id && !z.uuid().safeParse(id).success) || (botId && !z.uuid().safeParse(botId).success)) return Response.json({ error: agentCopy.invalidConversationID }, { status: 400, headers })
   try {
-    return Response.json(await getAgentHistory(session.user.id, id ?? undefined, params.get('new') === '1'), { headers })
+    return Response.json(await getAgentHistory(session.user.id, id ?? undefined, params.get('new') === '1', botId ?? undefined), { headers })
   } catch (error) {
     return Response.json({ error: error instanceof AgentStoreError ? error.message : agentCopy.unableToLoadChatHistoryPleaseTry }, {
       status: error instanceof AgentStoreError ? error.status : 503, headers,

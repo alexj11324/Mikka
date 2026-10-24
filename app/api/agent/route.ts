@@ -16,7 +16,7 @@ export const maxDuration = 300
 // Reuse the POST bundle: image lookup must not trigger a second cold route compilation.
 export { GET } from './images/route'
 
-const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional(), turnId: z.uuid().optional(), retry: z.boolean().optional() }).strict()
+const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional(), botId: z.uuid().optional(), turnId: z.uuid().optional(), retry: z.boolean().optional() }).strict()
 const errorHeaders = { 'Cache-Control': 'private, no-store', 'Content-Type': 'text/plain; charset=utf-8' }
 
 function agentErrorMessage(error: unknown) {
@@ -25,6 +25,11 @@ function agentErrorMessage(error: unknown) {
   if (status === 429 || status === 402) return agentCopy.opencodeGoIsRateLimitedOrOut
   if (error instanceof Error && /timeout|abort/i.test(error.name)) return agentCopy.theModelTimedOutReceivedContentIs
   return agentCopy.opencodeGoConnectionFailedReceivedContentIs
+}
+
+/** The chat is with a bot: answer as that bot. */
+function botInstructions(bot: { name: string }) {
+  return `\n\nYou are the bot "${bot.name}". Answer as ${bot.name}.`
 }
 
 export async function HEAD(request: Request) {
@@ -80,7 +85,7 @@ export async function POST(request: Request) {
   const turnId = parsed.data.turnId ?? crypto.randomUUID()
   let turn: Awaited<ReturnType<typeof beginAgentTurn>>
   try {
-    turn = await beginAgentTurn(session.user.id, sessionId, turnId, parsed.data.prompt, parsed.data.retry)
+    turn = await beginAgentTurn(session.user.id, sessionId, turnId, parsed.data.prompt, parsed.data.retry, parsed.data.botId ?? null)
   } catch (error) {
     return new Response(error instanceof AgentStoreError ? error.message : agentCopy.unableToSaveThisQuestionPleaseTry, {
       status: error instanceof AgentStoreError ? error.status : 503, headers: errorHeaders,
@@ -104,7 +109,7 @@ export async function POST(request: Request) {
   const result = streamText({
     model: opencode('deepseek-v4.1-flash'),
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
-    system: `${systemPrompt}\n\n${agentWebInstructions()}`,
+    system: `${systemPrompt}\n\n${agentWebInstructions()}${turn.bot ? botInstructions(turn.bot) : ''}`,
     messages,
     tools: {
       ...createAgentWebTools({ signal: request.signal }),

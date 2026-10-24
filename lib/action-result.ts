@@ -19,6 +19,7 @@ export const ACTION_ERROR_CODES = [
   'deviceNotFound',
   'agentHarnessMissing',
   'agentDuplicateName',
+  'botDuplicateName',
   'agentInvalidInput',
   'agentAddFailed',
   'agentSaveFailed',

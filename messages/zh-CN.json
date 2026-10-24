@@ -128,7 +128,10 @@
     "rail": "主导航",
     "conversations": "对话",
     "board": "看板",
-    "collapseList": "收起对话列表",
+    "collapseList": "收起 Bot 列表",
+    "bots": "Bot",
+    "newBot": "新建 Bot",
+    "messageBot": "给 {name} 发消息",
     "newConversation": "新对话",
     "pinned": "已置顶",
     "untitledConversation": "未命名对话"
@@ -888,6 +891,7 @@
     "deviceNotFound": "设备不存在。",
     "agentHarnessMissing": "这台设备上没有检测到该 harness。",
     "agentDuplicateName": "已有同名 Agent，请换一个名称。",
+    "botDuplicateName": "已有同名 Bot，请换一个名字。",
     "agentInvalidInput": "请检查填写内容。",
     "agentAddFailed": "添加失败，请重试。",
     "agentSaveFailed": "保存失败，请重试。",
@@ -2246,12 +2250,54 @@
     }
   },
   "Shell": {
+    "threads": {
+      "title": "线程",
+      "empty": "还没有线程",
+      "untitled": "未命名线程",
+      "waiting": "等你回复",
+      "failed": "失败",
+      "screen": "屏幕"
+    },
+    "newBot": {
+      "title": "新建 Bot",
+      "description": "给 Bot 起名，选一个形状和颜色。",
+      "name": "名字",
+      "namePlaceholder": "名字",
+      "color": "颜色",
+      "colors": {
+        "encre": "墨色",
+        "brun": "棕色",
+        "rouge": "红色",
+        "orange": "橙色",
+        "ambre": "琥珀色",
+        "vert": "绿色",
+        "turquoise": "青色",
+        "bleu": "蓝色",
+        "violet": "紫色",
+        "rose": "粉色",
+        "gris": "灰色"
+      },
+      "shape": "形状",
+      "shapes": {
+        "cercle": "圆形",
+        "galet": "卵石",
+        "squircle": "圆角方",
+        "capsule": "胶囊",
+        "triangle": "三角",
+        "hexagone": "六边形",
+        "nuage": "云朵",
+        "goutte": "水滴"
+      },
+      "create": "创建",
+      "creating": "正在创建…"
+    },
     "pinned": "置顶",
     "searchPlaceholder": "搜索对话、任务、Agent、知识库",
     "searchLabel": "全局搜索",
     "searchDescription": "搜索对话、任务和项目，用方向键选择，按 Enter 打开。",
     "searchEmpty": "没有匹配的结果",
     "groups": {
+      "bots": "Bot",
       "conversations": "对话",
       "tasks": "任务",
       "projects": "项目",
@@ -2259,7 +2305,7 @@
     },
     "newTask": "新建任务",
     "newConversation": "新对话",
-    "openList": "展开对话列表",
+    "openList": "展开 Bot 列表",
     "back": "后退",
     "forward": "前进",
     "window": "应用窗口",

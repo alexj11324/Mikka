@@ -128,7 +128,10 @@
     "rail": "Main navigation",
     "conversations": "Conversations",
     "board": "Board",
-    "collapseList": "Collapse conversation list",
+    "collapseList": "Collapse bot list",
+    "bots": "Bots",
+    "newBot": "New bot",
+    "messageBot": "Message {name}",
     "newConversation": "New conversation",
     "pinned": "Pinned",
     "untitledConversation": "Untitled conversation"
@@ -888,6 +891,7 @@
     "deviceNotFound": "This device does not exist.",
     "agentHarnessMissing": "The selected harness is not installed on this device.",
     "agentDuplicateName": "An agent with this name already exists. Choose another name.",
+    "botDuplicateName": "A bot with this name already exists. Choose another name.",
     "agentInvalidInput": "Please check the information you entered.",
     "agentAddFailed": "Could not add the agent. Please try again.",
     "agentSaveFailed": "Could not save the agent. Please try again.",
@@ -2246,12 +2250,54 @@
     }
   },
   "Shell": {
+    "threads": {
+      "title": "Threads",
+      "empty": "No threads yet",
+      "untitled": "Untitled thread",
+      "waiting": "Needs you",
+      "failed": "Failed",
+      "screen": "Screen"
+    },
+    "newBot": {
+      "title": "New bot",
+      "description": "Name the bot and pick a shape and colour.",
+      "name": "Name",
+      "namePlaceholder": "Name",
+      "color": "Colour",
+      "colors": {
+        "encre": "Ink",
+        "brun": "Brown",
+        "rouge": "Red",
+        "orange": "Orange",
+        "ambre": "Amber",
+        "vert": "Green",
+        "turquoise": "Turquoise",
+        "bleu": "Blue",
+        "violet": "Violet",
+        "rose": "Pink",
+        "gris": "Grey"
+      },
+      "shape": "Shape",
+      "shapes": {
+        "cercle": "Circle",
+        "galet": "Pebble",
+        "squircle": "Squircle",
+        "capsule": "Capsule",
+        "triangle": "Triangle",
+        "hexagone": "Hexagon",
+        "nuage": "Cloud",
+        "goutte": "Drop"
+      },
+      "create": "Create",
+      "creating": "Creating…"
+    },
     "pinned": "Pinned",
     "searchPlaceholder": "Search conversations, tasks, agents, knowledge",
     "searchLabel": "Search everything",
     "searchDescription": "Search conversations, tasks and projects. Use the arrow keys to choose and Enter to open.",
     "searchEmpty": "Nothing matches",
     "groups": {
+      "bots": "Bots",
       "conversations": "Conversations",
       "tasks": "Tasks",
       "projects": "Projects",
@@ -2259,7 +2305,7 @@
     },
     "newTask": "New task",
     "newConversation": "New conversation",
-    "openList": "Show conversations",
+    "openList": "Expand bot list",
     "back": "Back",
     "forward": "Forward",
     "window": "App window",
