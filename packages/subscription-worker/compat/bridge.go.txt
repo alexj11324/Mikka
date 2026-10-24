@@ -15,6 +15,8 @@ type ClaudeTokenStorage = claude.ClaudeTokenStorage
 
 var NewCredentialRefreshPatch = codex.NewCredentialRefreshPatch
 
+const CodexClientID = codex.ClientID
+
 type CodexPKCECodes = codex.PKCECodes
 type CodexAuthBundle = codex.CodexAuthBundle
 

@@ -1,14 +1,13 @@
-import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { SubscriptionRefusal, subscriptionRouteSchema } from '@mikka/protocol/subscription'
 import type { SubscriptionService } from './subscription-service'
-import { withBasePath } from './base-path'
 
 const id = z.uuid()
 const input = z.discriminatedUnion('action', [
   z.object({ action: z.literal('connect'), workspaceId: id, provider: z.enum(['codex', 'claude']) }).strict(),
   z.object({ action: z.literal('reconnect'), connectionId: id, revision: z.number().int().positive() }).strict(),
-  z.object({ action: z.literal('callback'), connectionId: id, state: z.string().length(43), code: z.string().min(1).max(4096) }).strict(),
+  z.object({ action: z.literal('poll'), connectionId: id, state: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict(),
+  z.object({ action: z.literal('callback'), connectionId: id, state: z.string().regex(/^[A-Za-z0-9_-]{43}$/), callbackUrl: z.string().min(1).max(8192) }).strict(),
   z.object({ action: z.enum(['status', 'disconnect', 'recover']), connectionId: id, revision: z.number().int().positive().optional() }).strict(),
   z.object({ action: z.literal('bind'), connectionId: id, revision: z.number().int().positive(), consumerId: z.string().min(1).max(128), route: subscriptionRouteSchema.exclude(['openai_siwc']), modelId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/) }).strict()
 ])
@@ -49,7 +48,8 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
       let result: unknown
       if (body.action === 'bind') result = { bindingId: await service.repository.bind(session.userId, row.workspaceId, body.consumerId, row.id, body.revision, body.route, body.modelId) }
       else if (body.action === 'status') result = await service.status(session.userId, row.id, request.signal)
-      else if (body.action === 'callback') { await worker.call('oauthComplete', { sessionId: session.sessionId, state: body.state, code: body.code }, request.signal); result = await service.status(session.userId, row.id, request.signal) }
+      else if (body.action === 'poll') result = await worker.call('oauthPoll', { sessionId: session.sessionId, state: body.state }, request.signal)
+      else if (body.action === 'callback') { await worker.call('oauthHandoff', { sessionId: session.sessionId, state: body.state, callbackUrl: body.callbackUrl }, request.signal); result = await service.status(session.userId, row.id, request.signal) }
       else if (body.action === 'reconnect') result = await worker.call('oauthStart', { revision: body.revision, sessionId: session.sessionId }, request.signal)
       else { await worker.call(body.action, { revision: body.revision }, request.signal); result = await service.status(session.userId, row.id, request.signal) }
       return Response.json(result, { headers })
@@ -75,17 +75,8 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
   }
 }
 
-/** Provider callback: find only this session owner's attempt, never a redirect target. */
-export async function subscriptionCallback(request: Request, deps: SubscriptionHTTPDependencies) {
-  const session = await deps.session(request)
-  if (!session) return Response.json({ error: 'auth_required' }, { status: 401, headers })
-  const url = new URL(request.url); const state = url.searchParams.get('state'); const code = url.searchParams.get('code')
-  if (!state || state.length !== 43 || !code || code.length > 4096 || url.searchParams.has('error')) return Response.json({ error: 'callback_refused' }, { status: 409, headers })
-  try {
-    const service = deps.service()
-    const { rows } = await service.repository.pool.query('select "connectionId" from byos_oauth_attempts where "stateHash"=$1 and "ownerId"=$2', [createHash('sha256').update(state).digest('hex'), session.userId])
-    if (!rows[0]) throw new Error('callback_refused')
-    const result = await subscriptionHTTP(deps)(new Request(new URL('/api/subscriptions', request.url), { method: 'POST', headers: { 'content-type': 'application/json', cookie: request.headers.get('cookie') ?? '' }, body: JSON.stringify({ action: 'callback', connectionId: rows[0].connectionId, state, code }), signal: request.signal }))
-    return new Response(null, { status: 303, headers: { ...headers, Location: withBasePath(`/settings?section=integrations&subscription=${result.ok ? 'connected' : 'error'}`) } })
-  } catch { return Response.json({ error: 'callback_refused' }, { status: 409, headers }) }
+/** Native CPA clients have no registered Mikka HTTPS callback. Complete inside
+ * the authenticated application through device polling or explicit URL handoff. */
+export async function subscriptionCallback(_request: Request, _deps: SubscriptionHTTPDependencies) {
+  return Response.json({ error: 'callback_handoff_required' }, { status: 410, headers })
 }

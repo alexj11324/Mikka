@@ -12,7 +12,7 @@ type oauthTransport struct{ base http.RoundTripper }
 
 func (t oauthTransport) RoundTrip(request *http.Request) (*http.Response, error) {
 	switch request.URL.String() {
-	case "https://auth.openai.com/oauth/token", "https://platform.claude.com/v1/oauth/token", "https://api.anthropic.com/api/oauth/profile":
+	case "https://auth.openai.com/api/accounts/deviceauth/usercode", "https://auth.openai.com/api/accounts/deviceauth/token", "https://auth.openai.com/oauth/token", "https://platform.claude.com/v1/oauth/token", "https://api.anthropic.com/api/oauth/profile":
 	default:
 		return nil, ErrUnsupported
 	}

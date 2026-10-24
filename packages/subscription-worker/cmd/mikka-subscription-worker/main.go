@@ -18,9 +18,12 @@ import (
 
 	worker "github.com/alexj11324/Mikka/subscription-worker"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
+	// CPA diagnostics can embed upstream response bodies; never publish them.
+	log.SetOutput(io.Discard)
 	if len(os.Args) == 2 && os.Args[1] == "--version" {
 		fmt.Println("mikka-subscription-worker CPA 8289ec4c71ad914d0612c2776352b76ba3d355a6")
 		return
@@ -50,8 +53,6 @@ func run() error {
 		EnableRuntime     bool         `json:"enableRuntime"`
 		EnablePlainModels bool         `json:"enablePlainModels"`
 		EnableClaudeOAuth bool         `json:"enableClaudeOAuth"`
-		ClaudeRedirectURI string       `json:"claudeRedirectUri"`
-		RedirectURI       string       `json:"redirectUri"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(frame))
 	decoder.DisallowUnknownFields()
@@ -85,11 +86,11 @@ func run() error {
 		}
 	}
 	if config.EnableCodexOAuth && config.Scope.Provider == "codex" {
-		w.OAuth = worker.CPACodexOAuth{RedirectURI: config.RedirectURI}
+		w.OAuth = worker.CPACodexOAuth{}
 		w.Executor = worker.CPACodexLifecycle{}
 	}
 	if config.EnableClaudeOAuth && config.Scope.Provider == "claude" {
-		w.OAuth = worker.CPAClaudeOAuth{RedirectURI: config.ClaudeRedirectURI}
+		w.OAuth = worker.CPAClaudeOAuth{}
 		w.Executor = worker.CPAClaudeLifecycle{}
 	}
 	if config.EnablePlainModels && w.Executor != nil {

@@ -28,7 +28,7 @@ export function subscriptionRuntime(): SubscriptionService {
   // adapter uses CPA converters with Mikka's identity and no native metadata.
   const ready = new Set((process.env.MIKKA_BYOS_VALIDATED_NATIVE_ROUTES ?? '').split(',').filter(route => ['codex_cli', 'claude_code_cli'].includes(route)))
   const modelRoutes = new Set((process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES ?? '').split(',').filter(route => ['codex_cpa', 'claude_cpa'].includes(route)))
-  return new SubscriptionService(new SubscriptionRepository(database), scope => new SubscriptionWorkerClient({ binary }, { scope, databaseUrl, infisicalOrigin, project, environment, path, workloadToken, enableRuntime: true, enablePlainModels: modelRoutes.has(scope.provider === 'codex' ? 'codex_cpa' : 'claude_cpa'), enableCodexOAuth: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', redirectUri: process.env.MIKKA_BYOS_CODEX_REDIRECT_URI, enableClaudeOAuth: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1', claudeRedirectUri: process.env.MIKKA_BYOS_CLAUDE_REDIRECT_URI }), {
+  return new SubscriptionService(new SubscriptionRepository(database), scope => new SubscriptionWorkerClient({ binary }, { scope, databaseUrl, infisicalOrigin, project, environment, path, workloadToken, enableRuntime: true, enablePlainModels: modelRoutes.has(scope.provider === 'codex' ? 'codex_cpa' : 'claude_cpa'), enableCodexOAuth: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', enableClaudeOAuth: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1' }), {
     ready: (route: SubscriptionRoute) => ready.has(route) || modelRoutes.has(route),
     oauth: { codex: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', claude: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1' },
     // Only a verified runner supplies native isolation; Vercel is not the runner.

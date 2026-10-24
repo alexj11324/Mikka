@@ -32,7 +32,7 @@ func TestClaudePlainOAuthAndRefreshExcludeNativeIdentityAndFingerprintPaths(t *t
 			return
 		}
 		if body["grant_type"] == "authorization_code" {
-			if body["code"] != "fixture-code" || len(body["code_verifier"].(string)) != 43 || len(body["state"].(string)) != 43 {
+			if body["redirect_uri"] != claudeCallbackURI || body["code"] != "fixture-code" || len(body["code_verifier"].(string)) != 43 || len(body["state"].(string)) != 43 {
 				out.WriteHeader(400)
 				return
 			}
@@ -58,19 +58,32 @@ func TestClaudePlainOAuthAndRefreshExcludeNativeIdentityAndFingerprintPaths(t *t
 		clone.URL = &u
 		return transport.RoundTrip(clone)
 	})}
-	w.OAuth = CPAClaudeOAuth{RedirectURI: "https://mikka.invalid/api/subscriptions/callback", Client: client}
+	w.OAuth = CPAClaudeOAuth{Client: client}
 	w.Executor = CPAClaudeLifecycle{Client: client}
 	begin, err := w.StartOAuth(context.Background(), 1, "fixture-session")
 	if err != nil {
 		t.Fatal(err)
 	}
 	parsed, _ := url.Parse(begin.AuthorizationURL)
-	if parsed.Host != "claude.ai" {
+	if parsed.Host != "claude.ai" || parsed.Query().Get("redirect_uri") != claudeCallbackURI || parsed.Query().Get("code_challenge_method") != "S256" {
 		t.Fatal("authorization target changed")
 	}
-	done, err := w.CompleteOAuth(context.Background(), "fixture-session", parsed.Query().Get("state"), "fixture-code")
+	state := begin.State
+	callback := claudeCallbackURI + "?code=fixture-code&state=" + state
+	for _, bad := range []string{"https://mikka.invalid/callback?code=fixture-code&state=" + state, callback + "&state=" + state, callback + "#override", strings.Replace(callback, "localhost:54545", "localhost:6666", 1), claudeCallbackURI + "?code=fixture-code&state=" + strings.Repeat("x", 43), "fixture-code", claudeCallbackURI + "?code=fixture-code", callback + "&error=denied", strings.Replace(callback, "/callback?", "/%63allback?", 1), strings.Replace(callback, "localhost:54545", "alice@localhost:54545", 1)} {
+		if _, err = w.CompleteHandoff(context.Background(), "fixture-session", state, bad); err != ErrUnsupported {
+			t.Fatal("malformed handoff accepted")
+		}
+	}
+	if _, err = w.CompleteHandoff(context.Background(), "wrong-session", state, callback); err != ErrStale {
+		t.Fatal("session not bound")
+	}
+	done, err := w.CompleteHandoff(context.Background(), "fixture-session", state, callback)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if _, err = w.CompleteHandoff(context.Background(), "fixture-session", state, callback); err != ErrStale {
+		t.Fatal("handoff replayed")
 	}
 	current, _ := w.Repo.Lookup(context.Background(), w.Scope)
 	inf.mu.Lock()
@@ -86,5 +99,16 @@ func TestClaudePlainOAuthAndRefreshExcludeNativeIdentityAndFingerprintPaths(t *t
 	lease, err := w.ClaudeNativeAuth(context.Background(), done.Revision)
 	if err != nil || lease.AccessToken != "fixture-rotated-access" || calls.Load() != 3 {
 		t.Fatal("native access lease did not reuse platform OAuth lifecycle", err)
+	}
+	next, err := w.StartOAuth(context.Background(), done.Revision, "fixture-session")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Repo.DB.Exec(`update byos_oauth_attempts set "expiresAt"=now()-interval '1 second' where "stateHash"=$1`, hashText(next.State))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = w.CompleteHandoff(context.Background(), "fixture-session", next.State, claudeCallbackURI+"?code=fixture-code&state="+next.State); err != ErrStale || calls.Load() != 3 {
+		t.Fatal("expired Claude handoff reached provider")
 	}
 }

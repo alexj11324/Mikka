@@ -24,14 +24,20 @@ type OAuthProvider interface {
 	Exchange(context.Context, string, string, string) (*core.Auth, error)
 }
 type OAuthStart struct {
-	AuthorizationURL string `json:"authorizationUrl"`
-	Revision         int64  `json:"revision"`
+	Flow             string    `json:"flow"`
+	State            string    `json:"state"`
+	UserCode         string    `json:"userCode,omitempty"`
+	Interval         int       `json:"interval,omitempty"`
+	ExpiresAt        time.Time `json:"expiresAt"`
+	AuthorizationURL string    `json:"authorizationUrl"`
+	Revision         int64     `json:"revision"`
 }
 type oauthSecret struct {
-	Scope       Scope  `json:"scope"`
-	SessionHash string `json:"sessionHash"`
-	Verifier    string `json:"verifier"`
-	OperationID string `json:"operationId"`
+	Scope       Scope          `json:"scope"`
+	SessionHash string         `json:"sessionHash"`
+	Device      *DeviceAttempt `json:"device,omitempty"`
+	Verifier    string         `json:"verifier"`
+	OperationID string         `json:"operationId"`
 }
 
 func hashText(value string) string {
@@ -50,6 +56,9 @@ func (w *Worker) StartOAuth(ctx context.Context, epoch int64, sessionID string) 
 	if w.OAuth == nil || sessionID == "" || len(sessionID) > 512 {
 		return OAuthStart{}, ErrUnsupported
 	}
+	if device, ok := w.OAuth.(DeviceOAuth); ok {
+		return w.startDevice(ctx, epoch, sessionID, device)
+	}
 	state, verifier := randomCode(), randomCode()
 	authURL, err := w.OAuth.Authorize(state, verifier)
 	if err != nil {
@@ -64,7 +73,7 @@ func (w *Worker) StartOAuth(ctx context.Context, epoch int64, sessionID string) 
 		return OAuthStart{}, err
 	}
 	name := "mikka-byos-" + newID()
-	raw, _ := json.Marshal(oauthSecret{w.Scope, hashText(sessionID), verifier, op.OperationID})
+	raw, _ := json.Marshal(oauthSecret{Scope: w.Scope, SessionHash: hashText(sessionID), Verifier: verifier, OperationID: op.OperationID})
 	if err = w.Secrets.Create(ctx, name, raw); err != nil {
 		_ = w.Repo.Fail(context.WithoutCancel(ctx), op, "publication_failed")
 		return OAuthStart{}, ErrStore
@@ -74,7 +83,7 @@ func (w *Worker) StartOAuth(ctx context.Context, epoch int64, sessionID string) 
 		_ = w.Repo.Fail(context.WithoutCancel(ctx), op, "publication_failed")
 		return OAuthStart{}, ErrDatabase
 	}
-	return OAuthStart{authURL, op.Epoch}, nil
+	return OAuthStart{Flow: "callback_handoff", State: state, AuthorizationURL: authURL, Revision: op.Epoch, ExpiresAt: time.Now().Add(5 * time.Minute)}, nil
 }
 
 type codeAuthenticator struct {
@@ -88,11 +97,11 @@ func (a codeAuthenticator) Login(ctx context.Context, _ *config.Config, _ *sdkau
 	return a.exchange(ctx)
 }
 func (w *Worker) CompleteOAuth(ctx context.Context, sessionID, state, code string) (Metadata, error) {
-	if w.OAuth == nil || sessionID == "" || len(sessionID) > 512 || len(state) != 43 || len(code) == 0 || len(code) > 4096 || strings.ContainsAny(code, "#\r\n\x00") {
+	if w.OAuth == nil || sessionID == "" || len(sessionID) > 512 || !validState(state) || len(code) == 0 || len(code) > 4096 || strings.ContainsAny(code, "#\r\n\x00") {
 		return Metadata{}, ErrUnsupported
 	}
 	var opID, name string
-	err := w.Repo.DB.QueryRowContext(ctx, `update byos_oauth_attempts set "consumedAt"=now() where "stateHash"=$1 and "sessionHash"=$2 and "connectionId"=$3 and "ownerId"=$4 and "workspaceId"=$5 and "consumedAt" is null and "expiresAt">now() returning "operationId"::text,"secretName"`, hashText(state), hashText(sessionID), w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID).Scan(&opID, &name)
+	err := w.Repo.DB.QueryRowContext(ctx, `update byos_oauth_attempts set "consumedAt"=now() where "stateHash"=$1 and "sessionHash"=$2 and "connectionId"=$3 and "ownerId"=$4 and "workspaceId"=$5 and flow='pkce' and "consumedAt" is null and "expiresAt">now() returning "operationId"::text,"secretName"`, hashText(state), hashText(sessionID), w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID).Scan(&opID, &name)
 	if err != nil {
 		return Metadata{}, ErrStale
 	}
@@ -113,20 +122,23 @@ func (w *Worker) CompleteOAuth(ctx context.Context, sessionID, state, code strin
 	if json.Unmarshal(raw, &attempt) != nil || attempt.Scope != w.Scope || attempt.SessionHash != hashText(sessionID) || attempt.OperationID != opID || len(attempt.Verifier) != 43 {
 		return fail(ErrIntegrity)
 	}
-	manager := sdkauth.NewManager(w.store(&op), scopedAuthenticator{codeAuthenticator{w.Scope.Provider, func(ctx context.Context) (*core.Auth, error) {
-		return w.OAuth.Exchange(ctx, code, state, attempt.Verifier)
-	}}, w.Scope})
-	if _, _, err = manager.Login(ctx, w.Scope.Provider, &config.Config{}, &sdkauth.LoginOptions{NoBrowser: true}); err != nil {
-		return fail(Refusal(safeCode(err)))
+	return w.publishOAuth(ctx, op, code, state, attempt.Verifier)
+}
+func newOAuthManager(w *Worker, op Operation, code, state, verifier string) func(context.Context) error {
+	return func(ctx context.Context) error {
+		manager := sdkauth.NewManager(w.store(&op), scopedAuthenticator{codeAuthenticator{w.Scope.Provider, func(ctx context.Context) (*core.Auth, error) {
+			return w.OAuth.Exchange(ctx, code, state, verifier)
+		}}, w.Scope})
+		_, _, err := manager.Login(ctx, w.Scope.Provider, &config.Config{}, &sdkauth.LoginOptions{NoBrowser: true})
+		return err
 	}
-	return w.Status(ctx)
+
 }
 
 // Codex acquisition uses CPA's plain OAuth service, not its legacy inference
 // executor or CLI-oriented callback listener/logger. Redirect is fixed by host.
 type CPACodexOAuth struct {
-	RedirectURI string
-	Client      *http.Client
+	Client *http.Client
 }
 
 func (p CPACodexOAuth) service() interface {
@@ -137,25 +149,10 @@ func (p CPACodexOAuth) service() interface {
 	return compat.NewCodexAuthWithHTTPClient(plainOAuthClient(p.Client))
 }
 
-func (p CPACodexOAuth) Authorize(state, verifier string) (string, error) {
-	redirect, err := url.Parse(p.RedirectURI)
-	if err != nil || redirect.User != nil || redirect.RawQuery != "" || redirect.Fragment != "" || !((redirect.Scheme == "https" && redirect.Host != "") || (p.RedirectURI == "http://localhost:1455/auth/callback")) {
-		return "", ErrUnsupported
-	}
-	sum := sha256.Sum256([]byte(verifier))
-	raw, err := p.service().GenerateAuthURL(state, &compat.CodexPKCECodes{CodeVerifier: verifier, CodeChallenge: base64.RawURLEncoding.EncodeToString(sum[:])})
-	if err != nil {
-		return "", ErrUnsupported
-	}
-	u, _ := url.Parse(raw)
-	q := u.Query()
-	q.Set("redirect_uri", p.RedirectURI)
-	u.RawQuery = q.Encode()
-	return u.String(), nil
-}
+func (p CPACodexOAuth) Authorize(string, string) (string, error) { return "", ErrUnsupported }
 func (p CPACodexOAuth) Exchange(ctx context.Context, code, _ string, verifier string) (*core.Auth, error) {
 	svc := p.service()
-	b, err := svc.ExchangeCodeForTokensWithRedirect(ctx, code, p.RedirectURI, &compat.CodexPKCECodes{CodeVerifier: verifier})
+	b, err := svc.ExchangeCodeForTokensWithRedirect(ctx, code, codexDeviceRedirect, &compat.CodexPKCECodes{CodeVerifier: verifier})
 	if err != nil {
 		return nil, ErrProvider
 	}

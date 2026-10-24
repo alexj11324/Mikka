@@ -52,7 +52,8 @@ own transient publication while still enforcing owner, epoch and binding.
 
 The production executable reads one trusted configuration frame over stdin,
 then private RPC. It opens no HTTP listener and reads no local provider credentials.
-Status/browser APIs contain metadata only. Native access material is returned
+Status APIs contain metadata only; connection ceremony responses additionally
+contain the public authorization URL, opaque attempt handle and device user code. Native access material is returned
 only by the private nativeAuth RPC, consumed by the trusted launcher; model RPC
 cannot select arbitrary methods. Infisical workload credentials never enter CLI
 environments. The broker interface can be implemented by a private remote channel.
@@ -72,8 +73,10 @@ The code now includes HTTP/OAuth, streaming and private launcher wiring. Live
 activation remains separate: provider client/redirect compatibility and
 eligibility, actual token/native CLI compatibility, provider billing controls,
 Infisical workload setup, and verified E2B owner isolation are not established.
-Native client defaults use loopback callbacks; do not assume they accept a Mikka
-HTTPS redirect. A real grant alone does not fix an invalid client/redirect pair.
+Codex now uses CPA device authorization with its provider-owned callback. Claude
+preserves CPA loopback redirect with explicit owner/session/state/PKCE-bound URL
+handoff in the Mikka form. Arbitrary Mikka HTTPS redirects are not supported.
+See docs/design/byos-oauth-transport.md for exact protocol and remaining live gates.
 
 Config directories are not a security boundary against a same-user shell.
 The web runtime never attests native isolation. Real E2B wiring must keep the

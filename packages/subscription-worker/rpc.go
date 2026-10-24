@@ -17,14 +17,15 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 	encoder := json.NewEncoder(output)
 	for scanner.Scan() {
 		var request struct {
-			ID        string          `json:"id"`
-			Method    string          `json:"method"`
-			Revision  int64           `json:"revision"`
-			Model     string          `json:"model,omitempty"`
-			Payload   json.RawMessage `json:"payload,omitempty"`
-			SessionID string          `json:"sessionId,omitempty"`
-			State     string          `json:"state,omitempty"`
-			Code      string          `json:"code,omitempty"`
+			ID          string          `json:"id"`
+			Method      string          `json:"method"`
+			Revision    int64           `json:"revision"`
+			Model       string          `json:"model,omitempty"`
+			Payload     json.RawMessage `json:"payload,omitempty"`
+			SessionID   string          `json:"sessionId,omitempty"`
+			State       string          `json:"state,omitempty"`
+			CallbackURL string          `json:"callbackUrl,omitempty"`
+			Code        string          `json:"code,omitempty"`
 		}
 		decoder := json.NewDecoder(bytes.NewReader(scanner.Bytes()))
 		decoder.DisallowUnknownFields()
@@ -42,6 +43,10 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 			switch request.Method {
 			case "oauthStart":
 				result, err = w.StartOAuth(callCtx, request.Revision, request.SessionID)
+			case "oauthPoll":
+				result, err = w.PollOAuth(callCtx, request.SessionID, request.State)
+			case "oauthHandoff":
+				result, err = w.CompleteHandoff(callCtx, request.SessionID, request.State, request.CallbackURL)
 			case "oauthComplete":
 				result, err = w.CompleteOAuth(callCtx, request.SessionID, request.State, request.Code)
 			case "nativeAuth":

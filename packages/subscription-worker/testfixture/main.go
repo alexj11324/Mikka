@@ -7,11 +7,11 @@ package main
 import (
 	"bufio"
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	log "github.com/sirupsen/logrus"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -33,28 +33,6 @@ func (f fixtureTransport) RoundTrip(r *http.Request) (*http.Response, error) { r
 
 type fixture struct{ provider string }
 
-func (f fixture) Authorize(state, verifier string) (string, error) {
-	sum := sha256.Sum256([]byte(verifier))
-	host := "https://auth.openai.com/oauth/authorize"
-	if f.provider == "claude" {
-		host = "https://claude.ai/oauth/authorize"
-	}
-	q := url.Values{"state": {state}, "code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}, "code_challenge_method": {"S256"}, "redirect_uri": {"http://localhost/fixture-callback"}}
-	return host + "?" + q.Encode(), nil
-}
-func (f fixture) Exchange(_ context.Context, code, _ string, verifier string) (*core.Auth, error) {
-	if code != "fixture-grant" || len(verifier) != 43 {
-		return nil, w.ErrProvider
-	}
-	expiry := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
-	a := &core.Auth{Provider: f.provider}
-	if f.provider == "codex" {
-		a.Storage = &compat.CodexTokenStorage{AccessToken: "fixture-access", RefreshToken: "fixture-refresh", IDToken: "fixture-id", AccountID: "fixture-account", Expire: expiry, PlanType: "plus"}
-	} else {
-		a.Storage = &compat.ClaudeTokenStorage{AccessToken: "fixture-access", RefreshToken: "fixture-refresh", AccountUUID: "fixture-account", OrganizationUUID: "fixture-org", Expire: expiry}
-	}
-	return a, nil
-}
 func (f fixture) Identifier() string { return f.provider }
 func (f fixture) Refresh(_ context.Context, a *core.Auth) (*core.Auth, error) {
 	if a.Metadata["refresh_token"] == nil {
@@ -86,6 +64,7 @@ func (f fixture) HttpRequest(context.Context, *core.Auth, *http.Request) (*http.
 	return nil, w.ErrUnsupported
 }
 func main() {
+	log.SetOutput(io.Discard)
 	if run() != nil {
 		fmt.Fprintln(os.Stderr, "fixture_worker_unavailable")
 		os.Exit(1)
@@ -122,22 +101,33 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	worker := w.Worker{Repo: &w.Repository{DB: db}, Secrets: secrets, Scope: c.Scope, OAuth: fixture{c.Scope.Provider}, Executor: fixture{c.Scope.Provider}}
+	worker := w.Worker{Repo: &w.Repository{DB: db}, Secrets: secrets, Scope: c.Scope, Executor: fixture{c.Scope.Provider}}
 	upstream, err := url.Parse(os.Getenv("MIKKA_BYOS_FIXTURE_UPSTREAM_ORIGIN"))
 	if err != nil || upstream.Scheme != "https" || upstream.Hostname() != "127.0.0.1" {
 		return w.ErrUnsupported
 	}
 	client := &http.Client{Transport: fixtureTransport(func(request *http.Request) (*http.Response, error) {
-		if request.URL.String() != "https://api.anthropic.com/v1/messages" && request.URL.String() != "https://chatgpt.com/backend-api/codex/responses" {
+		model := request.URL.String() == "https://api.anthropic.com/v1/messages" || request.URL.String() == "https://chatgpt.com/backend-api/codex/responses"
+		oauth := request.URL.String() == "https://auth.openai.com/api/accounts/deviceauth/usercode" || request.URL.String() == "https://auth.openai.com/api/accounts/deviceauth/token" || request.URL.String() == "https://auth.openai.com/oauth/token" || request.URL.String() == "https://platform.claude.com/v1/oauth/token"
+		if !model && !oauth {
 			return nil, w.ErrUnsupported
 		}
 		clone := request.Clone(request.Context())
 		target := *upstream
-		target.Path = "/provider/" + c.Scope.Provider
+		if model {
+			target.Path = "/provider/" + c.Scope.Provider
+		} else {
+			target.Path = "/oauth/" + c.Scope.Provider + request.URL.Path
+		}
 		clone.URL = &target
 		clone.Host = upstream.Host
 		return http.DefaultTransport.RoundTrip(clone)
 	})}
+	if c.Scope.Provider == "codex" {
+		worker.OAuth = w.CPACodexOAuth{Client: client}
+	} else {
+		worker.OAuth = w.CPAClaudeOAuth{Client: client}
+	}
 	worker.Executor = w.CPAPlainModel{ProviderExecutor: fixture{c.Scope.Provider}, Provider: c.Scope.Provider, Client: client}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM)

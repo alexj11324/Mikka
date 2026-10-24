@@ -38,6 +38,33 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
   const secrets = new Map()
   const secretMethods = []
   let providerCalls = 0
+  const devices = new Map()
+  const deviceVerifier = 'v'.repeat(43)
+  const deviceChallenge = (await import('node:crypto')).createHash('sha256').update(deviceVerifier).digest('base64url')
+  async function oauthProvider(request, response) {
+    assert.equal(request.headers['user-agent'], 'Mikka/1.0')
+    const chunks = []; for await (const chunk of request) chunks.push(chunk)
+    const raw = Buffer.concat(chunks).toString()
+    if (request.url.endsWith('/deviceauth/usercode')) {
+      assert.equal(JSON.parse(raw).client_id, 'app_EMoamEEZ73f0CkXaXp7hrann')
+      const id = randomUUID(); devices.set(id, 0)
+      response.end(JSON.stringify({ device_auth_id: id, user_code: 'ABCD-EFGH', interval: '5' })); return
+    }
+    if (request.url.endsWith('/deviceauth/token')) {
+      const body = JSON.parse(raw); assert.equal(body.user_code, 'ABCD-EFGH'); assert.ok(devices.has(body.device_auth_id))
+      const count = devices.get(body.device_auth_id); devices.set(body.device_auth_id, count + 1)
+      if (!count) { response.writeHead(403).end(); return }
+      response.end(JSON.stringify({ authorization_code: 'fixture-grant', code_verifier: deviceVerifier, code_challenge: deviceChallenge })); return
+    }
+    const codex = request.url.includes('/codex/')
+    const body = codex ? Object.fromEntries(new URLSearchParams(raw)) : JSON.parse(raw)
+    assert.equal(body.code, 'fixture-grant'); assert.equal(body.grant_type, 'authorization_code')
+    assert.equal(body.redirect_uri, codex ? 'https://auth.openai.com/deviceauth/callback' : 'http://localhost:54545/callback')
+    assert.equal(body.code_verifier.length, 43)
+    if (!codex) assert.equal(body.state.length, 43)
+    const claims = Buffer.from(JSON.stringify({ email: 'fixture@example.invalid', 'https://api.openai.com/auth': { chatgpt_account_id: 'fixture-account', chatgpt_plan_type: 'plus' } })).toString('base64url')
+    response.end(JSON.stringify({ access_token: 'fixture-access', refresh_token: 'fixture-refresh', id_token: `e30.${claims}.fixture`, expires_in: 7200, account: { uuid: 'fixture-account', email_address: 'fixture@example.invalid' }, organization: { uuid: 'fixture-org', name: 'Fixture' } }))
+  }
   async function nativeProvider(request, response) {
     providerCalls++
     assert.equal(request.headers['user-agent'], 'Mikka/1.0')
@@ -83,6 +110,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', privateKey, '-out', certificate, '-days', '1', '-subj', '/CN=BYOS synthetic fixture', '-addext', 'subjectAltName=IP:127.0.0.1', '-addext', 'basicConstraints=critical,CA:TRUE'], { stdio: 'ignore' })
   const infisical = httpsServer({ key: await readFile(privateKey), cert: await readFile(certificate) }, async (request, response) => {
     try {
+      if (request.url.startsWith('/oauth/')) { await oauthProvider(request, response); return }
       if (request.url.startsWith('/provider/')) { await nativeProvider(request, response); return }
       assert.equal(request.headers.authorization, 'Bearer fixture-workload-token')
       const url = new URL(request.url, 'https://fixture.invalid')
@@ -124,6 +152,14 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
   const http = subscriptionHTTP(dependencies)
   const request = (body, user = 'alice') => new Request('http://localhost/api/subscriptions', { method: 'POST', headers: { 'content-type': 'application/json', cookie: `fixture=${user}` }, body: JSON.stringify(body) })
   const post = async (body, user) => { const response = await http(request(body, user)); return { status: response.status, body: await response.json() } }
+  const readyPoll = async connectionId => { await pool.query('update byos_oauth_attempts set "nextPollAt"=now()-interval \'1 second\' where "connectionId"=$1', [connectionId]) }
+  const finishAttempt = async (connectionId, attempt) => {
+    if (attempt.flow === 'device') {
+      await readyPoll(connectionId); assert.equal((await post({ action: 'poll', connectionId, state: attempt.state })).body.pending, true)
+      await readyPoll(connectionId); return post({ action: 'poll', connectionId, state: attempt.state })
+    }
+    return post({ action: 'callback', connectionId, state: attempt.state, callbackUrl: `http://localhost:54545/callback?code=fixture-grant&state=${attempt.state}` })
+  }
   let browserServer
   let browser
   try {
@@ -134,13 +170,27 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       const connected = await post({ action: 'connect', workspaceId, provider })
       assert.equal(connected.status, 200)
       const { connectionId, revision, authorizationUrl } = connected.body
-      const state = new URL(authorizationUrl).searchParams.get('state')
-      assert.equal(new URL(authorizationUrl).searchParams.get('code_challenge_method'), 'S256')
-      assert.ok(new URL(authorizationUrl).searchParams.get('code_challenge'))
-      assert.equal((await post({ action: 'callback', connectionId, state, code: 'fixture-grant' }, 'bob')).status, 409)
-      assert.equal((await post({ action: 'callback', connectionId, state, code: 'fixture-grant' }, 'alice-new-session')).status, 409)
-      assert.equal((await post({ action: 'callback', connectionId, state, code: 'fixture-grant' })).status, 200)
-      assert.equal((await post({ action: 'callback', connectionId, state, code: 'fixture-grant' })).status, 409)
+      const state = connected.body.state
+      const completion = provider === 'codex' ? { action: 'poll', connectionId, state } : { action: 'callback', connectionId, state, callbackUrl: `http://localhost:54545/callback?code=fixture-grant&state=${state}` }
+      if (provider === 'codex') {
+        assert.equal(connected.body.flow, 'device'); assert.equal(authorizationUrl, 'https://auth.openai.com/codex/device'); assert.equal(connected.body.userCode, 'ABCD-EFGH')
+        assert.ok(!JSON.stringify(connected.body).includes('device_auth_id'))
+      } else {
+        assert.equal(new URL(authorizationUrl).searchParams.get('redirect_uri'), 'http://localhost:54545/callback')
+        assert.equal(new URL(authorizationUrl).searchParams.get('code_challenge_method'), 'S256')
+        assert.equal((await post({ ...completion, callbackUrl: `${completion.callbackUrl}&state=${state}` })).status, 409)
+        assert.equal((await post({ action: 'callback', connectionId, state, code: 'fixture-grant' })).status, 409, 'raw code acquisition not exposed')
+      }
+      assert.equal((await post(completion, 'bob')).status, 409)
+      assert.equal((await post(completion, 'alice-new-session')).status, 409)
+      if (provider === 'codex') {
+        assert.equal((await post(completion)).status, 409, 'early polling refused')
+        await readyPoll(connectionId)
+        assert.equal((await post(completion)).body.pending, true)
+        await readyPoll(connectionId)
+      }
+      assert.equal((await post(completion)).status, 200)
+      assert.equal((await post(completion)).status, 409)
       const persisted = await pool.query('select "secretName",epoch,state from byos_connections where id=$1', [connectionId])
       assert.equal(persisted.rows[0].state, 'connected')
       const stored = JSON.parse(secrets.get(persisted.rows[0].secretName))
@@ -191,8 +241,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       const stateAfter = await repository.connection('alice', connectionId)
       const reconnect = await post({ action: 'reconnect', connectionId, revision: Number(stateAfter.epoch) })
       assert.equal(reconnect.status, 200)
-      const newState = new URL(reconnect.body.authorizationUrl).searchParams.get('state')
-      assert.equal((await post({ action: 'callback', connectionId, state: newState, code: 'fixture-grant' })).status, 200)
+      assert.equal((await finishAttempt(connectionId, reconnect.body)).status, 200)
       await assert.rejects(service.model(use), { code: 'stale_binding' })
       assert.ok(!(await repository.connection('alice', connectionId)).quota, 'reconnect must clear old account quota')
       if (provider === 'codex') {
@@ -240,23 +289,47 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
     const context = await browser.newContext()
     await context.addCookies([{ name: 'fixture', value: 'browser-owner', url: browserOrigin }])
     let authorizations = 0
+    let claudeCallback
     await context.route('https://auth.openai.com/**', async route => {
+      authorizations++; assert.equal(route.request().url(), 'https://auth.openai.com/codex/device')
+      await route.fulfill({ body: '<html><body>Official device page fixture: enter ABCD-EFGH</body></html>' })
+    })
+    await context.route('https://claude.ai/**', async route => {
       authorizations++
-      const state = new URL(route.request().url()).searchParams.get('state')
-      await route.fulfill({ status: 302, headers: { Location: `${browserOrigin}/api/subscriptions/callback?state=${state}&code=fixture-grant` }, body: '' })
+      const query = new URL(route.request().url()).searchParams
+      assert.equal(query.get('redirect_uri'), 'http://localhost:54545/callback')
+      claudeCallback = `http://localhost:54545/callback?code=fixture-grant&state=${query.get('state')}`
+      await route.fulfill({ body: '<html><body>Official authorization fixture; registered loopback callback would appear in address bar.</body></html>' })
     })
     const page = await context.newPage()
     const errors = []; page.on('pageerror', error => errors.push(error.message))
     await page.goto(browserOrigin)
+    assert.equal((await subscriptionCallback(new Request(`${browserOrigin}/api/subscriptions/callback?code=fixture-grant&state=${'x'.repeat(43)}`), dependencies)).status, 410)
     await page.getByRole('button', { name: 'Connect subscription' }).first().click()
-    await page.waitForURL('**/settings?**')
+    await page.getByLabel('Device authorization code').waitFor()
+    const popupPromise = context.waitForEvent('page')
+    await page.getByRole('link', { name: 'Open official sign-in page' }).click()
+    const popup = await popupPromise; await popup.waitForLoadState(); await popup.close()
+    await page.waitForTimeout(5200)
+    await page.getByRole('button', { name: 'Check authorization' }).click()
+    await page.getByRole('status').waitFor()
+    await page.waitForTimeout(5200)
+    await page.getByRole('button', { name: 'Check authorization' }).click()
     await page.getByText('Connected', { exact: true }).waitFor()
-    assert.equal(authorizations, 1)
-    assert.deepEqual(errors, [])
-    await page.screenshot({ path: '/tmp/mikka-byos-phase3-browser.png', fullPage: true })
     await page.getByRole('button', { name: 'Disconnect', exact: true }).click()
-    await page.getByRole('button', { name: 'Connect subscription' }).first().waitFor()
-    console.log('BYOS browser acceptance: actual Settings component -> synthetic provider redirect -> bound callback -> Infisical fixture persistence -> connected -> disconnect; no live provider requests')
+    await page.getByRole('button', { name: 'Connect subscription' }).last().click()
+    const claudePopupPromise = context.waitForEvent('page')
+    await page.getByRole('link', { name: 'Open official sign-in page' }).click()
+    const claudePopup = await claudePopupPromise; await claudePopup.waitForLoadState(); await claudePopup.close()
+    assert.ok(claudeCallback)
+    await page.getByLabel('Complete callback URL').fill(claudeCallback)
+    await page.getByRole('button', { name: 'Check authorization' }).click()
+    await page.getByText('Connected', { exact: true }).waitFor()
+    assert.equal(authorizations, 2); assert.deepEqual(errors, [])
+    await page.screenshot({ path: '/tmp/mikka-byos-oauth-review-browser.png', fullPage: true })
+    await page.getByRole('button', { name: 'Disconnect', exact: true }).click()
+    console.log('BYOS browser acceptance: actual Settings -> CPA device pending/complete + registered Claude callback URL handoff -> owner-bound persistence -> disconnect; synthetic providers only')
+
   } finally {
     for (const session of sessions) await session.cancel().catch(() => {})
     if (browser) await browser.close()

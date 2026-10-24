@@ -90,7 +90,7 @@ export class SubscriptionWorkerClient {
     })
     return { result, stop: abort }
   }
-  async call<T>(method: "status" | "oauthStart" | "oauthComplete" | "refresh" | "recover" | "disconnect" | "nativeAuth", input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
+  async call<T>(method: "status" | "oauthStart" | "oauthComplete" | "oauthPoll" | "oauthHandoff" | "refresh" | "recover" | "disconnect" | "nativeAuth", input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
     return await this.start({ ...input, method }, signal).result as T
   }
   stream(revision: number, model: string, payload: unknown, signal?: AbortSignal): ReadableStream<Uint8Array> {

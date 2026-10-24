@@ -7,12 +7,27 @@ feature remains off by default; no real account or E2B resource was used.
 ## User-driven connection
 
 Settings → Integrations → Connect subscription starts a NEW authorization.
-The user signs in on the official provider page. An authenticated Mikka callback
-uses owner/session-bound state and S256 PKCE, a five-minute TTL and one-time
-consumption. No provider password or access/refresh token reaches the browser.
-Authorization code/state are normal OAuth ceremony data; application logs do
-not print them, and the callback redirects to a fixed settings path without its
-query. Deployment callback/access-log redaction must be checked before live use.
+Codex now follows pinned CPA's device flow: Mikka shows the official device page
+and user code, keeps device_auth_id private, enforces the returned poll interval,
+and exchanges the resulting code with the provider-owned device callback URI.
+Its opaque application attempt handle is owner/session-bound; device authorization
+uses the provider-returned PKCE verifier/challenge, not a fabricated web redirect.
+
+Claude preserves CPA's registered http://localhost:54545/callback URI and S256
+PKCE. The user signs in in a separate tab, then pastes the complete final callback
+URL into the authenticated Mikka form. A refused localhost connection is expected
+without a local listener; the address bar still provides the handoff. Mikka never
+fetches this URL. It requires the exact origin/path, one code and one matching
+state, original owner/session, five-minute TTL, and atomic one-time consumption.
+Raw codes, fragments, duplicate query keys, arbitrary callbacks and URL redirects
+are refused. This is an explicit manual ceremony, not seamless HTTPS callback
+support. Codex attempts expire after 15 minutes.
+
+Neither provider password nor access/refresh token reaches the browser. OAuth
+code/state and the user-facing device code are temporary ceremony data. They must
+stay out of logs, screenshots and assistant chat; production request-body logging
+and provider-page handling still require deployment acceptance. The old GET
+callback now returns 410; native clients cannot configure a Mikka HTTPS redirect.
 
 Existing local Claude/Codex credentials are not an acquisition source. The new
 feature has no file, Keychain, cookie or native-login import endpoint. Existing
@@ -29,7 +44,7 @@ E2B_API_KEY stay on the control plane and never enter an agent environment.
 
 | Path | Current source and evidence | Real-world status |
 | --- | --- | --- |
-| Connect/callback/reconnect | Authenticated HTTP handlers, workspace authorization, durable attempts, CPA-compatible acquisition/store, Infisical publication | Both providers tested with synthetic grants. Actual client/redirect registration unverified |
+| Connect/callback/reconnect | Authenticated HTTP handlers, workspace authorization, durable attempts, CPA-compatible acquisition/store, Infisical publication | Production device/code-return adapters tested with synthetic grants. Actual provider acceptance/eligibility remains unverified |
 | Own Mikka harness | Agent route → persisted binding → membership/capability/quota checks → AI SDK stream → private Go RPC → CPA converters and plain Mikka HTTP adapter | Text, tool calls/results, errors, cancellation and revocation tested through native provider SSE fixtures. Actual provider acceptance/eligibility unverified |
 | Hosted Codex | Service native dispatch → trusted runner factory → private access lease → existing CodexAdapter host-managed auth/refresh | Fake app-server and actual SDK Store exercised. Pinned official app-server/audience/billing compatibility unverified |
 | Hosted Claude Code | Same dispatch/broker → access-only OAuth lease → existing SDK adapter with isolated runtime home, account-mode check and expiry stop | Fake CLI exercised. Actual token scope/native compatibility unverified; transparent continuation at expiry is deferred |
@@ -98,8 +113,8 @@ separate from user consent and provider compatibility evidence:
 - MIKKA_BYOS_INFISICAL_ORIGIN / PROJECT / ENVIRONMENT / PATH / TOKEN select a
   dedicated managed workload scope. They are not per-user shared environment
   variables. The worker fetches each owner's bundle by its opaque reference.
-- MIKKA_BYOS_CODEX_OAUTH and MIKKA_BYOS_CODEX_REDIRECT_URI, and corresponding
-  CLAUDE_OAUTH / CLAUDE_REDIRECT_URI names, control the reviewed acquisition routes.
+- MIKKA_BYOS_CODEX_OAUTH / MIKKA_BYOS_CLAUDE_OAUTH control the acquisition
+  routes. Redirects are fixed to CPA protocol values, never runtime configuration.
 - MIKKA_BYOS_VALIDATED_MODEL_ROUTES and MIKKA_BYOS_VALIDATED_NATIVE_ROUTES are
   trusted operator capability settings, not browser assertions or proof by
   themselves. They default empty. The web process always has native isolation
@@ -118,13 +133,13 @@ viewer implementation was not replaced with a new desktop UI.
 
 ## Exact next live-validation boundary
 
-1. Verify a provider-approved client/redirect pair before asking the user to
-   authorize anything. Pinned CPA client defaults are native loopback callbacks
-   (Codex localhost:1455/auth/callback; Claude localhost:54545/callback). We have
-   not established that their client registrations accept Mikka HTTPS callbacks.
-   Source support for a fixed HTTPS URI is not registration evidence. An approved
-   remote registration or a separately reviewed callback transport is required;
-   existing native credentials are not a substitute.
+1. Review the source protocol evidence and manual UX in
+   [BYOS OAuth transport review](byos-oauth-transport.md). Codex now uses CPA's
+   device-code flow and its provider-owned redirect; Claude preserves CPA's
+   registered loopback redirect with an explicit URL handoff. No arbitrary Mikka
+   HTTPS registration is assumed. Source mocks prove parsing/state/lifecycle, not
+   actual provider acceptance of Mikka's honest HTTP identity or hosted custody.
+   Any live failure must stop that route; local CLI credentials are no substitute.
 2. Transfer the reviewed commit/patch to an authorized staging deployment and
    build the pinned Linux worker there. Preserve the corrected owner-isolation
    handoff when reconciling documentation PR #173. No push/deploy is authorized
@@ -136,7 +151,7 @@ viewer implementation was not replaced with a new desktop UI.
    disconnect/provider-revocation handling. No real token goes through chat,
    screenshots, local auth files, the user's CLI cache or shared environment syncs.
 4. The user's browser may then follow Mikka Connect to the official provider
-   page. This is a new consent flow. Verify account owner, callback replay refusal,
+   page and complete the device check or in-application callback URL handoff. This is a new consent flow. Verify account owner, callback replay refusal,
    persistence and task reuse before any inference. Provider calls require their
    own subscription-only, zero-API-credit test scope.
 5. Real hosted native inference additionally requires a pinned CLI compatibility
@@ -152,14 +167,15 @@ use but cannot undo an already transmitted provider request.
 ## Cloud Linux evidence
 
 - Worker: 19 top-level tests plus 6 provider subtests; race detector, vet, build,
-  actual CPA Codex exchange and plain Claude exchange/refresh against TLS HTTP
-  fixtures. Disposable Postgres applied all 29 migrations and replayed successfully.
+  actual CPA Codex device exchange and plain Claude exchange/refresh against TLS
+  fixtures. Disposable Postgres applied all 30 migrations and replayed successfully.
 - Application acceptance: actual handlers → new consent attempt → owner/session
-  callback → Infisical fixture → binding → AI SDK → actual CPA converters/plain
+  device poll / exact callback-URL handoff → Infisical fixture → binding → AI SDK → actual CPA converters/plain
   provider SSE fixtures. Repeated tasks, tools, no retry/fallback, stream cancel,
   active revocation, both native fake CLIs, reconnect and stale binding are covered.
 - Chromium: actual Settings component, synthetic Mikka session and provider
-  redirect; connected state and disconnect passed with no page errors. This is
+  device page and registered callback-URL handoff; connected state and disconnect
+  passed with no page errors. This is
   component/handler acceptance, not deployed authenticated Mikka acceptance.
 - Daemon: 209 passed, 7 real-agent tests skipped. Protocol: 223 passed. Model tests:
   8 passed. Root/daemon types, lint/migration policy, UI policy and i18n passed.
@@ -169,8 +185,11 @@ use but cannot undo an already transmitted provider request.
   partition-cookie assertion also fails on the unchanged base; neither was fixed
   as part of BYOS. Later root-check stages are not implied to pass.
 
-Logs: /tmp/mikka-byos-phase3-acceptance-final.log, -daemon.log, -protocol.log,
+Historical phase-three logs: /tmp/mikka-byos-phase3-acceptance-final.log, -daemon.log, -protocol.log,
 -model.log, -types.log, -daemon-types.log, -lint.log, -build.log. Browser screenshot:
 /tmp/mikka-byos-phase3-browser.png. All disposable test containers were removed.
 No live grant, credential import, Infisical configuration/write, paid provider
 request, E2B sandbox, push, PR or deployment was performed.
+
+Current protocol review checks/logs are recorded in byos-oauth-transport.md; older
+phase-three evidence does not validate the new device transport by itself.
