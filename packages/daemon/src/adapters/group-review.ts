@@ -19,14 +19,44 @@ const output=z.object({body:z.string().trim().min(1).max(32000),content:z.string
 const artifact=z.object({artifactId:z.uuid(),baseVersionId:z.uuid(),hash:z.string().regex(/^[a-f0-9]{64}$/)}).passthrough()
 const probeSchema=z.object({version:z.string(),help:z.string(),features:z.string()}).strict()
 interface DockerRuntime {args:string[];env:NodeJS.ProcessEnv}
+class ContainerCleanupError extends Error {}
 function docker(runtime:DockerRuntime,args:string[]){return exec('docker',[...runtime.args,...args],{timeout:5000,env:runtime.env})}
+async function removeContainer(runtime:DockerRuntime,name:string,uncertainCreate=false){
+ let last:unknown
+ for(let attempt=0;attempt<12;attempt++){
+  try{
+   // `rm --force` can succeed for a nonexistent name. Confirm registration
+   // first when create's outcome is uncertain; absence is not proof.
+   if(uncertainCreate){const found=await docker(runtime,['inspect','--type','container','--format','{{.Id}}',name]);if(!/^[a-f0-9]{64}$/.test(found.stdout.trim()))throw Error('Container registration unconfirmed')}
+   await docker(runtime,['rm','--force',name]);return
+  }
+  catch(error){
+   last=error
+   // An absent known-created container was already auto-removed. After a
+   // create timeout, absence alone cannot confirm the daemon finished create.
+   if(!uncertainCreate&&String((error as {stderr?:string}).stderr).includes('No such container'))return
+   if(attempt<11)await new Promise(resolve=>setTimeout(resolve,250))
+  }
+ }
+ throw new ContainerCleanupError(`Group CLI container cleanup unconfirmed: ${name}`,{cause:last})
+}
 async function container(runtime:DockerRuntime,image:string,input:unknown,signal:AbortSignal){
  const name='mikka-group-cli-'+randomUUID(),uid=process.getuid?.()??65534,gid=process.getgid?.()??65534
  if(uid===0)throw Error('Group CLI host must be unprivileged')
- const child=spawn('docker',[...runtime.args,'run','--pull=never','--rm','--interactive','--name',name,'--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--user',`${uid}:${gid}`,'--pids-limit','64','--memory','1g','--cpus','1','--tmpfs',`/scratch:rw,noexec,nosuid,nodev,size=64m,uid=${uid},gid=${gid},mode=700`,'--mount',`type=bind,source=${runnerPath},target=/opt/mikka-group-runner.mjs,readonly`,'--entrypoint','/usr/local/bin/node',image,'/opt/mikka-group-runner.mjs'],{env:runtime.env,stdio:['pipe','pipe','pipe']})
+ // Await creation before starting/attaching. Killing a `docker run` client
+ // during create can race cleanup and leave an unstarted container behind.
+ try{await docker(runtime,['create','--pull=never','--rm','--interactive','--name',name,'--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--user',`${uid}:${gid}`,'--pids-limit','64','--memory','1g','--cpus','1','--tmpfs',`/scratch:rw,noexec,nosuid,nodev,size=64m,uid=${uid},gid=${gid},mode=700`,'--mount',`type=bind,source=${runnerPath},target=/opt/mikka-group-runner.mjs,readonly`,'--entrypoint','/usr/local/bin/node',image,'/opt/mikka-group-runner.mjs'])}
+ catch(error){await removeContainer(runtime,name,true);throw error}
+ if(signal.aborted){await removeContainer(runtime,name);throw Error('Group CLI stopped before start')}
+ const child=spawn('docker',[...runtime.args,'start','--attach','--interactive',name],{env:runtime.env,stdio:['pipe','pipe','pipe']})
  const chunks:Buffer[]=[]
  let outSize=0,errSize=0,failed=false
- const kill=()=>{failed=true;void docker(runtime,['rm','--force',name]).catch(()=>{});child.kill('SIGKILL')}
+ let stopTask:Promise<void>|undefined
+ const kill=()=>{
+  failed=true
+  if(!stopTask){stopTask=removeContainer(runtime,name);void stopTask.catch(()=>{})}
+  child.kill('SIGKILL')
+ }
  const abort=()=>kill();signal.addEventListener('abort',abort,{once:true});if(signal.aborted)kill()
  child.stdout.on('data',d=>{outSize+=d.length;if(outSize>4_300_000)kill();else chunks.push(d)})
  child.stderr.on('data',d=>{errSize+=d.length;if(errSize>64000)kill()})
@@ -35,7 +65,7 @@ async function container(runtime:DockerRuntime,image:string,input:unknown,signal
   // exit does not guarantee all stdio is drained; close does.
   await new Promise<void>((resolve,reject)=>{child.once('error',reject);child.once('close',code=>code===0&&!failed?resolve():reject(Error('Isolated group CLI failed or exceeded limits')))})
   return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
- }finally{signal.removeEventListener('abort',abort);await docker(runtime,['rm','--force',name]).catch(()=>{})}
+ }finally{signal.removeEventListener('abort',abort);await stopTask?.catch(()=>{});await removeContainer(runtime,name)}
 }
 export async function createNativeGroupProcessor(value:unknown):Promise<NativeGroupProcessor>{
  if(process.platform!=='linux')throw Error('Group CLI isolation requires Linux Docker')
@@ -45,14 +75,23 @@ export async function createNativeGroupProcessor(value:unknown):Promise<NativeGr
  // local socket and fresh config. Never inherit DOCKER_HOST/context/auth.
  const runtime:DockerRuntime={args:['--host','unix:///var/run/docker.sock','--config',configDir],env:{PATH:process.env.PATH,NODE_ENV:'production',DOCKER_CONFIG:configDir}}
  const active=new Set<Promise<unknown>>()
+ const cleanupFailures:ContainerCleanupError[]=[]
  let disposed=false
  const invoke=(image:string,input:unknown,signal:AbortSignal)=>{
   if(disposed)return Promise.reject(new Error('Group CLI runtime disposed'))
   const task=container(runtime,image,input,signal);active.add(task)
-  void task.then(()=>active.delete(task),()=>active.delete(task))
+  void task.then(()=>active.delete(task),error=>{
+   active.delete(task)
+   // A worker's abort race may already have settled. Retain late cleanup
+   // uncertainty so disposal/daemon reporting cannot silently discard it.
+   if(error instanceof ContainerCleanupError){cleanupFailures.push(error);disposed=true}
+  })
   return task
  }
- const dispose=async()=>{disposed=true;await Promise.allSettled([...active]);await rm(configDir,{recursive:true,force:true})}
+ const dispose=async()=>{
+  disposed=true;await Promise.allSettled([...active]);await rm(configDir,{recursive:true,force:true})
+  if(cleanupFailures.length)throw new AggregateError(cleanupFailures,cleanupFailures.map(error=>error.message).join('; '))
+ }
  try{
   const info=await docker(runtime,['info','--format','{{.OSType}}'])
   if(info.stdout.trim()!=='linux')throw Error('Linux Docker required')

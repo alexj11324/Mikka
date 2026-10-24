@@ -647,7 +647,7 @@ export class Daemon {
       this.saveDevice({ repos: await link.listRepos(deviceId) })
       this.server = "online"
       await this.outbox.flushAll()
-      if (!this.draining) {
+      if (!this.draining && !this.stopped) {
         if (this.groupProcessor && link.groupReviews && !this.groupReviewTask) {
           this.groupReviewTask = runGroupReviewBatch(link.groupReviews(deviceId,this.groupReviewAbort.signal),this.groupProcessor,this.groupReviewAbort.signal)
             .catch((error:unknown)=>this.log.warn({err:error},'group review worker stopped'))
@@ -896,10 +896,11 @@ export class Daemon {
   async stop() {
     if (this.stopped) return
     this.stopped = true
+    if (this.timer) clearTimeout(this.timer)
     this.groupReviewAbort.abort()
     await this.groupReviewTask
-    await this.nativeGroupDispose?.()
-    if (this.timer) clearTimeout(this.timer)
+    let nativeCleanupError:unknown
+    try{await this.nativeGroupDispose?.()}catch(error){nativeCleanupError=error;this.log.error({err:error},'native group container cleanup unconfirmed')}
     await this.quota?.stop()
     this.commandsAbort.abort()
     await this.commandsLoop.catch(() => undefined)
@@ -916,6 +917,7 @@ export class Daemon {
     this.log.info("daemon stopped")
     // Close the log file only if this daemon opened it.
     if (!this.options.log) await closeLogger(this.log)
+    if(nativeCleanupError)throw nativeCleanupError
   }
 }
 

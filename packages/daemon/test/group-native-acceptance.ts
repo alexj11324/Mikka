@@ -105,9 +105,62 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
     await writeFile(join(build,'fake.mjs'),fake.replace('multi_agent_v2 stable false','unavailable_feature stable false'))
     missingCapImage=(await exec('docker',['build','--network=none','--quiet',build],{timeout:60000,env:{PATH:process.env.PATH,NODE_ENV:'test',DOCKER_CONFIG:join(build,'docker-config'),DOCKER_BUILDKIT:'0'}})).stdout.trim()
     await assert.rejects(createNativeGroupProcessor({codex:missingCapImage}),/tool-disable capability/)
+    const processor=await createNativeGroupProcessor({claude_code:image})
+    try{
+     const r=await newRequest(ccAgentId);await worker({action:'poll'})
+     const assignment=await worker({action:'claim',runId:r.work.workId})
+     const controller=new AbortController(),pending=processor(assignment,controller.signal)
+     // Cancel while create is in flight, before start/attach can run.
+     controller.abort()
+     await assert.rejects(pending,/stopped before start/)
+     assert.equal((await post(r.path,{action:'read',artifactId:r.base.artifactId})).versions.length,1)
+     await command(r.group.id,'member',{action:'cancel',workId:r.work.workId})
+    }finally{await processor.dispose()}
+    // A daemon can finish creation after its client timed out. A detached
+    // controlled shim reproduces that edge with a real, unstarted container.
+    const realDocker=(await exec('which',['docker'])).stdout.trim(),pathBefore=process.env.PATH
+    const shim=join(build,'shim'),marker=join(build,'late-create-confirmed')
+    await mkdir(shim)
+    const delayed=`const {spawnSync}=require('node:child_process');const {writeFileSync}=require('node:fs');setTimeout(()=>{const p=spawnSync(${JSON.stringify(realDocker)},JSON.parse(process.argv[1]),{stdio:'ignore'});writeFileSync(${JSON.stringify(marker)},String(p.status))},5200)`
+    const shimLog=join(build,'delayed-create.log')
+    await writeFile(join(shim,'docker'),`#!/usr/bin/env node\nconst {spawn,spawnSync}=require('node:child_process');const {openSync}=require('node:fs');const args=process.argv.slice(2);if(args.includes('create')){const p=spawn(process.execPath,['-e',${JSON.stringify(delayed)},JSON.stringify(args)],{detached:true,stdio:['ignore',openSync(${JSON.stringify(shimLog)},'a'),openSync(${JSON.stringify(shimLog)},'a')]});p.unref();setTimeout(()=>{},20000)}else{process.exit(spawnSync(${JSON.stringify(realDocker)},args,{stdio:'inherit'}).status??1)}\n`,{mode:0o700})
+    try{process.env.PATH=shim+':'+pathBefore;await assert.rejects(createNativeGroupProcessor({codex:image}),error=>{assert.match(String(error),/Command failed:.* create /s);return true})}
+    finally{if(pathBefore===undefined)delete process.env.PATH;else process.env.PATH=pathBefore}
+    let lateCreate=''
+    for(let i=0;i<40;i++){try{lateCreate=await readFile(marker,'utf8');break}catch{await new Promise(resolve=>setTimeout(resolve,25))}}
+    assert.equal(lateCreate,'0','timeout regression must actually create its delayed disposable container: '+await readFile(shimLog,'utf8'))
+    const blockRm=join(build,'block-rm')
+    await writeFile(join(shim,'docker'),`#!/usr/bin/env node\nconst {spawnSync}=require('node:child_process');const {existsSync}=require('node:fs');const args=process.argv.slice(2);if(args.includes('rm')&&existsSync(${JSON.stringify(blockRm)})){process.stderr.write('controlled cleanup unavailable');process.exit(1)}process.exit(spawnSync(${JSON.stringify(realDocker)},args,{stdio:'inherit'}).status??1)\n`,{mode:0o700})
+    const localDocker=(args:string[])=>exec(realDocker,['--host','unix:///var/run/docker.sock','--config',join(build,'docker-config'),...args],{env:{PATH:pathBefore,NODE_ENV:'test'},timeout:5000})
+    try{
+     process.env.PATH=shim+':'+pathBefore
+     const failingCleanup=await createNativeGroupProcessor({claude_code:image})
+     const r=await newRequest(ccAgentId,'fixture:wait');await worker({action:'poll'})
+     const assignment=await worker({action:'claim',runId:r.work.workId}),controller=new AbortController()
+     const pending=failingCleanup(assignment,controller.signal)
+     const rejected=assert.rejects(pending,/cleanup unconfirmed/)
+     try{
+      let running=''
+      for(let i=0;i<80;i++){running=(await localDocker(['ps','--filter','name=mikka-group-cli-','--format','{{.Names}}'])).stdout.trim();if(running)break;await new Promise(resolve=>setTimeout(resolve,25))}
+      assert.ok(running,'cleanup failure regression must start its isolated fixture')
+      await writeFile(blockRm,'1')
+      // Simulate the worker's abort race settling before native cleanup does.
+      const abortRace=Promise.race([pending,new Promise<never>((_,reject)=>controller.signal.addEventListener('abort',()=>reject(Error('fixture aborted')),{once:true}))])
+      controller.abort();await assert.rejects(abortRace,/fixture aborted/)
+      await assert.rejects(failingCleanup.dispose(),/cleanup unconfirmed/)
+      await rejected
+      await assert.rejects(failingCleanup(assignment,new AbortController().signal),/disposed/)
+     }finally{
+      controller.abort();await rm(blockRm,{force:true})
+      const names=(await localDocker(['ps','--all','--filter','name=mikka-group-cli-','--format','{{.Names}}'])).stdout.trim().split('\n').filter(Boolean)
+      if(names.length)await localDocker(['rm','--force',...names])
+      await failingCleanup.dispose().catch(()=>{})
+      await command(r.group.id,'member',{action:'cancel',workId:r.work.workId})
+     }
+    }finally{if(pathBefore===undefined)delete process.env.PATH;else process.env.PATH=pathBefore}
     assert.deepEqual((await readdir(tmpdir())).filter(name=>name.startsWith('mikka-group-docker-')).sort(),configsBefore,'all successful and failed native runtime config directories must be removed')
-    const running=await exec('docker',['--host','unix:///var/run/docker.sock','--config',join(build,'docker-config'),'ps','--filter','name=mikka-group-cli-','--format','{{.Names}}'],{env:{PATH:process.env.PATH,NODE_ENV:'test'},timeout:5000})
-    assert.equal(running.stdout.trim(),'','poisoned Docker context must not strand a cancelled worker container')
+    const running=await exec('docker',['--host','unix:///var/run/docker.sock','--config',join(build,'docker-config'),'ps','--all','--filter','name=mikka-group-cli-','--format','{{.Names}}'],{env:{PATH:process.env.PATH,NODE_ENV:'test'},timeout:5000})
+    assert.equal(running.stdout.trim(),'','poisoned Docker context must not strand a running OR unstarted cancelled worker container')
    }finally{
     if(previous===undefined)delete process.env.PRIVATE_HOST_SENTINEL;else process.env.PRIVATE_HOST_SENTINEL=previous
     for(const key of dockerKeys){if(oldDocker[key]===undefined)delete process.env[key];else process.env[key]=oldDocker[key]}
