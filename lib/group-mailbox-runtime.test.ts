@@ -22,15 +22,23 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
  const wsAdmin=new Pool({connectionString:workspaceURL})
  await admin.query(`CREATE SCHEMA "${schema}"`);await wsAdmin.query(`CREATE SCHEMA "${schema}_ws"`)
  const pool=new Pool({connectionString:url,options:`-c search_path=${schema}`,max:8}),ws=new Pool({connectionString:workspaceURL,options:`-c search_path=${schema}_ws`,max:4})
- const workspaceId=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),foreignDevice=randomUUID()
+ const workspaceId=randomUUID(),agentId=randomUUID(),ccAgentId=randomUUID(),deviceId=randomUUID(),foreignDevice=randomUUID()
  const directory=groupDirectory({async activeUsers(w,ids){return(await ws.query('SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[]) AND status=\'active\'',[w,ids])).rows.map(r=>r.userId)},async ownedAgents(u,ids,client){return(await(client??pool).query('SELECT id FROM agents WHERE "userId"=$1 AND id=ANY($2::uuid[])',[u,ids])).rows.map(r=>r.id)}})
  let port=0
  const server=createServer(async(req,res)=>{
   try{
    const parts=[];for await(const part of req)parts.push(part)
+   const path=req.url??''
+   const send=(body:unknown)=>{res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(body))}
+   if(path==='/v1/devices/register'){send({deviceId,workspaceId});return}
+   if(path.endsWith('/heartbeat')){send({leases:{}});return}
+   if(path.endsWith('/repos')){send({repos:[]});return}
+   if(path.includes('/runs?')){send({runIds:[]});return}
+   if(path.includes('/commands?')){await new Promise(r=>setTimeout(r,100));send({commands:[]});return}
+   if(path.includes('/fs/')){await new Promise(r=>setTimeout(r,100));send({requests:[]});return}
    const request=new Request(`http://127.0.0.1:${port}${req.url}`,{method:'POST',headers:req.headers as Record<string,string>,body:Buffer.concat(parts)})
    let result:Response
-   if(req.url==='/worker')result=await handleGroupWorkerRequest(request,deviceId,{pool,directory,authenticate:async r=>{const u=r.headers.get('x-controlled-identity');return ['owner','member','outsider'].includes(u??'')?{userId:u!}:null}})
+   if(req.url==='/worker'||req.url?.endsWith('/group-reviews'))result=await handleGroupWorkerRequest(request,deviceId,{pool,directory,authenticate:async r=>{const u=r.headers.get('authorization')==='Bearer controlled-device-fixture'?'owner':r.headers.get('x-controlled-identity');return ['owner','member','outsider'].includes(u??'')?{userId:u!}:null}})
    else{
     const body=await request.json(),userId=request.headers.get('x-controlled-identity')
     if(!userId)result=Response.json({error:'unauthorized'},{status:401})
@@ -42,11 +50,11 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
  })
  async function post(path:string,input:unknown,user='owner'){const r=await fetch(`http://127.0.0.1:${port}${path}`,{method:'POST',headers:{'content-type':'application/json','x-controlled-identity':user},body:JSON.stringify(input)});const value=await r.json();if(!r.ok)throw Object.assign(new Error(value.error),{status:r.status});return value}
  const worker=(input:unknown,user='owner')=>post('/worker',input,user)
- const newRequest=async()=>{
-  const group=await post('/groups',{workspaceId,title:'Review',members:[{memberType:'user',memberId:'member'},{memberType:'agent',memberId:agentId}]})
-  const path='/artifacts/'+group.id,created=await post(path,{action:'create',title:'Plan',mediaType:'text/markdown',currentAgentId:agentId,content:'hello world!'})
+ const newRequest=async(target=agentId,comment="Improve this quote.")=>{
+  const group=await post('/groups',{workspaceId,title:'Review',members:[{memberType:'user',memberId:'member'},{memberType:'agent',memberId:target}]})
+  const path='/artifacts/'+group.id,created=await post(path,{action:'create',title:'Plan',mediaType:'text/markdown',currentAgentId:target,content:'hello world!'})
   const base={artifactId:created.artifactId,baseVersionId:created.version.id,baseHash:created.version.hash}
-  const thread=await post(path,{action:'thread',...base,anchor:{kind:'source-range',start:6,end:11,quote:'world',prefix:'hello ',suffix:'!'},body:'Improve this quote.'},'member')
+  const thread=await post(path,{action:'thread',...base,anchor:{kind:'source-range',start:6,end:11,quote:'world',prefix:'hello ',suffix:'!'},body:comment},'member')
   const count=(await pool.query('SELECT count(*) FROM conversation_work WHERE "conversationId"=$1',[group.id])).rows[0].count;assert.equal(count,'0')
   const send={action:'send',...base,threadId:thread.threadId,requestId:randomUUID()}
   const work=await post(path,send,'member');assert.equal((await post(path,send,'member')).workId,work.workId)
@@ -63,6 +71,7 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
   for(const u of ['owner','member','outsider'])await ws.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')',[workspaceId,u,u+'@example.invalid'])
   await pool.query('INSERT INTO devices (id,"ownerId",name,enabled) VALUES ($1,\'owner\',\'controlled fixture\',true),($2,\'outsider\',\'foreign\',true)',[deviceId,foreignDevice])
   await pool.query('INSERT INTO agents (id,"userId",name,harness,instructions,"deviceId") VALUES ($1,\'owner\',\'Agent\',\'codex\',\'PRIVATE_INSTRUCTIONS_SENTINEL\',$2)',[agentId,deviceId])
+  await pool.query('INSERT INTO agents (id,"userId",name,harness,instructions,"deviceId") VALUES ($1,\'owner\',\'CC Agent\',\'claude_code\',\'PRIVATE_INSTRUCTIONS_SENTINEL\',$2)',[ccAgentId,deviceId])
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',()=>resolve()));port=(server.address() as {port:number}).port
   await t.test('real app handlers persist request, worker HTTP dispatches once, Docker-isolated fake proposes revision and completion ACKs atomically',async()=>{
    const r=await newRequest()
@@ -95,13 +104,16 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
    await assert.rejects(complete(first),/claim_expired/)
    const second=await claim(first.runId);assert.equal(second.claimEpoch,first.claimEpoch+1)
    await assert.rejects(complete(first),/claim_epoch_mismatch/)
+   await assert.rejects(worker({action:'fail',runId:first.runId,claimEpoch:first.claimEpoch,code:'processor_failed'}),/claim_epoch_mismatch/)
    const one=await complete(second),two=await complete(second);assert.equal(one.replyMessageId,two.replyMessageId)
    assert.equal((await post(r.path,{action:'read',artifactId:r.base.artifactId})).versions.length,2)
   })
   await t.test('cross-owner/browser spoofing and private mailbox routes cannot enter a group mailbox',async()=>{
    const r=await newRequest();await worker({action:'poll'})
    await assert.rejects(worker({action:'claim',runId:r.work.workId},'outsider'),/not_found/)
+   await assert.rejects(worker({action:'fail',runId:r.work.workId,claimEpoch:1,code:'processor_failed'},'outsider'),/not_found/)
    await assert.rejects(worker({action:'poll',userId:'owner'}),/invalid_input/)
+   await assert.rejects(worker({action:'claim',runId:r.work.workId,harness:'claude_code'}),/invalid_input/)
    await assert.rejects(worker({action:'poll'},''),/unauthorized/)
    const box=(await pool.query('SELECT "mailboxId" FROM agent_runs WHERE id=$1',[r.work.workId])).rows[0].mailboxId
    const store=new SessionMailbox(pool,workspaceId),actor=await store.conversation('owner','coordinator')
@@ -155,6 +167,11 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
    assert.equal((await pool.query('SELECT status FROM conversation_work WHERE id=$1',[r.work.workId])).rows[0].status,'cancelled')
    assert.equal((await pool.query('SELECT count(*) FROM artifact_versions WHERE "artifactId"=$1',[r.base.artifactId])).rows[0].count,'1')
   })
+  if(process.env.MIKKA_TEST_NATIVE_GROUPS==='1'){
+   const nativeURL=new URL('../packages/daemon/test/group-native-acceptance.ts',import.meta.url).href
+   const {nativeGroupAcceptance}=await import(nativeURL)
+   await t.test('actual daemon startup routes BOTH CC/Codex CLI adapters with isolated fake binaries',()=>nativeGroupAcceptance({pool,command:(id:string,user:string,input:unknown)=>groupReviewCommand(pool,directory,id,user,input),port,agentId,ccAgentId,newRequest,post,worker}))
+  }
   for(const table of ['session','account','device_tokens','run_tokens'])assert.equal((await pool.query(`SELECT count(*) FROM "${table}"`)).rows[0].count,'0')
  }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));await pool.end();await ws.end();await admin.query(`DROP SCHEMA "${schema}" CASCADE`);await wsAdmin.query(`DROP SCHEMA "${schema}_ws" CASCADE`);await admin.end();await wsAdmin.end()}
 })

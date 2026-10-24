@@ -61,7 +61,7 @@ export async function reviewArtifact(pool: Pool, directory: Directory, conversat
         thread.anchorStatus = anchorStatus(thread.anchor, version.content, artifact.mediaType, thread.versionId, artifact.headVersionId)
         thread.comments = (await client.query('SELECT * FROM artifact_comments WHERE "threadId"=$1 ORDER BY "createdAt",id', [thread.id])).rows
       }
-      return { artifact, versions, threads, requests: (await client.query('SELECT r.*,w.status,w."agentId" FROM artifact_change_requests r JOIN conversation_work w ON w.id=r."workId" WHERE r."artifactId"=$1 ORDER BY w."createdAt"', [artifact.id])).rows, acceptances: (await client.query('SELECT * FROM artifact_acceptances WHERE "artifactId"=$1', [artifact.id])).rows }
+      return { artifact, versions, threads, requests: (await client.query('SELECT r.*,w.status,w."agentId",ar.error AS "runtimeError" FROM artifact_change_requests r JOIN conversation_work w ON w.id=r."workId" LEFT JOIN agent_runs ar ON ar.id=w."runId" WHERE r."artifactId"=$1 ORDER BY w."createdAt"', [artifact.id])).rows, acceptances: (await client.query('SELECT * FROM artifact_acceptances WHERE "artifactId"=$1', [artifact.id])).rows }
     }
     if (input.action === 'comment') {
       const thread = (await client.query('SELECT 1 FROM artifact_threads WHERE id=$1 AND "artifactId"=$2', [input.threadId, artifact.id])).rows[0]

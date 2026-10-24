@@ -41,18 +41,20 @@ export async function claimGroupReview(pool:Pool,directory:Directory,userId:stri
     const identity=(await client.query('SELECT id FROM conversation_work WHERE "runId"=$1',[runId])).rows[0]
     if (!identity) return reject(404,'not_found')
     const work=await lockedWork(client,identity.id)
-    const run=(await client.query(`SELECT r.*,d.enabled FROM agent_runs r JOIN devices d ON d.id=r."deviceId" WHERE r.id=$1 AND r."userId"=$2 AND r."deviceId"=$3 AND d."ownerId"=$2 FOR UPDATE OF r`,[runId,userId,deviceId])).rows[0]
+    const run=(await client.query(`SELECT r.*,d.enabled,m.harness FROM agent_runs r JOIN devices d ON d.id=r."deviceId" JOIN session_mailboxes m ON m.id=r."mailboxId" JOIN agents a ON a.id=r."agentId" AND a."userId"=r."userId" AND a.harness=m.harness WHERE r.id=$1 AND r."userId"=$2 AND r."deviceId"=$3 AND d."ownerId"=$2 FOR UPDATE OF r`,[runId,userId,deviceId])).rows[0]
     if (!run || run.kind!=='group_review') return reject(404,'not_found')
     if (work.status!=='dispatched' || !run.enabled || run.stopRequestedAt) return reject(409,'work_not_live')
     try { await authorizedWork(client,directory,work) }
     catch(error) { if (!(error instanceof ReviewFailure)) throw error; await cancelWork(client,work.conversationId,{workId:work.id});return {status:'cancelled' as const} }
     if (run.status!=='queued' && !(run.status==='running' && run.leaseExpiresAt && new Date(run.leaseExpiresAt).getTime()<Date.now())) return reject(409,'already_claimed')
+    if (work.claimEpoch>=3) { await cancelWork(client,work.conversationId,{workId:work.id});return {status:'cancelled' as const,reason:'claim_attempt_limit'} }
     const {group}=await requireGroup(client,directory,work.conversationId,work.requestedBy)
     const messages=await new SessionMailbox(pool,group.workspaceId).groupInbox(client,runId,userId)
     if (messages.length!==1 || messages[0].id!==work.id) return reject(409,'isolated_input_required')
     const epoch=(await client.query('UPDATE conversation_work SET "claimEpoch"="claimEpoch"+1 WHERE id=$1 RETURNING "claimEpoch"',[work.id])).rows[0].claimEpoch as number
     await client.query(`UPDATE agent_runs SET status='running',"startedAt"=coalesce("startedAt",now()),"leaseExpiresAt"=now()+interval '90 seconds',"updatedAt"=now() WHERE id=$1`,[runId])
-    return {status:'claimed' as const,runId,claimEpoch:epoch,envelope:JSON.parse(messages[0].text) as unknown,capabilities:{tools:[] as string[],history:[] as string[],repository:null,credentials:null}}
+    if (!['claude_code','codex'].includes(run.harness)) return reject(409,'unsupported_group_harness')
+    return {status:'claimed' as const,runId,harness:run.harness as 'claude_code'|'codex',claimEpoch:epoch,envelope:JSON.parse(messages[0].text) as unknown,capabilities:{tools:[] as string[],history:[] as string[],repository:null,credentials:null}}
   })
 }
 export async function finishGroupReview(pool:Pool,directory:Directory,userId:string,deviceId:string,runId:string,input:unknown) {
@@ -74,5 +76,24 @@ export async function checkGroupReview(pool:Pool,directory:Directory,userId:stri
     try { await authorizedWork(client,directory,work);if (!run.enabled) return reject(409,'device_disabled') }
     catch(error){if(!(error instanceof ReviewFailure))throw error;await cancelWork(client,work.conversationId,{workId:work.id});return{live:false}}
     return {live:true}
+  })
+}
+
+/** Runtime failure is a terminal fence, never an authored reply or approval.
+ * Only the current authenticated claim may close its still-live work. */
+export async function failGroupReview(pool:Pool,directory:Directory,userId:string,deviceId:string,runId:string,claimEpoch:number) {
+  return transaction(pool,async client=>{
+    const identity=(await client.query('SELECT id FROM conversation_work WHERE "runId"=$1',[runId])).rows[0]
+    if(!identity)return reject(404,'not_found')
+    const work=await lockedWork(client,identity.id)
+    const run=(await client.query(`SELECT r.status,r."stopRequestedAt",r."leaseExpiresAt",d.enabled FROM agent_runs r JOIN devices d ON d.id=r."deviceId" WHERE r.id=$1 AND r."userId"=$2 AND r."deviceId"=$3 AND r.kind='group_review' AND d."ownerId"=$2 FOR UPDATE OF r`,[runId,userId,deviceId])).rows[0]
+    if(!run||!run.enabled)return reject(404,'not_found')
+    if(work.status!=='dispatched')return{status:work.status}
+    if(run.stopRequestedAt){await cancelWork(client,work.conversationId,{workId:work.id});return{status:'cancelled'}}
+    if(work.claimEpoch!==claimEpoch||run.status!=='running'||!run.leaseExpiresAt||new Date(run.leaseExpiresAt).getTime()<=Date.now())return reject(409,'claim_epoch_mismatch')
+    try{await authorizedWork(client,directory,work)}catch(error){if(!(error instanceof ReviewFailure))throw error;await cancelWork(client,work.conversationId,{workId:work.id});return{status:'cancelled'}}
+    await cancelWork(client,work.conversationId,{workId:work.id})
+    await client.query('UPDATE agent_runs SET error=$2 WHERE id=$1',[runId,'group_processor_failed'])
+    return{status:'cancelled',runtimeError:'group_processor_failed'}
   })
 }

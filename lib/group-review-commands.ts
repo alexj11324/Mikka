@@ -16,7 +16,7 @@ export async function groupReviewCommand(pool: Pool, directory: Directory, conve
   return transaction(pool, async client => {
     const { group, member } = await requireGroup(client, directory, conversationId, userId)
     if (input.action === 'work' || input.action === 'cancel') {
-      const work = (await client.query('SELECT * FROM conversation_work WHERE id=$1 AND "conversationId"=$2', [input.workId, conversationId])).rows[0]
+      const work = (await client.query('SELECT w.*,r.error AS "runtimeError" FROM conversation_work w LEFT JOIN agent_runs r ON r.id=w."runId" WHERE w.id=$1 AND w."conversationId"=$2', [input.workId, conversationId])).rows[0]
       if (!work) return reject(404, 'not_found')
       if (input.action === 'work') return { work }
       if (work.requestedBy !== userId && member.role !== 'owner') return reject(403, 'forbidden')

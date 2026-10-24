@@ -1,6 +1,6 @@
 import {expect,it,vi} from 'vitest'
 import {runGroupReviewBatch,type GroupReviewAssignment,type GroupReviewLink} from '../src/runs/group-review-worker'
-const claim:GroupReviewAssignment={status:'claimed',runId:'run',claimEpoch:1,envelope:{contract:'mikka.group-review.v1',workId:'run',triggerMessageId:'trigger',conversationId:'group',instruction:'trusted contract',untrustedData:{}},capabilities:{tools:[],history:[],repository:null,credentials:null}}
+const claim:GroupReviewAssignment={status:'claimed',harness:'codex',runId:'run',claimEpoch:1,envelope:{contract:'mikka.group-review.v1',workId:'run',triggerMessageId:'trigger',conversationId:'group',instruction:'trusted contract',untrustedData:{}},capabilities:{tools:[],history:[],repository:null,credentials:null}}
 function link(value=claim):GroupReviewLink{return{poll:async()=>({runIds:['run']}),claim:async()=>value,check:async()=>({live:true}),complete:vi.fn(async()=>({status:'completed'}))}}
 it('refuses a privileged assignment before invoking any processor',async()=>{
  const processor=vi.fn();await expect(runGroupReviewBatch(link({...claim,capabilities:{...claim.capabilities,tools:['shell']}}),processor)).rejects.toThrow('Unsafe group assignment');expect(processor).not.toHaveBeenCalled()
