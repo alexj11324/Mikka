@@ -25,8 +25,10 @@ bot's avatar. The computer a thread uses is its bot's computer.
 - The bot list holds bots and group chats only. A thread name ("#66 …",
   "MIK-11 …") is never a left-column row. A bot row's preview line may quote
   the latest message, which may mention a thread, but the row is the bot.
-- A thread view's title is the thread's name. The bot's name appears as the
-  owner (avatar or label), not as the title.
+- The right panel's 详情 header is the selected bot (the same avatar and
+  name as its left row), followed by 「<Bot 名> 的屏幕」. A thread's name
+  appears only as its row in the thread list, never as that header
+  (Alex, 2026-10-24 21:13; `rules.md` R-02).
 - Choosing another bot on the left changes the center chat and the right
   column's thread and computer together.
 - A task (issue, `MIK-xx`) is not a thread. A thread works on a task, and a
