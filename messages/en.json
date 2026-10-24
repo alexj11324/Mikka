@@ -2212,7 +2212,6 @@
       "user": "You're in control"
     },
     "screenOf": "{name}'s screen",
-    "screen": "Screen",
     "computerOf": "{name}'s computer",
     "cloud": "Mikka Cloud",
     "card": "Computer task",
@@ -2332,12 +2331,7 @@
         "finishing": "finishing",
         "failed": "failed",
         "succeeded": "done"
-      },
-      "command": "Direct this task…",
-      "commandLabel": "Send an instruction to the Coordinator",
-      "send": "Send",
-      "sent": "Sent to the Coordinator.",
-      "sendFailed": "That didn't send. Try again."
+      }
     },
     "empty": {
       "nothing": "Nothing here",

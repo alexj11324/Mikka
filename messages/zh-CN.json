@@ -2212,7 +2212,6 @@
       "user": "你在操作"
     },
     "screenOf": "{name} 的屏幕",
-    "screen": "屏幕",
     "computerOf": "{name} 的电脑",
     "cloud": "Mikka Cloud",
     "card": "电脑任务",
@@ -2332,12 +2331,7 @@
         "finishing": "收尾中",
         "failed": "失败",
         "succeeded": "已完成"
-      },
-      "command": "指挥这个任务…",
-      "commandLabel": "给 Coordinator 发指令",
-      "send": "发送",
-      "sent": "已发给 Coordinator。",
-      "sendFailed": "没发出去，再试一次。"
+      }
     },
     "empty": {
       "nothing": "这里是空的",
