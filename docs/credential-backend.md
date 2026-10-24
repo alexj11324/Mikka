@@ -28,9 +28,9 @@ link are rejected. A second login session does not inherit the first session's r
 The two existing databases remain separate; no new cross-database foreign keys or changes
 to the worker/daemon token interfaces are required.
 
-There is currently no automatic model/tool integration. A trusted server integration
-must create the form request and call the reference executor. Do not add a generic
-`getSecret` tool, daemon token authorization or plaintext getter route.
+Reference-only tools are registered in the existing Agent, Coordinator and MCP paths
+(see the system-registration section). The signed-in owner still submits through the
+separate secure HTTP form. No generic `getSecret` tool or plaintext getter route exists.
 
 ## HTTP contract
 
@@ -102,7 +102,7 @@ expiry/disconnect. An example view (no nonce/secret/vault path):
   id: string, credentialRef: string, serviceId: string, targetOrigin: string,
   mode: 'api_header' | 'browser_login',
   state: 'pending' | 'submitting' | 'ready' | 'using' | 'active_session' | 'consumed' |
-         'cancelled' | 'expired' | 'failed' | 'disconnected',
+         'cancelled' | 'expired' | 'failed' | 'disconnected' | 'handoff_required',
   retention: 'once' | 'session', expiresAt: string, useExpiresAt: string | null,
   cleanupPending: boolean, version: number
 }
@@ -125,7 +125,7 @@ Errors always have `{ "error": "<fixed code>" }`, with no validation values or c
 | 409 | `credential_request_exists`, `credential_busy`, `credential_already_submitted`, `credential_not_ready`; refresh state |
 | 410 | `credential_request_gone`; create a new request if still needed |
 | 413 / 415 | `credential_body_too_large` / `credential_json_required` |
-| 422 | `credential_service_unavailable`; no configured exact target |
+| 422 | `credential_service_unavailable`; no configured exact target. Executor `browser_handoff_required` means stop automated attempts and review the target; GET the terminal state |
 | 501 | `browser_isolation_unavailable`; browser capability is unavailable; do not ask for a password |
 | 502 / 503 | fixed execution/vault/configuration/availability codes; GET state before any retry |
 
@@ -151,7 +151,7 @@ await fetch(withBasePath(`/api/credential-requests/${request.id}/submit`), {
 ## Controlled API executor and cleanup
 
 `getCredentialBroker().use(credentialRef, expectedBinding)` is a server-only integration
-point, not a public API or an agent tool. `expectedBinding` must be constructed from the
+point behind the reference-only tool adapter. `expectedBinding` is constructed from the
 trusted authenticated execution context, not copied from model arguments. It includes
 ownerId, workspaceId, taskId, runId, executionSession, authSessionId and serviceId.
 Wrong bindings fail before vault read. Only a reference may enter tool arguments.
@@ -337,6 +337,81 @@ failure/cancellation cleanup, restoration and replacement-launch quarantine.
 
 ## Production gates and evidence
 
+### Actual system registration increment (local candidate; acceptance pending)
+
+The five reference-only tools `prepare_credential_request`, `credential_status`,
+`credential_use`, `credential_browser_action` and `credential_finish` are registered
+in the existing owner MCP, worker MCP, Agent route and durable Coordinator workflow.
+`lib/credentials/execution-tools.ts` derives the live task, workspace and execution
+session from the authenticated owner/run and the two existing databases. Workers
+cannot override their run. Coordinator calls must name a live owned run. Submission
+is still only the separate authenticated HTTP route; tools never accept a value or nonce.
+
+`prepare_credential_request` returns `{serviceId,targetOrigin,mode,runId,taskId,
+workspaceId,executionSession,submission:{method,url,body},instruction}`. Claude's form
+uses `submission.body` to create the request, keeps the returned nonce in local memory,
+and submits directly as described above. No form/card/UI was implemented here.
+After a successful submit the backend inserts an opaque reference/service notification
+into existing `run_messages`, deduplicated by request ID. A sweep retries delivery.
+The worker can then use the reference and perform named browser actions, ending with
+`credential_finish`. Finish also destroys saved API-header credentials.
+
+The daemon reuses `RunAssignment.mcp`, storing its platform run token only in the
+trusted daemon process. Its existing harness MCP child receives a random local
+capability for exactly those five tools, not the platform token. Per-run sandbox
+network rules allow only that bridge's exact host/port. Local handoff tool discovery
+is immediate and does not contact the backend. Failed remote initialization can retry;
+stopped/device-switched/terminal run grants refuse calls and are removed within five
+seconds. The backend independently checks authority on every operation.
+
+Owned-browser deployment settings are `MIKKA_CREDENTIAL_BROWSER_RUNNER=owned`,
+`MIKKA_CREDENTIAL_RUNTIME_KIND=dedicated`, `MIKKA_CREDENTIAL_CHROMIUM_PATH` and trusted
+`MIKKA_CREDENTIAL_BROWSER_POLICIES` (the `OwnedBrowserPolicy[]` contract). Serverless
+Vercel processes explicitly reject owned-browser enablement. Deploy the stateful runner
+as a dedicated trusted process apart from agent sandboxes; setting a flag does not
+prove host isolation. Only one live browser request per owner/workspace/run/session
+is admitted across service IDs. Idle pending browser sessions have a five-minute TTL;
+the dedicated process sweeps every five seconds, alongside the staged cron cleanup.
+Host crash/profile reclamation still requires a separately verified supervisor.
+
+The fill strategy is bounded: validate an exact same-origin POST form, one visible,
+enabled, editable password input and its matching submit control; try direct fill once;
+on failure revalidate the same target, verify keyboard focus, clear it and type once.
+No target guessing, arbitrary coordinates or retry after submit is allowed. DOM,
+screenshot and click observers remain fenced throughout both attempts. An unsafe target
+or exhausted keyboard attempt enters terminal `handoff_required`, destroys the password
+context, deletes its vault record and ends the replacement session. Claude should close
+the old request and ask the owner to review the target/start a fresh secure request;
+never ask them to paste a password into chat. An interactive owner takeover transport
+is not implemented by this backend or this status. Native apps and payments are excluded.
+
+`scripts/accept-credential-system.mjs` exercises the actual Next routes and MCP
+registration with isolated full-schema databases, synthetic TLS vault and test site.
+It is not a fake-handler substitute. This environment currently fails before Next
+startup: SWC's native loader rejects cache ancestors owned by another untrusted UID.
+Standard cache and supported temporary materialization both fail; no security-check
+skip or package downgrade was used. Actual system routes, SRT proxy and model-driven
+harness acceptance are therefore **unverified**, even though their source is connected.
+
+For the authorized token owner's later staging provider probe only,
+`node --import tsx scripts/accept-credential-vault.mjs crud <private-manifest.json>`
+requires `MIK79_ALLOW_STAGING_CRUD=1` plus privately supplied
+`MIKKA_CREDENTIAL_VAULT_TOKEN`. It is hard-scoped to project
+`89850d6a-f020-4936-863e-df77380dfe40`, staging `/credential-acceptance/mik79`, at most
+four random synthetic names. The folder must already exist. It does not list secrets,
+create folders, change IAM or read business records. It records exact names before
+attempted writes and retries idempotent deletion; `cleanup <same-manifest.json>` retries
+only that manifest's names after interruption. Values/token are never stored or printed.
+With the user's explicit staging approval this script was executed through the inherited
+platform proxy on 2026-10-24: four random synthetic records each returned POST 200,
+GET 200 with in-process value comparison, DELETE 200 and final exact-name GET 404.
+The dedicated `mik79` child folder was created after metadata confirmed it absent;
+no business values or IAM were accessed. Evidence/manifest:
+`/workspace/credential-backend-delivery/real-vault-GdnpQJ/`.
+This is vault CRUD evidence only and cannot establish full Mikka system acceptance.
+Do not copy an admin token
+between threads or into any agent configuration.
+
 Default is disabled. `MIKKA_CREDENTIAL_BROKER_ENABLED=1` plus
 `MIKKA_CREDENTIAL_INGRESS_NO_BODY_CAPTURE=1` are necessary opt-ins. The latter is an
 operator assertion, not a technical proof: verify all CDN/reverse-proxy/WAF/APM/error
@@ -350,8 +425,13 @@ Infisical v4 settings: `MIKKA_CREDENTIAL_VAULT_ORIGIN` (default
 `https://us.infisical.com`), `MIKKA_CREDENTIAL_VAULT_PROJECT_ID`,
 `MIKKA_CREDENTIAL_VAULT_ENVIRONMENT`, `MIKKA_CREDENTIAL_VAULT_PATH` (dedicated existing
 folder), and `MIKKA_CREDENTIAL_VAULT_TOKEN` supplied through platform workload/secret
-delivery. Use a minimally scoped machine identity with only CRUD in that folder;
-rotation/provisioning/grants are outside this patch. Token values never belong in a
+delivery. As of the online permission check reported by the parent on 2026-10-24,
+the existing identity has project-wide admin permissions, including secret CRUD and
+folder CRUD without environment/path conditions. Historical read-only identity notes
+do not describe this current token. It can support platform-controlled custody; it
+must not be given to an agent/runtime as a narrowly scoped reader. A dedicated test
+folder and exact create/read/delete scope still require explicit authorization before
+real acceptance. No IAM change or new identity is part of this patch. Token values never belong in a
 local env file, command line, chat or repository. Official contracts:
 [create](https://infisical.com/docs/api-reference/endpoints/secrets/create),
 [read](https://infisical.com/docs/api-reference/endpoints/secrets/read),
@@ -377,7 +457,8 @@ The real HTTP tests use Better Auth signup/session cookies, actual Postgres SQL/
 two separate databases for the existing authority boundaries, a controlled localhost
 upstream that echoes the synthetic secret, local Chromium test pages, and an in-memory
 **fake** vault. Chromium itself, HTML filling/submission, HTTP and Postgres are real.
-Infisical uses a synthetic HTTP transport contract test; no actual Infisical CRUD,
-production credentials, real login, OAuth grants, SMS/email, paid resources, push, PR,
+The general test suite uses a synthetic HTTP transport contract. A separate authorized
+real Infisical synthetic CRUD probe is recorded above. No production credentials,
+real account login, OAuth grants, SMS/email, paid resources, push, PR,
 merge or deploy has been executed. No full Next production runtime/Preview acceptance
 or platform telemetry configuration is established by this harness.

@@ -14,12 +14,19 @@ import { runComposioAction } from '@/lib/composio'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
+import { executeSystemCredentialTool } from '@/lib/credentials/runtime'
+import type { CredentialToolName } from '@/lib/credentials/execution-tools'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
 // expected failures instead of throwing, so a bad id is not retried.
 
 type ToolResult<T> = T | { error: string }
+
+export async function credentialTool(userId: string, name: CredentialToolName, input: unknown) {
+  'use step'
+  return executeSystemCredentialTool({ userId }, name, input)
+}
 
 async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {

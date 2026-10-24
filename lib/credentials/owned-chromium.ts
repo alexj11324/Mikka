@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core'
+import { chromium, type Browser, type BrowserContext, type Page, type ElementHandle } from 'playwright-core'
 import { CredentialError, type Binding, type BrowserTaskAction } from './contracts'
 import { assertBrowserIsolationTransition, type BrowserIsolationPhase } from './browser-protocol'
 
@@ -47,6 +47,22 @@ export class OwnedChromiumExecutor {
   #sessions = new Map<string, Session>()
   #policies = new Map<string, Readonly<OwnedBrowserPolicy>>()
   #events: { session: string; phase: string }[] = []
+  describe(serviceId: string) {
+    const policy = this.#policies.get(serviceId)
+    return policy ? { serviceId, targetOrigin: new URL(policy.formURL).origin } : undefined
+  }
+
+  async prepare(binding: Binding, serviceId: string) {
+    if (!this.#policies.has(serviceId)) return undefined
+    if (!this.#sessions.has(binding.executionSession)) await this.open(binding)
+    return this.policy(serviceId, binding)
+  }
+
+  claim(binding: Binding, reference: string) {
+    const session = this.#session(binding)
+    if (session.fenced || session.authenticated || (session.endedReference && session.endedReference !== reference)) throw new CredentialError('browser_isolation_locked', 423)
+    session.endedReference = reference
+  }
   constructor(private readonly config: {
     executablePath: string; policies: OwnedBrowserPolicy[];
     // Only for synthetic loopback acceptance in this cloud Linux environment.
@@ -112,6 +128,8 @@ export class OwnedChromiumExecutor {
     const session = await this.#launch(binding)
     if (this.#sessions.has(binding.executionSession)) { await this.#destroy(session); throw new CredentialError('browser_session_exists', 409) }
     this.#sessions.set(binding.executionSession, session)
+    session.expiryTimer = setTimeout(() => { void this.end(binding).catch(() => {}) }, 300_000)
+    session.expiryTimer.unref()
   }
 
   #session(binding: Binding) {
@@ -390,11 +408,45 @@ export class OwnedChromiumExecutor {
       await session.page.goto(policy.formURL, { waitUntil: 'domcontentloaded', timeout: 3000 })
       if (session.page.url() !== policy.formURL) throw new CredentialError('browser_origin_mismatch', 403)
       await check()
+      const confirmTarget = async (): Promise<ElementHandle<HTMLElement | SVGElement>> => {
+        await check()
+        if (session.page.url() !== policy.formURL || await session.page.locator(policy.secretSelector).count() !== 1 || await session.page.locator(policy.submitSelector).count() !== 1) throw new CredentialError('browser_handoff_required', 422)
+        const target = await session.page.locator(policy.secretSelector).elementHandle()
+        const submit = await session.page.locator(policy.submitSelector).elementHandle()
+        if (!target || !submit || !await target.evaluate((element, expected) => {
+            const input = element as HTMLInputElement, form = input.form
+            return input.tagName === 'INPUT' && input.type === 'password' && !!form && form.method.toLowerCase() === 'post' && form.action === expected && (!form.target || form.target === '_self')
+          }, policy.submitURL) || !await submit.evaluate((element, input) => {
+            const button = element as HTMLButtonElement
+            return (button.tagName === 'BUTTON' || button.tagName === 'INPUT') && button.type === 'submit' && button.form === (input as HTMLInputElement).form && !button.hasAttribute('formaction') && !button.hasAttribute('formtarget') && !button.hasAttribute('formmethod')
+          }, target) || !await target.isVisible() || !await target.isEnabled() || !await target.isEditable() || !await submit.isVisible() || !await submit.isEnabled()) throw new CredentialError('browser_handoff_required', 422)
+        return target
+      }
+      let target = await confirmTarget()
       secret = await capability.resolveAndAdmit()
       await check()
-      await session.page.locator(policy.secretSelector).fill(secret)
       passwordHash = createHash('sha256').update(secret).digest('hex')
       passwordLength = secret.length
+      try {
+        await target.fill(secret, { timeout: 1200 })
+        if (!await target.evaluate((element, value) => (element as HTMLInputElement).value === value, secret)) throw new Error()
+      } catch {
+        // Exactly one keyboard fallback. Reconfirm origin/form/unique editable password target
+        // while the same global observer fence remains held; never guess another selector.
+        target = await confirmTarget()
+        try {
+          await target.click({ timeout: 1000 })
+          if (!await target.evaluate(element => element === document.activeElement)) throw new Error()
+          await target.press('ControlOrMeta+A', { timeout: 500 }); await target.press('Backspace', { timeout: 500 })
+          await check()
+          if (session.page.url() !== policy.formURL) throw new CredentialError('browser_origin_mismatch', 403)
+          await target.type(secret, { timeout: 1500 })
+          if (!await target.evaluate((element, value) => (element as HTMLInputElement).value === value, secret)) throw new Error()
+        } catch (error) {
+          if (error instanceof CredentialError) throw error
+          throw new CredentialError('browser_handoff_required', 422)
+        }
+      }
       secret = undefined
       this.#move(session, 'filled')
       await check()
@@ -415,6 +467,7 @@ export class OwnedChromiumExecutor {
       this.#move(session, 'scrubbing')
       try {
         const replacement = await this.#restore(session, policy, binding, serviceId, capability.requestId, success, passwordHash, passwordLength, capability.sessionDeadline, check)
+        if (failure?.code === 'browser_handoff_required') replacement.endedReference = capability.requestId
         if (replacement.authenticated) { retained = replacement; retainedExpiresAt = new Date(replacement.authenticated.expiresAt).toISOString() }
         await this.#install(session, replacement, capability.requestId)
       } catch (error) {

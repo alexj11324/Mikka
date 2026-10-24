@@ -6,6 +6,10 @@ Base is `5a0e1c411f487fee433c48414f7130d0d58dad92`; verified against
 manifest. No push, PR, merge or deployment was performed. Delivery includes a patch
 against this baseline.
 
+**Acceptance status: NOT COMPLETE (#180 / MIK79).** The first commit `4bc7258`
+was a local candidate. The system-registration increment below is not evidence of
+real Infisical, deployed Mikka, frontend or real-account acceptance.
+
 ## Executed evidence
 
 - `CREDENTIAL_TEST_ADMIN_DATABASE_URL=<isolated-loopback-/postgres> node scripts/test-credential-backend.mjs`:
@@ -36,11 +40,9 @@ against this baseline.
   **11 pass**. Existing auth/config/request-scope regression tests: **13 pass**;
   `/tmp/mikka-credential-regressions.tap`.
 - `oxlint --deny-warnings` over every new source/test/route/script: **pass**.
-- Focused `tsgo --noEmit` including credential source/tests/routes and existing Next
-  declarations: **pass**. Whole-checkout typecheck: **23 existing errors** in unrelated
-  Telegram/UI modules or missing installed dependencies (`posthog-js`, HeroUI,
-  internationalized date, happy-dom and chat adapters); no credential-path errors.
-  Full output: `/tmp/mikka-credential-full-typecheck.txt`.
+- Initial focused typecheck passed. After installing the exact frozen lockfile's
+  dependencies, the whole-checkout and daemon-package `tsgo --noEmit` both pass.
+  The earlier 23 missing-dependency errors are historical, not current blockers.
 
 ## Independent reviews
 
@@ -70,8 +72,11 @@ resource/helper and scan tools were unavailable in this host.
 
 ## Integration boundaries and remaining gates
 
-- Default production credential admission is disabled. No production platform telemetry,
-  ingress body-capture exclusions or Infisical permissions/CRUD have been verified.
+- Default production credential admission is disabled. No production platform telemetry
+  or ingress body-capture exclusions have been verified. Parent's current online
+  permission metadata confirms an existing project admin identity; the separate authorized
+  staging synthetic CRUD below has passed. Historical read-only identity notes do not
+  describe that current identity. No IAM was changed.
 - Owned Chromium is an optional **dedicated trusted runner** module, tested locally.
   It supports allowlisted static forms, not JS login, arbitrary websites or existing
   shared browsers. A same-task continuation policy now retains authentication for
@@ -87,15 +92,16 @@ resource/helper and scan tools were unavailable in this host.
   `9760e91299bf54165c04a2caafb383f9cc85b13f`, existing `recordDeviceHeartbeat` renewal
   and `{leases}` protocol. Not merged/copied or required by the short local test.
   Main's 90-second run lease remains a fail-closed limit on longer sessions.
-- No daemon, worker token, heartbeat, claim, completion or protocol schema source changed.
-  New credential routes and SQL lifecycle triggers are additive.
+- The system increment changes daemon main, run-context and its MCP bridge, preserving
+  existing handoff tools. It reuses the existing `RunAssignment.mcp` field; no protocol
+  schema, heartbeat, `adapters/claude.ts` or subscription launcher source changes.
 - **BYOS combination:** preserve its subscriptions cron while appending this patch's
   credential-cleanup cron. Merge `package.json` and `pnpm-lock.yaml` additions rather
   than replacing either file. Production cron config is staged only; no schedule was
   deployed or paid resource created.
-- Real Infisical writes/reads, OAuth grants, real credential/account revocation,
-  external permission changes, SMS/email and publish/deploy operations were **never run**
-  under the user's explicit restrictions. No approval request is pending.
+- After specific user authorization, real Infisical synthetic writes/reads/deletes were
+  executed only in staging `/credential-acceptance/mik79` (details below). OAuth grants,
+  real account login/revocation, IAM changes, SMS/email and publish/deploy were never run.
 
 Frontend/API wiring and the owned-runner integration contract are in
 [`credential-backend.md`](credential-backend.md). No product UI or Figma was authored.
@@ -120,3 +126,62 @@ truncation/overlap redaction, cookie rotation/path coverage and the account proj
 This increment remains an engineering/manual security review, not a sealed scan.
 The earlier owned-executor hash above identifies the earlier one-shot checkpoint only;
 current file hashes and local commit are recorded in the delivery manifest.
+
+## System-registration and bounded fallback increment
+
+Current local suite: **18 pass, 0 fail, 0 skip**, including the real HTTP/SQL and
+Chromium cases above plus live tool-context derivation, saved API credential finish,
+cross-service browser-request exclusion, an injected direct-fill failure followed by
+actual keyboard fill/POST while observers remain fenced, and a real readonly password
+target entering `handoff_required` without vault read and with complete cleanup.
+TAP: `/tmp/mikka-credential-acceptance-KUkMkG/acceptance.tap`.
+
+The actual harness MCP child was spawned from `RunContext.mcpServer()` and exercised
+over stdio against a synthetic HTTP backend: **1 pass**. It preserves the three old
+handoff tools; discovery makes zero backend requests; the platform token is absent
+from child argv/env/output; a transient initialization 503 recovers; wrong-run and
+stopped calls refuse without forwarding. This is real transport, not a model-driven
+run or proof of SRT proxy isolation. Existing daemon `agents.test.ts`: **17 pass,
+7 host/network-gated skips**. Full root and daemon typechecks pass; migration policy
+checks accept **30 files**; the full migration chain including browser binding and
+handoff ran successfully on two fresh disposable databases.
+
+Fresh independent review found and rechecked fixes for API finish, blocking remote
+tool discovery and a permanently rejected initialization promise. Its final fallback
+review found no new blocking path within the owned, static-form boundary. No scanner
+seal, actual model run, shared-browser safety or generic website-login proof is claimed.
+
+Actual Next entry-point acceptance was attempted again from the current source snapshot:
+`/tmp/mikka-system-credential-XKxSzS/next.log`. The process fails loading the repository's
+unchanged Next config because SWC rejects both cache and temporary-mode root ancestry
+owned by UID 65534. No API route was reached. The dedicated-runner cleanup getter is
+independent of browser admission/configuration and sees sessions created after caching.
+Next, SRT per-run proxy, deployed telemetry, durable host-crash reclamation and
+same-version frontend/real-account acceptance remain unverified. A normal cloud
+execution host with trusted cache ancestry or an authorized frozen deployment is needed;
+no security-check skip, dependency downgrade, push or deployment was performed.
+
+## Authorized real Infisical synthetic CRUD
+
+User explicitly approved staging `/credential-acceptance/mik79`. This environment's
+normal Universal Auth configuration succeeded through its inherited platform proxy;
+tokens remained only inside trusted backend probe processes. No admin token was
+copied into this thread, CLI argv, repository, model tools or a harness process.
+
+The initial missing test folder produced POST/DELETE 404. Metadata showed no `mik79`
+child under `/credential-acceptance`; the dedicated child was created, ID
+`8c292056-e9d5-4148-a4c0-c1601ceb7ad2`. It remains as an empty test directory for
+subsequent integration; this task did not delete a pre-existing folder.
+
+Four new random synthetic records subsequently each completed **POST 200 → GET 200
+with in-process equality check → DELETE 200 → exact-name GET 404**. Final pending
+record cleanup count is **0**. Earlier failed-attempt names were also independently
+rechecked as DELETE 404 / GET 404. No broad secret list, business value read, IAM,
+production or account operation occurred. This is actual Infisical adapter CRUD,
+not full Mikka or real-account/provider-login acceptance.
+
+Evidence (no values or tokens):
+`/workspace/credential-backend-delivery/real-vault-GdnpQJ/provider-report.json` and
+`manifest.json`; earlier exact-name cleanup reports are under `real-vault-Rxx6mj`
+and `real-vault-NFe2ZR`. The no-secret, write-ahead recovery driver is
+`scripts/accept-credential-vault.mjs`. It is never run by normal tests/startup.

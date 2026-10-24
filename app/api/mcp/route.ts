@@ -9,6 +9,9 @@ import { runComposioAction } from '@/lib/composio'
 import * as actions from '@/lib/mcp/actions'
 import * as tools from '@/lib/mcp/tools'
 import * as worker from '@/lib/mcp/worker'
+import { credentialToolDefinitions, type CredentialToolName } from '@/lib/credentials/execution-tools'
+import { executeSystemCredentialTool } from '@/lib/credentials/runtime'
+import type { AuthInfo } from '@modelcontextprotocol/server'
 
 export const dynamic = 'force-dynamic'
 // Leaves room for read_coordinator_messages to wait for a reply.
@@ -40,6 +43,10 @@ const id = z.uuid()
  * writes go through the same server actions as the UI (lib/mcp/actions.ts).
  */
 const handler = createMcpHandler(server => {
+  for (const [name, definition] of Object.entries(credentialToolDefinitions)) {
+    server.registerTool(name, { description: definition.description, inputSchema: definition.inputSchema }, async (input: unknown, ctx: { http?: { authInfo?: AuthInfo } }) =>
+      outcome(await executeSystemCredentialTool({ userId: mcpUserId(ctx.http?.authInfo) }, name as CredentialToolName, input)))
+  }
   server.registerTool('send_to_coordinator', {
     title: 'Send a message to the Coordinator',
     description: 'Send a message to the person\'s Mikka Coordinator, the agent that plans work and dispatches runs, as if the person typed it in the chat. The Coordinator answers in its own time; call read_coordinator_messages with the returned `after` and waitSeconds to get the reply.',
@@ -243,6 +250,12 @@ const authed = withMcpAuth(handler, verifyMcpToken, {
  * picks these tools instead of the person's.
  */
 const workerHandler = createMcpHandler(server => {
+  for (const [name, definition] of Object.entries(credentialToolDefinitions)) {
+    server.registerTool(name, { description: definition.description, inputSchema: definition.inputSchema }, async (input: unknown, ctx: { http?: { authInfo?: AuthInfo } }) => {
+      const run = worker.workerRun(ctx.http?.authInfo)
+      return outcome(await executeSystemCredentialTool({ userId: run.userId, runId: run.id, taskId: run.issueId }, name as CredentialToolName, input))
+    })
+  }
   server.registerTool('report', {
     title: 'Report progress',
     description: 'Tell the person\'s Coordinator about progress on this run. Use it sparingly, at milestones (a plan settled, a hard part solved, ready for review), not after every step.',

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
 import { createComposioAITools } from '@/lib/composio-actions'
 import * as steps from './steps'
+import { createCredentialAITools } from '@/lib/credentials/ai-tools'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
 const MAX_ROUNDS = 10
@@ -48,6 +49,7 @@ export async function coordinatorTurn(userId: string) {
 function coordinatorTools(userId: string) {
   const id = z.uuid()
   return {
+    ...createCredentialAITools((name, input) => steps.credentialTool(userId, name, input)),
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input)),
     list_issues: tool({
       description: 'List the person\'s issues, most recently updated first. Optionally only one status (todo, doing, review, done and so on).',

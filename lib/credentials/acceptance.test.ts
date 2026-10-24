@@ -9,6 +9,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { betterAuth } from 'better-auth'
 import { chromium } from '@playwright/test'
+import type { ElementHandle } from 'playwright-core'
 import { CredentialBroker } from './broker'
 import { PostgresCredentialAuthority } from './authority'
 import { credentialHttp } from './http'
@@ -17,6 +18,7 @@ import { credentialServices } from './services'
 import { InfisicalCredentialVault, type CredentialVault } from './vault'
 import { assertBrowserIsolationTransition } from './browser-protocol'
 import { OwnedChromiumExecutor } from './owned-chromium'
+import { CredentialExecutionTools } from './execution-tools'
 
 const fixture = 'synthetic-credential-ONLY-6f8ab91c'
 function gate() {
@@ -67,7 +69,7 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
   const upstream = createServer()
   let received = 0
   let upstreamGate: ReturnType<typeof gate> | undefined
-  let browserSubmissions = 0, browserFailSubmit = false
+  let browserSubmissions = 0, browserFailSubmit = false, browserReadonly = false
   let browserPostGate: ReturnType<typeof gate> | undefined
   upstream.on('request', async (req, res) => {
     received++
@@ -92,6 +94,8 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
     CREATE TABLE mikka_workspace_members ("workspaceId" uuid, "userId" text, status text DEFAULT 'active');
     CREATE TABLE orvilo_team_issues ("issueId" uuid, "workspaceId" uuid);`)
   await app.query(await readFile(new URL('../../drizzle/20261024184000_credential_broker.sql', import.meta.url), 'utf8'))
+  await app.query(await readFile(new URL('../../drizzle/20261024202653_credential_browser_binding.sql', import.meta.url), 'utf8'))
+  await app.query(await readFile(new URL('../../drizzle/20261024202654_credential_handoff.sql', import.meta.url), 'utf8'))
   upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening')
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
@@ -123,7 +127,7 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
       let response: Response
       const request = toRequest(req)
       if (req.url!.startsWith('/api/auth/')) response = await auth.handler(request)
-      else if (req.url === '/credential-login') response = new Response('<!doctype html><form method="post" action="/credential-login-submit"><input id="credential" name="credential" type="password" autocomplete="off"><button id="submit" type="submit">Submit synthetic fixture</button></form>', { headers: { 'content-type': 'text/html' } })
+      else if (req.url === '/credential-login') response = new Response(`<!doctype html><form method="post" action="/credential-login-submit"><input id="credential" name="credential" type="password" autocomplete="off" ${browserReadonly ? 'readonly' : ''}><button id="submit" type="submit">Submit synthetic fixture</button></form>`, { headers: { 'content-type': 'text/html' } })
       else if (req.url === '/credential-login-submit') {
         const fields = new URLSearchParams(await request.text())
         assert.ok(fields.get('credential') === fixture, 'browser target receives the expected synthetic credential')
@@ -199,6 +203,25 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
     assert.equal((await call(`/${request.id}/submit`, { nonce: 'a'.repeat(43), secret: fixture })).status, 403)
     assert.equal((await call('', { workspaceId, runId, serviceId: 'fixture', mode: 'api_header' })).status, 409)
     await call(`/${request.id}/cancel`, {})
+  })
+  await t.test('system tool adapter derives live context, rejects cross-owner/run/task, and never accepts secret arguments', async () => {
+    const tools = new CredentialExecutionTools({ app, workspace, broker, basePath: '/mikka' })
+    const prepare = { runId, serviceId: 'fixture', mode: 'api_header' }
+    const result = await tools.execute({ userId: alice.id }, 'prepare_credential_request', prepare) as { workspaceId: string; submission: { body: unknown } }
+    assert.equal(result.workspaceId, workspaceId)
+    assert.deepEqual(result.submission.body, { workspaceId, runId, serviceId: 'fixture', mode: 'api_header' })
+    assert.deepEqual(await tools.execute({ userId: bob.id }, 'prepare_credential_request', prepare), { error: 'credential_not_found' })
+    assert.deepEqual(await tools.execute({ userId: alice.id, runId: randomUUID() }, 'prepare_credential_request', prepare), { error: 'credential_not_found' })
+    assert.deepEqual(await tools.execute({ userId: alice.id, taskId: randomUUID() }, 'prepare_credential_request', prepare), { error: 'credential_not_found' })
+    assert.deepEqual(await tools.execute({ userId: alice.id }, 'prepare_credential_request', { ...prepare, secret: fixture }), { error: 'credential_tool_input_invalid' })
+    const request = await create(); await submit(request)
+    assert.deepEqual(await tools.execute({ userId: bob.id, runId }, 'credential_status', { credentialRef: request.id }), { error: 'credential_not_found' })
+    assert.deepEqual(await tools.execute({ userId: alice.id, runId }, 'credential_use', { credentialRef: request.id }), { status: 200 })
+    assert.deepEqual(await tools.execute({ userId: alice.id, runId }, 'credential_use', { credentialRef: request.id }), { error: 'credential_request_gone' })
+    const saved = await create(); await submit(saved, true)
+    assert.deepEqual(await tools.execute({ userId: alice.id, runId }, 'credential_use', { credentialRef: saved.id }), { status: 200 })
+    const finished = await tools.execute({ userId: alice.id, runId }, 'credential_finish', { credentialRef: saved.id }) as { state: string }
+    assert.equal(finished.state, 'consumed'); assert.equal(vault.values.size, 0)
   })
   await t.test('one-time submit/replay; opaque-only events/DB; fixed-target executor discards echo body', async () => {
     const request = await create()
@@ -362,10 +385,10 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
     } finally { await browser.close() }
   })
   await t.test('owned Chromium: real HTTP secret submission, exclusive isolation, real fill/submit/site verification, destroy and restore', async () => {
-    const executor = new OwnedChromiumExecutor({ executablePath: '/usr/bin/chromium', loopbackFixture: true, policies: [{
-      id: 'fixture-browser', formURL: `${origin}/credential-login`, submitURL: `${origin}/credential-login-submit`, successURL: `${origin}/credential-login-ok`,
+    const executor = new OwnedChromiumExecutor({ executablePath: '/usr/bin/chromium', loopbackFixture: true, policies: ['fixture-browser', 'fixture-browser-other'].map(id => ({
+      id, formURL: `${origin}/credential-login`, submitURL: `${origin}/credential-login-submit`, successURL: `${origin}/credential-login-ok`,
       secretSelector: '#credential', submitSelector: '#submit', verifiedSelector: '[data-fixture-verified=true]',
-    }] })
+    })) })
     const ownedBroker = new CredentialBroker({ pool: app, vault, authority, services: new Map(), browser: executor })
     const principal = { ownerId: alice.id, authSessionId: alice.sessionId }
     const expected = { ...binding, serviceId: 'fixture-browser' }
@@ -380,7 +403,9 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
       return response.json()
     }
     try {
-      let request = await createBrowserRequest(); assert.equal((await submit(request)).status, 200)
+      let request = await createBrowserRequest()
+      await assert.rejects(ownedBroker.create(principal, { workspaceId, runId, serviceId: 'fixture-browser-other', mode: 'browser_login' }), { code: 'credential_request_exists' })
+      assert.equal((await submit(request)).status, 200)
       const before = browserSubmissions, block = gate(); vault.readGate = block
       const postBlock = gate(); browserPostGate = postBlock
       const priorScreenshot = executor.screenshot(binding)
@@ -432,6 +457,51 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
     } finally {
       vault.readGate = undefined; browserPostGate?.release(); browserPostGate = undefined; browserFailSubmit = false; activeHandler = handler
       await executor.end(binding)
+    }
+  })
+  await t.test('owned Chromium bounded keyboard fallback keeps the fence; invalid target hands off only after cleanup', async () => {
+    const probe = await chromium.launch({ executablePath: '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] })
+    const probePage = await probe.newPage(); await probePage.setContent('<input type="password">')
+    const probeTarget = await probePage.locator('input').elementHandle(); assert.ok(probeTarget)
+    const prototype = Object.getPrototypeOf(probeTarget) as ElementHandle
+    const originalFill = prototype.fill, originalType = prototype.type
+    let interruptDirect = true, keyboardCalls = 0
+    const typing = gate()
+    const executor = new OwnedChromiumExecutor({ executablePath: '/usr/bin/chromium', loopbackFixture: true, policies: [{
+      id: 'fixture-fallback', formURL: `${origin}/credential-login`, submitURL: `${origin}/credential-login-submit`, successURL: `${origin}/credential-login-ok`,
+      secretSelector: '#credential', submitSelector: '#submit', verifiedSelector: '[data-fixture-verified=true]',
+    }] })
+    const fallbackBroker = new CredentialBroker({ pool: app, vault, authority, services: new Map(), browser: executor })
+    const principal = { ownerId: alice.id, authSessionId: alice.sessionId }, expected = { ...binding, serviceId: 'fixture-fallback' }
+    prototype.fill = async function(value, options) {
+      if (interruptDirect && (await this.ownerFrame())?.url() === `${origin}/credential-login`) { interruptDirect = false; throw new Error('Synthetic direct-fill interruption') }
+      return originalFill.call(this, value, options)
+    }
+    prototype.type = async function(value, options) {
+      if ((await this.ownerFrame())?.url() === `${origin}/credential-login`) { keyboardCalls++; typing.start(); await typing.blocked }
+      return originalType.call(this, value, options)
+    }
+    try {
+      const request = await fallbackBroker.create(principal, { workspaceId, runId, serviceId: 'fixture-fallback', mode: 'browser_login' })
+      await fallbackBroker.submit(principal, request.id, { nonce: request.nonce, secret: fixture, save: false })
+      const using = fallbackBroker.use(request.id, expected); await typing.entered
+      await assert.rejects(executor.readDOM(binding), { code: 'browser_isolation_locked' })
+      await assert.rejects(executor.screenshot(binding), { code: 'browser_isolation_locked' })
+      await assert.rejects(executor.click(binding, '#submit'), { code: 'browser_isolation_locked' })
+      typing.release(); await using
+      assert.equal(interruptDirect, false); assert.equal(keyboardCalls, 1)
+      await executor.end(binding)
+      browserReadonly = true
+      const handoff = await fallbackBroker.create(principal, { workspaceId, runId, serviceId: 'fixture-fallback', mode: 'browser_login' })
+      await fallbackBroker.submit(principal, handoff.id, { nonce: handoff.nonce, secret: fixture, save: false })
+      const reads = vault.reads, submissions = browserSubmissions
+      await assert.rejects(fallbackBroker.use(handoff.id, expected), { code: 'browser_handoff_required' })
+      assert.equal((await fallbackBroker.get(principal, handoff.id)).state, 'handoff_required')
+      assert.equal(vault.reads, reads); assert.equal(browserSubmissions, submissions); assert.equal(vault.values.size, 0)
+      await assert.rejects(executor.readDOM(binding), { code: 'browser_session_not_found' })
+    } finally {
+      typing.release(); prototype.fill = originalFill; prototype.type = originalType; browserReadonly = false
+      await executor.end(binding); await probe.close()
     }
   })
   await t.test('owned Chromium replacement-launch fault quarantines all reads after original process destruction', async () => {

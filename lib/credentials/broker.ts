@@ -15,7 +15,7 @@ type Row = {
 export interface CredentialAuthority {
   resolve(principal: Principal, workspaceId: string, runId: string, client?: PoolClient): Promise<Binding | null>
 }
-const terminal = new Set<CredentialState>(['consumed', 'cancelled', 'expired', 'failed', 'disconnected'])
+const terminal = new Set<CredentialState>(['consumed', 'cancelled', 'expired', 'failed', 'disconnected', 'handoff_required'])
 const digest = (s: string) => createHash('sha256').update(s).digest('hex')
 function view(row: Row): CredentialView {
   return {
@@ -31,7 +31,20 @@ export class CredentialBroker {
     pool: Pool; vault: CredentialVault; authority: CredentialAuthority;
     services: ReadonlyMap<string, HeaderService>;
     browser?: OwnedChromiumExecutor;
+    notifyReady?: (binding: Binding, reference: string, serviceId: string) => Promise<void>;
   }) {}
+
+  serviceInfo(serviceId: string, mode: 'api_header' | 'browser_login') {
+    const info = mode === 'browser_login' ? this.options.browser?.describe(serviceId) : this.options.services.get(serviceId)
+    if (!info) throw new CredentialError(mode === 'browser_login' ? 'browser_isolation_unavailable' : 'credential_service_unavailable', mode === 'browser_login' ? 501 : 422)
+    return { serviceId, targetOrigin: 'targetOrigin' in info ? info.targetOrigin : new URL(info.endpoint).origin, mode }
+  }
+
+  async forRun(reference: string, actor: { userId: string; runId: string; taskId: string }) {
+    const row = await this.row(reference)
+    if (row.owner_id !== actor.userId || row.run_id !== actor.runId || row.task_id !== actor.taskId) denied()
+    return { ...this.binding(row), serviceId: row.service_id }
+  }
 
   private async row(id: string, principal?: Principal, client: Pool | PoolClient = this.options.pool): Promise<Row> {
     const { rows } = await client.query<Row>('SELECT * FROM credential_requests WHERE id=$1', [id])
@@ -40,7 +53,7 @@ export class CredentialBroker {
     return row
   }
 
-  private async revoke(id: string, state: 'cancelled' | 'expired' | 'failed' | 'disconnected', client: Pool | PoolClient = this.options.pool) {
+  private async revoke(id: string, state: 'cancelled' | 'expired' | 'failed' | 'disconnected' | 'handoff_required', client: Pool | PoolClient = this.options.pool) {
     await client.query(`UPDATE credential_requests SET state=$2, cleanup_pending=true, version=version+1, updated_at=now()
       WHERE id=$1 AND state IN ('pending','submitting','ready','using','active_session')`, [id, state])
   }
@@ -77,7 +90,7 @@ export class CredentialBroker {
     }
   }
 
-  private async cleanupLocked(id: string, client: PoolClient) {
+  private async cleanupLocked(id: string, client: Pool | PoolClient) {
     const row = await this.row(id, undefined, client)
     if (!row.cleanup_pending || (!terminal.has(row.state) && row.state !== 'active_session')) return
     try {
@@ -97,26 +110,36 @@ export class CredentialBroker {
   async create(principal: Principal, input: { workspaceId: string; runId: string; serviceId: string; mode: 'api_header' | 'browser_login' }) {
     const binding = await this.options.authority.resolve(principal, input.workspaceId, input.runId)
     if (!binding) denied()
-    // Existing shared browsers stay unsupported. Only an attached, newly owned session qualifies.
-    const browserPolicy = input.mode === 'browser_login' ? this.options.browser?.policy(input.serviceId, binding) : undefined
-    if (input.mode === 'browser_login' && !browserPolicy) throw new CredentialError('browser_isolation_unavailable', 501)
-    const service = this.options.services.get(input.serviceId)
-    if (input.mode === 'api_header' && !service) throw new CredentialError('credential_service_unavailable', 422)
-    const id = randomUUID(), vaultRef = randomUUID(), nonce = randomBytes(32).toString('base64url')
     await this.sweep(20)
-    try {
-      await this.options.pool.query(`INSERT INTO credential_requests
-        (id, owner_id, workspace_id, task_id, run_id, execution_session, auth_session_id, service_id, target_origin,
-         mode, state, nonce_hash, vault_ref, retention, expires_at, service_policy_hash)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',$11,$12,'once',now()+interval '5 minutes',$13)`,
-      [id, binding.ownerId, binding.workspaceId, binding.taskId, binding.runId, binding.executionSession,
-        principal.authSessionId, input.serviceId, browserPolicy?.origin ?? new URL(service!.endpoint).origin, input.mode, digest(nonce), vaultRef,
-        browserPolicy?.fingerprint ?? serviceFingerprint(service!)])
-    } catch (error) {
-      if ((error as { code?: string }).code === '23505') throw new CredentialError('credential_request_exists', 409)
-      throw error
+    const create = async (client: Pool | PoolClient) => {
+      // Existing shared browsers stay unsupported. Only an attached, newly owned session qualifies.
+      const browserPolicy = input.mode === 'browser_login' ? await this.options.browser?.prepare(binding, input.serviceId) : undefined
+      if (input.mode === 'browser_login' && !browserPolicy) throw new CredentialError('browser_isolation_unavailable', 501)
+      const service = this.options.services.get(input.serviceId)
+      if (input.mode === 'api_header' && !service) throw new CredentialError('credential_service_unavailable', 422)
+      const id = randomUUID(), vaultRef = randomUUID(), nonce = randomBytes(32).toString('base64url')
+      try {
+        await client.query(`INSERT INTO credential_requests
+          (id, owner_id, workspace_id, task_id, run_id, execution_session, auth_session_id, service_id, target_origin,
+           mode, state, nonce_hash, vault_ref, retention, expires_at, service_policy_hash)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',$11,$12,'once',now()+interval '5 minutes',$13)`,
+        [id, binding.ownerId, binding.workspaceId, binding.taskId, binding.runId, binding.executionSession,
+          principal.authSessionId, input.serviceId, browserPolicy?.origin ?? new URL(service!.endpoint).origin, input.mode, digest(nonce), vaultRef,
+          browserPolicy?.fingerprint ?? serviceFingerprint(service!)])
+      } catch (error) {
+        if ((error as { code?: string }).code === '23505') throw new CredentialError('credential_request_exists', 409)
+        throw error
+      }
+      if (input.mode === 'browser_login') {
+        try { this.options.browser!.claim(binding, id) }
+        catch (error) { await this.revoke(id, 'failed', client); await this.cleanupLocked(id, client); throw error }
+      }
+      return { ...view(await this.row(id, principal, client)), nonce }
     }
-    return { ...view(await this.row(id, principal)), nonce }
+    // One browser generation belongs to one request, even across service ids and app instances.
+    return input.mode === 'browser_login'
+      ? this.locked(`browser-create:${binding.ownerId}:${binding.runId}:${binding.executionSession}`, create)
+      : create(this.options.pool)
   }
 
   async get(principal: Principal, id: string) {
@@ -129,7 +152,7 @@ export class CredentialBroker {
   async submit(principal: Principal, id: string, input: { nonce: string; secret: string; save: boolean }) {
     const original = await this.row(id, principal)
     if (!timingSafeEqual(Buffer.from(digest(input.nonce)), Buffer.from(original.nonce_hash))) throw new CredentialError('credential_nonce_invalid', 403)
-    return this.locked(id, async client => {
+    const result = await this.locked(id, async client => {
       let row = await this.row(id, principal, client)
       try {
         if (!await this.live(row, client)) throw new CredentialError('credential_request_gone', 410)
@@ -154,6 +177,8 @@ export class CredentialBroker {
         throw new CredentialError('credential_submission_failed', 503)
       } finally { await this.cleanupLocked(id, client) }
     })
+    if (this.options.notifyReady) await this.options.notifyReady(this.binding(original), id, original.service_id).catch(() => {})
+    return result
   }
 
   async cancel(principal: Principal, id: string) {
@@ -218,7 +243,7 @@ export class CredentialBroker {
         }
         return result
       } catch (error) {
-        if (row.mode === 'browser_login' || admitted || attemptedRead || !(error instanceof CredentialError)) await this.revoke(reference, 'failed', client)
+        if (row.mode === 'browser_login' || admitted || attemptedRead || !(error instanceof CredentialError)) await this.revoke(reference, error instanceof CredentialError && error.code === 'browser_handoff_required' ? 'handoff_required' : 'failed', client)
         if (row.mode === 'browser_login') await this.options.browser?.end(expected, reference)
         if (error instanceof CredentialError) throw error
         throw new CredentialError('credential_execution_failed', 502)
@@ -265,10 +290,9 @@ export class CredentialBroker {
     return this.locked(reference, async client => {
       const row = await this.row(reference, undefined, client)
       this.requireExpected(row, expected)
-      if (row.mode !== 'browser_login') throw new CredentialError('credential_service_unavailable', 422)
       await client.query(`UPDATE credential_requests SET state='consumed', cleanup_pending=true, version=version+1, updated_at=now()
-        WHERE id=$1 AND state='active_session'`, [reference])
-      await this.options.browser?.end(this.binding(row), reference)
+        WHERE id=$1 AND state IN ('pending','submitting','ready','using','active_session')`, [reference])
+      if (row.mode === 'browser_login') await this.options.browser?.end(this.binding(row), reference)
       await this.cleanupLocked(reference, client)
       return view(await this.row(reference, undefined, client))
     })
@@ -289,7 +313,8 @@ export class CredentialBroker {
     // can finish after a delete; periodic idempotent deletion repairs that unknown outcome.
     const { rows } = await this.options.pool.query<Row>(`SELECT * FROM credential_requests ORDER BY updated_at LIMIT $1`, [limit])
     for (const row of rows) {
-      await this.live(row)
+      const live = await this.live(row)
+      if (live && row.state === 'ready' && this.options.notifyReady) await this.options.notifyReady(this.binding(row), row.id, row.service_id).catch(() => {})
       // A crashed submitting/using operation is never resumed. Lock acquisition proves no worker owns it.
       try {
         await this.locked(row.id, async client => {

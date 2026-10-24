@@ -13,7 +13,7 @@ export const submitCredentialSchema = z.object({
   save: z.boolean().default(false),
 }).strict()
 
-export type CredentialState = 'pending' | 'submitting' | 'ready' | 'using' | 'active_session' | 'consumed' | 'cancelled' | 'expired' | 'failed' | 'disconnected'
+export type CredentialState = 'pending' | 'submitting' | 'ready' | 'using' | 'active_session' | 'consumed' | 'cancelled' | 'expired' | 'failed' | 'disconnected' | 'handoff_required'
 export type Principal = { ownerId: string; authSessionId: string }
 const browserActionId = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/)
 export const browserTaskActionSchema = z.discriminatedUnion('type', [
