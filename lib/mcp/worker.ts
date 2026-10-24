@@ -1,10 +1,11 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { after } from 'next/server'
-import { and, eq, gt, inArray, isNull } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import type { AuthInfo } from '@modelcontextprotocol/server'
-import { db } from '@/lib/db'
-import { agentRuns, runTokens } from '@/lib/db/schema'
+import { db, pool } from '@/lib/db'
+import { verifiedWorkerToken } from '@/lib/run-token-auth'
+import { runTokens } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runBlockedEvent, runQuestionEvent, runReportEvent, type CoordinatorEventInput } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
@@ -19,8 +20,6 @@ import { wakeCoordinator } from '@/lib/coordinator/wake'
 export const RUN_TOKEN_PREFIX = 'mkw_'
 /** Longest a run token lives, even while its run is still going. */
 const RUN_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
-/** A run in one of these states may still use its token. */
-const LIVE_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -45,19 +44,10 @@ export async function revokeRunTokens(runId: string): Promise<void> {
  * out even before the revoke.
  */
 export async function verifyRunToken(_request: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
-  if (!bearerToken?.startsWith(RUN_TOKEN_PREFIX)) return undefined
-  const [row] = await db
-    .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId })
-    .from(runTokens)
-    .innerJoin(agentRuns, eq(agentRuns.id, runTokens.runId))
-    .where(and(
-      eq(runTokens.tokenHash, hashToken(bearerToken)), isNull(runTokens.revokedAt), gt(runTokens.expiresAt, new Date()),
-      eq(agentRuns.userId, runTokens.userId), inArray(agentRuns.status, [...LIVE_STATUSES]),
-    ))
-    .limit(1)
+  const row = await verifiedWorkerToken(pool, bearerToken)
   if (!row) return undefined
   return {
-    token: bearerToken, clientId: `run:${row.runId}`, scopes: [],
+    token: bearerToken!, clientId: `run:${row.runId}`, scopes: [],
     expiresAt: Math.floor(row.expiresAt.getTime() / 1000),
     extra: { userId: row.userId, runId: row.runId, issueId: row.issueId },
   }

@@ -1,7 +1,8 @@
+import { mailboxes } from '@/lib/mailbox-runtime'
 import { NextResponse } from 'next/server'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { agentRuns } from '@/lib/db/schema'
+import { agentRuns, sessionMailboxes } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 
 export const dynamic = 'force-dynamic'
@@ -15,9 +16,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ devi
   if (!device) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   // A device with scheduling off gets no work; it stays registered.
   if (!device.enabled) return NextResponse.json({ runIds: [] })
+  await mailboxes.flush(caller.userId)
   const rows = await db
     .select({ id: agentRuns.id })
-    .from(agentRuns)
-    .where(and(eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
+    .from(agentRuns).leftJoin(sessionMailboxes, eq(sessionMailboxes.id, agentRuns.mailboxId))
+    .where(and(eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt), or(isNull(agentRuns.mailboxId), eq(sessionMailboxes.disabled, false))))
   return NextResponse.json({ runIds: rows.map(row => row.id) })
 }

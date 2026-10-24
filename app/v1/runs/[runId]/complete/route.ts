@@ -1,15 +1,13 @@
 import { after, NextResponse } from 'next/server'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { runStateForStop } from '@mikka/protocol/daemon'
 import { runCompleteRequest, reachesReview } from '@mikka/protocol/run'
 import { db } from '@/lib/db'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { agentRuns, devices, issues, type RunStatus } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
-import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
-import { runFinishedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
-import { revokeRunTokens } from '@/lib/mcp/worker'
+import { mailboxes } from '@/lib/mailbox-runtime'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,15 +44,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   if (stopReason === 'submitted' && report?.verify.status !== 'passed' && run.kind !== 'plan') {
     status = report?.verify.status === 'failed' ? 'failed' : 'stopped'
   }
-  const ended = await db.update(agentRuns)
-    .set({ status, stopReason, report: report ?? null, finishedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATUSES])))
-    .returning({ id: agentRuns.id })
-  // Only the completion that ended the run tells the Coordinator.
-  if (ended.length) {
-    await revokeRunTokens(runId)
-    await recordCoordinatorEvent(db, runFinishedEvent({ ...run, status, stopReason, report }))
+  const ended = await mailboxes.complete(run.userId, runId, status, stopReason, report ?? null)
+  if (ended) {
     after(() => wakeCoordinator(run.userId))
+    await mailboxes.flush(run.userId)
   }
   if (run.issueId && reachesReview(stopReason, report)) {
     await db.update(issues).set({ status: 'review', updatedAt: new Date() }).where(eq(issues.id, run.issueId))

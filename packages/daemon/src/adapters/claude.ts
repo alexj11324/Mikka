@@ -365,6 +365,7 @@ export class ClaudeAdapter implements AgentAdapter {
     const ctx = new RunContext({
       harness: "claude_code",
       kind: options.kind,
+      mcp: options.mcp,
       worktree: options.cwd,
       networkAllow: options.networkAllow,
       policy: options.policy,

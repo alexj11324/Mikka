@@ -53,12 +53,12 @@ export async function takeInbox(userId: string, holder: string): Promise<{ held:
       .returning({ userId: coordinatorSessions.userId })
     if (!taken) return { held: false, added: 0 }
     const due = await tx.select().from(coordinatorEvents).where(waking(userId))
-      .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+      .orderBy(asc(coordinatorEvents.sequence)).limit(INBOX_BATCH)
     if (!due.length) return { held: true, added: 0 }
     const backgroundLimit = INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
-      .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
+      .orderBy(asc(coordinatorEvents.sequence)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
     if (!events.length) return { held: true, added: 0 }
     const first = await nextPosition(tx, userId)
@@ -82,7 +82,7 @@ export async function releaseLease(userId: string, holder: string): Promise<bool
 export async function untriagedEvents(userId: string) {
   return db.select().from(coordinatorEvents)
     .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier)))
-    .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+    .orderBy(asc(coordinatorEvents.sequence)).limit(INBOX_BATCH)
 }
 
 export async function setEventTier(id: string, tier: CoordinatorEventTier): Promise<void> {
@@ -190,7 +190,7 @@ export async function chatView(userId: string, limit = 200): Promise<ChatView> {
   // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.
   const waiting = await db.select().from(coordinatorEvents)
     .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt)))
-    .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+    .orderBy(asc(coordinatorEvents.sequence)).limit(INBOX_BATCH)
   const last = rows[0]?.position ?? 0
   const pending = waiting.filter(event => event.kind === 'user_message').map((event, index) => ({
     position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage,

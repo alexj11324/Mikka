@@ -94,7 +94,7 @@ export async function pendingCommands(deviceId: string, skip: readonly string[])
     .orderBy(asc(runMessages.createdAt))
     .limit(500)
   const commands: RunCommand[] = messages.map(message => ({
-    kind: 'input' as const, runId: message.runId, messageId: message.id, text: message.text,
+    kind: 'input' as const, runId: message.runId as string, messageId: message.id, text: message.text,
   }))
   for (const run of live) {
     if (run.stopRequestedAt) commands.push({ kind: 'stop' as const, runId: run.id })
