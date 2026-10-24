@@ -2275,7 +2275,8 @@
         "bleu": "Blue",
         "violet": "Violet",
         "rose": "Pink",
-        "gris": "Grey"
+        "gris": "Grey",
+        "creme": "Cream"
       },
       "shape": "Shape",
       "shapes": {
@@ -2286,7 +2287,15 @@
         "triangle": "Triangle",
         "hexagone": "Hexagon",
         "nuage": "Cloud",
-        "goutte": "Drop"
+        "goutte": "Drop",
+        "coeur": "Heart",
+        "etoile": "Star",
+        "fleur": "Flower",
+        "chat": "Cat",
+        "champignon": "Mushroom",
+        "fantome": "Ghost",
+        "feuille": "Leaf",
+        "ecran": "Screen"
       },
       "create": "Create",
       "creating": "Creating…"

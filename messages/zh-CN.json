@@ -2275,7 +2275,8 @@
         "bleu": "蓝色",
         "violet": "紫色",
         "rose": "粉色",
-        "gris": "灰色"
+        "gris": "灰色",
+        "creme": "奶油色"
       },
       "shape": "形状",
       "shapes": {
@@ -2286,7 +2287,15 @@
         "triangle": "三角",
         "hexagone": "六边形",
         "nuage": "云朵",
-        "goutte": "水滴"
+        "goutte": "水滴",
+        "coeur": "爱心",
+        "etoile": "星星",
+        "fleur": "花",
+        "chat": "猫",
+        "champignon": "蘑菇",
+        "fantome": "幽灵",
+        "feuille": "叶子",
+        "ecran": "屏幕"
       },
       "create": "创建",
       "creating": "正在创建…"

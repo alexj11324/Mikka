@@ -7,6 +7,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
+import { BOT_COLORS, BOT_SHAPES } from '@/lib/bot-shapes'
 
 /** A bot in the left column. Its instructions grow inside its chat, so they are not here. */
 export interface BotView {
@@ -16,8 +17,6 @@ export interface BotView {
   shape: string
 }
 
-const COLORS = ['encre', 'brun', 'rouge', 'orange', 'ambre', 'vert', 'turquoise', 'bleu', 'violet', 'rose', 'gris'] as const
-const SHAPES = ['cercle', 'galet', 'squircle', 'capsule', 'triangle', 'hexagone', 'nuage', 'goutte'] as const
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -33,7 +32,7 @@ export async function listBots(): Promise<BotView[]> {
 /** 新建 Bot: a name, a colour and a shape. Bots run on Mikka's own harness, so there is no machine to pick. */
 export async function createBot(input: { name: string; color: string; shape: string }): Promise<BotView> {
   const userId = await getUserId()
-  const parsed = z.object({ name: z.string().trim().min(1).max(60), color: z.enum(COLORS), shape: z.enum(SHAPES) }).safeParse(input)
+  const parsed = z.object({ name: z.string().trim().min(1).max(60), color: z.enum(BOT_COLORS), shape: z.enum(BOT_SHAPES) }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError(parsed.error.issues[0]?.path[0] === 'name' ? 'validationNameRequired' : 'validationGeneric')
   const bot = { id: crypto.randomUUID(), ...parsed.data }
   try {

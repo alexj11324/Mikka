@@ -1,17 +1,10 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, registerExtraShapes, type BotColor, type BotShape } from '@/lib/bot-shapes'
 import { cn } from '@/lib/utils'
 
-/** bloub's palette without cream, which disappears on the page (Figma 195:3226). Ink turns cream in the dark theme. */
-export const BOT_COLORS = ['encre', 'brun', 'rouge', 'orange', 'ambre', 'vert', 'turquoise', 'bleu', 'violet', 'rose', 'gris'] as const
-export type BotColor = (typeof BOT_COLORS)[number]
-export const DEFAULT_BOT_COLOR: BotColor = 'encre'
-
-/** bloub's base shapes (Figma BotAvatar 196:3571). */
-export const BOT_SHAPES = ['cercle', 'galet', 'squircle', 'capsule', 'triangle', 'hexagone', 'nuage', 'goutte'] as const
-export type BotShape = (typeof BOT_SHAPES)[number]
-export const DEFAULT_BOT_SHAPE: BotShape = 'cercle'
+export { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape }
 
 /**
  * What the bot is doing, as bloub states (Figma 196:3571): 空闲 idle (its eyes
@@ -24,16 +17,27 @@ export type BotMood = 'idle' | 'thinking' | 'notify' | 'wink' | 'exclaim' | 'sle
 export function colorFor(name: string): BotColor {
   let hash = 0
   for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) | 0
-  return BOT_COLORS[Math.abs(hash) % BOT_COLORS.length]
+  // Cream is left out: next to other avatars it reads as empty.
+  return BOT_COLORS[Math.abs(hash) % (BOT_COLORS.length - 1)]
+}
+
+/**
+ * The Coordinator (Figma BotAvatar/Coordinator 202:4518): the ink circle with
+ * an orange star at its lower right, outlined in the page colour so it looks
+ * cut out of the body, as Grok marks its own bot.
+ */
+export function CoordinatorAvatar({ size = 'list', mood }: { size?: keyof typeof SIZES; mood?: BotMood }) {
+  return <span className="relative inline-flex shrink-0">
+    <BotAvatar color="encre" shape="cercle" size={size} mood={mood} />
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={cn('absolute -right-0.5 -bottom-0.5 overflow-visible fill-bot-badge stroke-background stroke-3 [paint-order:stroke] [stroke-linejoin:round]',
+      (size === 'row' || size === 'pill') && 'size-2.5', (size === 'search' || size === 'list') && 'size-3.5', size !== 'row' && size !== 'pill' && size !== 'search' && size !== 'list' && 'size-6')}>
+      <path d="M12 2.6L14.7 8.9L21.5 9.5L16.4 14L17.9 20.6L12 17.1L6.1 20.6L7.6 14L2.5 9.5L9.3 8.9Z" />
+    </svg>
+  </span>
 }
 
 /** Visible blob sizes. bloub's svg is 1.58× the blob, so it overflows its box on purpose. */
-/** The Coordinator is a bloub too: the blue circle, so it reads as the one pinned on top. */
-export function CoordinatorAvatar({ size = 'list', mood }: { size?: keyof typeof SIZES; mood?: BotMood }) {
-  return <BotAvatar color="bleu" shape="cercle" size={size} mood={mood} />
-}
-
-const SIZES = { row: 16, swatch: 18, pill: 22, search: 28, list: 34, profile: 72, preview: 88 } as const
+const SIZES = { row: 16, pill: 22, search: 28, list: 34, cell: 40, profile: 72, hero: 144 } as const
 const SVG_SCALE = 1.58
 
 const pick = <T extends string>(value: string | null | undefined, options: readonly T[], fallback: T) => (options as readonly string[]).includes(value ?? '') ? value as T : fallback
@@ -48,7 +52,7 @@ type Live = { set: (next: { color: string; shape: string; mood: BotMood }) => vo
  * of remounting it. Small rows and anything `still` hold one pose; the rest
  * animate at 30fps and pause off screen.
  */
-export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, still = size === 'row' || size === 'swatch' }: {
+export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, still = size === 'row' }: {
   color?: string | null; shape?: string | null; size?: keyof typeof SIZES; mood?: BotMood; label?: string; still?: boolean
 }) {
   const host = useRef<HTMLSpanElement>(null)
@@ -65,8 +69,9 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
     const node = host.current
     if (!node) return
     let alive = true
-    void Promise.all([import('@norbert_bodziony/bloub'), import('@solidjs/web'), import('solid-js')]).then(([{ BloubBot }, { render, createComponent }, { createSignal }]) => {
+    void Promise.all([import('@norbert_bodziony/bloub'), import('@solidjs/web'), import('solid-js')]).then(([{ BloubBot, SHAPE_BY_ID }, { render, createComponent }, { createSignal }]) => {
       if (!alive) return
+      registerExtraShapes(SHAPE_BY_ID as unknown as Map<string, { id: string; radii: number[] }>)
       const [state, setState] = createSignal(latest.current())
       const dispose = render(() => createComponent(BloubBot, {
         size: Math.round(px * SVG_SCALE), paper: 'transparent', ariaLabel: label ?? '', fps: 30, initialPhase: Math.random() * 12,
@@ -89,6 +94,6 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
   return <span ref={host} role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true} data-slot="bot-avatar" data-color={tone} data-shape={form}
     className={cn('relative inline-flex shrink-0 [&>svg]:absolute [&>svg]:top-1/2 [&>svg]:left-1/2 [&>svg]:max-w-none [&>svg]:-translate-1/2',
       // Buttons and sidebar rows size every svg inside them; the blob's svg keeps its own size (1.58× the box).
-      size === 'row' && 'size-4 [&>svg]:size-6.5!', size === 'swatch' && 'size-4.5 [&>svg]:size-7!', size === 'pill' && 'size-5.5 [&>svg]:size-9!', size === 'search' && 'size-7 [&>svg]:size-11!',
-      size === 'list' && 'size-8.5 [&>svg]:size-13.5!', size === 'profile' && 'size-18 [&>svg]:size-28.5!', size === 'preview' && 'size-22 [&>svg]:size-35!')} />
+      size === 'row' && 'size-4 [&>svg]:size-6.5!', size === 'pill' && 'size-5.5 [&>svg]:size-9!', size === 'search' && 'size-7 [&>svg]:size-11!', size === 'list' && 'size-8.5 [&>svg]:size-13.5!',
+      size === 'cell' && 'size-10 [&>svg]:size-16!', size === 'profile' && 'size-18 [&>svg]:size-28.5!', size === 'hero' && 'size-36 [&>svg]:size-57!')} />
 }
