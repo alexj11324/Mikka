@@ -130,13 +130,14 @@ function MyTasks({ threads, issues, onOpenIssue }: { threads: Thread[]; issues: 
   const t = useTranslations('Shell.tasks')
   const { data: bots = [] } = useSWR('bots', listBots)
   const rows = threads.flatMap(thread => { const group = groupOf(thread); return group ? [{ thread, group }] : [] })
-  const groups: { id: Group; label: string }[] = [{ id: 'waiting', label: t('waiting') }, { id: 'running', label: t('running') }, { id: 'failed', label: t('failed') }]
+  const groups: { id: Group; label: string }[] = [{ id: 'waiting', label: t('waiting') }, { id: 'running', label: t('running') }]
   const done = rows.filter(row => row.group === 'done')
   return <section aria-label={t('mine')} className="flex flex-col gap-2">
     <h2 className="text-sm font-semibold">{t('mine')}</h2>
     {!rows.length && <p className="text-xs text-muted-foreground">{t('empty')}</p>}
     {groups.map(group => {
-      const list = rows.filter(row => row.group === group.id)
+      // A failed thread waits for the person too (Alex 2026-10-24): it sits under 等你, red.
+      const list = rows.filter(row => row.group === group.id || (group.id === 'waiting' && row.group === 'failed'))
       return list.length > 0 && <div key={group.id} className="flex flex-col gap-1">
         <h3 className="text-xs text-muted-foreground">{group.label} · {list.length}</h3>
         <TaskRows rows={list} issues={issues} bots={bots} onOpenIssue={onOpenIssue} />
@@ -194,7 +195,7 @@ export function ContextPanel({ userName, issues, threads, conversation, onOpenIs
   const coordinator = conversation.kind === 'coordinator'
   useEffect(() => { if (botId || coordinator) { setTab('details'); setPicked(null) } }, [botId, coordinator])
   // With a bot, the badge counts its threads waiting on you; otherwise every task's.
-  const waiting = (botId ? botThreads : threads).filter(item => item.status === 'waiting_input').length
+  const waiting = (botId ? botThreads : threads).filter(item => item.status === 'waiting_input' || item.status === 'failed').length
   // An older chat without a bot learns its thread from the 电脑 cards in it.
   const registered = useConversationThread(conversation.kind === 'agent' ? conversation.id : null)
   const computer = botId ?? registered?.botId
