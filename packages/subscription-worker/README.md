@@ -8,12 +8,20 @@ Run on the Agent's cloud Linux machine:
     pnpm test:byos-worker
 
 This verifies the exact official CPA commit, starts disposable loopback Postgres,
-applies all 32 migrations, builds the production and acceptance-only executables,
+applies all 33 migrations, builds the production and acceptance-only executables,
 runs Go race tests and vet, then runs application/native/browser acceptance and
 migration replay. No real grant, account credentials, Infisical write, provider
 inference or E2B sandbox is used. Docker images and Go module sums are pinned.
 
 ## Implemented path
+
+The independent [server enrollment receiver](../../docs/design/byos-server-enrollment.md)
+can receive consent before SQL/reader/native setup. Its private bind route then
+requires actual Mikka session/workspace authorization plus source operator
+authority, publishes through the same Store lifecycle and fences one-time source
+ownership globally. No user-side Infisical install/login is needed. Retained
+escrow recovery copies and live account/provider/deployment acceptance remain
+explicitly separate from synthetic canonical publication tests.
 
 1. Settings Connect starts a NEW provider OAuth attempt through Mikka's authenticated
    subscription API. No native CLI auth file, Keychain or browser-cookie import exists.

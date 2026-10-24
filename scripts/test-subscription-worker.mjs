@@ -135,10 +135,10 @@ try {
     "golang:1.26.10-bookworm@sha256:632dff7351799a5a9954a48dc06670ade72ee44e8c351cdc0e5a57af2fea21af",
     "sh",
     "-c",
-    "CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-worker ./cmd/mikka-subscription-worker && CGO_ENABLED=0 go build -mod=readonly -tags mikka_byos_fixture -o bin/mikka-subscription-fixture ./testfixture && go test -mod=readonly -race -timeout 90s -count=1 -v ./... && go vet -mod=readonly ./... && ./bin/mikka-subscription-worker --version"
+    "CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-worker ./cmd/mikka-subscription-worker && CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-enrollment ./cmd/mikka-subscription-enrollment && CGO_ENABLED=0 go build -mod=readonly -tags mikka_byos_fixture -o bin/mikka-subscription-fixture ./testfixture && go test -mod=readonly -race -timeout 90s -count=1 -v ./... && go vet -mod=readonly ./... && ./bin/mikka-subscription-worker --version"
   )
   await run("docker", dockerArgs)
-  await run(process.execPath, ["--import", "tsx", "--test", "tests/byos-application.test.mjs"], {
+  await run(process.execPath, ["--import", "tsx", "--test", "tests/byos-application.test.mjs", "tests/byos-enrollment-binding.test.mjs"], {
     ...baseEnv, NODE_ENV: "test", MIKKA_BYOS_BACKEND_ONLY: process.env.MIKKA_BYOS_BACKEND_ONLY ?? "", MIKKA_BYOS_TEST_DATABASE_URL: url,
     MIKKA_BYOS_FIXTURE_BINARY: `${worker}bin/mikka-subscription-fixture`
   })

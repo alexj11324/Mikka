@@ -5,9 +5,11 @@ package main
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	worker "github.com/alexj11324/Mikka/subscription-worker"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
@@ -25,14 +27,17 @@ func run() error {
 	input := bufio.NewScanner(io.LimitReader(os.Stdin, 131072))
 	input.Buffer(make([]byte, 4096), 65536)
 	var config struct {
-		Origin      string `json:"infisicalOrigin"`
-		Project     string `json:"project"`
-		Environment string `json:"environment"`
-		Token       string `json:"workloadToken"`
-		AttemptPath string `json:"attemptPath"`
-		ClaimPath   string `json:"claimPath"`
-		GrantPath   string `json:"grantPath"`
-		Principal   string `json:"principal"`
+		Origin             string `json:"infisicalOrigin"`
+		Project            string `json:"project"`
+		Environment        string `json:"environment"`
+		Token              string `json:"workloadToken"`
+		AttemptPath        string `json:"attemptPath"`
+		ClaimPath          string `json:"claimPath"`
+		GrantPath          string `json:"grantPath"`
+		Principal          string `json:"principal"`
+		DatabaseURL        string `json:"databaseUrl"`
+		CanonicalGrantPath string `json:"canonicalGrantPath"`
+		AccessPath         string `json:"accessPath"`
 	}
 	if !input.Scan() || json.Unmarshal(input.Bytes(), &config) != nil || config.Token == "" || config.AttemptPath == config.ClaimPath || config.AttemptPath == config.GrantPath || config.ClaimPath == config.GrantPath {
 		return worker.ErrUnsupported
@@ -57,6 +62,8 @@ func run() error {
 		Method      string `json:"method"`
 		ID          string `json:"id"`
 		CallbackURL string `json:"callbackUrl"`
+		OwnerID     string `json:"ownerId"`
+		WorkspaceID string `json:"workspaceId"`
 	}
 	if !input.Scan() || json.Unmarshal(input.Bytes(), &request) != nil {
 		return worker.ErrUnsupported
@@ -71,6 +78,34 @@ func run() error {
 		result, err = e.Complete(ctx, config.Principal, request.ID, request.CallbackURL)
 	case "status":
 		result, err = e.Status(ctx, config.Principal, request.ID)
+	case "bind":
+		paths := map[string]bool{}
+		for _, path := range []string{config.AttemptPath, config.ClaimPath, config.GrantPath, config.CanonicalGrantPath, config.AccessPath} {
+			if path == "" || paths[path] {
+				return worker.ErrUnsupported
+			}
+			paths[path] = true
+		}
+		identity, identityErr := worker.EnrollmentDatabaseIdentity(config.DatabaseURL)
+		if identityErr != nil {
+			return identityErr
+		}
+		db, openErr := sql.Open("pgx", config.DatabaseURL)
+		if openErr != nil {
+			return worker.ErrDatabase
+		}
+		defer db.Close()
+		db.SetMaxOpenConns(3)
+		canonical, storeErr := store(config.CanonicalGrantPath)
+		if storeErr != nil {
+			return storeErr
+		}
+		access, storeErr := store(config.AccessPath)
+		if storeErr != nil {
+			return storeErr
+		}
+		binder := worker.EnrollmentBinder{Enrollment: &e, Repo: &worker.Repository{DB: db}, Secrets: canonical, AccessSecrets: access, DatabaseIdentity: identity}
+		result, err = binder.Bind(ctx, config.Principal, request.ID, request.OwnerID, request.WorkspaceID)
 	default:
 		err = worker.ErrUnsupported
 	}

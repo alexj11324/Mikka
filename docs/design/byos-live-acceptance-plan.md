@@ -33,9 +33,11 @@ configuration and activation gaps. Users require no Infisical installation or
 login. Its pending-unbound envelopes remain unusable by tasks. In the original
 bound execution path, OAuth attempts, canonical bundles
 and publication checks require owner/workspace/connection/session scope. A
-pending-unbound to bound transfer still needs a one-use binding proof,
-verified provider subject and an atomic transfer confirmed by a real Mikka
-session. It must deny quota/model/task use before binding. Fabricated scope IDs,
+pending-unbound to bound transfer now has a private server implementation with
+one-use immutable ownership claim, provider subject/digest and an atomic ledger,
+confirmed by a real Mikka session/workspace authorization. Synthetic binding,
+refresh/replay and disconnect tests do not prove an actual live account. It
+denies quota/model/task use before binding. Fabricated scope IDs,
 plain-email claiming or bypassing `subscriptionRuntime` are not substitutes.
 No device code should be generated without a running poller and durable save
 path ready to finish that same attempt.

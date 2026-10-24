@@ -80,11 +80,19 @@ func (r *Repository) Lookup(ctx context.Context, s Scope) (Record, error) {
 	return scanRecord(r.DB.QueryRowContext(ctx, `select `+columns+` from byos_connections where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4`, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider))
 }
 func (r *Repository) BeginAcquire(ctx context.Context, s Scope, epoch int64) (Operation, error) {
+	return beginAcquire(ctx, r.DB, s, epoch)
+}
+
+type recordQueryer interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func beginAcquire(ctx context.Context, q recordQueryer, s Scope, epoch int64) (Operation, error) {
 	if !validScope(s) {
 		return Operation{}, ErrUnavailable
 	}
 	operation := newID()
-	record, err := scanRecord(r.DB.QueryRowContext(ctx, `update byos_connections set epoch=epoch+1,state='pending',quota=null,"secretName"=null,"secretDigest"=null,"accessSecretName"=null,"accessDigest"=null,"providerSubject"=null,"operationId"=$5,"operationKind"='acquire',"operationDeadline"=now()+interval '5 minutes',"stagedSecretName"=null,"stagedDigest"=null,"stagedAccessName"=null,"stagedAccessDigest"=null,"lastErrorCode"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$6 returning `+columns, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, operation, epoch))
+	record, err := scanRecord(q.QueryRowContext(ctx, `update byos_connections set epoch=epoch+1,state='pending',quota=null,"secretName"=null,"secretDigest"=null,"accessSecretName"=null,"accessDigest"=null,"providerSubject"=null,"operationId"=$5,"operationKind"='acquire',"operationDeadline"=now()+interval '5 minutes',"stagedSecretName"=null,"stagedDigest"=null,"stagedAccessName"=null,"stagedAccessDigest"=null,"lastErrorCode"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$6 returning `+columns, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, operation, epoch))
 	if err == ErrUnavailable {
 		return Operation{}, ErrStale
 	}

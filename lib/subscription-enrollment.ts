@@ -19,6 +19,9 @@ export interface EnrollmentConfiguration {
   attemptPath: string
   claimPath: string
   grantPath: string
+  databaseUrl?: string
+  canonicalGrantPath?: string
+  accessPath?: string
 }
 export function enrollmentOperator(request: Request, token: string | undefined): string | null {
   if (!token || token.length < 32) return null
@@ -31,6 +34,12 @@ export function enrollmentOperator(request: Request, token: string | undefined):
 export class EnrollmentClient {
   constructor(private readonly config: EnrollmentConfiguration) {}
   async call(principal: string, body: z.infer<typeof input>) {
+    return this.invoke(principal, { method: body.action, ...('id' in body ? { id: body.id } : {}), ...('callbackUrl' in body ? { callbackUrl: body.callbackUrl } : {}) }, body.action === 'start' ? started : status)
+  }
+  async bind(principal: string, id: string, ownerId: string, workspaceId: string) {
+    return this.invoke(principal, { method: 'bind', id, ownerId, workspaceId }, z.object({ id: z.uuid(), provider: z.literal('claude'), state: z.literal('connected'), revision: z.number().int().positive(), credentialVersion: z.number().int().positive() }).strict())
+  }
+  private async invoke(principal: string, request: Record<string, string>, schema: z.ZodType) {
     const { binary, ...config } = this.config
     const env: NodeJS.ProcessEnv = { PATH: process.env.PATH, LANG: 'C.UTF-8', NODE_ENV: 'production' }
     // Honor the platform's normal proxy/CA controls; no provider/local CLI
@@ -51,15 +60,15 @@ export class EnrollmentClient {
         try {
           if (code !== 0) throw new Error()
           const frame = JSON.parse(raw)
-          const result = (body.action === 'start' ? started : status).parse(frame.result)
-          if ('authorizationUrl' in result) {
+          const result = schema.parse(frame.result) as Record<string, unknown>
+          if (typeof result.authorizationUrl === 'string') {
             const target = new URL(result.authorizationUrl)
             if (target.origin !== 'https://claude.ai' || target.pathname !== '/oauth/authorize' || target.hash || target.username || target.password) throw new Error()
           }
           settled = true; clearTimeout(timer); resolve(result)
         } catch { fail() }
       })
-      child.stdin.end(`${JSON.stringify({ ...config, principal })}\n${JSON.stringify({ method: body.action, ...('id' in body ? { id: body.id } : {}), ...('callbackUrl' in body ? { callbackUrl: body.callbackUrl } : {}) })}\n`)
+      child.stdin.end(`${JSON.stringify({ ...config, principal })}\n${JSON.stringify(request)}\n`)
     })
   }
 }

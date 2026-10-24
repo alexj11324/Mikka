@@ -31,10 +31,38 @@ identity, rather than serializing `Auth` and losing Storage. It cannot be
 decoded as the worker's execution bundle. No ordinary bot/task can use it.
 After a real Mikka user/workspace is authenticated, an explicit owner-binding
 transfer must republish it in the existing canonical format and establish the
-existing single-refresh-authority record. That binding transfer is not yet
-implemented here; no fake owner or session is substituted. Pending enrollment
-does not independently rotate refresh tokens. The existing bound lifecycle
-remains the refresh authority after integration, without another provider login.
+existing single-refresh-authority record. This transfer is now implemented by
+the private `/api/subscriptions/enrollments/bind` route. It requires both the
+source operator credential and an actual Mikka session, derives the user ID
+from `auth.api.getSession`, and uses the existing active workspace membership
+check. Its body accepts only enrollment/workspace IDs, not owner/principal or
+connection IDs. No fake user or session is substituted. Pending enrollment
+does not independently rotate refresh tokens. After binding, the existing
+bound lifecycle is the refresh authority without another provider login.
+
+The additive `20261024223000_byos_enrollment_transfers.sql` migration stores
+only ownership, source digest/subject and original operation/epoch metadata.
+One transaction reserves the connection, acquire operation and transfer. A
+separate immutable Claims entry fixes source principal/digest, target database
+identity, owner/workspace, transfer/connection/operation IDs and epoch globally.
+Thus another preview database cannot consume the same source by creating a
+second local ledger. Database identity normalizes pooled/direct Neon hostname
+forms and excludes passwords. No user can supply that identity through HTTP.
+
+Initial publication reuses `Store.Save`. A failed publication resumes only the
+original staged names/digest via `createArtifact` and `Store.Recover`. A pending
+reservation may extend its own deadline; it never acquires a new epoch. Routine
+refresh preserves bot bindings and increments credential version. An explicit
+reconnect/disconnect advances epoch and permanently fences the old transfer.
+Repeated successful bind requests return the same connection and do not replace
+a refreshed grant with the escrow snapshot. No provider calls are made to bind.
+
+The source escrow remains a controlled recovery copy outside ordinary canonical
+artifact cleanup; this transfer does not delete it, including on publication
+failure. The immutable claim prevents rebinding after disconnect, and normal
+runtime checks refuse its old epoch. A complete owner-directed purge of that
+retained copy is separate lifecycle work; canonical disconnect/cleanup must not
+be described as having deleted every escrow copy or revoked upstream access.
 
 The one-use latch requires the vault's exclusive POST-create contract for a
 secret name/path; no CAS or mutable lock is invented. Verify duplicate-create
@@ -85,6 +113,16 @@ replace it with an invented public callback or let a relay choose upstream URLs.
 | `MIKKA_BYOS_ENROLLMENT_CLAIM_PATH` | Distinct immutable one-use claims |
 | `MIKKA_BYOS_ENROLLMENT_GRANT_PATH` | Distinct persistent real pending grants |
 
+Binding additionally uses the existing request-scoped application database URL,
+workspace database/auth session, `MIKKA_BYOS_INFISICAL_PATH` for canonical grants
+and `MIKKA_BYOS_ACCESS_INFISICAL_PATH` for access-only projections. All five
+vault paths must differ. Custody writes the projection using its existing
+server identity; an inference reader token is not needed merely to bind. The
+inference reader and route readiness/billing/quota checks remain required before
+actual model/native use. The receiving and binding routes never deliver the
+operator credential to the browser; ordinary end-user UI wiring must keep it on
+the trusted backend. This patch changes no frontend.
+
 Proposed staging paths: `/byos/enrollment-attempts`, `/byos/enrollment-claims`,
 `/byos/pending-grants`. They are proposals, not configured resources. Custody
 needs create/read on all three and delete only for completed attempts. No new
@@ -122,3 +160,10 @@ also starts the original Next application in an isolated Linux Docker snapshot
 and exercises the actual enrollment route against a local TLS vault fixture.
 It has no database, execution-reader or provider account configuration. The
 synthetic authorization link is never opened or passed to a user.
+
+`MIKKA_BYOS_BACKEND_ONLY=1 node scripts/test-subscription-worker.mjs` also runs
+binding tests with real disposable Postgres, all 33 additive migrations/replay,
+the production custody process and TLS vault fixtures. Session inputs in that
+synthetic integration are test dependencies, not proof of a real Mikka account.
+Actual account creation/session, provider consent and deployed Infisical policy
+still require the approved persistent preview acceptance.

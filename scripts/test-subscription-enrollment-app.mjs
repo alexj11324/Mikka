@@ -74,6 +74,8 @@ try {
     await new Promise(resolve => setTimeout(resolve, 250))
   }
   assert.ok(ready, 'real Next enrollment route did not become ready')
+  const unbound = await fetch(endpoint + '/bind', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(10000) })
+  assert.equal(unbound.status, 401)
   assert.equal(records.size, 0)
   const response = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${operator}` }, body: '{"action":"start"}', signal: AbortSignal.timeout(10000) })
   assert.equal(response.status, 200)
