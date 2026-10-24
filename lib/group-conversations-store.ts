@@ -1,10 +1,12 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
+import { cancelWork, enqueueWork, grantAgent, requireAgent, ReviewFailure } from './group-review-access'
+import { mentionRoute } from './coordinator/group-routing'
 
 const member = z.object({ memberType: z.enum(['user', 'agent']), memberId: z.string().min(1).max(256) }).strict()
 const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]) }).strict()
-const message = z.object({ body: z.string().trim().min(1).max(32000), mentions: z.array(member).max(100).default([]), replyToId: z.uuid().nullable().optional() }).strict()
+const message = z.object({ clientMessageId: z.uuid().optional(), body: z.string().trim().min(1).max(32000), mentions: z.array(member).max(100).default([]), replyToId: z.uuid().nullable().optional() }).strict()
 export type Member = z.infer<typeof member>
 export type Directory = (workspaceId: string, userId: string, members: Member[]) => Promise<boolean>
 export type GroupRequest = { userId: string | null; method: 'GET' | 'POST' | 'DELETE'; resource: 'conversations' | 'messages' | 'members'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; limit?: string | null; workspaceId?: string | null }
@@ -48,7 +50,10 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       const id = randomUUID()
       await q('INSERT INTO conversations (id,"workspaceId",kind,title,"createdBy") VALUES ($1,$2,\'group\',$3,$4)', [id, input.workspaceId, input.title, userId])
       await q('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,\'user\',$2,\'owner\')', [id, userId])
-      for (const m of input.members) await q('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,$2,$3,\'member\') ON CONFLICT DO NOTHING', [id, m.memberType, m.memberId])
+      for (const m of input.members) {
+        await q('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,$2,$3,\'member\') ON CONFLICT DO NOTHING', [id, m.memberType, m.memberId])
+        if (m.memberType === 'agent') await grantAgent(client, id, m.memberId, userId)
+      }
       result = { id, title: input.title }; status = 201
     } else if (req.resource === 'conversations' && req.method === 'GET') {
       if (req.workspaceId && (!z.uuid().safeParse(req.workspaceId).success || !await directory(req.workspaceId, userId, []))) return fail(404)
@@ -80,18 +85,36 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         result = { messages, nextBefore: more ? messages.at(-1)?.position : null }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)
-        if (!await directory(group.workspaceId, userId, input.mentions)) return fail(422)
+        if (!await directory(group.workspaceId, userId, input.mentions.filter(m => m.memberType === 'user'))) return fail(422)
         for (const m of input.mentions) {
           const { rowCount } = await q('SELECT 1 FROM conversation_members WHERE "conversationId"=$1 AND "memberType"=$2 AND "memberId"=$3 AND "leftAt" IS NULL', [req.id, m.memberType, m.memberId])
           if (!rowCount) return fail(422)
+          if (m.memberType === 'agent') {
+            if (!z.uuid().safeParse(m.memberId).success) return fail(422)
+            await requireAgent(client, directory, req.id!, group.workspaceId, m.memberId)
+          }
         }
         if (input.replyToId) {
           const { rowCount } = await q('SELECT 1 FROM conversation_messages WHERE id=$1 AND "conversationId"=$2', [input.replyToId, req.id])
           if (!rowCount) return fail(422)
         }
+        const hash = createHash('sha256').update(JSON.stringify({ body: input.body, mentions: input.mentions, replyToId: input.replyToId ?? null })).digest('hex')
+        const prior = input.clientMessageId ? (await q('SELECT * FROM conversation_message_keys WHERE "conversationId"=$1 AND "userId"=$2 AND key=$3', [req.id, userId, input.clientMessageId])).rows[0] : null
+        if (prior) {
+          if (prior.hash !== hash) return fail(409)
+          result = (await q('SELECT * FROM conversation_messages WHERE id=$1', [prior.messageId])).rows[0]
+          await client.query('COMMIT')
+          return { status: 200, body: result }
+        }
         const { rows: positions } = await q('UPDATE conversations SET "lastPosition"="lastPosition"+1 WHERE id=$1 RETURNING "lastPosition"::text AS position', [req.id])
         const id = randomUUID(), position = positions[0].position
         const { rows } = await q('INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body,mentions,"replyToId") VALUES ($1,$2,$3,\'user\',$4,$5,$6,$7) RETURNING *', [id, req.id, position, userId, input.body, JSON.stringify(input.mentions), input.replyToId ?? null])
+        if (input.clientMessageId) await q('INSERT INTO conversation_message_keys ("conversationId","userId",key,hash,"messageId") VALUES ($1,$2,$3,$4,$5)', [req.id, userId, input.clientMessageId, hash, id])
+        // Explicit mentions reuse the existing router's deterministic rule. Unaddressed
+        // messages wait for a human choice; this path never calls a decision model.
+        const agentIds = input.mentions.filter(m => m.memberType === 'agent').map(m => m.memberId)
+        const route = mentionRoute({ text: input.body, mentions: agentIds }, agentIds.map(id => ({ id, name: '', description: '' })))
+        for (const agentId of route?.responders ?? []) await enqueueWork(client, directory, req.id!, userId, id, agentId)
         result = rows[0]; status = 201
       } else if (req.resource === 'members' && ['POST', 'DELETE'].includes(req.method)) {
         if (group.role !== 'owner') return fail(403)
@@ -100,12 +123,15 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
           if (!await directory(group.workspaceId, userId, [input])) return fail(404)
           await q(`INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,$2,$3,'member')
             ON CONFLICT ("conversationId","memberType","memberId") DO UPDATE SET "leftAt"=NULL,"joinedAt"=CASE WHEN conversation_members."leftAt" IS NULL THEN conversation_members."joinedAt" ELSE now() END`, [req.id, input.memberType, input.memberId])
+          if (input.memberType === 'agent') await grantAgent(client, req.id!, input.memberId, userId)
         } else {
           // Owner transfer is not part of this API; never strand a group with no owner.
           const { rows } = await q('SELECT role FROM conversation_members WHERE "conversationId"=$1 AND "memberType"=$2 AND "memberId"=$3 AND "leftAt" IS NULL', [req.id, input.memberType, input.memberId])
           if (!rows.length) return fail(404)
           if (rows[0].role === 'owner') return fail(422)
           await q('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberType"=$2 AND "memberId"=$3', [req.id, input.memberType, input.memberId])
+          await cancelWork(client, req.id!, input.memberType === 'agent' ? { agentId: input.memberId } : { userId: input.memberId })
+          await q('UPDATE conversation_agent_grants SET "revokedAt"=now() WHERE "conversationId"=$1 AND "revokedAt" IS NULL AND ("agentId"::text=$2 OR "ownerId"=$2)', [req.id, input.memberId])
         }
         result = { ok: true }
       } else return fail(405)
@@ -114,7 +140,8 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
     return { status, body: result }
   } catch (error) {
     if (client) await client.query('ROLLBACK')
-    if (error instanceof Failure) return { status: error.status, body: { error: ({ 401: 'unauthorized', 403: 'forbidden', 404: 'not_found', 422: 'invalid_input', 405: 'method_not_allowed' } as Record<number, string>)[error.status] } }
+    if (error instanceof ReviewFailure) return { status: error.status, body: { error: error.code } }
+    if (error instanceof Failure) return { status: error.status, body: { error: ({ 401: 'unauthorized', 403: 'forbidden', 404: 'not_found', 422: 'invalid_input', 405: 'method_not_allowed', 409: 'conflict' } as Record<number, string>)[error.status] } }
     throw error
   } finally { client?.release() }
 }

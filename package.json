@@ -44,7 +44,7 @@
     "typecheck": "tsgo --noEmit",
     "daemon": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon --server http://localhost:3000",
     "daemon:login": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon login --server http://localhost:3000",
-    "test:groups": "node --import tsx --test lib/group-conversations.test.ts"
+    "test:groups": "node --import tsx --test lib/group-conversations.test.ts lib/group-artifact-review.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

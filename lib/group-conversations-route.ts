@@ -12,7 +12,7 @@ import { handleGroup, type GroupRequest } from '@/lib/group-conversations-store'
  * Until agents have an explicit workspace sharing model, only caller-owned agents qualify.
  * This adapter never returns agent configuration, credentials, runs or private history.
  */
-const directory = groupDirectory({
+export const directory = groupDirectory({
   async activeUsers(workspaceId, ids) {
     const rows = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(
       eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.status, 'active'), inArray(workspaceMembers.userId, ids),
