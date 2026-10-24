@@ -222,8 +222,12 @@ test('非创建者成员在他人公开任务上改父子关系，关系区与�
     await expect(member.getByLabel('任务标题', { exact: true })).toHaveValue(parentTitle)
     // Non-owners cannot delete (owner-only menu item), so delete/undo is covered by the owner flow only.
     await member.getByRole('button', { name: '更多任务操作', exact: true }).click()
+    const actions = member.getByRole('menu')
+    await expect(actions).toBeVisible()
     await expect(member.getByRole('menuitem', { name: /^删除任务/ })).toHaveCount(0)
     await member.keyboard.press('Escape')
+    // The closing menu keeps an inert backdrop over the page until it is gone.
+    await expect(actions).toHaveCount(0)
     const children = member.getByRole('region', { name: '子任务', exact: true })
     const addExisting = async () => {
       await children.getByRole('button', { name: '添加现有任务', exact: true }).click()
