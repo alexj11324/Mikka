@@ -6,14 +6,14 @@ import { getThreadName, listAgents } from '@/app/actions/agents'
 import { isMockedComputer } from '@/lib/computer/client'
 
 /** A thread that uses a bot's computer: the run, its name, and the bot that owns both. */
-export type ComputerThread = { agentId: string; agentName: string; runId: string; name: string }
+export type ComputerThread = { botId: string; botName: string; runId: string; name: string }
 
 type Registry = { threads: Record<string, ComputerThread[]>; register: (conversation: string, thread: ComputerThread) => void }
 
 const RegistryContext = createContext<Registry | null>(null)
 const ConversationContext = createContext<string | null>(null)
 
-const same = (a: ComputerThread, b: ComputerThread) => a.runId === b.runId && a.agentId === b.agentId && a.agentName === b.agentName && a.name === b.name
+const same = (a: ComputerThread, b: ComputerThread) => a.runId === b.runId && a.botId === b.botId && a.botName === b.botName && a.name === b.name
 
 /**
  * Which threads a conversation's bot is running on its computer: every 电脑
@@ -46,14 +46,14 @@ export function useConversationThread(conversation: string | null | undefined): 
 }
 
 /** A bot's display name: the one the card was given, else the bot list. */
-export function useComputerAgentName(agentId: string, given?: string) {
+export function useComputerBotName(botId: string, given?: string) {
   const { data } = useSWR(given ? null : 'agents', listAgents, { revalidateOnFocus: false })
-  return given ?? data?.find(agent => agent.id === agentId)?.name ?? 'Agent'
+  return given ?? data?.find(agent => agent.id === botId)?.name ?? 'Agent'
 }
 
 /** A thread's name from its task; the card's own name, then its task sentence, until that is known. */
-export function useThreadName(agentId: string, runId: string, given: string | undefined, fallback: string) {
-  const { data } = useSWR(given || isMockedComputer(agentId) ? null : ['thread-name', runId], ([, id]: [string, string]) => getThreadName(id), { revalidateOnFocus: false })
+export function useThreadName(botId: string, runId: string, given: string | undefined, fallback: string) {
+  const { data } = useSWR(given || isMockedComputer(botId) ? null : ['thread-name', runId], ([, id]: [string, string]) => getThreadName(id), { revalidateOnFocus: false })
   return given ?? data ?? fallback
 }
 
@@ -61,8 +61,8 @@ export function useRegisterComputerThread(thread: ComputerThread) {
   const registry = use(RegistryContext)
   const conversation = use(ConversationContext)
   const register = registry?.register
-  const { agentId, agentName, runId, name } = thread
+  const { botId, botName, runId, name } = thread
   useEffect(() => {
-    if (register && conversation) register(conversation, { agentId, agentName, runId, name })
-  }, [register, conversation, agentId, agentName, runId, name])
+    if (register && conversation) register(conversation, { botId, botName, runId, name })
+  }, [register, conversation, botId, botName, runId, name])
 }

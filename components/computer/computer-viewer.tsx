@@ -19,10 +19,10 @@ import { ComputerScreen } from './computer-screen'
  * gives them back. Closing while you hold control hands it back too, so the
  * agent is never left waiting on a window nobody sees.
  */
-export function ComputerViewer({ agentId, name, open, onOpenChange }: { agentId: string; name: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function ComputerViewer({ botId, name, open, onOpenChange }: { botId: string; name: string; open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useTranslations('Computer.viewer')
   const { data: session } = authClient.useSession()
-  const { data: state, mutate } = useComputer(open ? agentId : null)
+  const { data: state, mutate } = useComputer(open ? botId : null)
   const { mutate: mutateKey } = useSWRConfig()
   const [busy, setBusy] = useState(false)
   const mine = state?.control === 'user' && state.controlledBy?.userId === session?.user.id
@@ -32,8 +32,8 @@ export function ComputerViewer({ agentId, name, open, onOpenChange }: { agentId:
     if (!session) return
     setBusy(true)
     try {
-      const grant = await computerApi.takeover(agentId, session.user.id)
-      await mutateKey(['computer-viewer', agentId, 'control'], grant, { revalidate: false })
+      const grant = await computerApi.takeover(botId, session.user.id)
+      await mutateKey(['computer-viewer', botId, 'control'], grant, { revalidate: false })
       await mutate()
     } catch (error) {
       toast.error(error instanceof ComputerRequestError && error.status === 409 ? t('takenByOther') : t('takeoverFailed'))
@@ -41,7 +41,7 @@ export function ComputerViewer({ agentId, name, open, onOpenChange }: { agentId:
   }
   async function handback() {
     setBusy(true)
-    try { await computerApi.handback(agentId); await mutate() } catch { toast.error(t('handbackFailed')) } finally { setBusy(false) }
+    try { await computerApi.handback(botId); await mutate() } catch { toast.error(t('handbackFailed')) } finally { setBusy(false) }
   }
 
   return <Dialog open={open} onOpenChange={next => { if (!next && mine) void handback(); onOpenChange(next) }}>
@@ -49,7 +49,7 @@ export function ComputerViewer({ agentId, name, open, onOpenChange }: { agentId:
       <DialogTitle className="sr-only">{t('title', { name })}</DialogTitle>
       <Button variant="ghost" size="icon-sm" aria-label={t('close')} className="absolute top-3 right-3 text-screen-foreground/70 hover:bg-screen-foreground/10 hover:text-screen-foreground" onClick={() => onOpenChange(false)}><Minimize2 data-icon="inline-start" /></Button>
       <div className={cn('w-full max-w-[calc((100dvh-10rem)*1.6)] rounded-xl transition-shadow duration-150', mine && 'ring-2 ring-attention')}>
-        <ComputerScreen agentId={agentId} name={name} mode={mine ? 'control' : 'view'} frame="viewer" showTarget={!mine} />
+        <ComputerScreen botId={botId} name={name} mode={mine ? 'control' : 'view'} frame="viewer" showTarget={!mine} />
       </div>
       <div role="group" aria-label={t('controls')} className="flex items-center gap-1 rounded-full bg-screen-foreground/10 p-1 ring-1 ring-screen-foreground/15">
         {mine

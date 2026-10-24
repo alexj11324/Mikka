@@ -9,7 +9,7 @@ import { useComputer } from '@/hooks/use-computer'
 import { computerApi } from '@/lib/computer/client'
 import type { ApprovalView, ComputerTask } from '@/lib/computer/types'
 import { cn } from '@/lib/utils'
-import { useComputerAgentName, useRegisterComputerThread, useThreadName } from './computer-agents'
+import { useComputerBotName, useRegisterComputerThread, useThreadName } from './computer-agents'
 import { ComputerScreen } from './computer-screen'
 import { ComputerStatusBadge, taskStatus } from './computer-status'
 import { ComputerViewer } from './computer-viewer'
@@ -17,7 +17,7 @@ import { ComputerViewer } from './computer-viewer'
 /** 允许 / 拒绝 / 本任务内都允许 for the one operation the agent is waiting on. */
 function ApprovalBar({ approval }: { approval: ApprovalView }) {
   const t = useTranslations('Computer.approval')
-  const { mutate } = useComputer(approval.agentId)
+  const { mutate } = useComputer(approval.botId)
   const [sending, setSending] = useState<string | null>(null)
   async function decide(decision: 'approve' | 'deny', scope: 'once' | 'run') {
     setSending(`${decision}-${scope}`)
@@ -41,12 +41,12 @@ function ApprovalBar({ approval }: { approval: ApprovalView }) {
  * with the task sentence, the state and the live screen. Approval happens
  * here. While the computer is asleep or waking it shrinks to a chip.
  */
-export function ComputerCard({ agentId, agentName, runId, task, thread, state = 'working' }: Omit<ComputerTask, 'state'> & { state?: ComputerTask['state']; agentName?: string; thread?: string }) {
+export function ComputerCard({ botId, botName, runId, task, thread, state = 'working' }: Omit<ComputerTask, 'state'> & { state?: ComputerTask['state']; botName?: string; thread?: string }) {
   const t = useTranslations('Computer')
-  const name = useComputerAgentName(agentId, agentName)
-  const threadName = useThreadName(agentId, runId, thread, task)
-  useRegisterComputerThread({ agentId, agentName: name, runId, name: threadName })
-  const { data: computer } = useComputer(agentId)
+  const name = useComputerBotName(botId, botName)
+  const threadName = useThreadName(botId, runId, thread, task)
+  useRegisterComputerThread({ botId, botName: name, runId, name: threadName })
+  const { data: computer } = useComputer(botId)
   const [viewing, setViewing] = useState(false)
   const status = taskStatus(state, computer, runId)
   const approval = status === 'approval' && computer?.pendingApproval?.runId === runId ? computer.pendingApproval : undefined
@@ -63,9 +63,9 @@ export function ComputerCard({ agentId, agentName, runId, task, thread, state = 
     </div>
     <p className="text-sm">{task}</p>
     <Button variant="ghost" aria-label={t('openScreen', { name })} className="h-auto w-full rounded-lg p-0 hover:bg-transparent" onClick={() => setViewing(true)}>
-      <ComputerScreen agentId={agentId} name={name} showTarget={status !== 'done' && status !== 'failed'} />
+      <ComputerScreen botId={botId} name={name} showTarget={status !== 'done' && status !== 'failed'} />
     </Button>
     {approval && <ApprovalBar approval={approval} />}
-    {viewing && <ComputerViewer agentId={agentId} name={name} open={viewing} onOpenChange={setViewing} />}
+    {viewing && <ComputerViewer botId={botId} name={name} open={viewing} onOpenChange={setViewing} />}
   </section>
 }

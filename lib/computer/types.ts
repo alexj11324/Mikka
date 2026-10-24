@@ -20,7 +20,7 @@ export type ApprovalView = {
   id: string
   digest: string
   runId: string
-  agentId: string
+  botId: string
   action: { tool: ComputerTool; x?: number; y?: number; text?: string; rect?: ScreenRect }
   /** e.g. 点击「登录」: short, from the operation. */
   summary: string
@@ -42,14 +42,14 @@ export type ApprovalDecision = { digest: string; decision: 'approve' | 'deny'; s
 
 /** One computer task in a conversation: the `data-computer` run event. */
 export type ComputerTaskState = 'working' | 'approval' | 'done' | 'failed'
-export type ComputerTask = { agentId: string; runId: string; task: string; state: ComputerTaskState; approvalId?: string }
+export type ComputerTask = { botId: string; runId: string; task: string; state: ComputerTaskState; approvalId?: string }
 
 /** Workspace-wide pushes from GET /api/computer/events. */
 export type ComputerEvent =
   | { type: 'computer.machine'; state: MachineState }
-  | { type: 'computer.control'; agentId: string; control: ControlState; controlledBy?: { userId: string } }
-  | { type: 'computer.action'; agentId: string; lastAction: LastAction }
-  | { type: 'computer.approval'; agentId: string; approval: ApprovalView | null }
+  | { type: 'computer.control'; botId: string; control: ControlState; controlledBy?: { userId: string } }
+  | { type: 'computer.action'; botId: string; lastAction: LastAction }
+  | { type: 'computer.approval'; botId: string; approval: ApprovalView | null }
 
 /** A host the 添加设备 dialog offers: from the user's ~/.ssh/config or their Tailnet. */
 export type KnownHost = { alias: string; hostName?: string; user?: string; source: 'ssh' | 'tailnet'; configured: boolean }

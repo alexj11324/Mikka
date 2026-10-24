@@ -20,54 +20,54 @@ const listeners = new Set<(event: ComputerEvent) => void>()
 
 function emit(event: ComputerEvent) { for (const listener of listeners) listener(event) }
 
-function opening(agentId: string): ComputerState {
+function opening(botId: string): ComputerState {
   const at = new Date().toISOString()
   const click = { tool: 'click' as const, x: LOGIN_BUTTON.x + 170, y: LOGIN_BUTTON.y + 28, rect: LOGIN_BUTTON, at }
-  if (agentId.includes('idle') || agentId.includes('done')) return { machine: 'running', control: 'idle' }
-  if (agentId.includes('approval')) return {
+  if (botId.includes('idle') || botId.includes('done')) return { machine: 'running', control: 'idle' }
+  if (botId.includes('approval')) return {
     machine: 'running', control: 'agent', lastAction: click,
-    pendingApproval: { id: `approval-${agentId}`, digest: 'mock', runId: `run-${agentId}`, agentId, action: { tool: 'click', x: click.x, y: click.y, text: 'qa@mikka.dev', rect: LOGIN_BUTTON }, summary: '点击「登录」', expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() },
+    pendingApproval: { id: `approval-${botId}`, digest: 'mock', runId: `run-${botId}`, botId, action: { tool: 'click', x: click.x, y: click.y, text: 'qa@mikka.dev', rect: LOGIN_BUTTON }, summary: '点击「登录」', expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() },
   }
   return { machine: 'running', control: 'agent', lastAction: click }
 }
 
-function read(agentId: string): ComputerState {
+function read(botId: string): ComputerState {
   machine ??= typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('computer-mock') === 'sleep' ? 'sleeping' : 'running'
-  let state = states.get(agentId)
-  if (!state) { state = opening(agentId); states.set(agentId, state) }
+  let state = states.get(botId)
+  if (!state) { state = opening(botId); states.set(botId, state) }
   return { ...state, machine }
 }
 
-function write(agentId: string, next: ComputerState) { machine = next.machine; states.set(agentId, next) }
+function write(botId: string, next: ComputerState) { machine = next.machine; states.set(botId, next) }
 
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 export const mockComputer = {
-  async state(agentId: string): Promise<ComputerState> { await pause(80); return { ...read(agentId) } },
-  async wake(agentId: string) {
-    write(agentId, { ...read(agentId), machine: 'waking' })
+  async state(botId: string): Promise<ComputerState> { await pause(80); return { ...read(botId) } },
+  async wake(botId: string) {
+    write(botId, { ...read(botId), machine: 'waking' })
     emit({ type: 'computer.machine', state: 'waking' })
     setTimeout(() => {
-      write(agentId, { ...read(agentId), machine: 'running' })
+      write(botId, { ...read(botId), machine: 'running' })
       emit({ type: 'computer.machine', state: 'running' })
     }, 3000)
   },
-  async viewer(_agentId: string, _mode: ViewerMode): Promise<ViewerGrant> {
+  async viewer(_botId: string, _mode: ViewerMode): Promise<ViewerGrant> {
     return { url: MOCK_SCREEN_URL, expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() }
   },
-  async takeover(agentId: string, userId: string): Promise<ViewerGrant> {
-    write(agentId, { ...read(agentId), control: 'user', controlledBy: { userId }, lastAction: undefined })
-    emit({ type: 'computer.control', agentId, control: 'user', controlledBy: { userId } })
-    return mockComputer.viewer(agentId, 'control')
+  async takeover(botId: string, userId: string): Promise<ViewerGrant> {
+    write(botId, { ...read(botId), control: 'user', controlledBy: { userId }, lastAction: undefined })
+    emit({ type: 'computer.control', botId, control: 'user', controlledBy: { userId } })
+    return mockComputer.viewer(botId, 'control')
   },
-  async handback(agentId: string) {
-    write(agentId, { ...read(agentId), control: 'agent', controlledBy: undefined })
-    emit({ type: 'computer.control', agentId, control: 'agent' })
+  async handback(botId: string) {
+    write(botId, { ...read(botId), control: 'agent', controlledBy: undefined })
+    emit({ type: 'computer.control', botId, control: 'agent' })
   },
   async decide(approval: ApprovalView, decision: ApprovalDecision): Promise<{ queued: true }> {
     await pause(300)
-    write(approval.agentId, { ...read(approval.agentId), pendingApproval: undefined })
-    emit({ type: 'computer.approval', agentId: approval.agentId, approval: null })
+    write(approval.botId, { ...read(approval.botId), pendingApproval: undefined })
+    emit({ type: 'computer.approval', botId: approval.botId, approval: null })
     void decision
     return { queued: true }
   },

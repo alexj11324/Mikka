@@ -68,8 +68,8 @@ function Cursor({ x, y }: { x: number; y: number }) {
  * picture, the agent's target ring and cursor, and the sleeping and waking
  * covers. `children` sit centered on top (the details page's 打开).
  */
-export function ComputerScreen({ agentId, name, mode = 'view', live = true, showTarget = true, frame = 'rounded', children }: {
-  agentId: string
+export function ComputerScreen({ botId, name, mode = 'view', live = true, showTarget = true, frame = 'rounded', children }: {
+  botId: string
   name: string
   mode?: ViewerMode
   /** False keeps the last picture still (a finished task). */
@@ -79,14 +79,14 @@ export function ComputerScreen({ agentId, name, mode = 'view', live = true, show
   children?: ReactNode
 }) {
   const t = useTranslations('Computer')
-  const { data: state, mutate } = useComputer(agentId)
+  const { data: state, mutate } = useComputer(botId)
   const running = state?.machine === 'running'
-  const { data: grant } = useViewerGrant(agentId, mode, running && live)
+  const { data: grant } = useViewerGrant(botId, mode, running && live)
   const approval = state?.pendingApproval
   const target = approval?.action.rect ?? (state?.control === 'agent' ? state.lastAction?.rect : undefined)
   const point = approval ? { x: approval.action.x, y: approval.action.y } : state?.control === 'agent' ? { x: state.lastAction?.x, y: state.lastAction?.y } : null
   async function wake() {
-    try { await computerApi.wake(agentId); await mutate() } catch { toast.error(t('wakeFailed')) }
+    try { await computerApi.wake(botId); await mutate() } catch { toast.error(t('wakeFailed')) }
   }
   const label = t('screenOf', { name })
   return <div className={cn('@container/screen relative aspect-[16/10] w-full overflow-hidden bg-screen text-screen-foreground', frame === 'rounded' ? 'rounded-lg' : 'rounded-xl')}>

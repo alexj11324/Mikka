@@ -5,7 +5,7 @@ import type { ApprovalDecision, ApprovalView, ComputerEvent, ComputerState, Know
 /** The backend is still being built (#172); this flag plays it in the page instead. */
 export const computerMock = process.env.NEXT_PUBLIC_COMPUTER_MOCK === '1'
 /** The component library's demo bots (ids start with "demo-") always play the mock. */
-export const isMockedComputer = (agentId: string) => computerMock || agentId.startsWith('demo-')
+export const isMockedComputer = (botId: string) => computerMock || botId.startsWith('demo-')
 
 export class ComputerRequestError extends Error {
   constructor(readonly status: number, readonly body: unknown) { super(`HTTP ${status}`) }
@@ -23,16 +23,16 @@ async function call<T>(path: string, init?: RequestInit & { json?: unknown }): P
   return body as T
 }
 
-const agentPath = (agentId: string, rest = '') => `/api/agents/${encodeURIComponent(agentId)}/computer${rest}`
+const botPath = (botId: string, rest = '') => `/api/bots/${encodeURIComponent(botId)}/computer${rest}`
 
 export const computerApi = {
-  state: (agentId: string) => isMockedComputer(agentId) ? mockComputer.state(agentId) : call<ComputerState>(agentPath(agentId)),
-  wake: (agentId: string) => isMockedComputer(agentId) ? mockComputer.wake(agentId) : call<null>(agentPath(agentId, '/wake'), { method: 'POST' }),
-  viewer: (agentId: string, mode: ViewerMode) => isMockedComputer(agentId) ? mockComputer.viewer(agentId, mode) : call<ViewerGrant>(agentPath(agentId, '/viewer'), { method: 'POST', json: { mode } }),
-  takeover: (agentId: string, userId: string) => isMockedComputer(agentId) ? mockComputer.takeover(agentId, userId) : call<ViewerGrant>(agentPath(agentId, '/takeover'), { method: 'POST' }),
-  handback: (agentId: string) => isMockedComputer(agentId) ? mockComputer.handback(agentId) : call<null>(agentPath(agentId, '/handback'), { method: 'POST' }),
+  state: (botId: string) => isMockedComputer(botId) ? mockComputer.state(botId) : call<ComputerState>(botPath(botId)),
+  wake: (botId: string) => isMockedComputer(botId) ? mockComputer.wake(botId) : call<null>(botPath(botId, '/wake'), { method: 'POST' }),
+  viewer: (botId: string, mode: ViewerMode) => isMockedComputer(botId) ? mockComputer.viewer(botId, mode) : call<ViewerGrant>(botPath(botId, '/viewer'), { method: 'POST', json: { mode } }),
+  takeover: (botId: string, userId: string) => isMockedComputer(botId) ? mockComputer.takeover(botId, userId) : call<ViewerGrant>(botPath(botId, '/takeover'), { method: 'POST' }),
+  handback: (botId: string) => isMockedComputer(botId) ? mockComputer.handback(botId) : call<null>(botPath(botId, '/handback'), { method: 'POST' }),
   /** Answers "queued", never an invented success: the agent goes on when the daemon picks it up. */
-  decide: (approval: ApprovalView, decision: ApprovalDecision) => isMockedComputer(approval.agentId)
+  decide: (approval: ApprovalView, decision: ApprovalDecision) => isMockedComputer(approval.botId)
     ? mockComputer.decide(approval, decision)
     : call<{ queued: true }>(`/api/computer/approvals/${encodeURIComponent(approval.id)}`, { method: 'POST', json: decision }),
 }

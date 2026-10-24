@@ -18,16 +18,16 @@ import { ComputerViewer } from './computer-viewer'
  */
 export function AgentComputer({ thread }: { thread: ComputerThread }) {
   const t = useTranslations('Computer')
-  const { data: state } = useComputer(thread.agentId)
+  const { data: state } = useComputer(thread.botId)
   const [viewing, setViewing] = useState(false)
   const status = computerStatus(state)
   return <div className="flex flex-col items-center gap-3 pt-6">
     <ThreadAvatar />
     <h2 className="max-w-full truncate pb-3 text-xl font-semibold">{thread.name}</h2>
-    <ComputerScreen agentId={thread.agentId} name={thread.agentName}>
+    <ComputerScreen botId={thread.botId} name={thread.botName}>
       <Button size="sm" className="h-9 rounded-full bg-screen/80 px-3.5 text-screen-foreground backdrop-blur-sm hover:bg-screen/90" onClick={() => setViewing(true)}><Maximize2 data-icon="inline-start" />{t('open')}</Button>
     </ComputerScreen>
     <p className="flex items-center gap-2 text-xs text-muted-foreground">{t('screen')}{status && <ComputerStatusBadge status={status} />}</p>
-    {viewing && <ComputerViewer agentId={thread.agentId} name={thread.agentName} open={viewing} onOpenChange={setViewing} />}
+    {viewing && <ComputerViewer botId={thread.botId} name={thread.botName} open={viewing} onOpenChange={setViewing} />}
   </div>
 }
