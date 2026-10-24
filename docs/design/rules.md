@@ -61,10 +61,14 @@ source wins in a conflict is in [`README.md`](README.md).
 
 - **R-20** The 建议 list holds only notifications from connected apps'
   webhooks (Gmail, Notion, Slack, GitHub, Linear…) that the decision model
-  judged worth showing. The Coordinator never writes into it. Its own ideas
+  (OpenAI Decisions API) judged worth showing. The Coordinator never writes into it. Its own ideas
   go in its chat.
-- **R-21** With a bot selected, the right panel shows 建议 on top, that bot's
-  threads below, then 我的任务.
+- **R-21** The right panel has two parts: 建议 on top, then 任务. A 任务 here
+  is a thread started by the orchestrator or a bot; all of them stay listed.
+  It is not a flat list of the board's issues. The suggestion flow: the
+  decision model picks an item → it appears in 建议 → clicking it fills the
+  centre composer → the bot dispatches a thread → the item leaves 建议 and
+  shows up below as a 任务.
 - **R-22** Tasks are never created on the board itself: no column `+`, no
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
@@ -78,7 +82,8 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-25** Board cards show status, priority and the assignee's avatar only,
   never names. The board is the reUI Kanban.
 - **R-26** Workspace tasks sync with Linear (`MIK-xx`); personal tasks stay in
-  Mikka. Teammates see agent runs on workspace issues only, never left-column
+  Mikka. A task can move both ways: a workspace task can be turned back into
+  a personal one (its Linear issue is archived; issue #184). Teammates see agent runs on workspace issues only, never left-column
   chats or private memory.
 
 ## Look
@@ -104,8 +109,8 @@ source wins in a conflict is in [`README.md`](README.md).
   forward, centred search pill that opens ⌘K), 72px icon rail with a text
   label under each icon (主页, 看板…), and one rounded content card. Build on
   `components/app-shell.tsx`; no reUI App Shell blocks.
-- **R-36** Bots use bloub avatars (`BotAvatar`, Figma `196:3571`); people use
-  letter avatars. (The Figma style guide's rule 8, "渐变球", predates bloub
+- **R-36** Bots use bloub avatars (`BotAvatar`, Figma `196:3571`, all 16
+  shapes kept); people use letter avatars. (The Figma style guide's rule 8, "渐变球", predates bloub
   and is out of date.)
 - **R-37** Animate only when the user's action changes a size or position.
   Position and size move with springs; opacity and colour use a duration.
