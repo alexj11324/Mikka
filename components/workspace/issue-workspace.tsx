@@ -21,8 +21,9 @@ import { BoardPage } from './board-page'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { GlobalSearch, SearchPill } from '@/components/nav/global-search'
 import { ContextPanel } from '@/components/nav/context-panel'
+import type { CoordinatorPrefill } from '@/components/coordinator/coordinator-chat'
 import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
-import { listTaskRuns, listThreads } from '@/app/actions/task-runs'
+import { listThreads } from '@/app/actions/task-runs'
 import { listBots } from '@/app/actions/bots'
 import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'
 import { sessionPreview } from '@/lib/agent-history'
@@ -117,7 +118,6 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)
   const { data: teams = [] } = useSWR('teams', listTeams)
   const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams)
-  const { data: taskRuns = [] } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: boardBusy ? 0 : 15000, revalidateOnFocus: false })
   const { data: bots = [] } = useSWR('bots', listBots, { revalidateOnFocus: false })
   const { data: threads = [] } = useSWR('threads', () => listThreads(), { refreshInterval: boardBusy ? 0 : 15000, revalidateOnFocus: false })
   const [creatingBot, setCreatingBot] = useState(false)
@@ -125,7 +125,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const [panelOpen, setPanelOpen] = useState(true)
   useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])
   function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem('mikka:context-panel', next ? '1' : '0') } catch { /* storage unavailable */ } }
-  const [coordinatorPrefill, setCoordinatorPrefill] = useState<{ text: string; nonce: number }>()
+  const [coordinatorPrefill, setCoordinatorPrefill] = useState<CoordinatorPrefill>()
   const [teamId, setTeamId] = useState<string | null>(params.get('team'))
   const activeTeam = teams.find(team => team.id === teamId)
   const [section, setSection] = useState<WorkspaceSection>(params.get('team') ? 'team-home' : initialSection)
@@ -327,9 +327,9 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const conversationSessions = [...savedSessions.values()]
   const activeSession = section === 'agent' ? conversationSessions.find(session => session.id === activeAgentId) : undefined
   const lastCoordinatorItem = coordinatorChat?.items.findLast(item => item.from !== 'event')
-  function arrange(prompt: string) {
+  function arrange(prompt: string, suggestionId?: string) {
     openChat({ kind: 'coordinator' })
-    setCoordinatorPrefill(current => ({ text: prompt, nonce: (current?.nonce ?? 0) + 1 }))
+    setCoordinatorPrefill(current => ({ text: prompt, nonce: (current?.nonce ?? 0) + 1, suggestionId }))
   }
   const dialogs = <>
     <NewTaskDialog open={creating} project={creationProject ? scopedProjects.find(project => project.id === creationProject)?.name : null} initialText={typedAhead} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />
@@ -357,7 +357,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
         <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={open} onCreate={() => create()} />
       </>}
     </AppShellContent>
-    {isConversation && panelOpen && <ContextPanel userName={user.name || user.email} issues={tasks} runs={taskRuns} threads={threads} onOpenIssue={id => { open(id) }} onArrange={arrange} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
+    {isConversation && panelOpen && <ContextPanel userName={user.name || user.email} issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onArrange={arrange} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
       conversation={section === 'coordinator' ? { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt } : activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot', updatedAt: activeSession?.updatedAt } : { id: activeAgentId, name: activeSession?.title || i18nText('Nav.untitledConversation'), kind: 'agent', updatedAt: activeSession?.updatedAt }} />}
     {dialogs}
   </AppFrame></ComputerAgentsProvider></SignOutBoundary>

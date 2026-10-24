@@ -135,7 +135,6 @@
     "answerBot": "Type your answer, or ask anything",
     "messageBot": "Message {name}",
     "newConversation": "New conversation",
-    "pinned": "Pinned",
     "untitledConversation": "Untitled conversation"
   },
   "Plugins": {
@@ -2303,7 +2302,6 @@
       "create": "Create",
       "creating": "Creating…"
     },
-    "pinned": "Pinned",
     "searchPlaceholder": "Search conversations, tasks, agents, knowledge",
     "searchLabel": "Search everything",
     "searchDescription": "Search conversations, tasks and projects. Use the arrow keys to choose and Enter to open.",
@@ -2324,8 +2322,6 @@
     "attach": "Add file",
     "attachUnsupported": "Only text files up to {max} characters can be attached",
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
-    "whoIsWorking": "Who's working",
-    "agentsWorking": "{count, plural, one {# agent is} other {# agents are}} on tasks",
     "panel": {
       "label": "Right panel",
       "tabs": "Right panel content",
@@ -2343,7 +2339,6 @@
     "details": {
       "conversation": "This conversation",
       "kind": "Type",
-      "coordinatorKind": "Coordinator · pinned",
       "agentKind": "Agent conversation",
       "updated": "Last activity",
       "none": "No messages yet"

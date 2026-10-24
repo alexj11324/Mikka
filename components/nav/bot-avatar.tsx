@@ -21,19 +21,9 @@ export function colorFor(name: string): BotColor {
   return BOT_COLORS[Math.abs(hash) % (BOT_COLORS.length - 1)]
 }
 
-/**
- * The Coordinator (Figma BotAvatar/Coordinator 202:4518): the ink circle with
- * an orange star at its lower right, outlined in the page colour so it looks
- * cut out of the body, as Grok marks its own bot.
- */
+/** The Coordinator is a bot like any other (Figma 202:4518): the default ink circle, no badge. */
 export function CoordinatorAvatar({ size = 'list', mood }: { size?: keyof typeof SIZES; mood?: BotMood }) {
-  return <span className="relative inline-flex shrink-0">
-    <BotAvatar color="encre" shape="cercle" size={size} mood={mood} />
-    <svg aria-hidden="true" viewBox="0 0 24 24" className={cn('absolute -right-0.5 -bottom-0.5 overflow-visible fill-bot-badge stroke-background stroke-3 [paint-order:stroke] [stroke-linejoin:round]',
-      (size === 'row' || size === 'pill') && 'size-2.5', (size === 'search' || size === 'list') && 'size-3.5', size !== 'row' && size !== 'pill' && size !== 'search' && size !== 'list' && 'size-6')}>
-      <path d="M12 2.6L14.7 8.9L21.5 9.5L16.4 14L17.9 20.6L12 17.1L6.1 20.6L7.6 14L2.5 9.5L9.3 8.9Z" />
-    </svg>
-  </span>
+  return <BotAvatar color="encre" shape="cercle" size={size} mood={mood} />
 }
 
 /** Visible blob sizes. bloub's svg is 1.58× the blob, so it overflows its box on purpose. */

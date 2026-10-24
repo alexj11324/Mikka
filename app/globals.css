@@ -100,7 +100,6 @@
 --color-bot-rose: var(--bot-rose);
 --color-bot-gris: var(--bot-gris);
 --color-bot-creme: var(--bot-creme);
---color-bot-badge: var(--bot-badge);
 --color-avatar-foreground: var(--avatar-foreground);
 /* Source chips and lists (components/ui/streaming-text), on the shadcn palette so both themes follow. */
 --color-page: var(--page);
@@ -133,7 +132,6 @@
 --bot-gris: #a3a3a3;
 --bot-creme: #f1efe9;
 /* The Coordinator's star (Figma 202:4518). */
---bot-badge: #f59312;
 --settings-background: oklch(0.98 0.002 286);
 --settings-foreground: oklch(0.145 0 0);
 --settings-card: var(--card);

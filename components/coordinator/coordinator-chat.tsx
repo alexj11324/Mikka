@@ -1,17 +1,15 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
+import { withBasePath } from '@/lib/base-path'
 import { useTranslations } from 'next-intl'
-import { Send } from 'lucide-react'
 import { getCoordinatorChat, sendCoordinatorMessage, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
-import { listTaskRuns } from '@/app/actions/task-runs'
-import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
+import { CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
 import { useActionError } from '@/lib/use-action-error'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from '@/components/ui/message-scroller'
 import { Spinner } from '@/components/ui/spinner'
@@ -21,12 +19,12 @@ import { AgentThemeProvider } from '@/components/workspace/agent-theme'
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
 
+/** Text put into the composer from elsewhere; `suggestionId` when it came from a 建议 item. */
+export type CoordinatorPrefill = { text: string; nonce: number; suggestionId?: string }
+
 /** The person's conversation with their Coordinator, which dispatches agents to issues. */
-export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false }: { onOpenIssue: (id: string) => void; prefill?: { text: string; nonce: number }; placeholder?: string; compact?: boolean }) {
+export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean }) {
   const t = useTranslations('Coordinator')
-  const tShell = useTranslations('Shell')
-  const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000, revalidateOnFocus: false })
-  const working = [...new Map((runs ?? []).filter(run => ['preparing', 'running', 'finishing'].includes(run.status)).map(run => [run.agentId, run.agentName])).values()]
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actionError = useActionError()
   const { data, mutate, error: loadError } = useSWR<Chat>('coordinator-chat', () => getCoordinatorChat(), {
@@ -35,9 +33,13 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
-  // 「让 Agent 安排」 puts its sentence here for the person to finish (MIK-39).
+  const { mutate: mutateAll } = useSWRConfig()
+  // The 建议 item whose text is in the composer: once sent, the Coordinator dispatches a thread for it and it leaves 建议.
+  const suggestion = useRef<string | null>(null)
+  // 「让 Agent 安排」 and 建议 items put their sentence here for the person to finish (MIK-39).
   useEffect(() => {
     if (!prefill) return
+    suggestion.current = prefill.suggestionId ?? null
     setDraft(prefill.text)
     const input = inputRef.current
     if (input) { input.focus(); input.setSelectionRange(prefill.text.length, prefill.text.length) }
@@ -62,7 +64,15 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
-    if (await post(text)) setDraft(current => current.trim() === text ? '' : current)
+    if (!await post(text)) return
+    setDraft(current => current.trim() === text ? '' : current)
+    const id = suggestion.current
+    suggestion.current = null
+    if (id) {
+      await fetch(withBasePath(`/api/suggestions/${id}`), { method: 'DELETE', credentials: 'same-origin' }).catch(() => undefined)
+      void mutateAll(key => typeof key === 'string' && key.includes('/api/suggestions'))
+      void mutateAll('threads')
+    }
   }
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
   <section aria-label={t('label')} className="orvilo-agent flex min-h-0 flex-1 flex-col">
@@ -70,7 +80,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={t('conversation')}>
           <MessageScrollerContent className={cn('mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 pb-6', compact ? 'pt-4' : 'pt-18')}>
-            {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyMedia variant="icon"><Send /></EmptyMedia><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty>}
+            {/* Same as a bot's empty chat: the Coordinator itself, no prompt. */}
+            {data && !items.length && <div className="flex flex-1 flex-col items-center justify-center gap-3"><CoordinatorAvatar size="profile" /><p className="text-sm font-medium">{t('label')}</p></div>}
             {items.map(item => <MessageScrollerItem key={item.position} messageId={String(item.position)} scrollAnchor={item.from === 'person'}>
               {item.from === 'event'
                 ? <p className="text-center text-xs text-muted-foreground">{item.text.replace(/^\[Event\]\s*/, '')}</p>
@@ -88,7 +99,6 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       </MessageScroller>
     </MessageScrollerProvider>
     <div className={cn('mx-auto flex w-full max-w-3xl flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4')}>
-      {!compact && working.length > 0 && <p className="flex items-center gap-3 px-2 text-xs text-muted-foreground"><span>{tShell('whoIsWorking')}</span><span className="flex gap-0.5">{working.slice(0, 5).map(name => <BotAvatar key={name} color={colorFor(name)} size="pill" still />)}</span><span>{tShell('agentsWorking', { count: working.length })}</span></p>}
       {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
       {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}

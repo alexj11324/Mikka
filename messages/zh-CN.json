@@ -135,7 +135,6 @@
     "answerBot": "输入你的回答，或聊点别的",
     "messageBot": "给 {name} 发消息",
     "newConversation": "新对话",
-    "pinned": "已置顶",
     "untitledConversation": "未命名对话"
   },
   "Plugins": {
@@ -2303,7 +2302,6 @@
       "create": "创建",
       "creating": "正在创建…"
     },
-    "pinned": "置顶",
     "searchPlaceholder": "搜索对话、任务、Agent、知识库",
     "searchLabel": "全局搜索",
     "searchDescription": "搜索对话、任务和项目，用方向键选择，按 Enter 打开。",
@@ -2324,8 +2322,6 @@
     "attach": "添加文件",
     "attachUnsupported": "只能附加 {max} 字以内的文本文件",
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
-    "whoIsWorking": "谁在工作",
-    "agentsWorking": "{count} 个 agent 正在处理任务",
     "panel": {
       "label": "右栏",
       "tabs": "右栏内容",
@@ -2343,7 +2339,6 @@
     "details": {
       "conversation": "当前对话",
       "kind": "类型",
-      "coordinatorKind": "Coordinator · 置顶",
       "agentKind": "Agent 对话",
       "updated": "最近活动",
       "none": "还没有消息"

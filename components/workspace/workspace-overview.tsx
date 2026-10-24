@@ -14,11 +14,12 @@ import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'
 import type { AgentSessionRequest } from './agent-panel'
 import { ConversationPill } from '@/components/nav/conversation-pill'
 import { CoordinatorAvatar } from '@/components/nav/bot-avatar'
+import type { CoordinatorPrefill } from '@/components/coordinator/coordinator-chat'
 
 const AgentPanel = dynamic(() => import('./agent-panel').then(module => module.AgentPanel), { loading: WorkspaceContentLoading })
 const CoordinatorChat = dynamic(() => import('@/components/coordinator/coordinator-chat').then(module => module.CoordinatorChat), { loading: WorkspaceContentLoading })
 
-export function WorkspaceOverview({ section, teamName, counts, projectCount, onView, onProjects, tasks, userId, onOpen, initialAgentHistory, agentRequest, onAgentActive, onAgentSessions, coordinatorPrefill }: { onAgentSessions?: (sessions: SavedAgentSession[]) => void; coordinatorPrefill?: { text: string; nonce: number }; section: WorkspaceSection; teamName?: string; counts: Record<IssueView, number>; projectCount: number; onView: (view: IssueView) => void; onProjects: () => void; tasks: Awaited<ReturnType<typeof listIssues>>; userId: string; onOpen: (id: string) => void; initialAgentHistory?: AgentHistory; agentRequest?: AgentSessionRequest; onAgentActive?: (sessionId: string | null) => void }) {
+export function WorkspaceOverview({ section, teamName, counts, projectCount, onView, onProjects, tasks, userId, onOpen, initialAgentHistory, agentRequest, onAgentActive, onAgentSessions, coordinatorPrefill }: { onAgentSessions?: (sessions: SavedAgentSession[]) => void; coordinatorPrefill?: CoordinatorPrefill; section: WorkspaceSection; teamName?: string; counts: Record<IssueView, number>; projectCount: number; onView: (view: IssueView) => void; onProjects: () => void; tasks: Awaited<ReturnType<typeof listIssues>>; userId: string; onOpen: (id: string) => void; initialAgentHistory?: AgentHistory; agentRequest?: AgentSessionRequest; onAgentActive?: (sessionId: string | null) => void }) {
   const i18nText = useTranslations()
   const tIssue = useTranslations('Issue')
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value

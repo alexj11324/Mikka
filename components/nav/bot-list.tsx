@@ -134,7 +134,7 @@ export function BotList({ bots, threads, sessions, active, onOpen, onNewBot, rai
       <SidebarGroup className="px-2 pt-1"><SidebarMenu aria-label={i18nText('Nav.bots')} className="gap-0.5">
         <Row name={i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
           avatar={<CoordinatorAvatar />}
-          preview={<><span className="shrink-0">{i18nText('Shell.pinned')}</span>{lastReply && <><span aria-hidden="true">·</span><span className="truncate">{coordinatorLine(lastReply.text)}</span></>}</>} />
+          preview={lastReply ? <span className="truncate">{coordinatorLine(lastReply.text)}</span> : null} />
         {ordered.map(bot => {
           const line = latestChat.get(bot.id)?.preview
           return <Row key={bot.id} name={bot.name} current={active?.kind === 'bot' && active.botId === bot.id} unread={unread(bot.id)} onClick={() => choose({ kind: 'bot', botId: bot.id })}
