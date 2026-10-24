@@ -2210,6 +2210,7 @@
       "user": "你在操作"
     },
     "screenOf": "{name} 的屏幕",
+    "screen": "屏幕",
     "computerOf": "{name} 的电脑",
     "card": "电脑任务",
     "cardTitle": "电脑",

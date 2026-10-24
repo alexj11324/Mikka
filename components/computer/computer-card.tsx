@@ -9,7 +9,7 @@ import { useComputer } from '@/hooks/use-computer'
 import { computerApi } from '@/lib/computer/client'
 import type { ApprovalView, ComputerTask } from '@/lib/computer/types'
 import { cn } from '@/lib/utils'
-import { useComputerAgentName, useRegisterComputerAgent } from './computer-agents'
+import { useComputerAgentName, useRegisterComputerThread, useThreadName } from './computer-agents'
 import { ComputerScreen } from './computer-screen'
 import { ComputerStatusBadge, taskStatus } from './computer-status'
 import { ComputerViewer } from './computer-viewer'
@@ -41,10 +41,11 @@ function ApprovalBar({ approval }: { approval: ApprovalView }) {
  * with the task sentence, the state and the live screen. Approval happens
  * here. While the computer is asleep or waking it shrinks to a chip.
  */
-export function ComputerCard({ agentId, agentName, runId, task, state = 'working' }: Omit<ComputerTask, 'state'> & { state?: ComputerTask['state']; agentName?: string }) {
+export function ComputerCard({ agentId, agentName, runId, task, thread, state = 'working' }: Omit<ComputerTask, 'state'> & { state?: ComputerTask['state']; agentName?: string; thread?: string }) {
   const t = useTranslations('Computer')
   const name = useComputerAgentName(agentId, agentName)
-  useRegisterComputerAgent({ id: agentId, name })
+  const threadName = useThreadName(agentId, runId, thread, task)
+  useRegisterComputerThread({ agentId, agentName: name, runId, name: threadName })
   const { data: computer } = useComputer(agentId)
   const [viewing, setViewing] = useState(false)
   const status = taskStatus(state, computer, runId)

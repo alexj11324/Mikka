@@ -78,6 +78,10 @@
 --color-attention-foreground: var(--attention-foreground);
 --color-screen: var(--screen);
 --color-screen-foreground: var(--screen-foreground);
+/* A bot's avatar is a lit sphere (Figma 188:3115) in one of three tints, the same in both themes. */
+--background-image-bot-sphere-1: radial-gradient(ellipse 50% 50% at 70% 75%, rgb(158 242 217), rgb(122 217 198) 25%, rgb(85 191 179) 50%, rgb(49 166 159) 75%, rgb(31 153 150) 87.5%, rgb(13 140 140));
+--background-image-bot-sphere-2: radial-gradient(ellipse 50% 50% at 70% 75%, rgb(173 209 255), rgb(140 179 245) 25%, rgb(106 149 236) 50%, rgb(72 119 226) 75%, rgb(38 89 217));
+--background-image-bot-sphere-3: radial-gradient(ellipse 50% 50% at 70% 75%, rgb(224 189 255), rgb(197 156 242) 25%, rgb(170 122 230) 50%, rgb(142 89 217) 75%, rgb(115 56 204));
 /* App shell layers (Nav v3.1): the top bar and icon rail, then the list and right panels, then the conversation. */
 --color-shell-chrome: var(--shell-chrome);
 --color-shell-panel: var(--shell-panel);
@@ -275,3 +279,4 @@ body {
   @apply bg-background text-foreground;
 }
 }
+

@@ -78,7 +78,7 @@ export const AGENT_DEMO_SECTIONS = [
     response: `root = Stack([line, wrap, computer, ${content(`Markdown 正文里的引用同样显示为 chip：[[issue:${DEMO_TASK_2}]]，参考 [OpenUI 文档](https://www.openui.com/docs)。`)}])
 line = InlineText(["已派给 ", RunChip("${DEMO_RUN}"), " 处理 ", TaskChip("${DEMO_TASK}"), "，完成后接着做 ", TaskChip("${DEMO_TASK_2}"), "。PR：", SourceChip("https://github.com/alexj11324/Mikka/pull/92", "Mikka#92"), "。"])
 wrap = InlineText(["这一句故意写得比较长，用来看换行效果：引用 ", TaskChip("${DEMO_TASK}"), " 放在行尾放不下时，会和后面的文字一起换到下一行，而不是单独占一行。"])
-computer = ComputerCard("demo-done", "${DEMO_RUN}", "打开 #66 的预览部署，用测试账号登录，截一张首页。", "done", "Mikka Frontend")`,
+computer = ComputerCard("demo-done", "${DEMO_RUN}", "打开 #66 的预览部署，用测试账号登录，截一张首页。", "done", "Mikka Frontend", "#66 预览部署检查")`,
   },
   {
     id: 'ui', title: 'shadcn、REUI 与数据图表', description: '折叠面板、标签页、表格、进度条和 OpenUI 数据图表，均使用固定演示数据。',

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
-import { MousePointer2, Moon, Power } from 'lucide-react'
+import { MousePointer2, Power } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -96,12 +96,9 @@ export function ComputerScreen({ agentId, name, mode = 'view', live = true, show
       : <NoVncView url={grant.url} mode={mode} label={label} />)}
     {running && live && showTarget && target && <TargetRing rect={target} tone={approval ? 'approval' : 'agent'} />}
     {running && live && showTarget && point?.x !== undefined && point.y !== undefined && <Cursor x={point.x} y={point.y} />}
-    {state && !running && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-screen/80 backdrop-blur-sm">
-      {state.machine === 'sleeping' && <>
-        <Moon aria-hidden="true" className="text-screen-foreground/80" />
-        <p className="text-sm">{t('sleeping')}</p>
-        <Button size="sm" variant="secondary" className="rounded-lg" onClick={() => { void wake() }}><Power data-icon="inline-start" />{t('wake')}</Button>
-      </>}
+    {state && !running && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-[inherit] bg-screen/80 backdrop-blur-sm">
+      {/* Asleep, the caption under the screen says so; the cover only offers 唤醒 (Figma 188:3115). */}
+      {state.machine === 'sleeping' && <Button size="sm" className="h-9 rounded-full bg-screen-foreground/15 px-3.5 text-screen-foreground hover:bg-screen-foreground/25" onClick={() => { void wake() }}><Power data-icon="inline-start" />{t('wake')}</Button>}
       {state.machine === 'waking' && <>
         <Spinner aria-hidden="true" className="text-screen-foreground/80" />
         <p className="text-sm">{t('waking')}</p>

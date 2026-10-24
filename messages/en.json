@@ -2210,6 +2210,7 @@
       "user": "You're in control"
     },
     "screenOf": "{name}'s screen",
+    "screen": "Screen",
     "computerOf": "{name}'s computer",
     "card": "Computer task",
     "cardTitle": "Computer",

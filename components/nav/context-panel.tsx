@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils'
 import { LetterAvatar } from './letter-avatar'
 import { StatusDot } from './status-dot'
 import { AgentComputer } from '@/components/computer/agent-computer'
-import { useConversationComputerAgent } from '@/components/computer/computer-agents'
+import { useConversationThread } from '@/components/computer/computer-agents'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type PanelTab = 'details' | 'tasks' | 'browser' | 'knowledge' | 'schedules'
@@ -195,9 +195,9 @@ export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue
   const now = useNow({ updateInterval: 60_000 })
   const [tab, setTab] = useState<PanelTab>('tasks')
   const [wide, setWide] = useState(false)
-  const computerAgent = useConversationComputerAgent(conversation.kind === 'agent' ? conversation.id : null)
-  // A conversation that uses a bot's computer opens on that bot's 详情, where its screen is (Figma 103:64).
-  useEffect(() => { if (computerAgent?.id) setTab('details') }, [computerAgent?.id])
+  const thread = useConversationThread(conversation.kind === 'agent' ? conversation.id : null)
+  // A conversation whose bot works on its computer opens on that thread's 详情, where the screen is (Figma 103:64).
+  useEffect(() => { if (thread?.runId) setTab('details') }, [thread?.runId])
   const waiting = runs.filter(run => run.status === 'waiting_input' && issues.some(issue => issue.id === run.issueId)).length
   return <aside aria-label={t('label')} className={cn('hidden min-h-0 shrink-0 flex-col border-l transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90')}>
     <Tabs value={tab} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
@@ -215,9 +215,9 @@ export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('close')} onClick={onClose} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('close')}</TooltipContent></Tooltip>
         </div>
       </div>
-      <TabsContent value="details" className={cn('min-h-0', computerAgent ? 'flex flex-col' : 'overflow-y-auto px-4 py-3')}>
-        {computerAgent ? <>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3"><AgentComputer agentId={computerAgent.id} name={computerAgent.name} /></div>
+      <TabsContent value="details" className={cn('min-h-0', thread ? 'flex flex-col' : 'overflow-y-auto px-4 py-3')}>
+        {thread ? <>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3"><AgentComputer key={thread.runId} thread={thread} /></div>
           <CommandComposer />
         </> : <>
         <h2 className="text-xs font-medium text-muted-foreground">{tDetails('conversation')}</h2>

@@ -4,29 +4,30 @@ import { useState } from 'react'
 import { Maximize2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
-import { LetterAvatar } from '@/components/nav/letter-avatar'
+import { ThreadAvatar } from '@/components/nav/bot-avatar'
 import { useComputer } from '@/hooks/use-computer'
+import type { ComputerThread } from './computer-agents'
 import { ComputerScreen } from './computer-screen'
 import { ComputerStatusBadge, computerStatus } from './computer-status'
 import { ComputerViewer } from './computer-viewer'
 
 /**
- * A bot in the 详情 tab, Grok Bot style (Figma 103:64): avatar, name and
- * "X 的屏幕" with its state (the cover says it while asleep or waking).
+ * A thread in the 详情 tab (Figma 103:64, 188:3115): the thread's "#" avatar
+ * and name, then its bot's screen with 屏幕 and the computer's state.
  * 打开 opens the full-window viewer.
  */
-export function AgentComputer({ agentId, name }: { agentId: string; name: string }) {
+export function AgentComputer({ thread }: { thread: ComputerThread }) {
   const t = useTranslations('Computer')
-  const { data: state } = useComputer(agentId)
+  const { data: state } = useComputer(thread.agentId)
   const [viewing, setViewing] = useState(false)
   const status = computerStatus(state)
   return <div className="flex flex-col items-center gap-3 pt-6">
-    <LetterAvatar name={name} size="profile" />
-    <h2 className="pb-3 text-xl font-semibold">{name}</h2>
-    <ComputerScreen agentId={agentId} name={name}>
+    <ThreadAvatar />
+    <h2 className="max-w-full truncate pb-3 text-xl font-semibold">{thread.name}</h2>
+    <ComputerScreen agentId={thread.agentId} name={thread.agentName}>
       <Button size="sm" className="h-9 rounded-full bg-screen/80 px-3.5 text-screen-foreground backdrop-blur-sm hover:bg-screen/90" onClick={() => setViewing(true)}><Maximize2 data-icon="inline-start" />{t('open')}</Button>
     </ComputerScreen>
-    <p className="flex items-center gap-2 text-xs text-muted-foreground">{t('screenOf', { name })}{status && status !== 'sleeping' && status !== 'waking' && <ComputerStatusBadge status={status} />}</p>
-    {viewing && <ComputerViewer agentId={agentId} name={name} open={viewing} onOpenChange={setViewing} />}
+    <p className="flex items-center gap-2 text-xs text-muted-foreground">{t('screen')}{status && <ComputerStatusBadge status={status} />}</p>
+    {viewing && <ComputerViewer agentId={thread.agentId} name={thread.agentName} open={viewing} onOpenChange={setViewing} />}
   </div>
 }

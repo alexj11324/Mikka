@@ -106,8 +106,8 @@ export const agentComponentCatalog = {
     props: z.object({ url: z.string().url().max(2000).refine(value => /^https?:\/\//i.test(value)), label: z.string().min(1).max(80).optional() }),
   },
   ComputerCard: {
-    description: '电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。agentId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。',
-    props: z.object({ agentId: z.string().min(1).max(80), runId: z.string().min(1).max(80), task: z.string().min(1).max(200), state: z.enum(['working', 'approval', 'done', 'failed']).optional(), agentName: z.string().min(1).max(80).optional() }),
+    description: '电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。agentId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working；thread 可选，是这次运行（线程）的名字，例如「#66 预览部署检查」，不是 bot 名。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。',
+    props: z.object({ agentId: z.string().min(1).max(80), runId: z.string().min(1).max(80), task: z.string().min(1).max(200), state: z.enum(['working', 'approval', 'done', 'failed']).optional(), agentName: z.string().min(1).max(80).optional(), thread: z.string().min(1).max(80).optional() }),
   },
   ShadcnCard: {
     description: '本地 shadcn 卡片。用于有标题的建议、说明或内容分组，可嵌套已注册组件。',

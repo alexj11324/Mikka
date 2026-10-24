@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useId } from 'react'
 import { useTranslations } from 'next-intl'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { ChevronRight, Cloud, Laptop, Paperclip, Terminal } from 'lucide-react'
+import { ChevronRight, Laptop, Paperclip, Terminal } from 'lucide-react'
 import { listAgents, listDevices } from '@/app/actions/agents'
 import { sendCoordinatorMessage } from '@/app/actions/coordinator'
 import { useActionError } from '@/lib/use-action-error'
@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { ComputerStatusBadge } from '@/components/computer/computer-status'
 import { useComputer } from '@/hooks/use-computer'
+import { BotAvatar } from '@/components/nav/bot-avatar'
 
 const MAX_LENGTH = 8000
 
@@ -101,10 +102,10 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
       <div className="flex items-center gap-2 pr-8 text-sm">
         {device
           ? <Select value={device.value} onValueChange={value => setPicked(value)} items={machines.map(({ value, label }) => ({ value, label }))}>
-            <SelectTrigger size="sm" className="h-7 gap-1.5 rounded-full px-2.5" aria-label={t('device')}>{device.agentId ? <Cloud aria-hidden="true" className="text-muted-foreground" /> : device.server ? <Terminal aria-hidden="true" className="text-muted-foreground" /> : <Laptop aria-hidden="true" className="text-muted-foreground" />}<SelectValue /></SelectTrigger>
+            <SelectTrigger size="sm" className="h-7 gap-1.5 rounded-full px-2.5" aria-label={t('device')}>{device.agentId ? <BotAvatar id={device.agentId} size="byline" /> : device.server ? <Terminal aria-hidden="true" className="text-muted-foreground" /> : <Laptop aria-hidden="true" className="text-muted-foreground" />}<SelectValue /></SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-72"><SelectGroup>
               {machines.map(item => <SelectItem key={item.value} value={item.value}>
-                {item.agentId ? <Cloud aria-hidden="true" /> : item.server ? <Terminal aria-hidden="true" /> : <Laptop aria-hidden="true" />}<span className="min-w-0 flex-1 truncate pr-3">{item.label}</span>
+                {item.agentId ? <BotAvatar id={item.agentId} size="byline" /> : item.server ? <Terminal aria-hidden="true" /> : <Laptop aria-hidden="true" />}<span className="min-w-0 flex-1 truncate pr-3">{item.label}</span>
                 {item.agentId ? <CloudMachineStatus agentId={item.agentId} /> : <Badge radius="full" size="lg" variant="outline" className={cn('ml-auto shrink-0 border-transparent px-2 font-normal', item.online ? 'bg-success/10 text-success-foreground' : 'bg-muted text-muted-foreground')}><span aria-hidden="true" className="size-1.5 rounded-full bg-current" />{item.online ? t('online') : t('offline')}</Badge>}
               </SelectItem>)}
             </SelectGroup></SelectContent>

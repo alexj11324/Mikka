@@ -403,8 +403,8 @@
         "description": "内联网页来源，例如 pull request 或文档。url 为 http(s) 地址，label 为简短名称，可选；悬停显示网页预览。放在 InlineText 的 parts 里。"
       },
       "ComputerCard": {
-        "signature": "ComputerCard(agentId: string, runId: string, task: string, state?: \"working\" | \"approval\" | \"done\" | \"failed\", agentName?: string)",
-        "description": "电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。agentId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。"
+        "signature": "ComputerCard(agentId: string, runId: string, task: string, state?: \"working\" | \"approval\" | \"done\" | \"failed\", agentName?: string, thread?: string)",
+        "description": "电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。agentId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working；thread 可选，是这次运行（线程）的名字，例如「#66 预览部署检查」，不是 bot 名。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。"
       },
       "ShadcnCard": {
         "signature": "ShadcnCard(title: string, children: any[], description?: string)",
@@ -5140,6 +5140,11 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 80
+            },
+            "thread": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
             }
           },
           "required": [
@@ -5148,7 +5153,7 @@
             "task"
           ],
           "additionalProperties": false,
-          "description": "电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。agentId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。"
+          "description": "电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。agentId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working；thread 可选，是这次运行（线程）的名字，例如「#66 预览部署检查」，不是 bot 名。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。"
         },
         "ShadcnCard": {
           "type": "object",
