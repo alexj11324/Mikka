@@ -1,4 +1,4 @@
-import { test, expect, register, app, openCreateIssue } from './fixtures'
+import { test, expect, register, app, seedTask } from './fixtures'
 
 // Network failure is the action under test, not an ignored application exception.
 test.use({ trace: 'on', expectedConsoleErrors: [{ path: app('/'), message: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED' }] })
@@ -9,6 +9,9 @@ for (const width of [1280, 402]) {
     test(`offline refresh keeps ${layout} bounds stable at ${width}px`, async ({ page, context }, testInfo) => {
       await page.setViewportSize({ width, height: 900 })
       await register(page)
+      const title = `Offline layout ${width} ${layout}`
+      await seedTask(page, title)
+      await page.reload()
       // Use main's responsive rail: phones expose it inside the sidebar.
       if (width < 768) {
         await page.getByRole('button', { name: '展开或收起侧栏', exact: true }).click()
@@ -17,14 +20,9 @@ for (const width of [1280, 402]) {
         await page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name: '看板', exact: true }).click()
       }
       await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
-      const dialog = await openCreateIssue(page)
-      const title = `Offline layout ${width} ${layout}`
-      await dialog.getByLabel('任务标题', { exact: true }).fill(title)
-      await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
-      await expect(dialog).not.toBeVisible()
       await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
       // The toolbar and content fill the same bounds in empty and populated views.
-      const toolbar = page.getByRole('heading', { name: '看板', exact: true }).locator('..').locator('..')
+      const toolbar = page.getByRole('toolbar', { name: '看板工具栏', exact: true })
       const content = page.getByRole('region', { name: '任务看板', exact: true })
       await expect(content.getByRole('group', { name: title, exact: true })).toBeVisible()
       const contentBefore = await content.boundingBox()

@@ -1,14 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register, rail, openCreateIssue, openIssueFromSearch } from './fixtures'
-
-async function createIssue(page: Page, title: string) {
-  if (await rail(page, '看板').getAttribute('aria-current') !== 'page') await rail(page, '看板').click()
-  const dialog = await openCreateIssue(page)
-  await dialog.getByLabel('任务标题', { exact: true }).fill(title)
-  await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
-  await expect(dialog).not.toBeVisible()
-}
+import { test, expect, register, rail, seedTask, openIssueFromSearch } from './fixtures'
 
 async function openIssue(page: Page, title: string) {
   await openIssueFromSearch(page, title)
@@ -40,8 +32,9 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     const parent = `关系父任务 ${suffix}`
     const child = `关系子任务 ${suffix}`
     const blocker = `前置阻塞任务 ${suffix}`
-    await createIssue(page, parent)
-    await createIssue(page, blocker)
+    await seedTask(page, parent)
+    await seedTask(page, blocker)
+    await page.reload()
     await rail(page, '看板').click()
     await openIssue(page, parent)
     const parentUrl = page.url()

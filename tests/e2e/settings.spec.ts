@@ -11,7 +11,8 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
     await route.continue()
   })
   await register(page)
-  const workspaceSidebar = page.locator('[data-slot="sidebar-container"]')
+  // The conversation list is an in-flow sidebar (collapsible="none"), not the offcanvas container.
+  const workspaceSidebar = page.locator('[data-slot="sidebar"]')
   await expect(workspaceSidebar.getByRole('button', { name: '新对话', exact: true })).toBeVisible()
   await expect(workspaceSidebar.getByRole('link', { name: '浏览与管理团队', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeEnabled()

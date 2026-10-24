@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, rail, app, openCreateIssue, openIssueFromSearch } from './fixtures'
+import { test, expect, register, rail, app, seedTask, openIssueFromSearch } from './fixtures'
 
 test.use({ expectedConsoleErrors: [{ path: app('/api/auth/sign-out'), message: 'Failed to load resource: the server responded with a status of 400 (Bad Request)' }] })
 
@@ -84,11 +84,9 @@ for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
 test('sign-out waits for editor validation and preserves saved edits when revocation fails', async ({ page }) => {
   await register(page)
   const original = `退出保存 ${randomUUID()}`
+  await seedTask(page, original)
+  await page.reload()
   await rail(page, '看板').click()
-  const create = await openCreateIssue(page)
-  await create.getByLabel('任务标题', { exact: true }).fill(original)
-  await create.getByRole('button', { name: '创建任务', exact: true }).click()
-  await expect(create).not.toBeVisible()
   await openIssueFromSearch(page, original)
   const title = page.getByLabel('任务标题', { exact: true })
   await expect(title).toHaveValue(original)

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register, rail, browserClientHeaders, watchRuntime, app, BASE_PATH, openCreateIssue } from './fixtures'
+import { test, expect, register, rail, browserClientHeaders, watchRuntime, app, BASE_PATH, seedTask, openIssueFromSearch } from './fixtures'
 
 async function createTeam(page: Page, name: string, identifier: string) {
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
@@ -14,20 +14,27 @@ async function createTeam(page: Page, name: string, identifier: string) {
   await expect(page.getByRole('row').filter({ hasText: name })).toBeVisible()
 }
 async function createTask(page: Page, title: string, team?: string) {
-  if (await rail(page, '看板').getAttribute('aria-current') !== 'page') await rail(page, '看板').click()
-  const dialog = await openCreateIssue(page)
-  await dialog.getByLabel('任务标题', { exact: true }).fill(title)
-  // Create-issue dialog renders a NativeSelect: drive it with selectOption.
-  await dialog.getByRole('combobox', { name: '团队', exact: true }).selectOption(team ? { label: team } : '')
-  await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
-  await expect(dialog).not.toBeVisible()
+  await seedTask(page, title)
+  await page.reload()
+  if (!team) return
+  await openIssueFromSearch(page, title)
+  const teamSelect = page.getByRole('combobox', { name: '团队', exact: true })
+  await teamSelect.click()
+  await page.getByRole('option', { name: team, exact: true }).click()
+  const save = page.getByRole('button', { name: '保存团队归属', exact: true })
+  // Moving a task between teams asks for confirmation first.
+  page.once('dialog', dialog => { void dialog.accept() })
+  await save.click()
+  await expect(save).toHaveCount(0)
+  await expect(teamSelect).toContainText(team)
+  await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
 }
 async function showAllTasks(page: Page) {
   await rail(page, '看板').click()
-  // The board opens on 只看我的; teammates' public tasks need it off.
-  const onlyMine = page.getByRole('switch', { name: '只看我的', exact: true })
-  if (await onlyMine.isChecked()) await onlyMine.click()
-  await expect(onlyMine).not.toBeChecked()
+  // The board opens filtered to 负责人 = 我; teammates' public tasks need it off.
+  const clear = page.getByRole('button', { name: '移除负责人筛选', exact: true })
+  if (await clear.isVisible()) await clear.click()
+  await expect(clear).toHaveCount(0)
 }
 function boardCard(page: Page, title: string) {
   return page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })

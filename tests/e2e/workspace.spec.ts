@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, rail, app, openCreateIssue, openIssueFromSearch } from './fixtures'
+import { test, expect, register, rail, app, openCreateIssue, openIssueFromSearch, seedTask } from './fixtures'
 
 test('未登录访问受保护页面、注册和登录链接', async ({ page }) => {
   await page.goto(app('/settings/members'))
@@ -68,14 +68,15 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await expect(page.getByRole('button', { name: /^Coordinator/ })).toHaveAttribute('aria-current', 'page')
   await rail(page, '看板').click()
   await expect(page.getByRole('heading', { name: '看板', exact: true })).toBeVisible()
+  // A new task is a sentence for the Coordinator; it lands in the board's conversation.
   const dialog = await openCreateIssue(page)
-  const title = `按钮回归 ${randomUUID()}`
-  await dialog.getByLabel('任务标题', { exact: true }).fill(title)
-  await dialog.getByRole('button', { name: /^任务状态/ }).click()
-  await page.getByRole('menuitem', { name: '进行中', exact: true }).click()
+  const request = `把群聊未读数接到侧栏 ${randomUUID()}`
+  await dialog.getByLabel('任务描述', { exact: true }).fill(request)
   await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
   await expect(dialog).not.toBeVisible()
-  await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
+  await expect(page.getByRole('complementary', { name: 'Coordinator', exact: true }).getByText(request)).toBeVisible()
+  const title = `按钮回归 ${randomUUID()}`
+  await seedTask(page, title, { status: 'doing' })
   await page.reload()
   await rail(page, '看板').click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
