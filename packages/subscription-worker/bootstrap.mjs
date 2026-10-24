@@ -67,7 +67,7 @@ if (!head) {
 }
 if (git("-C", upstream, "rev-parse", "HEAD") !== pin)
   throw new Error("Existing CPA checkout has a different pin; preserved")
-if (git("-C", upstream, "diff", "--name-only"))
+if (git("-C", upstream, "diff", "--name-only", "HEAD", "--"))
   throw new Error("Tracked CPA modifications found; preserved")
 const untracked = git(
   "-C",
@@ -78,12 +78,19 @@ const untracked = git(
 )
   .split("\n")
   .filter(Boolean)
-if (untracked.some((path) => path !== "sdk/mikkaadapter/bridge.go"))
+const bridges = [
+  ["compat/bridge.go.txt", "sdk/mikkaadapter/bridge.go"],
+  ["compat/codex-http.go.txt", "internal/auth/codex/mikka_http.go"],
+  ["compat/claude-http.go.txt", "internal/auth/claude/mikka_http.go"]
+]
+if (untracked.some((path) => !bridges.some(([, target]) => path === target)))
   throw new Error("Unexpected untracked CPA files; preserved")
-const bridge = readFileSync(join(root, "compat/bridge.go.txt"), "utf8")
-const target = join(upstream, "sdk/mikkaadapter/bridge.go")
-if (existsSync(target) && readFileSync(target, "utf8") !== bridge)
-  throw new Error("Modified CPA type bridge found; preserved")
-mkdirSync(join(upstream, "sdk/mikkaadapter"), { recursive: true, mode: 0o700 })
-writeFileSync(target, bridge, { mode: 0o600 })
+for (const [source, destination] of bridges) {
+  const bridge = readFileSync(join(root, source), "utf8")
+  const target = join(upstream, destination)
+  if (existsSync(target) && readFileSync(target, "utf8") !== bridge)
+    throw new Error("Modified CPA bridge found; preserved")
+  mkdirSync(join(upstream, destination.substring(0, destination.lastIndexOf('/'))), { recursive: true, mode: 0o700 })
+  writeFileSync(target, bridge, { mode: 0o600 })
+}
 console.log(`CPA source verified: ${pin}; credential type bridge installed`)

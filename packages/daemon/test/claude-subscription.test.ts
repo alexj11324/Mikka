@@ -11,6 +11,13 @@ import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
 
 afterEach(cleanupTempDirs)
 
+it('rechecks revocation after native initialization before delivering the first prompt', async () => {
+  const verify = vi.fn(async () => { throw new Error('fixture-access revoked') })
+  const { adapter, options } = await fixture({ accountId: 'fixture-account', verify, token: async () => ({ accountId: 'fixture-account', accessToken: 'fixture-access', expiresAt: new Date(Date.now() + 60000).toISOString() }) })
+  await expect(adapter.start(options)).rejects.toThrow('Claude subscription authentication unavailable')
+  expect(verify).toHaveBeenCalledOnce()
+})
+
 async function fixture(
   subscriptionAuth?: ClaudeAdapterOptions["subscriptionAuth"]
 ) {

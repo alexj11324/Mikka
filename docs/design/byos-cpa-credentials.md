@@ -1,5 +1,10 @@
 # CPA subscription credentials: storage and lifecycle adapter
 
+Current source wiring, validation and activation prerequisites are recorded in
+[BYOS integration](byos-integration.md). Both acquisition adapters, the HTTP
+ceremony, streaming model adapter and private native launcher are implemented
+behind disabled flags. No real provider compatibility is implied by mock tests.
+
 Engineering review, 2026-10-24. The requested acquisition path is **CPA's Codex
 and Claude subscription login**, followed by platform custody and reuse. It is
 not a switch to generic SaaS OAuth or an SIWC-only product. Infisical is the
@@ -33,11 +38,12 @@ CPA's [`CodexAuthenticator`](https://github.com/router-for-me/CLIProxyAPI/blob/8
 supports PKCE/browser login and a device flow; callback defaults to port 1455.
 [`ClaudeAuthenticator`](https://github.com/router-for-me/CLIProxyAPI/blob/8289ec4c71ad914d0612c2776352b76ba3d355a6/sdk/auth/claude.go)
 uses PKCE/browser callback (default 54545), with a prompt fallback. Hosted
-callback routing, concurrent attempts, state/expiry/one-time consumption and
-safe event delivery need a dedicated live adapter. Their CLI-oriented URL
-printing must not become unrestricted application logs. The shipped executable
-does not register these live authenticators. Synthetic tests inject a fixture
-authenticator into CPA's real login manager; no real provider flow ran here.
+callback routing requires a verified client/redirect pair. Mikka now implements
+session-bound PKCE/state/TTL/one-time callback handling and separate ordinary
+HTTP acquisition adapters. The executable never registers these CLI-oriented
+authenticators or their unrestricted URL printing. Both adapters are disabled
+by default; actual provider services/types are tested against TLS fixtures.
+No real provider flow ran here.
 
 ## Infisical-compatible design
 
@@ -99,15 +105,14 @@ not implemented by logical disconnect.
 
 | Consumer | CPA-compatible execution design | Remaining compatibility proof |
 | --- | --- | --- |
-| Mikka own harness | Explicit `codex_cpa` / `claude_cpa` binding targets the implemented owner-scoped worker/store. Tests use real CPA login/refresh managers and injected HTTP fixture adapters for inference | Live provider authenticators/executors remain unregistered; fixed upstream transport, OAuth ceremony, model streaming into AI SDK, quota/consumer authorization and production connection APIs still need wiring |
-| Hosted native Codex | The worker supplies an access-only private `chatgptAuthTokens` helper. The daemon accepts a trusted owner-bound broker, enables the experimental login RPC, services host-refresh callbacks, checks the account, avoids native auth links and refuses paid-mode fallback. Eight fake app-server tests cover this boundary | Worker-to-daemon broker transport/launcher registration and actual CPA token audience/pinned CLI compatibility remain unimplemented/unverified. SIWC routes are refused by the native helper; CPA JSON is not native `auth.json`; native CLI never receives the rotating grant |
-| Hosted native Claude Code | Private worker access-lease helper plus optional daemon broker mode use `CLAUDE_CODE_OAUTH_TOKEN`, a separate runtime home and forced Claude account login method. SDK `accountInfo()` must report first-party/no-API-key mode before any prompt. Seven fake CLI tests cover delivery, account/expiry refusal, paid/gateway mode refusal and redaction | No documented SDK host-refresh callback: the child ends at access expiry; CPA refreshes before the next start. Real CPA grant scopes/native token acceptance, private broker/launcher wiring and runtime isolation remain unverified. CPA JSON is never written as native `.credentials.json` |
+| Mikka own harness | Agent route resolves persisted owner/consumer bindings and streams through private Go RPC, actual CPA converters and ordinary Mikka HTTP transports. HTTP consent/store/tool-stream/error/cancel/revocation integration tests pass | Actual provider client/redirect, eligibility, model API compatibility and billing controls remain unverified. Built-in identity-cloaking model executors are excluded |
+| Hosted native Codex | Access-only `chatgptAuthTokens`, host refresh callback, service dispatch and private native launcher are wired; nine fake app-server tests and the application integration pass | Actual CPA audience/pinned CLI and verified E2B runner remain unverified. SIWC is not silently converted. The CLI receives no refresh grant |
+| Hosted native Claude Code | Private lease, service dispatch and native launcher use the documented OAuth input, separate runtime home and account-mode check; eight fake CLI tests and application integration pass | No documented host refresh callback: the child ends at expiry and the next start reuses CPA refresh authority. Real scopes/native acceptance and verified E2B runner remain unverified; no native credential-file import/projection |
 
-One Mikka connection can hold provider-specific grants. Connecting once means
+One Mikka connection represents one provider account and serves both consumers. Connecting once means
 reuse across normal tasks and worker restarts, not a promise that every token
-works in both consumers. Disclose separate initial consent if required. Future
-native projection, if approved, must be outside shared project files, atomic,
-owner-only and protected by a verified runtime boundary. A native process that
+works in both consumers. Disclose separate initial consent if required. Native
+credential-file import/projection is outside this feature. A native process that
 must hold a credential can expose it if compromised; never claim absolute
 secrecy. No projection or credential-file reading was implemented/run here.
 
@@ -126,8 +131,8 @@ directory alone cannot provide that security boundary.
 The [official Codex app-server authentication reference](https://learn.chatgpt.com/docs/app-server#authentication)
 documents `chatgptAuthTokens` and `account/chatgptAuthTokens/refresh` for hosts
 that own auth lifecycle; it is experimental and does not prove CPA credential
-compatibility. Managed native login remains a fallback integration option under
-the same account, with any distinct initial consent disclosed. Claude's
+compatibility. Existing local native login is independent; it is not an
+acquisition/import fallback for platform BYOS. Claude's
 [documented native auth inputs](https://code.claude.com/docs/en/authentication)
 also require a version-specific compatibility test; the environment's OAuth
 token input is not evidence that arbitrary CPA JSON is a native credential.
@@ -144,10 +149,11 @@ CPA commit. We reuse the ownership/worker separation as a design reference,
 without copying Comma's AGPL source or building its account-pool fallback.
 
 CPA contains client identity/fingerprint/cloaking paths. Reusing it wholesale
-would include behavior this phase explicitly excludes. The next worker design
-must inventory and disable/remove those paths before registering live executors, using reviewed upstream
-extension points or a narrowly maintained patch; if not separable, return that
-specific blocker rather than copying the transport and calling it supported.
+would include behavior this phase explicitly excludes. The implemented plain
+Mikka adapters use narrow HTTP constructor/exchange bridges and CPA converters;
+they exclude built-in model executors, generated native identity metadata and
+fingerprint transports. The current integration document records exact source
+differences and unverified live compatibility rather than calling it supported.
 The worker now depends on the pinned CPA SDK; its MIT license is preserved in
 `packages/subscription-worker/third_party`. A small original type-alias bridge
 exposes actual upstream credential structs/patch logic without changing tracked

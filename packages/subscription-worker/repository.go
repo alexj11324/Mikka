@@ -83,7 +83,7 @@ func (r *Repository) BeginAcquire(ctx context.Context, s Scope, epoch int64) (Op
 		return Operation{}, ErrUnavailable
 	}
 	operation := newID()
-	record, err := scanRecord(r.DB.QueryRowContext(ctx, `update byos_connections set epoch=epoch+1,state='pending',"operationId"=$5,"operationKind"='acquire',"operationDeadline"=now()+interval '5 minutes',"stagedSecretName"=null,"stagedDigest"=null,"lastErrorCode"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$6 returning `+columns, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, operation, epoch))
+	record, err := scanRecord(r.DB.QueryRowContext(ctx, `update byos_connections set epoch=epoch+1,state='pending',quota=null,"operationId"=$5,"operationKind"='acquire',"operationDeadline"=now()+interval '5 minutes',"stagedSecretName"=null,"stagedDigest"=null,"lastErrorCode"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$6 returning `+columns, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, operation, epoch))
 	if err == ErrUnavailable {
 		return Operation{}, ErrStale
 	}
@@ -147,7 +147,7 @@ func (r *Repository) Disconnect(ctx context.Context, s Scope, epoch int64) error
 	if !validScope(s) {
 		return ErrUnavailable
 	}
-	result, err := r.DB.ExecContext(ctx, `update byos_connections set state='disconnected',epoch=epoch+1,"operationId"=null,"operationKind"=null,"operationDeadline"=null,"stagedSecretName"=null,"stagedDigest"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$5`, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, epoch)
+	result, err := r.DB.ExecContext(ctx, `update byos_connections set state='disconnected',epoch=epoch+1,quota=null,"operationId"=null,"operationKind"=null,"operationDeadline"=null,"stagedSecretName"=null,"stagedDigest"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$5`, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, epoch)
 	if err != nil {
 		return ErrDatabase
 	}

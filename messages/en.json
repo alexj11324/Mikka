@@ -1384,6 +1384,17 @@
     }
   },
   "Settings": {
+    "subscriptions": {
+      "title": "Subscriptions",
+      "description": "Connect your own account through the provider’s sign-in page. Mikka stores the authorized connection for future tasks.",
+      "reuse": "Connect once and reuse across supported tasks.",
+      "unavailable": "Not available yet.",
+      "connected": "Connected",
+      "connect": "Connect subscription",
+      "reconnect": "Reconnect",
+      "disconnect": "Disconnect",
+      "error": "The subscription could not be updated. Please try again."
+    },
     "title": "Settings",
     "backToApp": "Back to app",
     "searchLabel": "Search settings",
@@ -1938,6 +1949,7 @@
     }
   },
   "AgentCopy": {
+    "subscriptionConnectionFailed": "The subscription connection failed. Received content is preserved; check the connection and retry.",
     "pleaseSignInFirst": "Please sign in first.",
     "invalidConversationID": "Invalid conversation ID.",
     "unableToLoadChatHistoryPleaseTry": "Unable to load chat history. Please try again.",

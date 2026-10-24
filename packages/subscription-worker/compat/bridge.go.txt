@@ -6,9 +6,27 @@ package mikkaadapter
 import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
+	claudeconvert "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/claude/openai/chat-completions"
+	codexconvert "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/codex/openai/chat-completions"
 )
 
 type CodexTokenStorage = codex.CodexTokenStorage
 type ClaudeTokenStorage = claude.ClaudeTokenStorage
 
 var NewCredentialRefreshPatch = codex.NewCredentialRefreshPatch
+
+type CodexPKCECodes = codex.PKCECodes
+type CodexAuthBundle = codex.CodexAuthBundle
+
+var NewCodexAuth = codex.NewCodexAuth
+var NewCodexAuthWithHTTPClient = codex.NewMikkaAuth
+
+type ClaudePKCECodes = claude.PKCECodes
+type ClaudeAuthBundle = claude.ClaudeAuthBundle
+
+var NewClaudeAuthWithHTTPClient = claude.NewMikkaAuth
+
+var OpenAIToClaude = claudeconvert.ConvertOpenAIRequestToClaude
+var ClaudeToOpenAIStream = claudeconvert.ConvertClaudeResponseToOpenAI
+var OpenAIToCodex = codexconvert.ConvertOpenAIRequestToCodex
+var CodexToOpenAIStream = codexconvert.ConvertCodexResponseToOpenAI

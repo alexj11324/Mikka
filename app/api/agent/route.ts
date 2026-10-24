@@ -12,6 +12,8 @@ import { persistAgentStream } from '@/lib/agent-history'
 import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
 import { agentModelSourceSchema, resolveAgentModel } from '@/lib/agent-model'
 import { SubscriptionRefusal } from '@mikka/protocol/subscription'
+import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
+import { resolveAgentSubscription } from '@/lib/agent-subscription'
 
 export const maxDuration = 300
 
@@ -78,10 +80,16 @@ export async function POST(request: Request) {
   const sessionId = parsed.data.sessionId ?? crypto.randomUUID()
   const turnId = parsed.data.turnId ?? crypto.randomUUID()
   let model: Awaited<ReturnType<typeof resolveAgentModel>>
+  let modelSource = parsed.data.modelSource
   try {
-    model = await resolveAgentModel(parsed.data.modelSource, {
-      // BYOS backend is deliberately unregistered until provider eligibility,
-      // durable account binding and credential isolation have been validated.
+    if (!modelSource && process.env.MIKKA_BYOS_ENABLED === '1') {
+      const saved = await subscriptionRuntime().repository.defaultModelBinding(session.user.id, sessionId)
+      if (saved) modelSource = { type: 'subscription', bindingId: saved }
+    }
+    model = await resolveAgentModel(modelSource, {
+      subscriptionModel: async bindingId => {
+        return resolveAgentSubscription(session.user.id, sessionId, bindingId, subscriptionRuntime(), authorizeSubscriptionWorkspace, request.signal)
+      },
       defaultModel: () => {
         const apiKey = process.env.OPENCODE_API_KEY
         if (!apiKey) throw new Error('default_model_unavailable')
@@ -94,6 +102,7 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     if (error instanceof SubscriptionRefusal) return Response.json({ error: error.code }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } })
+    if (modelSource) return Response.json({ error: 'backend_unavailable' }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } })
     return new Response(agentCopy.opencodeapikeyIsNotConfiguredOnTheServer, { status: 503, headers: errorHeaders })
   }
   let turn: Awaited<ReturnType<typeof beginAgentTurn>>
@@ -113,6 +122,7 @@ export async function POST(request: Request) {
   }
   messages.push({ role: 'user', content: parsed.data.prompt })
 
+  const generationError = modelSource ? () => agentCopy.subscriptionConnectionFailed : agentErrorMessage
   const result = streamText({
     model,
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
@@ -124,11 +134,11 @@ export async function POST(request: Request) {
     },
     stopWhen: isStepCount(5),
     prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
-    maxRetries: 1,
+    maxRetries: modelSource ? 0 : 1,
     timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
     abortSignal: request.signal,
     onError: ({ error }) => {
-      if (!request.signal.aborted) console.error('Agent generation failed:', agentErrorMessage(error))
+      if (!request.signal.aborted) console.error('Agent generation failed:', generationError(error))
     },
   })
   return createUIMessageStreamResponse({
@@ -139,7 +149,7 @@ export async function POST(request: Request) {
     stream: persistAgentStream(toUIMessageStream({
       stream: result.stream,
       sendReasoning: false,
-      onError: agentErrorMessage,
+      onError: generationError,
     }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),
   })
 }

@@ -129,6 +129,8 @@ export interface SubscriptionAccess {
   binding: SubscriptionBinding | null
   connection: SubscriptionConnection | null
   backend: SubscriptionBackend | null
+  // Trusted durable-operation metadata, never accepted from browser assertions.
+  credentialTransition?: 'refreshing' | 'publication_pending'
 }
 
 // Unknown, stale, wrong-vendor or empty usage is not evidence of free capacity.

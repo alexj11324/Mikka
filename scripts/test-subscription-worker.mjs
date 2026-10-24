@@ -135,9 +135,13 @@ try {
     "golang:1.26.10-bookworm@sha256:632dff7351799a5a9954a48dc06670ade72ee44e8c351cdc0e5a57af2fea21af",
     "sh",
     "-c",
-    "go build -mod=readonly -o bin/mikka-subscription-worker ./cmd/mikka-subscription-worker && go test -mod=readonly -race -timeout 90s -count=1 -v ./... && go vet -mod=readonly ./... && ./bin/mikka-subscription-worker --version"
+    "CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-worker ./cmd/mikka-subscription-worker && CGO_ENABLED=0 go build -mod=readonly -tags mikka_byos_fixture -o bin/mikka-subscription-fixture ./testfixture && go test -mod=readonly -race -timeout 90s -count=1 -v ./... && go vet -mod=readonly ./... && ./bin/mikka-subscription-worker --version"
   )
   await run("docker", dockerArgs)
+  await run(process.execPath, ["--import", "tsx", "--test", "tests/byos-application.test.mjs"], {
+    ...baseEnv, NODE_ENV: "test", MIKKA_BYOS_TEST_DATABASE_URL: url,
+    MIKKA_BYOS_FIXTURE_BINARY: `${worker}bin/mikka-subscription-fixture`
+  })
   await run(process.execPath, ["scripts/migrate.mjs"], migrationEnv)
   const { rows } = await pool.query(
     "select count(*)::int as migrations from schema_migrations"

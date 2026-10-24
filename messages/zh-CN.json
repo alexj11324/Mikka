@@ -1384,6 +1384,17 @@
     }
   },
   "Settings": {
+    "subscriptions": {
+      "title": "订阅账号",
+      "description": "通过服务商的登录页面连接你自己的账号。Mikka 会保管授权连接，用于后续任务。",
+      "reuse": "连接一次，即可在支持的任务中复用。",
+      "unavailable": "暂未开放。",
+      "connected": "已连接",
+      "connect": "连接订阅",
+      "reconnect": "重新连接",
+      "disconnect": "断开连接",
+      "error": "暂时无法更新订阅，请重试。"
+    },
     "title": "设置",
     "backToApp": "返回应用",
     "searchLabel": "搜索设置",
@@ -1938,6 +1949,7 @@
     }
   },
   "AgentCopy": {
+    "subscriptionConnectionFailed": "订阅连接暂时不可用，已收到的内容已保留。请检查连接后重试。",
     "pleaseSignInFirst": "请先登录。",
     "invalidConversationID": "会话标识无效。",
     "unableToLoadChatHistoryPleaseTry": "无法读取聊天历史，请稍后重试。",

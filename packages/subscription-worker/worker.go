@@ -32,6 +32,7 @@ type Worker struct {
 	Scope         Scope
 	Authenticator sdkauth.Authenticator
 	Executor      core.ProviderExecutor
+	OAuth         OAuthProvider
 }
 
 func (w *Worker) store(operation *Operation) *Store {

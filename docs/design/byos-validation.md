@@ -1,5 +1,9 @@
 # Issue #172 foundation: Linux validation record
 
+This is the historical phase-one/two record. Current source wiring and final
+phase-three checks are in [BYOS integration](byos-integration.md); its status
+supersedes the deferred-wiring statements below.
+
 2026-10-24, Agent-owned cloud Linux, branch
 `codex/issue-172-byos-foundation`. No user Mac or v0 preview was used.
 This is a tested foundation, not activated dual-provider BYOS.

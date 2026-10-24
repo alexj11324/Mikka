@@ -10,6 +10,13 @@ import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
 
 afterEach(cleanupTempDirs)
 
+it('rechecks revocation after initialization before starting the first native turn', async () => {
+  const verify = vi.fn(async () => { throw new Error('fixture-access revoked') })
+  const { adapter, options } = await fixture({ accountId: 'fixture-account', verify, token: async () => ({ accessToken: 'fixture-access', chatgptAccountId: 'fixture-account' }) })
+  await expect(adapter.start(options)).rejects.toThrow('Codex subscription authentication unavailable')
+  expect(verify).toHaveBeenCalledOnce()
+})
+
 async function fixture(token?: CodexAdapterOptions["subscriptionAuth"]) {
   const home = tempDir("mikka-native-owner-")
   const userHome = join(home, "native")

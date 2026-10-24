@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	worker "github.com/alexj11324/Mikka/subscription-worker"
@@ -37,13 +39,19 @@ func run() error {
 		return worker.ErrUnsupported
 	}
 	var config struct {
-		Scope       worker.Scope `json:"scope"`
-		DatabaseURL string       `json:"databaseUrl"`
-		Origin      string       `json:"infisicalOrigin"`
-		Project     string       `json:"project"`
-		Environment string       `json:"environment"`
-		Path        string       `json:"path"`
-		Token       string       `json:"workloadToken"`
+		Scope             worker.Scope `json:"scope"`
+		DatabaseURL       string       `json:"databaseUrl"`
+		Origin            string       `json:"infisicalOrigin"`
+		Project           string       `json:"project"`
+		Environment       string       `json:"environment"`
+		Path              string       `json:"path"`
+		Token             string       `json:"workloadToken"`
+		EnableCodexOAuth  bool         `json:"enableCodexOAuth"`
+		EnableRuntime     bool         `json:"enableRuntime"`
+		EnablePlainModels bool         `json:"enablePlainModels"`
+		EnableClaudeOAuth bool         `json:"enableClaudeOAuth"`
+		ClaudeRedirectURI string       `json:"claudeRedirectUri"`
+		RedirectURI       string       `json:"redirectUri"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(frame))
 	decoder.DisallowUnknownFields()
@@ -69,5 +77,25 @@ func run() error {
 		return err
 	}
 	w := worker.Worker{Repo: &worker.Repository{DB: db}, Secrets: secrets, Scope: config.Scope}
-	return w.Serve(context.Background(), input, os.Stdout)
+	if config.EnableRuntime {
+		if config.Scope.Provider == "codex" {
+			w.Executor = worker.CPACodexLifecycle{}
+		} else if config.Scope.Provider == "claude" {
+			w.Executor = worker.CPAClaudeLifecycle{}
+		}
+	}
+	if config.EnableCodexOAuth && config.Scope.Provider == "codex" {
+		w.OAuth = worker.CPACodexOAuth{RedirectURI: config.RedirectURI}
+		w.Executor = worker.CPACodexLifecycle{}
+	}
+	if config.EnableClaudeOAuth && config.Scope.Provider == "claude" {
+		w.OAuth = worker.CPAClaudeOAuth{RedirectURI: config.ClaudeRedirectURI}
+		w.Executor = worker.CPAClaudeLifecycle{}
+	}
+	if config.EnablePlainModels && w.Executor != nil {
+		w.Executor = worker.CPAPlainModel{ProviderExecutor: w.Executor, Provider: config.Scope.Provider}
+	}
+	runtimeCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+	return w.Serve(runtimeCtx, input, os.Stdout)
 }

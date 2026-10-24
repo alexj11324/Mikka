@@ -10,12 +10,15 @@ connected subscriptions and be able to operate E2B terminal, browser and CUA
 tools. Compute, model authorization and execution harness are independent axes.
 The Mikka harness may run outside E2B and call its authorized tools remotely.
 
-**Delivery status:** routing/refusal policy and model/native-adapter seams are
-implemented. A pinned CPA worker/store now implements SDK acquisition/refresh,
-canonical credential hydration, Infisical v4 publication and Postgres fencing,
-tested with synthetic grants and HTTP fakes. Live providers/connect UI remain
-unregistered. No real account was connected or secret configured, and no E2B
-machine was provisioned. The viewer APIs below remain a target, not shipped APIs.
+**Delivery status:** the gated Settings OAuth entry, authenticated connection and
+binding APIs, AI SDK/private-worker streaming, and native broker/launcher are now
+wired. A pinned CPA worker implements acquisition/refresh, canonical hydration,
+plain Mikka provider transports, Infisical v4 publication and Postgres fencing.
+Cloud Linux acceptance covers synthetic consent, actual CPA converters, TLS
+provider/Infisical fixtures, native fake CLIs and Chromium. See the current
+[source integration and activation handoff](byos-integration.md). All live
+capabilities remain off/unverified: no real grant, secret configuration, provider
+inference or E2B provisioning occurred. The viewer APIs below remain a target.
 
 - Design review page: https://claude.ai/artifact/G8aEuFM4rwvGFeZbPYyVwU
 - Figma: file `zPe5LKycb2XuT1ivCLRw07`, section "云端电脑" (node `102:65`)
@@ -303,8 +306,8 @@ or credential. Workspace membership alone grants no subscription access.
 | --- | --- | --- |
 | `codex_cli` | `CodexAdapter`, official app-server | Optional host-managed token login/refresh bridge implemented and fake-tested; CPA audience, pinned CLI and isolated runner remain unverified |
 | `claude_code_cli` | `ClaudeAdapter`, Agent SDK bundled CLI | Optional access-lease broker mode, first-party/no-API-key mode check and expiry stop implemented/fake-tested; real CPA token scopes/native acceptance and isolated runner remain unverified |
-| `codex_cpa` | Mikka's existing AI SDK `streamText` loop | CPA-acquired Codex grant, owner-scoped executor/broker; implementation, transport and provider release gates remain |
-| `claude_cpa` | Same AI SDK model seam | CPA-acquired Claude grant, owner-scoped executor/broker; implementation, transport and provider release gates remain |
+| `codex_cpa` | Mikka's existing AI SDK `streamText` loop | CPA grant/store and plain Mikka HTTP/converter stream are wired and fixture-tested; real provider compatibility remains unverified |
+| `claude_cpa` | Same AI SDK model seam | Same source integration with plain Claude transport; real OAuth scopes and provider compatibility remain unverified |
 | `openai_siwc` | Optional separate AI SDK model route | Public SIWC direct plan access exists; Mikka's remote/paid admission unestablished; does not replace the CPA route |
 
 For CPA-hosted credentials, the optional daemon bridge uses experimental
@@ -366,17 +369,17 @@ session continuation is refused until an owner/revision/session ledger exists;
 this does not require a new provider login for each new task.
 
 `POST /api/agent` accepts an optional explicit
-`modelSource: {type:"subscription", bindingId:"<uuid>"}`. The production BYOS
-factory is deliberately unregistered, so that selection returns HTTP 409 with
-`backend_unavailable` before reading a paid-provider key or persisting a turn.
-Existing default-model requests retain their current behavior. No fallback to
-API billing or another account is permitted after a BYOS selection.
+`modelSource: {type:"subscription", bindingId:"<uuid>"}`. The source factory now
+resolves durable owner/consumer bindings and calls the private worker. A saved
+chat binding is reused when the browser omits the field; disconnected or stale
+bindings refuse use rather than revert to the paid default. Without enabled,
+validated backend configuration, BYOS returns HTTP 409 before paid-key lookup
+or turn persistence. Ordinary unbound default-model requests retain their
+behavior. No API billing or other-account fallback is permitted after selection.
 
-The live consumer-to-source preference still needs durable server-side storage:
-once a bot/session selects BYOS, subsequent tasks must resolve that binding
-automatically. Omitting a browser field must not revert a saved BYOS preference
-to the paid default. This foundation exposes no connection/selection UI and
-does not persist such preferences or register a production backend.
+Settings now has a gated new-OAuth connection entry. The connection, callback,
+binding and lifecycle HTTP routes are wired; source-level mock acceptance is
+documented in [BYOS integration](byos-integration.md). This is not live activation.
 
 The shared E2B tool plane must authorize owner, workspace, bot, desktop and run
 independently of model selection. Both harnesses use the same reviewed #161

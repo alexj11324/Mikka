@@ -62,6 +62,7 @@ export interface CodexAdapterOptions {
   /** Trusted, owner-bound broker only; never a task/model-supplied credential. */
   subscriptionAuth?: {
     accountId: string
+    verify?(): Promise<void>
     /** `true` handles the official app-server's explicit token-refresh request. */
     token(forceRefresh: boolean): Promise<ChatGPTAuthTokens>
   }
@@ -486,6 +487,9 @@ export class CodexAdapter implements AgentAdapter {
     let sessionId = threadId ?? ""
     const startTurn = async (message: string) => {
       lastError = undefined
+      if (externalAuth?.verify) {
+        try { await externalAuth.verify() } catch { throw new Error(SUBSCRIPTION_AUTH_ERROR) }
+      }
       const result = rpc.sendRequest<{ turn: { id: string } }>("turn/start", {
         threadId: sessionId,
         input: text(message)

@@ -290,7 +290,7 @@ func fixtureWorker(t *testing.T, provider string) (*Worker, *fakeInfisical, *fak
 	t.Cleanup(func() { _, _ = db.Exec(`delete from byos_connections where id=$1`, s.ConnectionID) })
 	inf, secrets := newFakeInfisical(t)
 	issuer := newFakeProvider(t, provider)
-	return &Worker{repo, secrets, s, fakeAuthenticator{issuer}, fakeExecutor{issuer}}, inf, issuer
+	return &Worker{Repo: repo, Secrets: secrets, Scope: s, Authenticator: fakeAuthenticator{issuer}, Executor: fakeExecutor{issuer}}, inf, issuer
 }
 func mustAcquire(t *testing.T, w *Worker) Metadata {
 	t.Helper()
@@ -321,7 +321,7 @@ func TestCPAInitialSaveRestartRefreshAndRepeatedUse(t *testing.T) {
 				}
 			}
 			// Reconstruct a worker: only Postgres metadata + mock Infisical survive.
-			restarted := &Worker{w.Repo, w.Secrets, w.Scope, w.Authenticator, w.Executor}
+			restarted := &Worker{Repo: w.Repo, Secrets: w.Secrets, Scope: w.Scope, Authenticator: w.Authenticator, Executor: w.Executor}
 			refreshed, err := restarted.Refresh(ctx, initial.Revision)
 			if err != nil {
 				t.Fatal(err)
@@ -427,7 +427,7 @@ func TestAcceptedSecretLostResponseRecoversAfterRestartWithoutLogin(t *testing.T
 	inf.mu.Lock()
 	inf.failRead = false
 	inf.mu.Unlock()
-	restarted := &Worker{w.Repo, w.Secrets, w.Scope, nil, w.Executor}
+	restarted := &Worker{Repo: w.Repo, Secrets: w.Secrets, Scope: w.Scope, Executor: w.Executor}
 	recovered, err := restarted.Recover(ctx)
 	if err != nil {
 		t.Fatal(err)

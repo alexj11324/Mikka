@@ -87,6 +87,7 @@ export interface ClaudeAdapterOptions {
   /** Trusted owner-bound broker; the CLI receives no refresh grant. */
   subscriptionAuth?: {
     accountId: string
+    verify?(): Promise<void>
     token(): Promise<{
       accountId: string
       accessToken: string
@@ -614,6 +615,7 @@ export class ClaudeAdapter implements AgentAdapter {
           account.apiKeySource !== "none"
         )
           throw new Error(SUBSCRIPTION_ERROR)
+        await externalAuth.verify?.()
       } catch {
         await end(null)
         throw new Error(SUBSCRIPTION_ERROR)
@@ -642,6 +644,9 @@ export class ClaudeAdapter implements AgentAdapter {
       events: () => queue.drain(),
       async send(text) {
         if (ending) throw new Error("The Claude session already ended")
+        if (externalAuth?.verify) {
+          try { await externalAuth.verify() } catch { await end({ outcome: 'failed', error: SUBSCRIPTION_ERROR }); throw new Error(SUBSCRIPTION_ERROR) }
+        }
         if (externalAuth && Date.now() >= expiresAt) {
           await end({ outcome: "failed", error: SUBSCRIPTION_ERROR })
           throw new Error(SUBSCRIPTION_ERROR)

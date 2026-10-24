@@ -206,7 +206,7 @@ func TestPrivateFramingRejectsTrailingObjectsAndOversizedFrames(t *testing.T) {
 	if !strings.Contains(out.String(), "provider_route_unavailable") {
 		t.Fatal("trailing object accepted")
 	}
-	if err := w.Serve(context.Background(), strings.NewReader(strings.Repeat("x", 131073)+"\n"), &out); err != ErrUnsupported {
+	if err := w.Serve(context.Background(), strings.NewReader(strings.Repeat("x", 524289)+"\n"), &out); err != ErrUnsupported {
 		t.Fatal("oversized frame accepted")
 	}
 }

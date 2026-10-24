@@ -13,15 +13,18 @@ import (
 // Serve starts; requests cannot replace them or import credentials/endpoints.
 func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) error {
 	scanner := bufio.NewScanner(input)
-	scanner.Buffer(make([]byte, 4096), 131072)
+	scanner.Buffer(make([]byte, 4096), 524288)
 	encoder := json.NewEncoder(output)
 	for scanner.Scan() {
 		var request struct {
-			ID       string          `json:"id"`
-			Method   string          `json:"method"`
-			Revision int64           `json:"revision"`
-			Model    string          `json:"model,omitempty"`
-			Payload  json.RawMessage `json:"payload,omitempty"`
+			ID        string          `json:"id"`
+			Method    string          `json:"method"`
+			Revision  int64           `json:"revision"`
+			Model     string          `json:"model,omitempty"`
+			Payload   json.RawMessage `json:"payload,omitempty"`
+			SessionID string          `json:"sessionId,omitempty"`
+			State     string          `json:"state,omitempty"`
+			Code      string          `json:"code,omitempty"`
 		}
 		decoder := json.NewDecoder(bytes.NewReader(scanner.Bytes()))
 		decoder.DisallowUnknownFields()
@@ -31,8 +34,27 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 			request.ID = ""
 			err = ErrUnsupported
 		} else {
-			callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			timeout := 30 * time.Second
+			if request.Method == "executeStream" {
+				timeout = 270 * time.Second
+			}
+			callCtx, cancel := context.WithTimeout(ctx, timeout)
 			switch request.Method {
+			case "oauthStart":
+				result, err = w.StartOAuth(callCtx, request.Revision, request.SessionID)
+			case "oauthComplete":
+				result, err = w.CompleteOAuth(callCtx, request.SessionID, request.State, request.Code)
+			case "nativeAuth":
+				if w.Scope.Provider == "codex" {
+					result, err = w.CodexNativeAuth(callCtx, request.Revision)
+				} else {
+					result, err = w.ClaudeNativeAuth(callCtx, request.Revision)
+				}
+			case "executeStream":
+				err = w.Stream(callCtx, request.Revision, request.Model, request.Payload, func(chunk []byte) error {
+					return encoder.Encode(map[string]any{"id": request.ID, "chunk": string(chunk)})
+				})
+				result = map[string]bool{"done": true}
 			case "status":
 				result, err = w.Status(callCtx)
 			case "acquire":
