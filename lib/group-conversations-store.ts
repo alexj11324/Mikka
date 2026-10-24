@@ -8,7 +8,7 @@ const member = z.object({ memberType: z.enum(['user', 'agent']), memberId: z.str
 const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]) }).strict()
 const message = z.object({ clientMessageId: z.uuid().optional(), body: z.string().trim().min(1).max(32000), mentions: z.array(member).max(100).default([]), replyToId: z.uuid().nullable().optional() }).strict()
 export type Member = z.infer<typeof member>
-export type Directory = (workspaceId: string, userId: string, members: Member[]) => Promise<boolean>
+export type Directory = (workspaceId: string, userId: string, members: Member[], client?: PoolClient) => Promise<boolean>
 export type GroupRequest = { userId: string | null; method: 'GET' | 'POST' | 'DELETE'; resource: 'conversations' | 'messages' | 'members'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; limit?: string | null; workspaceId?: string | null }
 class Failure extends Error { constructor(readonly status: number) { super(String(status)) } }
 const fail = (status: number): never => { throw new Failure(status) }
@@ -46,7 +46,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
     let status = 200
     if (req.resource === 'conversations' && req.method === 'POST') {
       const input = parse(create, req.body)
-      if (!await directory(input.workspaceId, userId, input.members)) return fail(404)
+      if (!await directory(input.workspaceId, userId, input.members, client)) return fail(404)
       const id = randomUUID()
       await q('INSERT INTO conversations (id,"workspaceId",kind,title,"createdBy") VALUES ($1,$2,\'group\',$3,$4)', [id, input.workspaceId, input.title, userId])
       await q('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,\'user\',$2,\'owner\')', [id, userId])
@@ -56,7 +56,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       }
       result = { id, title: input.title }; status = 201
     } else if (req.resource === 'conversations' && req.method === 'GET') {
-      if (req.workspaceId && (!z.uuid().safeParse(req.workspaceId).success || !await directory(req.workspaceId, userId, []))) return fail(404)
+      if (req.workspaceId && (!z.uuid().safeParse(req.workspaceId).success || !await directory(req.workspaceId, userId, [], client))) return fail(404)
       const { rows } = await q(`SELECT c.*, last.message AS "lastMessage",
         (SELECT count(*)::text FROM conversation_messages m WHERE m."conversationId"=c.id
           AND m.position > COALESCE(r."lastReadPosition",0) AND NOT (m."authorType"='user' AND m."authorId"=$1)) AS "unreadCount"
@@ -65,7 +65,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         LEFT JOIN LATERAL (SELECT to_jsonb(m) || jsonb_build_object('position', m.position::text) AS message FROM conversation_messages m WHERE m."conversationId"=c.id ORDER BY position DESC LIMIT 1) last ON true
         WHERE c.kind='group' AND ($2::uuid IS NULL OR c."workspaceId"=$2) ORDER BY c."createdAt" DESC,c.id DESC`, [userId, req.workspaceId ?? null])
       const accessible = []
-      for (const row of rows) if (await directory(row.workspaceId, userId, [])) accessible.push(row)
+      for (const row of rows) if (await directory(row.workspaceId, userId, [], client)) accessible.push(row)
       result = { conversations: accessible }
     } else {
       // Acquire the serialization lock before reading membership in a new statement.
@@ -73,9 +73,22 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       const { rows: groups } = await q(`SELECT * FROM conversations WHERE id=$1 AND kind='group' FOR UPDATE`, [req.id])
       const group = groups[0]
       const { rows: memberships } = await q(`SELECT role FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2 AND "leftAt" IS NULL`, [req.id, userId])
-      if (!group || !memberships.length || !await directory(group.workspaceId, userId, [])) return fail(404)
+      if (!group || !memberships.length || !await directory(group.workspaceId, userId, [], client)) return fail(404)
       group.role = memberships[0].role
-      if (req.resource === 'messages' && req.method === 'GET') {
+      if (req.resource === 'members' && req.method === 'GET') {
+        const rows = (await q(`SELECT cm."memberType",cm."memberId",cm.role, CASE WHEN cm."memberType"='user' THEN u.name ELSE a.name END AS name
+          FROM conversation_members cm LEFT JOIN "user" u ON cm."memberType"='user' AND u.id=cm."memberId"
+          LEFT JOIN agents a ON cm."memberType"='agent' AND a.id::text=cm."memberId"
+          WHERE cm."conversationId"=$1 AND cm."leftAt" IS NULL ORDER BY cm."joinedAt",cm."memberId"`, [req.id])).rows
+        for (const row of rows) {
+          row.active = await directory(group.workspaceId, row.memberType === 'user' ? row.memberId : userId, [], client)
+          if (row.memberType === 'agent') {
+            try { await requireAgent(client, directory, req.id!, group.workspaceId, row.memberId) }
+            catch (error) { if (!(error instanceof ReviewFailure)) throw error; row.active = false; row.name = null }
+          }
+        }
+        result = { conversation: { id: group.id, workspaceId: group.workspaceId, title: group.title, role: group.role }, members: rows, capabilities: { agentExecution: false } }
+      } else if (req.resource === 'messages' && req.method === 'GET') {
         const before = req.before == null ? null : decimal(req.before, '')
         const limit = Number(decimal(req.limit, '50'))
         if (limit > 100) return fail(422)
@@ -85,7 +98,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         result = { messages, nextBefore: more ? messages.at(-1)?.position : null }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)
-        if (!await directory(group.workspaceId, userId, input.mentions.filter(m => m.memberType === 'user'))) return fail(422)
+        if (!await directory(group.workspaceId, userId, input.mentions.filter(m => m.memberType === 'user'), client)) return fail(422)
         for (const m of input.mentions) {
           const { rowCount } = await q('SELECT 1 FROM conversation_members WHERE "conversationId"=$1 AND "memberType"=$2 AND "memberId"=$3 AND "leftAt" IS NULL', [req.id, m.memberType, m.memberId])
           if (!rowCount) return fail(422)
@@ -120,7 +133,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         if (group.role !== 'owner') return fail(403)
         const input = parse(member, req.body)
         if (req.method === 'POST') {
-          if (!await directory(group.workspaceId, userId, [input])) return fail(404)
+          if (!await directory(group.workspaceId, userId, [input], client)) return fail(404)
           await q(`INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,$2,$3,'member')
             ON CONFLICT ("conversationId","memberType","memberId") DO UPDATE SET "leftAt"=NULL,"joinedAt"=CASE WHEN conversation_members."leftAt" IS NULL THEN conversation_members."joinedAt" ELSE now() END`, [req.id, input.memberType, input.memberId])
           if (input.memberType === 'agent') await grantAgent(client, req.id!, input.memberId, userId)

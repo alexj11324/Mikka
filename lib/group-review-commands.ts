@@ -26,7 +26,7 @@ export async function groupReviewCommand(pool: Pool, directory: Directory, conve
     if (input.action === 'grant') {
       // A human may explicitly share only their own Agent into this group.
       // This does not change the private Agent directory's ownership rule.
-      if (!await directory(group.workspaceId, userId, [{ memberType: 'agent', memberId: input.agentId }])) return reject(404, 'not_found')
+      if (!await directory(group.workspaceId, userId, [{ memberType: 'agent', memberId: input.agentId }], client)) return reject(404, 'not_found')
       await client.query(`INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,'agent',$2,'member')
         ON CONFLICT ("conversationId","memberType","memberId") DO UPDATE SET "leftAt"=NULL,"joinedAt"=CASE WHEN conversation_members."leftAt" IS NULL THEN conversation_members."joinedAt" ELSE now() END`, [conversationId, input.agentId])
       await grantAgent(client, conversationId, input.agentId, userId)

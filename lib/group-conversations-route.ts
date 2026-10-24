@@ -19,7 +19,10 @@ export const directory = groupDirectory({
     ))
     return rows.map(row => row.id)
   },
-  async ownedAgents(userId, ids) {
+  async ownedAgents(userId, ids, client) {
+    // Reuse a held transaction connection: nested pool acquisition can starve
+    // every concurrent group request when the application pool is small.
+    if (client) return (await client.query('SELECT id FROM agents WHERE "userId"=$1 AND id=ANY($2::uuid[])', [userId, ids])).rows.map(row => row.id)
     const rows = await db.select({ id: agents.id }).from(agents).where(and(eq(agents.userId, userId), inArray(agents.id, ids)))
     return rows.map(row => row.id)
   },

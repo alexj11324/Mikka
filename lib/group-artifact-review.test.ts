@@ -85,6 +85,26 @@ test('disposable Postgres: mixed groups → durable isolated runtime → Artifac
       assert.equal((await pool.query('SELECT body FROM conversation_messages WHERE id=$1',[legacyMessage])).rows[0].body,'legacy history')
       conversationId = await createGroup()
     })
+    await t.test('ownership checks reuse transaction clients under a two-connection application pool', async () => {
+      const small = new Pool({ connectionString: dbURL, max: 2, connectionTimeoutMillis: 1000, options: `-c search_path=${schema}` })
+      const scopedDirectory = groupDirectory({
+        async activeUsers(w, ids) { return w === workspaceId ? ids.filter(id => active.has(id)) : [] },
+        async ownedAgents(userId, ids, client) {
+          assert.ok(client, 'transactional ownership checks must not acquire another pool connection')
+          return (await client.query('SELECT id FROM agents WHERE "userId"=$1 AND id=ANY($2::uuid[])', [userId, ids])).rows.map(row => row.id)
+        },
+      })
+      try {
+        const created = await handleGroup(small,scopedDirectory,{...req,body:JSON.stringify({workspaceId,title:'Small pool',members:[{memberType:'agent',memberId:agentId}]})})
+        assert.equal(created.status,201)
+        const id=(created.body as {id:string}).id
+        const replies=await Promise.all(Array.from({length:8},(_,i)=>handleGroup(small,scopedDirectory,{...req,id,resource:'messages',body:JSON.stringify({body:`concurrent ${i}`,mentions:[{memberType:'agent',memberId:agentId}]})})))
+        assert.ok(replies.every(response=>response.status===201))
+        const members=await handleGroup(small,scopedDirectory,{...req,id,resource:'members',method:'GET'})
+        assert.equal(members.status,200)
+        assert.ok(!JSON.stringify(members.body).includes('PRIVATE_ROLE_SENTINEL'))
+      } finally { await small.end() }
+    })
     await t.test('member may address shared Agent, but cannot enumerate or grant another owner’s private Agent', async () => {
       assert.equal(await directory(workspaceId,'member',[{memberType:'agent',memberId:agentId}]),false)
       await assert.rejects(command({action:'grant',agentId:privateAgent},'member'),failure('not_found'))

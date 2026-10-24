@@ -16,7 +16,7 @@ export async function transaction<T>(pool: Pool, fn: (client: PoolClient) => Pro
 export async function requireGroup(client: PoolClient, directory: Directory, conversationId: string, userId: string) {
   const group = (await client.query(`SELECT * FROM conversations WHERE id=$1 AND kind='group' FOR UPDATE`, [conversationId])).rows[0]
   const member = (await client.query(`SELECT * FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2 AND "leftAt" IS NULL`, [conversationId, userId])).rows[0]
-  if (!group || !member || !await directory(group.workspaceId, userId, [])) return reject(404, 'not_found')
+  if (!group || !member || !await directory(group.workspaceId, userId, [], client)) return reject(404, 'not_found')
   return { group, member }
 }
 /** Grant owner remains an active human member and still owns this agent. Never enumerate private agents. */
@@ -25,7 +25,7 @@ export async function requireAgent(client: PoolClient, directory: Directory, con
     JOIN conversation_members m ON m."conversationId"=g."conversationId" AND m."memberType"='agent' AND m."memberId"=g."agentId"::text AND m."leftAt" IS NULL
     JOIN conversation_members owner ON owner."conversationId"=g."conversationId" AND owner."memberType"='user' AND owner."memberId"=g."ownerId" AND owner."leftAt" IS NULL
     WHERE g."conversationId"=$1 AND g."agentId"=$2 AND g."revokedAt" IS NULL`, [conversationId, agentId])).rows[0]
-  if (!row || !await directory(workspaceId, row.ownerId, [{ memberType: 'agent', memberId: agentId }])) return reject(403, 'agent_grant_required')
+  if (!row || !await directory(workspaceId, row.ownerId, [{ memberType: 'agent', memberId: agentId }], client)) return reject(403, 'agent_grant_required')
   return row
 }
 export async function grantAgent(client: PoolClient, conversationId: string, agentId: string, ownerId: string) {
