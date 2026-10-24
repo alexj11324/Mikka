@@ -10,7 +10,7 @@ Decided by Alex, 2026-10-24.
 
 | Word | 中文 | What it is | Where it shows | Its name |
 | --- | --- | --- | --- | --- |
-| **Bot** | Bot | Chats with people and dispatches tasks to threads. It does not do the work itself. The user creates it (Grok Bot style) and can put several bots in a group chat. The Coordinator is a bot too. Stored as a row in `agents`. | **Bot list** (left column), one row per bot or group chat. | The bot's own name, e.g. "Mikka Frontend". |
+| **Bot** | Bot | Chats with people and dispatches tasks to threads. It does not do the work itself. The user creates it (Grok Bot style) and can put several bots in a group chat. The Coordinator is a bot too. Stored in its own `bots` table (name, colour, shape) and runs on Mikka's AI SDK harness; it is not a row in `agents`. | **Bot list** (left column), one row per bot or group chat. | The bot's own name, e.g. "Mikka Frontend". |
 | **Chat** | 对话 | The conversation between a person and the selected bot or group chat. | **Center column**. Header pill = the bot's (or group's) name. | Same as the bot or group. It has no name of its own. |
 | **Thread** | 线程 | Does the work a bot dispatched: one run (`agent_runs`), usually tied to a task. A bot can have many threads at once. | **Thread list** (right column), plus the thread view and its computer. | Its own name, about the work, e.g. "#66 群聊前端骨架" or "MIK-11 群聊建表". Never the bot's name. |
 
@@ -41,4 +41,4 @@ bot's avatar. The computer a thread uses is its bot's computer.
   still lists sessions; that is a known gap, not the model.
 - "会话" for a run (e.g. "打开会话" on a task's run). Say **线程**.
 - "Agent" when you mean the thing on the left. Say **bot**. "Agent" is fine
-  for the harness and the code that runs (`agents` table, Claude Code, Codex).
+  for the coding agents that run threads (`agents` table, Claude Code, Codex).
