@@ -12,6 +12,7 @@ import { appendGroupMessage, reject, requireAgent, requireGroup, ReviewFailure, 
  */
 export interface GroupRuntimeAdapter {
   enqueue(client: PoolClient, input: { workId: string; runId: string; agentId: string; ownerId: string; conversationId: string; data: string }): Promise<void>
+  /** Lock run identity/state until this transaction ends, serializing stops with replies. */
   live(client: PoolClient, runId: string, agentId: string): Promise<boolean>
 }
 /** Integration seam to the EXISTING run_messages transport, not a new bus.
@@ -36,7 +37,7 @@ export function runMessagesAdapter(prepare: GroupRuntimeAdapter['enqueue']): Gro
     async live(client, runId, agentId) {
       return Boolean((await client.query(`SELECT 1 FROM agent_runs WHERE id=$1 AND "agentId"=$2 AND kind='group_review'
         AND "issueId" IS NULL AND "deviceRepoId" IS NULL AND "stopRequestedAt" IS NULL
-        AND status IN ('queued','preparing','running','waiting_input','finishing')`, [runId, agentId])).rowCount)
+        AND status IN ('queued','preparing','running','waiting_input','finishing') FOR UPDATE`, [runId, agentId])).rowCount)
     },
   }
 }

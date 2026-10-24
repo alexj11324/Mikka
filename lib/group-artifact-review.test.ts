@@ -269,6 +269,24 @@ test('disposable Postgres: mixed groups → durable isolated runtime → Artifac
       await pool.query(`UPDATE conversation_members SET "joinedAt"="joinedAt"+interval '1 second' WHERE "conversationId"=$1 AND "memberType"='agent' AND "memberId"=$2`,[conversationId,agentId])
       assert.equal((await reply(epoch)).status,'cancelled')
     })
+    await t.test('a stop committed while reply validation waits prevents the late write', async () => {
+      const work=await send('concurrent stop');await dispatch(work.id)
+      const stop=await pool.connect()
+      await stop.query('BEGIN')
+      await stop.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1',[work.id])
+      const waitingReply=reply(work)
+      let waited=false
+      try {
+        for(let i=0;i<100&&!waited;i++) {
+          const blocked=await pool.query(`SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE 'SELECT 1 FROM agent_runs WHERE id=%'`)
+          waited=Boolean(blocked.rowCount)
+          if(!waited) await new Promise(resolve=>setTimeout(resolve,10))
+        }
+      } finally { await stop.query('COMMIT');stop.release() }
+      assert.equal(waited,true,'runtime validation actually waited for the stop transaction')
+      assert.equal((await waitingReply).status,'cancelled')
+      assert.equal((await pool.query('SELECT 1 FROM conversation_messages WHERE "replyToId"=$1',[work.triggerMessageId])).rowCount,0)
+    })
     await t.test('pending work revoked before dispatch never wakes runtime; Agent replies cannot forge browser approval', async () => {
       const work=await send('pending revoke')
       await command({action:'revoke',agentId})
