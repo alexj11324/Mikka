@@ -62,6 +62,12 @@ workspace ──1:1── cloud machine (E2B sandbox, Linux)
   local device (ADR 0016 link, `packages/protocol/src/device.ts`). It registers
   with `kind: "cloud"` so the devices UI can exclude it.
 
+### Secrets
+
+The E2B API key is `E2B_API_KEY`. Alex adds it to Infisical in `prod:/vercel`
+and in `dev`. None of the existing keys covers E2B. Read it from the
+environment only; never hand it to the model or to the sandbox.
+
 ### Licensing (hard rule)
 
 Only the MIT `cua-driver-rs` (pinned v0.38.0, as in #161) may be used. Do not
