@@ -4,6 +4,8 @@ import type { ApprovalDecision, ApprovalView, ComputerEvent, ComputerState, Know
 
 /** The backend is still being built (#172); this flag plays it in the page instead. */
 export const computerMock = process.env.NEXT_PUBLIC_COMPUTER_MOCK === '1'
+/** The component library's demo bots (ids start with "demo-") always play the mock. */
+export const isMockedComputer = (agentId: string) => computerMock || agentId.startsWith('demo-')
 
 export class ComputerRequestError extends Error {
   constructor(readonly status: number, readonly body: unknown) { super(`HTTP ${status}`) }
@@ -24,13 +26,13 @@ async function call<T>(path: string, init?: RequestInit & { json?: unknown }): P
 const agentPath = (agentId: string, rest = '') => `/api/agents/${encodeURIComponent(agentId)}/computer${rest}`
 
 export const computerApi = {
-  state: (agentId: string) => computerMock ? mockComputer.state(agentId) : call<ComputerState>(agentPath(agentId)),
-  wake: (agentId: string) => computerMock ? mockComputer.wake(agentId) : call<null>(agentPath(agentId, '/wake'), { method: 'POST' }),
-  viewer: (agentId: string, mode: ViewerMode) => computerMock ? mockComputer.viewer(agentId, mode) : call<ViewerGrant>(agentPath(agentId, '/viewer'), { method: 'POST', json: { mode } }),
-  takeover: (agentId: string, userId: string) => computerMock ? mockComputer.takeover(agentId, userId) : call<ViewerGrant>(agentPath(agentId, '/takeover'), { method: 'POST' }),
-  handback: (agentId: string) => computerMock ? mockComputer.handback(agentId) : call<null>(agentPath(agentId, '/handback'), { method: 'POST' }),
+  state: (agentId: string) => isMockedComputer(agentId) ? mockComputer.state(agentId) : call<ComputerState>(agentPath(agentId)),
+  wake: (agentId: string) => isMockedComputer(agentId) ? mockComputer.wake(agentId) : call<null>(agentPath(agentId, '/wake'), { method: 'POST' }),
+  viewer: (agentId: string, mode: ViewerMode) => isMockedComputer(agentId) ? mockComputer.viewer(agentId, mode) : call<ViewerGrant>(agentPath(agentId, '/viewer'), { method: 'POST', json: { mode } }),
+  takeover: (agentId: string, userId: string) => isMockedComputer(agentId) ? mockComputer.takeover(agentId, userId) : call<ViewerGrant>(agentPath(agentId, '/takeover'), { method: 'POST' }),
+  handback: (agentId: string) => isMockedComputer(agentId) ? mockComputer.handback(agentId) : call<null>(agentPath(agentId, '/handback'), { method: 'POST' }),
   /** Answers "queued", never an invented success: the agent goes on when the daemon picks it up. */
-  decide: (approval: ApprovalView, decision: ApprovalDecision) => computerMock
+  decide: (approval: ApprovalView, decision: ApprovalDecision) => isMockedComputer(approval.agentId)
     ? mockComputer.decide(approval, decision)
     : call<{ queued: true }>(`/api/computer/approvals/${encodeURIComponent(approval.id)}`, { method: 'POST', json: decision }),
 }
@@ -40,8 +42,8 @@ export const computerApi = {
  * fails once and closes; callers keep polling every 2s, which the contract
  * allows as the first step.
  */
-export function subscribeComputerEvents(listener: (event: ComputerEvent) => void): () => void {
-  if (computerMock) return mockComputer.subscribe(listener)
+export function subscribeComputerEvents(listener: (event: ComputerEvent) => void, mocked = computerMock): () => void {
+  if (mocked) return mockComputer.subscribe(listener)
   if (typeof EventSource === 'undefined') return () => {}
   const source = new EventSource(withBasePath('/api/computer/events'), { withCredentials: true })
   const types: ComputerEvent['type'][] = ['computer.machine', 'computer.control', 'computer.action', 'computer.approval']

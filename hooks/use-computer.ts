@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import useSWR from 'swr'
-import { computerApi, subscribeComputerEvents } from '@/lib/computer/client'
+import { computerApi, isMockedComputer, subscribeComputerEvents } from '@/lib/computer/client'
 import type { ComputerState, ViewerGrant, ViewerMode } from '@/lib/computer/types'
 
 /**
@@ -20,7 +20,7 @@ export function useComputer(agentId: string | null | undefined) {
       if (event.type === 'computer.control') void mutate(current => current && { ...current, control: event.control, controlledBy: event.controlledBy }, { revalidate: false })
       else if (event.type === 'computer.action') void mutate(current => current && { ...current, lastAction: event.lastAction }, { revalidate: false })
       else void mutate(current => current && { ...current, pendingApproval: event.approval ?? undefined }, { revalidate: false })
-    })
+    }, isMockedComputer(agentId))
   }, [agentId, mutate])
   return swr
 }
