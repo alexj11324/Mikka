@@ -412,7 +412,6 @@ test('49 项 AI Elements 对照不遗漏且 beUI 对应源码可导入', async (
 
 test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 会话组件', async () => {
   for (const [file, expectedImport] of [
-    ['agent-composer.tsx', 'prompt-input'],
     ['agent-conversation.tsx', 'message-scroller'],
     ['agent-conversation.tsx', 'message-bubble'],
     ['agent-conversation.tsx', 'message'],
@@ -451,15 +450,15 @@ test('Agent 只保留应用外壳，初始输入居中��会话导航收进�
   assert.ok(layout.includes('globalThis[Symbol.for("openui.devtools.autoMount")] = true;'))
   const conversation = await readFile(new URL('../components/workspace/agent-conversation.tsx', import.meta.url), 'utf8')
   assert.match(conversation, /<MessageGroup spacing="default">/)
-  assert.match(conversation, /<MessageAvatar>/)
+  // A 1:1 chat: the title pill names the bot, so no avatar, byline or 已发送.
+  assert.doesNotMatch(conversation, /<MessageAvatar|<MessageHeader|<MessageFooter/)
   assert.match(conversation, /variant="solid"/)
   assert.doesNotMatch(conversation, /<Empty|AgentStarters|有什么可以帮你/)
-  const composer = await readFile(new URL('../components/workspace/agent-composer.tsx', import.meta.url), 'utf8')
-  assert.match(composer, /minRows=\{isEmpty \? 2 : 1\}/)
+  // Every chat uses the Grok-style composer; the model is ours, so there is no picker.
+  const composer = await readFile(new URL('../components/coordinator/chat-composer.tsx', import.meta.url), 'utf8')
   assert.doesNotMatch(conversation, /今天想完成什么|Agent 使用说明/)
-  assert.match(composer, /models=\{/)
-  assert.match(composer, /actions=\{/)
-  assert.doesNotMatch(composer, /leadingAction|<Kbd/)
+  assert.doesNotMatch(composer, /models=|model=/)
+  assert.match(composer, /InputGroupTextarea/)
   const panel = await readFile(new URL('../components/workspace/agent-panel.tsx', import.meta.url), 'utf8')
   assert.doesNotMatch(panel, /starters=|AgentStarters/)
   assert.match(panel, /if \(question\) setPreviousTurns/)
@@ -470,17 +469,14 @@ test('Agent 只保留应用外壳，初始输入居中��会话导航收进�
 
 test('服务端和 beUI 界面均使用 DS 4.1 Flash', async () => {
   const route = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
-  const composer = await readFile(new URL('../components/workspace/agent-composer.tsx', import.meta.url), 'utf8')
   const chat = await readFile(new URL('../components/workspace/agent-chat.tsx', import.meta.url), 'utf8')
   assert.ok(route.includes("opencode('deepseek-v4.1-flash')"))
   assert.match(route, /providerOptions:\s*\{\s*opencode:\s*\{\s*reasoningEffort: 'medium'/)
   assert.doesNotMatch(route, /maxOutputTokens\s*:|thinking:\s*\{\s*type:\s*['"]disabled/)
   assert.match(route, /createOpenAICompatible/)
   assert.match(route, /validateAgentStream\(\)/)
-  assert.ok(composer.includes('model="deepseek-v4.1-flash"'))
-  assert.match(composer, /DS 4\.1 Flash/)
   assert.doesNotMatch(chat, /Agent 工作区|DS 4\.1 Flash/)
-  for (const source of [route, composer, chat]) assert.doesNotMatch(source, /glm-5\.3|GLM-5\.3/)
+  for (const source of [route, chat]) assert.doesNotMatch(source, /glm-5\.3|GLM-5\.3/)
 })
 
 test('停止按钮先取消表单默认行为，避免同步恢复后误发草稿', async () => {

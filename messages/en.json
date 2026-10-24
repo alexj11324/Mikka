@@ -1942,6 +1942,7 @@
     "unknownClient": "An unnamed app"
   },
   "Coordinator": {
+    "stop": "Stop",
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
     "emptyTitle": "Talk to your Coordinator",
@@ -2353,8 +2354,8 @@
       "briefing": "{count, plural, one {# new message is} other {# new messages are}} worth a look, starting with",
       "noneToday": "No new suggestions today.",
       "routine": "Routine",
-      "emptyTitle": "Nothing here",
-      "emptyDescription": "Check back later",
+      "emptyTitle": "All quiet for now",
+      "emptyDescription": "Anything worth a look will land here first",
       "refresh": "Refresh suggestions",
       "loadError": "Suggestions failed to load.",
       "action": {
@@ -2395,7 +2396,7 @@
       "sendFailed": "That didn't send. Try again."
     },
     "empty": {
-      "nothing": "Nothing here",
+      "nothing": "Nothing on your plate",
       "arrange": "Let an agent set it up",
       "knowledgePrompt": "Help me put the documents I use often into the knowledge base: ",
       "schedulesPrompt": "Help me set up a scheduled task: "

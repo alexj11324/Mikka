@@ -1942,6 +1942,7 @@
     "unknownClient": "一个未命名的应用"
   },
   "Coordinator": {
+    "stop": "停止",
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
     "emptyTitle": "和你的 Coordinator 聊聊",
@@ -2353,8 +2354,8 @@
       "briefing": "有 {count} 条新消息值得看，先看",
       "noneToday": "今天还没有新的建议。",
       "routine": "例行事项",
-      "emptyTitle": "这里是空的",
-      "emptyDescription": "Check back later",
+      "emptyTitle": "暂时没什么新鲜事",
+      "emptyDescription": "有值得看的会第一时间放到这里",
       "refresh": "刷新建议",
       "loadError": "建议加载失败。",
       "action": {
@@ -2395,7 +2396,7 @@
       "sendFailed": "没发出去，再试一次。"
     },
     "empty": {
-      "nothing": "这里是空的",
+      "nothing": "手头暂时没事",
       "arrange": "让 Agent 安排",
       "knowledgePrompt": "帮我把常用的资料整理进知识库：",
       "schedulesPrompt": "帮我设一个定时任务："

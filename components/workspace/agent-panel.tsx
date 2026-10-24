@@ -11,7 +11,7 @@ import type { AgentHistory } from '@/lib/agent-history'
 import type { ActionEvent } from '@openuidev/react-lang'
 import { toast } from 'sonner'
 import { useCompletion } from '@ai-sdk/react'
-import { AgentComposer } from './agent-composer'
+import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { AgentThemeProvider } from './agent-theme'
 import dynamic from 'next/dynamic'
 
@@ -200,8 +200,8 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
   return <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt, 'inline') }}><ComputerConversation id={sessionIdRef.current}>
       <AgentChat
         turns={[
-          ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse bot={bot} completion={turn.completion} error={turn.error} stopped={turn.stopped} isLoading={false} onAction={handleUIAction} /> })),
-          ...(question ? [{ id: generation, question, response: <AgentResponse bot={bot} completion={completion} error={error ?? restoredError} stopped={stopped} isLoading={isLoading} onAction={handleUIAction} onRetry={() => { if (lastRequestRef.current) lastRequestRef.current.failed = true; void request(question, 'inline') }} /> }] : []),
+          ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse completion={turn.completion} error={turn.error} stopped={turn.stopped} isLoading={false} onAction={handleUIAction} /> })),
+          ...(question ? [{ id: generation, question, response: <AgentResponse completion={completion} error={error ?? restoredError} stopped={stopped} isLoading={isLoading} onAction={handleUIAction} onRetry={() => { if (lastRequestRef.current) lastRequestRef.current.failed = true; void request(question, 'inline') }} /> }] : []),
         ]}
         streaming={isLoading}
         bot={bot}
@@ -211,7 +211,7 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
         onReset={onReset}
         onDemo={onDemo}
         onSuggestion={prompt => { updateDraft(prompt); inputRef.current?.focus() }}
-        composer={<AgentComposer ref={inputRef} isEmpty={!question} placeholder={bot ? tNav('messageBot', { name: bot.name }) : undefined} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} />}
+        composer={<ChatComposer ref={inputRef} label={bot ? tNav('messageBot', { name: bot.name }) : agentCopy.askAgent} value={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} sending={isLoading} onStop={() => { setStopped(true); stop() }} />}
       />
     </ComputerConversation></AgentInteractionContext>
 }

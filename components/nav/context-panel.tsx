@@ -1,17 +1,14 @@
 'use client'
 
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { ArrowUp, BookOpen, ChevronRight, CircleCheck, Clock, Globe, Info, Maximize2, Minimize2, RotateCw, Search, X, type LucideIcon } from 'lucide-react'
-import { toast } from 'sonner'
+import { BookOpen, ChevronRight, CircleCheck, Clock, Globe, Info, Maximize2, Minimize2, RotateCw, Search, X, type LucideIcon } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import type { TaskRun, Thread } from '@/app/actions/task-runs'
-import { sendCoordinatorMessage } from '@/app/actions/coordinator'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
@@ -23,7 +20,7 @@ import { StatusDot } from './status-dot'
 import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
 import { BotAvatar, colorFor, CoordinatorAvatar } from './bot-avatar'
-import { ThreadList, ThreadMark, threadName } from './thread-list'
+import { ThreadList } from './thread-list'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type PanelTab = 'details' | 'tasks' | 'browser' | 'knowledge' | 'schedules'
@@ -140,31 +137,6 @@ function MyTasks({ issues, runs, onOpenIssue }: { issues: Issue[]; runs: TaskRun
   </section>
 }
 
-/** 指挥这个任务…: one line to the Coordinator from the right column. */
-function CommandComposer() {
-  const t = useTranslations('Shell.tasks')
-  const [draft, setDraft] = useState('')
-  const [sending, setSending] = useState(false)
-  async function send(event?: FormEvent) {
-    event?.preventDefault()
-    const text = draft.trim()
-    if (!text || sending) return
-    setSending(true)
-    try {
-      const result = await sendCoordinatorMessage(text)
-      if (result.error) throw new Error(result.error)
-      setDraft('')
-      toast.success(t('sent'))
-    } catch { toast.error(t('sendFailed')) } finally { setSending(false) }
-  }
-  return <form onSubmit={send} className="shrink-0 p-3">
-    <InputGroup className="rounded-xl bg-muted/50">
-      <InputGroupTextarea aria-label={t('commandLabel')} placeholder={t('command')} rows={1} value={draft} disabled={sending} className="min-h-10" onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send() } }} />
-      {draft.trim() && <InputGroupAddon align="inline-end"><InputGroupButton type="submit" variant="default" size="icon-xs" aria-label={t('send')} disabled={sending}><ArrowUp /></InputGroupButton></InputGroupAddon>}
-    </InputGroup>
-  </form>
-}
-
 function EmptyTab({ title, onArrange, arrangeLabel }: { title: string; onArrange?: () => void; arrangeLabel?: string }) {
   const t = useTranslations('Shell.empty')
   return <div className="flex flex-1 flex-col">
@@ -238,10 +210,8 @@ export function ContextPanel({ userName, issues, runs, threads, conversation, on
       <TabsContent value="details" className={cn('min-h-0', computer ? 'flex flex-col' : 'overflow-y-auto px-4 py-3')}>
         {computer ? <>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{botId
-            ? <AgentComputer botId={botId} name={conversation.name} caption={tThreads('screen')}
-              head={thread ? { avatar: <ThreadMark />, title: threadName(thread, issues, tThreads('untitled')) } : { avatar: <BotAvatar color={conversation.color} shape={conversation.shape} size="profile" />, title: conversation.name }} />
-            : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} head={{ avatar: <ThreadMark />, title: registered.name }} />}</div>
-          <CommandComposer />
+            ? <AgentComputer botId={botId} name={conversation.name} />
+            : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} />}</div>
         </> : <>
         <h2 className="text-xs font-medium text-muted-foreground">{tDetails('conversation')}</h2>
         <div className="flex items-center gap-3 py-3">{conversation.kind === 'coordinator' ? <CoordinatorAvatar /> : <LetterAvatar name={conversation.name} />}<p className="min-w-0 truncate font-semibold">{conversation.name}</p></div>
@@ -261,7 +231,6 @@ export function ContextPanel({ userName, issues, runs, threads, conversation, on
           </section>}
           <MyTasks issues={issues} runs={runs} onOpenIssue={onOpenIssue} />
         </div>
-        <CommandComposer />
       </TabsContent>
       <TabsContent value="browser" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('browser')} /></TabsContent>
       <TabsContent value="knowledge" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('knowledge')} arrangeLabel={tEmpty('arrange')} onArrange={() => onArrange(tEmpty('knowledgePrompt'))} /></TabsContent>

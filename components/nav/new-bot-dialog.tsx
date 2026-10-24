@@ -59,7 +59,7 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
         <FieldGroup className="gap-5">
           <Field>
             <Input id="new-bot-name" aria-label={t('name')} autoFocus value={name} maxLength={60} disabled={saving} placeholder={t('namePlaceholder')}
-              className="h-11 rounded-lg text-center focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary" onChange={event => setName(event.target.value)} />
+              className="h-11 rounded-xl border-transparent bg-muted text-center focus-visible:border-transparent focus-visible:ring-0" onChange={event => setName(event.target.value)} />
           </Field>
           <Field>
             <ToggleGroup aria-label={t('shape')} spacing={2} className="grid grid-cols-4 justify-items-center sm:grid-cols-8" value={[shape]} disabled={saving} onValueChange={values => { const next = values[0] as BotShape | undefined; if (next) setShape(next) }}>
