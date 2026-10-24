@@ -14,7 +14,7 @@ import { issueIdentifier } from '@/components/workspace/issue-properties'
 import type { SavedAgentSession } from '@/lib/agent-history'
 import type { ChatTarget } from './bot-list'
 import { LetterAvatar } from './letter-avatar'
-import { BotAvatar } from './bot-avatar'
+import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Project = Awaited<ReturnType<typeof listProjects>>[number]
@@ -63,7 +63,7 @@ export function GlobalSearch({ open, onOpenChange, bots, sessions, coordinatorLi
           <CommandEmpty>{t('searchEmpty')}</CommandEmpty>
           <CommandGroup heading={t('groups.bots')}>
             <CommandItem value={`coordinator ${tNav('coordinator')} ${coordinatorLine ?? ''}`} onSelect={() => pick(() => onChat({ kind: 'coordinator' }))} className="gap-3 py-2">
-              <LetterAvatar name="Coordinator" tone="coordinator" size="search" />
+              <CoordinatorAvatar size="search" />
               <span className="flex min-w-0 flex-col"><span className="truncate font-medium">{tNav('coordinator')}</span>{coordinatorLine && <span className="truncate text-xs text-muted-foreground">{coordinatorLine}</span>}</span>
             </CommandItem>
             {bots.map(bot => <CommandItem key={bot.id} value={`bot ${bot.id} ${bot.name}`} onSelect={() => pick(() => onChat({ kind: 'bot', botId: bot.id }))} className="gap-3 py-2">

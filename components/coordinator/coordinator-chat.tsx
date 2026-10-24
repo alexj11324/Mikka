@@ -7,7 +7,7 @@ import { ArrowUp, Plus, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCoordinatorChat, sendCoordinatorMessage, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import { listTaskRuns } from '@/app/actions/task-runs'
-import { LetterAvatar } from '@/components/nav/letter-avatar'
+import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
 import { Input } from '@/components/ui/input'
@@ -111,7 +111,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       </MessageScroller>
     </MessageScrollerProvider>
     <div className={cn('mx-auto flex w-full max-w-3xl flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4')}>
-      {!compact && working.length > 0 && <p className="flex items-center gap-3 px-2 text-xs text-muted-foreground"><span>{tShell('whoIsWorking')}</span><span className="flex [&>*+*]:-ml-1.5">{working.slice(0, 5).map(name => <LetterAvatar key={name} name={name} size="stack" />)}</span><span>{tShell('agentsWorking', { count: working.length })}</span></p>}
+      {!compact && working.length > 0 && <p className="flex items-center gap-3 px-2 text-xs text-muted-foreground"><span>{tShell('whoIsWorking')}</span><span className="flex gap-0.5">{working.slice(0, 5).map(name => <BotAvatar key={name} color={colorFor(name)} size="pill" still />)}</span><span>{tShell('agentsWorking', { count: working.length })}</span></p>}
       {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
       {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}

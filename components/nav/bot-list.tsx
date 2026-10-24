@@ -15,8 +15,7 @@ import { WorkspaceMenu } from '@/components/workspace-menu'
 import { cn } from '@/lib/utils'
 import { sessionPreview, type SavedAgentSession } from '@/lib/agent-history'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
-import { LetterAvatar } from './letter-avatar'
-import { BotAvatar, type BotMood } from './bot-avatar'
+import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
 
 /**
  * What the center column shows: the Coordinator, a bot's chat, or an older
@@ -134,7 +133,7 @@ export function BotList({ bots, threads, sessions, active, onOpen, onNewBot, rai
     <SidebarContent>
       <SidebarGroup className="px-2 pt-1"><SidebarMenu aria-label={i18nText('Nav.bots')} className="gap-0.5">
         <Row name={i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
-          avatar={<LetterAvatar name="Coordinator" tone="coordinator" />}
+          avatar={<CoordinatorAvatar />}
           preview={<><span className="shrink-0">{i18nText('Shell.pinned')}</span>{lastReply && <><span aria-hidden="true">·</span><span className="truncate">{coordinatorLine(lastReply.text)}</span></>}</>} />
         {ordered.map(bot => {
           const line = latestChat.get(bot.id)?.preview

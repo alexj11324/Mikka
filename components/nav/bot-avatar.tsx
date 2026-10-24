@@ -28,6 +28,11 @@ export function colorFor(name: string): BotColor {
 }
 
 /** Visible blob sizes. bloub's svg is 1.58× the blob, so it overflows its box on purpose. */
+/** The Coordinator is a bloub too: the blue circle, so it reads as the one pinned on top. */
+export function CoordinatorAvatar({ size = 'list', mood }: { size?: keyof typeof SIZES; mood?: BotMood }) {
+  return <BotAvatar color="bleu" shape="cercle" size={size} mood={mood} />
+}
+
 const SIZES = { row: 16, swatch: 18, pill: 22, search: 28, list: 34, profile: 72, preview: 88 } as const
 const SVG_SCALE = 1.58
 

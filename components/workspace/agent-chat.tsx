@@ -36,8 +36,11 @@ export function AgentChat({ turns, composer, streaming, sessions, sessionId, onS
   return <section aria-label={agentCopy.agentConversationWorkspace} className="orvilo-agent relative flex size-full min-h-0 flex-col">
     <AgentChatHeader title={title} bot={bot} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} onDemo={onDemo} />
     <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
-    {turns.length === 0 ? <AgentWelcome composer={composer} sessions={bot ? [] : sessions} onSelect={onSelect} onSuggestion={onSuggestion} /> : <>
-      <AgentConversation turns={turns} streaming={streaming} />
+    {turns.length === 0 && !bot ? <AgentWelcome composer={composer} sessions={sessions} onSelect={onSelect} onSuggestion={onSuggestion} /> : <>
+      {/* A bot chat is just a conversation: the composer stays at the bottom, as in the Coordinator's. */}
+      {turns.length === 0 && bot
+        ? <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3"><BotAvatar color={bot.color} shape={bot.shape} size="profile" /><p className="text-sm font-medium">{bot.name}</p></div>
+        : <AgentConversation turns={turns} streaming={streaming} />}
       <footer className="shrink-0 px-4 pb-4 pt-2 sm:px-8 sm:pb-6">
         <div className="mx-auto w-full max-w-3xl">{composer}</div>
       </footer>

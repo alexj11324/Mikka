@@ -22,7 +22,7 @@ import { LetterAvatar } from './letter-avatar'
 import { StatusDot } from './status-dot'
 import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
-import { BotAvatar } from './bot-avatar'
+import { BotAvatar, colorFor, CoordinatorAvatar } from './bot-avatar'
 import { ThreadList, ThreadMark, threadName } from './thread-list'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
@@ -110,7 +110,7 @@ function TaskRows({ rows, onOpenIssue }: { rows: { run: TaskRun; issue: Issue; g
         <StatusDot status={group} />
         <span className="min-w-0 flex-1 truncate text-left">{issue.scope === 'workspace' && <span className="tabular-nums">{issueIdentifier(issue)} </span>}{issue.title}</span>
         {group !== 'running' && group !== 'done' && <span className={cn('shrink-0 text-xs', group === 'failed' ? 'text-destructive' : 'text-muted-foreground')}>{run.status === 'failed' ? run.error?.split('\n')[0]?.slice(0, 16) || t('status.failed') : t('status.waiting_input')}</span>}
-        <LetterAvatar name={run.agentName} size="row" />
+        <BotAvatar color={colorFor(run.agentName)} size="row" />
       </Button>
     </li>)}
   </ul>
@@ -244,7 +244,7 @@ export function ContextPanel({ userName, issues, runs, threads, conversation, on
           <CommandComposer />
         </> : <>
         <h2 className="text-xs font-medium text-muted-foreground">{tDetails('conversation')}</h2>
-        <div className="flex items-center gap-3 py-3"><LetterAvatar name={conversation.name} tone={conversation.kind === 'coordinator' ? 'coordinator' : undefined} /><p className="min-w-0 truncate font-semibold">{conversation.name}</p></div>
+        <div className="flex items-center gap-3 py-3">{conversation.kind === 'coordinator' ? <CoordinatorAvatar /> : <LetterAvatar name={conversation.name} />}<p className="min-w-0 truncate font-semibold">{conversation.name}</p></div>
         <dl className="grid grid-cols-[6rem_1fr] gap-y-2 text-sm">
           <dt className="text-muted-foreground">{tDetails('kind')}</dt><dd>{conversation.kind === 'coordinator' ? tDetails('coordinatorKind') : tDetails('agentKind')}</dd>
           <dt className="text-muted-foreground">{tDetails('updated')}</dt><dd>{conversation.updatedAt ? format.relativeTime(new Date(conversation.updatedAt), now) : tDetails('none')}</dd>
@@ -253,13 +253,12 @@ export function ContextPanel({ userName, issues, runs, threads, conversation, on
       </TabsContent>
       <TabsContent value="tasks" className="flex min-h-0 flex-col">
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-3">
+          <Suggestions name={userName} />
+          {/* With a bot, its threads take the place of 我的任务. */}
           {botId ? <section aria-label={tThreads('title')} className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold">{tThreads('title')}</h2>
             <ThreadList threads={botThreads} issues={issues} current={thread?.id ?? null} onPick={id => { setPicked(id); setTab('details') }} />
-          </section> : <>
-            <Suggestions name={userName} />
-            <MyTasks issues={issues} runs={runs} onOpenIssue={onOpenIssue} />
-          </>}
+          </section> : <MyTasks issues={issues} runs={runs} onOpenIssue={onOpenIssue} />}
         </div>
         <CommandComposer />
       </TabsContent>
