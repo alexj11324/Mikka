@@ -1,0 +1,73 @@
+// The executable exposes metadata/recovery/disconnect on private stdio.
+// Live provider authenticators/executors remain unregistered until reviewed;
+// the library's acquisition/refresh/execution path is tested with HTTP fakes.
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"time"
+
+	worker "github.com/alexj11324/Mikka/subscription-worker"
+	_ "github.com/jackc/pgx/v5/stdlib"
+)
+
+func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--version" {
+		fmt.Println("mikka-subscription-worker CPA 8289ec4c71ad914d0612c2776352b76ba3d355a6")
+		return
+	}
+	if run() != nil {
+		fmt.Fprintln(os.Stderr, "subscription_worker_unavailable")
+		os.Exit(1)
+	}
+}
+func run() error {
+	input := bufio.NewReaderSize(io.LimitReader(os.Stdin, 16<<20), 65537)
+	// First frame comes only from the trusted control plane. No env, auth files,
+	// secrets-manager fallback, password prompt or public HTTP listener exists.
+	frame, err := input.ReadSlice('\n')
+	if err != nil || len(frame) > 65536 {
+		return worker.ErrUnsupported
+	}
+	var config struct {
+		Scope       worker.Scope `json:"scope"`
+		DatabaseURL string       `json:"databaseUrl"`
+		Origin      string       `json:"infisicalOrigin"`
+		Project     string       `json:"project"`
+		Environment string       `json:"environment"`
+		Path        string       `json:"path"`
+		Token       string       `json:"workloadToken"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(frame))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&config) != nil {
+		return worker.ErrUnsupported
+	}
+	if config.DatabaseURL == "" {
+		return worker.ErrDatabase
+	}
+	db, err := sql.Open("pgx", config.DatabaseURL)
+	if err != nil {
+		return worker.ErrDatabase
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(3)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if db.PingContext(ctx) != nil {
+		return worker.ErrDatabase
+	}
+	secrets, err := worker.NewInfisical(worker.InfisicalConfig{Origin: config.Origin, ProjectID: config.Project, Environment: config.Environment, Path: config.Path, Token: func(context.Context) (string, error) { return config.Token, nil }})
+	if err != nil {
+		return err
+	}
+	w := worker.Worker{Repo: &worker.Repository{DB: db}, Secrets: secrets, Scope: config.Scope}
+	return w.Serve(context.Background(), input, os.Stdout)
+}

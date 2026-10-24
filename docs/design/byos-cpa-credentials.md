@@ -3,8 +3,11 @@
 Engineering review, 2026-10-24. The requested acquisition path is **CPA's Codex
 and Claude subscription login**, followed by platform custody and reuse. It is
 not a switch to generic SaaS OAuth or an SIWC-only product. Infisical is the
-preferred existing managed store to evaluate. No new vault, credential table,
-SaaS account, OAuth grant, secret import/write or connector is implemented here.
+preferred managed backing store. The implementation now includes a pinned CPA
+worker/store library, Infisical v4 HTTP adapter and additive Postgres metadata
+migration. Acquisition/rotation are exercised through actual CPA SDK managers
+with synthetic issuer/Infisical HTTP. No real OAuth grant, secret import/write,
+SaaS account, connector or new vault has been configured.
 
 Mikka owns account authorization; CPA acquires/uses provider grants; Infisical
 stores those bundles; E2B supplies compute. A workspace member does not thereby
@@ -31,8 +34,10 @@ supports PKCE/browser login and a device flow; callback defaults to port 1455.
 [`ClaudeAuthenticator`](https://github.com/router-for-me/CLIProxyAPI/blob/8289ec4c71ad914d0612c2776352b76ba3d355a6/sdk/auth/claude.go)
 uses PKCE/browser callback (default 54545), with a prompt fallback. Hosted
 callback routing, concurrent attempts, state/expiry/one-time consumption and
-safe event delivery need a dedicated adapter. Their CLI-oriented URL printing
-must not become unrestricted application logs. None of these flows ran here.
+safe event delivery need a dedicated live adapter. Their CLI-oriented URL
+printing must not become unrestricted application logs. The shipped executable
+does not register these live authenticators. Synthetic tests inject a fixture
+authenticator into CPA's real login manager; no real provider flow ran here.
 
 ## Infisical-compatible design
 
@@ -54,20 +59,19 @@ disconnect or account replacement changes it. Routine successful refresh only
 advances a private credential version/secret reference under that epoch. It
 must not invalidate all bot bindings or ask the user to reconnect per task.
 
-The custom Go Store maps CPA List/Save/Delete to this service through a private
-authenticated broker. CPA's store signature does not carry Mikka ownership;
-do not infer ownership from Auth.Metadata supplied by a client. The broker's
-workload/request identity supplies the immutable connection scope. Use CPA's
-published lifecycle/executor extension points behind that boundary. No
-public unauthenticated proxy listener or user-selectable account pool is needed.
+The implemented Go Store binds one owner/workspace/connection for its lifetime,
+queries Postgres using that scope, and calls Infisical directly with a trusted
+workload token. CPA's store signature does not carry Mikka ownership; ownership
+is never taken from Auth.Metadata. A trusted control-plane parent supplies scope
+and configuration over private stdio. There is no public management listener,
+request-controlled store switch or user-selectable account pool.
 
-Infisical provides managed storage and versioning; **atomic conditional update
-semantics for our exact deployment/API have not been established**. Do not
-pretend a read-then-update sequence is compare-and-swap. Before integration,
-verify immutable/versioned read/write support and choose either an appropriate
-native conditional write or a Neon lease plus staged-secret publication:
+Infisical's documented v4 API provides unique-name creation and version-specific
+reads; its update contract does not document a conditional-version parameter.
+The implementation therefore never PATCHes a secret or assumes Infisical CAS.
+It uses Postgres conditional updates and staged immutable-name publication:
 
-1. Claim a renewable per-connection refresh lease against current authorization
+1. Claim a bounded per-connection refresh operation against current authorization
    epoch and credential version;
    block concurrent refresh/use of a grant that may rotate.
 2. Fetch only the referenced bundle and perform CPA refresh once. Do not let a
@@ -76,23 +80,28 @@ native conditional write or a Neon lease plus staged-secret publication:
    the lease. Store a new immutable/version-pinned secret reference.
 4. Publish that reference using a transactional epoch/credential-version check. A
    reconnect/disconnect that advanced the revision prevents publication.
-5. If the provider rotated but persistence/publication outcome is uncertain,
-   mark unavailable/reconnect-required; do not silently keep spending through
-   an in-memory token. Retry known-idempotent storage publication only after
-   resolving its outcome. Clean orphaned secret versions asynchronously.
+5. If persistence/publication is uncertain, retain `publication_pending` and
+   deny use. Recovery reads only that staged name/version, verifies scope/digest,
+   and publishes without another OAuth/refresh call. A missing/invalid value
+   stays unavailable; no in-memory credential can bypass the database fence.
 
-These are integration steps, not implemented transactions. No encryption
-implementation or general-purpose credential vault is introduced. Verify
-Infisical's service limits, audit redaction, latency, access isolation and
-delete/version-retention semantics before selecting its final API.
+These boundaries are implemented in `packages/subscription-worker` and tested
+against real isolated Postgres and TLS HTTP fakes. Normal refresh keeps the
+account epoch/bot binding; explicit reconnect/disconnect advances it. Expired
+operations cannot automatically replay a potentially rotated grant. Inference
+receives access material without refresh/ID tokens. No encryption algorithm or
+general vault is introduced. Live Infisical workload permissions, region/path,
+audit behavior, limits and latency still require separately authorized setup.
+Historical secret deletion, orphan-version GC and provider-side revocation are
+not implemented by logical disconnect.
 
 ## Both consumers of the connected account
 
 | Consumer | CPA-compatible execution design | Remaining compatibility proof |
 | --- | --- | --- |
-| Mikka own harness | Explicit `codex_cpa` / `claude_cpa` binding resolves an owner-scoped supplied-credential worker. It reuses reviewed CPA authorization/refresh/execution adapters, then adapts model streaming into the existing AI SDK loop | Build the pinned worker with safe transport/configuration, normalize tokens correctly, enforce fixed upstream destinations, verify eligibility and account-bound quota, scrub raw errors. Real CPA execution is not wired in this slice |
-| Hosted native Codex | Existing `CodexAdapter` continues to run official app-server. Evaluate its experimental host-managed `chatgptAuthTokens` mode plus refresh callback so CPA can remain the single refresh writer; a native-state projection is another compatibility option | The adapter does not implement these auth RPCs today. Validate CPA token audience/scope, stable account ID, expiry, protocol version and host-refresh handshake. CPA JSON is not native `auth.json`. Never let CPA and CLI rotate the same grant independently |
-| Hosted native Claude Code | Existing SDK/bundled CLI adapter continues to execute. Account connection may contain a verified native grant/state reference alongside the CPA grant | CPA's flattened JSON is not Linux `claudeAiOauth` state. Native `.credentials.json`/config path and refresh behavior require an explicit tested bridge; preserve required provider fields and choose a single refresh writer |
+| Mikka own harness | Explicit `codex_cpa` / `claude_cpa` binding targets the implemented owner-scoped worker/store. Tests use real CPA login/refresh managers and injected HTTP fixture adapters for inference | Live provider authenticators/executors remain unregistered; fixed upstream transport, OAuth ceremony, model streaming into AI SDK, quota/consumer authorization and production connection APIs still need wiring |
+| Hosted native Codex | The worker supplies an access-only private `chatgptAuthTokens` helper. The daemon accepts a trusted owner-bound broker, enables the experimental login RPC, services host-refresh callbacks, checks the account, avoids native auth links and refuses paid-mode fallback. Eight fake app-server tests cover this boundary | Worker-to-daemon broker transport/launcher registration and actual CPA token audience/pinned CLI compatibility remain unimplemented/unverified. SIWC routes are refused by the native helper; CPA JSON is not native `auth.json`; native CLI never receives the rotating grant |
+| Hosted native Claude Code | Private worker access-lease helper plus optional daemon broker mode use `CLAUDE_CODE_OAUTH_TOKEN`, a separate runtime home and forced Claude account login method. SDK `accountInfo()` must report first-party/no-API-key mode before any prompt. Seven fake CLI tests cover delivery, account/expiry refusal, paid/gateway mode refusal and redaction | No documented SDK host-refresh callback: the child ends at access expiry; CPA refreshes before the next start. Real CPA grant scopes/native token acceptance, private broker/launcher wiring and runtime isolation remain unverified. CPA JSON is never written as native `.credentials.json` |
 
 One Mikka connection can hold provider-specific grants. Connecting once means
 reuse across normal tasks and worker restarts, not a promise that every token
@@ -101,6 +110,18 @@ native projection, if approved, must be outside shared project files, atomic,
 owner-only and protected by a verified runtime boundary. A native process that
 must hold a credential can expose it if compromised; never claim absolute
 secrecy. No projection or credential-file reading was implemented/run here.
+
+The Claude boundary is now implemented without native credential-file
+conversion. The installed SDK `0.3.305` documents the OAuth environment input,
+exposes `accountInfo()` and bundles CLI manifest `2.1.305`; no official CLI was
+invoked with a grant. Its public interface has no host token-refresh callback.
+Consequently long-running native Claude sessions stop at access expiry rather
+than independently refreshing or switching billing modes. A subsequent start
+can obtain a refreshed access lease from the same CPA connection without login.
+Transparent continuation across that boundary remains future session work.
+The native CLI receives access material in its process environment; a hosted
+runtime must isolate that owner from other shell users. A different config
+directory alone cannot provide that security boundary.
 
 The [official Codex app-server authentication reference](https://learn.chatgpt.com/docs/app-server#authentication)
 documents `chatgptAuthTokens` and `account/chatgptAuthTokens/refresh` for hosts
@@ -124,12 +145,16 @@ without copying Comma's AGPL source or building its account-pool fallback.
 
 CPA contains client identity/fingerprint/cloaking paths. Reusing it wholesale
 would include behavior this phase explicitly excludes. The next worker design
-must inventory and disable/remove those paths using reviewed upstream
+must inventory and disable/remove those paths before registering live executors, using reviewed upstream
 extension points or a narrowly maintained patch; if not separable, return that
 specific blocker rather than copying the transport and calling it supported.
-No CPA code/dependency is bundled in this slice, and no upstream test suite or
-live executor was run. CPA's MIT license and Comma's AGPL license were checked;
-provider authorization is an independent release gate.
+The worker now depends on the pinned CPA SDK; its MIT license is preserved in
+`packages/subscription-worker/third_party`. A small original type-alias bridge
+exposes actual upstream credential structs/patch logic without changing tracked
+upstream files. Built-in CPA model executors and fingerprint/cloaking transports
+are not registered or executed. No upstream full test suite, live executor or
+real credential acquisition ran. Comma's AGPL source is not copied. Provider
+authorization remains an independent release gate.
 
 ## Optional E2B delivery
 

@@ -58,6 +58,8 @@ import {
   runPaths,
 } from "../agents/run-context"
 import type { SandboxPolicy } from "../agents/sandbox"
+import { ownDir } from "../agents/harness-home"
+import { buildChildEnv } from "../env"
 import type { RunChunk } from "../chunks"
 import {
   claudePermissionRules,
@@ -82,7 +84,19 @@ export interface ClaudeAdapterOptions {
   binary?: string
   /** `~/.claude` of the user whose login the CLI uses. */
   configDir?: string
+  /** Trusted owner-bound broker; the CLI receives no refresh grant. */
+  subscriptionAuth?: {
+    accountId: string
+    token(): Promise<{
+      accountId: string
+      accessToken: string
+      expiresAt: string
+    }>
+  }
 }
+
+const SUBSCRIPTION_ERROR = "Claude subscription authentication unavailable"
+const SUBSCRIPTION_EXECUTION_ERROR = "Claude subscription execution failed"
 
 /** Claude Code's folder name for a project dir under `~/.claude/projects`. */
 export function claudeProjectDirName(cwd: string): string {
@@ -360,8 +374,49 @@ export class ClaudeAdapter implements AgentAdapter {
     firstMessage: string,
     options: SessionOptions & { prompt?: string }
   ): Promise<AgentSession> {
-    const configDir = this.options.configDir ?? join(homedir(), ".claude")
     const paths = runPaths(this.options.stateDir, options.runId)
+    const runDir = await claimRunDir(paths)
+    const externalAuth = this.options.subscriptionAuth
+    let nativeToken: string | undefined
+    let expiresAt = 0
+    if (externalAuth) {
+      const clean = buildChildEnv({
+        host: options.env,
+        runId:
+          options.env.MIKKA_RUN_ID === undefined ? undefined : options.runId
+      })
+      if (
+        Object.entries(options.env).some(
+          ([name, value]) => clean[name] !== value
+        )
+      )
+        throw new Error(SUBSCRIPTION_ERROR)
+      try {
+        const token = await externalAuth.token()
+        expiresAt = Date.parse(token.expiresAt)
+        if (
+          token.accountId !== externalAuth.accountId ||
+          !externalAuth.accountId ||
+          typeof token.accessToken !== "string" ||
+          !token.accessToken ||
+          token.accessToken.length > 32768 ||
+          /[\r\n\0]/.test(token.accessToken) ||
+          !Number.isFinite(expiresAt) ||
+          expiresAt <= Date.now()
+        )
+          throw new Error(SUBSCRIPTION_ERROR)
+        nativeToken = token.accessToken
+      } catch {
+        throw new Error(SUBSCRIPTION_ERROR)
+      }
+    }
+    // An external grant never loads the host's login/config. This is config
+    // isolation only; a hosted runner still requires an owner security boundary.
+    const nativeHome = externalAuth ? join(runDir, "native-home") : undefined
+    const configDir = nativeHome
+      ? join(nativeHome, ".claude")
+      : (this.options.configDir ?? join(homedir(), ".claude"))
+    if (nativeHome) ownDir(configDir)
     const ctx = new RunContext({
       harness: "claude_code",
       kind: options.kind,
@@ -369,7 +424,7 @@ export class ClaudeAdapter implements AgentAdapter {
       networkAllow: options.networkAllow,
       policy: options.policy,
       skills: options.skills,
-      runDir: await claimRunDir(paths),
+      runDir,
       privateDir: paths.privateDir,
       // Its session store, so `resume` works; keyed by the cwd it sees.
       extraWrite: [
@@ -399,6 +454,7 @@ export class ClaudeAdapter implements AgentAdapter {
     let ending = false
     let lastError: string | undefined
     let graceTimer: NodeJS.Timeout | undefined
+    let authTimer: NodeJS.Timeout | undefined
     let stderr = ""
     const stderrTail = () => stderr.slice(-STDERR_TAIL).trim() || "no output"
     /** True once the session proved open, false if the CLI failed first. */
@@ -418,9 +474,19 @@ export class ClaudeAdapter implements AgentAdapter {
           ...ctx.tempEnv(),
           ...CLAUDE_RUN_ENV,
           CLAUDE_CODE_TMPDIR: ctx.tmpDir,
+          ...(nativeHome
+            ? {
+                HOME: nativeHome,
+                CLAUDE_CONFIG_DIR: configDir,
+                CLAUDE_CODE_OAUTH_TOKEN: nativeToken
+              }
+            : {})
         },
         settingSources: [],
-        settings: claudeSettings(ctx.policy(), options.policy),
+        settings: {
+          ...claudeSettings(ctx.policy(), options.policy),
+          ...(externalAuth ? { forceLoginMethod: "claudeai" as const } : {})
+        },
         mcpServers: {
           [MCP_SERVER_NAME]: { type: "stdio", ...ctx.mcpServer() },
         },
@@ -438,7 +504,7 @@ export class ClaudeAdapter implements AgentAdapter {
           ? { spawnClaudeCodeProcess: spawnBinary(this.options.binary) }
           : {}),
         stderr: (data: string) => {
-          stderr = (stderr + data).slice(-STDERR_TAIL * 4)
+          if (!externalAuth) stderr = (stderr + data).slice(-STDERR_TAIL * 4)
         },
       },
     })
@@ -450,6 +516,7 @@ export class ClaudeAdapter implements AgentAdapter {
     const close = async (event: Omit<ExitEvent, "type"> | null) => {
       ending = true
       clearTimeout(graceTimer)
+      clearTimeout(authTimer)
       prompts.close()
       session.close()
       await gone
@@ -470,7 +537,9 @@ export class ClaudeAdapter implements AgentAdapter {
       queue.exit(
         handoff ?? {
           outcome: "failed",
-          error: `claude exited before the turn ended: ${error}`,
+          error: externalAuth
+            ? SUBSCRIPTION_EXECUTION_ERROR
+            : `claude exited before the turn ended: ${error}`
         }
       )
     }
@@ -483,11 +552,16 @@ export class ClaudeAdapter implements AgentAdapter {
           if (message.type === "assistant" || message.type === "user")
             clearTimeout(graceTimer)
           if (ending) continue
-          for (const chunk of claudeChunks(message)) queue.chunk(chunk)
+          // Authentication errors can contain provider diagnostics. Do not
+          // turn those diagnostics into model/UI text in external-auth mode.
+          if (!(externalAuth && message.type === "assistant" && message.error))
+            for (const chunk of claudeChunks(message)) queue.chunk(chunk)
           if (message.type !== "result") continue
           results++
           lastError = message.is_error
-            ? `Claude Code: ${resultError(message)}`
+            ? externalAuth
+              ? SUBSCRIPTION_EXECUTION_ERROR
+              : `Claude Code: ${resultError(message)}`
             : undefined
           if (results >= written) {
             turnEnded()
@@ -504,14 +578,56 @@ export class ClaudeAdapter implements AgentAdapter {
       } catch (error) {
         if (!ending) diedEarly(errorMessage(error))
       } finally {
+        clearTimeout(authTimer)
         spoke(false)
         finished()
       }
     })()
 
+    // This SDK exposes no documented host token-refresh callback. End at the
+    // access lease boundary; the broker refreshes once before the next start.
+    // Never hand the rotating grant to a second refresh writer.
+    authTimer = externalAuth
+      ? setTimeout(
+          () => {
+            void end({ outcome: "failed", error: SUBSCRIPTION_ERROR })
+          },
+          Math.min(2_147_483_647, Math.max(0, expiresAt - Date.now()))
+        )
+      : undefined
+    authTimer?.unref()
+    if (externalAuth) {
+      let timer: NodeJS.Timeout | undefined
+      try {
+        const account = await Promise.race([
+          session.accountInfo(),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error(SUBSCRIPTION_ERROR)),
+              10_000
+            )
+          })
+        ])
+        if (
+          ending ||
+          account.apiProvider !== "firstParty" ||
+          account.apiKeySource !== "none"
+        )
+          throw new Error(SUBSCRIPTION_ERROR)
+      } catch {
+        await end(null)
+        throw new Error(SUBSCRIPTION_ERROR)
+      } finally {
+        clearTimeout(timer)
+      }
+    }
     prompts.push(firstMessage)
     written++
     if (mode === "continue" && !(await untilSpoken(spoken))) {
+      if (externalAuth) {
+        await end(null)
+        throw new Error(SUBSCRIPTION_ERROR)
+      }
       log.info(
         { stderr: stderrTail() },
         "could not continue the earlier claude session; starting a new one"
@@ -526,6 +642,10 @@ export class ClaudeAdapter implements AgentAdapter {
       events: () => queue.drain(),
       async send(text) {
         if (ending) throw new Error("The Claude session already ended")
+        if (externalAuth && Date.now() >= expiresAt) {
+          await end({ outcome: "failed", error: SUBSCRIPTION_ERROR })
+          throw new Error(SUBSCRIPTION_ERROR)
+        }
         written++
         prompts.push(text)
       },

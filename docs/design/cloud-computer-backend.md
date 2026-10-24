@@ -10,11 +10,12 @@ connected subscriptions and be able to operate E2B terminal, browser and CUA
 tools. Compute, model authorization and execution harness are independent axes.
 The Mikka harness may run outside E2B and call its authorized tools remotely.
 
-**Delivery status:** the current slice implements credential-free routing
-contracts, refusal policy, AI SDK model and native-adapter seams, and synthetic
-tests. All production BYOS backends remain unregistered. It does not provision
-E2B, connect accounts, persist credentials, or implement the viewer APIs below.
-The frontend contract remains a target, not a shipped API.
+**Delivery status:** routing/refusal policy and model/native-adapter seams are
+implemented. A pinned CPA worker/store now implements SDK acquisition/refresh,
+canonical credential hydration, Infisical v4 publication and Postgres fencing,
+tested with synthetic grants and HTTP fakes. Live providers/connect UI remain
+unregistered. No real account was connected or secret configured, and no E2B
+machine was provisioned. The viewer APIs below remain a target, not shipped APIs.
 
 - Design review page: https://claude.ai/artifact/G8aEuFM4rwvGFeZbPYyVwU
 - Figma: file `zPe5LKycb2XuT1ivCLRw07`, section "云端电脑" (node `102:65`)
@@ -145,10 +146,11 @@ Report findings in the issue before building on an assumption that failed.
 
 ## 4. Data model (proposal)
 
-These tables remain proposals. No migration or credential table is added in
-this foundation: durable credential-provider selection, topology and auth
-lifecycle must be settled first. Future migrations must be additive and tested
-on isolated real Postgres before integration.
+The computer/desktop tables below remain proposals. The separate additive
+`20261024064200_byos_credential_publications.sql` migration introduces only
+`byos_connections` ownership/state/epoch/version/secret-reference/publication
+metadata. Credential values are never stored in this table. It is tested on
+isolated real Postgres; no production schema or secret was changed.
 
 - `cloud_machines`: workspaceId (unique), sandboxId, deviceId, state
   (`sleeping | waking | running | error`), lastActiveAt.
@@ -299,15 +301,21 @@ or credential. Workspace membership alone grants no subscription access.
 
 | Route | Existing execution seam | Current capability / release gate |
 | --- | --- | --- |
-| `codex_cli` | `CodexAdapter`, official app-server | Native ChatGPT login documented; persistent isolated runner/auth validation still required |
-| `claude_code_cli` | `ClaudeAdapter`, Agent SDK bundled CLI | Hosted unmodified CLI documented under conditions; SDK subscription use still documented; isolated runner/auth validation required |
+| `codex_cli` | `CodexAdapter`, official app-server | Optional host-managed token login/refresh bridge implemented and fake-tested; CPA audience, pinned CLI and isolated runner remain unverified |
+| `claude_code_cli` | `ClaudeAdapter`, Agent SDK bundled CLI | Optional access-lease broker mode, first-party/no-API-key mode check and expiry stop implemented/fake-tested; real CPA token scopes/native acceptance and isolated runner remain unverified |
 | `codex_cpa` | Mikka's existing AI SDK `streamText` loop | CPA-acquired Codex grant, owner-scoped executor/broker; implementation, transport and provider release gates remain |
 | `claude_cpa` | Same AI SDK model seam | CPA-acquired Claude grant, owner-scoped executor/broker; implementation, transport and provider release gates remain |
 | `openai_siwc` | Optional separate AI SDK model route | Public SIWC direct plan access exists; Mikka's remote/paid admission unestablished; does not replace the CPA route |
 
-Native Codex should use app-server managed `account/login/start` (`chatgpt` or
-`chatgptDeviceCode`), `account/read`, `account/logout`, and
-`account/rateLimits/read`. Do not repurpose arbitrary native Codex tokens as
+For CPA-hosted credentials, the optional daemon bridge uses experimental
+`account/login/start` (`chatgptAuthTokens`) and
+`account/chatgptAuthTokens/refresh`. A trusted owner-bound broker supplies only
+access material; the CPA worker retains refresh authority. This bridge is
+offline-tested against a fake app-server, not registered in the production
+launcher. Native managed `chatgpt` / `chatgptDeviceCode` login is a separate
+integration option, not an automatic fallback. Use `account/read`,
+`account/logout`, and `account/rateLimits/read` only through a verified account
+adapter. Do not repurpose arbitrary native Codex tokens as
 SIWC credentials. SIWC needs `chatgpt.tokens.use.direct`, validated identity and
 grant scopes, `store:false`, `stream:true`, and an eligible registered client.
 A model list is not an entitlement check.
@@ -344,8 +352,9 @@ the CLI concurrently. These compatibility/ownership choices remain deferred.
 Disconnect first denies new uses and invalidates platform leases, then cancels
 active runs, clears cached access and calls the supported provider/native logout
 operation. Report provider revocation limitations. The pure invalidation helper
-in this slice implements metadata transitions only; active-run cancellation,
-durable refresh serialization and provider logout are deferred.
+implements protocol metadata transitions only. The worker now provides durable
+refresh serialization and publication fencing. Active-run cancellation,
+provider logout/revocation and historical secret cleanup are deferred.
 
 `resolveSubscriptionModel` checks the binding before constructing the AI SDK
 model and again before each model call/tool step. `startSubscriptionSession`
@@ -389,20 +398,34 @@ inference is performed by official hosted CLIs or approved for every platform.
 
 License review: [Comma root is AGPL-3.0](https://github.com/AFK-surf/Comma/blob/ddcdcc5bd49620cefa623da2f38b98e72a7b613e/LICENSE);
 [CPA root is MIT](https://github.com/router-for-me/CLIProxyAPI/blob/8289ec4c71ad914d0612c2776352b76ba3d355a6/LICENSE).
-No source or dependencies from either project are copied or bundled here.
-We adopt explicit ownership and stale-result protection as design lessons, and
-do not implement client fingerprint impersonation or account pooling to evade
-limits. Their licenses do not grant provider subscription rights.
+The worker depends on the pinned CPA SDK and preserves its MIT license. Comma
+source is not copied. Only actual CPA lifecycle/store interfaces and credential
+data/patch types are used; built-in model executors and fingerprint/cloaking
+transports are not registered or executed. No account pooling to evade limits
+is implemented. These licenses do not grant provider subscription rights.
 
 ## 10. Next authorized acceptance gates
 
 Synthetic tests exercise repeated model tasks on one connection, both native
 adapters using fake CLIs, ownership/refusal policy, revocation and clean child
-environments. They do not prove CPA token acquisition, Infisical persistence,
-real subscription inference, native credential projection, OAuth refresh
-rotation, E2B isolation or restart/sleep survival. Those remain explicit gates.
-There are no additive migrations in this foundation; future metadata/lease
-migrations need isolated real Postgres checks.
+environments. The CPA worker additionally exercises actual SDK managers with
+TLS fixture acquisition/rotation/inference, immutable Infisical HTTP publication,
+real Postgres concurrency/faults, restart recovery and a private subprocess.
+Optional Codex and Claude native broker modes are tested with fake CLI processes;
+the latter ends at access expiry because its SDK lacks a documented host refresh
+callback. The CPA worker retains the sole rotating grant in both modes. Launcher
+registration/private broker delivery are still deferred, as is transparent
+Claude session continuation after an expiry stop.
+These prove the implemented adapter boundary against fakes; real provider OAuth,
+Infisical deployment, subscription inference, native token compatibility and E2B
+isolation/restart/sleep survival remain explicit gates. Run the reproducible
+Linux acceptance with `pnpm test:byos-worker`.
+
+Repository drift: this implementation began at main `7d7a345fc5801c34e9d664dff1c9dd7556448fc2`.
+Main later advanced to `5a0e1c411f487fee433c48414f7130d0d58dad92` via documentation
+PR #173. Its shared-HOME/login assertions conflict with the updated #172 owner
+requirements. This branch preserves the corrected ownership sections; a future
+merge must keep those corrections rather than restore shared credentials.
 
 Before any real E2B validation, obtain separate authorization for this bounded
 proposal: one existing standard sandbox template, default 2 vCPU / 4 GiB,
