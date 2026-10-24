@@ -1,4 +1,6 @@
 'use client'
+import { readIssueMetadata } from '@/lib/issue-metadata'
+import { issueChecklist } from '@/lib/issue-checklist'
 import { useTranslations } from 'next-intl'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -230,6 +232,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     applySelection(id, mode)
   }
   function open(id: string | null) {
+    if (id?.startsWith('optimistic-')) return false
     if (boardBusy || leaving.current) return false
     setPendingSelection(id)
     void leave(() => showIssue(id, 'push')).finally(() => setPendingSelection(undefined))
@@ -242,6 +245,33 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   const saved = useCallback((id: string) => { setSelected(id); void mutate() }, [mutate])
   function create(status: IssueStatus = ISSUE_STATUSES.some(item => item.value === view) ? view as IssueStatus : 'todo') { if (boardBusy) return; setTypedAhead(''); setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreateStatus(status); setCreating(true) }
+  // MIK-18: optimistic insert through SWR's mutate(promise) — polling/focus revalidations that start during the save
+  // can't overwrite the placeholder, and rollbackOnError restores the board if the save fails (the dialog shows the toast).
+  async function optimisticCreate<T extends object>(draft: { title: string; status: string; priority: string; teamId: string | null }, save: () => Promise<T>) {
+    const now = new Date()
+    const tempId = `optimistic-${crypto.randomUUID()}`
+    // teamId matches the dialog's team so team views keep showing the card until setIssueTeam + onCreated's refetch land.
+    const placeholder = { id: tempId, ownerId: user.id, ownerName: user.name ?? null, ownerImage: null, title: draft.title, status: draft.status, priority: draft.priority, revision: 1, createdAt: now, updatedAt: now, teamId: draft.teamId, metadata: readIssueMetadata({ type: 'doc' }), checklist: issueChecklist({ type: 'doc' }), optimistic: true } as unknown as (typeof tasks)[number]
+    let result: T | undefined
+    try {
+      // With optimisticData, the callback receives the committed (pre-placeholder) board.
+      await mutate(async current => {
+        result = await save()
+        const issue = 'issue' in result ? (result.issue as { id: string } | null | undefined) : null
+        if (!issue) throw new Error('create failed')
+        // Keep the card (now with its real id) until issueCreated's revalidation brings the server row.
+        return [{ ...placeholder, id: issue.id, optimistic: false }, ...(current ?? [])]
+      }, {
+        optimisticData: current => [placeholder, ...(current ?? [])],
+        rollbackOnError: true,
+        revalidate: false,
+      })
+    } catch (error) {
+      if (result) return result
+      throw error
+    }
+    return result!
+  }
   async function issueCreated(id: string) {
     void mutate()
     if (!creationProject) return
@@ -325,7 +355,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       </>}
     </AppShellContent>
     </>}
-    {creating && <CreateIssueDialog initialTitle={typedAhead} initialTeamId={(creationProject ? projectTeams.find(link => link.projectId === creationProject && link.isPrimary)?.teamId : section.startsWith('team-') ? teamId : null) ?? ''} initialStatus={createStatus} open={creating} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} onCreated={id => { void issueCreated(id) }} author={user.name || user.email} />}
+    {creating && <CreateIssueDialog initialTitle={typedAhead} initialTeamId={(creationProject ? projectTeams.find(link => link.projectId === creationProject && link.isPrimary)?.teamId : section.startsWith('team-') ? teamId : null) ?? ''} initialStatus={createStatus} open={creating} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} onOptimisticCreate={optimisticCreate} onCreated={id => { void issueCreated(id) }} author={user.name || user.email} />}
     {searchOpen && <IssueSearch open={searchOpen} onOpenChange={setSearchOpen} issues={tasks} onOpen={open} onCreate={() => create()} />}
   </AppShell></SignOutBoundary>
 }
