@@ -4,11 +4,12 @@ import type { LucideIcon, LucideProps } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Check } from 'lucide-react'
 import { BadgeButton } from '@/components/reui/badge'
+import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { statusDots, statusTones, type StatusTone } from '@/lib/status-appearance'
+import { statusDots, statusIconTints, statusTones, type StatusTone } from '@/lib/status-appearance'
 
-export function IssuePropertyMenu({ label, value, options, disabled, onChange }: {
+export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, disabled, iconOnly = false, onChange }: {
   label: string
   value: string
   options: readonly { value: string; label: string; icon?: LucideIcon; iconProps?: Pick<LucideProps, 'viewBox' | 'strokeWidth'>; indicatorClassName?: string; tone?: StatusTone }[]
@@ -31,10 +32,16 @@ export function IssuePropertyMenu({ label, value, options, disabled, onChange }:
     return item.label
   }
   const valueLabel = option ? optionLabel(option) : value
+  const ValueIcon = option?.icon ?? FallbackIcon
+  // Statuses carry their color; priorities stay grey, as their bars already say how urgent.
+  const tintTone: StatusTone = option?.indicatorClassName ? option.tone ?? 'neutral' : 'neutral'
   return <DropdownMenu>
-    <DropdownMenuTrigger render={<BadgeButton disabled={disabled} variant="outline" size="xl" className={cn('cursor-pointer px-2 py-0.5 hover:brightness-95', statusTones[option?.tone ?? 'neutral'])} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
+    {/* iconOnly: just the value's own icon (board cards), the name stays in the menu and the tooltip. */}
+    {iconOnly ? <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" disabled={disabled} className="text-muted-foreground" title={valueLabel} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
+      <ValueIcon data-icon="inline-start" className={cn('shrink-0', statusIconTints[tintTone])} {...option?.iconProps} />
+    </DropdownMenuTrigger> : <DropdownMenuTrigger render={<BadgeButton disabled={disabled} variant="outline" size="xl" className={cn('cursor-pointer px-2 py-0.5 hover:brightness-95', statusTones[option?.tone ?? 'neutral'])} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
       {valueLabel}
-    </DropdownMenuTrigger>
+    </DropdownMenuTrigger>}
     <DropdownMenuContent align="start" className="w-48">
       <DropdownMenuGroup>
         <DropdownMenuLabel>{label}</DropdownMenuLabel>
