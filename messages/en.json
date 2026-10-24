@@ -652,6 +652,32 @@
     "editorAria": "{label} editor"
   },
   "Devices": {
+    "otherDevices": "Other devices",
+    "menu": "More for {name}",
+    "add": {
+      "title": "Add device",
+      "description": "Any machine you can SSH into. Mikka installs itself.",
+      "trigger": "Add device",
+      "host": "Host",
+      "hostPlaceholder": "Hostname or IP",
+      "user": "User",
+      "userPlaceholder": "Your username on that machine",
+      "tailnet": "On your Tailnet",
+      "sshConfig": "In your SSH config",
+      "configured": "Set up",
+      "sshNew": "ssh · not set up",
+      "tailnetNew": "tailnet · not set up",
+      "shortcut": "Shortcut",
+      "cancel": "Cancel",
+      "setUp": "Set up",
+      "settingUp": "Setting up {host}",
+      "settingUpDescription": "Log in over SSH, install Mikka, start the service and record the host key.",
+      "progress": "Setup progress",
+      "interrupted": "The connection dropped.",
+      "back": "Back",
+      "done": "Done",
+      "emptyDescription": "Add a machine you can SSH into."
+    },
     "neverOnline": "Never online",
     "lastHeartbeat": "Last heartbeat {time}",
     "installedWithVersion": "Installed · {version}",
@@ -702,7 +728,7 @@
       "steps": {
         "login": "Sign in",
         "check": "Check host",
-        "install": "Install daemon",
+        "install": "Install Mikka",
         "start": "Start service",
         "connect": "Connect"
       },
@@ -1408,6 +1434,10 @@
       "integrations": {
         "title": "Integrations",
         "description": "Manage connected apps and message platforms."
+      },
+      "devices": {
+        "title": "Devices",
+        "description": "Machines you connected."
       },
       "workspace": {
         "title": "Workspace",
@@ -2168,6 +2198,49 @@
     "creating": "Creating…",
     "createWorkspace": "Create workspace"
   },
+  "Computer": {
+    "status": {
+      "working": "Agent working",
+      "approval": "Needs your approval",
+      "done": "Done",
+      "failed": "Error",
+      "sleeping": "Asleep",
+      "waking": "Waking",
+      "running": "Running",
+      "user": "You're in control"
+    },
+    "screenOf": "{name}'s screen",
+    "computerOf": "{name}'s computer",
+    "card": "Computer task",
+    "cardTitle": "Computer",
+    "openScreen": "Open {name}'s screen full window",
+    "open": "Open",
+    "sleeping": "The computer is asleep",
+    "wake": "Wake",
+    "waking": "Waking",
+    "machineError": "The computer didn't start",
+    "retry": "Retry",
+    "wakeFailed": "Couldn't wake it. Try again.",
+    "viewer": {
+      "title": "{name}'s screen",
+      "close": "Exit full window",
+      "controls": "Control",
+      "viewOnly": "View only",
+      "otherControls": "Someone else is in control",
+      "youControl": "You're in control",
+      "takeover": "Take control",
+      "handback": "Hand back to Agent",
+      "takenByOther": "Someone else is controlling this computer.",
+      "takeoverFailed": "Couldn't take control. Try again.",
+      "handbackFailed": "Couldn't hand back. Try again."
+    },
+    "approval": {
+      "allowRun": "Allow for this task",
+      "deny": "Deny",
+      "allow": "Allow",
+      "failed": "Not delivered. Try again."
+    }
+  },
   "Shell": {
     "pinned": "Pinned",
     "searchPlaceholder": "Search conversations, tasks, agents, knowledge",
@@ -2278,6 +2351,7 @@
       "device": "Machine",
       "noDevice": "No machine connected",
       "offline": "Offline",
+      "online": "Online",
       "contextProject": "project: {project}",
       "contextSeparator": ", ",
       "prompt": "Create a task for me: {text}",
