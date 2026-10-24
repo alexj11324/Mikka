@@ -4,8 +4,8 @@ import { useEffect, useRef, useState, useId } from 'react'
 import { useTranslations } from 'next-intl'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { ChevronRight, Laptop, Paperclip } from 'lucide-react'
-import { listDevices } from '@/app/actions/agents'
+import { ChevronRight, Cloud, Laptop, Paperclip, Terminal } from 'lucide-react'
+import { listAgents, listDevices } from '@/app/actions/agents'
 import { sendCoordinatorMessage } from '@/app/actions/coordinator'
 import { useActionError } from '@/lib/use-action-error'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
@@ -15,8 +15,21 @@ import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
+import { Badge } from '@/components/reui/badge'
+import { ComputerStatusBadge } from '@/components/computer/computer-status'
+import { useComputer } from '@/hooks/use-computer'
 
 const MAX_LENGTH = 8000
+
+type Machine = { value: string; label: string; agentId?: string; online?: boolean; server?: boolean }
+
+/** A bot's own cloud computer: 运行中 / 休眠中 / 唤醒中 (Figma 110:735). */
+function CloudMachineStatus({ agentId }: { agentId: string }) {
+  const { data: state } = useComputer(agentId)
+  if (!state) return null
+  return <ComputerStatusBadge status={state.machine === 'error' ? 'failed' : state.machine} end />
+}
 
 /**
  * 新建任务 the Comma way: say what needs doing in a sentence, on which machine,
@@ -42,9 +55,16 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const fileRef = useRef<HTMLInputElement>(null)
   const fileId = useId()
 
+  const tComputer = useTranslations('Computer')
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
+  const { data: bots = [] } = useSWR(open ? 'agents' : null, listAgents)
+  // The user's own machines, then each bot's cloud computer.
+  const machines: Machine[] = [
+    ...devices.filter(item => (item as typeof item & { kind?: string }).kind !== 'cloud').map(item => ({ value: item.id, label: item.name, online: item.online, server: item.platform !== 'darwin' && item.platform !== 'win32' })),
+    ...bots.map(bot => ({ value: `cloud:${bot.id}`, label: tComputer('computerOf', { name: bot.name }), agentId: bot.id })),
+  ]
   const [picked, setPicked] = useState<string | null>(null)
-  const device = devices.find(item => item.id === picked) ?? devices.find(item => item.online && item.enabled) ?? devices[0]
+  const device = machines.find(item => item.value === picked) ?? machines.find(item => devices.some(own => own.id === item.value && own.online && own.enabled)) ?? machines[0]
   useEffect(() => { if (open && initialText) setDraft(current => current || initialText) }, [open, initialText])
 
   async function attach(files: File[]) {
@@ -62,7 +82,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
     if (!text || sending) return
     setSending(true)
     try {
-      const context = [device && t('contextDevice', { device: device.name }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
+      const context = [device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
       const result = await sendCoordinatorMessage(context ? t('promptWithContext', { context, text }) : t('prompt', { text }))
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       setDraft('')
@@ -80,10 +100,13 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
     <DialogContent className="gap-3 p-4 sm:max-w-xl" closeLabel={tCommon('close')}>
       <div className="flex items-center gap-2 pr-8 text-sm">
         {device
-          ? <Select value={device.id} onValueChange={value => setPicked(value)} items={devices.map(item => ({ value: item.id, label: item.name }))}>
-            <SelectTrigger size="sm" className="h-7 gap-1.5 rounded-full px-2.5" aria-label={t('device')}><Laptop aria-hidden="true" className="text-muted-foreground" /><SelectValue /></SelectTrigger>
-            <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-48"><SelectGroup>
-              {devices.map(item => <SelectItem key={item.id} value={item.id}><Laptop aria-hidden="true" />{item.name}{!item.online && <span className="ml-auto pl-3 text-xs text-muted-foreground">{t('offline')}</span>}</SelectItem>)}
+          ? <Select value={device.value} onValueChange={value => setPicked(value)} items={machines.map(({ value, label }) => ({ value, label }))}>
+            <SelectTrigger size="sm" className="h-7 gap-1.5 rounded-full px-2.5" aria-label={t('device')}>{device.agentId ? <Cloud aria-hidden="true" className="text-muted-foreground" /> : device.server ? <Terminal aria-hidden="true" className="text-muted-foreground" /> : <Laptop aria-hidden="true" className="text-muted-foreground" />}<SelectValue /></SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-72"><SelectGroup>
+              {machines.map(item => <SelectItem key={item.value} value={item.value}>
+                {item.agentId ? <Cloud aria-hidden="true" /> : item.server ? <Terminal aria-hidden="true" /> : <Laptop aria-hidden="true" />}<span className="min-w-0 flex-1 truncate pr-3">{item.label}</span>
+                {item.agentId ? <CloudMachineStatus agentId={item.agentId} /> : <Badge radius="full" size="lg" variant="outline" className={cn('ml-auto shrink-0 border-transparent px-2 font-normal', item.online ? 'bg-success/10 text-success-foreground' : 'bg-muted text-muted-foreground')}><span aria-hidden="true" className="size-1.5 rounded-full bg-current" />{item.online ? t('online') : t('offline')}</Badge>}
+              </SelectItem>)}
             </SelectGroup></SelectContent>
           </Select>
           : <span className="flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{t('noDevice')}</span>}

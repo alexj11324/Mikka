@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { ArrowUp, BookOpen, ChevronRight, CircleCheck, Clock, Globe, Info, Maximize2, Minimize2, RotateCw, Search, X, type LucideIcon } from 'lucide-react'
@@ -20,6 +20,8 @@ import type { SuggestionAction, SuggestionSource } from '@/lib/db/schema'
 import { cn } from '@/lib/utils'
 import { LetterAvatar } from './letter-avatar'
 import { StatusDot } from './status-dot'
+import { AgentComputer } from '@/components/computer/agent-computer'
+import { useConversationComputerAgent } from '@/components/computer/computer-agents'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type PanelTab = 'details' | 'tasks' | 'browser' | 'knowledge' | 'schedules'
@@ -169,7 +171,7 @@ function EmptyTab({ title, onArrange, arrangeLabel }: { title: string; onArrange
   </div>
 }
 
-export type PanelConversation = { name: string; kind: 'coordinator' | 'agent'; updatedAt?: string }
+export type PanelConversation = { id?: string | null; name: string; kind: 'coordinator' | 'agent'; updatedAt?: string }
 
 /**
  * The right column beside a conversation (MIK-37, Figma 48:3): 详情 / 任务 /
@@ -193,6 +195,9 @@ export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue
   const now = useNow({ updateInterval: 60_000 })
   const [tab, setTab] = useState<PanelTab>('tasks')
   const [wide, setWide] = useState(false)
+  const computerAgent = useConversationComputerAgent(conversation.kind === 'agent' ? conversation.id : null)
+  // A conversation that uses a bot's computer opens on that bot's 详情, where its screen is (Figma 103:64).
+  useEffect(() => { if (computerAgent?.id) setTab('details') }, [computerAgent?.id])
   const waiting = runs.filter(run => run.status === 'waiting_input' && issues.some(issue => issue.id === run.issueId)).length
   return <aside aria-label={t('label')} className={cn('hidden min-h-0 shrink-0 flex-col border-l transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90')}>
     <Tabs value={tab} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
@@ -210,13 +215,18 @@ export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('close')} onClick={onClose} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('close')}</TooltipContent></Tooltip>
         </div>
       </div>
-      <TabsContent value="details" className="min-h-0 overflow-y-auto px-4 py-3">
+      <TabsContent value="details" className={cn('min-h-0', computerAgent ? 'flex flex-col' : 'overflow-y-auto px-4 py-3')}>
+        {computerAgent ? <>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3"><AgentComputer agentId={computerAgent.id} name={computerAgent.name} /></div>
+          <CommandComposer />
+        </> : <>
         <h2 className="text-xs font-medium text-muted-foreground">{tDetails('conversation')}</h2>
         <div className="flex items-center gap-3 py-3"><LetterAvatar name={conversation.name} tone={conversation.kind === 'coordinator' ? 'coordinator' : undefined} /><p className="min-w-0 truncate font-semibold">{conversation.name}</p></div>
         <dl className="grid grid-cols-[6rem_1fr] gap-y-2 text-sm">
           <dt className="text-muted-foreground">{tDetails('kind')}</dt><dd>{conversation.kind === 'coordinator' ? tDetails('coordinatorKind') : tDetails('agentKind')}</dd>
           <dt className="text-muted-foreground">{tDetails('updated')}</dt><dd>{conversation.updatedAt ? format.relativeTime(new Date(conversation.updatedAt), now) : tDetails('none')}</dd>
         </dl>
+        </>}
       </TabsContent>
       <TabsContent value="tasks" className="flex min-h-0 flex-col">
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-3">

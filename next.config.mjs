@@ -16,6 +16,8 @@ const nextConfig = {
   },
   webpack(config) {
     config.resolve.alias['react-syntax-highlighter$'] = new URL('./components/workspace/agent-syntax-highlighter.tsx', import.meta.url).pathname
+    // noVNC ships ES modules with top-level await but no "type": "module".
+    config.module.rules.push({ test: /[\\/]@novnc[\\/]novnc[\\/]lib[\\/].*\.js$/, type: 'javascript/esm' })
     return config
   },
   onDemandEntries: {
