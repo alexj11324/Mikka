@@ -37,6 +37,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
   const pool = new Pool({ connectionString: databaseUrl, max: 4 })
   const secrets = new Map()
   const secretMethods = []
+  const blockedDeletes = new Set()
   let providerCalls = 0
   const devices = new Map()
   const deviceVerifier = 'v'.repeat(43)
@@ -110,6 +111,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', privateKey, '-out', certificate, '-days', '1', '-subj', '/CN=BYOS synthetic fixture', '-addext', 'subjectAltName=IP:127.0.0.1', '-addext', 'basicConstraints=critical,CA:TRUE'], { stdio: 'ignore' })
   const infisical = httpsServer({ key: await readFile(privateKey), cert: await readFile(certificate) }, async (request, response) => {
     try {
+      if (request.url.startsWith('/quota/')) { assert.ok(request.headers.authorization.startsWith('Bearer fixture-'));response.end(JSON.stringify(request.url.endsWith('/codex') ? {credits:{has_credits:false,unlimited:false},rate_limit:{primary_window:{used_percent:20,limit_window_seconds:18000}}} : {extra_usage:{is_enabled:false},five_hour:{utilization:20}}));return }
       if (request.url.startsWith('/oauth/')) { await oauthProvider(request, response); return }
       if (request.url.startsWith('/provider/')) { await nativeProvider(request, response); return }
       assert.equal(request.headers.authorization, 'Bearer fixture-workload-token')
@@ -123,6 +125,8 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
         assert.equal(body.projectId, 'fixture-project'); assert.equal(body.secretPath, '/byos-cpa')
         if (secrets.has(name)) { response.writeHead(409).end(); return }
         secrets.set(name, body.secretValue)
+      } else if(request.method==='DELETE') {
+        const chunks=[];for await(const chunk of request)chunks.push(chunk);const body=JSON.parse(Buffer.concat(chunks).toString());assert.equal(body.secretPath,'/byos-cpa');assert.equal(body.projectId,'fixture-project');if(blockedDeletes.has(name)){response.writeHead(503).end();return};secrets.delete(name);response.writeHead(204).end();return
       } else {
         assert.equal(request.method, 'GET'); assert.equal(url.searchParams.get('version'), '1')
         assert.equal(url.searchParams.get('includeImports'), 'false'); assert.equal(url.searchParams.get('expandSecretReferences'), 'false')
@@ -138,8 +142,8 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
   let workerStarts = 0
   const service = new SubscriptionService(repository, scope => {
     workerStarts++
-    return new SubscriptionWorkerClient({ binary, env: { SSL_CERT_FILE: certificate, MIKKA_BYOS_FIXTURE_UPSTREAM_ORIGIN: origin } }, { scope, databaseUrl, infisicalOrigin: origin, project: 'fixture-project', environment: 'test', path: '/byos-cpa', workloadToken: 'fixture-workload-token' })
-  }, { ready: () => true, nativeIsolation: 'verified_runtime', oauth: { codex: true, claude: true } }, async provider => ({ vendor: provider === 'codex' ? 'codex' : 'claude_code', source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: 0.2, resetsAt: null }] }), async (_owner, workspace) => assert.equal(workspace, workspaceId))
+    return new SubscriptionWorkerClient({ binary, env: { SSL_CERT_FILE: certificate, MIKKA_BYOS_FIXTURE_UPSTREAM_ORIGIN: origin } }, { scope, databaseUrl, infisicalOrigin: origin, project: 'fixture-project', environment: 'test', path: '/byos-cpa', workloadToken: 'fixture-workload-token',accessPath:'/byos-cpa',accessToken:'fixture-workload-token' })
+  }, { ready: () => true, nativeIsolation: 'verified_runtime', oauth: { codex: true, claude: true } }, undefined, async (_owner, workspace) => assert.equal(workspace, workspaceId))
   const dependencies = {
     session: async request => {
       const value = request.headers.get('cookie')?.match(/fixture=([a-z-]+)/)?.[1]
@@ -200,14 +204,14 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       const bound = await post({ action: 'bind', connectionId, revision, consumerId, route, modelId: 'fixture-model' })
       assert.equal(bound.status, 200)
       const use = { ownerId: 'alice', workspaceId, consumerId, bindingId: bound.body.bindingId, execution: 'model' }
-      const initialSecrets = secrets.size
+      const initialSecretCreates = secretMethods.filter(method => method === 'POST').length
       for (let task = 0; task < 2; task++) {
         const remembered = await repository.defaultModelBinding('alice', consumerId)
         assert.equal(remembered, bound.body.bindingId)
         const model = await resolveAgentModel({ type: 'subscription', bindingId: remembered }, { defaultModel: () => { throw new Error('paid fallback invoked') }, subscriptionModel: bindingId => resolveAgentSubscription('alice', consumerId, bindingId, service, dependencies.workspace) })
         assert.equal(await streamText({ model, prompt: 'HELLO', maxRetries: 0 }).text, 'subscription fixture')
       }
-      assert.equal(secrets.size, initialSecrets, 'task reuse must not log in or store credentials again')
+      assert.equal(secretMethods.filter(method => method === 'POST').length, initialSecretCreates, 'task reuse must not log in or store credentials again')
       let toolCalls = 0
       const model = await service.model(use)
       const result = streamText({ model, prompt: 'TOOL', maxRetries: 0, stopWhen: isStepCount(3), tools: { weather: tool({ description: 'fixture weather', inputSchema: z.object({ city: z.string() }), execute: async ({ city }) => { toolCalls++; return { city, weather: 'snow' } } }) } })
@@ -261,8 +265,22 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       }
     }
     assert.ok(workerStarts > 10)
-    assert.ok(secretMethods.every(method => method === 'GET' || method === 'POST'))
+    assert.ok(secretMethods.every(method => method === 'GET' || method === 'POST' || method === 'DELETE'))
 
+    // Cron fairness: two persistently failing connections must not starve a third.
+    const fairness = []
+    for (let i = 0; i < 3; i++) {
+      const id = `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`
+      const name = `mikka-byos-${randomUUID()}`
+      await pool.query(`insert into byos_connections(id,"ownerId","workspaceId",provider,state) values($1,'fairness-owner',$2,'codex','disconnected')`, [id, workspaceId])
+      await pool.query(`insert into byos_secret_artifacts(name,"connectionId","ownerId","workspaceId",provider,kind,"notBefore","publishedAt","createStarted","createSettled") values($1,$2,'fairness-owner',$3,'codex','grant',now(),now(),true,true)`, [name,id,workspaceId])
+      secrets.set(name, 'synthetic-fairness-value'); if(i<2) blockedDeletes.add(name); fairness.push(name)
+    }
+    for(let pass=0;pass<4;pass++) await service.cleanupBatch()
+    assert.ok(!secrets.has(fairness[2]), 'two failed connections starved later cleanup')
+    for(const name of fairness) blockedDeletes.delete(name)
+    for(let pass=0;pass<4;pass++) await service.cleanupBatch()
+    if (process.env.MIKKA_BYOS_BACKEND_ONLY === '1') { console.log('Backend-only acceptance complete; browser acceptance intentionally not run'); return }
     // Actual Settings component in Chromium, synthetic session/provider only.
     const require = createRequire(import.meta.url)
     const esbuild = require(require.resolve('esbuild', { paths: [require.resolve('tsx')] }))

@@ -102,6 +102,19 @@ func newFakeInfisical(t *testing.T) (*fakeInfisical, *Infisical) {
 				_ = connection.Close()
 				return
 			}
+		case "DELETE":
+			var p map[string]string
+			if json.NewDecoder(r.Body).Decode(&p) != nil || p["projectId"] != "fixture-project" || p["environment"] != "test" || p["secretPath"] != "/byos-cpa" || p["type"] != "shared" || len(p) != 4 {
+				w.WriteHeader(400)
+				return
+			}
+			if _, ok := f.values[name]; !ok {
+				w.WriteHeader(404)
+				return
+			}
+			delete(f.values, name)
+			w.WriteHeader(204)
+			return
 		case "GET":
 			f.reads++
 			q := r.URL.Query()
@@ -287,10 +300,14 @@ func fixtureWorker(t *testing.T, provider string) (*Worker, *fakeInfisical, *fak
 	if err := repo.Create(context.Background(), s); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = db.Exec(`delete from byos_connections where id=$1`, s.ConnectionID) })
+	t.Cleanup(func() {
+		_, _ = db.Exec(`delete from byos_bindings where "connectionId"=$1`, s.ConnectionID)
+		_, _ = db.Exec(`delete from byos_oauth_attempts where "connectionId"=$1`, s.ConnectionID)
+		_, _ = db.Exec(`delete from byos_connections where id=$1`, s.ConnectionID)
+	})
 	inf, secrets := newFakeInfisical(t)
 	issuer := newFakeProvider(t, provider)
-	return &Worker{Repo: repo, Secrets: secrets, Scope: s, Authenticator: fakeAuthenticator{issuer}, Executor: fakeExecutor{issuer}}, inf, issuer
+	return &Worker{Repo: repo, Secrets: secrets, AccessSecrets: secrets, AllowNativeAuth: true, Scope: s, Authenticator: fakeAuthenticator{issuer}, Executor: fakeExecutor{issuer}}, inf, issuer
 }
 func mustAcquire(t *testing.T, w *Worker) Metadata {
 	t.Helper()
@@ -302,7 +319,27 @@ func mustAcquire(t *testing.T, w *Worker) Metadata {
 	if e != nil {
 		t.Fatal(e)
 	}
+	bindFixture(t, w, result.Revision, w.Scope.Provider+"_cpa")
 	return result
+}
+
+func bindFixture(t *testing.T, w *Worker, revision int64, route string) {
+	t.Helper()
+	id := newID()
+	consumer := "fixture-consumer"
+	_, err := w.Repo.DB.Exec(`insert into byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") values($1,$2,$3,$4,$5,$6,$7,'fixture-model')`, id, w.Scope.OwnerID, w.Scope.WorkspaceID, consumer, w.Scope.ConnectionID, revision, route)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Use = &RuntimeUse{BindingID: id, ConsumerID: consumer}
+	vendor := "codex"
+	if w.Scope.Provider == "claude" {
+		vendor = "claude_code"
+	}
+	quota, _ := json.Marshal(map[string]any{"vendor": vendor, "source": "official", "status": "ok", "observedAt": time.Now().UTC().Format(time.RFC3339Nano), "windows": []map[string]any{{"kind": "five_hour", "used": .2, "resetsAt": nil}}})
+	if _, err = w.Repo.DB.Exec(`update byos_connections set quota=$2 where id=$1`, w.Scope.ConnectionID, quota); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestCPAInitialSaveRestartRefreshAndRepeatedUse(t *testing.T) {
@@ -321,7 +358,7 @@ func TestCPAInitialSaveRestartRefreshAndRepeatedUse(t *testing.T) {
 				}
 			}
 			// Reconstruct a worker: only Postgres metadata + mock Infisical survive.
-			restarted := &Worker{Repo: w.Repo, Secrets: w.Secrets, Scope: w.Scope, Authenticator: w.Authenticator, Executor: w.Executor}
+			restarted := &Worker{Repo: w.Repo, Secrets: w.Secrets, AccessSecrets: w.AccessSecrets, Use: w.Use, AllowNativeAuth: w.AllowNativeAuth, Scope: w.Scope, Authenticator: w.Authenticator, Executor: w.Executor}
 			refreshed, err := restarted.Refresh(ctx, initial.Revision)
 			if err != nil {
 				t.Fatal(err)
@@ -335,8 +372,8 @@ func TestCPAInitialSaveRestartRefreshAndRepeatedUse(t *testing.T) {
 			if issuer.acquires.Load() != 1 || issuer.refreshes.Load() != 1 || issuer.executions.Load() != 3 {
 				t.Fatal("unexpected login, refresh or execution count")
 			}
-			if inf.creates != 2 {
-				t.Fatal("rotation must create a new immutable secret")
+			if inf.creates != 4 {
+				t.Fatal("rotation must publish an immutable grant and access-only projection")
 			}
 			var row string
 			if w.Repo.DB.QueryRow(`select row_to_json(c)::text from byos_connections c where id=$1`, w.Scope.ConnectionID).Scan(&row) != nil {
@@ -402,6 +439,7 @@ func TestSingleRefreshAuthorityAndReconnectRejectsLateResult(t *testing.T) {
 	if _, err = w.Execute(ctx, initial.Revision, "fixture-model", nil); err != ErrUnavailable {
 		t.Fatal("old binding resumed after reconnect")
 	}
+	bindFixture(t, w, reconnected.Revision, w.Scope.Provider+"_cpa")
 	if _, err = w.Execute(ctx, reconnected.Revision, "fixture-model", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -427,7 +465,7 @@ func TestAcceptedSecretLostResponseRecoversAfterRestartWithoutLogin(t *testing.T
 	inf.mu.Lock()
 	inf.failRead = false
 	inf.mu.Unlock()
-	restarted := &Worker{Repo: w.Repo, Secrets: w.Secrets, Scope: w.Scope, Executor: w.Executor}
+	restarted := &Worker{Repo: w.Repo, Secrets: w.Secrets, AccessSecrets: w.AccessSecrets, Use: w.Use, AllowNativeAuth: w.AllowNativeAuth, Scope: w.Scope, Executor: w.Executor}
 	recovered, err := restarted.Recover(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -505,6 +543,7 @@ func TestPrivateIPCDoesNotExposeCredentialsOrAcceptTenantOverrides(t *testing.T)
 	if !strings.Contains(out.String(), "provider_operation_failed") || !strings.Contains(out.String(), "provider_route_unavailable") {
 		t.Fatal("IPC did not return safe refusals")
 	}
+	bindFixture(t, w, initial.Revision, "codex_cli")
 	auth, err := w.CodexNativeAuth(ctx, initial.Revision)
 	if err != nil || auth.Type != "chatgptAuthTokens" || auth.ChatGPTAccountID != "fixture-account" {
 		t.Fatal("native Codex shape unavailable", err)
@@ -533,9 +572,11 @@ func TestPrivateIPCDoesNotExposeCredentialsOrAcceptTenantOverrides(t *testing.T)
 		t.Fatal(err)
 	}
 	inf.mu.Lock()
-	inf.values[record.SecretName] = raw
+	projection, _ := accessProjection(b)
+	raw, digest, _ = encodeBundle(projection)
+	inf.values[record.AccessName] = raw
 	inf.mu.Unlock()
-	if _, err = w.Repo.DB.Exec(`update byos_connections set "secretDigest"=$2 where id=$1`, w.Scope.ConnectionID, digest); err != nil {
+	if _, err = w.Repo.DB.Exec(`update byos_connections set "accessDigest"=$2 where id=$1`, w.Scope.ConnectionID, digest); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = w.CodexNativeAuth(ctx, initial.Revision); err != ErrUnsupported {

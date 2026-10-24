@@ -44,6 +44,7 @@ func TestClaudeNativeAccessLeaseReusesCPARotationAuthority(t *testing.T) {
 	w, _, issuer := fixtureWorker(t, "claude")
 	issuer.expiredAcquire.Store(true)
 	initial := mustAcquire(t, w)
+	bindFixture(t, w, initial.Revision, "claude_code_cli")
 	for task := 0; task < 2; task++ {
 		lease, err := w.ClaudeNativeAuth(context.Background(), initial.Revision)
 		if err != nil || lease.AccessToken == "" || lease.AccountID == "" || !lease.ExpiresAt.After(time.Now()) {
@@ -136,7 +137,7 @@ func TestInfisicalRedirectAndIntegrityFailuresDoNotPublish(t *testing.T) {
 	initial := mustAcquire(t, w)
 	record, _ := w.Repo.Lookup(context.Background(), w.Scope)
 	inf.mu.Lock()
-	inf.values[record.SecretName] = []byte(`{"schema":1,"ownerId":"bob"}`)
+	inf.values[record.AccessName] = []byte(`{"schema":1,"ownerId":"bob"}`)
 	inf.mu.Unlock()
 	if _, err = w.Execute(context.Background(), initial.Revision, "fixture-model", nil); err != ErrIntegrity {
 		t.Fatal("tampered/cross-owner bundle was used")

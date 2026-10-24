@@ -1,6 +1,9 @@
 # BYOS: source integration and live-validation handoff
 
-Current implementation record, 2026-10-24. This supersedes phase-two statements
+Current implementation record, 2026-10-24. Backend security hardening now adds
+access-only storage/execution identities, worker task authorization, token-free
+quota results and durable fair cleanup. See the subscription worker README for
+current configuration and exact remaining native/provider-revocation gates. This supersedes phase-two statements
 that OAuth, streaming, UI entry and private launcher wiring are absent. The
 feature remains off by default; no real account or E2B resource was used.
 
@@ -45,9 +48,9 @@ E2B_API_KEY stay on the control plane and never enter an agent environment.
 | Path | Current source and evidence | Real-world status |
 | --- | --- | --- |
 | Connect/callback/reconnect | Authenticated HTTP handlers, workspace authorization, durable attempts, CPA-compatible acquisition/store, Infisical publication | Production device/code-return adapters tested with synthetic grants. Actual provider acceptance/eligibility remains unverified |
-| Own Mikka harness | Agent route → persisted binding → membership/capability/quota checks → AI SDK stream → private Go RPC → CPA converters and plain Mikka HTTP adapter | Text, tool calls/results, errors, cancellation and revocation tested through native provider SSE fixtures. Actual provider acceptance/eligibility unverified |
-| Hosted Codex | Service native dispatch → trusted runner factory → private access lease → existing CodexAdapter host-managed auth/refresh | Fake app-server and actual SDK Store exercised. Pinned official app-server/audience/billing compatibility unverified |
-| Hosted Claude Code | Same dispatch/broker → access-only OAuth lease → existing SDK adapter with isolated runtime home, account-mode check and expiry stop | Fake CLI exercised. Actual token scope/native compatibility unverified; transparent continuation at expiry is deferred |
+| Own Mikka harness | Agent route → persisted binding → membership/capability/quota checks → AI SDK stream → private access-only Go RPC → CPA converters and plain Mikka HTTP adapter | Text, tool calls/results, errors, cancellation and revocation tested through native provider SSE fixtures. Actual provider acceptance/eligibility unverified |
+| Hosted Codex | Service native dispatch → trusted runner factory → private access lease → existing CodexAdapter host-managed auth/refresh | Library/fake app-server and actual SDK Store exercised; production export now blocked. Real runtime isolation/native safety remains unverified |
+| Hosted Claude Code | Same dispatch/broker → access-only OAuth lease → existing SDK adapter with isolated runtime home, account-mode check and expiry stop | Library/fake CLI exercised; production export now blocked. Actual shell/environment boundary and token scope/native compatibility unverified |
 
 The binding, model and workspace come from owner-scoped server records. A
 selected chat binding is remembered for later turns; disconnect/reconnect never
@@ -93,8 +96,9 @@ optional capability, not a reinterpretation of arbitrary Codex tokens. Honest
 Mikka requests may be refused; the adapter returns an error rather than imitating
 an official client, changing accounts or using API credits.
 
-Quota probes use platform access leases and existing decoding functions, not
-local credential readers. Missing or enabled provider credit/extra-usage fallback
+Quota probes now execute in the access-only worker, returning only projected
+usage/billing metadata to existing decoding functions. Node no longer receives
+provider access tokens for quota; no local credential readers are used. Missing or enabled provider credit/extra-usage fallback
 evidence remains unknown and refuses use. Native OAuth mode alone is not proof
 that provider-side spending controls are disabled. These controls require live
 compatibility validation before marking a route ready.
@@ -159,12 +163,39 @@ viewer implementation was not replaced with a new desktop UI.
    E2B proposal is one 2-vCPU/4-GiB sandbox, at most 600 aggregate running seconds,
    estimated compute $0.0276 and proposed $0.05 cap. No E2B operation was run.
 
-Historical secret/attempt GC, provider-side revocation, workload-token delivery
-and renewal, real E2B transport/isolation, and Claude transparent continuation
-after expiry remain release work. Logical disconnect immediately fences Mikka
+Known-artifact cleanup now has durable retries and an authenticated daily BYOS
+cron. Unknown remote creation outcomes remain explicitly pending; deletion is
+not falsely confirmed on a pre-commit 404. Pre-journal orphan discovery, provider
+revocation, workload-token delivery/renewal, real E2B isolation and safe native
+credential delivery remain release work. Production native export stays disabled. Logical disconnect immediately fences Mikka
 use but cannot undo an already transmitted provider request.
 
 ## Cloud Linux evidence
+
+Backend hardening rerun (no browser or real accounts):
+
+- Worker: 30 top-level tests, race detector, vet, production/fixture builds and
+  application-handler acceptance passed. Disposable Postgres applied all 31
+  migrations and replayed successfully. Synthetic vault/provider fixtures covered
+  access-only reads, binding refusals, normal rotation, disconnect, late writes,
+  uncertain remote commits and cleanup fairness across artifacts/connections.
+- Daemon: 211 passed, 7 real-agent tests skipped. Its unchanged permission test
+  requires an initial 0755 directory; the suite passed with `umask 022` after the
+  inherited 0077 mask caused that setup assertion to fail. Root/daemon type checks,
+  lint, migration policy and 8 model tests passed.
+- An isolated, credential-free Docker Next webpack production build passed;
+  all four agent/subscription/callback/cleanup routes trace the same worker
+  (SHA256 `75dde969f319a62add32781ebe7b15914936547a3b2c49780e27b1e1115b2007`).
+  Missing live Better Auth configuration emitted expected build-time diagnostics;
+  this is build/package validation, not live authentication acceptance.
+- Official Codex 0.163.0 accepted synthetic managed auth in a network-disabled
+  container with an empty home. The supplied token was absent from the inspected
+  process environment and owned home files. This did not test inference, shell
+  isolation, real accounts or E2B. Claude's executable was unavailable; production
+  native export remains blocked for both providers.
+
+The following records are retained from the earlier source candidate; browser,
+protocol-wide and root aggregate checks were not rerun for backend hardening:
 
 - Worker: 19 top-level tests plus 6 provider subtests; race detector, vet, build,
   actual CPA Codex device exchange and plain Claude exchange/refresh against TLS

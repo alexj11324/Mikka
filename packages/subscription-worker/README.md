@@ -8,7 +8,7 @@ Run on the Agent's cloud Linux machine:
     pnpm test:byos-worker
 
 This verifies the exact official CPA commit, starts disposable loopback Postgres,
-applies all 29 migrations, builds the production and acceptance-only executables,
+applies all 31 migrations, builds the production and acceptance-only executables,
 runs Go race tests and vet, then runs application/native/browser acceptance and
 migration replay. No real grant, account credentials, Infisical write, provider
 inference or E2B sandbox is used. Docker images and Go module sums are pinned.
@@ -36,7 +36,7 @@ inference or E2B sandbox is used. Docker images and Go module sums are pinned.
    CPA converters run through a separate ordinary Mikka HTTP model adapter;
    native identity metadata is removed, no native fingerprint executor is used.
    Errors, retries, cancellation and revocation fail closed without paid fallback.
-7. The native launcher uses the same connection through access-only leases and
+7. The native launcher seam can use the same connection through access-only leases and
    existing daemon adapters. Codex has host-managed login/refresh callbacks.
    Claude uses its documented OAuth environment input and ends at access expiry;
    its SDK has no documented host refresh callback. A later start reuses the
@@ -48,14 +48,55 @@ routine rotation preserves bot bindings, reconnect/disconnect advance the epoch.
 New turns refuse unavailable publications. Native refresh waits recognize their
 own transient publication while still enforcing owner, epoch and binding.
 
+## Backend credential boundary
+
+Custody children acquire/refresh grants and publish two immutable artifacts: the
+full grant and an independently validated access-only projection. Both references
+publish in one Postgres transaction. Execution children receive only the access
+reader identity; they cannot invoke custody methods or fall back to full bundles.
+A trusted prepare call handles refresh and upgrades legacy projections without
+another login. Go enforces owner/workspace/consumer/binding/route/model/revision
+and quota at use, not only in the TypeScript caller. Quota HTTP stays in Go and
+returns a numeric/boolean projection without bearer tokens or raw diagnostics.
+
+`MIKKA_BYOS_ACCESS_INFISICAL_PATH` and `MIKKA_BYOS_ACCESS_INFISICAL_TOKEN` are new
+private configuration. The access path and reader identity must differ from the
+grant path/identity. Custody needs read/create/delete on both exact BYOS paths;
+the execution identity needs read-only access on the access path, no grant-path
+access. Source checks do not establish actual IAM policy. No identities, grants
+or permissions were configured during synthetic validation. Ordinary trusted
+platform custody remains readable to its authorized runtime/operators.
+
+The production executable now refuses native credential export unconditionally;
+a configuration flag cannot attest isolation. Library/fake-CLI seams remain for
+compatibility tests. Real Codex/Claude tool/process/file boundaries and safe
+external credential delivery are still activation gates, not shipped guarantees.
+
+## Credential deletion
+
+An owner-bound durable artifact journal is written before any secret create.
+Disconnect advances the epoch and clears live references before deletion.
+Cleanup protects current/recoverable artifacts, tracks late writes and reports
+pending/failed/uncertain creation states. Unknown remote commits remain queued
+after 404 rather than being declared permanently deleted. Per-artifact and
+per-connection retries rotate fairly. The authenticated BYOS cron drains bounded
+batches daily; preparing another task also drains its connection. Scheduling is
+source configuration only until an authorized deployment.
+
+Provider revocation is explicitly `not_implemented`; no undocumented endpoint
+is invented. Historical artifacts whose references were already lost before the
+journal cannot be attributed/deleted automatically. Known prior references are
+backfilled by the additive migration. Real deletion permission and API operation
+remain untested; logical stop and physical deletion are distinct outcomes.
+
 ## Private process boundary
 
 The production executable reads one trusted configuration frame over stdin,
 then private RPC. It opens no HTTP listener and reads no local provider credentials.
 Status APIs contain metadata only; connection ceremony responses additionally
-contain the public authorization URL, opaque attempt handle and device user code. Native access material is returned
-only by the private nativeAuth RPC, consumed by the trusted launcher; model RPC
-cannot select arbitrary methods. Infisical workload credentials never enter CLI
+contain the public authorization URL, opaque attempt handle and device user code. Native access material is returned only by explicitly enabled library/test
+capabilities; the production nativeAuth RPC refuses export. Model RPC cannot
+select custody methods. Infisical workload credentials never enter CLI
 environments. The broker interface can be implemented by a private remote channel.
 
 Three small original bridge files are installed in the ignored pinned upstream
@@ -83,7 +124,8 @@ The web runtime never attests native isolation. Real E2B wiring must keep the
 credential broker/control-plane secrets outside untrusted compute. No topology
 or metered provisioning was selected here.
 
-Provider revocation, historical secret/attempt GC and deployment workload-token
-delivery/renewal remain operational integration work. Disconnect fences Mikka
+Provider revocation, pre-journal orphan discovery and deployment workload-token
+delivery/renewal remain operational integration work. Durable known-artifact
+cleanup is implemented and tested against local fakes, not real vault records. Disconnect fences Mikka
 use immediately; it does not claim provider-side revocation or undo an already
 transmitted request.

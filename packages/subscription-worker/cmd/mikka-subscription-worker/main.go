@@ -42,17 +42,21 @@ func run() error {
 		return worker.ErrUnsupported
 	}
 	var config struct {
-		Scope             worker.Scope `json:"scope"`
-		DatabaseURL       string       `json:"databaseUrl"`
-		Origin            string       `json:"infisicalOrigin"`
-		Project           string       `json:"project"`
-		Environment       string       `json:"environment"`
-		Path              string       `json:"path"`
-		Token             string       `json:"workloadToken"`
-		EnableCodexOAuth  bool         `json:"enableCodexOAuth"`
-		EnableRuntime     bool         `json:"enableRuntime"`
-		EnablePlainModels bool         `json:"enablePlainModels"`
-		EnableClaudeOAuth bool         `json:"enableClaudeOAuth"`
+		Scope             worker.Scope       `json:"scope"`
+		Use               *worker.RuntimeUse `json:"use"`
+		ExecutionOnly     bool               `json:"executionOnly"`
+		AccessPath        string             `json:"accessPath"`
+		AccessToken       string             `json:"accessToken"`
+		DatabaseURL       string             `json:"databaseUrl"`
+		Origin            string             `json:"infisicalOrigin"`
+		Project           string             `json:"project"`
+		Environment       string             `json:"environment"`
+		Path              string             `json:"path"`
+		Token             string             `json:"workloadToken"`
+		EnableCodexOAuth  bool               `json:"enableCodexOAuth"`
+		EnableRuntime     bool               `json:"enableRuntime"`
+		EnablePlainModels bool               `json:"enablePlainModels"`
+		EnableClaudeOAuth bool               `json:"enableClaudeOAuth"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(frame))
 	decoder.DisallowUnknownFields()
@@ -73,11 +77,37 @@ func run() error {
 	if db.PingContext(ctx) != nil {
 		return worker.ErrDatabase
 	}
-	secrets, err := worker.NewInfisical(worker.InfisicalConfig{Origin: config.Origin, ProjectID: config.Project, Environment: config.Environment, Path: config.Path, Token: func(context.Context) (string, error) { return config.Token, nil }})
-	if err != nil {
-		return err
+	var grants worker.SecretStore
+	if config.ExecutionOnly {
+		if config.Token != "" || config.Path != "" || config.EnableCodexOAuth || config.EnableClaudeOAuth {
+			return worker.ErrUnsupported
+		}
+	} else {
+		secrets, err := worker.NewInfisical(worker.InfisicalConfig{Origin: config.Origin, ProjectID: config.Project, Environment: config.Environment, Path: config.Path, Token: func(context.Context) (string, error) { return config.Token, nil }})
+		if err != nil {
+			return err
+		}
+		grants = secrets
 	}
-	w := worker.Worker{Repo: &worker.Repository{DB: db}, Secrets: secrets, Scope: config.Scope}
+	var access worker.SecretStore
+	if config.EnableRuntime || config.EnableCodexOAuth || config.EnableClaudeOAuth {
+		if config.AccessPath == "" || config.AccessToken == "" || (!config.ExecutionOnly && (config.AccessPath == config.Path || config.AccessToken == config.Token)) {
+			return worker.ErrUnsupported
+		}
+		credential := config.AccessToken
+		if !config.ExecutionOnly {
+			credential = config.Token
+		} // Custody writes both paths; execution receives only the read identity.
+		secrets, err := worker.NewInfisical(worker.InfisicalConfig{Origin: config.Origin, ProjectID: config.Project, Environment: config.Environment, Path: config.AccessPath, Token: func(context.Context) (string, error) { return credential, nil }})
+		if err != nil {
+			return err
+		}
+		access = secrets
+	}
+	// No production native credential export until a verified runner/broker path
+	// avoids exposing tokens to untrusted tools. Config flags cannot attest that.
+	w := worker.Worker{Repo: &worker.Repository{DB: db}, Secrets: grants, AccessSecrets: access, Scope: config.Scope, Use: config.Use, ExecutionOnly: config.ExecutionOnly}
+
 	if config.EnableRuntime {
 		if config.Scope.Provider == "codex" {
 			w.Executor = worker.CPACodexLifecycle{}

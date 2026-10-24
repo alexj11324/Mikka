@@ -41,10 +41,16 @@ func cloneMap(m map[string]any) map[string]any {
 	return out
 }
 func filterPayload(provider string, input map[string]any) (map[string]any, error) {
+	return filterCredentialPayload(provider, input, true)
+}
+func filterCredentialPayload(provider string, input map[string]any, full bool) (map[string]any, error) {
 	copy := cloneMap(input)
 	core.NormalizeCredentialMetadata(copy)
 	out := map[string]any{"type": provider}
 	for _, key := range credentialKeys(provider) {
+		if !full && (key == "refresh_token" || key == "id_token") {
+			continue
+		}
 		value, ok := copy[key]
 		if !ok || key == "type" {
 			continue
@@ -63,6 +69,9 @@ func filterPayload(provider string, input map[string]any) (map[string]any, error
 			}
 			filtered := map[string]any{}
 			for _, k := range []string{"access_token", "refresh_token", "id_token", "client_id", "device_id", "expired", "expires_at", "last_refresh", "scope", "scopes"} {
+				if !full && (k == "refresh_token" || k == "id_token") {
+					continue
+				}
 				if v, present := section[k]; present {
 					filtered[k] = v
 				}
@@ -77,6 +86,9 @@ func filterPayload(provider string, input map[string]any) (map[string]any, error
 		out[key] = text
 	}
 	for _, key := range []string{"access_token", "refresh_token", "expired"} {
+		if !full && key == "refresh_token" {
+			continue
+		}
 		if text, _ := out[key].(string); strings.TrimSpace(text) == "" {
 			return nil, ErrCredential
 		}
@@ -98,6 +110,38 @@ func filterPayload(provider string, input map[string]any) (map[string]any, error
 	}
 	return out, nil
 }
+
+func accessProjection(b bundle) (bundle, error) {
+	payload, err := filterCredentialPayload(b.Provider, b.Payload, false)
+	b.Payload = payload
+	return b, err
+}
+func decodeAccessBundle(s Scope, raw []byte, digest string) (bundle, error) {
+	if len(raw) > 131072 {
+		return bundle{}, ErrIntegrity
+	}
+	sum := sha256.Sum256(raw)
+	var b bundle
+	if hex.EncodeToString(sum[:]) != digest || json.Unmarshal(raw, &b) != nil || b.Schema != 1 || b.OwnerID != s.OwnerID || b.WorkspaceID != s.WorkspaceID || b.ConnectionID != s.ConnectionID || b.Provider != s.Provider {
+		return bundle{}, ErrIntegrity
+	}
+	// Access storage must never be silently reinterpreted as a full grant.
+	for _, p := range []map[string]any{b.Payload, objectMap(b.Payload["siwc"])} {
+		if _, ok := p["refresh_token"]; ok {
+			return bundle{}, ErrIntegrity
+		}
+		if _, ok := p["id_token"]; ok {
+			return bundle{}, ErrIntegrity
+		}
+	}
+	payload, err := filterCredentialPayload(s.Provider, b.Payload, false)
+	if err != nil {
+		return bundle{}, ErrIntegrity
+	}
+	b.Payload = payload
+	return b, nil
+}
+func objectMap(value any) map[string]any { out, _ := value.(map[string]any); return out }
 func normalizeAuth(s Scope, a *core.Auth, latest *bundle) (bundle, error) {
 	if a == nil || a.ID != s.ConnectionID || a.Provider != s.Provider {
 		return bundle{}, ErrCredential

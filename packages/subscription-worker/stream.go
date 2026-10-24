@@ -10,6 +10,9 @@ import (
 // Streams one explicitly selected credential. Closing IPC cancels the provider
 // context. No account pool, replay/retry or billing fallback exists here.
 func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload []byte, emit func([]byte) error) error {
+	if err := w.authorizeRuntime(ctx, epoch, "model", model); err != nil {
+		return err
+	}
 	if w.Executor == nil || w.Executor.Identifier() != w.Scope.Provider {
 		return ErrUnsupported
 	}
@@ -31,7 +34,7 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 	for {
 		select {
 		case <-ticker.C:
-			if _, err = w.Repo.Connected(ctx, w.Scope, r.Epoch, r.Version); err != nil {
+			if _, err = w.activeRuntime(ctx, r.Epoch, model); err != nil {
 				return err
 			}
 		case <-ctx.Done():
@@ -43,7 +46,7 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 			if chunk.Err != nil || len(chunk.Payload) > 65536 {
 				return ErrProvider
 			}
-			if _, err = w.Repo.Connected(ctx, w.Scope, r.Epoch, r.Version); err != nil {
+			if _, err = w.activeRuntime(ctx, r.Epoch, model); err != nil {
 				return err
 			}
 			if err = emit(chunk.Payload); err != nil {

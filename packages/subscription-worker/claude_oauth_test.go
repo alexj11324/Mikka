@@ -96,6 +96,7 @@ func TestClaudePlainOAuthAndRefreshExcludeNativeIdentityAndFingerprintPaths(t *t
 	if err != nil || rotated.Revision != done.Revision || rotated.CredentialVersion != 2 {
 		t.Fatal("plain refresh did not preserve binding", err)
 	}
+	bindFixture(t, w, done.Revision, "claude_code_cli")
 	lease, err := w.ClaudeNativeAuth(context.Background(), done.Revision)
 	if err != nil || lease.AccessToken != "fixture-rotated-access" || calls.Load() != 3 {
 		t.Fatal("native access lease did not reuse platform OAuth lifecycle", err)

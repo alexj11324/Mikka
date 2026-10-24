@@ -10,10 +10,11 @@ import (
 // Store implements the actual CPA persistence interface. It has immutable
 // owner scope and an optional durable operation; never a process-global tenant switch.
 type Store struct {
-	Repo      *Repository
-	Secrets   SecretStore
-	Scope     Scope
-	Operation *Operation
+	Repo          *Repository
+	Secrets       SecretStore
+	AccessSecrets SecretStore
+	Scope         Scope
+	Operation     *Operation
 }
 
 var _ core.Store = (*Store)(nil)
@@ -45,7 +46,19 @@ func (s *Store) List(ctx context.Context) ([]*core.Auth, error) {
 	} else if r.State != "connected" {
 		return nil, ErrUnavailable
 	}
-	b, err := s.load(ctx, r)
+	var b bundle
+	if refresh {
+		b, err = s.load(ctx, r)
+	} else {
+		if s.AccessSecrets == nil || r.AccessName == "" {
+			return nil, ErrUnavailable
+		}
+		var raw []byte
+		raw, err = s.AccessSecrets.Read(ctx, r.AccessName)
+		if err == nil {
+			b, err = decodeAccessBundle(s.Scope, raw, r.AccessDigest)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -86,24 +99,36 @@ func (s *Store) Save(ctx context.Context, a *core.Auth) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	name, err := s.Repo.Stage(ctx, o, digest)
+	projection, err := accessProjection(next)
 	if err != nil {
 		return "", err
 	}
-	if err = s.Secrets.Create(ctx, name, raw); err != nil {
-		// The create response can be lost after acceptance. Re-read only this
-		// operation's immutable name; never repeat OAuth/refresh automatically.
-		stored, readErr := s.Secrets.Read(ctx, name)
-		if readErr != nil {
-			_ = s.Repo.Fail(context.WithoutCancel(ctx), o, "publication_failed")
-			return "", ErrStore
-		}
-		if _, checkErr := decodeBundle(s.Scope, stored, digest); checkErr != nil {
-			_ = s.Repo.Fail(context.WithoutCancel(ctx), o, "integrity_failed")
-			return "", ErrIntegrity
-		}
+	accessRaw, accessDigest, err := encodeBundle(projection)
+	if err != nil {
+		return "", err
 	}
-	if err = s.Repo.Publish(ctx, o, name, digest, next.subject()); err != nil {
+	accessName := "mikka-byos-" + newID()
+	name, err := s.Repo.Stage(ctx, o, digest, accessName, accessDigest)
+	if err != nil {
+		return "", err
+	}
+	// Persist both references before either create. Register both even if the first
+	// fails, so recovery/cleanup can account for every possible late write.
+	if err = s.Repo.artifact(ctx, o, "grant", name); err != nil {
+		return "", err
+	}
+	if err = s.Repo.artifact(ctx, o, "access", accessName); err != nil {
+		return "", err
+	}
+	if err = createArtifact(ctx, s.Repo, s.Secrets, o, "grant", name, raw); err != nil {
+		_ = s.Repo.Fail(context.WithoutCancel(ctx), o, "publication_failed")
+		return "", err
+	}
+	if err = createArtifact(ctx, s.Repo, s.AccessSecrets, o, "access", accessName, accessRaw); err != nil {
+		_ = s.Repo.Fail(context.WithoutCancel(ctx), o, "publication_failed")
+		return "", err
+	}
+	if err = s.Repo.Publish(ctx, o, name, digest, accessName, accessDigest, next.subject()); err != nil {
 		return "", err
 	}
 	// CPA expects a persisted identifier, not necessarily a filesystem path.
@@ -142,8 +167,42 @@ func (s *Store) Recover(ctx context.Context) (Record, error) {
 	if r.OperationKind == "refresh" && r.Subject != b.subject() {
 		return Record{}, ErrIntegrity
 	}
-	if err = s.Repo.Publish(ctx, Operation{r}, r.StagedName, r.StagedDigest, b.subject()); err != nil {
+	projection, err := accessProjection(b)
+	if err != nil {
 		return Record{}, err
 	}
+	accessRaw, accessDigest, err := encodeBundle(projection)
+	if err != nil {
+		return Record{}, err
+	}
+	if r.StagedAccessName == "" && s.AccessSecrets != nil {
+		r.StagedAccessName = "mikka-byos-" + newID()
+		r.StagedAccessDigest = accessDigest
+		result, e := s.Repo.DB.ExecContext(ctx, `update byos_connections set "stagedAccessName"=$3,"stagedAccessDigest"=$4 where id=$1 and "operationId"=$2 and state='publication_pending' and "stagedAccessName" is null`, r.ConnectionID, r.OperationID, r.StagedAccessName, accessDigest)
+		if e != nil {
+			return Record{}, ErrDatabase
+		}
+		n, _ := result.RowsAffected()
+		if n != 1 {
+			return Record{}, ErrStale
+		}
+	}
+	if accessDigest != r.StagedAccessDigest || !validSecretName(r.StagedAccessName) || s.AccessSecrets == nil {
+		return Record{}, ErrIntegrity
+	}
+	existing, readErr := s.AccessSecrets.Read(ctx, r.StagedAccessName)
+	if readErr == ErrMissing {
+		if err = createArtifact(ctx, s.Repo, s.AccessSecrets, Operation{r}, "access", r.StagedAccessName, accessRaw); err != nil {
+			return Record{}, err
+		}
+	} else if readErr != nil {
+		return Record{}, readErr
+	} else if _, err = decodeAccessBundle(s.Scope, existing, accessDigest); err != nil {
+		return Record{}, err
+	}
+	if err = s.Repo.Publish(ctx, Operation{r}, r.StagedName, r.StagedDigest, r.StagedAccessName, r.StagedAccessDigest, b.subject()); err != nil {
+		return Record{}, err
+	}
+
 	return s.Repo.Lookup(ctx, s.Scope)
 }

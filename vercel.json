@@ -8,6 +8,7 @@
     }
   },
   "crons": [
-    { "path": "/mikka/api/cron/linear-sync", "schedule": "0 4 * * *" }
+    { "path": "/mikka/api/cron/linear-sync", "schedule": "0 4 * * *" },
+    { "path": "/mikka/api/cron/subscriptions", "schedule": "30 4 * * *" }
   ]
 }

@@ -1,7 +1,7 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { quotaSnapshotSchema, type QuotaSnapshot } from '@mikka/protocol'
 import { authorizeSubscriptionUse, SubscriptionRefusal, type SubscriptionAccess, type SubscriptionRoute, type SubscriptionUse } from '@mikka/protocol/subscription'
-import type { SubscriptionWorkerClient, NativeLease, WorkerMetadata } from '../packages/daemon/src/subscription-worker-client'
+import type { SubscriptionWorkerClient, WorkerMetadata } from '../packages/daemon/src/subscription-worker-client'
 import { readSubscriptionQuota } from '../packages/daemon/src/subscription-quota'
 import { SubscriptionRepository } from './subscription-repository'
 import { resolveSubscriptionModel } from './subscription-model'
@@ -15,7 +15,7 @@ export class SubscriptionService {
   constructor(readonly repository: SubscriptionRepository,
     readonly worker: (scope: ReturnType<SubscriptionRepository['scope']>) => SubscriptionWorkerClient,
     readonly capabilities: SubscriptionCapabilities,
-    readonly quota: (provider: 'codex' | 'claude', lease: NativeLease, signal?: AbortSignal) => Promise<QuotaSnapshot> = (provider, lease, signal) => readSubscriptionQuota(provider, lease, fetch, signal),
+    readonly quota: (provider: 'codex' | 'claude', result: {status: number; body: unknown}) => Promise<QuotaSnapshot> | QuotaSnapshot = readSubscriptionQuota,
     readonly workspace: (ownerId: string, workspaceId: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') }) {}
 
   async access(use: SubscriptionUse, signal?: AbortSignal): Promise<SubscriptionAccess> {
@@ -28,9 +28,11 @@ export class SubscriptionService {
     const baseQuota = { vendor: row.provider === 'codex' ? 'codex' : 'claude_code', status: 'unknown', source: 'local_credentials', plan: null, observedAt: new Date().toISOString(), windows: [] }
     let quota = quotaSnapshotSchema.safeParse(row.quota).data ?? quotaSnapshotSchema.parse(baseQuota)
     // Probe only after scope/state/revision and server-side capability checks.
-    if (readiness === 'ready' && row.state === 'connected' && revision === binding.connectionRevision && (quota.status !== 'ok' || Date.now() - Date.parse(quota.observedAt) > 45_000)) {
-      const lease = await this.worker(this.repository.scope(row)).call<NativeLease>('nativeAuth', { revision }, signal)
-      quota = quotaSnapshotSchema.parse(await this.quota(row.provider, lease, signal))
+    if ((use.execution !== 'native' || this.capabilities.nativeIsolation === 'verified_runtime') && readiness === 'ready' && row.state === 'connected' && revision === binding.connectionRevision && (quota.status !== 'ok' || Date.now() - Date.parse(quota.observedAt) > 45_000)) {
+      const client = this.worker(this.repository.scope(row)).forUse(use)
+      await client.call('prepare', { revision }, signal)
+      const result = await client.call<{status: number; body: unknown}>('quota', { revision }, signal)
+      quota = quotaSnapshotSchema.parse(await this.quota(row.provider, result))
       await this.repository.saveQuota(row, quota)
     }
     // Re-read after async quota probing: disconnect/reconnect must win.
@@ -45,7 +47,7 @@ export class SubscriptionService {
   async model(use: SubscriptionUse, signal?: AbortSignal) {
     const binding = await this.repository.binding(use.ownerId, use.bindingId)
     const row = await this.repository.connection(use.ownerId, binding.connectionId)
-    const client = this.worker(this.repository.scope(row))
+    const client = this.worker(this.repository.scope(row)).forUse(use)
     return resolveSubscriptionModel(use, binding.modelId, {
       access: () => this.access(use, signal),
       model: async modelId => {
@@ -93,11 +95,22 @@ export class SubscriptionService {
     const use: SubscriptionUse = { ownerId, consumerId, bindingId, workspaceId: binding.workspaceId, execution: 'native' }
     await this.check(use)
     const row = await this.repository.connection(ownerId, binding.connectionId)
-    return run({ use, modelId: binding.modelId, access: () => this.access(use), worker: this.worker(this.repository.scope(row)) })
+    return run({ use, modelId: binding.modelId, access: () => this.access(use), worker: this.worker(this.repository.scope(row)).forUse(use) })
   }
   async status(ownerId: string, id: string, signal?: AbortSignal) {
     const row = await this.repository.connection(ownerId, id)
     const status = await this.worker(this.repository.scope(row)).call<WorkerMetadata>('status', {}, signal)
-    return { id: row.id, provider: row.provider, state: status.state, revision: status.revision }
+    return { id: row.id, provider: row.provider, state: status.state, revision: status.revision, cleanup: status.cleanup }
+  }
+  async cleanupBatch() {
+    // Operator-authenticated caller only. Each worker remains fixed to one
+    // owner/connection; this never lists or exports credential values.
+    const { rows } = await this.repository.pool.query(`select c.id,c."ownerId",c."workspaceId",c.provider from byos_connections c join byos_secret_artifacts a on a."connectionId"=c.id where a."deletedAt" is null and (a."publishedAt" is not null or a."notBefore"<=now()) and a.name not in (coalesce(c."secretName",''),coalesce(c."accessSecretName",''),coalesce(c."stagedSecretName",''),coalesce(c."stagedAccessName",'')) group by c.id,c."ownerId",c."workspaceId",c.provider order by coalesce(max(a."deletingAt"),'epoch'::timestamptz),c.id limit 2`)
+    const results = []
+    for (const row of rows) {
+      try { results.push(await this.worker(this.repository.scope(row)).call<{pending: number; failed: number; providerRevocation: 'not_implemented'}>('cleanup')) }
+      catch { results.push({ pending: null, failed: true }) }
+    }
+    return { processed: results.length, results }
   }
 }

@@ -40,7 +40,18 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 				timeout = 270 * time.Second
 			}
 			callCtx, cancel := context.WithTimeout(ctx, timeout)
+			if w.ExecutionOnly && request.Method != "executeStream" && request.Method != "execute" && request.Method != "quota" {
+				cancel()
+				_ = encoder.Encode(map[string]any{"id": request.ID, "error": string(ErrUnsupported)})
+				continue
+			}
 			switch request.Method {
+			case "prepare":
+				result, err = w.PrepareRuntime(callCtx, request.Revision)
+			case "quota":
+				result, err = w.Quota(callCtx, request.Revision)
+			case "cleanup":
+				result, err = w.Cleanup(callCtx)
 			case "oauthStart":
 				result, err = w.StartOAuth(callCtx, request.Revision, request.SessionID)
 			case "oauthPoll":

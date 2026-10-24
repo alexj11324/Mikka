@@ -19,11 +19,12 @@ type Scope struct {
 }
 type Record struct {
 	Scope
-	State                                                string
-	Epoch, Version                                       int64
-	SecretName, Digest, Subject                          string
-	OperationID, OperationKind, StagedName, StagedDigest string
-	Deadline                                             time.Time
+	State                                                          string
+	Epoch, Version                                                 int64
+	SecretName, Digest, Subject                                    string
+	AccessName, AccessDigest, StagedAccessName, StagedAccessDigest string
+	OperationID, OperationKind, StagedName, StagedDigest           string
+	Deadline                                                       time.Time
 }
 type Operation struct{ Record }
 type Repository struct{ DB *sql.DB }
@@ -45,11 +46,11 @@ func newID() string {
 	return fmt.Sprintf("%s-%s-%s-%s-%s", h[:8], h[8:12], h[12:16], h[16:20], h[20:])
 }
 
-const columns = `id::text,"ownerId","workspaceId",provider,state,epoch,"credentialVersion",coalesce("secretName",''),coalesce("secretDigest",''),coalesce("providerSubject",''),coalesce("operationId"::text,''),coalesce("operationKind",''),coalesce("stagedSecretName",''),coalesce("stagedDigest",''),coalesce("operationDeadline",'epoch'::timestamptz)`
+const columns = `id::text,"ownerId","workspaceId",provider,state,epoch,"credentialVersion",coalesce("secretName",''),coalesce("secretDigest",''),coalesce("providerSubject",''),coalesce("operationId"::text,''),coalesce("operationKind",''),coalesce("stagedSecretName",''),coalesce("stagedDigest",''),coalesce("operationDeadline",'epoch'::timestamptz),coalesce("accessSecretName",''),coalesce("accessDigest",''),coalesce("stagedAccessName",''),coalesce("stagedAccessDigest",'')`
 
 func scanRecord(row interface{ Scan(...any) error }) (Record, error) {
 	var r Record
-	err := row.Scan(&r.ConnectionID, &r.OwnerID, &r.WorkspaceID, &r.Provider, &r.State, &r.Epoch, &r.Version, &r.SecretName, &r.Digest, &r.Subject, &r.OperationID, &r.OperationKind, &r.StagedName, &r.StagedDigest, &r.Deadline)
+	err := row.Scan(&r.ConnectionID, &r.OwnerID, &r.WorkspaceID, &r.Provider, &r.State, &r.Epoch, &r.Version, &r.SecretName, &r.Digest, &r.Subject, &r.OperationID, &r.OperationKind, &r.StagedName, &r.StagedDigest, &r.Deadline, &r.AccessName, &r.AccessDigest, &r.StagedAccessName, &r.StagedAccessDigest)
 	if err == sql.ErrNoRows {
 		return r, ErrUnavailable
 	}
@@ -83,7 +84,7 @@ func (r *Repository) BeginAcquire(ctx context.Context, s Scope, epoch int64) (Op
 		return Operation{}, ErrUnavailable
 	}
 	operation := newID()
-	record, err := scanRecord(r.DB.QueryRowContext(ctx, `update byos_connections set epoch=epoch+1,state='pending',quota=null,"operationId"=$5,"operationKind"='acquire',"operationDeadline"=now()+interval '5 minutes',"stagedSecretName"=null,"stagedDigest"=null,"lastErrorCode"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$6 returning `+columns, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, operation, epoch))
+	record, err := scanRecord(r.DB.QueryRowContext(ctx, `update byos_connections set epoch=epoch+1,state='pending',quota=null,"secretName"=null,"secretDigest"=null,"accessSecretName"=null,"accessDigest"=null,"providerSubject"=null,"operationId"=$5,"operationKind"='acquire',"operationDeadline"=now()+interval '5 minutes',"stagedSecretName"=null,"stagedDigest"=null,"stagedAccessName"=null,"stagedAccessDigest"=null,"lastErrorCode"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$6 returning `+columns, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, operation, epoch))
 	if err == ErrUnavailable {
 		return Operation{}, ErrStale
 	}
@@ -93,15 +94,15 @@ func (r *Repository) ClaimRefresh(ctx context.Context, s Scope, epoch, version i
 	if !validScope(s) {
 		return Operation{}, ErrUnavailable
 	}
-	record, err := scanRecord(r.DB.QueryRowContext(ctx, `update byos_connections set state='refreshing',"operationId"=$5,"operationKind"='refresh',"operationDeadline"=now()+interval '2 minutes',"stagedSecretName"=null,"stagedDigest"=null,"lastErrorCode"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$6 and "credentialVersion"=$7 and state='connected' and "operationId" is null returning `+columns, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, newID(), epoch, version))
+	record, err := scanRecord(r.DB.QueryRowContext(ctx, `update byos_connections set state='refreshing',"operationId"=$5,"operationKind"='refresh',"operationDeadline"=now()+interval '2 minutes',"stagedSecretName"=null,"stagedDigest"=null,"stagedAccessName"=null,"stagedAccessDigest"=null,"lastErrorCode"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$6 and "credentialVersion"=$7 and state='connected' and "operationId" is null returning `+columns, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, newID(), epoch, version))
 	if err == ErrUnavailable {
 		return Operation{}, ErrBusy
 	}
 	return Operation{record}, err
 }
-func (r *Repository) Stage(ctx context.Context, o Operation, digest string) (string, error) {
+func (r *Repository) Stage(ctx context.Context, o Operation, digest, accessName, accessDigest string) (string, error) {
 	name := "mikka-byos-" + o.OperationID
-	result, err := r.DB.ExecContext(ctx, `update byos_connections set state='publication_pending',"stagedSecretName"=$8,"stagedDigest"=$9,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$5 and "credentialVersion"=$6 and "operationId"=$7 and "operationDeadline">now() and state in ('pending','refreshing')`, o.ConnectionID, o.OwnerID, o.WorkspaceID, o.Provider, o.Epoch, o.Version, o.OperationID, name, digest)
+	result, err := r.DB.ExecContext(ctx, `update byos_connections set state='publication_pending',"stagedSecretName"=$8,"stagedDigest"=$9,"stagedAccessName"=$10,"stagedAccessDigest"=$11,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$5 and "credentialVersion"=$6 and "operationId"=$7 and "operationDeadline">now() and state in ('pending','refreshing')`, o.ConnectionID, o.OwnerID, o.WorkspaceID, o.Provider, o.Epoch, o.Version, o.OperationID, name, digest, accessName, accessDigest)
 	if err != nil {
 		return "", ErrDatabase
 	}
@@ -111,14 +112,25 @@ func (r *Repository) Stage(ctx context.Context, o Operation, digest string) (str
 	}
 	return name, nil
 }
-func (r *Repository) Publish(ctx context.Context, o Operation, name, digest, subject string) error {
-	result, err := r.DB.ExecContext(ctx, `update byos_connections set state='connected',"credentialVersion"="credentialVersion"+1,"secretName"=$8,"secretDigest"=$9,"providerSubject"=$10,"operationId"=null,"operationKind"=null,"operationDeadline"=null,"stagedSecretName"=null,"stagedDigest"=null,"lastErrorCode"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$5 and "credentialVersion"=$6 and "operationId"=$7 and state='publication_pending' and "stagedSecretName"=$8 and "stagedDigest"=$9`, o.ConnectionID, o.OwnerID, o.WorkspaceID, o.Provider, o.Epoch, o.Version, o.OperationID, name, digest, subject)
+func (r *Repository) Publish(ctx context.Context, o Operation, name, digest, accessName, accessDigest, subject string) error {
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return ErrDatabase
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `update byos_connections set state='connected',"credentialVersion"="credentialVersion"+1,"secretName"=$8,"secretDigest"=$9,"providerSubject"=$10,"accessSecretName"=$11,"accessDigest"=$12,"operationId"=null,"operationKind"=null,"operationDeadline"=null,"stagedSecretName"=null,"stagedDigest"=null,"stagedAccessName"=null,"stagedAccessDigest"=null,"lastErrorCode"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$5 and "credentialVersion"=$6 and "operationId"=$7 and state='publication_pending' and "stagedSecretName"=$8 and "stagedDigest"=$9 and "stagedAccessName"=$11 and "stagedAccessDigest"=$12`, o.ConnectionID, o.OwnerID, o.WorkspaceID, o.Provider, o.Epoch, o.Version, o.OperationID, name, digest, subject, accessName, accessDigest)
 	if err != nil {
 		return ErrDatabase
 	}
 	n, _ := result.RowsAffected()
 	if n != 1 {
 		return ErrStale
+	}
+	if _, err = tx.ExecContext(ctx, `update byos_secret_artifacts set "publishedAt"=now() where "connectionId"=$1 and "operationId"=$2`, o.ConnectionID, o.OperationID); err != nil {
+		return ErrDatabase
+	}
+	if tx.Commit() != nil {
+		return ErrDatabase
 	}
 	return nil
 }
@@ -147,7 +159,7 @@ func (r *Repository) Disconnect(ctx context.Context, s Scope, epoch int64) error
 	if !validScope(s) {
 		return ErrUnavailable
 	}
-	result, err := r.DB.ExecContext(ctx, `update byos_connections set state='disconnected',epoch=epoch+1,quota=null,"operationId"=null,"operationKind"=null,"operationDeadline"=null,"stagedSecretName"=null,"stagedDigest"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$5`, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, epoch)
+	result, err := r.DB.ExecContext(ctx, `update byos_connections set state='disconnected',epoch=epoch+1,quota=null,"secretName"=null,"secretDigest"=null,"accessSecretName"=null,"accessDigest"=null,"providerSubject"=null,"operationId"=null,"operationKind"=null,"operationDeadline"=null,"stagedSecretName"=null,"stagedDigest"=null,"stagedAccessName"=null,"stagedAccessDigest"=null,"updatedAt"=now() where id=$1 and "ownerId"=$2 and "workspaceId"=$3 and provider=$4 and epoch=$5`, s.ConnectionID, s.OwnerID, s.WorkspaceID, s.Provider, epoch)
 	if err != nil {
 		return ErrDatabase
 	}

@@ -139,7 +139,7 @@ try {
   )
   await run("docker", dockerArgs)
   await run(process.execPath, ["--import", "tsx", "--test", "tests/byos-application.test.mjs"], {
-    ...baseEnv, NODE_ENV: "test", MIKKA_BYOS_TEST_DATABASE_URL: url,
+    ...baseEnv, NODE_ENV: "test", MIKKA_BYOS_BACKEND_ONLY: process.env.MIKKA_BYOS_BACKEND_ONLY ?? "", MIKKA_BYOS_TEST_DATABASE_URL: url,
     MIKKA_BYOS_FIXTURE_BINARY: `${worker}bin/mikka-subscription-fixture`
   })
   await run(process.execPath, ["scripts/migrate.mjs"], migrationEnv)

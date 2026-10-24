@@ -231,7 +231,7 @@ export function authorizeSubscriptionUse(
   return { binding, connection, backend }
 }
 
-/** Revocation metadata only. Actual disconnect also cancels runs and destroys credentials. */
+/** Fences Mikka use. Credential deletion and provider revocation have separately reported states. */
 export function invalidateSubscriptionConnection(
   connection: SubscriptionConnection,
   state: "reconnect_required" | "disconnected",

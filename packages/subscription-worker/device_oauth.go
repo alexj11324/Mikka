@@ -127,7 +127,8 @@ func (w *Worker) startDevice(ctx context.Context, epoch int64, session string, d
 	}
 	state, name := randomCode(), "mikka-byos-"+newID()
 	raw, _ := json.Marshal(oauthSecret{Scope: w.Scope, SessionHash: hashText(session), OperationID: op.OperationID, Device: &device})
-	if w.Secrets.Create(ctx, name, raw) != nil {
+	op.Deadline = time.Now().Add(15 * time.Minute)
+	if createArtifact(ctx, w.Repo, w.Secrets, op, "oauth", name, raw) != nil {
 		return fail(ErrStore)
 	}
 	// Extend the publication deadline to match CPA's 15-minute device lifetime.
@@ -153,6 +154,9 @@ func validState(state string) bool {
 // Claims persist before network use. A crash/uncertain poll leaves polling=true:
 // reconnect is required; another worker must not retry a possibly consumed grant.
 func (w *Worker) PollOAuth(ctx context.Context, session, state string) (any, error) {
+	if w.ExecutionOnly || w.Secrets == nil {
+		return nil, ErrUnsupported
+	}
 	d, ok := w.OAuth.(DeviceOAuth)
 	if !ok || session == "" || len(session) > 512 || !validState(state) {
 		return nil, ErrUnsupported

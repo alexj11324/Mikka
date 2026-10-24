@@ -17,6 +17,10 @@ export interface WorkerConfiguration {
   environment: string
   path: string
   workloadToken: string
+  accessPath?: string
+  accessToken?: string
+  use?: { bindingId: string; consumerId: string }
+  executionOnly?: boolean
   enableCodexOAuth?: boolean
   enableRuntime?: boolean
   enablePlainModels?: boolean
@@ -24,7 +28,7 @@ export interface WorkerConfiguration {
   claudeRedirectUri?: string
   redirectUri?: string
 }
-export interface WorkerMetadata { id: string; provider: string; state: string; revision: number; credentialVersion: number }
+export interface WorkerMetadata { id: string; provider: string; state: string; revision: number; credentialVersion: number; cleanup?: { pending: number; failed: number; providerRevocation: 'not_implemented'; uncertainCreates: number } }
 export interface NativeLease { accessToken: string; accountId?: string; chatgptAccountId?: string; chatgptPlanType?: string; expiresAt?: string }
 
 export class WorkerRefusal extends Error {
@@ -34,6 +38,9 @@ const safeCode = (value: unknown) => typeof value === "string" && /^[a-z_]{1,64}
 
 export class SubscriptionWorkerClient {
   constructor(private readonly launch: { binary: string; args?: string[]; env?: Record<string, string> }, private readonly config: WorkerConfiguration) {}
+  forUse(use: { bindingId: string; consumerId: string }): SubscriptionWorkerClient {
+    return new SubscriptionWorkerClient(this.launch, { ...this.config, use: { bindingId: use.bindingId, consumerId: use.consumerId } })
+  }
 
   private start(request: Record<string, unknown>, signal?: AbortSignal, chunk?: (value: string) => void) {
     if (signal?.aborted) throw new WorkerRefusal("subscription_cancelled")
@@ -86,25 +93,37 @@ export class SubscriptionWorkerClient {
       child.stdin.on("error", () => finish(new WorkerRefusal()))
       signal?.addEventListener("abort", abort, { once: true })
       // The first frame is private host configuration, never a process argument.
-      child.stdin.write(`${JSON.stringify(this.config)}\n${JSON.stringify({ ...request, id })}\n`)
+      const executionOnly = request.method === 'executeStream' || request.method === 'execute' || request.method === 'quota'
+      // Execution children receive the access-store identity only. Refresh and
+      // OAuth stay in custody children, with no token material in their results.
+      const config = executionOnly ? { ...this.config, executionOnly: true, path: '', workloadToken: '', enableCodexOAuth: false, enableClaudeOAuth: false } : this.config
+      child.stdin.write(`${JSON.stringify(config)}\n${JSON.stringify({ ...request, id })}\n`)
     })
     return { result, stop: abort }
   }
-  async call<T>(method: "status" | "oauthStart" | "oauthComplete" | "oauthPoll" | "oauthHandoff" | "refresh" | "recover" | "disconnect" | "nativeAuth", input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
+  async call<T>(method: "status" | "oauthStart" | "oauthComplete" | "oauthPoll" | "oauthHandoff" | "refresh" | "recover" | "disconnect" | "nativeAuth" | "prepare" | "quota" | "cleanup", input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
     return await this.start({ ...input, method }, signal).result as T
   }
   stream(revision: number, model: string, payload: unknown, signal?: AbortSignal): ReadableStream<Uint8Array> {
     const encoder = new TextEncoder()
+    const abort = new AbortController()
+    const forwardAbort = () => abort.abort(signal?.reason)
+    if (signal?.aborted) forwardAbort()
+    else signal?.addEventListener('abort', forwardAbort, { once: true })
+    const cleanup = () => signal?.removeEventListener('abort', forwardAbort)
     let stop: (() => void) | undefined
+    let closed = false
     return new ReadableStream({
-      start: controller => {
+      start: async controller => {
         try {
-          const run = this.start({ method: "executeStream", revision, model, payload }, signal, value => controller.enqueue(encoder.encode(value)))
+          await this.call("prepare", { revision }, abort.signal)
+          if (closed || abort.signal.aborted) return
+          const run = this.start({ method: "executeStream", revision, model, payload }, abort.signal, value => { if (!closed) controller.enqueue(encoder.encode(value)) })
           stop = run.stop
-          void run.result.then(() => controller.close(), error => controller.error(error))
-        } catch { controller.error(new WorkerRefusal()) }
+          void run.result.then(() => { if (!closed) { closed = true; controller.close() }; cleanup() }, error => { if (!closed) { closed = true; controller.error(error) }; cleanup() })
+        } catch { if (!closed) { closed = true; controller.error(new WorkerRefusal()) }; cleanup() }
       },
-      cancel: () => stop?.()
+      cancel: () => { closed = true; abort.abort(); stop?.(); cleanup() }
     })
   }
 }

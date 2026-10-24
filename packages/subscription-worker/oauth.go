@@ -53,6 +53,9 @@ func randomCode() string {
 }
 
 func (w *Worker) StartOAuth(ctx context.Context, epoch int64, sessionID string) (OAuthStart, error) {
+	if w.ExecutionOnly || w.Secrets == nil {
+		return OAuthStart{}, ErrUnsupported
+	}
 	if w.OAuth == nil || sessionID == "" || len(sessionID) > 512 {
 		return OAuthStart{}, ErrUnsupported
 	}
@@ -74,7 +77,7 @@ func (w *Worker) StartOAuth(ctx context.Context, epoch int64, sessionID string) 
 	}
 	name := "mikka-byos-" + newID()
 	raw, _ := json.Marshal(oauthSecret{Scope: w.Scope, SessionHash: hashText(sessionID), Verifier: verifier, OperationID: op.OperationID})
-	if err = w.Secrets.Create(ctx, name, raw); err != nil {
+	if err = createArtifact(ctx, w.Repo, w.Secrets, op, "oauth", name, raw); err != nil {
 		_ = w.Repo.Fail(context.WithoutCancel(ctx), op, "publication_failed")
 		return OAuthStart{}, ErrStore
 	}
@@ -97,6 +100,9 @@ func (a codeAuthenticator) Login(ctx context.Context, _ *config.Config, _ *sdkau
 	return a.exchange(ctx)
 }
 func (w *Worker) CompleteOAuth(ctx context.Context, sessionID, state, code string) (Metadata, error) {
+	if w.ExecutionOnly || w.Secrets == nil {
+		return Metadata{}, ErrUnsupported
+	}
 	if w.OAuth == nil || sessionID == "" || len(sessionID) > 512 || !validState(state) || len(code) == 0 || len(code) > 4096 || strings.ContainsAny(code, "#\r\n\x00") {
 		return Metadata{}, ErrUnsupported
 	}

@@ -16,6 +16,7 @@ import (
 type SecretStore interface {
 	Create(context.Context, string, []byte) error
 	Read(context.Context, string) ([]byte, error)
+	Delete(context.Context, string) error
 }
 type InfisicalConfig struct {
 	Origin, ProjectID, Environment, Path string
@@ -54,6 +55,9 @@ func (i *Infisical) request(ctx context.Context, method, name string, raw []byte
 	if method == http.MethodGet {
 		query := url.Values{"projectId": {i.config.ProjectID}, "environment": {i.config.Environment}, "secretPath": {i.config.Path}, "type": {"shared"}, "version": {"1"}, "viewSecretValue": {"true"}, "expandSecretReferences": {"false"}, "includeImports": {"false"}}
 		endpoint += "?" + query.Encode()
+	} else if method == http.MethodDelete {
+		payload, _ := json.Marshal(map[string]any{"projectId": i.config.ProjectID, "environment": i.config.Environment, "secretPath": i.config.Path, "type": "shared"})
+		body = bytes.NewReader(payload)
 	} else {
 		payload, _ := json.Marshal(map[string]any{"projectId": i.config.ProjectID, "environment": i.config.Environment, "secretPath": i.config.Path, "type": "shared", "secretValue": string(raw), "skipMultilineEncoding": true})
 		body = bytes.NewReader(payload)
@@ -70,18 +74,35 @@ func (i *Infisical) request(ctx context.Context, method, name string, raw []byte
 	req.Header.Set("Content-Type", "application/json")
 	response, err := i.client.Do(req)
 	if err != nil {
+		if method == http.MethodPost {
+			return nil, ErrCreateUncertain
+		}
 		return nil, ErrStore
 	}
 	defer response.Body.Close()
+	if response.StatusCode == 404 && method == http.MethodDelete {
+		return nil, nil
+	}
 	if response.StatusCode == 404 && method == http.MethodGet {
 		return nil, ErrMissing
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		if method == http.MethodPost && response.StatusCode >= 500 {
+			_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+			return nil, ErrCreateUncertain
+		}
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
 		return nil, ErrStore
 	}
+	if method == http.MethodDelete {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+		return nil, nil
+	}
 	encoded, err := io.ReadAll(io.LimitReader(response.Body, 262145))
 	if err != nil || len(encoded) > 262144 {
+		if method == http.MethodPost {
+			return nil, ErrCreateUncertain
+		}
 		return nil, ErrStore
 	}
 	var result struct {
@@ -108,4 +129,8 @@ func (i *Infisical) Create(ctx context.Context, name string, raw []byte) error {
 }
 func (i *Infisical) Read(ctx context.Context, name string) ([]byte, error) {
 	return i.request(ctx, http.MethodGet, name, nil)
+}
+func (i *Infisical) Delete(ctx context.Context, name string) error {
+	_, err := i.request(ctx, http.MethodDelete, name, nil)
+	return err
 }

@@ -13,34 +13,48 @@ import (
 )
 
 type Metadata struct {
-	ID                string `json:"id"`
-	Provider          string `json:"provider"`
-	State             string `json:"state"`
-	Revision          int64  `json:"revision"`
-	CredentialVersion int64  `json:"credentialVersion"`
+	ID                string         `json:"id"`
+	Provider          string         `json:"provider"`
+	State             string         `json:"state"`
+	Revision          int64          `json:"revision"`
+	CredentialVersion int64          `json:"credentialVersion"`
+	Cleanup           *CleanupStatus `json:"cleanup,omitempty"`
 }
 
 func public(r Record) Metadata {
-	return Metadata{r.ConnectionID, r.Provider, r.State, r.Epoch, r.Version}
+	return Metadata{ID: r.ConnectionID, Provider: r.Provider, State: r.State, Revision: r.Epoch, CredentialVersion: r.Version}
 }
 
 // Each worker is permanently bound to one authenticated owner's connection.
 // Registrations are trusted host objects, never input-supplied executables.
 type Worker struct {
-	Repo          *Repository
-	Secrets       SecretStore
-	Scope         Scope
-	Authenticator sdkauth.Authenticator
-	Executor      core.ProviderExecutor
-	OAuth         OAuthProvider
+	Repo            *Repository
+	Secrets         SecretStore
+	AccessSecrets   SecretStore
+	Use             *RuntimeUse
+	AllowNativeAuth bool
+	ExecutionOnly   bool
+	QuotaClient     *http.Client
+	Scope           Scope
+	Authenticator   sdkauth.Authenticator
+	Executor        core.ProviderExecutor
+	OAuth           OAuthProvider
 }
 
 func (w *Worker) store(operation *Operation) *Store {
-	return &Store{w.Repo, w.Secrets, w.Scope, operation}
+	return &Store{Repo: w.Repo, Secrets: w.Secrets, AccessSecrets: w.AccessSecrets, Scope: w.Scope, Operation: operation}
 }
 func (w *Worker) Status(ctx context.Context) (Metadata, error) {
 	r, e := w.Repo.Lookup(ctx, w.Scope)
-	return public(r), e
+	out := public(r)
+	if e == nil {
+		status, err := w.CleanupStatus(ctx)
+		if err != nil {
+			return out, err
+		}
+		out.Cleanup = &status
+	}
+	return out, e
 }
 
 type scopedAuthenticator struct {
@@ -64,6 +78,9 @@ func (a scopedAuthenticator) Login(ctx context.Context, cfg *config.Config, opts
 	return copy, nil
 }
 func (w *Worker) Acquire(ctx context.Context, expectedEpoch int64) (Metadata, error) {
+	if w.ExecutionOnly || w.Secrets == nil {
+		return Metadata{}, ErrUnsupported
+	}
 	if w.Authenticator == nil || w.Authenticator.Provider() != w.Scope.Provider {
 		return Metadata{}, ErrUnsupported
 	}
@@ -101,7 +118,7 @@ func (e safeExecutor) HttpRequest(context.Context, *core.Auth, *http.Request) (*
 	return nil, ErrUnsupported
 }
 func (w *Worker) Refresh(ctx context.Context, expectedEpoch int64) (Metadata, error) {
-	if w.Executor == nil || w.Executor.Identifier() != w.Scope.Provider {
+	if w.ExecutionOnly || w.Secrets == nil || w.Executor == nil || w.Executor.Identifier() != w.Scope.Provider {
 		return Metadata{}, ErrUnsupported
 	}
 	r, err := w.Repo.Lookup(ctx, w.Scope)
@@ -159,6 +176,9 @@ func (w *Worker) readyAuth(ctx context.Context, expectedEpoch int64) (Record, *c
 		return Record{}, nil, ErrCredential
 	}
 	if !expires.After(time.Now().Add(time.Minute)) {
+		if w.ExecutionOnly || w.Secrets == nil {
+			return Record{}, nil, ErrUnavailable
+		}
 		if _, err = w.Refresh(ctx, expectedEpoch); err != nil {
 			return Record{}, nil, err
 		}
@@ -178,6 +198,9 @@ func (w *Worker) readyAuth(ctx context.Context, expectedEpoch int64) (Record, *c
 }
 
 func (w *Worker) Execute(ctx context.Context, expectedEpoch int64, model string, payload []byte) ([]byte, error) {
+	if err := w.authorizeRuntime(ctx, expectedEpoch, "model", model); err != nil {
+		return nil, err
+	}
 	if w.Executor == nil || w.Executor.Identifier() != w.Scope.Provider {
 		return nil, ErrUnsupported
 	}
@@ -196,12 +219,19 @@ func (w *Worker) Execute(ctx context.Context, expectedEpoch int64, model string,
 	return response.Payload, nil
 }
 func (w *Worker) Disconnect(ctx context.Context, expectedEpoch int64) (Metadata, error) {
+	if w.ExecutionOnly || w.Secrets == nil {
+		return Metadata{}, ErrUnsupported
+	}
 	if err := w.Repo.Disconnect(ctx, w.Scope, expectedEpoch); err != nil {
 		return Metadata{}, err
 	}
+	_, _ = w.Cleanup(ctx)
 	return w.Status(ctx)
 }
 func (w *Worker) Recover(ctx context.Context) (Metadata, error) {
+	if w.ExecutionOnly || w.Secrets == nil {
+		return Metadata{}, ErrUnsupported
+	}
 	r, e := w.store(nil).Recover(ctx)
 	return public(r), e
 }
@@ -219,8 +249,11 @@ type CodexNativeAuth struct {
 func (CodexNativeAuth) String() string   { return "[native auth redacted]" }
 func (CodexNativeAuth) GoString() string { return "[native auth redacted]" }
 func (w *Worker) CodexNativeAuth(ctx context.Context, expectedEpoch int64) (CodexNativeAuth, error) {
-	if w.Scope.Provider != "codex" {
+	if w.ExecutionOnly || !w.AllowNativeAuth || w.Scope.Provider != "codex" {
 		return CodexNativeAuth{}, ErrUnsupported
+	}
+	if err := w.authorizeRuntime(ctx, expectedEpoch, "native", ""); err != nil {
+		return CodexNativeAuth{}, err
 	}
 	_, auth, err := w.readyAuth(ctx, expectedEpoch)
 	if err != nil {
@@ -249,8 +282,11 @@ type ClaudeNativeAuth struct {
 func (ClaudeNativeAuth) String() string   { return "[native auth redacted]" }
 func (ClaudeNativeAuth) GoString() string { return "[native auth redacted]" }
 func (w *Worker) ClaudeNativeAuth(ctx context.Context, expectedEpoch int64) (ClaudeNativeAuth, error) {
-	if w.Scope.Provider != "claude" {
+	if w.ExecutionOnly || !w.AllowNativeAuth || w.Scope.Provider != "claude" {
 		return ClaudeNativeAuth{}, ErrUnsupported
+	}
+	if err := w.authorizeRuntime(ctx, expectedEpoch, "native", ""); err != nil {
+		return ClaudeNativeAuth{}, err
 	}
 	r, auth, err := w.readyAuth(ctx, expectedEpoch)
 	if err != nil {
