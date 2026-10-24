@@ -6,7 +6,6 @@ import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Spinner } from '@/components/ui/spinner'
 import { useComputer, useViewerGrant } from '@/hooks/use-computer'
 import { withBasePath } from '@/lib/base-path'
 import { computerApi } from '@/lib/computer/client'
@@ -97,13 +96,9 @@ export function ComputerScreen({ agentId, name, mode = 'view', live = true, show
     {running && live && showTarget && target && <TargetRing rect={target} tone={approval ? 'approval' : 'agent'} />}
     {running && live && showTarget && point?.x !== undefined && point.y !== undefined && <Cursor x={point.x} y={point.y} />}
     {state && !running && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-[inherit] bg-screen/80 backdrop-blur-sm">
-      {/* Asleep, the caption under the screen says so; the cover only offers 唤醒 (Figma 188:3115). */}
+      {/* The caption under the screen names the state; asleep the cover only offers 唤醒 (Figma 188:3115). */}
       {state.machine === 'sleeping' && <Button size="sm" className="h-9 rounded-full bg-screen-foreground/15 px-3.5 text-screen-foreground hover:bg-screen-foreground/25" onClick={() => { void wake() }}><Power data-icon="inline-start" />{t('wake')}</Button>}
-      {state.machine === 'waking' && <>
-        <Spinner aria-hidden="true" className="text-screen-foreground/80" />
-        <p className="text-sm">{t('waking')}</p>
-        <Progress aria-label={t('waking')} value={null} className="w-1/3 max-w-40" />
-      </>}
+      {state.machine === 'waking' && <Progress aria-label={t('waking')} value={null} className="w-1/3 max-w-40" />}
       {state.machine === 'error' && <>
         <p className="text-sm">{t('machineError')}</p>
         <Button size="sm" variant="secondary" className="rounded-lg" onClick={() => { void wake() }}><Power data-icon="inline-start" />{t('retry')}</Button>
