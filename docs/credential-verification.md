@@ -151,15 +151,13 @@ tool discovery and a permanently rejected initialization promise. Its final fall
 review found no new blocking path within the owned, static-form boundary. No scanner
 seal, actual model run, shared-browser safety or generic website-login proof is claimed.
 
-Actual Next entry-point acceptance was attempted again from the current source snapshot:
-`/tmp/mikka-system-credential-XKxSzS/next.log`. The process fails loading the repository's
-unchanged Next config because SWC rejects both cache and temporary-mode root ancestry
-owned by UID 65534. No API route was reached. The dedicated-runner cleanup getter is
-independent of browser admission/configuration and sees sessions created after caching.
-Next, SRT per-run proxy, deployed telemetry, durable host-crash reclamation and
-same-version frontend/real-account acceptance remain unverified. A normal cloud
-execution host with trusted cache ancestry or an authorized frozen deployment is needed;
-no security-check skip, dependency downgrade, push or deployment was performed.
+The earlier host attempt `/tmp/mikka-system-credential-XKxSzS/next.log` failed before
+routes: SWC rejected cache ancestry whose root owner was UID 65534. This is superseded
+by the successful normal Docker runtime evidence below. The dedicated-runner cleanup
+getter is independent of browser admission/configuration and sees later-created sessions.
+SRT per-run proxy, deployed telemetry, durable host-crash reclamation and same-version
+frontend/real-account acceptance remain unverified. No security-check skip, dependency
+downgrade, push or deployment was performed.
 
 ## Authorized real Infisical synthetic CRUD
 
@@ -185,3 +183,48 @@ Evidence (no values or tokens):
 `manifest.json`; earlier exact-name cleanup reports are under `real-vault-Rxx6mj`
 and `real-vault-NFe2ZR`. The no-secret, write-ahead recovery driver is
 `scripts/accept-credential-vault.mjs`. It is never run by normal tests/startup.
+
+## Normal Docker recovery and actual Next/harness runtime
+
+SWC 1.16.18's native carrier checks every ancestor of its selected cache. A current-user
+directory under the host's `/workspace` still traversed the untrusted UID-65534 `/`.
+A standard container supplies a root-owned `/` and accepts the task's UID-1000 cache.
+The initial read-only-container tmpfs was `noexec`; a task-owned executable bind mount
+resolved that separate restriction without changing shared ancestors or disabling checks.
+Official implementation reference: [SWC native cache ownership checks](https://github.com/swc-project/swc/blob/main/crates/swc_native_addon/src/platform/unix.rs).
+
+Runtime image `mikka-mik79-runtime:local`, immutable image ID
+`sha256:fde3f7ef6b1bcf7fdf67d6e4467b6f1ac018b27592266828918ee728705ecd08`,
+uses Node 24 Bookworm with official signed Debian Git/OpenSSL/Chromium packages. Build
+uses the inherited normal HTTPS proxy and public CA verification. It contains no real
+Infisical authentication variables. Its Dockerfile is preserved under
+`/workspace/credential-backend-delivery/system-runtime/`.
+
+The application runs as UID 1000 with a read-only root/source/dependency mount, writable
+task-owned cache and temporary snapshot, no published ports, and the network namespace
+of this task's isolated `postgres:17` fixture container. Both use loopback only; there is
+no external target login or new paid infrastructure. The source snapshot excludes `.git`,
+environment files and ignored build caches. The driver's child environment is synthetic.
+
+First actual run reached Next/Better Auth/device registration, then caught an invalid
+fixture priority (`none`); the fixture was corrected to the existing valid `normal`
+without changing any product constraint. Subsequent actual runtime passed:
+
+- Better Auth HTTP signup/session and cross-owner secure-route rejection.
+- Actual device registration, run claim and execution-session patch.
+- Actual worker MCP tools listing and the existing `RunContext.mcpServer()` stdio child
+  forwarding through the daemon-owned bridge to Next; no platform token in its config.
+- Independent owner HTTP create/submit and ready reference delivered by actual daemon
+  commands API, then real Chromium static-form login, protected-page navigation/read,
+  finish and replay refusal.
+- Actual HTTP cancellation and DB-clock expiry followed by harness status/use refusal;
+  fixture vault records cleared. This remains a synthetic vault/site test, separately
+  from the already completed real Infisical four-record CRUD; it does not repeat it.
+
+Intermediate evidence is under
+`system-runtime/tmp/mikka-system-credential-UuPMu5` and
+`system-runtime/tmp/mikka-system-credential-RwFWTw` in the delivery directory. The final
+frozen rerun and commit are recorded in its updated manifest. The reviewer required
+PASS only after all cleanup/marker checks and confirmed child termination; the driver
+now writes `FAIL_CLEANUP` when reclamation is not confirmed. No model invocation,
+SRT isolation, real-user account, frontend screenshot or deployed-runtime proof is claimed.

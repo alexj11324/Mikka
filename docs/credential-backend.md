@@ -387,11 +387,15 @@ is not implemented by this backend or this status. Native apps and payments are 
 
 `scripts/accept-credential-system.mjs` exercises the actual Next routes and MCP
 registration with isolated full-schema databases, synthetic TLS vault and test site.
-It is not a fake-handler substitute. This environment currently fails before Next
-startup: SWC's native loader rejects cache ancestors owned by another untrusted UID.
-Standard cache and supported temporary materialization both fail; no security-check
-skip or package downgrade was used. Actual system routes, SRT proxy and model-driven
-harness acceptance are therefore **unverified**, even though their source is connected.
+It is not a fake-handler substitute. The host's SWC cache-ancestry problem was resolved
+using a normal Docker container: root UID 0, current user UID 1000 and a task-owned
+executable cache bind-mounted at `/workspace/.cache`. No security-check skip, shared
+permission change or package downgrade was used. Actual Next HTTP/worker MCP, the
+real `RunContext` harness MCP child, daemon commands delivery, controlled login and
+protected navigation/read, finish, cancellation and expiry have passed with local
+synthetic TLS-vault/site fixtures. The driver records the commit and clean-tree status;
+it declares PASS only after confirmed process/database cleanup and output-confidentiality
+checks. Model-driven harness, SRT isolation and real account acceptance remain unverified.
 
 For the authorized token owner's later staging provider probe only,
 `node --import tsx scripts/accept-credential-vault.mjs crud <private-manifest.json>`

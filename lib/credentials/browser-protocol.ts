@@ -1,5 +1,5 @@
-/** Integration contract for a future trusted browser gateway, NOT a capability claim.
- * Current runtime refuses browser_login before issuing a request or reading the vault.
+/** Protocol boundary for a trusted browser gateway, NOT a generic CUA capability claim.
+ * The dedicated owned executor follows this state machine; shared browsers remain refused.
  * Never implement this with an agent-visible CDP client or a per-agent mutex.
  */
 export type BrowserCredentialCommand = {
