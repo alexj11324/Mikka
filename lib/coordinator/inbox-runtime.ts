@@ -1,7 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import * as schema from '@/lib/db/schema'
-import type { WorkspaceTransaction } from '@/lib/workspace-access'
+import type { PolicyClient } from '@/lib/policy/sql-client'
+import type { PoolClient } from 'pg'
 import { resourceWakeAdmission } from './wake-admission'
 import 'server-only'
 import { and, eq } from 'drizzle-orm'
@@ -16,11 +17,12 @@ import {
   type InboxOptions,
   type WakeAuthorization,
   type WakeScopeGuard,
+  type WakeDelivery,
 } from './inbox-receipts'
 import { controlledWakeConfiguration } from './wake-controlled'
 import { WORKSPACE_ID } from '@/lib/device-link'
 
-const workspaceScope = new AsyncLocalStorage<WorkspaceTransaction>()
+const workspaceScope = new AsyncLocalStorage<Pick<typeof workspaceDb,'select'>>()
 const authorize: WakeAuthorization = async (tx, event) => {
   if (!(await tx.query('SELECT id FROM "user" WHERE id=$1 FOR SHARE', [event.userId])).rowCount)
     throw new WakeError('wakeOwnerUnavailable', 403)
@@ -94,4 +96,20 @@ export function coordinatorInboxOptions(): InboxOptions {
 }
 export function coordinatorInbox() {
   return new CoordinatorInbox(pool, coordinatorInboxOptions())
+}
+
+/** Called in the canonical quota transaction, while the public policy adapter
+ * holds the exact workspace membership/policy locks. No nested pool borrow. */
+export async function fenceCoordinatorModel(tx:PoolClient,workspace:PolicyClient,input:{ownerId:string;workspaceId:string;eventId:string;generation:number;holder:string;delivery:WakeDelivery},deadline:Date){
+  const session=(await tx.query('SELECT * FROM coordinator_sessions WHERE "userId"=$1 FOR SHARE',[input.ownerId])).rows[0]
+  const event=(await tx.query('SELECT * FROM coordinator_events WHERE id=$1 AND "userId"=$2 FOR SHARE',[input.eventId,input.ownerId])).rows[0]
+  if(!session||!event||event.wake_replays!==input.generation||event.wake_workspace_id!==input.workspaceId||event.processed_at||event.wake_checkpoint||event.wake_status!=='running'||!['attention','result'].includes(event.tier)||event.kind==='issue_done'||event.wake_delivery_token!==input.delivery.token||event.processing_holder!==input.holder||session.leaseHolder!==input.holder||!session.leaseUntil||session.leaseUntil<=deadline)throw new WakeError('wakeLeaseLost')
+  const mode=await workspaceScope.run(drizzle(workspace as PoolClient),()=>authorize(tx,event,'commit'))
+  if(mode==='notify_only')throw new WakeError('wakeRunStopped')
+}
+
+export async function fenceCoordinatorTriage(tx:PoolClient,workspace:PolicyClient,input:{ownerId:string;workspaceId:string;eventId:string;generation:number}){
+  const event=(await tx.query('SELECT * FROM coordinator_events WHERE id=$1 AND "userId"=$2 FOR SHARE',[input.eventId,input.ownerId])).rows[0]
+  if(!event||event.wake_replays!==input.generation||event.wake_workspace_id!==input.workspaceId||event.processed_at||event.deliveredAt||event.tier!==null||!['pending','running'].includes(event.wake_status))throw new WakeError('wakeLeaseLost')
+  if(await workspaceScope.run(drizzle(workspace as PoolClient),()=>authorize(tx,event,'dispatch'))==='notify_only')throw new WakeError('wakeRunStopped')
 }

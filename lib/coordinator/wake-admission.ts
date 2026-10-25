@@ -8,5 +8,8 @@ export function configureWakeAdmission(adapter: WakeAdmission) {
   if (installed && installed !== adapter) throw new Error('wakeAdmissionAlreadyConfigured')
   installed = adapter
 }
-export const resourceWakeAdmission: WakeAdmission = async (scope, phase) =>
-  installed ? installed(scope, phase) : { admitted: false, retryAt: new Date(Date.now() + 60000) }
+export const resourceWakeAdmission: WakeAdmission = async (scope, phase) => {
+  if(installed)return installed(scope,phase)
+  const {publicWakeAdmission}=await import('../resources/runtime')
+  return publicWakeAdmission(scope,phase)
+}

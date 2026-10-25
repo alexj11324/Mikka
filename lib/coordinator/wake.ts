@@ -1,6 +1,9 @@
 import { coordinatorInboxOptions } from './inbox-runtime'
 import { controlledWakeConfiguration, startControlledWake } from './wake-controlled'
-import { CoordinatorInbox, WakeError, type WakeDelivery } from './inbox-receipts'
+import { CoordinatorInbox, WakeError, type WakeDelivery, type WakeEvent } from './inbox-receipts'
+import {resourceDecisionEnabled,resourceTestTransportEnabled} from '@/lib/resources/runtime'
+import {ModelExecutionFailure} from '@/lib/resources/model-execution'
+import {QuotaError} from '@/lib/quota/errors'
 import { retryInboxWakes } from './inbox-retry'
 import { pool } from '@/lib/db'
 import 'server-only'
@@ -18,12 +21,13 @@ import { coordinatorTurn } from '@/workflows/coordinator/workflow'
  * events still collect in the inbox and wait.
  */
 export function coordinatorEnabled(): boolean {
-  return Boolean(controlledWakeConfiguration()) || process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY)
+  return resourceTestTransportEnabled() || Boolean(controlledWakeConfiguration()) || process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY)
 }
 
 /** Asks the decision model whether an event needs the person. When it does not answer, the event gets its quiet tier. */
-async function decideTier(userId: string, event: Parameters<typeof triageState>[0]): Promise<CoordinatorEventTier> {
-  const answer = (await decide('triage', decisionInput(triageState(event)), triageQuestions(event), userId))?.get('needsPerson')
+async function decideTier(userId: string, event: WakeEvent): Promise<CoordinatorEventTier> {
+  const source=event.wake_workspace_id?{kind:'triage' as const,ownerId:userId,workspaceId:event.wake_workspace_id,operationId:event.id,generation:event.wake_replays}:undefined
+  const answer = (await decide('triage', decisionInput(triageState(event)), triageQuestions(event), userId,source))?.get('needsPerson')
   if (answer?.type === 'predicate') return tierFromDecision(answer.probability, event.kind)
   return event.kind === 'run_report' ? 'background' : 'result'
 }
@@ -41,11 +45,13 @@ async function triageInbox(userId?: string, limit = 25): Promise<void> {
   ).rows
   let decisions = 0
   for (const row of rows) {
+    let generation:number|undefined
     try {
       const event = await inbox.read(row.userId, row.id)
+      generation=event.wake_replays
       let tier = ruleTier(event)
       if (tier == null) {
-        if (process.env.DECISION_GATEWAY_API_KEY) {
+        if (resourceDecisionEnabled()) {
           if (decisions >= 3) continue
           const admission = await options.admit?.(
             {
@@ -57,7 +63,7 @@ async function triageInbox(userId?: string, limit = 25): Promise<void> {
             'dispatch',
           )
           if (!admission?.admitted) {
-            await inbox.deferTriage(event.userId, event.id, admission?.retryAt ?? new Date(Date.now() + 60000))
+            await inbox.deferTriage(event.userId, event.id, admission?.retryAt ?? new Date(Date.now() + 60000),event.wake_replays)
             continue
           }
           await inbox.read(row.userId, row.id)
@@ -68,7 +74,16 @@ async function triageInbox(userId?: string, limit = 25): Promise<void> {
       await setEventTier(event.id, tier)
     } catch (error) {
       if (error instanceof WakeError && error.status === 403) {
-        await inbox.denyTriage(row.userId, row.id, error.code)
+        await inbox.denyTriage(row.userId, row.id, error.code,generation)
+        continue
+      }
+      if(generation!==undefined&&error instanceof QuotaError&&error.reservationState==='executing'){
+        await inbox.deferTriage(row.userId,row.id,new Date(Date.now()+1000),generation)
+        continue
+      }
+      if(generation!==undefined&&(error instanceof ModelExecutionFailure||error instanceof QuotaError)){
+        const uncertain=error instanceof ModelExecutionFailure?error.outcome==='uncertain':error.reservationState!==undefined&&error.reservationState!=='refunded'
+        await inbox.failTriage(row.userId,row.id,generation,uncertain)
         continue
       }
       throw error

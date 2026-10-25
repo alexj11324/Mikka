@@ -16,8 +16,15 @@ const guard: WorkspaceGuard = async (owner, workspace, work) => workspaceDb.tran
 // Request-scoped app DB and the existing workspace membership authority.
 export function schedules() { return new ScheduleStore(pool, guard, undefined, scheduledAgent) }
 
-export function executeScheduleCommand(actor: Actor, command: Command) {
+export async function executeScheduleCommand(actor: Actor, command: Command) {
   if (['create','resume','update'].includes(command.action) && process.env.MIKKA_RUNTIME_SWEEP_ENABLED !== '1') throw new ScheduleError('scheduleRuntimeNotEnabled', 503)
+  // These commands write owned PG metadata only. Their future model/connected
+  // execution has its own mandatory policy/quota fence. Revocation cannot
+  // prevent the owner from pausing/cancelling or inspecting a schedule.
+  if(['create','resume','update'].includes(command.action)){
+    const {policyStore}=await import('@/lib/policy/runtime')
+    await policyStore().current(actor.ownerId,actor.workspaceId)
+  }
   return schedules().command(actor, command)
 }
 

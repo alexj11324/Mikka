@@ -272,25 +272,34 @@ export class CoordinatorInbox {
     })
   }
 
-  async deferTriage(owner: string, id: string, retryAt: Date) {
+  async deferTriage(owner: string, id: string, retryAt: Date,generation?:number) {
     return this.tx(async (tx) => {
       await this.session(tx, owner)
       await tx.query(
-        `UPDATE coordinator_events SET wake_next_at=$3,wake_error='wakeAdmissionDeferred' WHERE id=$1 AND "userId"=$2 AND tier IS NULL AND "deliveredAt" IS NULL AND processed_at IS NULL AND wake_status IN ('pending','running')`,
-        [id, owner, retryAt],
+        `UPDATE coordinator_events SET wake_next_at=$3,wake_error='wakeAdmissionDeferred' WHERE id=$1 AND "userId"=$2 AND tier IS NULL AND "deliveredAt" IS NULL AND processed_at IS NULL AND wake_status IN ('pending','running') AND ($4::integer IS NULL OR wake_replays=$4)`,
+        [id, owner, retryAt,generation??null],
       )
     })
   }
-  async denyTriage(owner: string, id: string, code: string) {
+  async denyTriage(owner: string, id: string, code: string,generation?:number) {
     return this.tx(async (tx) => {
       await this.session(tx, owner)
       const event = (
         await tx.query<WakeEvent>(
-          `SELECT * FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND tier IS NULL AND "deliveredAt" IS NULL AND processed_at IS NULL AND wake_status IN ('pending','running') FOR UPDATE`,
-          [id, owner],
+          `SELECT * FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND tier IS NULL AND "deliveredAt" IS NULL AND processed_at IS NULL AND wake_status IN ('pending','running') AND ($3::integer IS NULL OR wake_replays=$3) FOR UPDATE`,
+          [id, owner,generation??null],
         )
       ).rows[0]
       if (event) await this.noteFailure(tx, event, code, true)
+    })
+  }
+  async failTriage(owner:string,id:string,generation:number,uncertain:boolean){
+    return this.tx(async tx=>{
+      await this.session(tx,owner)
+      const event=(await tx.query<WakeEvent>(`SELECT * FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND wake_replays=$3 AND tier IS NULL AND "deliveredAt" IS NULL AND processed_at IS NULL AND wake_status IN ('pending','running') FOR UPDATE`,[id,owner,generation])).rows[0]
+      if(!event)return
+      if(uncertain)await tx.query("UPDATE coordinator_events SET wake_generation_state='uncertain' WHERE id=$1",[id])
+      await this.noteFailure(tx,event,uncertain?'wakeDecisionUncertain':'wakeDecisionRejected','failed')
     })
   }
   async delivered(owner: string, delivery: WakeDelivery, runId?: string) {

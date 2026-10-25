@@ -1,7 +1,9 @@
 import { authorizeModel, authorizePolicyTool } from '@/lib/policy/runtime'
 import { coordinatorRoute } from '@/lib/policy/model'
 import { type ModelMessage, type ToolExecutionOptions } from 'ai'
-import { generatePolicyText } from '@/lib/policy/generate-text'
+import { generateText } from 'ai'
+import type { ModelSource } from '@/lib/resources/runtime'
+import { QuotaWorkflowModel } from '@/lib/quota/workflow-model'
 import { coordinatorInbox } from '@/lib/coordinator/inbox-runtime'
 import {WakeError,type WakeDelivery,type WakeExecution} from '@/lib/coordinator/inbox-receipts'
 import {getStepMetadata} from 'workflow'
@@ -88,7 +90,7 @@ export async function appendMessages(userId: string, holder: string, messages: M
  * token budget, then returns the prompt for this turn: the instructions with
  * the person's memory, and the messages.
  */
-export async function preparePrompt(userId: string): Promise<{ instructions: string; messages: ModelMessage[] }> {
+export async function preparePrompt(userId: string,source?:ModelSource): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
   await reconcileFactoryRuns(userId)
   await factoryMonitor.reconcile(userId)
@@ -96,8 +98,9 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
   const cut = compactionCut(summary, messages)
   if (cut !== null) {
     const folded = messages.filter(row => row.position <= cut)
-    const { text } = await generatePolicyText(() => authorizeModel(userId, coordinatorRoute(COORDINATOR_MODEL)), {
-      model: COORDINATOR_MODEL,
+    if(!source||source.ownerId!==userId)throw new WakeError('wakeModelScopeUnavailable')
+    const { text } = await generateText({
+      model: new QuotaWorkflowModel(source,COORDINATOR_MODEL,'coordinator.compact'),
       maxRetries:0,
       timeout:{totalMs:45000},
       instructions: SUMMARY_INSTRUCTIONS,
@@ -108,6 +111,13 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
     messages = messages.filter(row => row.position > cut)
   }
   return { instructions: instructionsWithMemory(`${COORDINATOR_INSTRUCTIONS}\n\n${MAILBOX_INSTRUCTIONS}\n\n${SCHEDULE_INSTRUCTIONS}`, memory), messages: promptMessages(summary, messages) }
+}
+
+export async function coordinatorModelSource(userId:string,holder:string,delivery:WakeDelivery):Promise<ModelSource>{
+  'use step'
+  const event=await coordinatorInbox().assertCurrent(userId,holder,delivery)
+  if(!event.wake_workspace_id)throw new WakeError('wakeModelScopeUnavailable')
+  return {kind:'coordinator',ownerId:userId,workspaceId:event.wake_workspace_id,operationId:event.id,generation:event.wake_replays,holder,delivery}
 }
 // A request may already have been sent. The persisted inbox, rather than an
 // automatic step retry, records an uncertain outcome for reconciliation.

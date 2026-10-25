@@ -18,6 +18,7 @@ import * as steps from './steps'
 import { commandSchema } from '@/lib/self-improvement/contract'
 import { createCredentialAITools } from '@/lib/credentials/ai-tools'
 import { mailboxAck, mailboxSend } from '@/lib/mailbox-tools'
+import { QuotaWorkflowModel } from '@/lib/quota/workflow-model'
 
 /** One fenced event per durable run. The shared dispatcher starts its successor;
  * an accepted transport start never substitutes for the atomic consumption ACK. */
@@ -36,13 +37,14 @@ export async function coordinatorTurn(userId: string, delivery: WakeDelivery) {
     }else{
       await steps.assertWakeCurrent(userId,holder,delivery)
       const recovered = inbox.actionContext ? await steps.recoverAccountActions(userId, inbox.actionContext) : []
-      const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, maxRetries:0, tools: coordinatorTools(userId,inbox.actionContext,holder,delivery,inbox.recovery) })
+      const source=await steps.coordinatorModelSource(userId,holder,delivery)
+      const agent = new WorkflowAgent({ model: new QuotaWorkflowModel(source,COORDINATOR_MODEL), maxRetries:0, tools: coordinatorTools(userId,inbox.actionContext,holder,delivery,inbox.recovery) })
       // Fence the compaction model as well as the agent model before either sends.
       const generation=await steps.beginWakeGeneration(userId,holder,delivery)
       if(!generation.generate)return
-      const { instructions, messages } = await steps.preparePrompt(userId)
+      const { instructions, messages } = await steps.preparePrompt(userId,source)
       messages.push(...recovered)
-      const result = await agent.generate({ instructions, messages, timeout:45000, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: async info=>{await steps.authorizeCoordinator(userId,0,info.stepNumber);return coordinatorStep(info)} })
+      const result = await agent.generate({ instructions, messages, timeout:45000, maxOutputTokens:8192, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep })
       await steps.appendMessages(userId,holder,[...recovered,...result.responseMessages],turnWarning(result.finishReason,result.text),inbox.actionContext,delivery)
     }
     await steps.continueInbox(userId)

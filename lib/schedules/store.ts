@@ -1,6 +1,7 @@
 import { readIssueMetadata } from '../issue-metadata'
 import { isDeepStrictEqual } from 'node:util'
 import { randomUUID } from 'node:crypto'
+import { fenceScheduledModel, scheduleOutcomeDigest, type ScheduledModelSource } from './model-outcomes'
 import type { Pool, PoolClient } from 'pg'
 import { commandSchema, definitionSchema, ScheduleError, type Actor, type Command, type Definition } from './contract'
 import { nextTime, timezone } from './time'
@@ -10,12 +11,12 @@ type Schedule = {
   id: string; owner_id: string; workspace_id: string; conversation: 'bot' | 'coordinator'; session_id: string; source_id: string;
   definition: Definition; status: string; version: number; next_at: Date | null; request_id: string; request_definition: Definition
 }
-type Occurrence = { id: string; schedule_id: string; operation_id: string; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string; error: string | null; execution_decision: 'execute' | 'skip' | 'review'; report_next_at: Date; report_attempts: number }
+type Occurrence = { id: string; schedule_id: string; operation_id: string; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string; error: string | null; execution_decision: 'execute' | 'skip' | 'review'; report_next_at: Date; report_attempts: number; generation_state: string; generation_context: {leaseDigest:string}|null; generation_checkpoint: unknown; generation_digest: string|null }
 
 /** Only transaction-local, read-only tasks are registered. Adding a provider
  * effect requires #208's stable operation ledger and domain approval checks. */
 export class ScheduleStore {
-  constructor(private pool: Pool, private workspace: WorkspaceGuard, private clock: () => Date = () => new Date(), private agent?: { enabled(): boolean; read(ownerId: string, task: Extract<Definition['task'], { kind: 'agent_read' }>, operationId: string): Promise<unknown> }) {}
+  constructor(private pool: Pool, private workspace: WorkspaceGuard, private clock: () => Date = () => new Date(), private agent?: { enabled(): boolean; read(ownerId: string, task: Extract<Definition['task'], { kind: 'agent_read' }>, operationId: string, source: ScheduledModelSource): Promise<unknown> }) {}
   private async transaction<T>(work: (tx: PoolClient) => Promise<T>): Promise<T> {
     const tx = await this.pool.connect()
     try { await tx.query('BEGIN'); await tx.query("SET LOCAL lock_timeout='5s'"); const result = await work(tx); await tx.query('COMMIT'); return result }
@@ -142,7 +143,64 @@ export class ScheduleStore {
     await tx.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,tier) VALUES($1,$2,'schedule_result',$3,$4,'background') ON CONFLICT("dedupeKey") DO NOTHING`, [occurrence.id, schedule.owner_id, `schedule_result:${occurrence.id}`, { scheduleId: schedule.id, occurrenceId: occurrence.id, operationId: occurrence.operation_id, status, error }])
     await tx.query('UPDATE schedule_occurrences SET reported_at=$2,report_attempts=report_attempts+1 WHERE id=$1', [occurrence.id, this.clock()])
   }
-  async execute(claim: Occurrence) {
+  async execute(claim:Occurrence){
+    const current=(await this.pool.query<Occurrence>('SELECT * FROM schedule_occurrences WHERE id=$1',[claim.id])).rows[0]
+    if(current?.definition.task.kind==='agent_read'&&current.execution_decision==='execute')return this.executeAgent(claim)
+    return this.executeSimple(claim)
+  }
+  private async executeAgent(claim:Occurrence){
+    const schedule=(await this.pool.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1',[claim.schedule_id])).rows[0]
+    if(!schedule)return
+    try{
+      const prepared=await this.workspace(schedule.owner_id,schedule.workspace_id,()=>this.transaction(async tx=>{
+        const row=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1 FOR UPDATE',[schedule.id])).rows[0]
+        const occurrence=(await tx.query<Occurrence>("SELECT * FROM schedule_occurrences WHERE id=$1 AND status='running' AND lease_token=$2 AND lease_until>$3 FOR UPDATE",[claim.id,claim.lease_token,this.clock()])).rows[0]
+        if(!occurrence)return null
+        if(row.version!==occurrence.version||['cancelled','paused'].includes(row.status)){
+          await tx.query("UPDATE schedule_occurrences SET status='cancelled',finished_at=$2,lease_token=NULL,lease_until=NULL WHERE id=$1",[occurrence.id,this.clock()]);return null
+        }
+        await this.conversation(tx,{ownerId:row.owner_id,conversation:row.conversation,sessionId:row.session_id})
+        if(occurrence.generation_checkpoint!==null)return {row,occurrence,cached:true as const}
+        await this.taskPermission(tx,row.owner_id,occurrence.definition)
+        if(occurrence.generation_state==='sending'&&occurrence.generation_context?.leaseDigest===scheduleOutcomeDigest(claim.lease_token))return null
+        if(['sending','uncertain'].includes(occurrence.generation_state)){
+          await tx.query("UPDATE schedule_occurrences SET generation_state='uncertain' WHERE id=$1",[occurrence.id]);return {uncertain:true as const,row,occurrence}
+        }
+        if(occurrence.attempts>3)throw new Error('scheduleLeaseRecoveryExhausted')
+        const source:ScheduledModelSource={kind:'schedule',ownerId:row.owner_id,workspaceId:row.workspace_id,operationId:occurrence.operation_id,generation:0,occurrenceId:occurrence.id,scheduleId:row.id,version:occurrence.version,leaseToken:claim.lease_token}
+        const context={...source,leaseToken:undefined,leaseDigest:scheduleOutcomeDigest(claim.lease_token)}
+        await tx.query("UPDATE schedule_occurrences SET generation_state='sending',generation_context=$2 WHERE id=$1",[occurrence.id,context])
+        return {row,occurrence,source,cached:false as const}
+      }))
+      if(!prepared)return
+      if('uncertain'in prepared)throw new ScheduleError('scheduleGenerationUncertain')
+      let result=prepared.occurrence.generation_checkpoint
+      if(!prepared.cached){
+        const task=prepared.occurrence.definition.task
+        if(task.kind!=='agent_read'||!prepared.source)throw new ScheduleError('scheduleModelExecutionRequired',403)
+        // No app/session/workspace transaction surrounds the model/provider.
+        result=await this.agent!.read(prepared.row.owner_id,task,prepared.occurrence.operation_id,prepared.source)
+        result=JSON.parse(JSON.stringify(result))
+        if(!result||typeof result!=='object'||Array.isArray(result))throw new ScheduleError('scheduleAgentInvalidResult')
+        const source=prepared.source
+        await this.workspace(source.ownerId,source.workspaceId,()=>this.transaction(async tx=>{
+          await fenceScheduledModel(tx,source,this.clock())
+          await tx.query("UPDATE schedule_occurrences SET generation_state='returned',generation_checkpoint=$2,generation_digest=$3 WHERE id=$1",[source.occurrenceId,result,scheduleOutcomeDigest(result)])
+        }))
+      }
+      await this.workspace(schedule.owner_id,schedule.workspace_id,()=>this.transaction(async tx=>{
+        const row=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1 FOR UPDATE',[schedule.id])).rows[0]
+        const occurrence=(await tx.query<Occurrence>("SELECT * FROM schedule_occurrences WHERE id=$1 AND status='running' AND lease_token=$2 AND lease_until>$3 FOR UPDATE",[claim.id,claim.lease_token,this.clock()])).rows[0]
+        if(!occurrence)return
+        if(row.version!==occurrence.version||['cancelled','paused'].includes(row.status))return
+        await this.conversation(tx,{ownerId:row.owner_id,conversation:row.conversation,sessionId:row.session_id})
+        if(!occurrence.generation_checkpoint||occurrence.generation_digest!==scheduleOutcomeDigest(occurrence.generation_checkpoint))throw new ScheduleError('scheduleGenerationUncertain')
+        await tx.query("UPDATE schedule_occurrences SET status='succeeded',result=$2,finished_at=$3,error=NULL,lease_token=NULL,lease_until=NULL WHERE id=$1",[occurrence.id,occurrence.generation_checkpoint,this.clock()])
+        await this.report(tx,row,occurrence,'succeeded',occurrence.generation_checkpoint,null)
+      }))
+    }catch(error){await this.executionFailure(schedule,claim,error)}
+  }
+  private async executeSimple(claim: Occurrence) {
     const schedule = (await this.pool.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1', [claim.schedule_id])).rows[0]
     if (!schedule) return
     try {
@@ -159,16 +217,18 @@ export class ScheduleStore {
         const skipped = occurrence.execution_decision === 'skip'
         const task = occurrence.definition.task
         const issue = skipped ? null : await this.taskPermission(tx, row.owner_id, occurrence.definition)
-        const result = skipped ? null : task.kind === 'reminder' ? { text: task.text } : task.kind === 'agent_read' ? await this.agent!.read(row.owner_id, task, occurrence.operation_id) : { issueId: issue!.id, title: issue!.title, status: issue!.status, checkedAt: this.clock().toISOString() }
+        const result = skipped ? null : task.kind === 'reminder' ? { text: task.text } : task.kind === 'agent_read' ? (()=>{throw new ScheduleError('scheduleModelExecutionRequired',403)})() : { issueId: issue!.id, title: issue!.title, status: issue!.status, checkedAt: this.clock().toISOString() }
         const status = skipped ? 'skipped' : 'succeeded'
         await tx.query(`UPDATE schedule_occurrences SET status=$2,result=$3,finished_at=$4,error=$5,lease_token=NULL,lease_until=NULL WHERE id=$1`, [claim.id, status, result, this.clock(), skipped ? 'misfireSkipped' : null])
         await this.report(tx, row, occurrence, status, result, skipped ? 'misfireSkipped' : null)
       }))
-    } catch (error) {
+    } catch (error) { await this.executionFailure(schedule,claim,error) }
+  }
+  private async executionFailure(schedule:Schedule,claim:Occurrence,error:unknown){
       // Read-only transaction rolled back: retrying cannot duplicate an external
       // effect. Permission failures stop immediately, operational failures cap at 3.
       const denied = error instanceof ScheduleError && error.status === 403
-      const terminal = denied || (error instanceof ScheduleError && error.code === 'scheduleMisfireDecisionRequiresReview')
+      const terminal = denied || (error instanceof ScheduleError && ['scheduleMisfireDecisionRequiresReview','scheduleGenerationUncertain'].includes(error.code))
       const code = error instanceof ScheduleError ? error.code : 'scheduleExecutionUnavailable'
       const failed = await this.transaction(async tx => {
         await tx.query('SELECT id FROM user_schedules WHERE id=$1 FOR UPDATE', [schedule.id])
@@ -177,7 +237,6 @@ export class ScheduleStore {
 
       })
       if (failed) await this.publishFailedReport(schedule, failed.id)
-    }
   }
   /** A denied row advances durably so a full prefix cannot monopolize LIMIT.
    * Permission checks remain outside and inside the publication transaction. */
