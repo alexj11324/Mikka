@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { isLocalSettingsNavigation, pushSettingsHistory } from '../lib/settings-navigation.ts'
 
-const url = path => new URL(path, 'https://orvilo.example')
+const url = path => new URL(path, 'https://mikka.example')
 
 test('设置页面间与团队子页使用即时导航', () => {
   for (const [from, to, workspace] of [

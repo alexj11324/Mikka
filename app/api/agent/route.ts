@@ -102,7 +102,7 @@ async function handlePOST(request: Request) {
     name: 'opencode',
     apiKey,
     baseURL: 'https://opencode.ai/zen/go/v1',
-    headers: { 'User-Agent': 'Orvilo-UI-Agent/1.0', 'x-opencode-session': sessionId },
+    headers: { 'User-Agent': 'Mikka-UI-Agent/1.0', 'x-opencode-session': sessionId },
   })
   const result = streamText({
     model: opencode('deepseek-v4.1-flash'),

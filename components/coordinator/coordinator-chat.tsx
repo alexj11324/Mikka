@@ -24,6 +24,7 @@ import { useLinkPreviews, type AgentCitations } from '@/components/workspace/age
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
 import { AgentThemeProvider } from '@/components/workspace/agent-theme'
 import { CoordinatorReply } from './coordinator-reply'
+import { PendingActions } from './pending-actions'
 
 /** The person's conversation with their Coordinator, which dispatches agents to issues. */
 export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false }: { onOpenIssue: (id: string) => void; prefill?: { text: string; nonce: number }; placeholder?: string; compact?: boolean }) {
@@ -88,7 +89,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   }
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
-  <section aria-label={t('label')} className="orvilo-agent flex min-h-0 flex-1 flex-col">
+  <section aria-label={t('label')} className="mikka-agent flex min-h-0 flex-1 flex-col">
     <MessageScrollerProvider defaultScrollPosition="end">
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={t('conversation')}>
@@ -115,6 +116,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
       {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
+      <PendingActions />
       {/* Grok-style composer: one rounded bar, attach on the left, send on the right. */}
       <form onSubmit={send}>
         <FieldGroup className="sr-only"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
