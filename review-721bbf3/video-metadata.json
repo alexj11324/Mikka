@@ -1,0 +1,19 @@
+{
+    "programs": [
+
+    ],
+    "stream_groups": [
+
+    ],
+    "streams": [
+        {
+            "codec_name": "vp9",
+            "width": 1280,
+            "height": 800
+        }
+    ],
+    "format": {
+        "duration": "5.160000",
+        "size": "746057"
+    }
+}

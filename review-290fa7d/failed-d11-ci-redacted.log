@@ -1,0 +1,41 @@
+policy	Compiled Next policy API regression	﻿2026-10-25T18:56:01.2747477Z ##[group]Run set -euo pipefail
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2747685Z [36;1mset -euo pipefail[0m
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2747907Z [36;1mpnpm exec next start --hostname 127.0.0.1 --port 3130 > policy-next.log 2>&1 &[0m
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2748192Z [36;1mnode scripts/policy/http-acceptance.mjs | tee policy-http.log[0m
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2748576Z [36;1mnode -e "const a=require('./policy-http-evidence/acceptance.json'); if(a.results!=='passed'||a.requests.length<30) process.exit(1)"[0m
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2796392Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2796581Z env:
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2796904Z   MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/policy_app_e2e
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2797203Z   DATABASE_URL: postgresql://postgres@127.0.0.1:5432/policy_workspace_e2e
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2797481Z   POLICY_WORKSPACE_TEST_URL: postgresql://postgres@127.0.0.1:5432/policy_workspace_e2e
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2797709Z   REQUIRE_POLICY_DB: 1
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2797829Z   CI: true
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2797970Z   BETTER_AUTH_URL: http://127.0.0.1:3130
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2798123Z   NEXT_TELEMETRY_DISABLED: 1
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2798270Z   POLICY_HTTP_ORIGIN: http://127.0.0.1:3130
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2798440Z   POLICY_EVIDENCE_DIR: policy-http-evidence
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2798725Z   POLICY_EXTERNAL_SERVER: 1
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2798886Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2799136Z   BETTER_AUTH_SECRET: [REDACTED_SYNTHETIC]
+policy	Compiled Next policy API regression	2026-10-25T18:56:01.2799365Z ##[endgroup]
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0429448Z node:internal/modules/run_main:107
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0430394Z     triggerUncaughtException(
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0457350Z     ^
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0457613Z 
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0457890Z AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0458086Z 
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0458147Z 429 !== 200
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0458220Z 
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0458434Z     at signup (file:///home/runner/work/Mikka/Mikka/scripts/policy/http-acceptance.mjs:69:12)
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0458841Z     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0459201Z     at async file:///home/runner/work/Mikka/Mikka/scripts/policy/http-acceptance.mjs:72:46 {
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0459464Z   generatedMessage: true,
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0459614Z   code: 'ERR_ASSERTION',
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0459758Z   actual: 429,
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0459882Z   expected: 200,
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0460014Z   operator: 'strictEqual',
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0460156Z   diff: 'simple'
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0460278Z }
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0460344Z 
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0460396Z Node.js v24.21.0
+policy	Compiled Next policy API regression	2026-10-25T18:56:04.0615605Z ##[error]Process completed with exit code 1.

@@ -1,0 +1,263 @@
+{
+  "sha": "3763acd26492d2e625238db0598e28557cfad292",
+  "utc": "2026-10-25T18:54:02.537Z",
+  "error": "Expected values to be strictly equal:\n\n429 !== 200\n",
+  "requests": [
+    {
+      "requestId": "b1aca1fc-dc9b-4110-a466-4ffe5ff9615a",
+      "method": "POST",
+      "path": "/api/auth/sign-up/email",
+      "status": 200,
+      "utc": "2026-10-25T18:54:00.320Z"
+    },
+    {
+      "requestId": "3e00da27-8742-452e-9624-698f69f79c58",
+      "method": "POST",
+      "path": "/api/auth/sign-up/email",
+      "status": 200,
+      "utc": "2026-10-25T18:54:00.533Z"
+    },
+    {
+      "utc": "2026-10-25T18:54:00.867Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth:search_notion_pages",
+      "expected": "composioNotConfigured"
+    },
+    {
+      "utc": "2026-10-25T18:54:00.920Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth:read_notion_page_blocks",
+      "expected": "composioNotConfigured"
+    },
+    {
+      "utc": "2026-10-25T18:54:00.967Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth:search_slack_messages",
+      "expected": "composioNotConfigured"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.019Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth:read_slack_thread",
+      "expected": "composioNotConfigured"
+    },
+    {
+      "requestId": "525044d9-c78f-4ff7-9589-07921a82161c",
+      "method": "POST",
+      "path": "/api/policy?workspaceId=408d65bc-fa8f-4202-8876-578555622780",
+      "status": 201,
+      "utc": "2026-10-25T18:54:01.092Z"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.118Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth first enrollment after auth",
+      "expected": "toolEnforcementUnavailable"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.163Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth:search_notion_pages",
+      "expected": "toolEnforcementUnavailable"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.240Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth:read_notion_page_blocks",
+      "expected": "toolEnforcementUnavailable"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.293Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth:search_slack_messages",
+      "expected": "toolEnforcementUnavailable"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.333Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth:read_slack_thread",
+      "expected": "toolEnforcementUnavailable"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.389Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth:search_notion_pages",
+      "expected": "toolEnforcementUnavailable"
+    },
+    {
+      "requestId": "47629473-55a5-413c-998a-98b453d9bf4f",
+      "method": "POST",
+      "path": "/api/policy?workspaceId=408d65bc-fa8f-4202-8876-578555622780",
+      "status": 201,
+      "utc": "2026-10-25T18:54:01.464Z"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.499Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth policy revoke after auth",
+      "expected": "policyRevoked"
+    },
+    {
+      "requestId": "b5e8bad7-8e4f-4be5-9726-5eba24caff96",
+      "method": "POST",
+      "path": "/api/policy?workspaceId=408d65bc-fa8f-4202-8876-578555622780",
+      "status": 201,
+      "utc": "2026-10-25T18:54:01.562Z"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.583Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth policy new version after auth",
+      "expected": "toolEnforcementUnavailable"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.664Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth member suspend after auth",
+      "expected": "policyAccessDenied"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.723Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth membership removed after auth",
+      "expected": "policyAccessDenied"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.769Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth token expires after auth",
+      "expected": "mcpAuthorizationRevoked"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.826Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth session expires after auth",
+      "expected": "mcpAuthorizationRevoked"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.885Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth token revoke after auth",
+      "expected": "mcpAuthorizationRevoked"
+    },
+    {
+      "utc": "2026-10-25T18:54:01.936Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth client disable after auth",
+      "expected": "mcpAuthorizationRevoked"
+    },
+    {
+      "requestId": "efc9beee-813a-49e0-98eb-b54353858032",
+      "method": "POST",
+      "path": "/api/policy?workspaceId=408d65bc-fa8f-4202-8876-578555622780",
+      "status": 201,
+      "utc": "2026-10-25T18:54:02.105Z"
+    },
+    {
+      "utc": "2026-10-25T18:54:02.170Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth concurrent revoke 1",
+      "expected": "policyRevoked"
+    },
+    {
+      "utc": "2026-10-25T18:54:02.182Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth concurrent revoke 6",
+      "expected": "policyRevoked"
+    },
+    {
+      "utc": "2026-10-25T18:54:02.185Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth concurrent revoke 3",
+      "expected": "policyRevoked"
+    },
+    {
+      "utc": "2026-10-25T18:54:02.195Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth concurrent revoke 5",
+      "expected": "policyRevoked"
+    },
+    {
+      "utc": "2026-10-25T18:54:02.201Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth concurrent revoke 2",
+      "expected": "policyRevoked"
+    },
+    {
+      "utc": "2026-10-25T18:54:02.205Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth concurrent revoke 4",
+      "expected": "policyRevoked"
+    },
+    {
+      "utc": "2026-10-25T18:54:02.288Z",
+      "method": "POST",
+      "path": "/api/mcp",
+      "status": 200,
+      "probe": "oauth:list_issues",
+      "expected": null
+    },
+    {
+      "requestId": "7ce88118-741f-4d8c-b134-228433717334",
+      "method": "POST",
+      "path": "/api/auth/sign-up/email",
+      "status": 200,
+      "utc": "2026-10-25T18:54:02.473Z"
+    },
+    {
+      "requestId": "7c57f1de-ee72-430d-bbf2-77de8767ddd1",
+      "method": "POST",
+      "path": "/api/auth/sign-up/email",
+      "status": 429,
+      "utc": "2026-10-25T18:54:02.534Z"
+    }
+  ]
+}

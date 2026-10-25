@@ -1,0 +1,34 @@
+
+> next-app@0.0.1 test:policy /workspace/mikka-policy-230
+> node --import tsx --test lib/policy/*.test.ts
+
+✔ lower defaults never erase ceilings, explicit empty network and model lists deny (25.04892ms)
+✔ strict fields, schema version, scope, TTL and canonical HTTPS endpoint (1.90385ms)
+✔ signature, unknown fields, tampering and key rotation fail closed (14.10916ms)
+✔ every HTTP attempt rechecks policy, endpoint, model aliases, redirect and cancellation (37.310788ms)
+✔ signatures survive JSON persistence with optional undefined values (6.840952ms)
+✔ compaction retry rechecks policy after published, without SDK hidden sends (59.19949ms)
+✔ compaction retry rechecks policy after revoked, without SDK hidden sends (3.843984ms)
+✔ compaction retry rechecks policy after versionUpdated, without SDK hidden sends (2.025728ms)
+▶ real PostgreSQL policy transactions, HTTP contract, tenant isolation, revocation and failure
+  ✔ no policy is explicitly unmanaged; missing origin, bearer and member writes refused (67.854496ms)
+  ✔ twelve concurrent publishers produce one winner, one version and one audit event (135.043227ms)
+  ✔ tenant rules differ; route aliases, endpoints, region and unmanaged-scope omission cannot bypass (83.349982ms)
+  ✔ revoke then rollback creates monotonic version, new instances see it and old signed bytes cannot supersede head (66.230564ms)
+  ✔ audit failure rolls back publication; suspended users lose current reads and writes (40.70821ms)
+  ✔ missing current version and replayed signed payload cannot become unmanaged or current (28.783979ms)
+  ✔ policy decisions reuse one held transaction connection and commit denial audit (31.507792ms)
+  ✔ tool admission fences publication and denies without invoking side effects (68.162836ms)
+  ✔ real policy publication, revoke and revision during retryable SDK failure prevent a second send (89.996283ms)
+  ✔ database unavailable returns 503 with no implicit unmanaged fallback (2.820248ms)
+✔ real PostgreSQL policy transactions, HTTP contract, tenant isolation, revocation and failure (660.526463ms)
+✔ real PG worker scope validates continuation parents and rejects untrusted history (187.511849ms)
+✔ transaction adapter binds repeated and reordered values without SQL interpolation (4.711193ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2427.880549

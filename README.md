@@ -1,3 +1,7 @@
+# Current review repairs
+
+Current source `721bbf3615f7b9a3672c149112382dac75c72cb8`: see [review-721bbf3](review-721bbf3/README.md). Exact-SHA CI pending. Older source below was later found to have OAuth MCP and retry bypasses and is **superseded**. It must not be deployed. The 15-test total below means five contract cases, eight PG subcases, their parent and one adapter, not 15 PG scenarios. The old six-worker-request case is unmanaged worker auth revocation, not policy-version concurrency.
+
 # #230 / #231 backend isolation evidence
 
 Frozen source: `80f3cab2b15ad967d1a27e45e6f833435d4de72e`, branch `codex/org-policy-230-231-20261025`, draft PR #264. Base audit #259: `9532817f3456ae0ed4decc9cd5d7e0e5bac95feb`. Both issues remain open; this is a backend candidate, not completed enterprise/production acceptance.

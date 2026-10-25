@@ -1,0 +1,16 @@
+{
+  "utc": "2026-10-25T19:08:29.177Z",
+  "sourceSha": "721bbf3615f7b9a3672c149112382dac75c72cb8",
+  "node": "v24.19.0",
+  "runtime": "cloud Linux isolated Docker Next development/on-demand; production Next verified separately in CI",
+  "applicationDatabase": "loopback:55430/policy_app_e2e",
+  "workspaceDatabase": "loopback:55430/policy_workspace_e2e",
+  "runtimeImage": "sha256:dc1f22974dab4be31a8b56d58cb1f8fc218e83de83ccd831d885b3d7ac1223fb",
+  "providerKeysPresent": [],
+  "auditOverlay": {
+    "sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+    "path": "drizzle/20261025170000_security_audit_application.sql",
+    "sha256": "05e51cde9f9113ef47079cbc1918d4df0f16aafc5533c678776f039039d6da83"
+  },
+  "scope": "synthetic test-only DB overlay; no final integrated source/deployment acceptance"
+}
