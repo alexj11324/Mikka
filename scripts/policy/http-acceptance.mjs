@@ -1,5 +1,6 @@
 // Real compiled Next HTTP acceptance on disposable cloud Linux databases only.
 import assert from 'node:assert/strict'
+import { continuationPolicyAcceptance } from './continuation-acceptance.mjs'
 import { oauthMcpAcceptance } from './oauth-mcp-acceptance.mjs'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { execFile, spawn } from 'node:child_process'
@@ -95,6 +96,7 @@ try {
   await workspace.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)`,[issueId,teamId,w,userId])
   await app.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"leaseExpiresAt") VALUES($1,$2,$3,$4,$5,$6,'queued','Synthetic policy worker',now()+interval '90 seconds')`,[runId,userId,issueId,agentId,deviceId,repoId])
   const deviceHeaders={authorization:`Bearer ${deviceToken}`}
+  const continuation = process.env.POLICY_AUDIT_REPAIR_SHA ? await continuationPolicyAcceptance({app,workspace,owner,userId,deviceId,repoId,agentId,workspaceId:w,teamId,deviceHeaders,anonymous,receipts}) : {status:'pending parent-reviewed audit integration; not independent deployment'}
   const claimed=await anonymous.call(`/v1/devices/${deviceId}/runs/${runId}/claim`,'POST',{},deviceHeaders)
   assert.equal(claimed.body.error,'workerEnforcementUnavailable')
   assert.equal((await app.query('SELECT status FROM agent_runs WHERE id=$1',[runId])).rows[0].status,'queued')
@@ -161,7 +163,7 @@ try {
   }
   const versions=(await workspace.query('SELECT workspace_id,version,actor_id,rollback_of,published_at FROM organization_policy_versions WHERE workspace_id=ANY($1::uuid[]) ORDER BY workspace_id,version',[[w,other]])).rows
   const events=(await workspace.query(`SELECT tenant,seq,event,hash FROM security_audit_events WHERE tenant=ANY($1::text[]) AND event->>'action' LIKE 'policy.%' ORDER BY tenant,seq`,[[w,other]])).rows
-  await writeFile(`${evidence}/acceptance.json`,JSON.stringify({sha,results:"passed",utc:new Date().toISOString(),environment:'dedicated cloud Linux; compiled Next; separate loopback PG17 databases; synthetic sessions; no external provider keys',requests:receipts,oauthMcp,versions,events,limitations:['not deployed Preview or production acceptance','no real OAuth/provider/CLI allowed path','#215 reservation and verified managed worker transport remain unavailable']},null,2))
+  await writeFile(`${evidence}/acceptance.json`,JSON.stringify({sha,results:"passed",utc:new Date().toISOString(),environment:'dedicated cloud Linux; compiled Next; separate loopback PG17 databases; synthetic sessions; no external provider keys',requests:receipts,oauthMcp,continuation,versions,events,limitations:['not deployed Preview or production acceptance','no real OAuth/provider/CLI allowed path','#215 reservation and verified managed worker transport remain unavailable']},null,2))
   console.log(JSON.stringify({sha,requests:receipts.length,results:'passed',video:process.env.POLICY_RECORD_VIDEO==='1',evidence}))
 } catch (error) {
   await writeFile(`${evidence}/failed-attempt.json`,JSON.stringify({sha,utc:new Date().toISOString(),error:error instanceof Error?error.message:"acceptanceFailed",requests:receipts},null,2));
