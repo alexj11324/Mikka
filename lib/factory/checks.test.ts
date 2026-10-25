@@ -122,6 +122,7 @@ test(
           noCriteria?: boolean;
           timeout?: boolean;
           noRuntime?: boolean;
+          finding?: boolean;
         } = {},
       ) => {
         const run = (
@@ -159,8 +160,10 @@ test(
             : [
                 {
                   text: "Expected response",
-                  passed: true,
-                  evidence: "Fixture observation",
+                  passed: !options.finding,
+                  evidence: options.finding
+                    ? "ORIGINAL_REVIEW_EVIDENCE: missing owner check at fixture.ts:7"
+                    : "Fixture observation",
                 },
               ],
         };
@@ -397,6 +400,29 @@ test(
         (await store.read("owner", same.task.id)).task.status,
         "blocked",
       );
+
+      const findingTask = await route();
+      const findingImpl = await dispatch(findingTask.task);
+      await complete(findingImpl.runId, sha1);
+      await reconcile("owner");
+      let found = await store.read("owner", findingTask.task.id);
+      const findingReview = await dispatch(found.task);
+      await complete(findingReview.runId, sha1, { finding: true });
+      await reconcile("owner");
+      found = await store.read("owner", found.task.id);
+      assert.equal(found.task.stage, "execute");
+      const findingRepair = await dispatch(found.task);
+      assert.match(
+        (
+          await pool.query(`SELECT prompt FROM agent_runs WHERE id=$1`, [
+            findingRepair.runId,
+          ])
+        ).rows[0].prompt,
+        /ORIGINAL_REVIEW_EVIDENCE/,
+      );
+      await pool.query(`UPDATE agent_runs SET status='cancelled' WHERE id=$1`, [
+        findingRepair.runId,
+      ]);
 
       const cancelled = await route();
       const cancelledExecute = await dispatch(cancelled.task);

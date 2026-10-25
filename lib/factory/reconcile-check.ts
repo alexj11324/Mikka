@@ -75,6 +75,12 @@ export async function reconcileFactoryCheck(
     error: run.error,
     verify: run.report?.verify,
     check: run.report?.check,
+    summary: run.report?.summary?.slice(0, 2000),
+    findings: run.report?.criteria
+      ?.filter((c) => !c.passed)
+      .slice(0, 3)
+      .map((c) => ({ ...c, evidence: c.evidence?.slice(0, 8000) })),
+    knownIssues: run.report?.knownIssues?.slice(0, 5),
   };
   // Keep the frozen check assignment for gate revalidation and audit.
   const {
@@ -120,7 +126,7 @@ export async function reconcileFactoryCheck(
     run.report.criteria?.some((c: { passed: boolean }) => c.passed === false)
   ) {
     status = "failed";
-    reason = `Independent ${task.stage} failed: ${run.error ?? run.report.verify?.output ?? run.stopReason}`;
+    reason = `Independent ${task.stage} failed: ${run.error ?? run.report.criteria?.find((c) => !c.passed)?.text ?? run.report.verify?.output ?? run.stopReason}`;
   }
   // Failed results must be bound to the same independent session/candidate too.
   // Missing auth, old daemons or corrupted provenance need recovery, not an automatic repair.

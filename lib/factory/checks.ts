@@ -297,7 +297,7 @@ export async function verifierCommandEvidence(
     typeof r.result === "string" ? true : r.result?.exitCode === 0,
   );
   const selected = includeFailure
-    ? [...passed, ...matching.filter((r) => !passed.includes(r))].slice(0, 49)
+    ? [...passed, ...matching.filter((r) => !passed.includes(r))].slice(0, 10)
     : passed.slice(0, 1);
   return selected.flatMap((row) => [row.input as string, row.output as string]);
 }
