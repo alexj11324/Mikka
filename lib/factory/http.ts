@@ -11,11 +11,11 @@ export interface FactoryRequest {
   url: string;
   body?: unknown;
 }
-const stopSchema = z
+const controlSchema = z
   .object({
     binding: bindingSchema,
     eventId: z.uuid(),
-    action: z.enum(["cancel", "revoke"]),
+    action: z.enum(["cancel", "revoke", "retry", "repair"]),
     reason: z.string().trim().min(1).max(4000),
   })
   .strict();
@@ -44,7 +44,7 @@ export async function handleFactory(
   try {
     if (req.method === "GET")
       return { status: 200, body: await store.read(req.userId, req.taskId) };
-    const parsed = stopSchema.safeParse(req.body);
+    const parsed = controlSchema.safeParse(req.body);
     if (!parsed.success || parsed.data.binding.taskId !== req.taskId)
       return { status: 422, body: { error: "factoryInvalid" } };
     const { binding, eventId, action, reason } = parsed.data;

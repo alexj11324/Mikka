@@ -104,6 +104,48 @@ test("Factory HTTP API isolates owners, requires sessions/origins and atomically
     expect(read.status()).toBe(200);
     expect(read.headers()["cache-control"]).toContain("no-store");
     expect((await read.json()).task.stage).toBe("execute");
+    const recoverySource = randomUUID();
+    await pool.query(
+      'INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$2,\'user_message\',$3,\'{"text":"Separate recoverable fixture"}\')',
+      [recoverySource, userId, `factory-recovery:${recoverySource}`],
+    );
+    const recovery = await store.route(userId, {
+      issueId,
+      sourceEventId: recoverySource,
+      eventId: recoverySource,
+      rationale: "Separate recovery fixture",
+    });
+    const blocked = await store.apply(
+      userId,
+      bind(recovery.task),
+      randomUUID(),
+      {
+        action: "finish",
+        status: "blocked",
+        reason: "Fixture environment unavailable",
+        evidence: [],
+        output: {},
+      },
+    );
+    const recovered = await owner.post(
+      app(`/api/factory/tasks/${recovery.task.id}`),
+      {
+        headers: { origin },
+        data: {
+          binding: bind(blocked.task),
+          eventId: randomUUID(),
+          action: "retry",
+          reason: "Owner requests recovery",
+        },
+      },
+    );
+    expect(recovered.status()).toBe(200);
+    const recoveryState = await recovered.json();
+    expect(recoveryState.task.status).toBe("pending");
+    expect(recoveryState.attempts).toHaveLength(2);
+    expect(recoveryState.attempts[0].reason).toBe(
+      "Fixture environment unavailable",
+    );
     const command = {
       binding: bind(state.task),
       eventId: randomUUID(),
@@ -165,6 +207,7 @@ test("Factory HTTP API isolates owners, requires sessions/origins and atomically
           taskId,
           runId,
           checks: [
+            "ownerRecovery200WithHistory",
             "session401",
             "worker401",
             "foreignOwner404",

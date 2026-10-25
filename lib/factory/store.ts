@@ -580,6 +580,7 @@ export function createFactoryStore(
           task.reason = change.reason;
           await freshAttempt(tx, task, change.stage, change.reason);
         } else if (change.action === "retry" || change.action === "repair") {
+          if (task.stage === "clarify") fail("factoryTransition");
           if (!["failed", "blocked", "waiting"].includes(task.status))
             fail("factoryTransition");
           if (
