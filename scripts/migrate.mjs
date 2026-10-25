@@ -7,6 +7,7 @@
 // `-- target: DATABASE_URL` (the workspace database).
 import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
+import { orderMigrations } from './migration-order.mjs'
 
 const shouldRun = process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production'
 if (!shouldRun) {
@@ -15,13 +16,17 @@ if (!shouldRun) {
 }
 
 const targets = {
-  // ORVILO_DATABASE_URL is the pre-rename name.
-  MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL ?? process.env.ORVILO_DATABASE_URL,
+  MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL,
   DATABASE_URL: process.env.DATABASE_URL,
 }
 
 const dir = new URL('../drizzle/', import.meta.url)
-const files = readdirSync(dir).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort()
+// 旧迁移是 NNNN_*.sql，新迁移是 YYYYMMDDHHMMSS_*.sql（UTC）。按文件名排序时时间戳文件排在所有旧文件之后。
+// 其它 .sql 文件名直接报错，避免迁移被静默跳过。
+const sqlFiles = readdirSync(dir).filter((name) => name.endsWith('.sql'))
+const unknown = sqlFiles.filter((name) => !/^(\d{4}|\d{14})_.+\.sql$/.test(name))
+if (unknown.length) throw new Error(`migrate: 无法识别的迁移文件名：${unknown.join(', ')}`)
+const files = orderMigrations(sqlFiles)
 
 const byTarget = new Map()
 for (const name of files) {

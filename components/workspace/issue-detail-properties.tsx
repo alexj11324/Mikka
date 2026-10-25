@@ -9,11 +9,13 @@ import { Field, FieldContent, FieldGroup, FieldLabel } from '@/components/ui/fie
 import { IssuePropertyMenu } from './issue-property-menu'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 import { IssueMetadataControls, type MetadataRequest, type MetadataSavedIssue } from './issue-metadata-controls'
+import { IssueScopeControl } from './issue-scope-control'
+import type { TaskScope } from '@/lib/task-identifier'
 import type { IssueMetadata } from '@/lib/issue-metadata'
 import { cn } from '@/lib/utils'
 
 export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled, onMetadataBusy, status, priority, pending, onStatus, onPriority, request, relations, onDate, onEstimate }: {
-  task: { id: string; revision: number; metadata: IssueMetadata }; onMetadataSaved: (issue: MetadataSavedIssue) => void; metadataDisabled: boolean; onMetadataBusy: (busy: boolean) => void
+  task: { id: string; revision: number; scope: TaskScope; scopeSetBy: 'agent' | 'user'; metadata: IssueMetadata }; onMetadataSaved: (issue: MetadataSavedIssue) => void; metadataDisabled: boolean; onMetadataBusy: (busy: boolean) => void
   status: string; priority: string; pending: boolean; onStatus: (value: string) => void; onPriority: (value: string) => void
   request: MetadataRequest | null; relations: ReactNode; onDate: () => void; onEstimate: () => void
 }) {
@@ -34,6 +36,7 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
       <FieldGroup className="gap-3">
         <Field orientation="horizontal" className="items-center gap-3"><FieldLabel className="w-20 shrink-0">{t('statusLabel')}</FieldLabel><FieldContent className="min-w-0"><IssuePropertyMenu label={t('statusLabel')} value={status} options={statusOptions} icon={CircleDashed} disabled={pending} onChange={onStatus} /></FieldContent></Field>
         <Field orientation="horizontal" className="items-center gap-3"><FieldLabel className="w-20 shrink-0">{t('priorityLabel')}</FieldLabel><FieldContent className="min-w-0"><IssuePropertyMenu label={t('priorityLabel')} value={priority} options={priorityOptions} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} /></FieldContent></Field>
+        <Field orientation="horizontal" className="items-center gap-3"><FieldLabel className="w-20 shrink-0">{t('scope.label')}</FieldLabel><FieldContent className="min-w-0"><IssueScopeControl task={task} disabled={metadataDisabled} onSaved={onMetadataSaved} /></FieldContent></Field>
         <Field orientation="horizontal" className="items-center gap-3"><FieldLabel className="w-20 shrink-0">{tMetadata('assignee')}</FieldLabel><FieldContent className="min-w-0"><IssueMetadataControls {...control} section="assignee" /></FieldContent></Field>
         <Field orientation="horizontal" className="items-start gap-3"><FieldLabel className="w-20 shrink-0">{tMetadata('labels')}</FieldLabel><FieldContent className="min-w-0"><div className="flex flex-wrap gap-2"><IssueMetadataControls {...control} section="labels" /></div></FieldContent></Field>
         <Field orientation="horizontal" className="items-center gap-3"><FieldLabel className="w-20 shrink-0">{tMetadata('project')}</FieldLabel><FieldContent className="min-w-0"><IssueMetadataControls {...control} section="project" /></FieldContent></Field>

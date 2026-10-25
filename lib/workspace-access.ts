@@ -58,7 +58,7 @@ export async function loadWorkspaceContext(requestedId?: string, authenticatedUs
     choices = await readChoices()
   }
 
-  const savedId = (cookieStore.get('mikka-workspace') ?? cookieStore.get('orvilo-workspace'))?.value
+  const savedId = cookieStore.get('mikka-workspace')?.value
   const workspaceId = requestedId ?? choices.find(item => item.id === savedId)?.id ?? choices[0]?.id
   let selected = choices.find(item => item.id === workspaceId)
   if (selected) {

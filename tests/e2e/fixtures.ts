@@ -1,6 +1,7 @@
 import { randomBytes, randomInt, randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { test as base, expect, type BrowserContext, type Page } from '@playwright/test'
+import { Pool } from 'pg'
 
 // The app is served under next.config.mjs's basePath. page.goto('/x') resolves
 // against the origin, so app paths go through app().
@@ -8,6 +9,67 @@ export const BASE_PATH = '/mikka'
 export function app(path: string) {
   if (path === '/' || path.startsWith('/?')) return `${BASE_PATH}${path.slice(1)}`
   return `${BASE_PATH}${path}`
+}
+
+/** Buttons on the left icon rail (主页 / 看板 / 插件). Phones have no rail. */
+export function rail(page: Page, name: '主页' | '看板' | '插件') {
+  return page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name, exact: true })
+}
+
+/** Opens ⌘K from the top bar; returns the dialog. */
+export async function openSearch(page: Page) {
+  // Desktop uses the top bar; phones keep the search icon in the page header.
+  await page.getByRole('button', { name: /^(打开)?全局搜索$/ }).click()
+  const dialog = page.getByRole('dialog', { name: '全局搜索', exact: true })
+  await expect(dialog).toBeVisible()
+  return dialog
+}
+
+/** Searches ⌘K for a task by title and opens it. */
+export async function openIssueFromSearch(page: Page, title: string) {
+  const dialog = await openSearch(page)
+  await dialog.getByRole('combobox', { name: '全局搜索', exact: true }).fill(title)
+  await dialog.getByRole('option').filter({ hasText: title }).click()
+}
+
+/** ⌘K's 新建任务 opens the dialog that hands a sentence to the Coordinator. */
+export async function openCreateIssue(page: Page) {
+  const dialog = await openSearch(page)
+  await dialog.getByRole('option', { name: '新建任务', exact: true }).click()
+  const create = page.getByRole('dialog', { name: '新建任务', exact: true })
+  await expect(create).toBeVisible()
+  return create
+}
+
+let pool: Pool | null = null
+function database() {
+  const connectionString = process.env.E2E_DATABASE_URL
+  if (!connectionString) throw new Error('E2E 任务数据必须写入独立的 E2E_DATABASE_URL。')
+  return pool ??= new Pool({ connectionString, max: 1 })
+}
+
+/**
+ * Tasks are created by the Coordinator, which e2e cannot run, so tests write
+ * them straight into the signed-in person's tasks, numbered like the app does.
+ */
+export async function seedTask(page: Page, title: string, { status = 'todo', priority = 'normal' }: { status?: string; priority?: string } = {}) {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('seedTask 需要已登录的页面。')
+  const db = database()
+  const { rows: [session] } = await db.query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  if (!session) throw new Error('找不到当前登录会话。')
+  const { rows: [{ number }] } = await db.query<{ number: number }>(`SELECT COALESCE(MAX((content->'attrs'->'mikka'->>'number')::int), 0) + 1 AS number FROM issues WHERE "userId" = $1`, [session.userId])
+  const id = randomUUID()
+  const content = { type: 'doc', content: [{ type: 'paragraph' }], attrs: { mikka: { number } } }
+  await db.query('INSERT INTO issues (id, "userId", title, content, status, priority) VALUES ($1, $2, $3, $4, $5, $6)', [id, session.userId, title, content, status, priority])
+  await db.query('INSERT INTO issue_versions (id, "issueId", "userId", revision, title, content, status, priority) VALUES ($1, $2, $3, 1, $4, $5, $6, $7)', [randomUUID(), id, session.userId, title, content, status, priority])
+  return id
+}
+
+/** The current conversation's title pill over the chat (desktop). */
+export function conversationPill(page: Page) {
+  // Conversations opened earlier stay mounted but hidden; only the current one is visible.
+  return page.locator('[data-slot="conversation-pill"]:visible [data-slot="conversation-pill-title"]')
 }
 
 type ExpectedConsoleError = { path: string; message: string }

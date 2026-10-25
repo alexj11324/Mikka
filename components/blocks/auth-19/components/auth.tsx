@@ -6,7 +6,7 @@ import { Link } from '@/i18n/navigation'
 import { buttonVariants } from '@/components/ui/button'
 import { AuthLogo } from './auth-logo'
 
-export function Auth({ registering = false, addAccount = false, children, next = '/' }: { registering?: boolean; addAccount?: boolean; children: ReactNode; next?: string }) {
+export function Auth({ registering = false, addAccount = false, children, next = '/', label }: { registering?: boolean; addAccount?: boolean; children: ReactNode; next?: string; label?: string }) {
   const t = useTranslations('Auth')
   function authHref(path: string) {
     const params = new URLSearchParams()
@@ -28,13 +28,9 @@ export function Auth({ registering = false, addAccount = false, children, next =
           </>}
         </div>
       </header>
-      <section aria-label={addAccount ? t('addAccountLabel') : registering ? t('signUpLabel') : t('signInLabel')} className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8 sm:py-16">
+      <section aria-label={label ?? (addAccount ? t('addAccountLabel') : registering ? t('signUpLabel') : t('signInLabel'))} className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8 sm:py-16">
         <div className="flex w-full flex-col items-center gap-6">
           {children}
-          <footer className="text-muted-foreground flex max-w-[26rem] flex-col items-center gap-2 text-center text-sm leading-6 text-pretty">
-            <p>{t('tagline')}</p>
-            <p>{t('accountNote')}<br />{t('dataNote')}</p>
-          </footer>
         </div>
       </section>
     </main>

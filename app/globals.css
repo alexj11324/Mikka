@@ -51,6 +51,8 @@
 --color-sidebar-foreground: var(--sidebar-foreground);
 --color-sidebar-primary: var(--sidebar-primary);
 --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+--color-sidebar-primary-soft: var(--sidebar-primary-soft);
+--color-sidebar-primary-soft-foreground: var(--sidebar-primary-soft-foreground);
 --color-sidebar-accent: var(--sidebar-accent);
 --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 --color-sidebar-border: var(--sidebar-border);
@@ -72,6 +74,20 @@
 --color-success: var(--success);
 --color-label-violet: var(--label-violet);
 --color-label-blue: var(--label-blue);
+--color-attention: var(--attention);
+--color-attention-foreground: var(--attention-foreground);
+--color-screen: var(--screen);
+--color-screen-foreground: var(--screen-foreground);
+/* App shell layers (Nav v3.1): the top bar and icon rail, then the list and right panels, then the conversation. */
+--color-shell-chrome: var(--shell-chrome);
+--color-shell-panel: var(--shell-panel);
+--color-shell-raised: var(--shell-raised);
+--color-avatar-1: var(--avatar-1);
+--color-avatar-2: var(--avatar-2);
+--color-avatar-3: var(--avatar-3);
+--color-avatar-4: var(--avatar-4);
+--color-avatar-5: var(--avatar-5);
+--color-avatar-foreground: var(--avatar-foreground);
 /* Source chips and lists (components/ui/streaming-text), on the shadcn palette so both themes follow. */
 --color-page: var(--page);
 --color-canvas: var(--canvas);
@@ -91,14 +107,14 @@
 
 :root {
 --settings-background: oklch(0.98 0.002 286);
---settings-foreground: oklch(0.25 0 0);
---settings-card: oklch(1 0 0);
+--settings-foreground: oklch(0.145 0 0);
+--settings-card: var(--card);
 --settings-sidebar: oklch(0.95 0.002 286);
---settings-sidebar-foreground: oklch(0.44 0 0);
+--settings-sidebar-foreground: oklch(0.205 0 0);
 --settings-sidebar-accent: oklch(0.905 0.002 286);
 --settings-border: oklch(0.905 0 0);
 --settings-input: oklch(0.89 0 0);
---settings-muted-foreground: oklch(0.51 0 0);
+--settings-muted-foreground: oklch(0.49 0 0);
   --diagram-surface: color-mix(in oklch, var(--label-blue) 6%, var(--card));
   --diagram-border: color-mix(in oklch, var(--label-blue) 30%, var(--border));
   --diagram-line: color-mix(in oklch, var(--label-blue) 30%, var(--muted-foreground));
@@ -120,6 +136,15 @@
 --project-action-foreground: oklch(0.985 0 0);
 --label-violet: var(--color-violet-600);
 --label-blue: var(--color-blue-600);
+--shell-chrome: oklch(0.97 0 0);
+--shell-panel: oklch(0.982 0 0);
+--shell-raised: oklch(1 0 0);
+--avatar-1: var(--color-blue-500);
+--avatar-2: var(--color-pink-500);
+--avatar-3: var(--color-emerald-500);
+--avatar-4: var(--color-violet-500);
+--avatar-5: var(--color-orange-500);
+--avatar-foreground: oklch(0.985 0 0);
   --background: oklch(1 0 0);
 --foreground: oklch(0.145 0 0);
 --card: oklch(1 0 0);
@@ -131,7 +156,7 @@
 --secondary: oklch(0.97 0 0);
 --secondary-foreground: oklch(0.205 0 0);
 --muted: oklch(0.97 0 0);
---muted-foreground: oklch(0.556 0 0);
+--muted-foreground: oklch(0.49 0 0);
 --accent: oklch(0.97 0 0);
 --accent-foreground: oklch(0.205 0 0);
 --destructive: oklch(0.577 0.245 27.325);
@@ -145,11 +170,13 @@
 --chart-5: oklch(0.269 0 0);
 --radius: 0.625rem;
 --sidebar: oklch(0.985 0 0);
---sidebar-foreground: oklch(0.44 0 0);
---sidebar-primary: oklch(0.205 0 0);
+--sidebar-foreground: oklch(0.145 0 0);
+--sidebar-primary: oklch(0.546 0.245 262.881);
 --sidebar-primary-foreground: oklch(0.985 0 0);
+--sidebar-primary-soft: color-mix(in oklch, var(--sidebar-primary) 15%, var(--sidebar));
+--sidebar-primary-soft-foreground: var(--sidebar-primary);
 --sidebar-accent: oklch(0.97 0 0);
---sidebar-accent-foreground: oklch(0.30 0 0);
+--sidebar-accent-foreground: oklch(0.205 0 0);
 --sidebar-border: oklch(0.922 0 0);
 --sidebar-ring: oklch(0.708 0 0);
 --destructive-foreground: var(--color-red-800);
@@ -161,20 +188,34 @@
 --warning-foreground: var(--color-yellow-900);
 --invert: var(--color-zinc-900);
 --invert-foreground: var(--color-zinc-50);
+/* The computer: orange while it waits on you or you hold control; the viewer is dark in both themes. */
+--attention: var(--color-orange-500);
+--attention-foreground: var(--color-orange-600);
+--screen: oklch(0.17 0 0);
+--screen-foreground: oklch(0.985 0 0);
 }
 
 .dark {
 --settings-background: oklch(0.17 0 0);
 --settings-foreground: oklch(0.94 0 0);
---settings-card: oklch(0.205 0 0);
---settings-sidebar: oklch(0.145 0 0);
---settings-sidebar-foreground: oklch(0.78 0 0);
+--settings-card: var(--card);
+--settings-sidebar: var(--background);
+--settings-sidebar-foreground: oklch(0.985 0 0);
 --settings-sidebar-accent: oklch(0.25 0 0);
 --settings-border: oklch(0.31 0 0);
 --settings-input: oklch(0.34 0 0);
 --settings-muted-foreground: oklch(0.71 0 0);
 --label-violet: var(--color-violet-400);
 --label-blue: var(--color-blue-400);
+--shell-chrome: oklch(0.12 0 0);
+--shell-panel: oklch(0.185 0 0);
+--shell-raised: oklch(0.255 0 0);
+--avatar-1: var(--color-blue-500);
+--avatar-2: var(--color-pink-500);
+--avatar-3: var(--color-emerald-500);
+--avatar-4: var(--color-violet-500);
+--avatar-5: var(--color-orange-500);
+--avatar-foreground: oklch(0.985 0 0);
   --background: oklch(0.145 0 0);
 --foreground: oklch(0.985 0 0);
 --card: oklch(0.205 0 0);
@@ -199,9 +240,11 @@
 --chart-4: oklch(0.371 0 0);
 --chart-5: oklch(0.269 0 0);
 --sidebar: oklch(0.115 0 0);
---sidebar-foreground: oklch(0.78 0 0);
+--sidebar-foreground: oklch(0.985 0 0);
 --sidebar-primary: oklch(0.488 0.243 264.376);
 --sidebar-primary-foreground: oklch(0.985 0 0);
+--sidebar-primary-soft: color-mix(in oklch, var(--sidebar-primary) 40%, var(--sidebar));
+--sidebar-primary-soft-foreground: oklch(0.985 0 0);
 --sidebar-accent: oklch(0.269 0 0);
 --sidebar-accent-foreground: oklch(0.985 0 0);
 --sidebar-border: oklch(1 0 0 / 10%);
@@ -215,6 +258,10 @@
 --warning-foreground: var(--color-yellow-600);
 --invert: var(--color-zinc-700);
 --invert-foreground: var(--color-zinc-50);
+--attention: var(--color-orange-500);
+--attention-foreground: var(--color-orange-400);
+--screen: oklch(0.17 0 0);
+--screen-foreground: oklch(0.985 0 0);
 }
 
 @layer base {
@@ -228,3 +275,4 @@ body {
   @apply bg-background text-foreground;
 }
 }
+
