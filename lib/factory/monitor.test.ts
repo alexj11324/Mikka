@@ -6,7 +6,11 @@ import test from "node:test";
 import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { FactoryError, type FactoryBinding } from "./contract";
-import { createFactoryStore, type FactoryTask } from "./store";
+import {
+  createFactoryStore,
+  type FactoryTask,
+  type FactorySnapshot,
+} from "./store";
 import {
   createFactoryMonitor,
   monitorGate,
@@ -219,13 +223,16 @@ test(
       owner: string,
       issueId: string,
       failure: string | null = "HTTP 503 request 123 token=fixture-secret",
+      initial?: FactorySnapshot,
     ) => {
-      let state = await store.route(owner, {
-        issueId,
-        eventId: randomUUID(),
-        sourceEventId: await source(owner, issueId),
-        rationale: "Explicit isolated fixture",
-      });
+      let state =
+        initial ??
+        (await store.route(owner, {
+          issueId,
+          eventId: randomUUID(),
+          sourceEventId: await source(owner, issueId),
+          rationale: "Explicit isolated fixture",
+        }));
       const execute = await run(owner, issueId);
       state = await store.apply(owner, binding(state.task), randomUUID(), {
         action: "bind_run",
@@ -507,6 +514,25 @@ test(
             "factoryNotFound",
           );
           denied.delete(issueId);
+          const revoked = await toMonitor("owner", issueId);
+          const stopped = await store.apply(
+            "owner",
+            binding(revoked.task),
+            randomUUID(),
+            { action: "revoke", reason: "Permission revoked" },
+          );
+          await rejects(
+            () => monitor.consume("owner", revoked.input),
+            "factoryStopped",
+          );
+          await rejects(
+            () =>
+              store.apply("owner", binding(stopped.task), randomUUID(), {
+                action: "repair",
+                reason: "must not repair after revocation",
+              }),
+            "factoryStopped",
+          );
         },
       );
       await t.test(
@@ -584,7 +610,47 @@ test(
               )
             ).rows.length,
           );
-          const recovered = await toMonitor("owner", issueId, null);
+          for (const tamper of [
+            "sha",
+            "session",
+            "missing-verification-run",
+          ] as const) {
+            const invalid = await toMonitor("owner", issueId, null);
+            if (tamper === "sha")
+              await complete(invalid.runId, null, "2".repeat(40));
+            if (tamper === "session")
+              await pool.query(
+                'UPDATE agent_runs SET "sessionId"=(SELECT "sessionId" FROM factory_attempts WHERE "taskId"=$2 AND stage=\'verify\') WHERE id=$1',
+                [invalid.runId, invalid.task.id],
+              );
+            if (tamper === "missing-verification-run")
+              await pool.query(
+                'DELETE FROM agent_runs WHERE id=(SELECT "runId" FROM factory_attempts WHERE "taskId"=$1 AND stage=\'verify\')',
+                [invalid.task.id],
+              );
+            assert.equal(
+              (await monitor.consume("owner", invalid.input)).outcome,
+              "blocked",
+              tamper,
+            );
+          }
+          const failedTask = (await store.read("owner", first.task.id)).task;
+          const repair = await store.apply(
+            "owner",
+            binding(failedTask),
+            randomUUID(),
+            { action: "repair", reason: "Repair original monitor incident" },
+          );
+          assert.equal(repair.task.stage, "execute");
+          assert.equal(repair.task.candidateId, null);
+          assert.notEqual(repair.task.attemptId, failedTask.attemptId);
+          assert.ok(
+            repair.attempts.some(
+              (a) => a.stage === "monitor" && a.status === "failed",
+            ),
+          );
+          const recovered = await toMonitor("owner", issueId, null, repair);
+          assert.equal(recovered.task.id, first.task.id);
           assert.equal(
             (await monitor.consume("owner", recovered.input)).outcome,
             "passed",
@@ -610,21 +676,6 @@ test(
               ])
             ).rows[0].status,
             "todo",
-          );
-          const failedTask = (await store.read("owner", first.task.id)).task;
-          const repair = await store.apply(
-            "owner",
-            binding(failedTask),
-            randomUUID(),
-            { action: "repair", reason: "Repair original monitor incident" },
-          );
-          assert.equal(repair.task.stage, "execute");
-          assert.equal(repair.task.candidateId, null);
-          assert.notEqual(repair.task.attemptId, failedTask.attemptId);
-          assert.ok(
-            repair.attempts.some(
-              (a) => a.stage === "monitor" && a.status === "failed",
-            ),
           );
         },
       );

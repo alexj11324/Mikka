@@ -31,9 +31,9 @@ export type MonitorNotice = {
   occurrences: number;
   transitionBlocked: boolean;
 };
-const fail = (code: string): never => {
+function fail(code: string): never {
   throw new FactoryError(code);
-};
+}
 const bindingFor = (task: FactoryTask): FactoryBinding => ({
   taskId: task.id,
   issueId: task.issueId,
@@ -397,7 +397,9 @@ export function createFactoryMonitor(
         [
           factoryEventId("monitor-notice", id),
           userId,
-          outcome === "passed" ? "run_report" : "run_blocked",
+          outcome === "passed" && !transitionBlocked
+            ? "run_report"
+            : "run_blocked",
           `factory-monitor:${id}`,
           notice.issueId,
           source.id,
@@ -409,7 +411,7 @@ export function createFactoryMonitor(
               ? "factoryMonitorTransitionBlocked: contract coordination required"
               : `Factory monitor ${outcome}`,
           }),
-          outcome === "passed" ? "result" : "attention",
+          outcome === "passed" && !transitionBlocked ? "result" : "attention",
         ],
       );
       await appendEvidence(tx, notice);
