@@ -166,6 +166,10 @@ jobs:
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
+      - name: Apply tracked migrations to disposable browser database
+        run: node scripts/migrate.mjs
+        env:
+          MIGRATE: '1'
       - name: Factory state and API isolation (temporary Postgres 17 only)
         run: pnpm test:factory
         env:
