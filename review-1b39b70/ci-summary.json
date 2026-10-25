@@ -1,0 +1,189 @@
+{
+  "sourceSha": "1b39b709ce361b9643524aea983860e6de818ff6",
+  "recordedAt": "2026-10-25T18:46:07.790420+00:00",
+  "allApplicableNonSkippedChecksSuccessful": true,
+  "main": {
+    "id": 40221512522,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/40221512522",
+    "attempt": 1,
+    "conclusion": "success",
+    "performance": {
+      "passed": 5,
+      "failed": 0
+    },
+    "browser": {
+      "passed": 86,
+      "skipped": 1,
+      "failed": 0,
+      "retries": 0
+    },
+    "credentialAcceptance": {
+      "passed": 18,
+      "skipped": 0,
+      "failed": 0,
+      "permanent61sFixtureRegression": true
+    },
+    "evidenceMethod": "GitHub run API plus actual completed job log totals; no claim of independently inspecting report ZIP contents"
+  },
+  "runs": [
+    {
+      "id": 40221515391,
+      "name": "Controlled Skill improvement",
+      "head_sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_attempt": 1,
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/40221515391",
+      "event": "pull_request",
+      "created_at": "2026-10-25T18:29:52Z",
+      "updated_at": "2026-10-25T18:29:53Z"
+    },
+    {
+      "id": 40221515395,
+      "name": "Run dispatch transactions",
+      "head_sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_attempt": 1,
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/40221515395",
+      "event": "pull_request",
+      "created_at": "2026-10-25T18:29:52Z",
+      "updated_at": "2026-10-25T18:29:53Z"
+    },
+    {
+      "id": 40221515352,
+      "name": "CI",
+      "head_sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_attempt": 1,
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/40221515352",
+      "event": "pull_request",
+      "created_at": "2026-10-25T18:29:52Z",
+      "updated_at": "2026-10-25T18:29:53Z"
+    },
+    {
+      "id": 40221515378,
+      "name": "Security audit PostgreSQL",
+      "head_sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_attempt": 1,
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/40221515378",
+      "event": "pull_request",
+      "created_at": "2026-10-25T18:29:52Z",
+      "updated_at": "2026-10-25T18:30:00Z"
+    },
+    {
+      "id": 40221515355,
+      "name": "Session mailbox contracts",
+      "head_sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/40221515355",
+      "event": "pull_request",
+      "created_at": "2026-10-25T18:29:52Z",
+      "updated_at": "2026-10-25T18:32:23Z"
+    },
+    {
+      "id": 40221515350,
+      "name": "BYOS backend integration",
+      "head_sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/40221515350",
+      "event": "pull_request",
+      "created_at": "2026-10-25T18:29:52Z",
+      "updated_at": "2026-10-25T18:32:57Z"
+    },
+    {
+      "id": 40221513747,
+      "name": "CLA",
+      "head_sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/40221513747",
+      "event": "pull_request_target",
+      "created_at": "2026-10-25T18:29:50Z",
+      "updated_at": "2026-10-25T18:30:02Z"
+    },
+    {
+      "id": 40221512496,
+      "name": "Controlled Skill improvement",
+      "head_sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/40221512496",
+      "event": "push",
+      "created_at": "2026-10-25T18:29:49Z",
+      "updated_at": "2026-10-25T18:30:38Z"
+    },
+    {
+      "id": 40221512487,
+      "name": "Run dispatch transactions",
+      "head_sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/40221512487",
+      "event": "push",
+      "created_at": "2026-10-25T18:29:49Z",
+      "updated_at": "2026-10-25T18:30:42Z"
+    },
+    {
+      "id": 40221512518,
+      "name": "Security audit PostgreSQL",
+      "head_sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/40221512518",
+      "event": "push",
+      "created_at": "2026-10-25T18:29:49Z",
+      "updated_at": "2026-10-25T18:30:41Z"
+    },
+    {
+      "id": 40221512474,
+      "name": "Session mailbox contracts",
+      "head_sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/40221512474",
+      "event": "push",
+      "created_at": "2026-10-25T18:29:49Z",
+      "updated_at": "2026-10-25T18:32:03Z"
+    },
+    {
+      "id": 40221512522,
+      "name": "CI",
+      "head_sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/40221512522",
+      "event": "push",
+      "created_at": "2026-10-25T18:29:49Z",
+      "updated_at": "2026-10-25T18:44:32Z"
+    }
+  ],
+  "intentionalSkips": [
+    "Duplicate same-repository PR jobs use the push result",
+    "Real issuer/OIDC credential access intentionally skipped on synthetic audit branch"
+  ],
+  "prior709Run": {
+    "id": 40218177477,
+    "attempt1": "failure retained",
+    "attempt2": "cancelled by audit lane; no environment correction; never counted successful",
+    "reasonForReplacement": "Actual fixture gap fixed in code rather than repeated same-SHA reruns"
+  },
+  "remainingBoundaries": [
+    "pnpm check still3 unchanged baseline frontend/static-regex failures (independent compared evidence)",
+    "Current-head independent re-review and coordinator unified integration pending",
+    "Production SQL/deployment/user/OAuth/provider acceptance unapproved and unexecuted"
+  ]
+}
