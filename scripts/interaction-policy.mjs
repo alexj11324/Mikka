@@ -162,7 +162,7 @@ export function auditInteractions(file, text) {
         const composed = !!renderParent && hasAction(renderParent) || parents.some(parent => behaviorControls.test(nameOf(parent)) || nameOf(parent) === 'Slot' && hasAction(parent))
         for (const handler of handlers) if (!meaningful(expression(handler)) && !composed) add(handler, 'interaction/no-placeholder-action', '按钮动作为空、仅日志/拦截事件或占位提示；必须接入实际功能。')
         const navigation = realHref(tag) || renderedNavigation(tag)
-        const unavailable = !!attr(tag, 'disabled') && (literal(expression(attr(tag, 'data-feature-flag'))) ?? '').startsWith('orvilo-upcoming-') && expression(attr(tag, 'data-feature-implemented'))?.kind === ts.SyntaxKind.FalseKeyword && !!attr(tag, 'aria-describedby') && !!attr(tag, 'title')
+        const unavailable = !!attr(tag, 'disabled') && (literal(expression(attr(tag, 'data-feature-flag'))) ?? '').startsWith('mikka-upcoming-') && expression(attr(tag, 'data-feature-implemented'))?.kind === ts.SyntaxKind.FalseKeyword && !!attr(tag, 'aria-describedby') && !!attr(tag, 'title')
         if (!hasAction(tag) && !behaviorControls.test(name) && !composed && !formAction && !(type === 'reset' && form) && !navigation && !unavailable) {
           add(tag, 'interaction/no-dead-control', '可点击控件没有实际事件、有效导航、表单动作或组件触发行为；不能用 disabled、Tooltip 或空回调代替功能。')
         }

@@ -12,17 +12,17 @@ describe("parseGitRemote", () => {
     const want = {
       host: "github.com",
       owner: "alexj11324",
-      name: "Orvilo",
-      webUrl: "https://github.com/alexj11324/Orvilo",
+      name: "Mikka",
+      webUrl: "https://github.com/alexj11324/Mikka",
       isGitHub: true,
     }
     for (const url of [
-      "https://github.com/alexj11324/Orvilo.git",
-      "https://github.com/alexj11324/Orvilo",
-      "git@github.com:alexj11324/Orvilo.git",
-      "ssh://git@github.com/alexj11324/Orvilo.git",
-      "ssh://git@github.com:22/alexj11324/Orvilo.git",
-      "https://x-access-token:abc@github.com/alexj11324/Orvilo.git/",
+      "https://github.com/alexj11324/Mikka.git",
+      "https://github.com/alexj11324/Mikka",
+      "git@github.com:alexj11324/Mikka.git",
+      "ssh://git@github.com/alexj11324/Mikka.git",
+      "ssh://git@github.com:22/alexj11324/Mikka.git",
+      "https://x-access-token:abc@github.com/alexj11324/Mikka.git/",
     ])
       expect(parseGitRemote(url)).toEqual(want)
   })
@@ -142,13 +142,13 @@ describe("redactRemoteUrl", () => {
 describe("repoIdentity", () => {
   it("is one key for every URL form of the same repo", () => {
     for (const url of [
-      "https://github.com/alexj11324/Orvilo.git",
-      "git@github.com:alexj11324/Orvilo.git",
-      "ssh://git@github.com/alexj11324/Orvilo.git",
-      "https://x-access-token:abc@github.com/alexj11324/Orvilo.git",
-      "https://GitHub.com/AlexJ11324/Orvilo",
+      "https://github.com/alexj11324/Mikka.git",
+      "git@github.com:alexj11324/Mikka.git",
+      "ssh://git@github.com/alexj11324/Mikka.git",
+      "https://x-access-token:abc@github.com/alexj11324/Mikka.git",
+      "https://GitHub.com/AlexJ11324/Mikka",
     ])
-      expect(repoIdentity(url)).toBe("github.com/alexj11324/orvilo")
+      expect(repoIdentity(url)).toBe("github.com/alexj11324/mikka")
   })
 
   it("keeps a group path and is null when no repo is named", () => {
