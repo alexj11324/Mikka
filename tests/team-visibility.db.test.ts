@@ -115,7 +115,7 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     const workerRun = randomUUID()
     await pool.query('INSERT INTO agent_runs(id,"userId","issueId","agentId",status,prompt) VALUES($1,$2,$3,$4,\'running\',\'Synthetic worker\')',[workerRun,member,shared,ownAgent])
     const workerToken=await issueRunToken({id:workerRun,userId:member})
-    assert.ok(await verifyRunToken(new Request('http://localhost'),workerToken.token))
+    assert.equal((await verifyRunToken(new Request('http://localhost'),workerToken.token))?.extra?.agentId,agent)
     // Revoke after a successful read: no per-request/global positive cache.
     await workspacePool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2',[workspace,member])
     assert.equal(await issueForUser(member,shared),null)

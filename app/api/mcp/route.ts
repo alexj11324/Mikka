@@ -3,7 +3,7 @@ import { pool as auditPool } from '@/lib/db'
 import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import { z } from 'zod'
 import { withBasePath } from '@/lib/base-path'
-import { mcpUserId, verifyMcpToken } from '@/lib/mcp/auth'
+import { mcpActor, mcpUserId, verifyMcpToken } from '@/lib/mcp/auth'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { MCP_SCOPE } from '@/lib/mcp/resource'
 import { COMPOSIO_ACTIONS } from '@/lib/composio-actions'
@@ -178,14 +178,14 @@ const handler = createMcpHandler(server => {
     title: 'Create an issue',
     description: 'Create an issue for the person. Status defaults to todo and priority to normal.',
     inputSchema: z.object({ title: z.string().trim().min(1).max(200), body: z.string().max(50_000).optional().describe('Plain text; one paragraph per line.'), ...issueChanges }),
-  }, async (input, ctx) => outcome(await actions.createIssue(mcpUserId(ctx.http?.authInfo), input)))
+  }, async (input, ctx) => outcome(await actions.createIssue(mcpUserId(ctx.http?.authInfo), input, mcpActor(ctx.http?.authInfo))))
 
   server.registerTool('update_issue', {
     title: 'Update an issue',
     description: 'Change an issue\'s title, status, priority, project, labels or assigned agent. Only the fields given change. The text is edited in the app, not here.',
     inputSchema: z.object({ issueId: id, title: z.string().trim().min(1).max(200).optional(), ...issueChanges }),
     annotations: { idempotentHint: true },
-  }, async (input, ctx) => outcome(await actions.updateIssue(mcpUserId(ctx.http?.authInfo), input)))
+  }, async (input, ctx) => outcome(await actions.updateIssue(mcpUserId(ctx.http?.authInfo), input, mcpActor(ctx.http?.authInfo))))
 
   server.registerTool('link_issues', {
     title: 'Link issues',
@@ -194,7 +194,7 @@ const handler = createMcpHandler(server => {
       issueId: id, kind: z.enum(['parent', 'child', 'related', 'blockedBy', 'blocks', 'duplicate']),
       targetId: id.nullable(), remove: z.boolean().optional(),
     }),
-  }, async (input, ctx) => outcome(await actions.linkIssues(mcpUserId(ctx.http?.authInfo), input)))
+  }, async (input, ctx) => outcome(await actions.linkIssues(mcpUserId(ctx.http?.authInfo), input, mcpActor(ctx.http?.authInfo))))
 
   server.registerTool('dispatch_run', {
     title: 'Dispatch a run',

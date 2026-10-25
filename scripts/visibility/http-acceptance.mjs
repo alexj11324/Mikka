@@ -8,7 +8,7 @@ assert.notEqual(appURL.toString(),wsURL.toString());assert.ok(['localhost','127.
 const app=new Pool({connectionString:appURL.toString()}),ws=new Pool({connectionString:wsURL.toString()})
 const id=()=>randomUUID(),owner=id(),member=id(),outsider=id(),w1=id(),w2=id(),team=id(),shared=id(),personal=id(),agent=id(),run=id(),privateRun=id(),device=id(),deviceTokenId=id()
 const evidence={sha:process.env.GITHUB_SHA??null,startedAt:new Date().toISOString(),environment:'real Next MCP HTTP, two isolated PostgreSQL databases',checks:[]}
-const tokens=new Map()
+const tokens=new Map(),clients=new Map()
 async function call(user,name,args){
  const response=await fetch(new URL('/mikka/api/mcp',origin),{method:'POST',headers:{authorization:'Bearer '+tokens.get(user),'content-type':'application/json',accept:'application/json, text/event-stream'},body:JSON.stringify({jsonrpc:'2.0',id:id(),method:'tools/call',params:{name,arguments:args}})})
  assert.equal(response.status,200)
@@ -21,7 +21,7 @@ async function value(user,name,args){const r=await call(user,name,args);assert.e
 try{
  for(const u of [owner,member,outsider]){
   await app.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())',[u,u+'@example.invalid'])
-  const client=id(),secret=randomBytes(32).toString('base64url');tokens.set(u,'mka_'+secret)
+  const client=id(),secret=randomBytes(32).toString('base64url');tokens.set(u,'mka_'+secret);clients.set(u,client)
   await app.query('INSERT INTO "oauthClient"(id,"clientId","redirectUris",disabled,"userId") VALUES($1,$1,\'[]\',false,$2)',[client,u])
   await app.query('INSERT INTO "oauthAccessToken"(id,token,"clientId","userId","expiresAt","createdAt",scopes) VALUES($1,$2,$3,$4,now()+interval \'1 hour\',now(),\'["mikka"]\')',[id(),createHash('sha256').update(secret).digest('base64url'),client,u])
  }
@@ -48,6 +48,11 @@ try{
  assert.equal((await call(outsider,'get_run',{runId:run})).error,true)
  const full=await value(owner,'get_run',{runId:run});assert.equal(full.summary,'private-report-marker');assert.ok(full.recentEvents[0].includes('private-transcript-marker'))
  evidence.checks.push('active teammate receives exact metadata allowlist; personal stale invitation/team link stays private; other workspace denied; owner retains report/transcript; core suite separately verifies messages')
+ const updated=await call(owner,'update_issue',{issueId:shared,title:'Actor attributed MCP task',actorType:'user',actorId:outsider})
+ assert.equal(updated.error,false)
+ const actorRow=(await app.query('SELECT actor_type,actor_id FROM issue_versions WHERE "issueId"=$1 ORDER BY revision DESC LIMIT 1',[shared])).rows[0]
+ assert.deepEqual(actorRow,{actor_type:'agent',actor_id:clients.get(owner)})
+ evidence.checks.push('actual OAuth MCP write ignores forged actor fields and records verified client identity')
  await ws.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',[w1,member])
  assert.equal((await call(member,'get_run',{runId:run})).error,true);assert.deepEqual(await value(member,'list_runs',{issueId:shared}),[])
  await ws.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2',[w1,member])

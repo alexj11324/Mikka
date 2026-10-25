@@ -1,7 +1,7 @@
 name: Metadata visibility integration
 on:
   push:
-    branches: ['fix/169-metadata-integration']
+    branches: ['fix/169-metadata-integration', 'fix/168-170-data-integration']
 permissions:
   contents: read
 jobs:
@@ -53,6 +53,9 @@ jobs:
       - run: E2E_DATABASE_URL="$VISIBILITY_WORKSPACE_DATABASE_URL" pnpm test:e2e:setup
       - run: pnpm test:e2e:setup
       - run: REQUIRE_DB=1 pnpm test:visibility-db
+      - run: REQUIRE_DB=1 pnpm test:activity-actor-db
+      - run: REQUIRE_DB=1 pnpm test:issue-search-db
+      - run: pnpm test:issues && pnpm test:issue-search
       - run: node --import tsx --test lib/run-visibility.test.ts lib/issue-owner-scope.test.ts
       - name: Transaction-local revocation and audit fault regression
         run: node --conditions=react-server --import ./scripts/daemon/server-only.mjs --import tsx scripts/daemon/revocation-faults.mjs
@@ -84,11 +87,13 @@ jobs:
           for i in $(seq 1 60); do curl -fsS http://localhost:3100/mikka/sign-in > /dev/null && break; sleep 1; done
           E2E_BASE_URL=http://localhost:3100 node scripts/visibility/http-acceptance.mjs
           E2E_BASE_URL=http://localhost:3100 node scripts/visibility/assignment-http.mjs
+          E2E_BASE_URL=http://localhost:3100 node scripts/data/http-acceptance.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: metadata-visibility-sanitized-evidence
           path: |
+            test-results/data/http-evidence.json
             test-results/visibility/http-evidence.json
             test-results/visibility/assignment-evidence.json
             browser-results/**/device-revocation-evidence.json

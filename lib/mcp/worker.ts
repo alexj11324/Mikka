@@ -51,7 +51,7 @@ export async function revokeRunTokens(runId: string): Promise<void> {
 async function currentRun(bearerToken?: string, executor: Pick<typeof db, 'select'> = db, workspaceExecutor: Pick<typeof workspaceDb, 'select'> = workspaceDb, lock = false) {
   if (!bearerToken?.startsWith(RUN_TOKEN_PREFIX)) return undefined
   const query = executor
-    .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId, kind: agentRuns.kind })
+    .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId, kind: agentRuns.kind, agentId: agentRuns.agentId })
     .from(runTokens)
     .innerJoin(agentRuns, eq(agentRuns.id, runTokens.runId))
     .where(and(
@@ -72,7 +72,7 @@ export async function verifyRunToken(_request: Request, bearerToken?: string): P
   return {
     token: bearerToken, clientId: `run:${row.runId}`, scopes: [],
     expiresAt: Math.floor(row.expiresAt.getTime() / 1000),
-    extra: { userId: row.userId, runId: row.runId, issueId: row.issueId },
+    extra: { userId: row.userId, runId: row.runId, issueId: row.issueId, agentId: row.agentId },
   }
 }
 
