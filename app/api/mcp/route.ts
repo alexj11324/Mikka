@@ -6,6 +6,7 @@ import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { MCP_SCOPE } from '@/lib/mcp/resource'
 import { COMPOSIO_ACTIONS } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
+import { dispatchRequestKey } from '@/lib/run-dispatch'
 import * as actions from '@/lib/mcp/actions'
 import * as tools from '@/lib/mcp/tools'
 import * as worker from '@/lib/mcp/worker'
@@ -193,6 +194,7 @@ const handler = createMcpHandler(server => {
       issueId: id, agentId: id,
       deviceRepoId: id.describe('A repository id from list_agents, on the agent\'s own device.'),
       note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
+      requestKey: dispatchRequestKey.optional().describe('Reuse this key when retrying the same dispatch. Changed parameters with the same key are rejected.'),
     }),
   }, async (input, ctx) => outcome(await actions.dispatchRun(mcpUserId(ctx.http?.authInfo), input)))
 

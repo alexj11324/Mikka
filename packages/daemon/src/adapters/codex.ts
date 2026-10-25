@@ -76,7 +76,7 @@ export function codexItemChunks(
   phase: "started" | "completed",
   item: ThreadItem,
   streamed: Set<string>,
-  worktree: string
+  worktree: string,
 ): RunChunk[] {
   switch (item.type) {
     case "agentMessage": {
@@ -190,6 +190,10 @@ export class CodexAdapter implements AgentAdapter {
 
   start(options: StartOptions): Promise<AgentSession> {
     const continued = options.continueSession
+    if (options.requireSessionResume && !continued)
+      return Promise.reject(
+        new Error("Original Codex question session is required"),
+      )
     return continued
       ? this.open(continued.sessionId, "continue", continued.message, options)
       : this.open(null, "new", options.prompt, options)
@@ -209,7 +213,7 @@ export class CodexAdapter implements AgentAdapter {
     mode: "new" | "restart" | "continue",
     firstMessage: string,
     options: SessionOptions &
-      Partial<Pick<StartOptions, "prompt" | "continueSession">>
+      Partial<Pick<StartOptions, "prompt" | "continueSession">>,
   ): Promise<AgentSession> {
     const log = options.log.child({ harness: "codex" })
     const paths = runPaths(this.options.stateDir, options.runId)
@@ -218,14 +222,18 @@ export class CodexAdapter implements AgentAdapter {
       try {
         const earlier = runPaths(
           this.options.stateDir,
-          options.continueSession.runId
+          options.continueSession.runId,
         ).runDir
         carryHistory(
           join(earlier, "codex-home"),
           join(runDir, "codex-home"),
-          CODEX_HISTORY
+          CODEX_HISTORY,
         )
       } catch (error) {
+        if (options.requireSessionResume)
+          throw new Error("Original Codex question history is unavailable", {
+            cause: error,
+          })
         log.info({ err: error }, "could not copy the earlier codex threads")
       }
     }
@@ -233,7 +241,7 @@ export class CodexAdapter implements AgentAdapter {
     const codexHome = prepareCodexHome(
       join(runDir, "codex-home"),
       log,
-      this.options.userHome
+      this.options.userHome,
     )
     const ctx = new RunContext({
       harness: "codex",
@@ -280,7 +288,7 @@ export class CodexAdapter implements AgentAdapter {
     void child.exited.then(checkAuth)
     const rpc: MessageConnection = jsonlConnection(
       child.process.stdout,
-      child.process.stdin
+      child.process.stdin,
     )
     const queue = new EventQueue()
     const streamed = new Set<string>()
@@ -299,7 +307,7 @@ export class CodexAdapter implements AgentAdapter {
       if (pending.length > 0)
         log.warn(
           { dropped: pending.length },
-          "session ended with unsent messages"
+          "session ended with unsent messages",
         )
       rpc.dispose()
       await child.kill()
@@ -341,7 +349,7 @@ export class CodexAdapter implements AgentAdapter {
             phase,
             item,
             streamed,
-            ctx.worktree
+            ctx.worktree,
           ))
             queue.chunk(chunk)
           return
@@ -388,7 +396,7 @@ export class CodexAdapter implements AgentAdapter {
       const next = pending.shift()
       if (next) {
         await startTurn(next).catch((error: unknown) =>
-          finish({ outcome: "failed", error: `Codex: ${errorMessage(error)}` })
+          finish({ outcome: "failed", error: `Codex: ${errorMessage(error)}` }),
         )
         return
       }
@@ -408,7 +416,7 @@ export class CodexAdapter implements AgentAdapter {
       lastError = undefined
       const { turn } = await rpc.sendRequest<{ turn: { id: string } }>(
         "turn/start",
-        { threadId: sessionId, input: text(message) }
+        { threadId: sessionId, input: text(message) },
       )
       activeTurn ??= turn.id
     }
@@ -425,7 +433,7 @@ export class CodexAdapter implements AgentAdapter {
       })
     })
 
-    const ready = <T>(step: Promise<T>, label: string) =>
+    const ready = <T,>(step: Promise<T>, label: string) =>
       untilReady(child, step, `codex ${label}`)
     try {
       await ready(
@@ -437,7 +445,7 @@ export class CodexAdapter implements AgentAdapter {
           },
           capabilities: null,
         }),
-        "initialize"
+        "initialize",
       )
       await rpc.sendNotification("initialized")
       const thread: ThreadStartParams = {
@@ -450,7 +458,7 @@ export class CodexAdapter implements AgentAdapter {
       const newThread = () =>
         ready(
           rpc.sendRequest<ThreadResponse>("thread/start", thread),
-          "thread/start"
+          "thread/start",
         )
       let response: ThreadResponse
       if (!threadId) response = await newThread()
@@ -461,13 +469,14 @@ export class CodexAdapter implements AgentAdapter {
               ...thread,
               threadId,
             }),
-            "thread/resume"
+            "thread/resume",
           )
         } catch (error) {
-          if (mode !== "continue" || ending) throw error
+          if (mode !== "continue" || ending || options.requireSessionResume)
+            throw error
           log.info(
             { err: error, thread_id: threadId },
-            "could not continue the earlier codex thread; starting a new one"
+            "could not continue the earlier codex thread; starting a new one",
           )
           mode = "new"
           firstMessage = options.prompt ?? firstMessage
@@ -475,12 +484,14 @@ export class CodexAdapter implements AgentAdapter {
         }
       }
       sessionId = response.thread.id
+      if (options.requireSessionResume && sessionId !== threadId)
+        throw new Error("Codex resumed a different question thread")
       await ready(startTurn(firstMessage), "turn/start")
     } catch (error) {
       await finish(null)
       throw new Error(
         `Could not start codex app-server: ${errorMessage(error)}. ${child.stderrTail()}`.trim(),
-        { cause: error }
+        { cause: error },
       )
     }
     log.info({ session_id: sessionId, mode }, "codex session started")

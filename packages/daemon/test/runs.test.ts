@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import type { RunChunk } from "../src/chunks"
 import { Daemon } from "../src/main"
+import { RunJournal } from "../src/runs/journal"
 import { connectDaemonInDataDir } from "../src/rpc/client"
 import {
   MAX_CONTINUES,
@@ -543,6 +544,22 @@ describe("follow-up runs", () => {
 // reason, and the issue gets a next owner or a named wait reason. Only a
 // submission whose verify passed goes to review.
 describe("run stops", () => {
+  it("preserves a blocked question's empty worktree durably until explicit cancellation", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const runId = queue(server, "blocked-question")
+    const run = await runToEnd(daemon, server, runId)
+    expect(run.stopReason).toBe("blocked")
+    expect(await daemon.supervisor.discardIfEmpty(runId)).toBe(false)
+    expect(existsSync(run.worktree as string)).toBe(true)
+    const journal = new RunJournal(join(dataDir, "runs.json"))
+    expect(journal.get(runId)?.waitingQuestionId).toBe(
+      "8ebea126-b259-46b1-afca-7fe845576de1"
+    )
+    expect(await daemon.supervisor.discardIfEmpty(runId, runId)).toBe(true)
+    expect(existsSync(run.worktree as string)).toBe(false)
+  })
+
   it.each([
     [
       "turn-ended",
