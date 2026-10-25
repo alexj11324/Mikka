@@ -210,6 +210,33 @@ synthetic integration are test dependencies, not proof of a real Mikka account.
 Actual account creation/session, provider consent and deployed Infisical policy
 still require the approved persistent preview acceptance.
 
+## Authenticated browser binding handoff
+
+The direct bind API requires both a real Mikka session and the private operator
+credential. An ordinary browser instead receives a short-lived, target-scoped
+binding proof minted only by the controlled operator. Its purpose-separated HMAC
+binds the enrollment ID, exact authenticated Mikka user ID, workspace, receiving
+HTTPS origin, canonical database identity and an expiry of at most five minutes.
+The server derives the original custody principal from its own configuration;
+the browser never supplies a principal or obtains the global operator key.
+
+The thin GET transport on the existing bind route immediately scrubs its fragment
+and submits to that same origin using the real session. It stores no proof or
+credentials. It handles a new fragment on an already-open page. The POST still
+checks the actual session user and active workspace authorization before calling
+the existing worker. Mikka owner email and provider subscription email may differ.
+
+This proof permits safe retries to the same target within its TTL; it is not a
+strict single-consumption token. The worker's immutable cross-database ownership
+claim and epoch checks remain authoritative, including after reconnect or
+disconnect. Signing a proof neither creates a session nor changes connection
+state. No public proof-signing endpoint is provided.
+
+Linux checks cover exact target matching, modified or expired proof, foreign
+origin/database/owner, workspace refusal, missing actual session, and clean-page
+then fragment navigation. The custody-only unauthenticated refusal still works
+without a database. Synthetic sessions in tests do not establish real binding.
+
 ## Escrow cleanup Linux verification (2026-10-24)
 
 Source-only checks use synthetic credentials, loopback TLS fixtures and disposable
