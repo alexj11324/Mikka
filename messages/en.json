@@ -872,6 +872,8 @@
     "runAlreadyActive": "This task already has an active run.",
     "runDispatchKeyConflict": "This request key was already used for different run parameters.",
     "runNotFound": "This run does not exist.",
+    "runNotActive": "This run has ended and has no answerable question.",
+    "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
     "messageRequired": "A message cannot be empty.",
     "deviceSaveFailed": "The save failed. Please try again.",
     "tokenCreateFailed": "Could not create a token. Please try again.",

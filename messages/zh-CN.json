@@ -872,6 +872,8 @@
     "runAlreadyActive": "此任务已有正在执行的线程。",
     "runDispatchKeyConflict": "此请求标识已用于不同的运行参数。",
     "runNotFound": "运行不存在。",
+    "runNotActive": "此运行已结束，且没有可回答的问题。",
+    "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。",
     "messageRequired": "消息不能为空。",
     "deviceSaveFailed": "保存失败，请重试。",
     "tokenCreateFailed": "生成 token 失败，请重试。",

@@ -31,6 +31,8 @@ export const ACTION_ERROR_CODES = [
   'runAlreadyActive',
   'runDispatchKeyConflict',
   'runNotFound',
+  'runNotActive',
+  'factoryQuestionNeedsAnswerTool',
   'messageRequired',
   'deviceSaveFailed',
   'tokenCreateFailed',
