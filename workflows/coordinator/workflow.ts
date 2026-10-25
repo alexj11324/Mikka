@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
 import { createComposioAITools, createGoogleAITools } from '@/lib/composio-actions'
 import * as steps from './steps'
+import { QuotaWorkflowModel } from '@/lib/quota/workflow-model'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
 const MAX_ROUNDS = 10
@@ -19,7 +20,7 @@ export async function coordinatorTurn(userId: string) {
   'use workflow'
   const holder = getWorkflowMetadata().workflowRunId
   const agent = new WorkflowAgent({
-    model: COORDINATOR_MODEL,
+    model: new QuotaWorkflowModel(userId, COORDINATOR_MODEL, `coordinator:${holder}:initial`),
     tools: coordinatorTools(userId),
   })
   for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -31,7 +32,10 @@ export async function coordinatorTurn(userId: string) {
     }
     try {
       const { instructions, messages } = await steps.preparePrompt(userId)
-      const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep })
+      const result = await agent.generate({ instructions, messages, maxRetries: 0, maxOutputTokens: 8192, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: ({ stepNumber }) => ({
+        ...coordinatorStep({ stepNumber }),
+        model: new QuotaWorkflowModel(userId, COORDINATOR_MODEL, `coordinator:${holder}:${round}:${stepNumber}`),
+      }) })
       // Every step's messages, not only the final step's: the tool calls and
       // results are history the next turn needs.
       await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text))

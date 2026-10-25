@@ -10,6 +10,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { revokeRunTokens } from '@/lib/mcp/worker'
+import { tenantQuotas } from '@/lib/quota/runtime'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,14 +28,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { runId } = await params
   const [run] = await db
-    .select({ id: agentRuns.id, userId: agentRuns.userId, issueId: agentRuns.issueId, status: agentRuns.status, kind: agentRuns.kind })
+    .select({ id: agentRuns.id, userId: agentRuns.userId, issueId: agentRuns.issueId, status: agentRuns.status, kind: agentRuns.kind, quotaReservationId: agentRuns.quotaReservationId })
     .from(agentRuns)
     .innerJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(and(eq(agentRuns.id, runId), eq(devices.ownerId, caller.userId)))
     .limit(1)
   if (!run) return NextResponse.json({ error: 'Unknown run.' }, { status: 404 })
   // A run ends once: a repeated completion is accepted and ignored.
-  if (!(LIVE_STATUSES as readonly string[]).includes(run.status)) return new NextResponse(null, { status: 204 })
+  if (!(LIVE_STATUSES as readonly string[]).includes(run.status)) {
+    if (run.quotaReservationId) await tenantQuotas.finish(run.userId, run.quotaReservationId, 'settled')
+    return new NextResponse(null, { status: 204 })
+  }
   const parsed = runCompleteRequest.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid completion.' }, { status: 400 })
   const { stopReason, report } = parsed.data
@@ -50,6 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     .set({ status, stopReason, report: report ?? null, finishedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATUSES])))
     .returning({ id: agentRuns.id })
+  if (run.quotaReservationId) await tenantQuotas.finish(run.userId, run.quotaReservationId, 'settled')
   // Only the completion that ended the run tells the Coordinator.
   if (ended.length) {
     await revokeRunTokens(runId)

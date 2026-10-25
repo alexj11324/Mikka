@@ -125,6 +125,9 @@ importers:
       '@vercel/oidc':
         specifier: ^4.0.2
         version: 4.0.2
+      '@workflow/serde':
+        specifier: 5.0.0
+        version: 5.0.0
       ai:
         specifier: 7.0.148
         version: 7.0.148(zod@4.6.7)

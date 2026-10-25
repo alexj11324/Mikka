@@ -1,0 +1,46 @@
+name: Tenant quota PostgreSQL regression
+on:
+  push:
+    branches: ['codex/215-*']
+  pull_request:
+    paths: ['lib/quota/**', 'drizzle/*tenant_quotas.sql', 'app/api/workspaces/**', '.github/workflows/tenant-quota.yml']
+permissions:
+  contents: read
+jobs:
+  quota-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: quota
+          POSTGRES_PASSWORD: isolated-test-only
+          POSTGRES_DB: mikka_quota_e2e
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U quota -d mikka_quota_e2e" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      QUOTA_TEST_DATABASE_URL: postgresql://quota:isolated-test-only@127.0.0.1:5432/mikka_quota_e2e
+      E2E_DATABASE_URL: postgresql://quota:isolated-test-only@127.0.0.1:5432/mikka_quota_e2e
+      MIKKA_DATABASE_URL: postgresql://quota:isolated-test-only@127.0.0.1:5432/mikka_quota_e2e
+      DATABASE_URL: postgresql://quota:isolated-test-only@127.0.0.1:5432/mikka_quota_e2e
+      BETTER_AUTH_URL: http://localhost:3215
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.3 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+      - run: node --import tsx --test lib/quota/store.test.ts
+      - run: MIGRATE=1 pnpm migrate
+      - run: pnpm build
+      - run: node --import tsx --test tests/quota-api.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tenant-quota-evidence
+          path: quota-api-evidence.json
+          if-no-files-found: ignore

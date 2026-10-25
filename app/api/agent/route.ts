@@ -10,6 +10,8 @@ import systemPrompt from '@/lib/agent-system-prompt.json'
 import { validateAgentStream } from '@/lib/agent-fetch'
 import { persistAgentStream } from '@/lib/agent-history'
 import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
+import { beginQuota, quotaFailure, tenantQuotas, withTenantQuota } from '@/lib/quota/runtime'
+import { QuotaError, quotaResponse } from '@/lib/quota/errors'
 
 export const maxDuration = 300
 
@@ -86,6 +88,13 @@ export async function POST(request: Request) {
       status: error instanceof AgentStoreError ? error.status : 503, headers: errorHeaders,
     })
   }
+  let quota: Awaited<ReturnType<typeof beginQuota>>
+  try {
+    quota = await beginQuota({ ownerId: session.user.id, key: `agent:${turnId}`, resource: 'agent.turn', binding: { sessionId, turnId, prompt: parsed.data.prompt } })
+  } catch (error) {
+    await saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, { status: 'failed', completion: '', error: error instanceof QuotaError ? error.code : 'quotaUnavailable' })
+    return error instanceof QuotaError ? quotaResponse(error) : Response.json({ error: 'quotaUnavailable' }, { status: 503, headers: errorHeaders })
+  }
   const messages: { role: 'user' | 'assistant'; content: string }[] = []
   let historySize = 0
   for (const previous of [...turn.history].reverse()) {
@@ -101,21 +110,29 @@ export async function POST(request: Request) {
     baseURL: 'https://opencode.ai/zen/go/v1',
     headers: { 'User-Agent': 'Mikka-UI-Agent/1.0', 'x-opencode-session': sessionId },
   })
+  let modelAcceptedWork = false
   const result = streamText({
     model: opencode('deepseek-v4.1-flash'),
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
     system: `${systemPrompt}\n\n${agentWebInstructions()}`,
     messages,
     tools: {
-      ...createAgentWebTools({ signal: request.signal }),
+      ...createAgentWebTools({ signal: request.signal, admit: (operation, input, execute) => withTenantQuota(session.user.id, 'gateway.web', { operation, input }, execute) }),
       ...createComposioAITools((action, input) => runComposioAction(session.user.id, action, input)),
     },
     stopWhen: isStepCount(5),
     prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
-    maxRetries: 1,
+    maxRetries: 0,
+    maxOutputTokens: 8192,
     timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
     abortSignal: request.signal,
-    onError: ({ error }) => {
+    onChunk: ({ chunk }) => {
+      if (['text-delta', 'reasoning-delta', 'tool-call', 'tool-result'].includes(chunk.type)) modelAcceptedWork = true
+    },
+    onStepEnd: () => { modelAcceptedWork = true },
+    onError: async ({ error }) => {
+      const failure = quotaFailure(error)
+      await tenantQuotas.finish(session.user.id, quota.id, modelAcceptedWork ? 'uncertain' : failure.outcome, undefined, failure.retryAfter)
       if (!request.signal.aborted) console.error('Agent generation failed:', agentErrorMessage(error))
     },
   })
@@ -128,6 +145,9 @@ export async function POST(request: Request) {
       stream: result.stream,
       sendReasoning: false,
       onError: agentErrorMessage,
-    }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),
+    }).pipeThrough(validateAgentStream()), async checkpoint => {
+      await saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint)
+      if (checkpoint.status !== 'pending') await tenantQuotas.finish(session.user.id, quota.id, checkpoint.status === 'complete' ? 'settled' : 'uncertain')
+    }, request.signal),
   })
 }

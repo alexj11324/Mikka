@@ -15,6 +15,9 @@ import { proposeAction } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
+import { getStepMetadata } from 'workflow'
+import { withTenantQuota } from '@/lib/quota/runtime'
+import { QuotaError } from '@/lib/quota/errors'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -27,6 +30,7 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
     return await fn()
   } catch (error) {
     if (error instanceof ActionFailureError) return { error: error.code }
+    if (error instanceof QuotaError) return { error: error.code }
     throw error
   }
 }
@@ -62,11 +66,14 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
   const cut = compactionCut(summary, messages)
   if (cut !== null) {
     const folded = messages.filter(row => row.position <= cut)
-    const { text } = await generateText({
+    const { text } = await withTenantQuota(userId, 'coordinator.summary', { cut, summary, folded }, () => generateText({
       model: COORDINATOR_MODEL,
       instructions: SUMMARY_INSTRUCTIONS,
       messages: [...promptMessages(summary, folded), { role: 'user', content: 'Write the summary now.' }],
-    })
+      maxRetries: 0,
+      maxOutputTokens: 8192,
+      timeout: { totalMs: 270000 },
+    }), `summary:${getStepMetadata().stepId}`)
     await store.saveSummary(userId, text, cut)
     summary = text
     messages = messages.filter(row => row.position > cut)

@@ -72,6 +72,7 @@ export function createAgentWebTools(options: {
   signal: AbortSignal
   run?: RunWebTool
   resolve?: ResolveHost
+  admit?: (operation: Operation, input: string, execute: () => Promise<unknown>) => Promise<unknown>
 }) {
   const run = options.run ?? runGatewayTool
   const resolve = options.resolve ?? (hostname => lookup(hostname, { all: true }))
@@ -91,7 +92,9 @@ export function createAgentWebTools(options: {
           return { ok: false as const, error: '该地址不是允许访问的公共网页。' }
         }
       }
-      const output = await run(operation, input, signal)
+      // Production callers supply the tenant gate; tests can exercise parsing
+      // without a provider or database. Never silently bypass a supplied gate.
+      const output = await (options.admit ? options.admit(operation, input, () => run(operation, input, signal)) : run(operation, input, signal))
       const retrievedAt = new Date().toISOString()
       if (operation === 'search') {
         const parsed = searchResponse.parse(output)

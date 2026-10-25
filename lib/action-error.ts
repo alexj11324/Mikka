@@ -1,4 +1,5 @@
 import type { ActionErrorCode, ActionErrorParams, ActionResult } from './action-result'
+import { QuotaError } from './quota/errors'
 
 export class ActionFailureError extends Error {
   constructor(readonly code: ActionErrorCode, readonly params?: ActionErrorParams) {
@@ -16,6 +17,7 @@ export async function runAction<T>(fn: () => Promise<T | ActionResult<T>>): Prom
     return await fn() as ActionResult<T>
   } catch (error) {
     if (error instanceof ActionFailureError) return { error: error.code, params: error.params }
+    if (error instanceof QuotaError) return { error: 'generic', params: { quota: error.code, retryAfter: error.retryAfter } }
     throw error
   }
 }

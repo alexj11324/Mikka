@@ -3,12 +3,15 @@ import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { coordinatorEvents } from '@/lib/db/schema'
 import type { CoordinatorEventInput } from '@/lib/coordinator-events'
+import { withTenantQuota } from '@/lib/quota/runtime'
 
 type Executor = Pick<typeof db, 'insert'>
 
 /** Writes the event once; a repeat with the same dedupe key is ignored. */
 export async function recordCoordinatorEvent(executor: Executor, event: CoordinatorEventInput) {
-  await executor.insert(coordinatorEvents).values({ id: crypto.randomUUID(), ...event }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey })
+  const insert = async () => { await executor.insert(coordinatorEvents).values({ id: crypto.randomUUID(), ...event }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }) }
+  if (event.kind === 'user_message') await withTenantQuota(event.userId, 'coordinator.submit', event.payload, insert, event.dedupeKey)
+  else await insert()
 }
 
 /** The person's events the Coordinator has not taken yet, oldest first. */

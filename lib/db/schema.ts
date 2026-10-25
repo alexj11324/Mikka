@@ -183,6 +183,7 @@ export const agentRuns = pgTable('agent_runs', {
   /** The run this one retries, when its device went offline. */
   retryOf: uuid('retryOf').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
   stopRequestedAt: timestamp('stopRequestedAt', { withTimezone: true }),
+  quotaReservationId: uuid('quotaReservationId'),
   startedAt: timestamp('startedAt', { withTimezone: true }),
   finishedAt: timestamp('finishedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),

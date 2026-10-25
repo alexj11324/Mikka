@@ -6,6 +6,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import { chatView } from '@/lib/coordinator/store'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
+import { QuotaError, quotaResponse } from '@/lib/quota/errors'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +28,11 @@ export async function POST(request: Request) {
   const parsed = z.object({ text: z.string().trim().min(1).max(10_000) }).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'messageRequired' }, { status: 400 })
   const userId = session.user.id
-  await recordCoordinatorEvent(db, userMessageEvent(userId, parsed.data.text))
+  try { await recordCoordinatorEvent(db, userMessageEvent(userId, parsed.data.text)) }
+  catch (error) {
+    if (error instanceof QuotaError) return quotaResponse(error)
+    throw error
+  }
   after(() => wakeCoordinator(userId))
   return NextResponse.json({ queued: true, enabled: coordinatorEnabled() }, { status: 202 })
 }

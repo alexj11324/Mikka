@@ -163,6 +163,7 @@ export async function executeComposioAction(
   actionName: string,
   input: unknown,
   client: ComposioActionClient | null,
+  onFailure?: (error: unknown) => Promise<void>,
 ): Promise<ComposioActionResult> {
   if (!Object.hasOwn(COMPOSIO_ACTIONS, actionName)) return { error: 'integrationActionNotAllowed' }
   const action = COMPOSIO_ACTIONS[actionName as ComposioActionName]
@@ -191,6 +192,7 @@ export async function executeComposioAction(
       ? { data: result.data, ...(result.logId ? { logId: result.logId } : {}) }
       : { error: result.error ?? 'integrationActionFailed', ...(result.logId ? { logId: result.logId } : {}) }
   } catch (error) {
+    await onFailure?.(error)
     console.error('Composio action failed', {
       action: action.slug,
       error: error instanceof Error ? error.name : 'unknown',

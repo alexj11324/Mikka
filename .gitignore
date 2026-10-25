@@ -40,3 +40,7 @@ next-env.d.ts
 # Workflow SDK local world
 /.workflow-data/
 /.swc
+
+# Isolated quota regression output
+quota-api-evidence.json
+.quota-node-modules/

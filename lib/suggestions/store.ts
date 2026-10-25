@@ -16,7 +16,7 @@ const LIST_LIMIT = 100
 async function judge(notification: ExternalNotification): Promise<Verdict> {
   const ruled = ruleVerdict(notification)
   if (ruled) return ruled
-  const answers = await decide('suggestion', decisionInput(suggestionState(notification)), suggestionQuestions())
+  const answers = await decide('suggestion', decisionInput(suggestionState(notification)), suggestionQuestions(), notification.userId, `suggestion:${notification.source}:${notification.externalId}`)
   const answer = answers?.get('worthShowing')
   return answer?.type === 'predicate' ? modelVerdict(answer.probability) : fallbackVerdict(notification)
 }

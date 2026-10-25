@@ -9,6 +9,7 @@ import { runFinishedEvent, runRetriedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { revokeRunTokens } from '@/lib/mcp/worker'
 import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATTEMPTS, pickTakeover, RETRY_QUEUE_WAIT_MS, retryPrompt, type TakeoverCandidate } from '@/lib/run-retry'
+import { tenantQuotas } from '@/lib/quota/runtime'
 
 // Run leases on the server (ADR 0012). The heartbeat renews the lease of each
 // run the device reports; a run left out is not renewed, and the daemon stops
@@ -23,10 +24,19 @@ import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATT
  */
 export async function renewRunLeases(deviceId: string, runIds: readonly string[], now = new Date()): Promise<{ leases: Record<string, string>; revoked?: string[] }> {
   if (!runIds.length) return { leases: {} }
+  const candidates = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, quotaId: agentRuns.quotaReservationId }).from(agentRuns)
+    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, [...runIds]), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), gt(agentRuns.leaseExpiresAt, now)))
+  const allowed: string[] = []
+  for (const run of candidates) {
+    if (!run.quotaId) continue // A pre-migration worker must be claimed through the gate again.
+    try { await tenantQuotas.renew(run.ownerId, run.quotaId, RUN_LEASE_MS); allowed.push(run.id) }
+    catch { /* Fail closed on revoked membership, stale quota or unavailable database. */ }
+  }
+  if (!allowed.length) return { leases: {}, revoked: [...runIds] }
   const leaseExpiresAt = new Date(now.getTime() + RUN_LEASE_MS)
   const renewed = await db.update(agentRuns)
     .set({ leaseExpiresAt, updatedAt: now })
-    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, [...runIds]), inArray(agentRuns.status, [...LEASED_RUN_STATUSES])))
+    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, allowed), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), gt(agentRuns.leaseExpiresAt, now)))
     .returning({ id: agentRuns.id })
   const held = new Set(renewed.map(run => run.id))
   const revoked = runIds.filter(id => !held.has(id))
@@ -127,7 +137,10 @@ async function reclaimLostRun(run: Run, now: Date) {
     await recordCoordinatorEvent(tx, runRetriedEvent(run, { runId: retryId, attempt: outcome.attempt, maxAttempts: MAX_RUN_ATTEMPTS, movedToDeviceId: target?.deviceId ?? null }))
     return true
   })
-  if (retried) await revokeRunTokens(run.id)
+  if (retried) {
+    if (run.quotaReservationId) await tenantQuotas.finish(run.userId, run.quotaReservationId, 'uncertain')
+    await revokeRunTokens(run.id)
+  }
 }
 
 /** Ends a run that is still in one of `from`; false when something else ended it first. */
@@ -141,6 +154,7 @@ async function endRun(runId: string, from: readonly Run['status'][], end: { stat
 
 /** Same as a completion from the daemon: tokens off, and the Coordinator hears it. A failure lands in 等你. */
 async function announceEnd(run: Run & { status: 'failed' | 'stopped' }) {
+  if (run.quotaReservationId) await tenantQuotas.finish(run.userId, run.quotaReservationId, 'uncertain')
   await revokeRunTokens(run.id)
   await recordCoordinatorEvent(db, runFinishedEvent({ ...run, stopReason: 'device_lost', report: null }))
   after(() => wakeCoordinator(run.userId))

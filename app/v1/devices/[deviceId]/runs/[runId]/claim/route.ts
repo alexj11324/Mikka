@@ -9,6 +9,8 @@ import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
 import { latestCheckpoint } from '@/lib/run-leases'
 import { retryNote } from '@/lib/run-retry'
+import { beginQuota, tenantQuotas } from '@/lib/quota/runtime'
+import { QuotaError, quotaResponse } from '@/lib/quota/errors'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const [run] = await db
     .select()
     .from(agentRuns)
-    .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
     .limit(1)
   if (!run) return NextResponse.json({ error: 'Run is not queued for this device.' }, { status: 409 })
   const [agent] = await db.select().from(agents).where(eq(agents.id, run.agentId)).limit(1)
@@ -41,10 +43,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
+  let quota: Awaited<ReturnType<typeof beginQuota>>
+  try {
+    quota = await beginQuota({ ownerId: run.userId, key: `daemon:${run.id}`, resource: 'daemon.run', binding: { runId, issueId: run.issueId, agentId: run.agentId, repoId: repo.id }, leaseMs: RUN_LEASE_MS })
+  } catch (error) {
+    if (error instanceof QuotaError) return quotaResponse(error)
+    return NextResponse.json({ error: 'quotaUnavailable' }, { status: 503 })
+  }
   const claimed = await db.update(agentRuns)
-    .set({ status: 'preparing', startedAt: new Date(), leaseExpiresAt: new Date(leaseExpiresAt), updatedAt: new Date() })
+    .set({ status: 'preparing', startedAt: new Date(), leaseExpiresAt: new Date(leaseExpiresAt), quotaReservationId: quota.id, updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
     .returning({ id: agentRuns.id })
+  if (!claimed.length) {
+    await tenantQuotas.finish(run.userId, quota.id, 'refunded')
+    return NextResponse.json({ error: 'Run is no longer queued.' }, { status: 409 })
+  }
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
   const mcp = claimed.length

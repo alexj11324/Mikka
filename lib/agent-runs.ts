@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { agents, agentRuns, deviceRepos, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
+import { withTenantQuota } from '@/lib/quota/runtime'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -56,11 +57,11 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
     .where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.deviceId, agent.deviceId), eq(deviceRepos.userId, userId))).limit(1)
   if (!repo) throw new ActionFailureError('agentRepoMissing')
   const runId = crypto.randomUUID()
-  await db.insert(agentRuns).values({
+  await withTenantQuota(userId, 'daemon.dispatch', { ...parsed.data, runId }, async () => { await db.insert(agentRuns).values({
     id: runId, userId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
     deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
     prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note),
-  })
+  }) }, `dispatch:${runId}`)
   return { runId }
 }
 
