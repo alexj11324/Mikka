@@ -1,3 +1,6 @@
+//go:build application_integration
+
+// Requires the application checkout and Node runtime, not the worker-only Go image.
 package worker
 
 import (

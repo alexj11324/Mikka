@@ -69,7 +69,7 @@ jobs:
           GOMODCACHE: ${{ github.workspace }}/packages/subscription-worker/.cache/build-toolchain/modules
           GOCACHE: ${{ github.workspace }}/packages/subscription-worker/.cache/build-toolchain/objects
           MIKKA_BYOS_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_e2e
-        run: .cache/build-toolchain/go/bin/go test -mod=readonly -run '^TestDaemonCredentialRevokeCancelsSilentNativeStream$' -count=1 -timeout=45s -v . > ../../test-results/daemon-faults/byos-revocation.log 2>&1
+        run: .cache/build-toolchain/go/bin/go test -tags=application_integration -mod=readonly -run '^TestDaemonCredentialRevokeCancelsSilentNativeStream$' -count=1 -timeout=45s -v . > ../../test-results/daemon-faults/byos-revocation.log 2>&1
       - run: pnpm exec playwright test tests/e2e/device-revocation.spec.ts --output=browser-results
       - uses: actions/upload-artifact@v4
         if: always()
