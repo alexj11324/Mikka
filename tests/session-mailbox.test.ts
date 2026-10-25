@@ -168,12 +168,15 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
       assert.match((await store.inbox(coordinator)).messages.map(row => row.text).join('\n'), /Parser verified/)
     })
     await t.test('late messages queue by default, bounded policy resumes the exact prior session, concurrent late sends share one attempt', async () => {
+      const refs=[{operationId:randomUUID(),sourceEventId:randomUUID(),actionSlotId:randomUUID(),proposalDigest:"1".repeat(64)}]
+      await pool.query('UPDATE agent_runs SET "accountActionRefs"=$2 WHERE id=$1',[runB,JSON.stringify(refs)])
       await store.send(a, { to: b.mailboxId, key: randomUUID(), text: 'Late clarification' })
       assert.equal((await pool.query('select count(*) from agent_runs')).rows[0].count, '3')
       await store.policy(owner, b.mailboxId, 2, false)
       const latest = (await pool.query('select * from agent_runs where "mailboxId"=$1 and id<>$2', [b.mailboxId, runB])).rows[0]
       assert.equal(latest.continuesRunId, runB); assert.equal(latest.resumeSessionId, 'cli-session-b')
       assert.equal(latest.status, 'queued'); assert.match(latest.followUp, /mailbox_inbox/)
+      assert.deepEqual(latest.accountActionRefs,refs,'continuation preserves existing operation identity; it cannot allocate replacement effects')
       await Promise.all([store.send(a, { to: b.mailboxId, key: randomUUID(), text: 'Another detail' }), store.send(a, { to: b.mailboxId, key: randomUUID(), text: 'One more detail' })])
       assert.equal((await pool.query('select count(*) from agent_runs where "mailboxId"=$1', [b.mailboxId])).rows[0].count, '2')
       assert.equal((await store.run(owner, latest.id)).mailboxId, b.mailboxId)
