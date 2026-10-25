@@ -41,7 +41,7 @@
     "check:ci": "pnpm check && pnpm build && pnpm test:performance && pnpm test:e2e --grep-invert @performance",
     "test:issues": "node --import tsx --test scripts/issue-checklist.test.mjs scripts/issue-metadata.test.mjs scripts/issue-relations.test.mjs lib/issue-activity.test.ts lib/activity-actor.test.ts lib/issue-team-access-policy.test.ts lib/task-identifier.test.ts lib/issue-scope.test.ts lib/workspace-name.test.ts lib/locale-alias.test.ts lib/shortcut-guard.test.ts lib/document-sync-snapshot.test.ts scripts/issue-editor-keys.test.mjs scripts/issue-team-select.test.mjs lib/activity-actor-view.test.ts",
     "test:suggestions": "node --import tsx --test lib/suggestions/suggestions.test.ts",
-    "test:telegram": "node --import tsx --test lib/telegram/commands.test.ts lib/telegram/logger.test.ts lib/telegram/unique-violation.test.ts",
+    "test:telegram": "node --import tsx --test lib/telegram/commands.test.ts lib/telegram/logger.test.ts lib/telegram/messages.test.ts lib/telegram/unique-violation.test.ts",
     "start": "next start",
     "typecheck": "tsgo --noEmit",
     "daemon": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon --server http://localhost:3000",

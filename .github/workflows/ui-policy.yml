@@ -88,6 +88,7 @@ jobs:
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
       - run: pnpm test:integrations
+      - run: pnpm test:telegram
       - run: pnpm test:agent
       - run: pnpm test:acceptance
       - run: pnpm test:csv
