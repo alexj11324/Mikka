@@ -16,6 +16,8 @@ export function ruleTier(event: TriageEvent): CoordinatorEventTier | null {
     case 'user_message':
       return 'attention'
     case 'issue_done':
+    // A retry after the device went offline is the system handling it.
+    case 'run_retried':
       return 'background'
     case 'run_finished':
       if (event.payload.status === 'failed') return 'attention'

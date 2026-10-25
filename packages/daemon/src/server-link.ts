@@ -318,18 +318,20 @@ export class MemoryServer {
         if (device) device.lastHeartbeat = status
 
         const leases: Record<string, string> = {}
+        const revoked: string[] = []
         for (const { runId } of status.runs) {
           const run = this.runs.get(runId)
-          if (
-            !run ||
-            run.deviceId !== deviceId ||
-            isTerminalRunState(run.state)
-          )
+          if (!run) continue
+          // The real server also takes back runs it no longer knows; this one
+          // forgets every run on restart (`--server memory`), so it does not.
+          if (run.deviceId !== deviceId || isTerminalRunState(run.state)) {
+            revoked.push(runId)
             continue
+          }
           run.leaseExpiresAt = Date.now() + this.leaseMs
           leases[runId] = new Date(run.leaseExpiresAt).toISOString()
         }
-        return { leases }
+        return { leases, ...(revoked.length ? { revoked } : {}) }
       },
       listRepos: async (deviceId) => {
         this.check()
