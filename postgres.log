@@ -1,0 +1,20 @@
+▶ PostgreSQL audit: tenant isolation, role matrix, retries, immutable export, failure and retention
+  ✔ concurrent retry is one event; conflicting duplicate rejected; secret fields rejected (25.5165ms)
+  ✔ admin/member/suspended/foreign/bearer/current revocation matrix and filters (52.263165ms)
+  ✔ configured origin survives internal proxy URL without trusting foreign origins (15.898752ms)
+  ✔ paged snapshot resumes after new events and fresh connection; no gaps/count/hash mismatch (42.531124ms)
+  ✔ two-store export resumes partial creation without replacing application snapshot (19.188866ms)
+  ✔ run, credential, account approval and uncertain operation transitions are atomic and contain references only (27.531056ms)
+  ✔ automatic auth lifecycle is durable, sanitised, and rolls back when audit cannot persist (7.806511ms)
+  ✔ unauthorised mutation blocked and controlled privileged corruption/deletion/reorder detected (12.69718ms)
+{"evidence":"audit-210","tenants":["4d89002b-0864-4ea9-9d4b-921bf917671e","357f2b72-a9f3-496c-802f-039e38104f1e"],"owner":"audit_86fad11b-11be-43a3-8693-0106b940043c","member":"audit_b95a023b-2188-42c2-b08f-cff2a8fc6928","appDatabase":"audit_app_final_e2e","workspaceDatabase":"audit_workspace_final_e2e","kind":"fixture-context","utc":"2026-10-25T16:29:22.107Z"}
+  ✔ legal hold, export lease, checkpoint prune and tombstone replay after expiry (29.677965ms)
+✔ PostgreSQL audit: tenant isolation, role matrix, retries, immutable export, failure and retention (283.760775ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 554.786784

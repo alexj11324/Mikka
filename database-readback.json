@@ -1,0 +1,660 @@
+{
+  "sourceSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+  "layer": "separate PG17 contract fixtures; not production",
+  "utc": "2026-10-25T16:38:37.675Z",
+  "fixture": {
+    "evidence": "audit-210",
+    "tenants": [
+      "4d89002b-0864-4ea9-9d4b-921bf917671e",
+      "357f2b72-a9f3-496c-802f-039e38104f1e"
+    ],
+    "owner": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+    "member": "audit_b95a023b-2188-42c2-b08f-cff2a8fc6928",
+    "appDatabase": "audit_app_final_e2e",
+    "workspaceDatabase": "audit_workspace_final_e2e",
+    "kind": "fixture-context",
+    "utc": "2026-10-25T16:29:22.107Z"
+  },
+  "databases": {
+    "application": {
+      "database": "audit_app_final_e2e",
+      "storeId": "1b484834-50cd-4419-ba83-577fa6b5bc7a",
+      "version": "17.11 (Debian 17.11-1.pgdg13+2)",
+      "ledger": [
+        {
+          "name": "0001_agents_devices.sql",
+          "appliedAt": "2026-10-25T16:13:21.398Z"
+        },
+        {
+          "name": "0002_device_enabled.sql",
+          "appliedAt": "2026-10-25T16:13:21.399Z"
+        },
+        {
+          "name": "0003_agents_columns.sql",
+          "appliedAt": "2026-10-25T16:13:21.401Z"
+        },
+        {
+          "name": "0004_linear_sync.sql",
+          "appliedAt": "2026-10-25T16:13:21.410Z"
+        },
+        {
+          "name": "0004_telegram_chat.sql",
+          "appliedAt": "2026-10-25T16:13:21.417Z"
+        },
+        {
+          "name": "0005_linear_sync_retry_and_comment_keys.sql",
+          "appliedAt": "2026-10-25T16:13:21.421Z"
+        },
+        {
+          "name": "0005_mikka_issue_metadata.sql",
+          "appliedAt": "2026-10-25T16:13:21.423Z"
+        },
+        {
+          "name": "0006_linear_comment_authorship.sql",
+          "appliedAt": "2026-10-25T16:13:21.425Z"
+        },
+        {
+          "name": "0007_coordinator_events.sql",
+          "appliedAt": "2026-10-25T16:13:21.428Z"
+        },
+        {
+          "name": "0007_linear_description_snapshot.sql",
+          "appliedAt": "2026-10-25T16:13:21.430Z"
+        },
+        {
+          "name": "0008_coordinator_sessions.sql",
+          "appliedAt": "2026-10-25T16:13:21.432Z"
+        },
+        {
+          "name": "0008_linear_mikka_issue_metadata.sql",
+          "appliedAt": "2026-10-25T16:13:21.436Z"
+        },
+        {
+          "name": "0009_oauth_provider.sql",
+          "appliedAt": "2026-10-25T16:13:21.448Z"
+        },
+        {
+          "name": "0010_coordinator_session_error.sql",
+          "appliedAt": "2026-10-25T16:13:21.449Z"
+        },
+        {
+          "name": "0011_coordinator_event_tier.sql",
+          "appliedAt": "2026-10-25T16:13:21.454Z"
+        },
+        {
+          "name": "0012_run_tokens.sql",
+          "appliedAt": "2026-10-25T16:13:21.457Z"
+        },
+        {
+          "name": "20261023143000_decision_calls.sql",
+          "appliedAt": "2026-10-25T16:13:21.464Z"
+        },
+        {
+          "name": "20261023150000_suggestions.sql",
+          "appliedAt": "2026-10-25T16:13:21.467Z"
+        },
+        {
+          "name": "20261023154800_issue_scope.sql",
+          "appliedAt": "2026-10-25T16:13:21.470Z"
+        },
+        {
+          "name": "20261023161128_issue_scope_source.sql",
+          "appliedAt": "2026-10-25T16:13:21.472Z"
+        },
+        {
+          "name": "20261023170500_drop_decision_calls.sql",
+          "appliedAt": "2026-10-25T16:13:21.474Z"
+        },
+        {
+          "name": "20261023171500_suggestion_trigger_checks.sql",
+          "appliedAt": "2026-10-25T16:13:21.475Z"
+        },
+        {
+          "name": "20261023213851_group_conversations.sql",
+          "appliedAt": "2026-10-25T16:13:21.483Z"
+        },
+        {
+          "name": "20261023221259_application_baseline.sql",
+          "appliedAt": "2026-10-25T16:13:21.389Z"
+        },
+        {
+          "name": "20261025000400_run_retries.sql",
+          "appliedAt": "2026-10-25T16:13:21.484Z"
+        },
+        {
+          "name": "20261025005600_mikka_linear_sync_setting.sql",
+          "appliedAt": "2026-10-25T16:13:21.486Z"
+        },
+        {
+          "name": "20261025013400_run_checkpoints.sql",
+          "appliedAt": "2026-10-25T16:13:21.488Z"
+        },
+        {
+          "name": "20261025043000_pending_actions.sql",
+          "appliedAt": "2026-10-25T16:13:21.490Z"
+        },
+        {
+          "name": "20261025051201_run_dispatch_keys.sql",
+          "appliedAt": "2026-10-25T16:13:21.492Z"
+        },
+        {
+          "name": "20261025051202_factory_192_stages.sql",
+          "appliedAt": "2026-10-25T16:13:21.505Z"
+        },
+        {
+          "name": "20261025051203_factory_194_approvals.sql",
+          "appliedAt": "2026-10-25T16:13:21.514Z"
+        },
+        {
+          "name": "20261025051204_factory_195_monitor.sql",
+          "appliedAt": "2026-10-25T16:13:21.519Z"
+        },
+        {
+          "name": "20261025051205_factory_192_questions.sql",
+          "appliedAt": "2026-10-25T16:13:21.523Z"
+        },
+        {
+          "name": "20261025052001_operation_ledger.sql",
+          "appliedAt": "2026-10-25T16:13:21.526Z"
+        },
+        {
+          "name": "20261025052031_session_mailboxes.sql",
+          "appliedAt": "2026-10-25T16:13:21.533Z"
+        },
+        {
+          "name": "20261025052032_group_artifact_review.sql",
+          "appliedAt": "2026-10-25T16:13:21.546Z"
+        },
+        {
+          "name": "20261025052033_group_review_mailboxes.sql",
+          "appliedAt": "2026-10-25T16:13:21.549Z"
+        },
+        {
+          "name": "20261025052200_credential_broker.sql",
+          "appliedAt": "2026-10-25T16:13:21.552Z"
+        },
+        {
+          "name": "20261025052201_credential_browser_binding.sql",
+          "appliedAt": "2026-10-25T16:13:21.554Z"
+        },
+        {
+          "name": "20261025052202_credential_handoff.sql",
+          "appliedAt": "2026-10-25T16:13:21.555Z"
+        },
+        {
+          "name": "20261025060001_calendar_operation_binding.sql",
+          "appliedAt": "2026-10-25T16:13:21.556Z"
+        },
+        {
+          "name": "20261025070001_account_action_intents.sql",
+          "appliedAt": "2026-10-25T16:13:21.558Z"
+        },
+        {
+          "name": "20261025070600_self_improvement.sql",
+          "appliedAt": "2026-10-25T16:13:21.571Z"
+        },
+        {
+          "name": "20261025082237_group_turn_mailbox_policy.sql",
+          "appliedAt": "2026-10-25T16:13:21.577Z"
+        },
+        {
+          "name": "20261025083303_improvement_skill_assignments.sql",
+          "appliedAt": "2026-10-25T16:13:21.583Z"
+        },
+        {
+          "name": "20261025141650_byos_credential_publications.sql",
+          "appliedAt": "2026-10-25T16:13:21.586Z"
+        },
+        {
+          "name": "20261025141651_byos_bindings_oauth.sql",
+          "appliedAt": "2026-10-25T16:13:21.590Z"
+        },
+        {
+          "name": "20261025141652_byos_device_authorization.sql",
+          "appliedAt": "2026-10-25T16:13:21.591Z"
+        },
+        {
+          "name": "20261025141653_byos_access_and_cleanup.sql",
+          "appliedAt": "2026-10-25T16:13:21.594Z"
+        },
+        {
+          "name": "20261025141654_byos_native_runs.sql",
+          "appliedAt": "2026-10-25T16:13:21.596Z"
+        },
+        {
+          "name": "20261025141655_byos_enrollment_transfers.sql",
+          "appliedAt": "2026-10-25T16:13:21.598Z"
+        },
+        {
+          "name": "20261025141656_byos_enrollment_cleanup.sql",
+          "appliedAt": "2026-10-25T16:13:21.601Z"
+        },
+        {
+          "name": "20261025160000_byos_environment_transfers.sql",
+          "appliedAt": "2026-10-25T16:13:21.604Z"
+        },
+        {
+          "name": "20261025170000_security_audit_application.sql",
+          "appliedAt": "2026-10-25T16:13:21.611Z"
+        }
+      ],
+      "events": [
+        {
+          "seq": "1",
+          "occurred_at": "2026-10-25T16:29:21.895Z",
+          "event": {
+            "action": "credential.revoked",
+            "reason": "other_tenant",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "dcefa4be-357c-429f-b1ef-80ded942d890"
+          },
+          "hash": "68d52a363a6e73a5d05105fcfc1c768bc35904c1fb7aa8f862dddb9261363dd9"
+        },
+        {
+          "seq": "1",
+          "occurred_at": "2026-10-25T16:29:21.872Z",
+          "event": {
+            "action": "credential.revoked",
+            "reason": "revoked",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "dcefa4be-357c-429f-b1ef-80ded942d890"
+          },
+          "hash": "254f9c7f6cbe25435e1977bef786f50801b836cf3567b70d2a2d204c07baec0f"
+        },
+        {
+          "seq": "2",
+          "occurred_at": "2026-10-25T16:29:21.967Z",
+          "event": {
+            "action": "credential.revoked",
+            "reason": "page_0",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "dcefa4be-357c-429f-b1ef-80ded942d890"
+          },
+          "hash": "79ec0b376c38af67d8266a851e9c6bf8f4ff3e3b149116c8ef022b5bc7694628"
+        },
+        {
+          "seq": "3",
+          "occurred_at": "2026-10-25T16:29:21.969Z",
+          "event": {
+            "action": "credential.revoked",
+            "reason": "page_1",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "dcefa4be-357c-429f-b1ef-80ded942d890"
+          },
+          "hash": "3a9a187cfd893a5e16da74c5ef1cac1d2e878204f8e1995bc52baa9bb56f32f1"
+        },
+        {
+          "seq": "4",
+          "occurred_at": "2026-10-25T16:29:21.970Z",
+          "event": {
+            "action": "credential.revoked",
+            "reason": "page_2",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "dcefa4be-357c-429f-b1ef-80ded942d890"
+          },
+          "hash": "c72f7d489ca585a7d4181bdeea18fd74e54a1c30b5c36e8220233482dc66cc93"
+        },
+        {
+          "seq": "5",
+          "occurred_at": "2026-10-25T16:29:21.970Z",
+          "event": {
+            "action": "credential.revoked",
+            "reason": "page_3",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "dcefa4be-357c-429f-b1ef-80ded942d890"
+          },
+          "hash": "06d3940a4cda3f2ab1fb7c706acb29755debf10045d1737973d9bbd8f23fe15a"
+        },
+        {
+          "seq": "6",
+          "occurred_at": "2026-10-25T16:29:21.971Z",
+          "event": {
+            "action": "credential.revoked",
+            "reason": "page_4",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "dcefa4be-357c-429f-b1ef-80ded942d890"
+          },
+          "hash": "224c3319fccfcdeb0bf43b44a00796422ff2fa0abd174bcff2232ce89ed5fe33"
+        },
+        {
+          "seq": "7",
+          "occurred_at": "2026-10-25T16:29:21.972Z",
+          "event": {
+            "action": "credential.revoked",
+            "reason": "page_5",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "dcefa4be-357c-429f-b1ef-80ded942d890"
+          },
+          "hash": "1d026d01a349c5b4fcaf219e235dc3a506338b3c89da2008ba5650c72b5fdf6b"
+        },
+        {
+          "seq": "8",
+          "occurred_at": "2026-10-25T16:29:21.973Z",
+          "event": {
+            "action": "credential.revoked",
+            "reason": "page_6",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "dcefa4be-357c-429f-b1ef-80ded942d890"
+          },
+          "hash": "b5e490732dc4abc7ed12c72fe2a4aea72ed60b9f43e8822570d66c46dcf72254"
+        },
+        {
+          "seq": "9",
+          "occurred_at": "2026-10-25T16:29:21.978Z",
+          "event": {
+            "action": "audit.export",
+            "reason": "snapshot",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "1b5d754b-8ab7-4bd5-9af9-4ab146405450"
+          },
+          "hash": "25d1b375047dd1228830ad50c38060c7580ca32e497a2ea9d105b6dd4cd1854c"
+        },
+        {
+          "seq": "10",
+          "occurred_at": "2026-10-25T16:29:21.984Z",
+          "event": {
+            "action": "credential.revoked",
+            "reason": "after_snapshot",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "dcefa4be-357c-429f-b1ef-80ded942d890"
+          },
+          "hash": "90b95c5cab6469fb32d231fe948c09d0915a26bea6995f8ee8e235b09965f751"
+        },
+        {
+          "seq": "11",
+          "occurred_at": "2026-10-25T16:29:22.013Z",
+          "event": {
+            "action": "audit.export",
+            "reason": "snapshot",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "a31ee3ba-960a-45fd-b272-4fd640338e5e"
+          },
+          "hash": "a298bbd8a04766befbf281b273f140799dabf35fe00a77afc1ed3d06bcc8bd06"
+        },
+        {
+          "seq": "12",
+          "occurred_at": "2026-10-25T16:29:22.019Z",
+          "event": {
+            "action": "credential.revoked",
+            "reason": "between_source_snapshots",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "dcefa4be-357c-429f-b1ef-80ded942d890"
+          },
+          "hash": "c49b65f38a5eddeefde72250175cdf8899ac9da3fafd7ec0635a49cde9aa169d"
+        },
+        {
+          "seq": "13",
+          "occurred_at": "2026-10-25T16:29:22.034Z",
+          "event": {
+            "runId": "195c8b94-1b74-44c8-a027-d4089188cca4",
+            "action": "agent_runs.insert",
+            "reason": "queued",
+            "actorId": "system",
+            "outcome": "success",
+            "actorType": "system",
+            "subjectId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "resourceId": "195c8b94-1b74-44c8-a027-d4089188cca4"
+          },
+          "hash": "2784f1c0ffac9b0894b5cfceae9944bed5debf6ddadf403577f58dae2886287b"
+        },
+        {
+          "seq": "14",
+          "occurred_at": "2026-10-25T16:29:22.037Z",
+          "event": {
+            "runId": "195c8b94-1b74-44c8-a027-d4089188cca4",
+            "action": "agent_runs.update",
+            "reason": "running",
+            "actorId": "synthetic_worker_reference",
+            "outcome": "success",
+            "actorType": "worker",
+            "requestId": "1a2c0d88-581f-4751-8f11-e568f16022bf",
+            "subjectId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "resourceId": "195c8b94-1b74-44c8-a027-d4089188cca4"
+          },
+          "hash": "982291701bfb5ad68ff08ddd4f68dadfdfc770c97ac53f15e36d1eb2472e5fd9"
+        },
+        {
+          "seq": "15",
+          "occurred_at": "2026-10-25T16:29:22.039Z",
+          "event": {
+            "runId": "195c8b94-1b74-44c8-a027-d4089188cca4",
+            "action": "credential_requests.insert",
+            "reason": "pending",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "pending",
+            "actorType": "human",
+            "subjectId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "resourceId": "11384477-b1b8-4d27-bcdd-810e9f5db45d"
+          },
+          "hash": "2be60d0b60bea925501ffefc4ff0178a107a3cb787b83a427171758307994acd"
+        },
+        {
+          "seq": "16",
+          "occurred_at": "2026-10-25T16:29:22.040Z",
+          "event": {
+            "runId": "195c8b94-1b74-44c8-a027-d4089188cca4",
+            "action": "credential_requests.update",
+            "reason": "cancelled",
+            "actorId": "system",
+            "outcome": "failed",
+            "actorType": "system",
+            "subjectId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "resourceId": "11384477-b1b8-4d27-bcdd-810e9f5db45d"
+          },
+          "hash": "fe771704fa8f0d7fb2a7a6a118f3946de3f7d49df3d2d754c435c877e74ff6fd"
+        },
+        {
+          "seq": "17",
+          "occurred_at": "2026-10-25T16:29:22.045Z",
+          "event": {
+            "action": "operation_ledger.insert",
+            "reason": "reserved",
+            "actorId": "system",
+            "outcome": "pending",
+            "actorType": "system",
+            "subjectId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "resourceId": "6cf6873a-d20c-4a1f-8ec4-23549794369c",
+            "operationId": "6cf6873a-d20c-4a1f-8ec4-23549794369c"
+          },
+          "hash": "dd5c21c0eb28f97865e5f6418d99e812fd6b1415b769187b1e6494a03075de9d"
+        },
+        {
+          "seq": "18",
+          "occurred_at": "2026-10-25T16:29:22.046Z",
+          "event": {
+            "action": "operation_ledger.update",
+            "reason": "uncertain",
+            "actorId": "system",
+            "outcome": "uncertain",
+            "actorType": "system",
+            "subjectId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "resourceId": "6cf6873a-d20c-4a1f-8ec4-23549794369c",
+            "operationId": "6cf6873a-d20c-4a1f-8ec4-23549794369c"
+          },
+          "hash": "64dff515b87393e59f66d52c745af186247f0f0847a94515bb70a011afad171d"
+        },
+        {
+          "seq": "19",
+          "occurred_at": "2026-10-25T16:29:22.048Z",
+          "event": {
+            "action": "byos_connections.insert",
+            "reason": "pending",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "pending",
+            "actorType": "human",
+            "subjectId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "resourceId": "f54f04ef-f1a7-43c7-a00d-4df6dac4b2d1"
+          },
+          "hash": "efa33e07ce5bd5d9effdc8d7e09d8c96c7e0c587ff3af675d2128ed1a8ef04c4"
+        },
+        {
+          "seq": "20",
+          "occurred_at": "2026-10-25T16:29:22.049Z",
+          "event": {
+            "action": "byos_connections.update",
+            "reason": "disconnected",
+            "actorId": "system",
+            "outcome": "failed",
+            "actorType": "system",
+            "subjectId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "resourceId": "f54f04ef-f1a7-43c7-a00d-4df6dac4b2d1"
+          },
+          "hash": "8ed950f1ff3a68dc6e49b8a33407ffe7b2a9e09cbd1827fd05a9e8cc54a068ee"
+        },
+        {
+          "seq": "21",
+          "occurred_at": "2026-10-25T16:29:22.052Z",
+          "event": {
+            "runId": "fa22ea9c-67f2-450a-9d8c-f5c610bc7a92",
+            "action": "agent_runs.insert",
+            "reason": "queued",
+            "actorId": "system",
+            "outcome": "success",
+            "actorType": "system",
+            "subjectId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "resourceId": "fa22ea9c-67f2-450a-9d8c-f5c610bc7a92"
+          },
+          "hash": "9032be8940cf1d08bcdbbf33009ab39fb3d59f757b7d90abe878f48538328b40"
+        }
+      ]
+    },
+    "workspace": {
+      "database": "audit_workspace_final_e2e",
+      "storeId": "9be4d53b-c6f6-482a-a0f3-10de43deed85",
+      "version": "17.11 (Debian 17.11-1.pgdg13+2)",
+      "ledger": [
+        {
+          "name": "0004_mikka_workspace_tables.sql",
+          "appliedAt": "2026-10-25T16:13:21.622Z"
+        },
+        {
+          "name": "0006_workspace_tables.sql",
+          "appliedAt": "2026-10-25T16:13:21.635Z"
+        },
+        {
+          "name": "0014_workspace_teams.sql",
+          "appliedAt": "2026-10-25T16:13:21.643Z"
+        },
+        {
+          "name": "20261025005500_mikka_team_tables.sql",
+          "appliedAt": "2026-10-25T16:13:21.646Z"
+        },
+        {
+          "name": "20261025170001_security_audit_workspace.sql",
+          "appliedAt": "2026-10-25T16:13:21.657Z"
+        }
+      ],
+      "events": [
+        {
+          "seq": "1",
+          "occurred_at": "2026-10-25T16:29:21.868Z",
+          "event": {
+            "action": "membership.insert",
+            "reason": "admin.active",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "subjectId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "resourceId": "audit_86fad11b-11be-43a3-8693-0106b940043c"
+          },
+          "hash": "378dec89512540162e7b0a7ceda10c9cd4dd29261e759cdbbc9c2f9c4391b738"
+        },
+        {
+          "seq": "2",
+          "occurred_at": "2026-10-25T16:29:21.870Z",
+          "event": {
+            "action": "membership.insert",
+            "reason": "member.active",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "subjectId": "audit_b95a023b-2188-42c2-b08f-cff2a8fc6928",
+            "resourceId": "audit_b95a023b-2188-42c2-b08f-cff2a8fc6928"
+          },
+          "hash": "507feeb501b8393c46ae8bdf4f92180b79c2f9f2a591922a3db0637bbec6e32a"
+        },
+        {
+          "seq": "3",
+          "occurred_at": "2026-10-25T16:29:21.931Z",
+          "event": {
+            "action": "authorization.denied",
+            "reason": "audit_admin_required",
+            "actorId": "audit_b95a023b-2188-42c2-b08f-cff2a8fc6928",
+            "outcome": "denied",
+            "actorType": "human",
+            "requestId": "1c1423c1-cec8-4551-bdaa-707a8b7a3b7e",
+            "resourceId": "audit"
+          },
+          "hash": "2b28ce6063b920a59da6ad9c302b8fd433d1aaf319d318d206c2abeb334855dc"
+        },
+        {
+          "seq": "4",
+          "occurred_at": "2026-10-25T16:29:21.937Z",
+          "event": {
+            "action": "membership.update",
+            "reason": "admin.suspended",
+            "actorId": "system",
+            "outcome": "success",
+            "actorType": "system",
+            "subjectId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "resourceId": "audit_86fad11b-11be-43a3-8693-0106b940043c"
+          },
+          "hash": "a1feee750aff9fa4566ae4e149f163e1f21a2e800306597efeff14867fa0a0c0"
+        },
+        {
+          "seq": "5",
+          "occurred_at": "2026-10-25T16:29:21.940Z",
+          "event": {
+            "action": "membership.update",
+            "reason": "admin.active",
+            "actorId": "system",
+            "outcome": "success",
+            "actorType": "system",
+            "subjectId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "resourceId": "audit_86fad11b-11be-43a3-8693-0106b940043c"
+          },
+          "hash": "064de335d8b2eaf73d0e47e84cd72b088a5e26d4458ee310302acc21fbf62424"
+        },
+        {
+          "seq": "6",
+          "occurred_at": "2026-10-25T16:29:22.023Z",
+          "event": {
+            "action": "audit.export",
+            "reason": "snapshot",
+            "actorId": "audit_86fad11b-11be-43a3-8693-0106b940043c",
+            "outcome": "success",
+            "actorType": "human",
+            "resourceId": "a31ee3ba-960a-45fd-b272-4fd640338e5e"
+          },
+          "hash": "1764a93c2a7663d16f2e5c2acdd074f102ac00ccfa13eb04abf3ab4c9a352353"
+        }
+      ]
+    }
+  }
+}
