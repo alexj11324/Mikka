@@ -28,6 +28,8 @@ export const ACTION_ERROR_CODES = [
   'repoPathInvalid',
   'repoNotFound',
   'runInvalid',
+  'runAlreadyActive',
+  'runDispatchKeyConflict',
   'runNotFound',
   'messageRequired',
   'deviceSaveFailed',

@@ -1,0 +1,44 @@
+name: Run dispatch transactions
+
+on:
+  push:
+    branches-ignore: ['gh-readonly-queue/**']
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch-postgres:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: dispatch
+          POSTGRES_PASSWORD: disposable-ci-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dispatch -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:run-dispatch
+        env:
+          RUN_DISPATCH_DB_TESTS: '1'
+          E2E_DATABASE_URL: postgresql://dispatch:disposable-ci-only@127.0.0.1:5432/mikka_e2e

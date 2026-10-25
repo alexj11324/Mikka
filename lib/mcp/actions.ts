@@ -14,6 +14,7 @@ import { getIssue as readIssue, saveIssue } from '@/app/actions/issues'
 import { updateIssueMetadata, type IssueMetadataPatch } from '@/app/actions/issue-metadata'
 import { updateIssueRelation } from '@/app/actions/issue-operations'
 import { listProjects as readProjects, moveIssueToProject } from '@/app/actions/projects'
+import type { DispatchInput } from '@/lib/run-dispatch'
 
 // The MCP tools that change things, and the reads that need more than one
 // table. Writes go through the app's own server actions inside `actAs`, so an
@@ -136,8 +137,8 @@ export async function listAgents(userId: string) {
   }))
 }
 
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }) {
-  return attempt(async () => ({ ...(await queueRun(userId, input)), status: 'queued' }))
+export async function dispatchRun(userId: string, input: DispatchInput) {
+  return attempt(() => queueRun(userId, input))
 }
 
 export async function sendToRun(userId: string, input: { runId: string; text: string }) {

@@ -4,6 +4,7 @@ import { getWorkflowMetadata } from 'workflow'
 import { z } from 'zod'
 import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
 import { createComposioAITools } from '@/lib/composio-actions'
+import { dispatchRequestKey } from '@/lib/run-dispatch'
 import * as steps from './steps'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
@@ -70,6 +71,7 @@ function coordinatorTools(userId: string) {
         issueId: id, agentId: id,
         deviceRepoId: id.describe('A repository id from list_agents, on the agent\'s own device.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
+        requestKey: dispatchRequestKey.optional().describe('Stable key for this logical dispatch. Reuse after an error or lost response; choose a new key only for new work.'),
       }),
       execute: input => steps.dispatchRun(userId, input),
     }),
