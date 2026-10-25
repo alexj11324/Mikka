@@ -66,7 +66,7 @@ test('claim initializes mailboxes before the queued-to-preparing compare-and-set
 test('Bot turns advertise messaging only when mailbox setup succeeds', () => {
   const route = source('app/api/agent/route.ts')
   assert.match(route, /mailboxes.conversation\([\s\S]*?\.catch\(/)
-  assert.match(route, /mailboxActor \? mailboxTools\(mailboxes, mailboxActor\) : \{\}/)
+  assert.match(route, /mailboxActor \? mailboxTools\(mailboxes, mailboxActor, \(\) => authorizePolicyTool\(session.user.id\)\) : \{\}/)
   assert.match(route, /mailboxActor \? MAILBOX_INSTRUCTIONS : ''/)
 })
 

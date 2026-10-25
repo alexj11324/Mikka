@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdir, writeFile, copyFile } from 'node:fs/promises'
+import { mkdir, writeFile, copyFile, readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { getMigrations } from 'better-auth/db/migration'
 import { oauthProvider } from '@better-auth/oauth-provider'
@@ -17,6 +17,7 @@ for (const key of ['MIKKA_DATABASE_URL','DATABASE_URL']) {
 assert.notEqual(process.env.MIKKA_DATABASE_URL,process.env.DATABASE_URL)
 const sha=(await exec('git',['rev-parse','HEAD'])).stdout.trim()
 assert.match(sha,/^[a-f0-9]{40}$/)
+assert.equal((await readFile('.next/policy-source-sha','utf8')).trim(),sha,'compiled application must match frozen source SHA')
 const evidence=process.env.POLICY_EVIDENCE_DIR ?? '/tmp/policy-230-http'
 await mkdir(evidence,{recursive:true})
 const app=new Pool({connectionString:process.env.MIKKA_DATABASE_URL}), workspace=new Pool({connectionString:process.env.DATABASE_URL})
@@ -53,10 +54,10 @@ try {
   await migrations.runMigrations()
   const isolatedSecret=randomBytes(32).toString('hex')
   // Docker runtime receives only these explicit synthetic settings; no provider/API keys.
-  const env={...process.env,BETTER_AUTH_SECRET:isolatedSecret,BETTER_AUTH_URL:origin.origin,NODE_EXTRA_CA_CERTS:'/tmp/environment-proxy-ca.crt',NEXT_TELEMETRY_DISABLED:'1'}
+  const env={...process.env,BETTER_AUTH_SECRET:isolatedSecret,BETTER_AUTH_URL:origin.origin,NODE_EXTRA_CA_CERTS:'/tmp/environment-proxy-ca.crt',NEXT_TELEMETRY_DISABLED:'1',CI:'true'}
   if(process.env.POLICY_EXTERNAL_SERVER !== '1') {
     const args=[...dockerArgs,'run','--name',name,'--network','host','--mount',`type=bind,source=${process.cwd()},target=/app`,'--mount','type=bind,source=/usr/local/share/ca-certificates/environment-proxy-ca.crt,target=/tmp/environment-proxy-ca.crt,readonly','--workdir','/app']
-    for(const key of ['MIKKA_DATABASE_URL','DATABASE_URL','BETTER_AUTH_SECRET','BETTER_AUTH_URL','NODE_EXTRA_CA_CERTS','NEXT_TELEMETRY_DISABLED'])args.push('--env',key)
+    for(const key of ['MIKKA_DATABASE_URL','DATABASE_URL','BETTER_AUTH_SECRET','BETTER_AUTH_URL','NODE_EXTRA_CA_CERTS','NEXT_TELEMETRY_DISABLED','CI'])args.push('--env',key)
     args.push('node:24-bookworm-slim','node','node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port',origin.port)
     runtime=spawn('docker',args,{env,stdio:['ignore','ignore','ignore']})
     runtime.on('error',()=>{})

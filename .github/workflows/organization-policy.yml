@@ -26,6 +26,7 @@ jobs:
       DATABASE_URL: postgresql://postgres@127.0.0.1:5432/policy_workspace_e2e
       POLICY_WORKSPACE_TEST_URL: postgresql://postgres@127.0.0.1:5432/policy_workspace_e2e
       REQUIRE_POLICY_DB: '1'
+      CI: 'true'
       BETTER_AUTH_URL: http://127.0.0.1:3130
       NEXT_TELEMETRY_DISABLED: '1'
       POLICY_HTTP_ORIGIN: http://127.0.0.1:3130
@@ -57,6 +58,7 @@ jobs:
       - name: Generate isolated auth secret
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
       - run: pnpm exec next build --webpack
+      - run: git rev-parse HEAD > .next/policy-source-sha
       - name: Compiled Next policy API regression
         run: |
           pnpm exec next start --hostname 127.0.0.1 --port 3130 > policy-next.log 2>&1 &
