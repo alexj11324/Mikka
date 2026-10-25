@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { randomUUID, createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
+import { fork } from 'node:child_process'
+import { once } from 'node:events'
+import { fileURLToPath } from 'node:url'
 import { createServer } from 'node:http'
 import test from 'node:test'
 import { Pool } from 'pg'
@@ -38,6 +41,14 @@ test('operation ledger: real PG concurrency, reconnect and HTTP fault windows', 
     assert.equal(claims.filter(r => r.status === 'fulfilled').length, 1)
     assert.equal((await pool.query('SELECT count(*) FROM operation_ledger WHERE "operationId"=$1', [b.operationId])).rows[0].count, '1')
   })
+  await t.test('both unique indexes tolerate repeated ten-way reservation races', async () => {
+    for (let round = 0; round < 25; round++) {
+      const b = make()
+      const rows = await Promise.all(Array.from({ length: 10 }, () => ledger.reserve(b)))
+      assert.equal(rows.every(row => row.operationId === b.operationId), true)
+      assert.equal(new Set(rows.map(row => row.idempotencyKey)).size, 1)
+    }
+  })
   await t.test('reservation and claim use the same database authorization lock order', async () => {
     await pool.query('CREATE TABLE IF NOT EXISTS operation_test_authority (id uuid PRIMARY KEY)')
     const b = make(), id = identity(b)
@@ -62,6 +73,40 @@ test('operation ledger: real PG concurrency, reconnect and HTTP fault windows', 
     await assert.rejects(ledger.claim(id, randomUUID()), /operationAlreadyClaimed/)
     assert.equal((await ledger.reserve(b)).idempotencyKey, row.idempotencyKey)
     assert.equal((await ledger.reconcile(id, async () => null)).status, 'uncertain')
+  })
+  await t.test('SIGKILL and new process recover pre-send and post-effect windows without replay', async () => {
+    const objects = new Map<string, string>(); let writes = 0
+    const server = createServer((req, res) => {
+      const key = req.url!.slice(1)
+      if (req.method === 'POST') { writes++; objects.set(key, randomUUID()) }
+      res.writeHead(objects.has(key) ? 200 : 404, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ objectId: objects.get(key) }))
+    })
+    server.listen(0, '127.0.0.1'); await once(server, 'listening')
+    t.after(() => new Promise<void>(resolve => server.close(() => resolve())))
+    const address = server.address(); assert.ok(address && typeof address !== 'string')
+    for (const mode of ['claim', 'effect'] as const) {
+      const b = make(), id = identity(b); await ledger.reserve(b)
+      const config = { url: url!, identity: id, endpoint: `http://127.0.0.1:${address.port}`, mode }
+      const spawn = () => {
+        const child = fork(fileURLToPath(new URL('./fixtures/restart-worker.ts', import.meta.url)), [], { execArgv: ['--import', 'tsx'], stdio: ['ignore', 'ignore', 'inherit', 'ipc'] })
+        t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL') })
+        return child
+      }
+      const first = spawn(), ready = once(first, 'message', { signal: AbortSignal.timeout(10000) })
+      first.send(config)
+      const [committed] = await ready; assert.equal(committed.ready, true)
+      const killed = once(first, 'exit'); first.kill('SIGKILL')
+      assert.equal((await killed)[1], 'SIGKILL')
+      assert.equal((await ledger.read(id)).status, 'executing')
+      const second = spawn(), recovered = once(second, 'message', { signal: AbortSignal.timeout(10000) }), exited = once(second, 'exit')
+      second.send({ ...config, mode: 'recover' })
+      const [result] = await recovered
+      assert.equal(result.status, mode === 'claim' ? 'uncertain' : 'succeeded')
+      assert.equal(result.key, committed.key)
+      assert.equal((await exited)[0], 0)
+    }
+    assert.equal(writes, 1)
   })
   await t.test('HTTP success followed by PG writeback failure; fresh connection reads back without resend', async () => {
     const objects = new Map<string, string>(); let writes = 0

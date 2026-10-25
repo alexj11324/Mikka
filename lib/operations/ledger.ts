@@ -48,7 +48,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize)
       const binding = intent.parse(input)
       return transaction(async tx => {
         const key = createHash('sha256').update(JSON.stringify(['mikka-operation-v1', binding.ownerId, binding.workspaceId, binding.operationId])).digest('hex')
-        await tx.query('INSERT INTO operation_ledger ("operationId","ownerId","workspaceId",binding,"idempotencyKey") VALUES ($1,$2,$3,$4,$5) ON CONFLICT ("operationId") DO NOTHING', [binding.operationId, binding.ownerId, binding.workspaceId, binding, key])
+        await tx.query('INSERT INTO operation_ledger ("operationId","ownerId","workspaceId",binding,"idempotencyKey") VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING', [binding.operationId, binding.ownerId, binding.workspaceId, binding, key])
         const row = await owned(tx, { operationId: binding.operationId, ownerId: binding.ownerId, workspaceId: binding.workspaceId })
         await authorize(tx, row.binding, null, 'reserve')
         if (JSON.stringify(intent.parse(row.binding)) !== JSON.stringify(binding)) throw new OperationError('operationBindingConflict')

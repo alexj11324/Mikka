@@ -61,11 +61,44 @@ owner/workspace rejection, callback denial and stale run, token rejection, retry
 stability, uncertain negative lookup, real HTTP effect plus real SQL trigger writeback
 failure, fresh pool recovery/readback with one HTTP write, terminal overwrite rejection.
 Authorization in these tests is a synthetic callback, not actual auth/approval rows.
-Fresh pool recovery is not a killed/restarted worker-process test.
+The original fresh-pool test remains; follow-up tests additionally SIGKILL a child after durable claim and after a real loopback HTTP effect, then start a distinct process for readback. Missing objects remain uncertain; completed objects reconcile without another POST.
 
-Not run/blocked: actual Mikka HTTP/auth wiring, real approval expiration/revocation
-transactions, killed worker process, old-worker execution after partition, real provider
+Not run/blocked: actual Mikka production route wiring, complete domain approval binding,
+old-worker execution after partition, real provider
 readback/guarantee matrix, true run retry propagation, combined #177/#194 acceptance.
 No approved real provider target was supplied; these gates remain blocked. No Preview
 or production deployment is requested. Existing credential CI job is skipped only for
 this candidate branch to respect synthetic-only authorization; ordinary checks remain.
+
+
+## Follow-up server authorization evidence
+
+`withOperationSession` composes a mandatory domain authorizer with transactional
+checks of the existing Better Auth session row. Actor identity must come from
+server-side `getSession`, never JSON. It locks the session after the ledger row,
+then checks DB-clock expiry after obtaining the lock. This is an independent
+server primitive, not a published route or a complete #177 domain policy.
+
+The isolated HTTP fixture uses actual Better Auth sign-in/session validation and
+tracked application/approval migrations. It checks missing cookies, bearer requests,
+cross-origin requests, successful claim, existing pending_actions revocation and
+expiry, a claim blocked behind a real revocation transaction, and session expiry
+both before HTTP authentication and between authentication and ledger mutation.
+The approval adapter is explicitly test-only: #204 lacks account/workspace/candidate
+binding, so it cannot honestly serve as the full production authorizer yet.
+
+Evidence retention correction: the first follow-up local expiry test caused Better
+Auth's internal expired-session cleanup to delete one synthetic session record.
+No explicit cleanup was requested or run. Subsequent test schemas install a
+DELETE-to-NOTHING rule on the fixture session table, and assert the expired row
+remains. This rule is isolated test infrastructure, never a production migration.
+Other synthetic rows, schemas and process-test evidence remain retained.
+
+Independent follow-up review also reproduced a second-unique-index race: an INSERT
+conflicting on both operationId and idempotencyKey could throw 23505 when only the
+primary key was the ON CONFLICT arbiter. Reserve now handles any unique conflict,
+then checks owned identity and immutable binding before returning. A committed
+25-round ten-way regression and an independent 100-round reserve/claim stress test
+passed after the fix. Session expiry is rechecked after domain lock waits too.
+The expiry fixture disables automatic session refresh to test actual expiration;
+its initial 200 response under automatic refresh was recorded and investigated.
