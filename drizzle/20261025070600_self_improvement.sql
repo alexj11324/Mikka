@@ -39,9 +39,16 @@ CREATE TABLE IF NOT EXISTS improvement_proposal_sources (
 CREATE OR REPLACE FUNCTION reject_improvement_rewrite() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'improvement evidence is immutable'; END;
 $$;
-CREATE TRIGGER improvement_scorers_immutable BEFORE UPDATE OR DELETE ON improvement_scorers FOR EACH ROW EXECUTE FUNCTION reject_improvement_rewrite();
-CREATE TRIGGER improvement_feedback_immutable BEFORE UPDATE OR DELETE ON improvement_feedback FOR EACH ROW EXECUTE FUNCTION reject_improvement_rewrite();
-CREATE TRIGGER improvement_scores_immutable BEFORE UPDATE OR DELETE ON improvement_scores FOR EACH ROW EXECUTE FUNCTION reject_improvement_rewrite();
-CREATE TRIGGER improvement_proposals_immutable BEFORE UPDATE OR DELETE ON improvement_proposals FOR EACH ROW EXECUTE FUNCTION reject_improvement_rewrite();
-CREATE TRIGGER improvement_sources_immutable BEFORE UPDATE OR DELETE ON improvement_proposal_sources FOR EACH ROW EXECUTE FUNCTION reject_improvement_rewrite();
+-- migrate.mjs records its ledger after this transaction commits. A process
+-- interruption between those steps must permit safely replaying this SQL.
+DO $$
+DECLARE table_name text;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY['improvement_scorers','improvement_feedback','improvement_scores','improvement_proposals','improvement_proposal_sources'] LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass(table_name) AND tgname=table_name || '_immutable') THEN
+      EXECUTE format('CREATE TRIGGER %I BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION reject_improvement_rewrite()',table_name || '_immutable',table_name);
+    END IF;
+  END LOOP;
+END;
+$$;
 COMMIT;

@@ -1,13 +1,14 @@
 name: Controlled Skill improvement
 on:
   push:
-    branches: ['codex/controlled-skill-improvement-*']
+    branches-ignore: ['gh-readonly-queue/**']
   pull_request:
-    paths: ['lib/self-improvement/**', 'app/api/self-improvement/**', 'drizzle/*self_improvement.sql', '.github/workflows/self-improvement.yml']
+  merge_group:
 permissions:
   contents: read
 jobs:
   postgres-http:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:

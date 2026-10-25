@@ -27,6 +27,7 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
   const dir = new URL('../../drizzle/', import.meta.url)
   const files = orderMigrations((await readdir(dir)).filter(name => name.endsWith('.sql')))
   for (const name of files) await pool.query(await readFile(new URL(name, dir), 'utf8'))
+  await pool.query(await readFile(new URL('20261025070600_self_improvement.sql', dir), 'utf8'))
   assert.equal((await pool.query(`SELECT count(*) FROM pg_constraint c
     JOIN pg_class child ON child.oid=c.conrelid JOIN pg_namespace n ON n.oid=child.relnamespace
     JOIN pg_class parent ON parent.oid=c.confrelid
@@ -40,7 +41,8 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
   await pool.query(`INSERT INTO agents(id,"userId",harness,name,"deviceId") VALUES($1,$2,'codex','synthetic-agent',$3)`, [agentId, owner, deviceId])
   await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,$3,'/synthetic/report')`, [repoId, deviceId, owner])
   let access = true
-  const authorize = async (userId: string, issue: string) => access && userId === owner && issue === issueId
+  const authorizedIssues = new Set([issueId])
+  const authorize = async (userId: string, issue: string) => access && userId === owner && authorizedIssues.has(issue)
   let store = createImprovementStore(pool, authorize)
   const runs: string[] = []
   async function makeRun(options: { status?: string; agent?: string; repo?: string; issue?: string; report?: unknown } = {}) {
@@ -214,6 +216,18 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
     const current = await makeRun({ agent: cancellationAgent })
     assert.equal((await propose(current)).pendingDistinctFailures, 0)
     assert.equal((await post({ action: 'propose', runId: source })).status, 409)
+  })
+
+  await t.test('moving a run cannot expose its historical issue score through read or feedback replay', async () => {
+    const moved = await makeRun(), destination = randomUUID()
+    const input = feedback(moved)
+    await store.recordFeedback(owner, input)
+    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'synthetic-destination','{}','todo','normal')`, [destination, owner])
+    await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [moved, destination])
+    authorizedIssues.add(destination)
+    assert.equal((await store.read(owner, moved)).scores.length, 0)
+    assert.equal((await post(input)).status, 409)
+    assert.equal((await propose(moved)).pendingDistinctFailures, 0)
   })
 
   console.log(JSON.stringify({ layer: 'actual-PG17-HTTP', fixtures: 'synthetic-run-report-and-identity', retainedSchema: schema,

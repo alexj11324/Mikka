@@ -58,7 +58,9 @@ export function createImprovementStore(pool: Pool, authorize: Authorize) {
       const { rows: [old] } = await tx.query('SELECT id,fingerprint FROM improvement_feedback WHERE "userId"=$1 AND "eventId"=$2', [userId, feedback.eventId])
       if (old) {
         if (old.fingerprint !== fingerprint) throw new ImprovementError('conflict')
-        return (await tx.query('SELECT * FROM improvement_scores WHERE id=$1 AND "userId"=$2', [old.id, userId])).rows[0]
+        const { rows: [previous] } = await tx.query('SELECT * FROM improvement_scores WHERE id=$1 AND "userId"=$2 AND bucket=$3', [old.id, userId, bucket])
+        if (!previous) throw new ImprovementError('conflict')
+        return previous
       }
       const id = randomUUID()
       const assessment = score(feedback.verdict, run.report)
@@ -122,7 +124,7 @@ export function createImprovementStore(pool: Pool, authorize: Authorize) {
 
   async function read(userId: string, runId: string) {
     return withRun(userId, runId, async (tx, run, bucket) => {
-      const scores = (await tx.query('SELECT * FROM improvement_scores WHERE "userId"=$1 AND "runId"=$2 ORDER BY "createdAt",id', [userId, run.id])).rows
+      const scores = (await tx.query('SELECT * FROM improvement_scores WHERE "userId"=$1 AND "runId"=$2 AND bucket=$3 ORDER BY "createdAt",id', [userId, run.id, bucket])).rows
       const proposals = (await tx.query('SELECT * FROM improvement_proposals WHERE "userId"=$1 AND bucket=$2 ORDER BY "createdAt",id', [userId, bucket])).rows
       return { scores, proposals }
     })

@@ -8,7 +8,7 @@ It does not replace #192–#195, #208, #230 or #232. See [the spec](self-improve
 | Layer | Evidence | Meaning |
 | --- | --- | --- |
 | Source | Three scorer/contract/document tests | Unknown signals, immutable definitions, allowlist, negative regression |
-| Actual PG17 + HTTP | One suite with seven subtests; 11 total tests including source tests | Tracked migrations, real transactions/socket requests, synthetic runs/reports/identity |
+| Actual PG17 + HTTP | One suite with eight subtests; 12 total tests including source tests | Tracked migrations, real transactions/socket requests, synthetic runs/reports/identity |
 | Existing migration checks | 33 migration files and 11 policy/order tests | No renaming, rewriting or duplicate timestamp |
 | Static lint | Targeted oxlint with denied warnings; diff whitespace check | Source hygiene |
 | Remote CI | PR exact-head checks | Full typecheck/build/browser regression plus dedicated PG17 suite |
@@ -25,6 +25,10 @@ connection-pool recreation and HTTP readback. Stored scorer versions and scores
 reject rewriting; duplicate version with changed definition fails. Candidate bytes
 never contain the adversarial feedback note. Synthetic comparison explicitly
 reports `independentVerification=false` and `productionEligible=false`.
+Moving a run to a different issue also hides the old bucket's snapshots and
+rejects replay of feedback originally recorded against that earlier issue.
+Replaying the new migration after its SQL committed also succeeds, covering
+an interruption before the existing migration runner records its ledger.
 
 An independent review found that initial lifecycle foreign keys would block the
 existing Agent deletion cascade. Source run/issue identifiers are now snapshots,
