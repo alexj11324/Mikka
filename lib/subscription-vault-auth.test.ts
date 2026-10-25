@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createSubscriptionVaultTokens} from './subscription-vault-auth'
-const config=()=>({MIKKA_BYOS_INFISICAL_ORIGIN:'https://app.infisical.com',MIKKA_BYOS_VAULT_AUTH:'universal',MIKKA_BYOS_CUSTODY_CLIENT_ID:'custody-fixture',MIKKA_BYOS_CUSTODY_CLIENT_SECRET:'custody-fixture-secret',MIKKA_BYOS_ACCESS_CLIENT_ID:'access-fixture',MIKKA_BYOS_ACCESS_CLIENT_SECRET:'access-fixture-secret'})
+const config=()=>({NODE_ENV:'test' as const,MIKKA_BYOS_INFISICAL_ORIGIN:'https://app.infisical.com',MIKKA_BYOS_VAULT_AUTH:'universal',MIKKA_BYOS_CUSTODY_CLIENT_ID:'custody-fixture',MIKKA_BYOS_CUSTODY_CLIENT_SECRET:'custody-fixture-secret',MIKKA_BYOS_ACCESS_CLIENT_ID:'access-fixture',MIKKA_BYOS_ACCESS_CLIENT_SECRET:'access-fixture-secret'})
 test('custody enrollment has no reader dependency; scoped providers do not share credentials or denial',async()=>{
  const env:NodeJS.ProcessEnv=config(); const seen:string[]=[]
  const tokens=createSubscriptionVaultTokens(()=>env,async(url,options)=>{

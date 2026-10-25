@@ -1,0 +1,37 @@
+[
+  {
+    "name": "20261025141650_byos_credential_publications.sql",
+    "previousCandidateName": "20261024064200_byos_credential_publications.sql",
+    "sha256": "1ec983216f55262ceaf1adbdafd191168a3e2ac552909f8c529eb04ad74865e3"
+  },
+  {
+    "name": "20261025141651_byos_bindings_oauth.sql",
+    "previousCandidateName": "20261024080000_byos_bindings_oauth.sql",
+    "sha256": "daa6b4adc31536f66b9cc56bb2c4142c834efc4c540e3073340b023dcd3839d8"
+  },
+  {
+    "name": "20261025141652_byos_device_authorization.sql",
+    "previousCandidateName": "20261024160000_byos_device_authorization.sql",
+    "sha256": "6e4aa98f3efa36a48af3c0937b7eddd64bb1d03498c65cc92b48461dd7a0ce9f"
+  },
+  {
+    "name": "20261025141653_byos_access_and_cleanup.sql",
+    "previousCandidateName": "20261024190000_byos_access_and_cleanup.sql",
+    "sha256": "5f08ca8b2814f5539af0013f7ef927ab264c895007d7cbc766fdbb0055aaca6d"
+  },
+  {
+    "name": "20261025141654_byos_native_runs.sql",
+    "previousCandidateName": "20261024201500_byos_native_runs.sql",
+    "sha256": "8dd7726b41a89b602cf2b6e70217ab7a2374de4664a66b2ea4b7ea5c21bb3333"
+  },
+  {
+    "name": "20261025141655_byos_enrollment_transfers.sql",
+    "previousCandidateName": "20261024223000_byos_enrollment_transfers.sql",
+    "sha256": "8e8887e88e39c74f9e240d7bf125029a511817038ef9e787d5a2c97d741daf43"
+  },
+  {
+    "name": "20261025141656_byos_enrollment_cleanup.sql",
+    "previousCandidateName": "20261024230000_byos_enrollment_cleanup.sql",
+    "sha256": "3c159f69bc6ed132b0289499e2ea71d240f0b7a0324caecca7a5b6b206cb6ea4"
+  }
+]
