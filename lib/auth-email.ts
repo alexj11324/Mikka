@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { APIError, type BetterAuthOptions, type User, type DBAdapter } from 'better-auth'
-import { runWithTransaction } from '@better-auth/core/context'
+import { getCurrentAdapter, runWithTransaction } from '@better-auth/core/context'
 import { verifyJWT } from 'better-auth/crypto'
 
 export const AUTH_EMAIL_TTL_SECONDS = 15 * 60
@@ -81,6 +81,13 @@ export function createAuthEmail(options: {
     } else {
       if (url.pathname !== `/mikka/api/auth/reset-password/${encodeURIComponent(data.token)}`) invalidLink()
       callback(url.searchParams.get('callbackURL') ?? undefined, resetReturn)
+      // A user ID alone is insufficient proof if the account email changes
+      // between issuance and redemption. Never retain the raw reset token here.
+      if (!await context.internalAdapter.reserveVerificationValue({
+        identifier: `mikka-mail-reset:${digest(data.token)}`,
+        value: JSON.stringify({ id: data.user.id, email: data.user.email.toLowerCase() }),
+        expiresAt: new Date(Date.now() + AUTH_EMAIL_TTL_SECONDS * 1000),
+      })) unavailable()
       url.searchParams.set('callbackURL', resetReturn)
     }
     const subject = kind === 'verification' ? 'Verify your Mikka email address' : 'Reset your Mikka password'
@@ -134,6 +141,42 @@ export function createAuthEmail(options: {
       if (ctx.path === '/request-password-reset') callback(ctx.body?.redirectTo, resetReturn)
       if (ctx.path?.startsWith('/reset-password/')) callback(ctx.query?.callbackURL, resetReturn, false)
       if (['/send-verification-email', '/request-password-reset'].includes(ctx.path ?? '') && !options.apiKey()) unavailable()
+      if (ctx.path === '/reset-password') {
+        const token = ctx.body?.token || ctx.query?.token
+        if (typeof token !== 'string' || !token || token.length > 4096) invalidLink('reset_token')
+        if (ctx.context.adapter.options?.adapterConfig.transaction === false) unavailable()
+        const original = ctx.context.internalAdapter
+        const resetIdentifier = `reset-password:${token}`
+        const proofIdentifier = `mikka-mail-reset:${digest(token)}`
+        // Better Auth 1.7.12 invokes consumeVerificationValue inside the same
+        // transaction as session revocation and the credential write. Do not use
+        // onPasswordReset: it runs after commit and cannot roll back either side.
+        return { context: { context: { internalAdapter: {
+          ...original,
+          consumeVerificationValue: async (identifier: string) => {
+            if (identifier !== resetIdentifier) invalidLink('reset_identifier')
+            const proof = await original.findVerificationValue(proofIdentifier)
+            if (!proof || new Date(proof.expiresAt).getTime() <= Date.now()) invalidLink('reset_proof')
+            let binding: { id: string; email: string }
+            try { binding = JSON.parse(proof.value) } catch { invalidLink('reset_binding') }
+            if (typeof binding.id !== 'string' || typeof binding.email !== 'string') invalidLink('reset_binding')
+            const consumed = await original.consumeVerificationValue(identifier)
+            if (!consumed || consumed.value !== binding.id) invalidLink('reset_owner')
+            const spent = await original.consumeVerificationValue(proofIdentifier)
+            if (!spent || spent.value !== proof.value) invalidLink('reset_proof')
+            // Conditional no-op update locks the exact issuance owner/email.
+            // This closes a concurrent email-change window until reset commits.
+            const adapter = await getCurrentAdapter(ctx.context.adapter)
+            const locked = await adapter.update<User>({ model: 'user', where: [
+              { field: 'id', value: binding.id }, { field: 'email', value: binding.email },
+            ], update: { email: binding.email } })
+            if (!locked) invalidLink('reset_email_changed')
+            const verified = await original.updateUser(binding.id, { emailVerified: true })
+            if (!verified || verified.id !== binding.id || verified.email !== binding.email || !verified.emailVerified) invalidLink('reset_verification_failed')
+            return consumed
+          },
+        } } } }
+      }
       if (ctx.path !== '/verify-email') return
       const raw = ctx.request ? new URL(ctx.request.url).searchParams : null
       // Fixed booleans only: runtime logs already supply deployment/request IDs.

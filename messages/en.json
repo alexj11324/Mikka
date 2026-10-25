@@ -320,6 +320,7 @@
       "searchAria": "Search related tasks",
       "loadFailed": "Could not load tasks",
       "noTasks": "No other tasks from this owner are available.",
+      "noMatch": "No matching tasks",
       "noTasksSameOwner": "Tasks owned by someone else cannot be linked here.",
       "loading": "Loading tasks…",
       "group": "Available tasks",
