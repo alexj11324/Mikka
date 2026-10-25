@@ -7,6 +7,7 @@ import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 import { withBasePath } from '@/lib/base-path'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
+import { latestCheckpoint } from '@/lib/run-leases'
 import { retryNote } from '@/lib/run-retry'
 import { pool } from '@/lib/db'
 import { isFactoryCheckRun } from '@/lib/factory/checks'
@@ -70,11 +71,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     : undefined
   // A retry after a lost lease works on in the lost attempt's worktree and,
   // when the harness can, its session; the daemon falls back to `prompt`.
+  // Another machine has no such worktree and starts from the latest
+  // checkpoint instead.
   const [lost] = run.retryOf
     ? await db.select({ sessionId: agentRuns.sessionId }).from(agentRuns).where(eq(agentRuns.id, run.retryOf)).limit(1)
     : []
+  const resumeFrom = run.retryOf ? await latestCheckpoint(run.retryOf) : null
   const retry = run.retryOf
-    ? { continuesRunId: run.retryOf, followUp: retryNote(run.attempt), ...(lost?.sessionId ? { resumeSessionId: lost.sessionId } : {}) }
+    ? {
+      continuesRunId: run.retryOf, followUp: retryNote(run.attempt),
+      ...(lost?.sessionId ? { resumeSessionId: lost.sessionId } : {}),
+      ...(resumeFrom ? { resumeFrom } : {}),
+    }
     : {}
   return NextResponse.json({
     runId, issueId: run.issueId, deviceId, repoId: repo.id,

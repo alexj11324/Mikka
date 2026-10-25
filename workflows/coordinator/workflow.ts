@@ -57,7 +57,7 @@ function coordinatorTools(userId: string) {
       execute: input => steps.listIssues(userId, input),
     }),
     get_issue: tool({
-      description: 'Read one issue: its text, status, priority and latest runs.',
+      description: 'Read one issue: text, status, priority, latest runs and persisted Factory task ids/bindings/reasons. Use this after restart or compaction, then get_factory_task for history.',
       inputSchema: z.object({ issueId: id }),
       execute: input => steps.getIssue(userId, input),
     }),

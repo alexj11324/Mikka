@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import test from "node:test";
 import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
@@ -524,24 +525,36 @@ test(
         ).rows[0].n,
         0,
       );
-      console.log(
-        JSON.stringify({
-          layer: "real PG17 with explicit fixture Harness reports",
-          schema,
-          taskId: state.task.id,
-          candidates: state.candidates,
-          attempts: state.attempts.map((a) => ({
-            id: a.id,
-            stage: a.stage,
-            status: a.status,
-            runId: a.runId,
-            sessionId: a.sessionId,
-          })),
-          failedCommand: failure.output,
-          preview: "deployment denied/pending; no retry",
-          finalAcceptance: false,
-        }),
-      );
+      // Runtime identities belong only in an explicitly selected private local artifact.
+      if (
+        process.env.GITHUB_ACTIONS !== "true" &&
+        process.env.FACTORY_EVIDENCE_OUT
+      ) {
+        await mkdir(process.env.FACTORY_EVIDENCE_OUT, { recursive: true });
+        await writeFile(
+          join(process.env.FACTORY_EVIDENCE_OUT, "factory-checks-pg17.json"),
+          JSON.stringify(
+            {
+              layer: "real PG17 with explicit fixture Harness reports",
+              schema,
+              taskId: state.task.id,
+              candidates: state.candidates,
+              attempts: state.attempts.map((a) => ({
+                id: a.id,
+                stage: a.stage,
+                status: a.status,
+                runId: a.runId,
+                sessionId: a.sessionId,
+              })),
+              failedCommand: failure.output,
+              preview: "deployment denied/pending; no retry",
+              finalAcceptance: false,
+            },
+            null,
+            2,
+          ),
+        );
+      }
     } finally {
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);

@@ -1,6 +1,6 @@
 # Independent review and verification (#193)
 
-Initial frozen base: PR #197, `605bf086d4371e19f2df2e2857a487f1decd649d`. The parent-coordinated unified #191/#192 baseline `4cd3a1b5fa05773094722bab7774e15a8d49d018` was subsequently merged without conflicts; its stage/candidate runtime contract is unchanged. Factory contract v1 is unchanged. The candidate retains only `20261025011347_run_dispatch_keys.sql` for #191 and `20261025010001_factory_192_stages.sql` for #192. There is no new migration or stage source.
+Current shared baseline: `87696d6344f65a6369117e8145759462f0e59ef7`, including the coordinated migration manifest at `7e93b86277fbfeb1a5f19d41bcc0c03596484491`. Factory contract v1 is unchanged. The sole #191 migration is `20261025013401_run_dispatch_keys.sql` and #192 is `20261025013402_factory_192_stages.sql`. #193 adds no migration or stage source. Downstream consumers use the coordinated #194 compatibility commit and the manifest's existing #195 filename; duplicate migration histories must not be introduced.
 
 `factoryCheckGates` supplies only review and verify validators to `createFactoryStore(pool, authorize, gates)`. Existing authenticated `route/read/apply`, #191 dispatch transaction and Coordinator preparation/completion events remain the execution path. Pending review and verify dispatch through the same Coordinator tool, on separate run/session identities. No new scheduler is added; #176 still owns reliable wake. Approval, publish and monitor validators remain closed and their implementations are unchanged.
 
@@ -24,14 +24,6 @@ pnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs
 
 `factory-check.test.ts` uses the real daemon, Git worktrees and actual child commands with an explicitly mock Harness. An intentional command failure exits 17 and prints `REAL_ASSERTION_FAILURE`; a real Git commit repairs it and fresh sessions get zero exit. This proves the daemon/command layer, not sandboxed CC/Codex acceptance. `factory-check-api.spec.ts` adds real HTTP/PG coverage in existing CI, using synthetic daemon reports; it checks claim policy/SHA, command freezing, duplicate claim, receipt persistence and out-of-order terminal patches.
 
-## Acceptance still blocked
+## Acceptance boundary
 
-On 2026-10-25 the selected remote Debian environment had Node 24.19.0 and Codex CLI 0.163.0. Disposable PG17.11 and the missing `socat` dependency were unpacked only under `/tmp`; no system installation, cloud database, IAM, paid resource or credential transfer was used. After dependencies passed, the actual existing sandbox-runtime command failed with:
-
-```text
-bwrap: setting up uid map: Read-only file system
-```
-
-Action: launch the existing sandbox-runtime process in this selected execution environment. Result: blocked by container UID-map restrictions before any Harness session. No unsandboxed real Harness fallback, old CLI credential access or retry through another path was attempted. Raw probe and test evidence is saved under `/workspace/issue193-evidence` for the parent thread's private Pages evidence collection.
-
-The parent-coordinated nonproduction Preview deployment was already denied by approval review and is pending the user's response. No Preview deployment was requested or retried here. Fixed Preview OAuth, actual Mikka chat → CC/Codex implement → independent review/verification → real failure/repair/retest, readonly-write denial and #181 same-version acceptance remain incomplete. No screenshot/recording is fabricated. Passing source, PG, mock Harness, HTTP or CI checks does not complete #193.
+Execution records are maintained privately. Layered source, fixture, database and HTTP tests do not replace real Mikka/Harness acceptance, the required deployment and same-version checks, or independent review. A missing runtime or authorization must remain visibly blocked; no gate may be bypassed or passed from model claims alone.
