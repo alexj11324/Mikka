@@ -45,7 +45,7 @@ Only these frames count as a source (file `zPe5LKycb2XuT1ivCLRw07`).
 
 | Area | Section / frames | Accepted |
 | --- | --- | --- |
-| Nav v3.1 shell | `48:2` (as implemented in PR #165) | 2026-10-24 |
+| ~~Nav v3.1 shell~~ | ~~`48:2`~~ moved to 归档 2026-10-25; the shell is what PR #165 built (`components/app-shell.tsx`) | ~~2026-10-24~~ |
 | Kanban v2 | `77:2`, frames `89:2`–`92:2` | 2026-10-23 |
 | Cloud computer | `102:65` | 2026-10-24 06:19 |
 | Style guide | `98:2` (rule 8 out of date, see R-36) | 2026-10-24 |
