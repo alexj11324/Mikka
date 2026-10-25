@@ -59,3 +59,41 @@ jobs:
           OPERATION_DB_TESTS: '1'
           OPERATION_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_208_test
       - run: pnpm typecheck
+      - name: Build the real Next workflow for isolated Local World acceptance
+        run: pnpm build
+        env:
+          CI: 'true'
+          BETTER_AUTH_URL: http://127.0.0.1:3177
+          BETTER_AUTH_SECRET: isolated-sdk-build-only-no-live-provider-access
+          NEXT_TELEMETRY_DISABLED: '1'
+      - name: Real Workflow SDK duplicate delivery and Next worker SIGKILL
+        env:
+          WORKFLOW_TARGET_WORLD: local
+          WORKFLOW_LOCAL_BASE_URL: http://127.0.0.1:3177/mikka
+          WORKFLOW_NODE_HTTP: '1'
+        run: |
+          export WORKFLOW_LOCAL_DATA_DIR="/tmp/mikka-sdk-176-${GITHUB_RUN_ID}"
+          mkdir -p "$WORKFLOW_LOCAL_DATA_DIR"
+          docker run -d --name mikka176-sdk-next --network host --user "$(id -u):$(id -g)" \
+            -e CI=true -e NODE_ENV=production -e NEXT_TELEMETRY_DISABLED=1 \
+            -e BETTER_AUTH_SECRET=isolated-sdk-build-only-no-live-provider-access \
+            -e BETTER_AUTH_URL=http://127.0.0.1:3177 \
+            -e MIKKA_DATABASE_URL -e DATABASE_URL -e WORKFLOW_TARGET_WORLD \
+            -e WORKFLOW_LOCAL_BASE_URL -e WORKFLOW_LOCAL_DATA_DIR -e WORKFLOW_NODE_HTTP \
+            -v "$PWD:$PWD" -v "$WORKFLOW_LOCAL_DATA_DIR:$WORKFLOW_LOCAL_DATA_DIR" -w "$PWD" \
+            node:24-bookworm-slim node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3177
+          python3 scripts/record-terminal.py wake-sdk.cast node --import tsx scripts/verify-wake-sdk.mjs > wake-sdk.log 2>&1
+      - name: Preserve Workflow evidence and stop the isolated test container
+        if: always()
+        run: |
+          docker logs mikka176-sdk-next > wake-sdk-next.log 2>&1 || true
+          docker stop mikka176-sdk-next || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actual-workflow-local-world
+          path: |
+            wake-sdk.cast
+            wake-sdk.log
+            wake-sdk-next.log
+          if-no-files-found: ignore
