@@ -3,18 +3,21 @@
   <img src="public/brand/mikka-icon-light.svg" alt="Mikka" width="72">
 </picture>
 
+**English** · [简体中文](README.zh-CN.md)
+
 # Mikka
 
 ### The AI lead for ambitious work.
 
-为大事而生的 AI lead：从本地到云端，所有 Agent 协作如一。
+Every agent, from laptop to cloud, working as one team.
 
-Mikka runs the coding agents you already use as one team. Tell a bot what you
-need in plain words. It turns the ask into tasks and hands each one to Claude
-Code, Codex or Cursor, on your own machine today and on a cloud computer soon.
+Mikka coordinates the coding agents you already use as a single team. Describe
+what you need to a bot in natural language. The bot breaks the request into
+tasks and assigns each one to Claude Code, Codex or Cursor. Tasks run on your
+own machines today; cloud computers are coming soon.
 
-You follow every piece of work as it happens, step in when it needs you, and
-review what comes back.
+You can follow each task in real time, step in when a decision is needed, and
+review the results.
 
 **Open Mikka:** [app.aspectlylabs.com/mikka](https://app.aspectlylabs.com/mikka)
 · **Docs:** [aspectlylabs.com/mikka/docs](https://aspectlylabs.com/mikka/docs)
@@ -22,39 +25,39 @@ review what comes back.
 
 ## How Mikka works
 
-- **Bots talk. Threads work.**
+- **Bots coordinate. Threads execute.**
   - A bot chats with you, plans the work and hands it out. It does not do the
-    work itself.
+    work directly.
   - Each piece of work runs in a **thread**: one agent run with its own name,
     usually tied to a task. One bot can run many threads at once.
   - The full definitions are in the [glossary](docs/design/glossary.md).
 
-- **One lead, many agents.**
-  - The Coordinator is a long-running bot. It wakes up when a run ends, a task
-    moves, or a worker asks a question, decides what happens next, and tells
-    you only when it needs you.
-  - Create more bots for different kinds of work, or put several in a group
-    chat and let them split it.
+- **One coordinator for many agents.**
+  - The Coordinator is a long-running bot. It wakes when a run ends, a task
+    changes state, or a worker asks a question, decides the next step, and
+    notifies you only when your input is required.
+  - You can create dedicated bots for different kinds of work, or add several
+    bots to a group chat to divide the work among them.
 
-- **Your machines, your agents.**
+- **Runs on your own machines.**
   - The Mikka daemon connects your Mac, Linux machine or server.
-  - It runs agents through the CLIs you already installed and signed in to, so
-    your own plans and settings apply.
+  - It runs agents through the CLIs you have already installed and signed in
+    to, so your existing plans and settings apply.
 
-- **Work that survives failure.**
+- **Recovers from failures.**
   - Each run holds a lease. If a machine goes offline mid-run, Mikka retries
     the run in the same worktree and session instead of starting over.
 
-- **Meets you where you already work.**
-  - Tasks sync both ways with Linear. Other agents drive Mikka through MCP.
-    Telegram turns a message into a task.
+- **Fits into your existing tools.**
+  - Tasks sync both ways with Linear, other agents can operate Mikka through
+    MCP, and a Telegram message can create a task.
 
 ## What Mikka does today
 
-- **Turns asks into tasks.** The Coordinator breaks a request into tasks,
+- **Turns requests into tasks.** The Coordinator breaks a request into tasks,
   dispatches runs, and decides whether each task belongs to the workspace or to
-  you. You can change it in one click.
-- **Shows the work, not just the result.** Every thread shows what its agent
+  you. You can change the assignment in one click.
+- **Makes progress visible.** Every thread shows what its agent
   is doing. Workers report progress, ask questions and flag blocks through
   Mikka's MCP tools, and the Coordinator triages each one.
 - **Cites its sources.** Replies show the tasks, runs and web pages they draw
@@ -62,15 +65,15 @@ review what comes back.
 - **Keeps tasks in one place.** Tasks show on a board and a list, with
   relations, activity history and per-person task numbers. They sync both ways
   with Linear.
-- **Catches what matters.** Mikka reads notifications from GitHub, Linear,
-  Notion, Slack and Gmail, keeps only the ones worth your time, and writes a
-  short daily briefing.
-- **Works from other tools.** Drive Mikka from Claude Code or Codex through its
+- **Filters notifications.** Mikka collects notifications from GitHub, Linear,
+  Notion, Slack and Gmail, surfaces only those that need your attention, and
+  writes a daily briefing.
+- **Works from other tools.** Operate Mikka from Claude Code or Codex through its
   [MCP server](https://aspectlylabs.com/mikka/docs/mcp), or create tasks from
   Telegram.
-- **Runs as a team.** Workspaces, members, invitations and teams, with Google
+- **Supports teams.** Workspaces, members, invitations and teams, with Google
   and GitHub sign-in.
-- **Speaks your language.** The app ships in English and Simplified Chinese.
+- **Bilingual interface.** The app is available in English and Simplified Chinese.
 
 ## What we're building
 
@@ -78,20 +81,21 @@ Work in progress is tracked in
 [GitHub issues](https://github.com/alexj11324/Mikka/issues), mirrored from
 Linear (`MIK-xx`).
 
-| Area | What's coming | Tracking |
+| Area | Planned | Tracking |
 | --- | --- | --- |
-| **Cloud computer** | Every bot gets its own desktop. Watch it live, take control, hand it back. It sleeps when idle and keeps its disk. You can also bring your own machine. | [#172](https://github.com/alexj11324/Mikka/issues/172), [#147](https://github.com/alexj11324/Mikka/issues/147) |
-| **Approvals in chat** | When an agent needs your OK, approve it in the chat: once, never, or for the rest of the task. | [#147](https://github.com/alexj11324/Mikka/issues/147), [#177](https://github.com/alexj11324/Mikka/issues/177) |
-| **Group chats** | Several bots and people in one chat, with turn-taking, @ mentions and a "who is working" bar. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
-| **Factory** | A full delivery loop: one run per task at a time, durable stages, independent review and verification threads, and a human release gate backed by real evidence. | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
-| **Hand-off between machines** | Save work in progress and move a lost run to another machine. | [PR #201](https://github.com/alexj11324/Mikka/pull/201) |
-| **Scheduled tasks** | Ask a bot to do something later or on a schedule, and get the result back in chat. | [#179](https://github.com/alexj11324/Mikka/issues/179) |
-| **Connected apps** | Mail, calendar, docs and Slack workflows that act, not just read, with approval. | [#177](https://github.com/alexj11324/Mikka/issues/177) |
-| **Everyday polish** | Onboarding, ⌘K search, a knowledge base, web search for agents, and team visibility rules. | [#129](https://github.com/alexj11324/Mikka/issues/129), [#131](https://github.com/alexj11324/Mikka/issues/131), [#134](https://github.com/alexj11324/Mikka/issues/134), [#100](https://github.com/alexj11324/Mikka/issues/100), [#127](https://github.com/alexj11324/Mikka/issues/127) |
+| **Cloud computer** | Each bot gets its own desktop, which you can watch live, take control of, and hand back. It sleeps when idle and keeps its disk. Your own machines can also be connected. | [#172](https://github.com/alexj11324/Mikka/issues/172), [#147](https://github.com/alexj11324/Mikka/issues/147) |
+| **Approvals in chat** | When an agent needs authorization, you respond in the chat: allow once, deny, or allow for the rest of the task. | [#147](https://github.com/alexj11324/Mikka/issues/147), [#177](https://github.com/alexj11324/Mikka/issues/177) |
+| **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
+| **Factory** | An end-to-end delivery process: one run per task at a time, durable stage state, independent review and verification threads, and human release approval based on recorded evidence. | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
+| **Cross-machine handoff** | Save work in progress and resume interrupted runs on another machine. | [PR #201](https://github.com/alexj11324/Mikka/pull/201) |
+| **Scheduled tasks** | Bots run tasks at a set time or on a recurring schedule and report the results in chat. | [#179](https://github.com/alexj11324/Mikka/issues/179) |
+| **Connected apps** | Workflows for mail, calendar, documents and Slack that can take actions, not only read, subject to your approval. | [#177](https://github.com/alexj11324/Mikka/issues/177) |
+| **Secure credentials** | Agents request credentials through a secure form. A vault holds them, and a controlled browser uses them only for approved actions. | [#180](https://github.com/alexj11324/Mikka/issues/180) |
+| **Usability** | Onboarding, ⌘K search, a knowledge base, web search for agents, and team visibility settings. | [#129](https://github.com/alexj11324/Mikka/issues/129), [#131](https://github.com/alexj11324/Mikka/issues/131), [#134](https://github.com/alexj11324/Mikka/issues/134), [#100](https://github.com/alexj11324/Mikka/issues/100), [#127](https://github.com/alexj11324/Mikka/issues/127) |
 
 ## Connect your agents
 
-### Drive Mikka over MCP
+### Operate Mikka through MCP
 
 Mikka is an MCP server (Streamable HTTP, OAuth 2.1). Add it to Claude Code:
 
@@ -99,7 +103,7 @@ Mikka is an MCP server (Streamable HTTP, OAuth 2.1). Add it to Claude Code:
 claude mcp add --transport http mikka https://app.aspectlylabs.com/mikka/api/mcp
 ```
 
-Claude Code signs you in through your browser. Agents can then read and change
+Claude Code completes sign-in in your browser. Agents can then read and modify
 tasks, dispatch runs and update the Coordinator's memory. Other clients and the
 full tool list are in the [MCP docs](https://aspectlylabs.com/mikka/docs/mcp).
 
@@ -114,8 +118,33 @@ the machine and runs threads through them:
 | Codex | `codex` |
 | Cursor | `cursor-agent` or `agent` |
 
-Each run gets its own git worktree, so parallel threads do not step on each
-other.
+Each run uses its own git worktree, so parallel threads stay isolated.
+
+## Architecture
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
+  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: clients reach the Next.js app on Vercel, the Coordinator dispatches runs to the daemon on your machine, agents report back through MCP, and state lives in Postgres and syncs with Linear.">
+</picture>
+
+The web app, Telegram and MCP clients all reach the same Next.js application on
+Vercel. Events such as a finished run or a worker question go to the
+Coordinator, a durable workflow that triages each event and decides the next
+step.
+
+Runs execute on your machines. The daemon registers the device, claims runs
+through the device API, and starts the agent CLI in a dedicated git worktree.
+The agent reports progress, questions and blocks through Mikka's MCP worker
+tools.
+
+Linear sync runs in a Cloudflare Worker that exchanges changes with Postgres
+through a durable inbox and outbox.
+
+Dashed boxes and lines are on the roadmap: the Scheduler
+([#179](https://github.com/alexj11324/Mikka/issues/179)), Factory stages ([#191](https://github.com/alexj11324/Mikka/issues/191)–[#194](https://github.com/alexj11324/Mikka/issues/194)), Monitoring
+([#195](https://github.com/alexj11324/Mikka/issues/195)), the cloud computer ([#172](https://github.com/alexj11324/Mikka/issues/172)), handoff between machines
+([PR #201](https://github.com/alexj11324/Mikka/pull/201)), local computer use ([#147](https://github.com/alexj11324/Mikka/issues/147)), connected-app actions
+([#177](https://github.com/alexj11324/Mikka/issues/177)) and the credential vault ([#180](https://github.com/alexj11324/Mikka/issues/180)).
 
 ## Built with
 
@@ -151,9 +180,9 @@ docs/                # Engineering and design docs
 Mikka is developed against cloud Preview deployments, not a local server.
 Builds, type checks and end-to-end tests run in CI, and each pull request gets
 its own Preview URL. Credentials live in Infisical Cloud; never commit them or
-put them in a local `.env`.
+store them in a local `.env` file.
 
-Install dependencies and run the source-only checks:
+Install dependencies and run the checks that do not require a server:
 
 ```sh
 pnpm install
@@ -172,11 +201,20 @@ Start with these documents:
   chat mean.
 - [`docs/acceptance.md`](docs/acceptance.md): how a change is accepted on a
   Preview.
-- [`docs/review-checklist.md`](docs/review-checklist.md): run before showing UI
-  to anyone.
+- [`docs/review-checklist.md`](docs/review-checklist.md): complete before
+  presenting UI to others.
 
 ## Get access
 
 Mikka is in early access. Email
 [hello@aspectlylabs.com](mailto:hello@aspectlylabs.com) for an invite, then
 follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart).
+
+## License
+
+Mikka is licensed under [AGPL-3.0-only](LICENSE). Third-party components keep
+their own licenses; see
+[`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md).
+
+If you run a modified version of Mikka as a network service, the AGPL requires
+you to offer its users the source code of your version.
