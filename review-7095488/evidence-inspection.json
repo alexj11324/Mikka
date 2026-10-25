@@ -1,0 +1,18 @@
+{
+  "sourceSha": "70954888ecf6e13d88cab736060044f9f7dee832",
+  "checkedAt": "2026-10-25T18:07:40.779012+00:00",
+  "scope": "Only synthetic cloud Linux isolated acceptance artifacts; not production data",
+  "textChecks": [
+    "no literal bearer/token/private-key/session-cookie pattern detected",
+    "receipts omit auth request bodies/cookies/passwords/token values; only synthetic IDs and safe statuses",
+    "video console and API query/personal/denied screenshots visually inspected; no secrets or user PII"
+  ],
+  "media": [
+    "raw VP9 byte identity checked against original page@ captures",
+    "H264 full-duration17.68s with no cuts; full decode/native Chromium playback passed"
+  ],
+  "limitations": [
+    "Not an automated proof against every sensitive string; fixtures were generated exclusively for isolated acceptance",
+    "No full product UI/production/provider/daemon execution recording claimed"
+  ]
+}

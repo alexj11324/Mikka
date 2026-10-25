@@ -1,0 +1,27 @@
+
+> next-app@0.0.1 test:audit /workspace/mikka-audit-210
+> node --import tsx --test --test-concurrency=1 lib/audit/postgres.test.ts lib/audit/mailbox-locks.test.ts
+
+{"schema":"audit_lock_2309e15c310e4141b9d9f3adb855ee2e","tenant":"f75fc98d-d50b-43af-867a-48b740e5e442","owner":"owner_034e4f46-04df-478c-8fd2-514dfa108702","source":"70954888ecf6e13d88cab736060044f9f7dee832","expectDeadlock":false,"observations":[{"stage":"stop holds audit H at barrier; complete entered","stop":{"pid":1636,"wait_event":"advisory","blockers":[1633]},"complete":{"pid":1637,"wait_event":"transactionid","blockers":[1636]}},{"stage":"both barriers released","result":[{"ok":true,"code":""},{"ok":true,"code":""}]}],"rows":[{"id":"1b3f5997-cea0-4f48-b525-c7798b6c7edd","status":"stopped"},{"id":"f784873c-bf3a-433b-8945-8fcecbbcd31d","status":"cancelled"}],"utc":"2026-10-25T17:48:44.937Z"}
+✔ real PG: coordinated stop versus complete preserves audit and mailbox lock order (450.317864ms)
+▶ PostgreSQL audit: tenant isolation, role matrix, retries, immutable export, failure and retention
+  ✔ concurrent retry is one event; conflicting duplicate rejected; secret fields rejected (69.550218ms)
+  ✔ admin/member/suspended/foreign/bearer/current revocation matrix and filters (80.033764ms)
+  ✔ configured origin survives internal proxy URL without trusting foreign origins (15.240519ms)
+  ✔ paged snapshot resumes after new events and fresh connection; no gaps/count/hash mismatch (53.632237ms)
+  ✔ two-store export resumes partial creation without replacing application snapshot (22.785637ms)
+  ✔ run, credential, account approval and uncertain operation transitions are atomic and contain references only (32.278603ms)
+  ✔ ordinary mailbox continuation inherits workspace; forged parent chains are rejected (97.662263ms)
+  ✔ automatic auth lifecycle is durable, sanitised, and rolls back when audit cannot persist (20.170206ms)
+  ✔ unauthorised mutation blocked and controlled privileged corruption/deletion/reorder detected (19.448383ms)
+{"evidence":"audit-210","tenants":["453e2fda-ea96-45cd-8b04-ecd9b91061c9","3495716b-474c-4aa7-983a-2b74dbc55dc9"],"owner":"audit_f421930d-2316-42cc-b260-be3c2ed86b0e","member":"audit_8dad350e-83ea-432d-8f5a-6510c6c611f0","appDatabase":"audit_app_verified_e2e","workspaceDatabase":"audit_workspace_verified_e2e","kind":"fixture-context","utc":"2026-10-25T17:48:45.680Z"}
+  ✔ legal hold, export lease, checkpoint prune and tombstone replay after expiry (29.254341ms)
+✔ PostgreSQL audit: tenant isolation, role matrix, retries, immutable export, failure and retention (484.574044ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1372.686757

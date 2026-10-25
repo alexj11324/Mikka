@@ -1,0 +1,255 @@
+{
+  "sha": "70954888ecf6e13d88cab736060044f9f7dee832",
+  "utc": "2026-10-25T18:06:42.217Z",
+  "incident": "Unplanned local root filesystem ENOSPC after all primary HTTP and recordings passed. Own PG container exited; reproducible caches relocated without deleting evidence or DB volumes; PG restarted.",
+  "layer": "real isolated DB chain verification after local process recovery, not a production fault exercise",
+  "streams": [
+    {
+      "database": "audit_app_709_e2e",
+      "tenant": "35cf101f-ce43-42bd-8461-8d3b0ebb1ecd",
+      "result": {
+        "tenant": "35cf101f-ce43-42bd-8461-8d3b0ebb1ecd",
+        "seq": "6",
+        "hash": "f4105727c1990327d565fc60f83c19ba7a0bba3ae4080abf0e31ddd5a5c2ce80",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_app_709_e2e",
+      "tenant": "63aa9d8d-5c28-4b5a-a7f2-f4e547df464f",
+      "result": {
+        "tenant": "63aa9d8d-5c28-4b5a-a7f2-f4e547df464f",
+        "seq": "5",
+        "hash": "307901ca11f6a4d286cac78e9443fc854feaaf94a9f330f2c3f42b0ba1bab2c2",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_app_709_e2e",
+      "tenant": "892d325d-44f6-4c73-b0f4-428708c6cc80",
+      "result": {
+        "tenant": "892d325d-44f6-4c73-b0f4-428708c6cc80",
+        "seq": "6",
+        "hash": "7a71db5017627671805541f86d6b360237f9c8ba994d68ab8836c4d6688844a5",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_app_709_e2e",
+      "tenant": "personal:anohGie9UcZgC5wIl87JKbIDRe0Xz55X",
+      "result": {
+        "tenant": "personal:anohGie9UcZgC5wIl87JKbIDRe0Xz55X",
+        "seq": "2",
+        "hash": "186d853ef18638658b7758c382ccb3e68060ec129f7f4a3401fbeb1a0b5c22f5",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_app_709_e2e",
+      "tenant": "personal:D14Otlw0I7JMu99qfxK6AIjysoHqnfZL",
+      "result": {
+        "tenant": "personal:D14Otlw0I7JMu99qfxK6AIjysoHqnfZL",
+        "seq": "3",
+        "hash": "06c195d47b51c4b238ca9902c14435784187f54ce33e8b5b5c71ff470158976b",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 30,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_app_709_e2e",
+      "tenant": "personal:E0OmhuRYlV22YfpH9jK74OUBn3Ub99qs",
+      "result": {
+        "tenant": "personal:E0OmhuRYlV22YfpH9jK74OUBn3Ub99qs",
+        "seq": "1",
+        "hash": "6958f97226d2bf765e099966ae3bbfa6599f89795d5c489aab1d7b34d77712eb",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_app_709_e2e",
+      "tenant": "personal:h1cKdTgbo30ire9qVeQQ4eNYnCcIgOtE",
+      "result": {
+        "tenant": "personal:h1cKdTgbo30ire9qVeQQ4eNYnCcIgOtE",
+        "seq": "3",
+        "hash": "ecc49afe42a5103cad98759f054503b217648c8815da034c1ad2a98bc3947ef9",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_app_709_e2e",
+      "tenant": "personal:MhdxWxAERVfb7H0Aaf3591qJdXUmxJNO",
+      "result": {
+        "tenant": "personal:MhdxWxAERVfb7H0Aaf3591qJdXUmxJNO",
+        "seq": "2",
+        "hash": "741b1b5ba6a08eac9d32626442781cd782ce520556599a7905421a473a25f737",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_app_709_e2e",
+      "tenant": "personal:mR1ZzBOOH53Qybgj8X4UDX09SrKktNY9",
+      "result": {
+        "tenant": "personal:mR1ZzBOOH53Qybgj8X4UDX09SrKktNY9",
+        "seq": "1",
+        "hash": "055bf0ab33c28de6aa39b89232b323cee220f043125e1cf89b1093e58e551f4a",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_app_709_e2e",
+      "tenant": "personal:PefXBSQeyvBibHmNYFW5bZyS3Z5QUNwa",
+      "result": {
+        "tenant": "personal:PefXBSQeyvBibHmNYFW5bZyS3Z5QUNwa",
+        "seq": "1",
+        "hash": "3c64ee3b92efb55b870b9f321da6dc8ffbb05485091e6c30e7d3bdb6e6ca188d",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_app_709_e2e",
+      "tenant": "personal:tgn7NKp0zwYIg0XSxMz4VwrxhfrLcsdo",
+      "result": {
+        "tenant": "personal:tgn7NKp0zwYIg0XSxMz4VwrxhfrLcsdo",
+        "seq": "2",
+        "hash": "6f1bb09ea4cb3f6a9568cc01ed9016ae433b3b7e6f1f228d8ec2cb7b3657254c",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_app_709_e2e",
+      "tenant": "system:auth",
+      "result": {
+        "tenant": "system:auth",
+        "seq": "5",
+        "hash": "2172006da043c3b31ce27eadc4d3b4e1a9cbb3d5496a93f64cc7155bc9bde4cf",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_workspace_709_e2e",
+      "tenant": "3135903e-acf8-4baa-8480-7359860740c5",
+      "result": {
+        "tenant": "3135903e-acf8-4baa-8480-7359860740c5",
+        "seq": "1",
+        "hash": "f660c26f928ca63a718bdbbbfe8653098535f3c5c6199ddd646e3f516c467802",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_workspace_709_e2e",
+      "tenant": "35cf101f-ce43-42bd-8461-8d3b0ebb1ecd",
+      "result": {
+        "tenant": "35cf101f-ce43-42bd-8461-8d3b0ebb1ecd",
+        "seq": "2",
+        "hash": "7a00673e6370d35851fa828d5d01cef264bbde1f5866df9a6e4924f9c1dac0f1",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_workspace_709_e2e",
+      "tenant": "4f59cdb4-0525-4f51-8e35-50c95fe92ef9",
+      "result": {
+        "tenant": "4f59cdb4-0525-4f51-8e35-50c95fe92ef9",
+        "seq": "1",
+        "hash": "33ef18cac74d380b99f440532d786691d3691ff62600e524e2bed368c154f5e9",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_workspace_709_e2e",
+      "tenant": "63aa9d8d-5c28-4b5a-a7f2-f4e547df464f",
+      "result": {
+        "tenant": "63aa9d8d-5c28-4b5a-a7f2-f4e547df464f",
+        "seq": "9",
+        "hash": "1a066cf1b7d35862ac1eacc5b4f3fc951e8df3706f3fd7a65276428d6f1f3fab",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_workspace_709_e2e",
+      "tenant": "892d325d-44f6-4c73-b0f4-428708c6cc80",
+      "result": {
+        "tenant": "892d325d-44f6-4c73-b0f4-428708c6cc80",
+        "seq": "2",
+        "hash": "19f1fdf5a9a96e0f309ae57f8268291ec2cf09ebf5bb3121d74a771e1108570f",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_workspace_709_e2e",
+      "tenant": "90a12d10-ac73-427d-b4b8-2b1da14999f9",
+      "result": {
+        "tenant": "90a12d10-ac73-427d-b4b8-2b1da14999f9",
+        "seq": "1",
+        "hash": "4e0c792418c195c48eae28ec4f4e9d9f1042f1675e4c81ff75252578cfe7dc92",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    },
+    {
+      "database": "audit_workspace_709_e2e",
+      "tenant": "personal:D14Otlw0I7JMu99qfxK6AIjysoHqnfZL",
+      "result": {
+        "tenant": "personal:D14Otlw0I7JMu99qfxK6AIjysoHqnfZL",
+        "seq": "1",
+        "hash": "e438bc7eb0471725f43ee20dfbf9ae056485472fbb80457dacd1bda111e44aef",
+        "floor": "0",
+        "floor_hash": "",
+        "retention_days": 90,
+        "legal_hold": false
+      }
+    }
+  ]
+}

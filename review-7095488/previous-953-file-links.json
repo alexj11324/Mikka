@@ -1,0 +1,294 @@
+{
+  "evidenceCommit": "7f3fa4fd4217d4eb267a784b499f062a464d6aab",
+  "sourceSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+  "files": [
+    {
+      "file": "README.md",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/README.md",
+      "bytes": 4426,
+      "httpStatus": 200,
+      "sha256": "48592ebe7100c002b29130583a5f51b3b16c032b02078c6104acdbec0ec590cd",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "SHA256SUMS",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/SHA256SUMS",
+      "bytes": 2617,
+      "httpStatus": 200,
+      "sha256": "9a9bc1abc5e9566c6c472e8d716b6ed92e75569edb54cd03923ddc96b842d755",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "acceptance.json",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/acceptance.json",
+      "bytes": 6350,
+      "httpStatus": 200,
+      "sha256": "9408affe305dca3769227220824844fa77e49c54b2f2eaf15ac132067881e56c",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "application-page-0.jsonl",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/application-page-0.jsonl",
+      "bytes": 1131,
+      "httpStatus": 200,
+      "sha256": "1115342b21ad1022cce9d3ddc252653d37716436674ff21e2b07cd6d2cb183ef",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "audit-http-raw.webm",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/audit-http-raw.webm",
+      "bytes": 606261,
+      "httpStatus": 200,
+      "sha256": "9dd92da4f03542e780902aeee4652725bfb00c22807c855186125493caa53535",
+      "kind": "raw recording",
+      "authRequired": false
+    },
+    {
+      "file": "ci-summary.json",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/ci-summary.json",
+      "bytes": 3953,
+      "httpStatus": 200,
+      "sha256": "8bd481dffb2bc0671de91f7f57fda047255770eb189ce2a7489cc815ec319a9b",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "database-readback.json",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/database-readback.json",
+      "bytes": 23792,
+      "httpStatus": 200,
+      "sha256": "012160b153f14f2e7a8ea7c33bdbdbea5a53a793cb2c926051845c2451e8e424",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "failure-http.log",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/failure-http.log",
+      "bytes": 143,
+      "httpStatus": 200,
+      "sha256": "6564b110b3bc5590be5de9c67244725566b0ed00c4e2638a1292c9904ec9c2f2",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "failure-reproduce.mjs",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/failure-reproduce.mjs",
+      "bytes": 5629,
+      "httpStatus": 200,
+      "sha256": "6b69b6903c65b865d9ff3c4290ea47f385e7fff987be583fe701d5d93949c1ed",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "failure-restart-acceptance.json",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/failure-restart-acceptance.json",
+      "bytes": 2512,
+      "httpStatus": 200,
+      "sha256": "f60dcd4aa637aeb3f4eb18a6064683688ead7f7d11b5066dbc0f4467934ce54c",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "http.log",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/http.log",
+      "bytes": 266,
+      "httpStatus": 200,
+      "sha256": "1a5a2f9f0e97678edda852aa1026dfa763fa77bcfca82d66240294dfe2713fd7",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "lint.log",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/lint.log",
+      "bytes": 1666,
+      "httpStatus": 200,
+      "sha256": "21e90de89a22c8d1b922324bd2155b2b2206ca1012e29bdd446ad30d10cc07ea",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "mailbox.log",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/mailbox.log",
+      "bytes": 3444,
+      "httpStatus": 200,
+      "sha256": "bf322a916731b9dc193dbe1ec4beca56bfa8cb1be4bc609f0024145712685a5a",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "member-denied.png",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/member-denied.png",
+      "bytes": 8801,
+      "httpStatus": 200,
+      "sha256": "5bed235ba8e48cdf9d8e3932b51796da0c0d1ca80b7d83f8ffb374edef88e947",
+      "kind": "raw screenshot",
+      "authRequired": false
+    },
+    {
+      "file": "migration-repeat.log",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/migration-repeat.log",
+      "bytes": 0,
+      "httpStatus": 200,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "migrations.log",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/migrations.log",
+      "bytes": 4428,
+      "httpStatus": 200,
+      "sha256": "29d342083b6fe5861461e5553509a2331be87312f110eb7d91df0d1b2fec33c4",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "personal-query.png",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/personal-query.png",
+      "bytes": 89745,
+      "httpStatus": 200,
+      "sha256": "75b73f131365adebe49f9d90acaddc50bf3987e33a8cd14046d33d3b1f453b12",
+      "kind": "raw screenshot",
+      "authRequired": false
+    },
+    {
+      "file": "postgres.log",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/postgres.log",
+      "bytes": 1656,
+      "httpStatus": 200,
+      "sha256": "ebccff64cc9b336653aa1701d0bf7f9c52b091004e2e27e97bec2a2920d0b43b",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "process.json",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/process.json",
+      "bytes": 214,
+      "httpStatus": 200,
+      "sha256": "01cb701e54e7804dd7a01d7787d766d9977b02c97cb6015f4dd6640eeba49bf8",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "production-build.log",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/production-build.log",
+      "bytes": 5777,
+      "httpStatus": 200,
+      "sha256": "b41f576c6c63f4e950807f611708df6c50cbbbfde88a8c840056b8a3034b3787",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "scoped-lint.log",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/scoped-lint.log",
+      "bytes": 0,
+      "httpStatus": 200,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "typecheck.log",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/typecheck.log",
+      "bytes": 0,
+      "httpStatus": 200,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "validation-history.md",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/validation-history.md",
+      "bytes": 2588,
+      "httpStatus": 200,
+      "sha256": "6cd1b4f1b05bf9dd90773ca50c92f8fd6e08d4e4524c6ca1e0b986e123f9881f",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "video-info.json",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/video-info.json",
+      "bytes": 244,
+      "httpStatus": 200,
+      "sha256": "14a4d07240c6a94994336c36c29ea77768e9030d8fbe4e33c0c660a0c8222d85",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "worker-acceptance.json",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/worker-acceptance.json",
+      "bytes": 3682,
+      "httpStatus": 200,
+      "sha256": "f357e483d0296b6bc3d486e4bbc3b22c524ad9d449f58bdc066681bd4cf065b4",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "worker-http.log",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/worker-http.log",
+      "bytes": 140,
+      "httpStatus": 200,
+      "sha256": "2feb87ce02d476c070769f4ccc5164e80edd6747abd653751b718ffa826a7579",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "worker-reproduce.mjs",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/worker-reproduce.mjs",
+      "bytes": 4167,
+      "httpStatus": 200,
+      "sha256": "bbf04d2dbf05daf9e256bf48ffe951e83c2bf82be60d85ce8871b1c29b0233f6",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "workspace-page-0.jsonl",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/workspace-page-0.jsonl",
+      "bytes": 1159,
+      "httpStatus": 200,
+      "sha256": "720b95b87a81b1b789305cb113e23ce35d07b6655d5133ead72547ca490a1a9c",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "workspace-page-1.jsonl",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/workspace-page-1.jsonl",
+      "bytes": 1224,
+      "httpStatus": 200,
+      "sha256": "87c07b518ee9e36dc651a15d7d44adbde354a6d06e6986dc76cb5e7fae3ad7c1",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "workspace-page-2.jsonl",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/workspace-page-2.jsonl",
+      "bytes": 1235,
+      "httpStatus": 200,
+      "sha256": "fa9e78c16de32ef74c7e31abf8d23645cc84752ae62440f72e9b25bd41dd919e",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "workspace-page-3.jsonl",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/workspace-page-3.jsonl",
+      "bytes": 1191,
+      "httpStatus": 200,
+      "sha256": "eba29ee5bf5559951d73cd691c4e33ae06da039a4b01077e0eff88dc23e1063a",
+      "kind": "receipt/export/log/document",
+      "authRequired": false
+    },
+    {
+      "file": "workspace-query.png",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/7f3fa4fd4217d4eb267a784b499f062a464d6aab/workspace-query.png",
+      "bytes": 198945,
+      "httpStatus": 200,
+      "sha256": "a6ed6c0ab5226aef084f3b79c41ff511c4a3c3df5102018167e44e6b84720d17",
+      "kind": "raw screenshot",
+      "authRequired": false
+    }
+  ]
+}

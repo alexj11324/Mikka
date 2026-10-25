@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:21010) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › tests/e2e/self-improvement-api.spec.ts:17:1 › Skill baseline selection, actual claim receipt and feedback provenance use real authenticated routes (7.6s)
+
+  1 passed (9.7s)

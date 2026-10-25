@@ -1,0 +1,13 @@
+{
+  "sha": "70954888ecf6e13d88cab736060044f9f7dee832",
+  "image": "sha256:739f342b809d803f7351c2825e9bb6eb31ace41d16373f2ff3048270261d0d66",
+  "startedAt": "2026-10-25T17:54:10.732967069Z",
+  "buildId": "7gMV-FzCqN-bmhVKVQxTF",
+  "origin": "http://127.0.0.1:3110/mikka",
+  "dbTargets": [
+    "audit_app_709_e2e",
+    "audit_workspace_709_e2e"
+  ],
+  "scope": "isolated synthetic cloud Linux; no production deployment",
+  "currentlyStopped": "Controlled stop for relocating reproducible caches after host root ENOSPC; evidence was captured before that incident"
+}

@@ -1,0 +1,41 @@
+{
+  "sourceSha": "70954888ecf6e13d88cab736060044f9f7dee832",
+  "currentCI": {
+    "id": 40218177477,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/40218177477",
+    "conclusion": "failure",
+    "stage": "Credential broker integration",
+    "controlledBrowserDurationMs": 60013.502036,
+    "failedChildCases": [
+      {
+        "source": "lib/credentials/acceptance.test.ts:405",
+        "error": "404 credential_not_found != 201"
+      },
+      {
+        "source": "lib/credentials/acceptance.test.ts:488",
+        "error": "credential_not_found"
+      },
+      {
+        "source": "lib/credentials/acceptance.test.ts:521",
+        "error": "credential_not_found"
+      }
+    ],
+    "parentSuiteAlsoCounted": true,
+    "causeBoundary": "Unchanged fixture has no worker heartbeat across a60s Chromium subtest; exact-base causal clock-state PG reproduction is separate from full browser CI",
+    "coordinatedFix": "pending parent shared fixture decision; no production protection weakened"
+  },
+  "previousCI": {
+    "sha": "88eff863c9d4e9c3acf3ee625cb154e456ce81cc",
+    "id": 40216696886,
+    "performancePassed": 5,
+    "browserPassed": 85,
+    "browserSkipped": 1,
+    "browserFailed": 1,
+    "cause": "test performed post-insert retryOf reparenting rejected by intended audit guard",
+    "fixedIn": "70954888ecf6e13d88cab736060044f9f7dee832"
+  },
+  "sameBaseAndHeadBlobs": {
+    "lib/credentials/acceptance.test.ts": "e43b65aac2cde21f40f8c7b799f97e15501d05db",
+    "lib/credentials/authority.ts": "1332d828b1192ff5630e51a4ae5c20895f3d24e7"
+  }
+}

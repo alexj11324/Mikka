@@ -1,0 +1,133 @@
+⚠ Serde warning for classes "Run", "ChannelImpl", "Message", "ThreadImpl", "GatewayEmbeddingModel", "GatewayImageModel", "GatewayLanguageModel": Workflow bundle contains Node.js built-in imports: crypto, fs, path. These will fail at runtime in the workflow sandbox. Add "use step" to methods that depend on Node.js APIs so they are stripped from the workflow bundle.
+✓ Compiled workflows in 2.1s (64 steps, 1 workflow)
+▲ Next.js 16.1.6 (webpack)
+- Experiments (use with caution):
+  ✓ globalNotFound
+
+  Creating an optimized production build ...
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Parsing of /app/node_modules/.pnpm/next-intl@4.14.9_@types+react@19.3.0_next@16.1.6_@babel+core@7.29.7_@opentelemetry+api@_05400d200bd0e46dd14566ec384f351c/node_modules/next-intl/dist/esm/production/extractor/format/index.js for build dependencies failed at 'import(t(c).href)'.
+<w> Build dependencies behind this expression are ignored and might cause incorrect cache invalidation.
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Parsing of /app/node_modules/.pnpm/next-intl@4.14.9_@types+react@19.3.0_next@16.1.6_@babel+core@7.29.7_@opentelemetry+api@_05400d200bd0e46dd14566ec384f351c/node_modules/next-intl/dist/esm/production/extractor/format/index.js for build dependencies failed at 'import(t(c).href)'.
+<w> Build dependencies behind this expression are ignored and might cause incorrect cache invalidation.
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Parsing of /app/node_modules/.pnpm/next-intl@4.14.9_@types+react@19.3.0_next@16.1.6_@babel+core@7.29.7_@opentelemetry+api@_05400d200bd0e46dd14566ec384f351c/node_modules/next-intl/dist/esm/production/extractor/format/index.js for build dependencies failed at 'import(t(c).href)'.
+<w> Build dependencies behind this expression are ignored and might cause incorrect cache invalidation.
+✓ Compiled successfully in 104s
+  Running next.config.js provided runAfterProductionCompile ...
+✓ Completed runAfterProductionCompile in 12ms
+  Running TypeScript ...
+  Collecting page data using 4 workers ...
+  Generating static pages using 4 workers (0/34) ...
+  Generating static pages using 4 workers (8/34) 
+  Generating static pages using 4 workers (16/34) 
+  Generating static pages using 4 workers (25/34) 
+✓ Generating static pages using 4 workers (34/34) in 401.8ms
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+┌ ○ /_not-found
+├ ƒ /.well-known/oauth-authorization-server
+├ ƒ /.well-known/oauth-protected-resource
+├ ƒ /.well-known/workflow/v1/flow
+├ ƒ /.well-known/workflow/v1/webhook/[token]
+├ ƒ /[locale]
+├ ƒ /[locale]/[...rest]
+├ ƒ /[locale]/acceptance
+├ ƒ /[locale]/dashboard
+├ ƒ /[locale]/devices
+├ ƒ /[locale]/forgot-password
+├ ƒ /[locale]/invite/[token]
+├ ƒ /[locale]/oauth/consent
+├ ƒ /[locale]/preview
+├ ƒ /[locale]/preview/settings
+├ ƒ /[locale]/reset-password
+├ ƒ /[locale]/settings
+├ ƒ /[locale]/settings/members
+├ ƒ /[locale]/settings/teams
+├ ƒ /[locale]/sign-in
+├ ƒ /[locale]/sign-up
+├ ƒ /[locale]/verify-email
+├ ƒ /[locale]/workspaces/new
+├ ƒ /api/acceptance
+├ ƒ /api/agent
+├ ƒ /api/agent/images
+├ ƒ /api/agent/sessions
+├ ƒ /api/audit
+├ ƒ /api/audit/export
+├ ƒ /api/auth/[...all]
+├ ƒ /api/conversations
+├ ƒ /api/conversations/[id]/artifacts
+├ ƒ /api/conversations/[id]/members
+├ ƒ /api/conversations/[id]/messages
+├ ƒ /api/conversations/[id]/review
+├ ƒ /api/conversations/directory
+├ ƒ /api/coordinator/messages
+├ ƒ /api/credential-requests
+├ ƒ /api/credential-requests/[id]
+├ ƒ /api/credential-requests/[id]/cancel
+├ ƒ /api/credential-requests/[id]/events
+├ ƒ /api/credential-requests/[id]/submit
+├ ƒ /api/cron/credential-cleanup
+├ ƒ /api/cron/linear-sync
+├ ƒ /api/cron/subscriptions
+├ ƒ /api/devices/ssh
+├ ƒ /api/factory/questions/[questionId]
+├ ƒ /api/factory/tasks
+├ ƒ /api/factory/tasks/[taskId]
+├ ƒ /api/factory/tasks/[taskId]/approval
+├ ƒ /api/health
+├ ƒ /api/integrations/composio
+├ ƒ /api/integrations/composio/callback
+├ ƒ /api/integrations/google/callback
+├ ƒ /api/integrations/linear/callback
+├ ƒ /api/mailboxes
+├ ƒ /api/mailboxes/[mailboxId]
+├ ƒ /api/mcp
+├ ƒ /api/pending-actions
+├ ƒ /api/self-improvement
+├ ƒ /api/skills/search
+├ ƒ /api/subscriptions
+├ ƒ /api/subscriptions/callback
+├ ƒ /api/subscriptions/enrollments
+├ ƒ /api/subscriptions/enrollments/bind
+├ ƒ /api/subscriptions/enrollments/handoff
+├ ƒ /api/suggestions
+├ ƒ /api/suggestions/[id]
+├ ƒ /api/teams/[teamId]/members
+├ ƒ /api/teams/directory
+├ ƒ /api/test-workspace
+├ ƒ /api/webhooks/composio
+├ ƒ /api/webhooks/github
+├ ƒ /api/webhooks/linear
+├ ƒ /api/webhooks/telegram
+├ ƒ /api/worker/account-actions
+├ ƒ /api/workspace
+├ ƒ /api/workspace/switcher
+├ ○ /apple-icon.png
+├ ○ /icon.svg
+├ ƒ /v1/devices/[deviceId]/commands
+├ ƒ /v1/devices/[deviceId]/commands/ack
+├ ƒ /v1/devices/[deviceId]/fs/requests
+├ ƒ /v1/devices/[deviceId]/fs/requests/[requestId]
+├ ƒ /v1/devices/[deviceId]/group-reviews
+├ ƒ /v1/devices/[deviceId]/heartbeat
+├ ƒ /v1/devices/[deviceId]/repos
+├ ƒ /v1/devices/[deviceId]/runs
+├ ƒ /v1/devices/[deviceId]/runs/[runId]/claim
+├ ƒ /v1/devices/[deviceId]/runs/[runId]/subscription
+├ ƒ /v1/devices/register
+├ ƒ /v1/mailbox
+├ ƒ /v1/runs/[runId]
+├ ƒ /v1/runs/[runId]/checkpoint
+├ ƒ /v1/runs/[runId]/complete
+├ ƒ /v1/runs/[runId]/events
+├ ƒ /v1/runs/[runId]/group-reply
+├ ƒ /v1/runs/[runId]/skill-receipt
+└ ƒ /w/[slug]
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

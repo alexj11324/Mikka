@@ -1,0 +1,242 @@
+{
+  "utc": "2026-10-25T17:24:06.211122+00:00",
+  "environment": {
+    "platform": "cloud Linux x64",
+    "node": "v24.19.0",
+    "pnpm": "10.34.3",
+    "samePhysicalDependencyInstallation": true,
+    "worktrees": {
+      "base": "/workspace/mikka-audit-base-20e",
+      "head": "/workspace/mikka-audit-210"
+    }
+  },
+  "checks": [
+    {
+      "label": "base",
+      "sourceSha": "20e2f2e4ed14a9b08b3ef02fb56199809e29558e",
+      "command": "PATH=/workspace/.tools/bin:$PATH pnpm check",
+      "exit": 1,
+      "failingStage": "test:agent",
+      "stageTests": 54,
+      "stagePassed": 51,
+      "stageFailed": 3,
+      "failures": [
+        "Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀",
+        "Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单",
+        "联网工具只暴露搜索和网页读取，保留 DS 聊天及认证"
+      ],
+      "rawLogSha256": "87fbe469618e875e07e8034910da70de19106b0a502345154117c3a2150f89b0",
+      "rawPrivateLog": "/tmp/audit-base-pnpm-check.log",
+      "summaryOnly": true
+    },
+    {
+      "label": "head",
+      "sourceSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "command": "PATH=/workspace/.tools/bin:$PATH pnpm check",
+      "exit": 1,
+      "failingStage": "test:agent",
+      "stageTests": 54,
+      "stagePassed": 51,
+      "stageFailed": 3,
+      "failures": [
+        "Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀",
+        "Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单",
+        "联网工具只暴露搜索和网页读取，保留 DS 聊天及认证"
+      ],
+      "rawLogSha256": "56ec540ab205b9d105c1ec7e868316c526c5132215cf8c856505d8aab849c193",
+      "rawPrivateLog": "/tmp/audit-head-pnpm-check.log",
+      "summaryOnly": true
+    },
+    {
+      "label": "reviewedHead",
+      "sourceSha": "88eff863c9d4e9c3acf3ee625cb154e456ce81cc",
+      "command": "PATH=/workspace/.tools/bin:$PATH pnpm check",
+      "exit": 1,
+      "failingStage": "test:agent",
+      "stageTests": 54,
+      "stagePassed": 51,
+      "stageFailed": 3,
+      "failures": [
+        "Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀",
+        "Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单",
+        "联网工具只暴露搜索和网页读取，保留 DS 聊天及认证"
+      ],
+      "rawLogSha256": "48978d5a619c2ed99feae6fa0008019b1e217b5cbaacb9a5994344857ef2c8d4",
+      "rawPrivateLog": "/tmp/audit-final-pnpm-check.log",
+      "summaryOnly": true
+    },
+    {
+      "label": "currentHead",
+      "sourceSha": "70954888ecf6e13d88cab736060044f9f7dee832",
+      "command": "PATH=/workspace/.tools/bin:$PATH pnpm check",
+      "exit": 1,
+      "failingStage": "test:agent",
+      "stageTests": 54,
+      "stagePassed": 51,
+      "stageFailed": 3,
+      "failures": [
+        "Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀",
+        "Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单",
+        "联网工具只暴露搜索和网页读取，保留 DS 聊天及认证"
+      ],
+      "rawLogSha256": "71444a083c8783c1ec59f0c5ff98e9c3b1c1c60495b103d3d5971864255cfe3f",
+      "rawPrivateLog": "/tmp/audit-pnpm-check-7095488.log",
+      "summaryOnly": true
+    }
+  ],
+  "blobs": [
+    {
+      "path": "pnpm-lock.yaml",
+      "same": true,
+      "versions": {
+        "20e2f2e4ed14a9b08b3ef02fb56199809e29558e": {
+          "gitBlob": "5afb961c0884937124d1db07a1cd78e31c816db8",
+          "sha256": "67832ca305e8c108c733d48d429fe3195700e96bbb897a2ea6507a69bb0d379a"
+        },
+        "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb": {
+          "gitBlob": "5afb961c0884937124d1db07a1cd78e31c816db8",
+          "sha256": "67832ca305e8c108c733d48d429fe3195700e96bbb897a2ea6507a69bb0d379a"
+        }
+      },
+      "reviewedHead": {
+        "gitBlob": "5afb961c0884937124d1db07a1cd78e31c816db8",
+        "sha256": "67832ca305e8c108c733d48d429fe3195700e96bbb897a2ea6507a69bb0d379a"
+      },
+      "reviewedHeadSameAsBase": true
+    },
+    {
+      "path": "tests/agent-ui.test.mjs",
+      "same": true,
+      "versions": {
+        "20e2f2e4ed14a9b08b3ef02fb56199809e29558e": {
+          "gitBlob": "e0221b746aa3c0a23352c47b213640b12b9181df",
+          "sha256": "4dd350862fd6acd750cffdc9ddf51ebf90bbaab71541363550243c8622573eb8"
+        },
+        "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb": {
+          "gitBlob": "e0221b746aa3c0a23352c47b213640b12b9181df",
+          "sha256": "4dd350862fd6acd750cffdc9ddf51ebf90bbaab71541363550243c8622573eb8"
+        }
+      },
+      "reviewedHead": {
+        "gitBlob": "e0221b746aa3c0a23352c47b213640b12b9181df",
+        "sha256": "4dd350862fd6acd750cffdc9ddf51ebf90bbaab71541363550243c8622573eb8"
+      },
+      "reviewedHeadSameAsBase": true
+    },
+    {
+      "path": "tests/agent-web-tools.test.mjs",
+      "same": true,
+      "versions": {
+        "20e2f2e4ed14a9b08b3ef02fb56199809e29558e": {
+          "gitBlob": "3e6961c47e40ff11bfcc30455cdef42570d0796c",
+          "sha256": "402b7d5081e5bb6c3d911826702845cb1cc30ee1e3e409a4a43595b7fffeb53b"
+        },
+        "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb": {
+          "gitBlob": "3e6961c47e40ff11bfcc30455cdef42570d0796c",
+          "sha256": "402b7d5081e5bb6c3d911826702845cb1cc30ee1e3e409a4a43595b7fffeb53b"
+        }
+      },
+      "reviewedHead": {
+        "gitBlob": "3e6961c47e40ff11bfcc30455cdef42570d0796c",
+        "sha256": "402b7d5081e5bb6c3d911826702845cb1cc30ee1e3e409a4a43595b7fffeb53b"
+      },
+      "reviewedHeadSameAsBase": true
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "same": true,
+      "versions": {
+        "20e2f2e4ed14a9b08b3ef02fb56199809e29558e": {
+          "gitBlob": "903832fd49cb2ff010264777cda6526e2d03b6fc",
+          "sha256": "96200b07231417bda1d061d24222b31deac12086716ded561b679652f076dc38"
+        },
+        "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb": {
+          "gitBlob": "903832fd49cb2ff010264777cda6526e2d03b6fc",
+          "sha256": "96200b07231417bda1d061d24222b31deac12086716ded561b679652f076dc38"
+        }
+      },
+      "reviewedHead": {
+        "gitBlob": "903832fd49cb2ff010264777cda6526e2d03b6fc",
+        "sha256": "96200b07231417bda1d061d24222b31deac12086716ded561b679652f076dc38"
+      },
+      "reviewedHeadSameAsBase": true
+    },
+    {
+      "path": "components/workspace/workspace-overview.tsx",
+      "same": true,
+      "versions": {
+        "20e2f2e4ed14a9b08b3ef02fb56199809e29558e": {
+          "gitBlob": "1ab09ca6f44735dc3f5f34e4252009b781dec1de",
+          "sha256": "82b1604bb84b9dc0391e3098721522ad344035635ce48303bb29c62cbb8d1cf5"
+        },
+        "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb": {
+          "gitBlob": "1ab09ca6f44735dc3f5f34e4252009b781dec1de",
+          "sha256": "82b1604bb84b9dc0391e3098721522ad344035635ce48303bb29c62cbb8d1cf5"
+        }
+      },
+      "reviewedHead": {
+        "gitBlob": "1ab09ca6f44735dc3f5f34e4252009b781dec1de",
+        "sha256": "82b1604bb84b9dc0391e3098721522ad344035635ce48303bb29c62cbb8d1cf5"
+      },
+      "reviewedHeadSameAsBase": true
+    },
+    {
+      "path": "components/workspace/agent-chat.tsx",
+      "same": true,
+      "versions": {
+        "20e2f2e4ed14a9b08b3ef02fb56199809e29558e": {
+          "gitBlob": "92f65a9b04a67967320c7717093972c936b3e622",
+          "sha256": "79bcbc7bdc5cd9e35d4eea976133e8d0149cb56e6413a55fc913c72fb0dc1594"
+        },
+        "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb": {
+          "gitBlob": "92f65a9b04a67967320c7717093972c936b3e622",
+          "sha256": "79bcbc7bdc5cd9e35d4eea976133e8d0149cb56e6413a55fc913c72fb0dc1594"
+        }
+      },
+      "reviewedHead": {
+        "gitBlob": "92f65a9b04a67967320c7717093972c936b3e622",
+        "sha256": "79bcbc7bdc5cd9e35d4eea976133e8d0149cb56e6413a55fc913c72fb0dc1594"
+      },
+      "reviewedHeadSameAsBase": true
+    },
+    {
+      "path": "app/api/agent/route.ts",
+      "same": true,
+      "versions": {
+        "20e2f2e4ed14a9b08b3ef02fb56199809e29558e": {
+          "gitBlob": "bf019a3d8f782574b4b0817ba637befc61ab4ed6",
+          "sha256": "088b3ed007934ca955d479d9b7ce93b3d2c71ff1c6735dded86556224efa2cd1"
+        },
+        "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb": {
+          "gitBlob": "bf019a3d8f782574b4b0817ba637befc61ab4ed6",
+          "sha256": "088b3ed007934ca955d479d9b7ce93b3d2c71ff1c6735dded86556224efa2cd1"
+        }
+      },
+      "reviewedHead": {
+        "gitBlob": "bf019a3d8f782574b4b0817ba637befc61ab4ed6",
+        "sha256": "088b3ed007934ca955d479d9b7ce93b3d2c71ff1c6735dded86556224efa2cd1"
+      },
+      "reviewedHeadSameAsBase": true
+    },
+    {
+      "path": "lib/agent-web-tools.ts",
+      "same": true,
+      "versions": {
+        "20e2f2e4ed14a9b08b3ef02fb56199809e29558e": {
+          "gitBlob": "ebcf35877054e7bfb7ae034d36f7637c22db3e14",
+          "sha256": "352e32c28c69b9469462d8cf5112de9b566e1eb2db799d2273ba0a111a4ca38f"
+        },
+        "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb": {
+          "gitBlob": "ebcf35877054e7bfb7ae034d36f7637c22db3e14",
+          "sha256": "352e32c28c69b9469462d8cf5112de9b566e1eb2db799d2273ba0a111a4ca38f"
+        }
+      },
+      "reviewedHead": {
+        "gitBlob": "ebcf35877054e7bfb7ae034d36f7637c22db3e14",
+        "sha256": "352e32c28c69b9469462d8cf5112de9b566e1eb2db799d2273ba0a111a4ca38f"
+      },
+      "reviewedHeadSameAsBase": true
+    }
+  ],
+  "conclusion": "The same 3 source-shape/frontend-design assertions fail on both frozen versions; affected test/source/lock blobs are identical. No UI layout or stale assertions were changed by the audit lane."
+}

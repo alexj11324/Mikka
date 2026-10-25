@@ -1,0 +1,332 @@
+{
+  "sourceSha": "70954888ecf6e13d88cab736060044f9f7dee832",
+  "utc": "2026-10-25T17:59:41.591Z",
+  "layer": "real isolated synthetic PG17 HTTP fixtures; no production",
+  "databases": {
+    "application": {
+      "database": "audit_app_709_e2e",
+      "store": [
+        {
+          "singleton": true,
+          "id": "ddbde5b4-d76c-40f2-b69d-8c1baa61464e"
+        }
+      ],
+      "ledger": [
+        {
+          "name": "0001_agents_devices.sql",
+          "appliedAt": "2026-10-25T17:52:06.544Z"
+        },
+        {
+          "name": "0002_device_enabled.sql",
+          "appliedAt": "2026-10-25T17:52:06.546Z"
+        },
+        {
+          "name": "0003_agents_columns.sql",
+          "appliedAt": "2026-10-25T17:52:06.548Z"
+        },
+        {
+          "name": "0004_linear_sync.sql",
+          "appliedAt": "2026-10-25T17:52:06.559Z"
+        },
+        {
+          "name": "0004_telegram_chat.sql",
+          "appliedAt": "2026-10-25T17:52:06.568Z"
+        },
+        {
+          "name": "0005_linear_sync_retry_and_comment_keys.sql",
+          "appliedAt": "2026-10-25T17:52:06.571Z"
+        },
+        {
+          "name": "0005_mikka_issue_metadata.sql",
+          "appliedAt": "2026-10-25T17:52:06.573Z"
+        },
+        {
+          "name": "0006_linear_comment_authorship.sql",
+          "appliedAt": "2026-10-25T17:52:06.574Z"
+        },
+        {
+          "name": "0007_coordinator_events.sql",
+          "appliedAt": "2026-10-25T17:52:06.577Z"
+        },
+        {
+          "name": "0007_linear_description_snapshot.sql",
+          "appliedAt": "2026-10-25T17:52:06.579Z"
+        },
+        {
+          "name": "0008_coordinator_sessions.sql",
+          "appliedAt": "2026-10-25T17:52:06.581Z"
+        },
+        {
+          "name": "0008_linear_mikka_issue_metadata.sql",
+          "appliedAt": "2026-10-25T17:52:06.583Z"
+        },
+        {
+          "name": "0009_oauth_provider.sql",
+          "appliedAt": "2026-10-25T17:52:06.593Z"
+        },
+        {
+          "name": "0010_coordinator_session_error.sql",
+          "appliedAt": "2026-10-25T17:52:06.594Z"
+        },
+        {
+          "name": "0011_coordinator_event_tier.sql",
+          "appliedAt": "2026-10-25T17:52:06.596Z"
+        },
+        {
+          "name": "0012_run_tokens.sql",
+          "appliedAt": "2026-10-25T17:52:06.598Z"
+        },
+        {
+          "name": "20261023143000_decision_calls.sql",
+          "appliedAt": "2026-10-25T17:52:06.603Z"
+        },
+        {
+          "name": "20261023150000_suggestions.sql",
+          "appliedAt": "2026-10-25T17:52:06.605Z"
+        },
+        {
+          "name": "20261023154800_issue_scope.sql",
+          "appliedAt": "2026-10-25T17:52:06.610Z"
+        },
+        {
+          "name": "20261023161128_issue_scope_source.sql",
+          "appliedAt": "2026-10-25T17:52:06.612Z"
+        },
+        {
+          "name": "20261023170500_drop_decision_calls.sql",
+          "appliedAt": "2026-10-25T17:52:06.614Z"
+        },
+        {
+          "name": "20261023171500_suggestion_trigger_checks.sql",
+          "appliedAt": "2026-10-25T17:52:06.616Z"
+        },
+        {
+          "name": "20261023213851_group_conversations.sql",
+          "appliedAt": "2026-10-25T17:52:06.624Z"
+        },
+        {
+          "name": "20261023221259_application_baseline.sql",
+          "appliedAt": "2026-10-25T17:52:06.534Z"
+        },
+        {
+          "name": "20261025000400_run_retries.sql",
+          "appliedAt": "2026-10-25T17:52:06.626Z"
+        },
+        {
+          "name": "20261025005600_mikka_linear_sync_setting.sql",
+          "appliedAt": "2026-10-25T17:52:06.627Z"
+        },
+        {
+          "name": "20261025013400_run_checkpoints.sql",
+          "appliedAt": "2026-10-25T17:52:06.630Z"
+        },
+        {
+          "name": "20261025043000_pending_actions.sql",
+          "appliedAt": "2026-10-25T17:52:06.632Z"
+        },
+        {
+          "name": "20261025051201_run_dispatch_keys.sql",
+          "appliedAt": "2026-10-25T17:52:06.634Z"
+        },
+        {
+          "name": "20261025051202_factory_192_stages.sql",
+          "appliedAt": "2026-10-25T17:52:06.645Z"
+        },
+        {
+          "name": "20261025051203_factory_194_approvals.sql",
+          "appliedAt": "2026-10-25T17:52:06.653Z"
+        },
+        {
+          "name": "20261025051204_factory_195_monitor.sql",
+          "appliedAt": "2026-10-25T17:52:06.661Z"
+        },
+        {
+          "name": "20261025051205_factory_192_questions.sql",
+          "appliedAt": "2026-10-25T17:52:06.667Z"
+        },
+        {
+          "name": "20261025052001_operation_ledger.sql",
+          "appliedAt": "2026-10-25T17:52:06.671Z"
+        },
+        {
+          "name": "20261025052031_session_mailboxes.sql",
+          "appliedAt": "2026-10-25T17:52:06.690Z"
+        },
+        {
+          "name": "20261025052032_group_artifact_review.sql",
+          "appliedAt": "2026-10-25T17:52:06.715Z"
+        },
+        {
+          "name": "20261025052033_group_review_mailboxes.sql",
+          "appliedAt": "2026-10-25T17:52:06.718Z"
+        },
+        {
+          "name": "20261025052200_credential_broker.sql",
+          "appliedAt": "2026-10-25T17:52:06.723Z"
+        },
+        {
+          "name": "20261025052201_credential_browser_binding.sql",
+          "appliedAt": "2026-10-25T17:52:06.724Z"
+        },
+        {
+          "name": "20261025052202_credential_handoff.sql",
+          "appliedAt": "2026-10-25T17:52:06.726Z"
+        },
+        {
+          "name": "20261025060001_calendar_operation_binding.sql",
+          "appliedAt": "2026-10-25T17:52:06.728Z"
+        },
+        {
+          "name": "20261025070001_account_action_intents.sql",
+          "appliedAt": "2026-10-25T17:52:06.730Z"
+        },
+        {
+          "name": "20261025070600_self_improvement.sql",
+          "appliedAt": "2026-10-25T17:52:06.738Z"
+        },
+        {
+          "name": "20261025082237_group_turn_mailbox_policy.sql",
+          "appliedAt": "2026-10-25T17:52:06.744Z"
+        },
+        {
+          "name": "20261025083303_improvement_skill_assignments.sql",
+          "appliedAt": "2026-10-25T17:52:06.749Z"
+        },
+        {
+          "name": "20261025141650_byos_credential_publications.sql",
+          "appliedAt": "2026-10-25T17:52:06.755Z"
+        },
+        {
+          "name": "20261025141651_byos_bindings_oauth.sql",
+          "appliedAt": "2026-10-25T17:52:06.759Z"
+        },
+        {
+          "name": "20261025141652_byos_device_authorization.sql",
+          "appliedAt": "2026-10-25T17:52:06.761Z"
+        },
+        {
+          "name": "20261025141653_byos_access_and_cleanup.sql",
+          "appliedAt": "2026-10-25T17:52:06.766Z"
+        },
+        {
+          "name": "20261025141654_byos_native_runs.sql",
+          "appliedAt": "2026-10-25T17:52:06.768Z"
+        },
+        {
+          "name": "20261025141655_byos_enrollment_transfers.sql",
+          "appliedAt": "2026-10-25T17:52:06.771Z"
+        },
+        {
+          "name": "20261025141656_byos_enrollment_cleanup.sql",
+          "appliedAt": "2026-10-25T17:52:06.775Z"
+        },
+        {
+          "name": "20261025160000_byos_environment_transfers.sql",
+          "appliedAt": "2026-10-25T17:52:06.777Z"
+        },
+        {
+          "name": "20261025170000_security_audit_application.sql",
+          "appliedAt": "2026-10-25T17:52:06.788Z"
+        }
+      ],
+      "heads": [
+        {
+          "tenant": "35cf101f-ce43-42bd-8461-8d3b0ebb1ecd",
+          "seq": "6",
+          "hash": "f4105727c1990327d565fc60f83c19ba7a0bba3ae4080abf0e31ddd5a5c2ce80",
+          "floor": "0",
+          "floor_hash": "",
+          "retention_days": 90,
+          "legal_hold": false
+        },
+        {
+          "tenant": "63aa9d8d-5c28-4b5a-a7f2-f4e547df464f",
+          "seq": "5",
+          "hash": "307901ca11f6a4d286cac78e9443fc854feaaf94a9f330f2c3f42b0ba1bab2c2",
+          "floor": "0",
+          "floor_hash": "",
+          "retention_days": 90,
+          "legal_hold": false
+        },
+        {
+          "tenant": "personal:h1cKdTgbo30ire9qVeQQ4eNYnCcIgOtE",
+          "seq": "3",
+          "hash": "ecc49afe42a5103cad98759f054503b217648c8815da034c1ad2a98bc3947ef9",
+          "floor": "0",
+          "floor_hash": "",
+          "retention_days": 90,
+          "legal_hold": false
+        }
+      ],
+      "continuation": [
+        {
+          "id": "a6b0b73b-c439-42da-80f5-c9c22d172096",
+          "continuesRunId": "813306c5-24bc-4928-8fb6-40524d88e293",
+          "retryOf": null,
+          "status": "stopped",
+          "tenant": "35cf101f-ce43-42bd-8461-8d3b0ebb1ecd"
+        }
+      ]
+    },
+    "workspace": {
+      "database": "audit_workspace_709_e2e",
+      "store": [
+        {
+          "singleton": true,
+          "id": "14baea9b-4350-4566-9827-580000112ed5"
+        }
+      ],
+      "ledger": [
+        {
+          "name": "0004_mikka_workspace_tables.sql",
+          "appliedAt": "2026-10-25T17:52:06.804Z"
+        },
+        {
+          "name": "0006_workspace_tables.sql",
+          "appliedAt": "2026-10-25T17:52:06.809Z"
+        },
+        {
+          "name": "0014_workspace_teams.sql",
+          "appliedAt": "2026-10-25T17:52:06.815Z"
+        },
+        {
+          "name": "20261025005500_mikka_team_tables.sql",
+          "appliedAt": "2026-10-25T17:52:06.817Z"
+        },
+        {
+          "name": "20261025170001_security_audit_workspace.sql",
+          "appliedAt": "2026-10-25T17:52:06.827Z"
+        }
+      ],
+      "heads": [
+        {
+          "tenant": "35cf101f-ce43-42bd-8461-8d3b0ebb1ecd",
+          "seq": "2",
+          "hash": "7a00673e6370d35851fa828d5d01cef264bbde1f5866df9a6e4924f9c1dac0f1",
+          "floor": "0",
+          "floor_hash": "",
+          "retention_days": 90,
+          "legal_hold": false
+        },
+        {
+          "tenant": "4f59cdb4-0525-4f51-8e35-50c95fe92ef9",
+          "seq": "1",
+          "hash": "33ef18cac74d380b99f440532d786691d3691ff62600e524e2bed368c154f5e9",
+          "floor": "0",
+          "floor_hash": "",
+          "retention_days": 90,
+          "legal_hold": false
+        },
+        {
+          "tenant": "63aa9d8d-5c28-4b5a-a7f2-f4e547df464f",
+          "seq": "9",
+          "hash": "1a066cf1b7d35862ac1eacc5b4f3fc951e8df3706f3fd7a65276428d6f1f3fab",
+          "floor": "0",
+          "floor_hash": "",
+          "retention_days": 90,
+          "legal_hold": false
+        }
+      ]
+    }
+  }
+}
