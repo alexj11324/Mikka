@@ -89,6 +89,22 @@ export const agentComponentCatalog = {
     description: '现有 Lucide 图标白名单，不是 beUI 独立图标包。用于带中文含义的状态说明，不能传入 SVG、组件代码、路径或任意图标名。',
     props: z.object({ name: z.enum(['assistant', 'reply', 'approve', 'question', 'progress', 'task', 'code', 'source']), label: z.string().min(1).max(80) }),
   },
+  InlineText: {
+    description: '一段内联正文，parts 依次是文字和 TaskChip / RunChip / SourceChip 引用，chip 跟着文字排版，放不下时整体换行，不单独占一行。只在需要引用任务、运行或网页时使用，其余正文用 TextContent。',
+    props: z.object({ parts: z.array(z.any()).min(1).max(40) }),
+  },
+  TaskChip: {
+    description: '内联任务引用：状态点、编号、标题。id 必须是工具返回的真实任务 id，宿主按 id 查出状态、编号和标题，点击打开任务；不要再在旁边重复标题。没有真实任务 id 时不要使用。放在 InlineText 的 parts 里。',
+    props: z.object({ id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) }),
+  },
+  RunChip: {
+    description: '内联运行引用：Agent 名和 harness 图标，悬停显示状态和所属任务。id 必须是工具返回的真实运行 id；没有时不要使用。放在 InlineText 的 parts 里。',
+    props: z.object({ id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) }),
+  },
+  SourceChip: {
+    description: '内联网页来源，例如 pull request 或文档。url 为 http(s) 地址，label 为简短名称，可选；悬停显示网页预览。放在 InlineText 的 parts 里。',
+    props: z.object({ url: z.string().url().max(2000).refine(value => /^https?:\/\//i.test(value)), label: z.string().min(1).max(80).optional() }),
+  },
   ShadcnCard: {
     description: '本地 shadcn 卡片。用于有标题的建议、说明或内容分组，可嵌套已注册组件。',
     props: z.object({ title: text, children, description: text.optional() }),
@@ -145,6 +161,7 @@ export const agentComponentGroups: { name: string; components: AgentComponentNam
   { name: '审批与问题', components: ['BeApproval', 'BeQuestions'], notes: ['Confirmation → ApprovalCard；选择问题复用 ApprovalCard 提问模式。在回答区直接提交并继续对话，不执行工具、不持久保存审批。ToolApproval 已安装但仅供未来真实工具授权流程使用，不开放给模型伪造授权。'] },
   { name: '任务与进度', components: ['BeTodoList', 'BeStat', 'ShadcnProgress'], notes: ['Plan/Task → TodoList；Loader/Shimmer → AgentProgress、ReasoningText、ThinkingShimmer，由宿主根据请求状态控制。建议计划保持待开始；数字只能来自用户输入。'] },
   { name: '图标状态与操作', components: ['AgentIcon', 'BeBadge', 'BeButton', 'BeFollowUps'], notes: ['Lucide 提供图标；beUI AnimatedBadge 提供动态状态图标；Button 提供操作反馈。不得用动态图标伪造执行结果。'] },
+  { name: '任务与来源引用', components: ['InlineText', 'TaskChip', 'RunChip', 'SourceChip'], notes: ['引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。'] },
   { name: '本地内容与兼容组件', components: ['TextContent', 'BeCodeBlock', 'BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame'], notes: ['复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock 用于代码回复；FileDiff、ToolResult、AgentActivity、Citations、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不自动生成虚构工具记录。'] },
 ]
 

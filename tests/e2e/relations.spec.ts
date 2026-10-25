@@ -1,20 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register } from './fixtures'
-
-async function createIssue(page: Page, title: string) {
-  await page.getByRole('button', { name: '新建任务', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
-  await dialog.getByLabel('任务标题', { exact: true }).fill(title)
-  await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
-  await expect(dialog).not.toBeVisible()
-}
+import { test, expect, register, rail, seedTask, openIssueFromSearch } from './fixtures'
 
 async function openIssue(page: Page, title: string) {
-  await page.getByRole('button', { name: '打开全局搜索', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '搜索任务', exact: true })
-  await dialog.getByRole('combobox', { name: '全局搜索任务', exact: true }).fill(title)
-  await dialog.getByRole('option').filter({ hasText: title }).click()
+  await openIssueFromSearch(page, title)
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
   await expect(page.getByRole('button', { name: '更多任务操作', exact: true })).toBeEnabled()
 }
@@ -43,9 +32,10 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     const parent = `关系父任务 ${suffix}`
     const child = `关系子任务 ${suffix}`
     const blocker = `前置阻塞任务 ${suffix}`
-    await createIssue(page, parent)
-    await createIssue(page, blocker)
-    await page.getByRole('button', { name: '任务', exact: true }).click()
+    await seedTask(page, parent)
+    await seedTask(page, blocker)
+    await page.reload()
+    await rail(page, '看板').click()
     await openIssue(page, parent)
     const parentUrl = page.url()
     await page.setViewportSize(viewport)
@@ -69,8 +59,23 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await invalidParent.getByRole('button', { name: '关闭', exact: true }).click()
     await children.getByRole('button', { name: `移除子任务关系：${child}`, exact: true }).click()
     await expect(children.getByRole('button', { name: '子任务 0 / 0', exact: true })).toBeVisible()
+    // Regression: reopening the picker right after unlinking must not filter against the board snapshot cached
+    // by the earlier "设置父任务" picker (where the child still had this parent). Hold the server actions
+    // (listIssues / listIssueConnections) so we observe the picker before fresh data arrives.
+    let releaseActions!: () => void
+    const actionsHeld = new Promise<void>(resolve => { releaseActions = resolve })
+    let heldActions = 0
+    await page.route('**/*', async route => {
+      if (route.request().method() === 'POST' && route.request().headers()['next-action']) { heldActions++; await actionsHeld }
+      await route.fallback()
+    })
     await children.getByRole('button', { name: '添加现有任务', exact: true }).click()
     const existing = page.getByRole('dialog', { name: '添加现有子任务', exact: true })
+    await expect.poll(() => heldActions).toBeGreaterThan(0)
+    await expect(existing.getByText('正在读取任务…', { exact: true }).or(existing.getByRole('option').filter({ hasText: child }))).toBeVisible()
+    releaseActions()
+    await page.unroute('**/*')
+    await expect(existing.getByRole('option').filter({ hasText: child })).toBeVisible()
     await existing.getByRole('combobox', { name: '搜索关联任务', exact: true }).fill(child)
     await existing.getByRole('option').filter({ hasText: child }).click()
     await expect(existing).not.toBeVisible()

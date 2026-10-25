@@ -3,7 +3,8 @@ import type { JSONContent } from '@tiptap/core'
 import { db } from '@/lib/db'
 import { issueVersions, issues } from '@/lib/db/schema'
 import { allocateIssueNumbers } from '@/lib/issue-numbering'
-import { issueWithMetadata, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { issueView } from '@/lib/task-identifier-server'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -38,5 +39,5 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
     status: issue.status,
     priority: issue.priority,
   })
-  return issueWithMetadata(issue)
+  return issueView(issue, tx)
 }

@@ -18,5 +18,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
     if (query.acceptance === '1') localeRedirect({ href: '/acceptance', locale: await getLocale() })
     redirect('/api/acceptance')
   }
-  return <IssueWorkspace key={user.id} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialSection={query.section === 'agent' ? 'agent' : 'projects'} initialSettingsSection={query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
+  return <IssueWorkspace key={user.id} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialSection={query.section === 'agent' || query.section === 'projects' ? query.section : 'coordinator'} initialSettingsSection={query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
 }
