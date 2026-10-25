@@ -1,5 +1,7 @@
 # Isolated durable Coordinator consumption acceptance
 
+Historical record: four later review findings exposed gaps in this version. See [the subsequent fixes and actual replay verification](../176-review/README.md) for authoritative background fairness, protocol scope, effect fencing and pre-claim triage results. The original logs below are retained unchanged.
+
 This is public-core backend work for #176, stacked on #271 (`b7d7358a90cee9fde8e6c311159ce34b585c7374`) and #269. Those reviewed heads are unchanged. Runtime source is frozen at `1b8a18e0b7284fee286cd53d27d939532fcdc6fd`; subsequent commits add evidence, test harnesses, the mailbox migration-order fixture and CI wiring only; production app/library/workflow/migration sources are unchanged. No production migration, deployment, cron registration, IAM change, external message, paid model call or cloud Workflow run was performed. Issues remain open.
 
 ## Formal code

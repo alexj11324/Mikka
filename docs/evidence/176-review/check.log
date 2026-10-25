@@ -1,0 +1,823 @@
+$ pnpm check:agent-ui && pnpm test:preview && pnpm test:agent && pnpm test:byos && pnpm test:acceptance && pnpm test:auth-composio && pnpm test:ui-policy && pnpm test:motion && pnpm test:i18n && pnpm i18n:check && pnpm test:ssh-target && pnpm test:linear-sync && pnpm test:coordinator-events && pnpm test:factory && pnpm test:groups && pnpm test:integrations && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm test:issues && pnpm test:telegram && pnpm test:suggestions && pnpm test:schedules && pnpm test:wake && pnpm lint && pnpm typecheck
+$ node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check
+OpenUI 组件目录与提示词已校验：111 个组件定义。
+$ node --test tests/preview-ready.test.mjs
+✔ background precompilation is enabled by default and only explicit zero disables it (1.140633ms)
+✔ startup compiles chat, images, history and workspace with read-only HEAD requests (35.001514ms)
+✔ startup begins every warmup without waiting for other routes (0.601902ms)
+✔ startup supports deployments without a base path (0.80263ms)
+✔ page warmup accepts the sign-in redirect but API redirects remain failures (0.372651ms)
+✔ compile failures cannot report preview ready (1.773441ms)
+✔ optional warmup aborts a stalled request instead of hanging startup work (10.520845ms)
+✔ page requests never wait for unrelated AI routes or readiness marker files (5.785523ms)
+✔ preview bootstrap script is inside head to avoid hydration failure (2.284083ms)
+✔ startup preserves readiness output and starts default warmup without awaiting it (2.379729ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 286.276212
+$ node --import tsx --test tests/agent-fetch.test.mjs tests/agent-ui.test.mjs tests/agent-history.test.mjs tests/agent-web-tools.test.mjs
+✔ 配图关键词闭合即预加载，不等待卡片介绍、标签或回复完成 (21.959376ms)
+✔ 图片观察不预加载推理，不吞正文，并限制为最多六张不同配图 (10.584857ms)
+✔ 正常结束保留全部正文，不人为截断长回复 (1.388528ms)
+✔ 思考耗尽预算和空回复不会显示为成功 (5.638894ms)
+✔ 流提前断开保留正文并通知重试，已有错误不重复追加 (8.557076ms)
+✔ 主动停止不生成空回复或连接中断错误 (0.936085ms)
+✔ 请求头尚未返回时，即使预览传输忽略取消，也能结束等待 (5.396775ms)
+✔ 响应头已返回时，停止会中断流读取并取消上游 (82.163047ms)
+✔ 正常 SSE 响应保持内容、状态和响应头 (5.496607ms)
+✔ 完成前保存完整回复，不保存推理片段 (13.020293ms)
+✔ 失败回复保留正文和错误，不误标为完成 (0.965389ms)
+✔ 断流保存为失败，不静默当作成功 (0.93464ms)
+✔ 取消请求保存已生成片段且取消上游 (1.165934ms)
+✔ 数据库检查点缓慢时正文继续返回，完成前仍等待保存 (2.166039ms)
+✔ 保存失败必须向客户端报告错误 (1.242134ms)
+✔ KaTeX 样式字体与 rehype 渲染引擎使用同一版本 (79.040808ms)
+✔ 演示公式覆盖行内、对齐、矩阵及长公式，且不输出解析错误 (709.046895ms)
+✔ Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀 (38.811826ms)
+✔ 综合演示每个分组都可解析，覆盖全部本地回复组件 (165.095134ms)
+✔ beUI 代码块在 OpenUI 和 Markdown 中真正接入，等待状态使用 ReasoningText (17.458038ms)
+✔ 普通聊天正文不加载公式引擎，含公式时复用完整 Markdown 渲染 (2.467235ms)
+✔ 图片解析保留真实来源和许可，拒绝不安全资源 (17.607643ms)
+✔ 配图检索通过固定来源查询，并正确处理无结果及上游错误 (46.278066ms)
+✔ 图片复用正文入口并共享 SWR 预加载，回复缩略图不懒加载 (4.474223ms)
+✔ 资料配图和详细回答规则进入模型规范 (11.879506ms)
+✔ TextContent 统一支持 Markdown、LaTeX 和 Mermaid，保留旧字号契约 (12.20269ms)
+✔ Beautiful Mermaid 实际渲染六类图表，主题自适应且样式不污染其他回复 (456.514158ms)
+✔ 精致图表优先，复杂语法保留严格 Mermaid 回退和 SVG 清洗 (18.037534ms)
+✔ 混合真实换行与 JSON 转义的回复仍正确渲染标题、列表和自注意力公式 (54.170211ms)
+✔ 修复仅处理 OpenUI 字符串语法，保留代码、矩阵换行、转义引号与流式前缀 (16.820884ms)
+✔ 相关追问支持具体问题、上下文及内联继续，不再被提示词压制 (45.363954ms)
+✔ 完整正文和可自动补齐的括号不会误报失败 (11.288922ms)
+✔ 真实缺少段落与组件格式错误分别说明原因 (9.761744ms)
+✔ 紧凑推荐卡片可解析且模型规范优先小卡片 (19.838809ms)
+✔ beUI 组件包含在运行时和可序列化规范中 (78.139664ms)
+✔ beUI OpenUI Lang 输出可解析且保留旧组件兼容 (819.299495ms)
+✔ 功能分组完整且每个本地组件仅属于一个功能组 (5.957655ms)
+✔ 审批、问题、回复和任务计划均可解析 (12.166631ms)
+✔ 问题、任务与图标严格限制输入，不能��造审批结果 (15.318332ms)
+✔ 49 项 AI Elements 对照不遗漏且 beUI 对应源码可导入 (132.577693ms)
+✔ 会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 会话组件 (184.215558ms)
+✔ Agent 保留应用外壳与固定标题 pill，导航由应用外壳承担 (10.274669ms)
+✔ 服务端和 beUI 界面均使用 DS 4.1 Flash (4.273288ms)
+✔ 停止按钮先取消表单默认行为，避免同步恢复后误发草稿 (5.966493ms)
+✔ 回复动作统一直接请求，澄清使用内联问题卡片 (37.619762ms)
+✔ beUI 限制按钮语义、状态、数字和小数位 (2.08989ms)
+✔ \( \) 与 \[ \] 定界符转换为 KaTeX 公式，代码内容保持原样，中文使用 cjk_fallback (45.513478ms)
+✔ 联网工具只暴露搜索和网页读取，保留 DS 聊天及认证 (14.870946ms)
+✔ 拒绝非 HTTPS、凭据、内网地址、IP 及自定义端口 (10.382324ms)
+✔ 搜索保留原始来源、日期和检索时间，裁剪内容 (4.604162ms)
+✔ 网页先检查 DNS，拒绝混合公共和私网解析 (0.775693ms)
+✔ 网页只返回有效正文，不把重定向或上游错误当成资料 (3.010321ms)
+✔ 计费验证未完成时说明具体原因且不重复调用上游 (0.877035ms)
+✔ 上游失败不泄漏错误详情，限制每轮费用，取消传播 (2.200695ms)
+ℹ tests 54
+ℹ suites 0
+ℹ pass 54
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10626.194844
+$ node --import tsx --test lib/subscription-*.test.ts
+✔ persisted binding discovery does not need runtime credentials; metadata failures do not mean unbound (2.487109ms)
+✔ disabled runtime refuses a persisted native binding and preserves ordinary unbound claims (5.922815ms)
+﹣ real PG claim atomically publishes binding; concurrency, failure and cancellation preserve fences (1.800473ms) # SKIP
+✔ binding requires both source operator and real session and derives owner before workspace authorization (83.526224ms)
+✔ short scoped proof accepts exact target and rejects scope changes or another operator (15.72727ms)
+✔ proof expires and refuses an expiry over five minutes or weak/invalid issuance (1.053761ms)
+✔ database identity matches Go canonical pooler/direct identity without credential or query dependence (0.31977ms)
+✔ scoped route still requires real session, derives principal server-side and retains workspace checks (61.593402ms)
+✔ binding HTML has no supplied secret, scrubs fragment and restricts transport to same origin (0.900771ms)
+✔ preflighted binding page handles later fragment navigation and scrubs it before same-origin POST (915.099473ms)
+✔ scoped handoff transports only an exact completion without operator, owner or vault credentials (65.592599ms)
+✔ disabled and failed handoff never echo callback or capability (13.649436ms)
+✔ transport page keeps callback values out of server URLs and locks script/connect origins (2.502104ms)
+✔ isolated test retention cannot disable normal production cleanup (1.449693ms)
+✔ server custody route authenticates the operator without SQL, inference reader or browser vault credentials (121.377084ms)
+✔ callback failures return fixed errors and do not echo secret ceremony bodies (1.762044ms)
+✔ browser model selection accepts a binding reference, rejects credential and endpoint input (10.004687ms)
+✔ Mikka AI SDK loop streams two codex_cpa tasks through the same bound connection without login or paid fallback (128.499337ms)
+✔ Mikka AI SDK loop streams two claude_cpa tasks through the same bound connection without login or paid fallback (23.200408ms)
+✔ Mikka AI SDK loop streams two openai_siwc tasks through the same bound connection without login or paid fallback (55.184866ms)
+✔ explicit BYOS fails closed when production backend is unregistered (2.017615ms)
+✔ quota and cross-user refusals never construct a model or select a paid provider (0.720057ms)
+✔ cached model rechecks binding on each AI SDK step after disconnect (0.611675ms)
+✔ existing default provider remains explicit when no subscription was selected (3.080791ms)
+✔ transfer errors invalidate only their own token role and other binds stay ordinary (335.577284ms)
+✔ transfer approval binds source and production target without equating provider identity to app email (7.792958ms)
+✔ wrong owner, workspace, database, origin, expired and broadened approval fail closed (2.026238ms)
+✔ custody enrollment has no reader dependency; scoped providers do not share credentials or denial (29.379957ms)
+✔ same identity, disabled auth, or rotated origin fail without static fallback (0.53578ms)
+✔ explicit shared identity uses separate logical caches and disabling it fences cached access (1.163089ms)
+✔ only exact server opt-in admits shared source and access; no credential fallback (0.903208ms)
+✔ real isolated HTTP: shared source denial isolates caches; issuer 30-day tokens accepted (77.852206ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 3444.104703
+$ node --import tsx --test tests/acceptance.test.mjs
+✔ 预览分区 Cookie 保持 HttpOnly、Secure 和 SameSite=None (23.48062ms)
+✔ 验收恢复需要用户授权，且不改用不安全的客户端会话 (1.99823ms)
+✔ Safari 授权必须在点击调用栈内发生，授权完成后才导航 (1.68615ms)
+✔ Safari 拒绝授权时不重定向、不再次创建访客会话 (0.874124ms)
+✔ 不支持 Storage Access 的内嵌浏览器应使用独立入口而不是重复失败 (0.804591ms)
+✔ 独立标签页直接建立第一方会话，无需第三方授权 (0.511981ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 506.88831
+$ node --import tsx --test lib/auth-error.test.ts lib/auth-config.test.ts lib/db/config.test.ts lib/auth-return.test.ts lib/auth-recovery.test.ts lib/composio-config.test.ts lib/composio-webhook.test.ts lib/google-link.test.ts
+✔ Preview chooses its deployment origin and keeps explicit configuration authoritative (1.706686ms)
+✔ trusts exact configured cloud origins in production and validates origin syntax (1.570259ms)
+✔ proxy requires both explicit settings and an HTTPS hub origin (0.410549ms)
+✔ development and hosted CI allow only HTTP loopback origins; the proxy hub always requires HTTPS (1.062337ms)
+✔ real Better Auth Preview initiation sends Google to the stable hub callback (217.943251ms)
+✔ local development can initiate Google login directly or through the fixed hub (56.777932ms)
+✔ real Better Auth rejects foreign origins and lookalike callback hosts (28.334066ms)
+✔ Vercel branch aliases can sign out an authenticated session without trusting other deployments (212.145697ms)
+✔ v0 hosts and local development complete signed proxy login through a hub that trusts only itself (222.607446ms)
+✔ recognizes an unlinked provider in single or repeated query values (2.487425ms)
+✔ classifies the backend error responses (6.002546ms)
+✔ reads the retry delay from a rate limit and falls back to the page cooldown (0.348352ms)
+✔ maps errors to message keys (2.463446ms)
+✔ checks the new password length in JavaScript string units before the confirmation (0.511529ms)
+✔ reads a failed verification link and drops the error from the address (5.032546ms)
+✔ takes the reset token out of the address (0.400539ms)
+✔ allows supported local destinations with validated settings context (1.642154ms)
+✔ rejects external redirects, unsupported settings state, and malformed context (0.926687ms)
+✔ OAuth resume URLs omit app-only parameters while preserving the signed request (0.255089ms)
+✔ builds the callback verifier URL under the app base path (6.982164ms)
+✔ requires the configured Composio verifier URL to match exactly (0.916232ms)
+✔ verifies a valid Composio HMAC event (61.629801ms)
+✔ rejects an invalid Composio HMAC event (240.541598ms)
+✔ Preview uses the Neon integration branch rather than global database overrides (1.117333ms)
+✔ other deployments use MIKKA_DATABASE_URL (0.259172ms)
+✔ marks the authenticated user verified only after a linked Google account exists (3.442324ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9156.075474
+$ node --test scripts/ui-policy.test.mjs scripts/interaction-policy.test.mjs
+✔ requires Button component: native working button (23.064261ms)
+✔ requires Button component: native disabled button (6.541993ms)
+✔ requires Button component: button role on div (1.046844ms)
+✔ requires Button component: clickable span (9.994537ms)
+✔ requires Button component: clickable div (22.036314ms)
+✔ requires Button component: composed native host (2.034517ms)
+✔ rejects missing action (0.819338ms)
+✔ rejects native missing action (0.684425ms)
+✔ rejects disabled is not implementation (5.709596ms)
+✔ rejects feature flag alone is not implementation (0.761922ms)
+✔ rejects feature marked implemented still needs action (0.722806ms)
+✔ rejects empty callback (16.351933ms)
+✔ rejects undefined callback (0.610166ms)
+✔ rejects returned undefined (0.32549ms)
+✔ rejects returned function without invocation (0.275175ms)
+✔ rejects returned method without invocation (1.934519ms)
+✔ rejects empty resolved promise (1.59211ms)
+✔ rejects event cancellation only (1.340406ms)
+✔ rejects log only (0.499556ms)
+✔ rejects named empty function (2.555056ms)
+✔ rejects aliased empty function (1.068658ms)
+✔ rejects wrapped empty function (0.80116ms)
+✔ rejects placeholder message (0.634133ms)
+✔ rejects tooltip is not a button action (1.893129ms)
+✔ rejects submit outside form (0.813908ms)
+✔ rejects submit without form action (0.322605ms)
+✔ rejects empty navigation (0.304318ms)
+✔ rejects hash placeholder (0.411241ms)
+✔ rejects javascript placeholder (0.86507ms)
+✔ rejects menu missing action (6.010421ms)
+✔ rejects command missing action (0.360184ms)
+✔ rejects role button without action (7.962108ms)
+✔ rejects onSelect cannot implement a button click (1.672716ms)
+✔ rejects onSubmit cannot implement a button click (0.364609ms)
+✔ rejects constant placeholder href (0.423538ms)
+✔ rejects aliased placeholder href (0.936536ms)
+✔ rejects cyclic href aliases (1.594914ms)
+✔ rejects object placeholder handler (5.669553ms)
+✔ rejects object placeholder method (2.718083ms)
+✔ rejects aliased button (2.828457ms)
+✔ allows explicit unimplemented feature presentation (1.849306ms)
+✔ allows real callback (0.62909ms)
+✔ allows forwarded callback (1.338355ms)
+✔ allows async mutation (1.505729ms)
+✔ allows named mutation (1.04653ms)
+✔ allows shadowed callback (0.784132ms)
+✔ allows cancel then act (16.385696ms)
+✔ allows conditional action (0.952013ms)
+✔ allows menu trigger render composition (1.564983ms)
+✔ allows menu trigger child composition (0.274874ms)
+✔ allows beUI morph popover trigger (0.248767ms)
+✔ allows beUI trigger stops row click (0.691624ms)
+✔ allows aliased beUI trigger (0.924971ms)
+✔ allows lucide Link icon (0.367044ms)
+✔ allows aliased lucide Link icon (0.284691ms)
+✔ allows motion button forwarded callback (0.830803ms)
+✔ allows dialog cancel (0.199534ms)
+✔ allows popover trigger (0.453714ms)
+✔ allows tooltip with real callback (0.217436ms)
+✔ allows real href (0.251559ms)
+✔ allows dynamic href (0.484429ms)
+✔ allows guarded normalized href (0.933306ms)
+✔ allows conditional routes (0.297581ms)
+✔ allows render host event delegation (0.387867ms)
+✔ allows fragment target (0.170834ms)
+✔ allows template URL (1.013516ms)
+✔ allows aliased template URL (0.636778ms)
+✔ allows aliased settings URL (0.60763ms)
+✔ allows object action (0.448684ms)
+✔ allows rendered navigation (0.446424ms)
+✔ allows form submit (0.329159ms)
+✔ allows form server action (0.340252ms)
+✔ allows external form (0.683409ms)
+✔ allows button form action (0.26525ms)
+✔ allows form reset (0.32833ms)
+✔ allows menu selection (0.328848ms)
+✔ allows noninteractive layout (0.289589ms)
+✔ raw HTML (37.967426ms)
+✔ HTML alias (6.066087ms)
+✔ handwritten input (2.070719ms)
+✔ handwritten textarea (0.636393ms)
+✔ handwritten select (0.47637ms)
+✔ handwritten fieldset (0.342416ms)
+✔ handwritten kbd (0.740791ms)
+✔ handwritten details (4.245286ms)
+✔ handwritten hr (2.528463ms)
+✔ handwritten label (1.167097ms)
+✔ handwritten table (3.045866ms)
+✔ handwritten dialog (2.49852ms)
+✔ handwritten nav (0.231578ms)
+✔ handwritten progress (0.18145ms)
+✔ primitive bypass (0.298982ms)
+✔ factory alias (0.729893ms)
+✔ DOM factory (0.877418ms)
+✔ custom variants (1.917955ms)
+✔ inline style (1.900834ms)
+✔ inline font (2.697807ms)
+✔ arbitrary font size (1.654487ms)
+✔ variable font size (0.496909ms)
+✔ arbitrary line height (0.49818ms)
+✔ non preset font weight (0.441119ms)
+✔ non preset size (0.353594ms)
+✔ slash line height (0.571256ms)
+✔ uncheckable classes (0.563204ms)
+✔ raw palette (0.334957ms)
+✔ space utility (0.384289ms)
+✔ dark color override (0.453645ms)
+✔ conditional classes (0.605193ms)
+✔ equal dimensions (0.307518ms)
+✔ horizontal bottom rule (0.225576ms)
+✔ horizontal top rule (0.29629ms)
+✔ horizontal both rule (0.558208ms)
+✔ row divider rule (0.276095ms)
+✔ hand-drawn rule (0.551708ms)
+✔ horizontal separator (0.33862ms)
+✔ dynamic separator orientation (0.394631ms)
+✔ truncate shorthand (1.820998ms)
+✔ overlay stacking (0.471862ms)
+✔ aliased menu grouping (2.496766ms)
+✔ avatar fallback (0.263277ms)
+✔ accessible title (0.284622ms)
+✔ card structure (0.563594ms)
+✔ loading prop (0.193137ms)
+✔ Base UI menu events (0.244868ms)
+✔ Base UI render (0.147868ms)
+✔ InputGroup control (0.517865ms)
+✔ field grouping (1.063487ms)
+✔ icon component reference (0.293714ms)
+✔ button icon metadata (0.317711ms)
+✔ icon dimensions (0.409483ms)
+✔ font family allowlist (0.206135ms)
+✔ component composition + business data/event wiring + layout are allowed (3.825525ms)
+✔ shared settings fields retain form grouping checks without accepting lookalike wrappers (0.922588ms)
+✔ valid grouped items + title + avatar (0.688198ms)
+✔ vertical separators, box borders and spacing-based grouping stay legal (1.028552ms)
+✔ business code cannot bypass typography presets (0.688913ms)
+✔ field titles retain the shared primary hierarchy (6.146768ms)
+✔ browser CSS assertions are not typography utilities, while test JSX remains checked (0.77223ms)
+✔ system colors are not mistaken for arbitrary font sizes (0.310307ms)
+✔ arbitrary lengths are typography, not colors (0.281737ms)
+✔ CSS cannot bypass typography restrictions (18.712836ms)
+✔ framework html/body shell is not mistaken for a handmade widget (4.093748ms)
+✔ plain layout containers stay legal: only elements with a component equivalent are banned (2.3966ms)
+✔ a component callsite may adjust appearance, but raw palettes stay banned (2.426384ms)
+✔ a render prop host element is composition, not a hand-written control (1.360616ms)
+✔ official buttonVariants links are permitted without bypassing class checks (32.285229ms)
+✔ only the configured component-library directories are outside the business UI audit (0.248144ms)
+✔ lint permits imported components but fails handwritten business UI without any source lock (3850.825759ms)
+✔ utility parser respects bracket expressions and variants (0.813536ms)
+ℹ tests 149
+ℹ suites 0
+ℹ pass 149
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4623.823397
+$ node --import tsx --test lib/message-navigation.test.ts
+✔ next assistant is strictly after each row, including consecutive user rows (1.910553ms)
+✔ closestSortedIndex reads only logarithmically many row centers (0.417455ms)
+✔ closestSortedIndex handles edges, gaps and an empty transcript (0.174208ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 150.884125
+$ node --test scripts/check-i18n.test.mjs
+✔ flattenMessages turns a nested catalog into dotted keys (3.885987ms)
+✔ extractPlaceholders reads named and plural placeholders (0.424829ms)
+✔ compareMessages accepts aligned catalogs (0.811422ms)
+✔ compareMessages reports missing, extra and empty keys (0.899648ms)
+✔ compareMessages rejects corrupted translation text in either locale (0.62546ms)
+✔ compareMessages reports placeholder mismatches (0.616676ms)
+✔ extractActionErrorCodes reads quoted entries and fails loudly when absent (0.528136ms)
+✔ checkErrorCodes requires every code in both locales (0.688546ms)
+✔ findHardcodedText catches JSX text and attributes, ignoring comments and console (15.676282ms)
+✔ findHardcodedText honors line and file ignores (2.805057ms)
+✔ findHardcodedText catches Chinese in template literals (1.649768ms)
+✔ findMissingTranslationKeys resolves namespaced and object-form translators (4.618168ms)
+✔ findMissingTranslationKeys skips dynamic and ambiguous keys (3.163658ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 599.307453
+$ node scripts/check-i18n.mjs
+i18n check passed: messages aligned, placeholders match, no hardcoded CJK in reachable UI.
+$ node --import tsx --test lib/ssh-target.test.ts
+✔ accepts the shapes a person types into the host field (1.567701ms)
+✔ refuses an option-looking host, which ssh would run as a flag (0.172807ms)
+✔ refuses shell metacharacters and whitespace (0.225105ms)
+✔ refuses an option-looking or malformed user (0.117345ms)
+✔ isSafeTarget catches a target that skipped validation (0.397849ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 266.371658
+$ node --import tsx --test lib/db/request-scope.test.ts lib/linear-sync/mapping.test.ts lib/linear-sync/markdown.test.ts lib/linear-sync/webhook.test.ts cloudflare/linear-sync/src/index.test.ts cloudflare/linear-sync/src/credential-cleanup.test.ts
+✔ default-off performs no request and never invents credentials (9.205034ms)
+✔ real HTTP transport authenticates, reports bounded progress, preserves failures and refuses redirects (269.245497ms)
+✔ malformed results and network ambiguity never report successful cleanup (5.184855ms)
+✔ scheduled minute dispatch is opt-in and daily Linear path is not redirected (203.441621ms)
+✔ exposes only webhook intake and the protected sync cron route (489.186682ms)
+✔ returns 503 before accepting webhooks when the secret is missing (31.866798ms)
+✔ rejects unauthorized cron requests before accessing the database (83.740073ms)
+✔ acknowledges valid but unsupported Linear event types without database access (106.412775ms)
+✔ overlapping request scopes keep Drizzle and Pool bound to their own clients (20.857197ms)
+✔ maps Linear review and duplicate states into Mikka statuses (56.230759ms)
+✔ round trips Markdown task lists without turning them into plain bullets (2.579982ms)
+✔ binds new comment authors to the authenticated writer and preserves old authors (44.851245ms)
+✔ rejects edits to another writer's comment body (1.682056ms)
+✔ rejects deleting another writer's comment and thread aliases (1.99999ms)
+✔ keeps an existing Linear comment bound to its original app writer (4.779657ms)
+✔ rechecks Linear snapshots against the locked local and remote versions (3.895506ms)
+✔ plain app comments survive Linear Markdown formatting and line breaks (3.319816ms)
+✔ unchanged Linear Markdown does not replace local rich text (0.307189ms)
+✔ accepts a signed Linear event and returns the validated payload (39.708424ms)
+✔ rejects invalid signatures, stale events, and oversized bodies (14.100046ms)
+✔ verifies cron bearer tokens without accepting missing configuration (13.418246ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4229.909478
+$ node --import tsx --test lib/run-retry.test.ts lib/coordinator-events.test.ts lib/coordinator/context.test.ts lib/coordinator/model.test.ts lib/coordinator/triage.test.ts lib/coordinator/decision.test.ts lib/coordinator/group-routing.test.ts lib/coordinator/citations.test.ts lib/link-preview-parse.test.ts lib/coordinator-submission.test.ts tests/orchestration-prompts.test.ts
+✔ a move to done is an event, keyed by the revision that made it (3.968276ms)
+✔ saves that do not move the issue to done are not events (0.614074ms)
+✔ a finished run is one event per run, with its summary (1.232431ms)
+✔ a retry after the device went offline is one event per lost run (1.149926ms)
+✔ worker tool calls become events on the run, each one new (2.263246ms)
+✔ a question keeps only the parts the agent gave (0.922333ms)
+✔ regression: a plain retry after a 409 used to get id2; now it makes no request and keeps id1 (92.720018ms)
+✔ regression: a send before the account was known used to go out under owner "" and retry as id2; now nothing is sent until it is known (3.843464ms)
+✔ same content: a retry of an unsettled submission keeps its id; a new submission after it settled gets a new id (2.9446ms)
+✔ concurrent sends of one submission make one request and one event (2.992029ms)
+✔ a lost response is retried with the same id and body, and the server replays it (2.214362ms)
+✔ a 5xx or network failure keeps the id and body for the next send (3.608758ms)
+✔ once accepted, the same text sent again is a new submission with a new id (7.765249ms)
+✔ after a 409 the body is closed: sending it again makes no request and gets no new id (2.817243ms)
+✔ the server answers 409 to the same id with another text or questionId (1.9854ms)
+✔ sending an edited draft never replaces a submission that is still uncertain (2.20747ms)
+✔ questionId is part of the frozen body (1.919036ms)
+✔ after a 401 the same account resends the same submission; another account never does (9.076596ms)
+✔ no request is made while the account is unknown (1.590342ms)
+✔ enabled: false is accepted once and never resent (0.424664ms)
+✔ blank or too long text is refused without a request (0.189968ms)
+✔ reads server responses, including the older server without idempotency (1.631359ms)
+✔ splitCitations keeps text and citations in order (4.093721ms)
+✔ splitCitations reads a bare id as a citation of either kind (0.355441ms)
+✔ citedIds looks bare ids up as both issues and runs (0.289002ms)
+✔ splitCitations reads Markdown links and bare URLs as web sources (1.564923ms)
+✔ remarkCitations links citations for the chip renderer and keeps line breaks (0.835717ms)
+✔ remarkCitations leaves code and Markdown links alone (0.608489ms)
+✔ remarkCitations cuts a GFM autolink glued to Chinese text (2.364238ms)
+✔ token estimate counts Chinese closer to a token a character (1.692533ms)
+✔ the summary leads the prompt (0.97839ms)
+✔ old tool calls are pruned, recent ones stay (2.594339ms)
+✔ a short history is not compacted (0.354848ms)
+✔ a long history is cut just before a user message, keeping recent turns (110.269381ms)
+✔ the same history always gives the same cut and prompt (33.294155ms)
+✔ memory notes are added as list lines, removed by text, and capped (0.954132ms)
+✔ events read as messages from Mikka (0.804193ms)
+✔ the chat folds one reply's steps together and marks events (2.29226ms)
+✔ uncertain and unknown action events tolerate missing input without declaring failure or decline (0.816994ms)
+✔ answers come back by name, without refusals (25.562023ms)
+✔ state reads as key: value lines (0.317883ms)
+✔ an @mention goes straight to that agent, in mention order (2.65154ms)
+✔ mentioning a non-member is an error (1.126132ms)
+✔ a confident pick answers alone (0.829347ms)
+✔ an unsure pick goes to the Lead, who asks whether that member was meant (0.35775ms)
+✔ no answer, or a pick outside the group, goes to the Lead (0.28335ms)
+✔ a question for everyone runs every member in turn, the most relevant first (0.521857ms)
+✔ the model picks among members by role description (0.5152ms)
+✔ the model reads context and past corrections before the message (0.759626ms)
+✔ later members add only what is new, or stay silent (0.827604ms)
+✔ re-@ing someone else or saying "不是你" records a correction (0.885066ms)
+✔ tools stay on until the last allowed step (5.284241ms)
+✔ a reply that stopped normally with text has no warning (2.242966ms)
+✔ a cut-off, filtered, failed or empty reply is flagged (1.633535ms)
+✔ clear cases follow the rules (1.572499ms)
+✔ a success with a summary goes to the decision model (0.865838ms)
+✔ the model's probability picks attention or result (0.21244ms)
+✔ the tier reaches the Coordinator but not the chat (1.377226ms)
+✔ a waking message reaches a batch ahead of an older background backlog (0.569027ms)
+✔ worker events: questions and blocks need the person, reports go to the model (0.222079ms)
+✔ a worker question tells the Coordinator to relay the answer (0.175542ms)
+✔ uncertain and unknown action outcomes remain attention while explicit decline is background (0.115317ms)
+✔ parsePreview reads Open Graph tags and resolves relative URLs (3.714547ms)
+✔ parsePreview falls back to <title> and /favicon.ico, and drops non-web URLs (0.429145ms)
+✔ isPrivateAddress blocks loopback, private and link-local addresses (6.128353ms)
+✔ a run that lost its device is queued again as the next attempt (3.379652ms)
+✔ the last attempt fails instead, for the person (0.310271ms)
+✔ a lost question continuation never enters generic device takeover or retry (0.768377ms)
+✔ a run the person asked to stop just stops (0.155197ms)
+✔ a run without its issue or repository cannot be queued again (0.147299ms)
+✔ the retry brief keeps the original and says what happened, once (0.247072ms)
+✔ the retry brief stays within the prompt limit and keeps its note (0.514583ms)
+✔ a resumed session gets only the note on what happened (0.178611ms)
+✔ https and ssh spellings of one remote match (0.773006ms)
+✔ a run goes on another machine with the same repository and harness (0.344383ms)
+✔ no other machine fits: the run waits for its own (0.267791ms)
+✔ Coordinator strategies match actual tools and preserve event/citation protocol (2.583068ms)
+✔ clear work skips planning; ambiguity needs approval without inventing plan dispatch support (0.732261ms)
+✔ revised goals, duplicate avoidance, resume limits and stop semantics are explicit (0.778842ms)
+✔ worker adaptations preserve finish, permission, foreground, skills and publication ownership contracts (1.933379ms)
+✔ source attribution includes full upstream MIT license and immutable pin (0.600923ms)
+✔ claim initializes mailboxes before the queued-to-preparing compare-and-set (0.425617ms)
+✔ Bot turns advertise messaging only when mailbox setup succeeds (0.465055ms)
+✔ device discovery and the final claim predicate both reject disabled mailboxes (0.657003ms)
+✔ Coordinator advances actionable goals and events through evidence-backed acceptance (0.721032ms)
+✔ Coordinator limits questions to essential decisions and preserves scope and human authority (1.599899ms)
+✔ Coordinator diagnoses transient failures without unsafe retries or terminal claims (0.371505ms)
+✔ proactive policy remains in the actual Coordinator instruction composition with memory and mailbox rules (0.60392ms)
+✔ ordinary recovery has evidence and budget bounds; the conditional one-retry rule applies only to actual denials (0.499141ms)
+ℹ tests 89
+ℹ suites 0
+ℹ pass 89
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2596.050914
+$ node --import tsx --test --test-concurrency=1 lib/factory/contract.test.ts lib/factory/postgres.test.ts lib/factory/checks.test.ts lib/factory/check-independence.test.ts lib/factory/approval.test.ts lib/factory/local-publication.test.ts lib/factory/vercel-publication.test.ts lib/factory/vercel-monitor.test.ts lib/factory/monitor-cycle.test.ts lib/factory/monitor.test.ts lib/factory/monitor-dispatch.test.ts lib/factory/questions/contract.test.ts lib/factory/questions/postgres.test.ts
+✔ approval schema cannot accept a client-supplied human identity (6.481951ms)
+﹣ PG17 approval/publish contract: real SQL, HTTP handler, isolated filesystem effect; upstream identities/results are fixtures (0.289088ms) # SKIP
+﹣ PG17 check question ancestry (synthetic provider reports, real store/dispatch/gates) (3.123253ms) # SKIP
+﹣ PG17 check integration: atomic dispatch, frozen commands, independent provenance, repair/new SHA, restart and closed downstream gates (fixture run reports) (0.758955ms) # SKIP
+✔ clear authorization routes directly; only missing items clarify, spec is optional (4.69098ms)
+✔ API rejects missing session, invalid ids, cross origin, missing origin and unsupported methods before DB (2.718544ms)
+✔ explicit loopback wiring rejects cloud/production and incomplete configuration (4.315684ms)
+✔ real nonproduction target write/readback, exact SHA/repository/environment, immutable receipt and no path input (37.936561ms)
+﹣ PG17 monitor cycles: immutable history, CAS/replay, rollback, owner/candidate/stop fences (1.050273ms) # SKIP
+﹣ PG17 normal monitor dispatch: actual local publication receipt, readonly claim, queue replay/rollback and closed boundaries (1.29812ms) # SKIP
+✔ legacy and unlinked workspace issues never collapse into a personal-owner partition (0.966099ms)
+✔ fingerprints strip volatile IDs and secret output; owner/workspace/component/candidate environment isolate failures (0.952799ms)
+﹣ PG17 monitor: real transactions, concurrent dedupe, original issue, restart/rollback, fences, repair and recovery (0.24121ms) # SKIP
+﹣ PG17: routing, 10-way replay/CAS, actual SQL rollback/reconnect, attempts, candidate fences and API isolation (0.87235ms) # SKIP
+✔ question identity requires original run/session plus complete current Factory fence (6.058822ms)
+✔ hand-in retains a supplied questionId; legacy ID is stable for one run (3.401125ms)
+✔ Orchestrator answer schema requires fact provenance and cannot assert a human source (2.455995ms)
+✔ human answer cannot inject source, scope or approval grants (1.210163ms)
+✔ answer fingerprints ignore object key order but bind actor, source, answer and original question (9.73033ms)
+﹣ PG17 execution questions: durable waiting, exact facts/human source, one continuation, rollback and stop fences (0.847088ms) # SKIP
+▶ Vercel monitor actual loopback HTTP protocol substitute (not provider acceptance)
+  ✔ production binds real git source, fixed alias before/after and application liveness without forwarding credentials (49.09599ms)
+  ✔ preview uses immutable health only and never pretends to be production (10.620166ms)
+  ✔ wrong git SHA (4.453989ms)
+  ✔ metadata SHA without real source (4.644007ms)
+  ✔ wrong team (4.742008ms)
+  ✔ wrong project (6.251319ms)
+  ✔ wrong environment (4.581373ms)
+  ✔ wrong repository (4.906507ms)
+  ✔ wrong publication (3.868114ms)
+  ✔ wrong binding hash (4.118903ms)
+  ✔ wrong operation (3.40324ms)
+  ✔ wrong reference (4.518361ms)
+  ✔ pending deployment (3.569903ms)
+  ✔ unassigned aliases (3.953782ms)
+  ✔ project GitHub link mismatch fails before health (1.470977ms)
+  ✔ moving production alias is observed and cannot pass (14.881522ms)
+  ✔ health HTTP failure is sanitized, not recovery (18.900011ms)
+  ✔ a moved alias overrides an observed application failure (12.074927ms)
+  ✔ preview rechecks immutable identity even after health failure (13.74598ms)
+  ✔ wrong service does not prove application health (13.426538ms)
+  ✔ health redirects are never followed (22.38522ms)
+  ✔ response bodies and total request lifetime are bounded (49.652335ms)
+  ✔ receipt mismatch and missing runtime credential cause no external call (0.760886ms)
+  ✔ provider authorization failures and redirects stay closed without application checks (15.382549ms)
+  ✔ legacy receipt and non-HTTPS application destination are rejected before network (0.648112ms)
+✔ Vercel monitor actual loopback HTTP protocol substitute (not provider acceptance) (292.285715ms)
+✔ runtime registration is explicit and constrained to existing project resources (0.525046ms)
+✔ real HTTP protocol substitute: preview exact SHA and provider receipt (187.347134ms)
+✔ real HTTP protocol substitute: production exact SHA and provider receipt (54.688758ms)
+✔ queued operation is checkpointed; reconciliation only reads, preserves expiry/session/fence binding (32.340343ms)
+✔ accepted POST with lost response recovers through metadata lookup without a second POST (23.205835ms)
+✔ readback rejects wrong project/team/SHA/environment/repository/meta/URL and terminal failures (163.074383ms)
+✔ no match stays uncertain, grant mismatch and missing token make no provider write (13.300931ms)
+✔ preflight expiry and trusted live-grant hook prevent the create POST (211.603425ms)
+✔ transport rejects invalid JSON and HTTP failure; receipt cannot relabel production as preview (26.399214ms)
+ℹ tests 55
+ℹ suites 0
+ℹ pass 47
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 8
+ℹ todo 0
+ℹ duration_ms 13133.953515
+$ node --import tsx --test lib/group-conversations.test.ts lib/group-artifact-review.test.ts lib/group-mailbox-runtime.test.ts lib/group-worker-authority.test.ts lib/group-mailbox-turns.test.ts
+✔ source anchors never migrate to another version; HTML identity fails closed (6.113305ms)
+﹣ disposable Postgres: mixed groups → durable isolated runtime → Artifact revision → human acceptance (0.172565ms) # SKIP
+✔ directory rejects foreign/suspended users and private or malformed agents (3.248416ms)
+✔ GET conversations: authentication, write Origin/Host before DB (0.742388ms)
+✔ POST conversations: authentication, write Origin/Host before DB (0.317311ms)
+✔ GET messages: authentication, write Origin/Host before DB (0.102576ms)
+✔ POST messages: authentication, write Origin/Host before DB (0.562462ms)
+✔ POST members: authentication, write Origin/Host before DB (0.190598ms)
+✔ DELETE members: authentication, write Origin/Host before DB (0.234029ms)
+﹣ Postgres17 migration, atomic history, pagination, unread counts, membership and privacy (0.151272ms) # SKIP
+﹣ actual HTTP dispatch → group mailbox → isolated fake worker → trusted revision (1.447441ms) # SKIP
+﹣ single durable group executor: concurrency, replay, rounds and uncertainty (1.987425ms) # SKIP
+✔ group message HTTP never imports the retired direct-provider dispatcher (31.927323ms)
+﹣ trusted issue-less group HTTP assignment and commit-time workspace authority (1.297738ms) # SKIP
+ℹ tests 14
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 5
+ℹ todo 0
+ℹ duration_ms 1948.924559
+$ node --import tsx --test lib/auth-callback.test.ts lib/composio-actions.test.ts lib/pending-action-view.test.ts lib/composio-pagination.test.ts lib/issue-owner-scope.test.ts lib/skills-search.test.ts
+✔ Google uses the stable cloud callback hub under the Mikka base path (19.593233ms)
+✔ uses the production base path and requires a configured base URL (0.284156ms)
+✔ executes only for the signed-in user’s active, enabled account and pins its tool version (13.045979ms)
+✔ does not execute if no active connection exists or the toolkit has multiple accounts (0.883249ms)
+✔ rejects tool slugs outside Mikka’s fixed allowlist (0.609685ms)
+✔ sends an email as plain text to the first recipient plus the rest (2.793643ms)
+✔ creates an event on the primary calendar without a Meet link, emailing guests unless told not to (2.432432ms)
+✔ an event change must change something and cannot cancel the event (2.234754ms)
+✔ only sending mail and writing the calendar need approval (0.202453ms)
+✔ loads every Composio page in cursor order (18.446462ms)
+✔ owner issue scope requires caller ownership or membership (3.010418ms)
+✔ reads an event’s title and times, also when nested under response_data (18.92097ms)
+✔ keeps only ids and the link from a result (0.381548ms)
+✔ accepts skills.sh search results (8.37931ms)
+✔ rejects result links outside skills.sh (0.423483ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3002.968141
+$ node --experimental-strip-types --test tests/invitation-csv.test.mjs
+✔ 识别 BOM、中文表头、CRLF，并规范化和去重邮箱 (4.898137ms)
+✔ 支持带逗号、换行和转义引号的其他列 (0.464367ms)
+✔ 支持单列无表头以及分号、制表符格式 (0.310773ms)
+✔ 拒绝空文件、只有表头以及缺少邮箱列的多列文件 (0.728072ms)
+✔ 指出无效邮箱行且不部分导入 (0.821051ms)
+✔ 拒绝未闭合和不合法引号 (0.226425ms)
+✔ 按去重后的数量校验批量上限，手动输入同样校验 (1.248954ms)
+✔ CSV 导出保留中文并转义引号和公式注入 (0.419544ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 423.012773
+$ node --experimental-strip-types --test tests/analytics-policy.test.mjs
+✔ pageviews strip query strings, hashes, document identifiers and unapproved properties (3.037823ms)
+✔ automatic top-level person mutations are stripped without losing ingestion metadata (0.269843ms)
+✔ unknown events, replay and raw exception events never pass the allowlist (0.213242ms)
+✔ all upcoming features fail closed, even if the remote switch is accidentally enabled (0.601898ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 215.954308
+$ node --experimental-strip-types --test tests/settings-navigation.test.mjs tests/team-identifier.test.mjs
+✔ 设置页面间与团队子页使用即时导航 (2.203933ms)
+✔ 工作台与设置之间的路由切换使用即时导航 (0.553176ms)
+✔ 带 basePath 与 locale 前缀的设置路由仍使用即时导航 (0.361495ms)
+✔ 认证页、未知页面及外站不绕过 Next.js 路由 (0.55229ms)
+✔ 即时导航只写入一次历史记录，未知路径不改写 URL (1.916309ms)
+✔ 带 basePath 与 locale 的 history 写入保留部署路径和当前语言 (1.017777ms)
+✔ 根据团队名称生成合法标识："eng" (2.948453ms)
+✔ 根据团队名称生成合法标识："Engineering" (0.962378ms)
+✔ 根据团队名称生成合法标识："Design team" (0.458349ms)
+✔ 根据团队名称生成合法标识："Quality Assurance" (0.127855ms)
+✔ 根据团队名称生成合法标识："  customer-success  " (0.197522ms)
+✔ 根据团队名称生成合法标识："Équipe" (0.424534ms)
+✔ 根据团队名称生成合法标识："123 engineering" (0.363943ms)
+✔ 根据团队名称生成合法标识："a" (0.283747ms)
+✔ 根据团队名称生成合法标识："工程团队" (1.433525ms)
+✔ 根据团队名称生成合法标识："123" (0.518471ms)
+✔ 根据团队名称生成合法标识："🚀" (1.929967ms)
+✔ 根据团队名称生成合法标识："" (0.147306ms)
+✔ 根据团队名称生成合法标识："   " (0.155716ms)
+✔ 自动标识忽略大小写并避开当前工作区已有标识 (0.183879ms)
+✔ 名称及冲突后缀不会超出服务端标识长度限制 (0.088286ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 213.880847
+$ node --import tsx --test scripts/issue-checklist.test.mjs scripts/issue-metadata.test.mjs scripts/issue-relations.test.mjs lib/issue-activity.test.ts lib/issue-team-access-policy.test.ts lib/task-identifier.test.ts lib/issue-scope.test.ts lib/workspace-name.test.ts lib/locale-alias.test.ts lib/shortcut-guard.test.ts lib/document-sync-snapshot.test.ts scripts/issue-editor-keys.test.mjs scripts/issue-team-select.test.mjs
+✔ document sync notifies only when the visible snapshot changes (13.227383ms)
+✔ keeps creation and drops description-only autosaves (42.326028ms)
+✔ always keeps the created row when later events exceed the limit (2.297916ms)
+✔ records label add and remove without a description-only row (1.985978ms)
+✔ records clearing an assignee and ignores subtasks created before the parent (1.054844ms)
+✔ only a confident judgment makes a workspace task (1.525469ms)
+✔ the question is one predicate named workspace (0.275805ms)
+✔ earlier corrections go along as examples (0.219183ms)
+✔ only active workspace members can access team-linked issues (0.728242ms)
+✔ redirects zh aliases to zh-CN and leaves real locales alone (2.37918ms)
+✔ keys typed before the new-task dialog mounts are kept (1.514804ms)
+✔ single-key shortcuts stay quiet while a dialog or field is focused (24.750625ms)
+✔ the personal prefix is the first four letters of the email, skipping digits and symbols (1.422417ms)
+✔ a chosen prefix must be four letters (0.470031ms)
+✔ a prefix that equals a connected Linear team key is not used (0.407837ms)
+✔ workspace tasks show their Linear id, personal tasks their prefix (0.548805ms)
+✔ builds a locale-specific default workspace name (1.274873ms)
+✔ renames only an auto-generated name from the other locale (0.830908ms)
+✔ empty document has no invented checklist progress (3.179793ms)
+✔ nested checklist items count only persisted boolean completion (0.373254ms)
+✔ completed checklist reports one hundred percent (0.254653ms)
+✔ description edits do not repaint from every Yjs update (2.450215ms)
+✔ Enter, Backspace, Delete and select-all delete keep the description (273.904864ms)
+✔ splitting and joining paragraphs does not loop through the live Yjs editor (147.558607ms)
+✔ legacy documents have no invented attributes (8.231699ms)
+✔ attributes round-trip through persisted JSON without altering body content (6.358055ms)
+✔ pre-rename orvilo metadata is read and moved to the mikka key on write (3.195731ms)
+✔ collaborative body replacement preserves the latest card attributes (1.016899ms)
+✔ issue hydration exposes stable numeric identifiers (0.558632ms)
+✔ PR links reject unsafe schemes and non-PR URLs (1.205633ms)
+✔ metadata enforces collection and field bounds (1.938841ms)
+✔ parent and dependency graphs reject self and transitive cycles (3.309767ms)
+✔ unrelated existing graph cycles terminate without hanging (0.342839ms)
+✔ description comparisons ignore issue properties (35.353858ms)
+✔ description equality tolerates editor defaults and reordered persisted keys (0.335307ms)
+✔ description equality preserves meaningful rich text attributes (0.311301ms)
+✔ description diff preserves rich nodes and identifies separate changes (0.283254ms)
+✔ issue operations round trip without overwriting document or unrelated metadata (2.611709ms)
+✔ relation fields and personal preferences have bounded validated values (0.624913ms)
+✔ re-rendering the team control with equal props does not update Select items (177.364024ms)
+✔ a fresh team items array is written into the Select store on every render (41.899186ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 41
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5036.130279
+$ node --import tsx --test lib/telegram/commands.test.ts lib/telegram/logger.test.ts lib/telegram/unique-violation.test.ts
+✔ parses a command addressed to this bot and keeps its arguments (2.880357ms)
+✔ ignores commands addressed to another bot and ordinary text (0.566203ms)
+✔ omits SDK log context that may contain private Telegram content (4.041085ms)
+✔ recognizes PostgreSQL unique violations directly and through Drizzle causes (1.493238ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 324.142564
+$ node --import tsx --test lib/suggestions/suggestions.test.ts
+✔ a Gmail message keeps its subject and reads labels (2.002092ms)
+✔ Composio events route by toolkit (0.811383ms)
+✔ Linear: an issue assigned to me by someone else is required (0.912892ms)
+✔ GitHub: review requests and replies on my PRs (1.171121ms)
+✔ GitHub signatures are checked against the raw body (0.902227ms)
+✔ rules decide the clear cases and leave the rest to the model (0.36006ms)
+✔ the briefing names required items first and counts by source (0.47506ms)
+✔ local dates follow the person's time zone (22.802682ms)
+✔ triggers are picked from Composio's catalog (0.983406ms)
+✔ only missing triggers are created, so a re-check is safe (0.650267ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 205.493113
+$ node --import tsx --test lib/schedules/time.test.ts lib/schedules/http.test.ts cloudflare/linear-sync/src/runtime-sweep.test.ts
+✔ shared minute tick is opt-in and never falls through to daily Linear (1.224926ms)
+✔ runtime sweep targets an explicit HTTPS preview; auth cannot follow redirects (30.561749ms)
+✔ browser schedule requests bind configured origin and actual Host despite internal Next URL (33.513003ms)
+✔ DST spring gap skips the absent local date (32.327772ms)
+✔ DST fold selects explicit earlier/later or rejects; Lord Howe half-hour fold (12.183162ms)
+✔ past once/interval starts and invalid zones reject, interval skips backlog (4.724842ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 405.833195
+$ node --conditions=react-server --import tsx --test lib/coordinator/wake-contract.test.ts
+✔ public core has no positive resource-policy fallback (2.438495ms)
+✔ controlled transport rejects cloud/provider credentials and non-isolated configuration (1.925466ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 158.024141
+$ pnpm lint:code && pnpm lint:ui
+$ oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations
+$ node scripts/check-migrations.mjs
+migrations: 61 个迁移文件检查通过
+$ node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs tests/factory-migration-order.test.mjs
+✔ 历史重号在白名单内通过 (2.378251ms)
+✔ 新的 NNNN_ 文件被拒绝 (0.273875ms)
+✔ 修改旧迁移被拒绝 (0.358282ms)
+✔ 删除旧迁移被拒绝 (0.32755ms)
+✔ 非法时间戳被拒绝 (0.622523ms)
+✔ 不晚于 main 最新迁移被拒绝 (10.30314ms)
+✔ 晚于 main 最新迁移通过 (0.280688ms)
+✔ 时间戳重复被拒绝 (0.272931ms)
+✔ 拿不到 main 时只跳过顺序检查 (0.29239ms)
+✔ only the explicit baseline precedes legacy migrations, without changing their IDs (7.96314ms)
+✔ missing baseline fails before connecting to any database (0.836911ms)
+✔ one canonical Factory migration per component, after main and before consumers, with unchanged shared SQL (14.20815ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 191.200707
+$ node scripts/lint-ui.mjs
+
+UI policy: 690 business files, 0 errors; 254 component-library files excluded (no source verification).
+Interaction policy: 282 files, including downloaded business blocks; only UI/ReUI primitives excluded.
+{}
+$ tsgo --noEmit

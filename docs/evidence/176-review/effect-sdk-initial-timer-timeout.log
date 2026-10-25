@@ -1,0 +1,10 @@
+{"at":"2026-10-25T21:27:17.665Z","phase":"actual SDK effect replay harness ready","beforeFix":true,"cloudWorkflow":false,"realModel":false,"sourceSha":"6c725df72f4fd4e70d85271bc0666529615a0496","nextBuildId":"J7xNWwztPE5HgHdMqUhT4"}
+file:///workspace/Mikka-176/scripts/verify-wake-effect-sdk.mjs:19
+async function wait(fn,label){const end=Date.now()+30000;while(Date.now()<end){if(await fn())return;await sleep(50)}throw new Error(`timeout: ${label}`)}
+                                                                                                                          ^
+
+Error: timeout: actual replay terminal
+    at wait (file:///workspace/Mikka-176/scripts/verify-wake-effect-sdk.mjs:19:123)
+    at async file:///workspace/Mikka-176/scripts/verify-wake-effect-sdk.mjs:35:3
+
+Node.js v24.19.0

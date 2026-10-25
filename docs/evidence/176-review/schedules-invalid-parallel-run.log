@@ -1,0 +1,97 @@
+▶ real PG schedule lifecycle, concurrency, fencing, recovery and original-chat result
+  ✔ ten repeated creates and ten concurrent due scans yield one occurrence/result (879.868141ms)
+  ✖ two recurring executions retain stable IDs across fresh process stores (192.506936ms)
+  ✖ claimed worker crash expires lease; stale claim cannot execute after restart (856.706074ms)
+  ✔ pause/cancel/update fence already claimed work, persistence and optimistic version (217.229408ms)
+  ✔ ten real cancellation-versus-execution races have one linearized outcome (939.516963ms)
+  ✔ late policy records skip; catch-up coalesces and records at most one backlog slot (65.532359ms)
+  ✔ cross owner/workspace/source denied and membership revoked before execution (92.904783ms)
+  ✔ read current issue state; revoked issue visibility produces a final error, not task data (190.647541ms)
+{"evidence":"retained PG schedule records","owner":"schedule-owner-bab9986d-3f05-453e-b68c-04cd62f1a513","workspace":"08508ade-5053-4221-8944-81d0f4b2bde7","session":"fe44bf07-c4b0-497f-8864-4cdd563c762f","source":"d677db71-0461-4504-9de4-be1f45dcbf68","at":"2030-01-01T00:31:01.001Z"}
+  ✖ real transaction failure retries three times and persists final error in chat (116.117401ms)
+✖ real PG schedule lifecycle, concurrency, fencing, recovery and original-chat result (3657.250166ms)
+{"evidence":"real report fault then fresh process-store retry","task":"reminder","occurrenceId":"1437e800-38c5-489f-a70c-c62ffae66954","operationId":"52021cc0-58f3-452f-b0fc-294bcf4fd2ec","status":"skipped","result":null,"effects":0}
+▶ recovery P2s use actual PG report faults, effects and permission rows
+  ✔ immutable skip after real report fault and restarted reminder (621.830588ms)
+{"evidence":"real report fault then fresh process-store retry","task":"issue_snapshot","occurrenceId":"dc70a2b6-b87b-4f6a-a25c-40ec9193c1de","operationId":"739fd330-cd2d-4fdf-8af0-d4bcfd3c2277","status":"skipped","result":null,"effects":0}
+  ✔ immutable skip after real report fault and restarted issue_snapshot (366.729803ms)
+{"evidence":"real report fault then fresh process-store retry","task":"agent_read","occurrenceId":"39a4ecd9-6197-4bad-839c-ae989d37e546","operationId":"868c33c8-a4b6-4c9d-a696-c55bb8ba1691","status":"skipped","result":null,"effects":0}
+  ✔ immutable skip after real report fault and restarted agent_read (609.709531ms)
+  ✔ catch_up_once still executes after the same report fault without duplicate logical output (500.31704ms)
+{"evidence":"denied prefix before legal tenant","deniedCount":32,"queued":245,"scans":11,"limit":25,"healthyOccurrence":"14cbd12b-18d7-4632-9bcb-24cef5cdbfb0","healthyReports":1,"deniedOwner":"recovery-5e1127fe-dca2-49c7-b3f2-1f7856bbba8c","healthyOwner":"recovery-62507b2f-509e-4bed-9bb4-a8ce9de9a034"}
+  ✔ more than LIMIT denied reports cannot starve a later authorized tenant after restart (5466.213287ms)
+✔ recovery P2s use actual PG report faults, effects and permission rows (7779.924179ms)
+{"evidence":"existing inbox compensation only; not Workflow SDK acceptance","owner":"wake179-3b9dc397-a6ef-418e-8fd9-94e30a0a13c6","event":"d9e20930-8823-487a-af8e-ada6e135be82","exhausted":"c88f16df-fc39-4ef1-a594-474b01776203"}
+✔ existing inbox persists delivery failures, compensation, concurrent claim and exhaustion (1374.013468ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 13
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 73424.762799
+
+✖ failing tests:
+
+test at lib/schedules/postgres.test.ts:1:4267
+✖ two recurring executions retain stable IDs across fresh process stores (192.506936ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(rows.every(r=>r.status==='succeeded'))
+  
+      at TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/postgres.test.ts:68:42)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/postgres.test.ts:62:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at lib/schedules/postgres.test.ts:1:4869
+✖ claimed worker crash expires lease; stale claim cannot execute after restart (856.706074ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(stale)
+  
+      at TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/postgres.test.ts:77:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/postgres.test.ts:72:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at lib/schedules/postgres.test.ts:1:10592
+✖ real transaction failure retries three times and persists final error in chat (116.117401ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'succeeded'
+  - 'failed'
+  
+      at TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/postgres.test.ts:152:45)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/postgres.test.ts:144:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'succeeded',
+    expected: 'failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,27 @@
+▶ formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoint, exhaustion and authority
+  ✔ legacy staged events require reconciliation; migration replay preserves decisions (2756.158297ms)
+  ✔ three transport failures persist; ten duplicate claims lead to one atomic response (1360.219325ms)
+  ✔ accepted start whose ACK is lost after consumption never reopens completed event (324.030367ms)
+{"evidence":"actual child SIGKILL","phase":"staged","eventId":"a5bfe96c-9d8b-4b1f-a40b-102d736bbded","state":"completed","generation":"returned"}
+  ✔ actual SIGKILL after staged: fenced restart and no blind generation resend (2591.941474ms)
+{"evidence":"actual child SIGKILL","phase":"checkpoint","eventId":"a3f48911-350a-4d00-8653-d19372233302","state":"completed","generation":"returned"}
+  ✔ actual SIGKILL after checkpoint: fenced restart and no blind generation resend (3131.597671ms)
+{"evidence":"actual child SIGKILL","phase":"effect","eventId":"39cb6643-eafd-4095-a9c9-4684056eba07","state":"failed","generation":"uncertain"}
+  ✔ actual SIGKILL after effect: fenced restart and no blind generation resend (1796.799258ms)
+  ✔ publication PG failure keeps checkpoint; fresh lease ACK reuses result without effect (297.281366ms)
+  ✔ exhaustion and owner-scoped replay preserve operation ID and never grant new approval (680.046454ms)
+  ✔ current workspace revocation and scope mismatch prevent consumption and publication (345.995516ms)
+  ✔ persisted output publishes without a new resource admission or generation (368.80314ms)
+  ✔ stop committed after staging fences generation and recovered notice has zero effects (259.084491ms)
+  ✔ budget deferral neither sends nor burns retry; late start ACK preserves defer (125.610513ms)
+✔ formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoint, exhaustion and authority (14285.319886ms)
+{"evidence":"actual tool handler, not model conversation","owner":"wake176-69915e66-b378-49f6-bbfd-34c370e6c65b","sourceEventId":"bd14edf7-ecea-4621-8525-73dca3c02384","workspaceId":"8b88667c-3078-4b94-a867-e24f1ad0a047","scheduleId":"37ce35b8-2d52-4240-b19e-ef152f0b3b82","otherWorkspaceId":"a5dc4c1e-961c-4a02-83a0-9d49b8db0304"}
+✔ actual Coordinator schedule tool uses its persisted workspace and original chat (16243.096369ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20263.886165
