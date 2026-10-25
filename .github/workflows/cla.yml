@@ -32,5 +32,5 @@ jobs:
           path-to-signatures: signatures/cla.json
           path-to-document: https://github.com/alexj11324/Mikka/blob/main/CLA.md
           branch: cla-signatures
-          # The maintainer's account (shared by the project's coding agents) and bots need no signature.
-          allowlist: alexj11324,*[bot]
+          # Repository policy exempts the maintainer, the exact codex account, and bots; this is not a signature.
+          allowlist: alexj11324,codex,*[bot]
