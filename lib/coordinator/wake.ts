@@ -1,3 +1,5 @@
+import { retryInboxWakes } from './inbox-retry'
+import { pool } from '@/lib/db'
 import 'server-only'
 import { start } from 'workflow/api'
 import { hasWakingEvents, setEventTier, untriagedEvents } from '@/lib/coordinator/store'
@@ -38,9 +40,20 @@ async function triageInbox(userId: string): Promise<void> {
 export async function wakeCoordinator(userId: string): Promise<void> {
   if (!coordinatorEnabled()) return
   try {
-    await triageInbox(userId)
-    if (await hasWakingEvents(userId)) await start(coordinatorTurn, [userId])
+    await deliverCoordinatorWake(userId)
   } catch (error) {
     console.error('Failed to wake the Coordinator', error instanceof Error ? error.message : error)
   }
+}
+
+/** Shared delivery entry. Compensation must observe failures; request-side
+ * wakeCoordinator keeps its historical best-effort response contract. */
+async function deliverCoordinatorWake(userId: string) {
+  await triageInbox(userId)
+  if (await hasWakingEvents(userId)) await start(coordinatorTurn, [userId])
+}
+
+/** The runtime sweep shares the existing inbox delivery mechanism. */
+export async function retryCoordinatorInbox(limit = 25) {
+  return retryInboxWakes(pool, deliverCoordinatorWake, coordinatorEnabled(), limit)
 }

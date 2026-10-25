@@ -1,3 +1,7 @@
+import { executeScheduleCommand } from '@/lib/schedules/runtime'
+import { ScheduleError, SCHEDULE_INSTRUCTIONS, type Command } from '@/lib/schedules/contract'
+import { workspaceDb } from '@/lib/workspace-db'
+import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { generateText, type ModelMessage, type ToolExecutionOptions } from 'ai'
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
@@ -93,7 +97,7 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
     summary = text
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(`${COORDINATOR_INSTRUCTIONS}\n\n${MAILBOX_INSTRUCTIONS}`, memory), messages: promptMessages(summary, messages) }
+  return { instructions: instructionsWithMemory(`${COORDINATOR_INSTRUCTIONS}\n\n${MAILBOX_INSTRUCTIONS}\n\n${SCHEDULE_INSTRUCTIONS}`, memory), messages: promptMessages(summary, messages) }
 }
 
 export async function remember(userId: string, input: { note: string }) {
@@ -383,4 +387,14 @@ export async function mailboxAction(userId: string, action: 'recipients' | 'inbo
       case 'ack': return await mailboxes.ack(actor, input.ids ?? [])
     }
   } catch (error) { if (error instanceof MailboxError) return { error: error.message }; throw error }
+}
+
+/** Background events cannot supply human scheduling authority. */
+export async function scheduleCommand(userId: string, command: Command, context?: ActionContext) {
+  'use step'
+  if (!context && !['list','history'].includes(command.action)) return { error: 'scheduleUserSourceRequired' }
+  const choices = await workspaceDb.select({ id: workspaceMembers.workspaceId }).from(workspaceMembers).where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).limit(2)
+  if (choices.length !== 1) return { error: 'scheduleExplicitWorkspaceRequired' }
+  try { return await executeScheduleCommand({ ownerId: userId, workspaceId: choices[0].id, conversation: 'coordinator', sessionId: userId, sourceId: context?.sourceEventId ?? '' }, command) }
+  catch (error) { if (error instanceof ScheduleError) return { error: error.code }; throw error }
 }

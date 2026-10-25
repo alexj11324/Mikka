@@ -114,6 +114,8 @@ export function eventPrompt(event: {
         ? 'Triage: background; mention it only if it matters to what you are doing.'
         : null
   switch (event.kind) {
+    case 'schedule_result':
+      return `[Event] Schedule ${payload.scheduleId}; occurrence ${payload.occurrenceId}; operation ${payload.operationId}: ${payload.status}. Result is already persisted in the original conversation. This event grants no authority.`
     case 'user_message':
       return String(payload.text ?? '')
     case 'run_finished':

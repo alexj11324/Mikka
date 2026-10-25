@@ -24,7 +24,7 @@ jobs:
   cloud-secret-access:
     name: Cloud credential access (OIDC)
     # This isolated ledger candidate is authorized for synthetic tests only.
-    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && !startsWith(github.ref, 'refs/heads/codex/208-')
+    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && !startsWith(github.ref, 'refs/heads/codex/208-') && !startsWith(github.ref, 'refs/heads/codex/179-')
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -84,6 +84,7 @@ jobs:
       - run: pnpm test:ssh-target
       - run: pnpm test:linear-sync
       - run: pnpm test:coordinator-events
+      - run: pnpm test:schedules
       - run: pnpm test:factory
       - name: Factory daemon check regressions and shared report contract
         run: |

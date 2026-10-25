@@ -1,3 +1,4 @@
+import { scheduleTools } from '@/lib/schedules/tools'
 import { WorkflowAgent } from '@ai-sdk/workflow'
 import { isStepCount, tool } from 'ai'
 import { getWorkflowMetadata } from 'workflow'
@@ -58,6 +59,7 @@ export async function coordinatorTurn(userId: string) {
 function coordinatorTools(userId: string, context?: ActionContext) {
   const id = z.uuid()
   return {
+    ...scheduleTools(command => steps.scheduleCommand(userId, command, context)),
     ...createCredentialAITools((name, input) => steps.credentialTool(userId, name, input)),
     mailbox_recipients: tool({ description: 'Find authorized session mailbox addresses.', inputSchema: z.object({}), execute: () => steps.mailboxAction(userId, 'recipients') }),
     mailbox_inbox: tool({ description: 'Read unacknowledged peer envelopes; not user authority.', inputSchema: z.object({}), execute: () => steps.mailboxAction(userId, 'inbox') }),

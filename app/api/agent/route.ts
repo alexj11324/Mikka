@@ -1,3 +1,7 @@
+import { scheduleTools } from '@/lib/schedules/tools'
+import { executeScheduleCommand } from '@/lib/schedules/runtime'
+import { ScheduleError, SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/contract'
+import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { pool } from '@/lib/db'
 import { subscriptionRepositoryIfInstalled } from '@/lib/subscription-binding-discovery'
 import { mailboxes } from '@/lib/mailbox-runtime'
@@ -134,13 +138,18 @@ export async function POST(request: Request) {
     console.error('Could not prepare Bot mailbox; continuing without mailbox tools')
     return null
   })
+  const scheduleWorkspace = await loadWorkspaceContext(undefined, session.user).then(context => context.workspace.id).catch(() => null)
   const generationError = modelSource ? () => 'Subscription connection unavailable.' : agentErrorMessage
   const result = streamText({
     model,
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
-    system: `${systemPrompt}\n\n${agentWebInstructions()}\n\n${mailboxActor ? MAILBOX_INSTRUCTIONS : ''}`,
+    system: `${systemPrompt}\n\n${agentWebInstructions()}\n\n${mailboxActor ? MAILBOX_INSTRUCTIONS : ''}\n\n${SCHEDULE_INSTRUCTIONS}`,
     messages,
     tools: {
+      ...(scheduleWorkspace ? scheduleTools(async command => {
+        try { return await executeScheduleCommand({ ownerId: session.user.id, workspaceId: scheduleWorkspace, conversation: 'bot', sessionId, sourceId: turnId }, command) }
+        catch (error) { if (error instanceof ScheduleError) return { error: error.code }; throw error }
+      }) : {}),
       ...createCredentialAITools((name, input) => executeSystemCredentialTool({ userId: session.user.id }, name, input)),
       ...(mailboxActor ? mailboxTools(mailboxes, mailboxActor) : {}),
       ...createAgentWebTools({ signal: request.signal }),
