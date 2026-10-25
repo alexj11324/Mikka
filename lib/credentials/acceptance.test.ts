@@ -354,6 +354,9 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
     await app.query("UPDATE agent_runs SET \"leaseExpiresAt\"=now()-interval '1 second' WHERE id=$1", [runId])
     assert.equal((await call('', { workspaceId, runId, serviceId: 'fixture', mode: 'api_header' })).status, 404)
     await app.query("UPDATE agent_runs SET \"leaseExpiresAt\"=now()+interval '90 seconds' WHERE id=$1", [runId])
+    await app.query("UPDATE devices SET \"lastSeenAt\"=now()-interval '61 seconds' WHERE id=$1", [deviceId])
+    assert.equal((await call('', { workspaceId, runId, serviceId: 'fixture', mode: 'api_header' })).status, 404)
+    await app.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
   })
   await t.test('DB lifecycle hooks revoke on stop/device disable independently of app callbacks', async () => {
     let request = await create(); await submit(request)
@@ -545,6 +548,11 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
       return session ? { ownerId: session.user.id, authSessionId: session.session.id } : null
     } })
     const prepare = async () => {
+      // Each positive scenario represents a still-running device. Earlier real
+      // Chromium fault cases can outlast the production heartbeat/lease TTLs.
+      // Refresh only at scenario entry; stale-authority cases above stay strict.
+      await app.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
+      await app.query("UPDATE agent_runs SET \"leaseExpiresAt\"=now()+interval '90 seconds' WHERE id=$1", [runId])
       await executor.open(binding)
       const response = await call('', { workspaceId, runId, serviceId: 'fixture-retained', mode: 'browser_login' })
       assert.equal(response.status, 201)
