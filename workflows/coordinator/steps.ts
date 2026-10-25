@@ -116,10 +116,12 @@ export async function getIssue(userId: string, input: { issueId: string }) {
   if (!issue) return { error: 'issueNotFound' }
   const runs = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
     .where(and(eq(agentRuns.issueId, issue.id), eq(agentRuns.userId, userId))).orderBy(desc(agentRuns.createdAt)).limit(5)
+  const {tasks: factory} = await factoryStore.listForIssue(userId,issue.id)
   return {
     id: issue.id, number: readIssueMetadata(issue.content).number ?? null, title: issue.title,
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
     runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
+    factory: factory.map(({id,...task})=>({taskId:id,...task})),
   }
 }
 

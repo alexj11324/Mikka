@@ -19,6 +19,27 @@ const controlSchema = z
     reason: z.string().trim().min(1).max(4000),
   })
   .strict();
+/** Read-only discovery; identity is always supplied by the session adapter. */
+export async function handleFactoryList(
+  store: FactoryStore,
+  req: { userId: string | null; issueId: string | null },
+): Promise<{ status: number; body: unknown }> {
+  if (!req.userId) return { status: 401, body: { error: "authRequired" } };
+  if (!z.uuid().safeParse(req.issueId).success)
+    return { status: 422, body: { error: "factoryInvalid" } };
+  try {
+    return {
+      status: 200,
+      body: await store.listForIssue(req.userId, req.issueId!),
+    };
+  } catch (error) {
+    if (!(error instanceof FactoryError)) throw error;
+    return {
+      status: error.code === "factoryNotFound" ? 404 : 422,
+      body: { error: error.code },
+    };
+  }
+}
 /** Session identity comes from the adapter. No runtime pass, dispatch or approval API. */
 export async function handleFactory(
   store: FactoryStore,
