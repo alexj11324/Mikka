@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
+import { factoryCheckIndependent } from "./check-independence";
 import {
   bindingSchema,
   candidateSchema,
@@ -579,11 +580,8 @@ export function createFactoryStore(
                 if (!rows.length) fail("factoryArtifactMissing");
               }
               if (["review", "verify"].includes(task.stage)) {
-                const { rows } = await tx.query(
-                  'SELECT 1 FROM factory_attempts WHERE "taskId"=$1 AND id<>$2 AND ("runId"=$3 OR "sessionId"=$4)',
-                  [task.id, attempt.id, run.id, run.sessionId],
-                );
-                if (rows.length) fail("factoryIndependentRunRequired");
+                if (!(await factoryCheckIndependent(tx, task, run.id)))
+                  fail("factoryIndependentRunRequired");
               }
               await tx.query(
                 'UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1',
