@@ -457,11 +457,22 @@ test(
             `UPDATE factory_questions SET "originRevision"="originRevision"+1 WHERE id=$1`,
             [q.question.id],
           ),
-        "ordinary retry edge": (f, q) =>
-          pool.query(`UPDATE agent_runs SET "retryOf"=$2 WHERE id=$1`, [
-            q.answer.continuationRunId,
-            f.originRunId,
-          ]),
+        "ordinary retry edge": async (f, q) => {
+          const values=[q.answer.continuationRunId,f.originRunId];
+          // The audit lineage guard now rejects normal reparenting first.
+          await assert.rejects(pool.query(`UPDATE agent_runs SET "retryOf"=$2 WHERE id=$1`,values),/security_audit_lineage_invalid/);
+          // Controlled owner-only fixture corruption still exercises the
+          // independent Factory reader gate; no production guard is relaxed.
+          const tx=await pool.connect();
+          try {
+            await tx.query('BEGIN');
+            await tx.query('ALTER TABLE agent_runs DISABLE TRIGGER security_audit_transition');
+            await tx.query(`UPDATE agent_runs SET "retryOf"=$2 WHERE id=$1`,values);
+            await tx.query('ALTER TABLE agent_runs ENABLE TRIGGER security_audit_transition');
+            await tx.query('COMMIT');
+          } catch(error) { await tx.query('ROLLBACK'); throw error; }
+          finally { tx.release(); }
+        },
         "missing metadata": (f, q) =>
           pool.query(
             `UPDATE agent_runs SET "questionContinuation"=NULL WHERE id=$1`,
