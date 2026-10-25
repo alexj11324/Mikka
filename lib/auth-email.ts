@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { APIError, type BetterAuthOptions, type User } from 'better-auth'
+import { APIError, type BetterAuthOptions, type User, type DBAdapter } from 'better-auth'
+import { runWithTransaction } from '@better-auth/core/context'
 import { verifyJWT } from 'better-auth/crypto'
 
 export const AUTH_EMAIL_TTL_SECONDS = 15 * 60
@@ -8,24 +9,27 @@ export const AUTH_EMAIL_FROM = 'Mikka <noreply@aspectlylabs.com>'
 type VerificationStore = {
   reserveVerificationValue(input: { identifier: string; value: string; expiresAt: Date }): Promise<boolean>
   consumeVerificationValue(identifier: string): Promise<{ value: string } | null>
+  findVerificationValue(identifier: string): Promise<{ value: string; expiresAt: Date } | null>
   findUserById(id: string): Promise<User | null>
   updateUser(id: string, data: Partial<User> & Record<string, unknown>): Promise<User | null>
 }
 export type AuthMailContext = { secret: string; internalAdapter: VerificationStore }
-type MailContext = AuthMailContext
+type MailContext = AuthMailContext & { adapter: DBAdapter }
 type HookContext = { path?: string; body?: Record<string, unknown>; query?: Record<string, unknown>; request?: Request; context: MailContext }
 type MailKind = 'verification' | 'password-reset'
 type MailData = { user: { id: string; email: string }; url: string; token: string }
 type Delivery = { kind: MailKind; outcome: 'accepted_by_provider' | 'failed' | 'throttled' }
 
 function digest(value: string) { return createHash('sha256').update(value).digest('hex') }
-function invalidLink(): never { throw new APIError('BAD_REQUEST', { code: 'INVALID_TOKEN', message: 'Invalid or expired link' }) }
+function invalidLink(stage = 'validation'): never {
+  console.warn('auth_email_verification_rejected', { stage })
+  throw new APIError('BAD_REQUEST', { code: 'INVALID_TOKEN', message: 'Invalid or expired link' }) }
 function unavailable(): never { throw new APIError('SERVICE_UNAVAILABLE', { code: 'AUTH_EMAIL_DELIVERY_UNAVAILABLE', message: 'Email service unavailable' }) }
 
 export function createAuthEmail(options: {
   origin: string
   apiKey: () => string | undefined
-  context: () => Promise<MailContext>
+  context: () => Promise<AuthMailContext>
   fetch?: typeof fetch
   report?: (event: Delivery) => void
   background?: (task: () => Promise<void>) => void
@@ -43,7 +47,7 @@ export function createAuthEmail(options: {
 
   function callback(value: unknown, expected: string, allowDefault = true) {
     if (allowDefault && (value === undefined || value === '' || value === '/')) return expected
-    if (!allowDefault && value !== expected) invalidLink()
+    if (!allowDefault && value !== expected) invalidLink('callback')
     if (typeof value !== 'string' || value.includes('\\')) invalidLink()
     let url: URL
     try { url = new URL(value, origin) } catch { invalidLink() }
@@ -131,22 +135,36 @@ export function createAuthEmail(options: {
       if (ctx.path?.startsWith('/reset-password/')) callback(ctx.query?.callbackURL, resetReturn, false)
       if (['/send-verification-email', '/request-password-reset'].includes(ctx.path ?? '') && !options.apiKey()) unavailable()
       if (ctx.path !== '/verify-email') return
+      const raw = ctx.request ? new URL(ctx.request.url).searchParams : null
+      // Fixed booleans only: runtime logs already supply deployment/request IDs.
+      // Never log the URL, parsed values, identifiers, or key fingerprints.
+      console.info('auth_email_verification_input', {
+        tokenIsString: typeof ctx.query?.token === 'string',
+        nonceHasExpectedShape: typeof ctx.query?.nonce === 'string' && /^[a-f0-9]{32}$/.test(ctx.query.nonce),
+        callbackMatches: ctx.query?.callbackURL === verifyReturn,
+        rawTokenUnique: raw ? raw.getAll('token').length === 1 : null,
+        rawNonceUnique: raw ? raw.getAll('nonce').length === 1 : null,
+        rawTokenMatchesParsed: raw ? raw.get('token') === ctx.query?.token : null,
+        rawNonceMatchesParsed: raw ? raw.get('nonce') === ctx.query?.nonce : null,
+        contextSecretMatchesEnvironment: process.env.BETTER_AUTH_SECRET ? ctx.context.secret === process.env.BETTER_AUTH_SECRET : null,
+      })
       callback(ctx.query?.callbackURL, verifyReturn, false)
       const token = ctx.query?.token
       const nonce = ctx.query?.nonce
-      if (typeof token !== 'string' || token.length > 4096 || typeof nonce !== 'string' || !/^[a-f0-9]{32}$/.test(nonce)) invalidLink()
-      let email: string
-      try {
-        const payload = await verifyJWT<Record<string, unknown>>(token, ctx.context.secret)
-        if (!payload || typeof payload.email !== 'string' || payload.updateTo || payload.requestType || typeof payload.exp !== 'number' || payload.exp > Date.now() / 1000 + AUTH_EMAIL_TTL_SECONDS + 5) invalidLink()
-        email = payload.email.toLowerCase()
-      } catch { invalidLink() }
-      const issued = await ctx.context.internalAdapter.consumeVerificationValue(`mikka-mail-verify:${digest(`${token}\0${nonce}`)}`)
-      if (!issued) invalidLink()
+      if (typeof token !== 'string' || token.length > 4096 || typeof nonce !== 'string' || !/^[a-f0-9]{32}$/.test(nonce)) invalidLink('token_or_nonce_shape')
+      let payload: Record<string, unknown> | null
+      try { payload = await verifyJWT<Record<string, unknown>>(token, ctx.context.secret) }
+      catch { invalidLink('jwt_signature_or_expiry') }
+      if (!payload) invalidLink('jwt_signature_or_expiry')
+      if (typeof payload.email !== 'string' || payload.updateTo || payload.requestType || typeof payload.exp !== 'number' || payload.exp > Date.now() / 1000 + AUTH_EMAIL_TTL_SECONDS + 5) invalidLink('jwt_claims')
+      const email = payload.email.toLowerCase()
+      const identifier = `mikka-mail-verify:${digest(`${token}\0${nonce}`)}`
+      const issued = await ctx.context.internalAdapter.findVerificationValue(identifier)
+      if (!issued || new Date(issued.expiresAt).getTime() <= Date.now()) invalidLink('issuance_missing_or_expired')
       let binding: { id: string; email: string }
       try { binding = JSON.parse(issued.value) } catch { invalidLink() }
       const user = await ctx.context.internalAdapter.findUserById(binding.id)
-      if (!user || user.email.toLowerCase() !== email || binding.email !== email) invalidLink()
+      if (!user || user.emailVerified || user.email.toLowerCase() !== email || binding.email !== email) invalidLink('owner_binding')
       const original = ctx.context.internalAdapter
       // Scope the library's later lookup/write to the immutable issuance owner.
       // Do not mutate the shared adapter. Keep the library's hooks/cache handling.
@@ -155,14 +173,24 @@ export function createAuthEmail(options: {
         findUserByEmail: async (requestedEmail: string) => {
           if (requestedEmail.toLowerCase() !== binding.email) invalidLink()
           const current = await original.findUserById(binding.id)
-          if (!current || current.email.toLowerCase() !== binding.email) invalidLink()
+          if (!current || current.emailVerified || current.email.toLowerCase() !== binding.email) invalidLink()
           return { user: current, accounts: [] }
         },
         updateUserByEmail: async (requestedEmail: string, data: Partial<User> & Record<string, unknown>) => {
           if (requestedEmail.toLowerCase() !== binding.email) invalidLink()
-          const current = await original.updateUser(binding.id, data)
-          if (!current || current.id !== binding.id || current.email.toLowerCase() !== binding.email) invalidLink()
-          return current
+          // Use Better Auth's transaction context so nonce consumption and the
+          // database update commit or roll back together. Better Auth still runs
+          // its after-commit hooks and cache invalidation at their normal boundary.
+          if (ctx.context.adapter.options?.adapterConfig.transaction === false) unavailable()
+          return runWithTransaction(ctx.context.adapter, async () => {
+            const consumed = await original.consumeVerificationValue(identifier)
+            if (!consumed || consumed.value !== issued.value) invalidLink()
+            const owner = await original.findUserById(binding.id)
+            if (!owner || owner.emailVerified || owner.email.toLowerCase() !== binding.email) invalidLink()
+            const current = await original.updateUser(binding.id, data)
+            if (!current || current.id !== binding.id || current.email.toLowerCase() !== binding.email || !current.emailVerified) invalidLink()
+            return current
+          })
         },
       } } } }
     },

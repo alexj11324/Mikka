@@ -25,6 +25,7 @@ function fixture(autoSend = false, deferred = false) {
   const reports: unknown[] = []
   let fail = false
   let key: string | undefined = 'synthetic-resend-key'
+  let failUpdate = false
   let duringVerify: (() => Promise<void>) | undefined
   const pending: (() => Promise<void>)[] = []
   const email = createAuthEmail({ origin, apiKey: () => key,
@@ -41,6 +42,7 @@ function fixture(autoSend = false, deferred = false) {
   const auth = betterAuth({ baseURL: origin, basePath: '/mikka/api/auth', secret, database: pool,
     emailAndPassword: email.emailAndPassword, emailVerification: { ...email.emailVerification, sendOnSignUp: autoSend },
     rateLimit: email.rateLimit, trustedOrigins: [origin], logger: { disabled: true },
+    databaseHooks: { user: { update: { before: async () => { if (failUpdate) throw new Error('synthetic update failure') } } } },
     hooks: {
       before: createAuthMiddleware(async ctx => {
         const result = await email.before(ctx)
@@ -57,11 +59,11 @@ function fixture(autoSend = false, deferred = false) {
       }),
     },
   })
-  const post = (path: string, body: unknown, ip = '192.0.2.1') => auth.handler(new Request(`${root}${path}`, {
+  const post = (path: string, body: unknown, ip = fixtureIP) => auth.handler(new Request(`${root}${path}`, {
     method: 'POST', headers: { 'content-type': 'application/json', origin, 'x-forwarded-for': ip }, body: JSON.stringify(body),
   }))
   const get = (url: URL) => auth.handler(new Request(url, { headers: { 'x-forwarded-for': fixtureIP } }))
-  return { auth, email, mail, reports, post, get, race: (operation: () => Promise<void>) => { duringVerify = operation }, flush: () => Promise.all(pending.splice(0).map(task => task())), failure: () => { fail = true }, noKey: () => { key = undefined } }
+  return { auth, email, mail, reports, post, get, updateFailure: (value: boolean) => { failUpdate = value }, race: (operation: () => Promise<void>) => { duringVerify = operation }, flush: () => Promise.all(pending.splice(0).map(task => task())), failure: () => { fail = true }, noKey: () => { key = undefined } }
 }
 let seq = 0
 async function user(f: ReturnType<typeof fixture>) {
@@ -220,4 +222,35 @@ test('HTTP request rate limits are enabled independently of production mode', as
   const f = fixture()
   for (let i = 0; i < 3; i++) assert.equal((await f.post('/request-password-reset', { email: 'absent-rate@example.test' }, '192.0.2.26')).status, 202)
   assert.equal((await f.post('/request-password-reset', { email: 'absent-rate@example.test' }, '192.0.2.26')).status, 429)
+})
+
+
+test('instance A issues and instance B validates; successful verification rejects replay', async () => {
+  const a = fixture(); const created = await user(a); const b = fixture()
+  await a.post('/send-verification-email', { email: created.user.email })
+  const url = link(a)
+  assert.equal((await b.get(url)).status, 302)
+  assert.equal((await a.get(url)).status, 400)
+})
+
+test('user update failure rolls back nonce consumption and another instance can retry', async () => {
+  const a = fixture(); const created = await user(a)
+  await a.post('/send-verification-email', { email: created.user.email })
+  const url = link(a); a.updateFailure(true)
+  assert.equal((await a.get(url)).status, 500)
+  assert.equal((await pool.query('select "emailVerified" from "user" where id=$1', [created.user.id])).rows[0].emailVerified, false)
+  const b = fixture()
+  assert.equal((await b.get(url)).status, 302)
+  assert.equal((await a.get(url)).status, 400)
+})
+
+
+test('HEAD inspection cannot consume a verification link; normal GET consumes exactly once', async () => {
+  const f = fixture(); const created = await user(f)
+  await f.post('/send-verification-email', { email: created.user.email })
+  const url = link(f)
+  const head = await f.auth.handler(new Request(url, { method: 'HEAD' }))
+  assert.notEqual(head.status, 302)
+  assert.equal((await f.get(url)).status, 302)
+  assert.equal((await f.get(url)).status, 400)
 })
