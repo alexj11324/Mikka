@@ -291,7 +291,7 @@ export async function pruneAudit(
   );
   await appendAudit(tx, tenant, {
     actorId: actor,
-    actorType: "human",
+    actorType: actor === "system" ? "system" : "human",
     resourceId: tenant,
     action: "audit.prune",
     outcome: "success",
