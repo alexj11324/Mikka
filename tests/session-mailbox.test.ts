@@ -1,3 +1,4 @@
+import { mailboxCompletionLockAcceptance } from './mailbox-lock-order'
 import { retryMcpAcceptance } from './mailbox-retry-mcp'
 import { createFactoryStore } from '../lib/factory/store'
 import { createExecutionClaim } from '../lib/factory/execution-claim'
@@ -279,6 +280,9 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
       await pool.query(`UPDATE factory_tasks SET status='cancelled' WHERE id=$1`,[task.id])
       await assert.rejects(createExecutionClaim(pool,async()=>true)(owner,device,child,new Date(Date.now()+60000).toISOString()),/factoryStopped/)
       assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[child])).rows[0].status,'queued')
+    })
+    await t.test('owner send and completion preserve both envelopes across the FK lock barrier', async () => {
+      await mailboxCompletionLockAcceptance(pool, workspace, { owner, issue, role, device, repo })
     })
     await t.test('result/terminal update roll back together if event persistence fails', async () => {
       await pool.query(`create function reject_finish() returns trigger language plpgsql as $$ begin if new.kind='run_finished' then raise exception 'injected completion failure'; end if; return new; end $$`)

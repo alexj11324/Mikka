@@ -13,3 +13,9 @@ This is not universal exactly-once messaging: new keys denote new operations, AC
 Validation uses retained disposable PostgreSQL17 schemas, concurrent sends, same-role independent senders, continuation retries, conflicting payloads, historical duplicate ambiguity, workspace/disabled/stop fences, and the shipped MCP stdio subprocess. The MCP test commits an envelope then drops the HTTP socket, restarts the process and creates an infrastructure retry before replay. It also checks old-token denial and independent-sender same-UUID delivery. Its HTTP server calls the actual store and worker-token verifier; it does not substitute for full Next issue-policy, live vendor or production acceptance.
 
 Frontend, group executors and #249/#250 are unchanged. No providers, deployment, production SQL, IAM or credentials are used. Original issues remain open pending the coordinated production acceptance.
+
+## Independent completion/send lock correction
+
+A separate real PostgreSQL17 barrier test pauses ownerSend after locking target M, lets complete lock its run and upsert coordinator C, then releases ownerSend. Before the fix, PostgreSQL detects 40P01: completion's result references M with KEY SHARE while ownerSend's sender FK references C. One transaction aborts. This is a pre-existing store defect, not introduced by retry identity.
+
+The recipient lock is now FOR NO KEY UPDATE. It remains exclusive against other row writers, preserving scheduling serialization, but is compatible with the FK KEY SHARE needed by completion. The identical barrier now commits both envelopes and the succeeded run. No FK, authorization check or message is removed; no automatic retry masks the failure. The raw before/after logs remain in the private task evidence directory. Production acceptance is still pending.

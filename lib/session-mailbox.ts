@@ -129,7 +129,9 @@ export class SessionMailbox {
       // Serialize this logical sender/key before selecting a recipient. The unique
       // index alone would turn cross-recipient races into an unhandled 23505.
       await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))', [`${actor.workspaceId}:${actor.userId}:${scope.lock}:${input.key}`])
-      const { rows: [target] } = await client.query<Mailbox>('select * from session_mailboxes where id=$1 and "userId"=$2 and "workspaceId"=$3 for update', [input.to, actor.userId, this.workspaceId])
+      // Serialize scheduling/policy writers without blocking FK KEY SHARE on
+      // this address. Completion may hold the coordinator while referencing it.
+      const { rows: [target] } = await client.query<Mailbox>('select * from session_mailboxes where id=$1 and "userId"=$2 and "workspaceId"=$3 for no key update' , [input.to, actor.userId, this.workspaceId])
       if (!target || target.kind === 'group') throw new MailboxError('Recipient unavailable')
       await this.authorize(client, actor)
       const refreshed = await this.sendScope(client, actor, box)
