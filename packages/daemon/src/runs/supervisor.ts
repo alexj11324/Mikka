@@ -212,6 +212,18 @@ export class RunSupervisor {
     }
   }
 
+  /**
+   * Stops the runs the server says this device no longer holds. Runs without
+   * a server lease (local dev runs) were never the server's to take back.
+   */
+  revokeLeases(runIds: readonly string[]) {
+    for (const runId of runIds) {
+      const run = this.active.get(runId)
+      if (run && !run.forcedStop && this.leases.has(runId))
+        this.forceStop(runId, run, "device_lost")
+    }
+  }
+
   /** Lease and watchdog pass; the daemon calls it on every tick. */
   check(now = Date.now()) {
     const stallMs = this.deps.stallMs ?? DEFAULT_STALL_MS
