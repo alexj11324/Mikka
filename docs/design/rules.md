@@ -82,8 +82,10 @@ source wins in a conflict is in [`README.md`](README.md).
   machine). Settings › 设备 uses the same two groups.
 - **R-24** A device's online state is a StatusDot on the top-right of its
   icon (green online, grey offline, red error), never a text badge.
-- **R-25** Board cards show status, priority and the assignee's avatar only,
-  never names. The board is the reUI Kanban.
+- **R-25** Board cards show the id, the assignee's avatar (never a name),
+  the status icon, the title, then one row with priority, labels, linked PRs
+  and the latest run's state. The board is the reUI Kanban with no column
+  `+` (R-22). Figma: section `77:2`.
 - **R-26** Workspace tasks sync with Linear (`MIK-xx`); personal tasks stay in
   Mikka. A task can move both ways: a workspace task can be turned back into
   a personal one (its Linear issue is archived; issue #184). Teammates see agent runs on workspace issues only, never left-column
