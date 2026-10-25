@@ -27,7 +27,7 @@ export async function judgeIssueScope(issueId: string, source: string): Promise<
       .where(and(eq(issues.userId, issue.userId), eq(issues.scopeSetBy, 'user'), ne(issues.id, issue.id)))
       .orderBy(desc(issues.updatedAt)).limit(SCOPE_EXAMPLE_LIMIT)
     const state = scopeState({ title: issue.title, description: tiptapToText(issue.content), source, linearTeam: team, examples })
-    const answer = (await decide('issue-scope', decisionInput(state), scopeQuestions()))?.get('workspace')
+    const answer = (await decide('issue-scope', decisionInput(state), scopeQuestions(), issue.userId))?.get('workspace')
     if (answer?.type !== 'predicate') return
     const scope = scopeFromProbability(answer.probability)
     // Only while the agent still owns the decision: a click in the meantime wins.

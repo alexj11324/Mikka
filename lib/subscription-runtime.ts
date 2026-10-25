@@ -1,3 +1,4 @@
+import { authorizePolicyTool } from './policy/runtime'
 import { subscriptionVaultTokens } from './subscription-vault-auth'
 import 'server-only'
 import { retainEnrollmentSourcesForAcceptance } from './subscription-enrollment-policy'
@@ -11,6 +12,7 @@ import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-wo
 
 export async function authorizeSubscriptionWorkspace(userId: string, workspaceId: string) {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, userId))
+  await authorizePolicyTool(userId, workspaceId)
 }
 export function subscriptionRuntime(nativeBroker = false, custodyOnly = false): SubscriptionService {
   if (process.env.MIKKA_BYOS_ENABLED !== '1' && !(custodyOnly && process.env.MIKKA_BYOS_ENROLLMENT_ENABLED === '1')) throw new SubscriptionRefusal('backend_unavailable')

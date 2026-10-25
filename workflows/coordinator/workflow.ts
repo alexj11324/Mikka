@@ -41,7 +41,7 @@ export async function coordinatorTurn(userId: string) {
       const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, tools: coordinatorTools(userId, inbox.actionContext) })
       const { instructions, messages } = await steps.preparePrompt(userId)
       messages.push(...recovered)
-      const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep, })
+      const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: async info => { await steps.authorizeCoordinator(userId, round, info.stepNumber); return coordinatorStep(info) }, })
       // Every step's messages, not only the final step's: the tool calls and
       // results are history the next turn needs.
       await steps.appendMessages(userId, holder, [...recovered, ...result.responseMessages], turnWarning(result.finishReason, result.text), inbox.actionContext)

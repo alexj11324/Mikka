@@ -1,3 +1,4 @@
+import { authorizePolicyWorker } from '@/lib/policy/runtime'
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { after } from 'next/server'
@@ -62,6 +63,7 @@ async function currentRun(bearerToken?: string, executor: Pick<typeof db, 'selec
     .limit(1)
   const [row] = await (lock ? query.for('share') : query)
   if (!row?.issueId || row.kind === 'group_review' || !await issueForUser(row.userId, row.issueId, false, executor, workspaceExecutor) || row.expiresAt.getTime() <= Date.now()) return undefined
+  try { await authorizePolicyWorker(row.userId, row.runId, row.issueId) } catch { return undefined }
   return row
 }
 

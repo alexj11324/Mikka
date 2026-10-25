@@ -1,3 +1,4 @@
+import { authorizePolicyWorker } from '@/lib/policy/runtime'
 import 'server-only'
 import { after } from 'next/server'
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
@@ -23,18 +24,24 @@ import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATT
  */
 export async function renewRunLeases(deviceId: string, runIds: readonly string[], now = new Date()): Promise<{ leases: Record<string, string>; revoked?: string[] }> {
   if (!runIds.length) return { leases: {} }
+  const authorizedIds: string[] = []
+  const candidates = await db.select({ id: agentRuns.id, userId: agentRuns.userId, issueId: agentRuns.issueId }).from(agentRuns).where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, [...runIds])))
+  for (const run of candidates) {
+    try { await authorizePolicyWorker(run.userId, run.id, run.issueId ?? undefined); authorizedIds.push(run.id) } catch { /* Authority unavailable: do not renew this run. */ }
+  }
+  if (!authorizedIds.length) return { leases: {}, revoked: [...runIds] }
   const {renewed,leaseExpiresAt} = await db.transaction(async tx => {
     // Lock before evaluating time. An UPDATE predicate can be evaluated before
     // a row-lock wait, even when it contains clock_timestamp(). Group claims
     // belong exclusively to the dedicated epoch-bound protocol.
     await tx.select({id:agentRuns.id}).from(agentRuns)
-      .where(and(eq(agentRuns.deviceId,deviceId),inArray(agentRuns.id,[...runIds]),ne(agentRuns.kind,'group_review')))
+      .where(and(eq(agentRuns.deviceId,deviceId),inArray(agentRuns.id,authorizedIds),ne(agentRuns.kind,'group_review')))
       .orderBy(agentRuns.id).for('update')
     const renewedAt=new Date(Math.max(now.getTime(),Date.now()))
     const leaseExpiresAt=new Date(renewedAt.getTime()+RUN_LEASE_MS)
     const renewed=await tx.update(agentRuns)
       .set({leaseExpiresAt,updatedAt:renewedAt})
-      .where(and(eq(agentRuns.deviceId,deviceId),inArray(agentRuns.id,[...runIds]),
+      .where(and(eq(agentRuns.deviceId,deviceId),inArray(agentRuns.id,authorizedIds),
         inArray(agentRuns.status,[...LEASED_RUN_STATUSES]),ne(agentRuns.kind,'group_review'),
         isNull(agentRuns.stopRequestedAt),gt(agentRuns.leaseExpiresAt,sql`clock_timestamp()`)))
       .returning({id:agentRuns.id})

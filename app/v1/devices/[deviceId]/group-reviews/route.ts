@@ -1,3 +1,5 @@
+import { authorizePolicyTool } from '@/lib/policy/runtime'
+import { PolicyError } from '@/lib/policy/contract'
 import { authenticateDevice } from '@/lib/device-link'
 import { pool } from '@/lib/db'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -10,7 +12,7 @@ export async function POST(request:Request,{params}:{params:Promise<{deviceId:st
   const caller=await authenticateDevice(request)
   if(!caller)return Response.json({error:'unauthorized'},{status:401})
   const {deviceId}=await params
-  try{return await withGroupWorkerAuthority(workspaceDb.$client,caller,deviceId,directory=>
+  try{await authorizePolicyTool(caller.userId);return await withGroupWorkerAuthority(workspaceDb.$client,caller,deviceId,directory=>
     handleGroupWorkerRequest(request,deviceId,{pool,directory,authenticate:async()=>caller}))}
-  catch(error){if(error instanceof ReviewFailure)return Response.json({error:error.code},{status:error.status});throw error}
+  catch(error){if(error instanceof PolicyError)return Response.json({error:error.code},{status:error.status});if(error instanceof ReviewFailure)return Response.json({error:error.code},{status:error.status});throw error}
 }

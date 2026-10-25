@@ -70,6 +70,7 @@ const pageResponse = z.object({ content: z.string(), statusCode: z.number() })
 
 export function createAgentWebTools(options: {
   signal: AbortSignal
+  authorize?: () => Promise<void>
   run?: RunWebTool
   resolve?: ResolveHost
 }) {
@@ -91,6 +92,7 @@ export function createAgentWebTools(options: {
           return { ok: false as const, error: '该地址不是允许访问的公共网页。' }
         }
       }
+      await options.authorize?.()
       const output = await run(operation, input, signal)
       const retrievedAt = new Date().toISOString()
       if (operation === 'search') {

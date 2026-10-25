@@ -1,3 +1,6 @@
+import { authorizePolicyWorker } from '@/lib/policy/runtime'
+import { PolicyError } from '@/lib/policy/contract'
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { randomUUID } from 'node:crypto'
 import { appendAudit } from '@/lib/audit/store'
 import { mailboxes } from '@/lib/mailbox-runtime'
@@ -130,6 +133,11 @@ export async function POST(
   if(subscription && (run.userId!==caller.userId || agent.userId!==caller.userId || repo.userId!==caller.userId)) return NextResponse.json({error:'Run owner mismatch.'},{status:409})
   if (subscription && !device.harnesses.some(harness => harness.harness === agent.harness && harness.subscriptionBroker)) {
     return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
+  }
+  try { await authorizePolicyWorker(caller.userId, runId, run.issueId ?? undefined, subscription?.workspaceId) }
+  catch (error) {
+    if (!(error instanceof PolicyError)) return NextResponse.json({ error: 'policyUnavailable' }, { status: 503 })
+    return NextResponse.json({ error: error.code }, { status: error.status })
   }
   const onClaim = async (tx: import('pg').PoolClient) => {
     if (subscription) await bindSubscriptionClaim(tx, runId, subscription)
@@ -287,6 +295,7 @@ export async function POST(
     prompt: run.prompt,
     accountActionRefs: run.accountActionRefs,
     kind: run.kind,
+    policy: defaultRunPolicy(),
     leaseExpiresAt,
     ...(run.continuesRunId ? { continuesRunId: run.continuesRunId } : {}),
     ...(run.resumeSessionId ? { resumeSessionId: run.resumeSessionId } : {}),

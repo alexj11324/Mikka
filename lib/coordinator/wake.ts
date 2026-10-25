@@ -17,8 +17,8 @@ export function coordinatorEnabled(): boolean {
 }
 
 /** Asks the decision model whether an event needs the person. When it does not answer, the event gets its quiet tier. */
-async function decideTier(event: Parameters<typeof triageState>[0]): Promise<CoordinatorEventTier> {
-  const answer = (await decide('triage', decisionInput(triageState(event)), triageQuestions(event)))?.get('needsPerson')
+async function decideTier(userId: string, event: Parameters<typeof triageState>[0]): Promise<CoordinatorEventTier> {
+  const answer = (await decide('triage', decisionInput(triageState(event)), triageQuestions(event), userId))?.get('needsPerson')
   if (answer?.type === 'predicate') return tierFromDecision(answer.probability, event.kind)
   return event.kind === 'run_report' ? 'background' : 'result'
 }
@@ -26,7 +26,7 @@ async function decideTier(event: Parameters<typeof triageState>[0]): Promise<Coo
 /** Gives every untriaged event in the inbox its tier. */
 async function triageInbox(userId: string): Promise<void> {
   for (const event of await untriagedEvents(userId)) {
-    await setEventTier(event.id, ruleTier(event) ?? await decideTier(event))
+    await setEventTier(event.id, ruleTier(event) ?? await decideTier(userId, event))
   }
 }
 

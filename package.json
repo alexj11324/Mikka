@@ -58,7 +58,8 @@
     "test:group-native": "MIKKA_TEST_NATIVE_GROUPS=1 node --import tsx --test lib/group-mailbox-runtime.test.ts",
     "test:mailboxes": "node --import tsx --test tests/session-mailbox.test.ts tests/orchestration-prompts.test.ts",
     "test:run-dispatch": "node --import tsx --test tests/run-dispatch.test.ts",
-    "test:byos-claim": "node scripts/test-byos-claim.mjs"
+    "test:byos-claim": "node scripts/test-byos-claim.mjs",
+    "test:policy": "node --import tsx --test lib/policy/*.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

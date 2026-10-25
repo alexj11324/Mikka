@@ -1,3 +1,5 @@
+import { authorizeModel, authorizePolicyTool } from '@/lib/policy/runtime'
+import { coordinatorRoute } from '@/lib/policy/model'
 import { generateText, type ModelMessage, type ToolExecutionOptions } from 'ai'
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
@@ -39,6 +41,7 @@ type ToolResult<T> = T | { error: string }
 
 export async function credentialTool(userId: string, name: CredentialToolName, input: unknown) {
   'use step'
+  await authorizePolicyTool(userId)
   return executeSystemCredentialTool({ userId }, name, input)
 }
 
@@ -84,6 +87,7 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
   const cut = compactionCut(summary, messages)
   if (cut !== null) {
     const folded = messages.filter(row => row.position <= cut)
+    await authorizeModel(userId, coordinatorRoute(COORDINATOR_MODEL))
     const { text } = await generateText({
       model: COORDINATOR_MODEL,
       instructions: SUMMARY_INSTRUCTIONS,
@@ -114,11 +118,13 @@ export async function forget(userId: string, input: { text: string }) {
 
 export async function composioAction(userId: string, action: ComposioActionName, input: unknown) {
   'use step'
+  await authorizePolicyTool(userId)
   return runComposioAction(userId, action, input)
 }
 
 export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, context?: ActionContext, options?: Pick<ToolExecutionOptions<unknown>, 'messages' | 'toolCallId'>) {
   'use step'
+  await authorizePolicyTool(userId)
   if (action === 'create_calendar_event') {
     if (!context || !options) return { error: 'accountActionSourceRequired' }
     try { return await proposeCalendarBatch(userId, context, options) }
@@ -168,6 +174,7 @@ export async function listAgents(userId: string) {
 
 export async function dispatchRun(userId: string, input: FactoryDispatchInput, context?: ActionContext, options?: Pick<ToolExecutionOptions<unknown>, 'messages' | 'toolCallId'>) {
   'use step'
+  await authorizePolicyTool(userId)
   return asToolResult(async () => {
     if (context && options) await prepareAccountActionBatch(userId, context, options)
     return dispatchFactoryRun(userId, input, undefined, context?.sourceEventId)
@@ -176,18 +183,22 @@ export async function dispatchRun(userId: string, input: FactoryDispatchInput, c
 
 export async function selectBaselineSkill(userId: string, input: { runId:string }) {
   'use step'
+  await authorizePolicyTool(userId)
   return asToolResult(() => skillAssignments.selectBaseline(userId,input.runId))
 }
 export async function dispatchBaselineRehearsal(userId:string,input:Omit<ImprovementRehearsal,'action'>) {
   'use step'
+  await authorizePolicyTool(userId)
   return asToolResult(()=>improvementFactory.rehearse(userId,{action:'rehearse',...input}))
 }
 export async function recordRunFeedback(userId: string, input: Omit<Feedback,'action'>) {
   'use step'
+  await authorizePolicyTool(userId)
   return asToolResult(() => improvementStore.recordFeedback(userId,{ action:'feedback',...input }))
 }
 export async function proposeSkillImprovement(userId: string, input: { runId:string }) {
   'use step'
+  await authorizePolicyTool(userId)
   return asToolResult(() => improvementStore.propose(userId,input.runId))
 }
 export async function readRunImprovements(userId: string, input: { runId:string }) {
@@ -196,6 +207,7 @@ export async function readRunImprovements(userId: string, input: { runId:string 
 }
 export async function handoffSkillImprovement(userId: string, input: Omit<ImprovementHandoff,'action'>) {
   'use step'
+  await authorizePolicyTool(userId)
   return asToolResult(() => improvementFactory.handoff(userId,{ action:'handoff',...input }))
 }
 export async function getSkillImprovementFactory(userId: string, input: { proposalId:string }) {
@@ -232,6 +244,7 @@ export async function listFactoryRequests(userId: string) {
 
 export async function routeFactoryTask(userId: string, input: Omit<FactoryRoute,'eventId'>) {
   'use step'
+  await authorizePolicyTool(userId)
   return asToolResult(() => factoryStore.route(userId,{...input,eventId:input.sourceEventId}))
 }
 
@@ -271,6 +284,7 @@ export async function answerFactoryContext(
   input: ContextQuestionAnswer,
 ) {
   'use step'
+  await authorizePolicyTool(userId)
   return asToolResult(() =>
     factoryQuestions.answer({ source: 'orchestrator', userId }, input),
   )
@@ -293,6 +307,7 @@ export async function answerFactoryQuestionFromUser(
   },
 ) {
   'use step'
+  await authorizePolicyTool(userId)
   return asToolResult(async () => {
     const [event] = await db
       .select({ payload: coordinatorEvents.payload })
@@ -316,6 +331,7 @@ export async function answerFactoryQuestionFromUser(
 
 export async function resolveFactoryTask(userId: string, input: { binding: FactoryBinding; sourceEventId: string; rationale: string; missingInformation: string[]; missingPermissions: string[]; needsSpec: boolean }) {
   'use step'
+  await authorizePolicyTool(userId)
   const {binding,...resolution} = input
   return asToolResult(() => factoryStore.apply(userId,binding,input.sourceEventId,{action:'resolve',...resolution}))
 }
@@ -350,6 +366,7 @@ export async function getRun(userId: string, input: { runId: string }) {
 
 export async function sendToRun(userId: string, input: { runId: string; text: string }) {
   'use step'
+  await authorizePolicyTool(userId)
   return asToolResult(async () => { await addRunMessage(userId, input); return { sent: true } })
 }
 
@@ -368,11 +385,13 @@ export async function stopRun(userId: string, input: { runId: string }) {
 
 export async function recoverAccountActions(userId: string, context: ActionContext) {
   'use step'
+  await authorizePolicyTool(userId)
   return recoverCalendarBatch(userId, context)
 }
 
 export async function mailboxAction(userId: string, action: 'recipients' | 'inbox' | 'sent' | 'send' | 'ack', input: { to?: string; key?: string; text?: string; replyTo?: string; ids?: string[] } = {}) {
   'use step'
+  await authorizePolicyTool(userId)
   try {
     const actor = await mailboxes.conversation(userId, 'coordinator')
     switch (action) {
@@ -383,4 +402,9 @@ export async function mailboxAction(userId: string, action: 'recipients' | 'inbo
       case 'ack': return await mailboxes.ack(actor, input.ids ?? [])
     }
   } catch (error) { if (error instanceof MailboxError) return { error: error.message }; throw error }
+}
+
+export async function authorizeCoordinator(userId: string, _round: number, _step: number) {
+  'use step'
+  await authorizeModel(userId, coordinatorRoute(COORDINATOR_MODEL))
 }

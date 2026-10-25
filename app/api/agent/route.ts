@@ -3,6 +3,9 @@ import { subscriptionRepositoryIfInstalled } from '@/lib/subscription-binding-di
 import { mailboxes } from '@/lib/mailbox-runtime'
 import { MAILBOX_INSTRUCTIONS, mailboxTools } from '@/lib/mailbox-tools'
 import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
+import { authorizeModel, authorizePolicyTool } from '@/lib/policy/runtime'
+import { PolicyError } from '@/lib/policy/contract'
+import { AGENT_ROUTE, modelFetch, coordinatorRoute } from '@/lib/policy/model'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createUIMessageStreamResponse, isStepCount, streamText, toUIMessageStream } from 'ai'
 import { agentWebInstructions, createAgentWebTools } from '@/lib/agent-web-tools'
@@ -92,21 +95,24 @@ export async function POST(request: Request) {
       const saved = await (await subscriptionRepositoryIfInstalled(pool))?.defaultModelBinding(session.user.id, sessionId)
       if (saved) modelSource = { type: 'subscription', bindingId: saved }
     }
+    if (!modelSource) await authorizeModel(session.user.id, AGENT_ROUTE)
     model = await resolveAgentModel(modelSource, {
       subscriptionModel: async bindingId => {
+        await authorizePolicyTool(session.user.id)
         return resolveAgentSubscription(session.user.id, sessionId, bindingId, subscriptionRuntime(), authorizeSubscriptionWorkspace, request.signal)
       },
       defaultModel: () => {
         const apiKey = process.env.OPENCODE_API_KEY
         if (!apiKey) throw new Error('default_model_unavailable')
         const opencode = createOpenAICompatible({
-          name: 'opencode', apiKey, baseURL: 'https://opencode.ai/zen/go/v1',
+          name: 'opencode', apiKey, fetch: modelFetch(() => authorizeModel(session.user.id, AGENT_ROUTE), AGENT_ROUTE), baseURL: 'https://opencode.ai/zen/go/v1',
           headers: { 'User-Agent': 'Mikka-UI-Agent/1.0', 'x-opencode-session': sessionId },
         })
         return opencode('deepseek-v4.1-flash')
       },
     })
   } catch (error) {
+    if (error instanceof PolicyError) return Response.json({ error: error.code }, { status: error.status, headers: errorHeaders })
     if (error instanceof SubscriptionRefusal) return Response.json({ error: error.code }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } })
     if (modelSource) return Response.json({ error: 'backend_unavailable' }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } })
     return new Response(agentCopy.opencodeapikeyIsNotConfiguredOnTheServer, { status: 503, headers: errorHeaders })
@@ -141,10 +147,10 @@ export async function POST(request: Request) {
     system: `${systemPrompt}\n\n${agentWebInstructions()}\n\n${mailboxActor ? MAILBOX_INSTRUCTIONS : ''}`,
     messages,
     tools: {
-      ...createCredentialAITools((name, input) => executeSystemCredentialTool({ userId: session.user.id }, name, input)),
-      ...(mailboxActor ? mailboxTools(mailboxes, mailboxActor) : {}),
-      ...createAgentWebTools({ signal: request.signal }),
-      ...createComposioAITools((action, input) => runComposioAction(session.user.id, action, input)),
+      ...createCredentialAITools(async (name, input) => { await authorizePolicyTool(session.user.id); return executeSystemCredentialTool({ userId: session.user.id }, name, input) }),
+      ...(mailboxActor ? mailboxTools(mailboxes, mailboxActor, () => authorizePolicyTool(session.user.id)) : {}),
+      ...createAgentWebTools({ signal: request.signal, authorize: async () => { await authorizeModel(session.user.id, coordinatorRoute('openai/gpt-5.4-mini')); await authorizePolicyTool(session.user.id) } }),
+      ...createComposioAITools((action, input) => (async () => { await authorizePolicyTool(session.user.id); return runComposioAction(session.user.id, action, input) })()),
     },
     stopWhen: isStepCount(5),
     prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
