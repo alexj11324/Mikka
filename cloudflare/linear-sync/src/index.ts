@@ -117,10 +117,10 @@ export async function handleRequest(request: Request, env: Env, ctx: WorkerConte
 export default {
   fetch: handleRequest,
   scheduled(controller: WorkerSchedule, env: Env, ctx: WorkerContext) {
-    if (controller.cron === '* * * * *' && env.CREDENTIAL_CLEANUP_ENABLED === '1') {
+    if (controller.cron === '* * * * *') {
       // Rejections remain visible to the scheduler. Next tick retries durable
       // tombstones; never log provider responses or follow redirects with auth.
-      ctx.waitUntil(runCredentialCleanup(env))
+      if (env.CREDENTIAL_CLEANUP_ENABLED === '1') ctx.waitUntil(runCredentialCleanup(env))
       return
     }
     if (!env.CRON_SECRET || !syncConfigured(env)) return

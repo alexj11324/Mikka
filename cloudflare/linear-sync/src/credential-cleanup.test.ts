@@ -53,6 +53,14 @@ test('scheduled minute dispatch is opt-in and daily Linear path is not redirecte
   try {
     const ctx = { waitUntil(promise: Promise<unknown>) { pending.push(promise) } }
     worker.scheduled({ cron: '* * * * *' }, {}, ctx)
+    const configured = {
+      CRON_SECRET: 'synthetic-test-only', HYPERDRIVE: { connectionString: 'postgresql://fixture@127.0.0.1/fixture_e2e' },
+      LINEAR_CLIENT_ID: 'synthetic-client', LINEAR_CLIENT_SECRET: 'synthetic-secret',
+      LINEAR_TOKEN_ENCRYPTION_KEY: 'synthetic-encryption', LINEAR_WEBHOOK_SECRET: 'synthetic-webhook',
+    }
+    worker.scheduled({ cron: '* * * * *' }, configured, ctx)
+    worker.scheduled({ cron: '* * * * *' }, { ...configured, CREDENTIAL_CLEANUP_ENABLED: '0' }, ctx)
+    assert.equal(pending.length, 0, 'disabled minute trigger must not fall through to Linear')
     worker.scheduled({ cron: '0 4 * * *' }, { CREDENTIAL_CLEANUP_ENABLED: '1' }, ctx)
     assert.equal(requests, 0)
     worker.scheduled({ cron: '* * * * *' }, { CREDENTIAL_CLEANUP_ENABLED: '1', CRON_SECRET: 'synthetic-test-only' }, ctx)
