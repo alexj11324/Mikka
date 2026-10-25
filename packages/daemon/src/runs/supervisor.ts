@@ -28,6 +28,7 @@
 // agent's summary, open questions, next step and blocker are taken from the
 // agent. A submission is `succeeded` only when verify passed.
 import { fixedCheckSnapshot } from "./check"
+import { runQuestion } from "@mikka/protocol/run"
 import { randomUUID } from "node:crypto"
 import { resolve } from "node:path"
 
@@ -251,7 +252,7 @@ export class RunSupervisor {
    */
   async saveCheckpoints(
     save: (runId: string, checkpoint: RunCheckpoint) => Promise<void>,
-    now = Date.now()
+    now = Date.now(),
   ) {
     for (const [runId, run] of this.active) {
       const entry = this.deps.journal.get(runId)
@@ -305,7 +306,7 @@ export class RunSupervisor {
     if (!run.cancelTimer) {
       run.cancelTimer = setTimeout(
         () => run.abort.abort(),
-        this.deps.cancelGraceMs ?? DEFAULT_CANCEL_GRACE_MS
+        this.deps.cancelGraceMs ?? DEFAULT_CANCEL_GRACE_MS,
       )
       run.cancelTimer.unref()
     }
@@ -333,7 +334,7 @@ export class RunSupervisor {
    */
   async discardIfEmpty(
     runId: string,
-    cancelledRunId?: string
+    cancelledRunId?: string,
   ): Promise<boolean> {
     const entry = this.deps.journal.get(runId)
     if (!entry) return false
@@ -357,7 +358,7 @@ export class RunSupervisor {
       group.map((e) => e.assignment.runId),
       worktree,
       repo.path,
-      runId
+      runId,
     )
   }
 
@@ -368,7 +369,7 @@ export class RunSupervisor {
   async discardOrphan(
     runId: string,
     worktree: string | null,
-    repoPath: string
+    repoPath: string,
   ): Promise<boolean> {
     if (this.deps.journal.get(runId)) return false
     return this.discard([runId], worktree, repoPath, runId)
@@ -378,18 +379,18 @@ export class RunSupervisor {
     runIds: string[],
     worktree: string | null,
     repoPath: string,
-    logRunId: string
+    logRunId: string,
   ): Promise<boolean> {
     try {
       const removed = await this.deps.worktrees.discardIfEmpty(
         runIds,
         worktree,
-        repoPath
+        repoPath,
       )
       if (removed)
         this.deps.log.info(
           { run_id: logRunId },
-          "removed the empty worktree and branches"
+          "removed the empty worktree and branches",
         )
       return removed
     } catch (err) {
@@ -413,7 +414,7 @@ export class RunSupervisor {
     if (!isSafeId(assignment.runId)) {
       throw new InvalidIdError(
         `Refusing run id ${JSON.stringify(assignment.runId)}: only letters, digits, "_" and "-" (1-64 characters)`,
-        { runId: assignment.runId }
+        { runId: assignment.runId },
       )
     }
     const existing = this.deps.journal.get(assignment.runId)
@@ -479,7 +480,7 @@ export class RunSupervisor {
         this.finish(
           entry.assignment.runId,
           "error",
-          new RepoNotAllowedError(entry.assignment.repoId).message
+          new RepoNotAllowedError(entry.assignment.repoId).message,
         )
         continue
       }
@@ -496,7 +497,7 @@ export class RunSupervisor {
     if (!run?.session) throw new RunNotFoundError(runId)
     if (!adapter.capabilities.supportsInterject) {
       throw new Error(
-        `Harness "${adapter.harness}" cannot take messages mid-run`
+        `Harness "${adapter.harness}" cannot take messages mid-run`,
       )
     }
     // The agent's answer to this goes in a new message, after the person's.
@@ -533,7 +534,7 @@ export class RunSupervisor {
     const grace = new Promise<void>((resolve) => {
       timer = setTimeout(
         resolve,
-        this.deps.stopGraceMs ?? DEFAULT_STOP_GRACE_MS
+        this.deps.stopGraceMs ?? DEFAULT_STOP_GRACE_MS,
       )
     })
     await Promise.race([Promise.all(runs.map((run) => run.done)), grace])
@@ -591,7 +592,7 @@ export class RunSupervisor {
   private emitPlanCards(
     runId: string,
     report: HandoffReport,
-    planning: boolean
+    planning: boolean,
   ) {
     const plan = planning ? report.plan : undefined
     if (!plan) return
@@ -643,7 +644,7 @@ export class RunSupervisor {
     runId: string,
     stopReason: StopReason,
     error?: string,
-    report: HandoffReport = baseReport(error)
+    report: HandoffReport = baseReport(error),
   ) {
     // The kind the orchestrator dispatched, not what the agent said: an
     // agent must not be able to make a run read as a planning one (ADR ORV-205).
@@ -686,7 +687,7 @@ export class RunSupervisor {
       worktree?: string
       error?: string
       stopReason?: StopReason
-    } = {}
+    } = {},
   ) {
     const entry = this.deps.journal.update(runId, {
       state,
@@ -724,7 +725,7 @@ export class RunSupervisor {
     assignment: RunAssignment,
     stopReason: StopReason,
     error: string | undefined,
-    agent: AgentReport | undefined
+    agent: AgentReport | undefined,
   ): Promise<{ report: HandoffReport; verifyError?: string; tree?: string }> {
     let report: HandoffReport = {
       ...baseReport(error),
@@ -760,7 +761,7 @@ export class RunSupervisor {
         const fixed = await fixedCheckSnapshot(
           repo.path,
           worktree,
-          assignment.baseBranch
+          assignment.baseBranch,
         )
         report = { ...report, check: { sha: fixed.sha, readOnly: true } }
         before = fixed.tree
@@ -797,7 +798,7 @@ export class RunSupervisor {
     if (after !== before)
       return failed(
         output,
-        `Submitted, but the verify command changed the worktree (\`${command}\`); the work is unverified`
+        `Submitted, but the verify command changed the worktree (\`${command}\`); the work is unverified`,
       )
     return {
       report: {
@@ -818,7 +819,7 @@ export class RunSupervisor {
   private async startPoint(
     runId: string,
     repo: DeviceRepo,
-    assignment: RunAssignment
+    assignment: RunAssignment,
   ): Promise<string> {
     // Taking over a run from another machine: start where it started.
     const resume = assignment.resumeFrom?.baseCommit
@@ -830,12 +831,12 @@ export class RunSupervisor {
         repo.path,
         repo.push.remote ?? "origin",
         branch,
-        runId
+        runId,
       )
     } catch (error) {
       this.deps.log.info(
         { run_id: runId, branch, err: error },
-        "issue branch not fetched; starting from the base branch"
+        "issue branch not fetched; starting from the base branch",
       )
       return assignment.baseBranch
     }
@@ -851,7 +852,7 @@ export class RunSupervisor {
     repo: DeviceRepo,
     assignment: RunAssignment,
     report: HandoffReport,
-    tree: string
+    tree: string,
   ): Promise<RunPublish> {
     const publisher = this.deps.publisher as NonNullable<
       SupervisorDeps["publisher"]
@@ -900,7 +901,7 @@ export class RunSupervisor {
         } catch (finishError) {
           this.deps.log.error(
             { run_id: runId, err: finishError },
-            "could not record the run's end"
+            "could not record the run's end",
           )
         }
       })
@@ -916,6 +917,23 @@ export class RunSupervisor {
     let entry = this.deps.journal.get(runId) as JournalEntry
     const { assignment } = entry
     const adapter = this.adapterFor(runId)
+    if (
+      assignment.requireSessionResume &&
+      entry.questionResumeState === "starting"
+    )
+      throw new Error(
+        "Question continuation delivery is uncertain after interruption; explicit recovery is required",
+      )
+    if (
+      assignment.requireSessionResume &&
+      (!assignment.resumeSessionId ||
+        !assignment.continuesRunId ||
+        !adapter.capabilities.supportsResume ||
+        !["claude_code", "codex"].includes(adapter.harness))
+    )
+      throw new Error(
+        "Question continuation requires the original resumable session",
+      )
 
     if (entry.state === "queued") {
       this.setState(runId, "preparing")
@@ -938,16 +956,20 @@ export class RunSupervisor {
             repo.path,
             this.deps.journal.get(assignment.continuesRunId)?.worktree ??
               this.deps.worktrees.pathFor(assignment.continuesRunId),
-            runId
+            runId,
           )
         : null
+    if (assignment.requireSessionResume && !entry.worktree && !continued)
+      throw new Error(
+        "Original question worktree is unavailable; a fresh task cannot replace it",
+      )
     const worktree =
       entry.worktree ??
       continued ??
       (await this.deps.worktrees.create(
         runId,
         repo.path,
-        await this.startPoint(runId, repo, assignment)
+        await this.startPoint(runId, repo, assignment),
       ))
     if (!entry.worktree) {
       // A continued worktree was bootstrapped by the run that made it.
@@ -967,7 +989,7 @@ export class RunSupervisor {
         })
         log.info(
           { files: assignment.resumeFrom.files, applied },
-          "checkpoint from the earlier attempt"
+          "checkpoint from the earlier attempt",
         )
       }
       const setup =
@@ -978,7 +1000,7 @@ export class RunSupervisor {
             : await this.deps.worktrees.bootstrap(
                 worktree,
                 repo.path,
-                repo.setup
+                repo.setup,
               )
       log.info({ worktree, setup }, "worktree ready")
       this.deps.journal.update(runId, { worktree, baseCommit })
@@ -992,6 +1014,7 @@ export class RunSupervisor {
     }
     const options = {
       runId,
+      requireSessionResume: assignment.requireSessionResume,
       kind: assignment.kind,
       cwd: worktree,
       env: buildChildEnv({
@@ -1030,11 +1053,30 @@ export class RunSupervisor {
         : undefined
     const session = resuming
       ? await adapter.resume(entry.sessionId as string, options)
-      : await adapter.start({
-          ...options,
-          prompt: assignment.prompt,
-          continueSession,
-        })
+      : await (async () => {
+          if (assignment.requireSessionResume)
+            this.deps.journal.update(runId, {
+              questionResumeState: "starting",
+            })
+          return adapter.start({
+            ...options,
+            prompt: assignment.prompt,
+            continueSession,
+            requireSessionResume: assignment.requireSessionResume,
+          })
+        })()
+    if (assignment.requireSessionResume) {
+      if (session.sessionId !== assignment.resumeSessionId) {
+        await session.cancel()
+        throw new Error(
+          "Question continuation returned a different session; execution stopped",
+        )
+      }
+      this.deps.journal.update(runId, {
+        questionResumeState: "accepted",
+        sessionId: session.sessionId,
+      })
+    }
     run.session = session
     log.info(
       {
@@ -1044,7 +1086,7 @@ export class RunSupervisor {
           continueSession !== undefined &&
           session.sessionId === continueSession.sessionId,
       },
-      "session open"
+      "session open",
     )
     if (entry.state !== "running" || !resuming) {
       this.setState(runId, "running", {
@@ -1104,7 +1146,7 @@ export class RunSupervisor {
           assignment,
           stopReason,
           error,
-          event.report
+          event.report,
         )
         if (this.stopping) return
         const { verifyError, tree } = outcome
@@ -1123,14 +1165,14 @@ export class RunSupervisor {
             repo,
             assignment,
             report,
-            tree
+            tree,
           )
           report = { ...report, publish }
         }
         this.finish(runId, stopReason, error ?? verifyError, report)
         log.info(
           { outcome: event.outcome, stop_reason: stopReason },
-          "run ended"
+          "run ended",
         )
         // A stopped or failed run that changed nothing leaves no worktree or
         // branch behind. A finished chat turn keeps its worktree: the next
@@ -1207,6 +1249,8 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
   else if (agent.nextStep === null) picked.nextStep = null
   if (typeof agent.blockedOn === "string")
     picked.blockedOn = agent.blockedOn.slice(0, 500)
+  const question = runQuestion.safeParse(agent.question)
+  if (question.success) picked.question = question.data
   // The planning hand-in was already parsed and checked by the adapter's
   // `readHandoff`; it is copied whole or not at all (ADR ORV-205).
   if (agent.plan) picked.plan = agent.plan
@@ -1284,7 +1328,7 @@ async function unsandboxedVerify(run: {
 
 function verifyFailure(
   command: string,
-  result: Pick<VerifyResult, "exitCode" | "signal" | "timedOut">
+  result: Pick<VerifyResult, "exitCode" | "signal" | "timedOut">,
 ): string {
   const how = result.timedOut
     ? "timed out"

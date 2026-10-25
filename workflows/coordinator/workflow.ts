@@ -2,10 +2,15 @@ import { WorkflowAgent } from '@ai-sdk/workflow'
 import { isStepCount, tool } from 'ai'
 import { getWorkflowMetadata } from 'workflow'
 import { z } from 'zod'
-import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
+import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL, coordinatorStep, turnWarning, } from '@/lib/coordinator/model'
 import { createComposioAITools } from '@/lib/composio-actions'
 import { bindingSchema, routeSchema } from '@/lib/factory/contract'
 import { factoryDispatchSchema } from '@/lib/factory/dispatch'
+import {
+  contextQuestionAnswerSchema,
+  questionReferenceSchema,
+  questionEscalationSchema,
+} from '@/lib/factory/questions/contract'
 import * as steps from './steps'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
@@ -33,13 +38,13 @@ export async function coordinatorTurn(userId: string) {
     }
     try {
       const { instructions, messages } = await steps.preparePrompt(userId)
-      const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep })
+      const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep, })
       // Every step's messages, not only the final step's: the tool calls and
       // results are history the next turn needs.
-      await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text))
+      await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text),)
     } catch (error) {
       // The messages stay in the conversation; the next wake answers them.
-      await steps.failTurn(userId, holder, error instanceof Error ? error.message : String(error))
+      await steps.failTurn(userId, holder, error instanceof Error ? error.message : String(error),)
       throw error
     }
   }
@@ -50,16 +55,16 @@ export async function coordinatorTurn(userId: string) {
 function coordinatorTools(userId: string) {
   const id = z.uuid()
   return {
-    ...createComposioAITools((action, input) => steps.composioAction(userId, action, input)),
+    ...createComposioAITools((action, input) => steps.composioAction(userId, action, input),),
     list_issues: tool({
       description: 'List the person\'s issues, most recently updated first. Optionally only one status (todo, doing, review, done and so on).',
       inputSchema: z.object({ status: z.string().optional() }),
-      execute: input => steps.listIssues(userId, input),
+      execute: ( input) => steps.listIssues(userId, input),
     }),
     get_issue: tool({
       description: 'Read one issue: text, status, priority, latest runs and persisted Factory task ids/bindings/reasons. Use this after restart or compaction, then get_factory_task for history.',
       inputSchema: z.object({ issueId: id }),
-      execute: input => steps.getIssue(userId, input),
+      execute: ( input) => steps.getIssue(userId, input),
     }),
     list_agents: tool({
       description: 'List the person\'s agents with their harness, whether their device is online, and the repositories on that device.',
@@ -72,55 +77,91 @@ function coordinatorTools(userId: string) {
     }),
     route_factory_task: tool({
       description: 'Persist routing for the request and issue. Clear authorized work starts execute. Record only material missing information/permissions; spec is optional.',
-      inputSchema: routeSchema.omit({ eventId: true }), execute: input => steps.routeFactoryTask(userId,input),
+      inputSchema: routeSchema.omit({ eventId: true }), execute: ( input) => steps.routeFactoryTask(userId,input),
     }),
     get_factory_task: tool({
       description: 'Read durable routing, current binding, reasons, runs, attempts, candidate and evidence.',
-      inputSchema: z.object({ taskId: id }), execute: input => steps.getFactoryTask(userId,input),
+      inputSchema: z.object({ taskId: id }), execute: ( input) => steps.getFactoryTask(userId, input),
+    }),
+    list_factory_questions: tool({
+      description:
+        'Read durable execution questions and their original task/run/session after restart. Never infer waiting solely from model memory.',
+      inputSchema: z.object({ taskId: id.optional() }),
+      execute: (input) => steps.listFactoryQuestions(userId, input),
+    }),
+    get_factory_question: tool({
+      description:
+        'Read a durable question, current fence, reason and continuation state.',
+      inputSchema: z.object({ questionId: id }),
+      execute: (input) => steps.getFactoryQuestion(userId, input),
+    }),
+    answer_factory_context: tool({
+      description:
+        'Resolve only a context question using exact excerpts from accessible issue/request facts. This cannot answer a decision/permission or grant authorization.',
+      inputSchema: contextQuestionAnswerSchema,
+      execute: (input) => steps.answerFactoryContext(userId, input),
+    }),
+    escalate_factory_question: tool({
+      description:
+        'Escalate the actual unresolved information, decision, permission or external condition after checking available facts. Does not cancel the task or authorize anything.',
+      inputSchema: questionEscalationSchema,
+      execute: (input) => steps.escalateFactoryQuestion(userId, input),
+    }),
+    answer_factory_question_from_user: tool({
+      description:
+        'Relay an actual subsequent authenticated browser user_message to its question. The backend derives the verbatim answer and checks provenance/ambiguity; model text and delegated messages cannot become human approval.',
+      inputSchema: z
+        .object({
+          reference: questionReferenceSchema,
+          answerId: id,
+          sourceEventId: id,
+        })
+        .strict(),
+      execute: (input) => steps.answerFactoryQuestionFromUser(userId,input),
     }),
     resolve_factory_task: tool({
       description: 'Record only the missing items answered by a subsequent actual user request. Actual run permissions are checked again at dispatch.',
-      inputSchema: z.object({ binding: bindingSchema, sourceEventId: id, rationale: z.string().min(1).max(4000), missingInformation: z.array(z.string().min(1).max(4000)).max(20), missingPermissions: z.array(z.string().min(1).max(4000)).max(20), needsSpec: z.boolean() }),
-      execute: input => steps.resolveFactoryTask(userId,input),
+      inputSchema: z.object({ binding: bindingSchema, sourceEventId: id, rationale: z.string().min(1).max(4000), missingInformation: z.array(z.string().min(1).max(4000)).max(20), missingPermissions: z.array(z.string().min(1).max(4000)).max(20), needsSpec: z.boolean(), }),
+      execute: ( input) => steps.resolveFactoryTask(userId,input),
     }),
     stop_factory_task: tool({
       description: 'Cancel the task or record withdrawn permission; stop bound runs and block later events.',
-      inputSchema: z.object({ binding: bindingSchema, reason: z.string().min(1).max(4000), action: z.enum(['cancel','revoke']) }), execute: input => steps.stopFactoryTask(userId,input),
+      inputSchema: z.object({ binding: bindingSchema, reason: z.string().min(1).max(4000), action: z.enum(['cancel','revoke']), }), execute: ( input) => steps.stopFactoryTask(userId,input),
     }),
     dispatch_run: tool({
       description: 'Queue and bind one Factory run atomically. Use the exact current pending binding from route_factory_task/get_factory_task. Waiting, cancelled, revoked or stale tasks cannot dispatch. Reuse the same binding after a lost response.',
       inputSchema: factoryDispatchSchema,
-      execute: input => steps.dispatchRun(userId, input),
+      execute: ( input) => steps.dispatchRun(userId, input),
     }),
     list_runs: tool({
       description: 'List recent runs, newest first, optionally for one issue or only those still going.',
-      inputSchema: z.object({ issueId: id.optional(), activeOnly: z.boolean().optional() }),
-      execute: input => steps.listRuns(userId, input),
+      inputSchema: z.object({ issueId: id.optional(), activeOnly: z.boolean().optional(), }),
+      execute: ( input) => steps.listRuns(userId, input),
     }),
     get_run: tool({
       description: 'Read one run: status, how it ended, the agent\'s summary, and its latest events.',
       inputSchema: z.object({ runId: id }),
-      execute: input => steps.getRun(userId, input),
+      execute: ( input) => steps.getRun(userId, input),
     }),
     send_to_run: tool({
       description: 'Send a message to a running agent. It reads it on its next poll.',
       inputSchema: z.object({ runId: id, text: z.string().min(1).max(10_000) }),
-      execute: input => steps.sendToRun(userId, input),
+      execute: ( input) => steps.sendToRun(userId, input),
     }),
     remember: tool({
       description: 'Save one short note to the person\'s memory, which you see in every conversation. Use it when the person asks you to remember something, or for a lasting preference or decision. Not for run status or anything that will soon change.',
       inputSchema: z.object({ note: z.string().min(1).max(500) }),
-      execute: input => steps.remember(userId, input),
+      execute: ( input) => steps.remember(userId, input),
     }),
     forget: tool({
       description: 'Remove every memory line that contains this text. Use it when the person asks you to forget something or a note is no longer true.',
       inputSchema: z.object({ text: z.string().min(1).max(200) }),
-      execute: input => steps.forget(userId, input),
+      execute: ( input) => steps.forget(userId, input),
     }),
     stop_run: tool({
       description: 'Ask a run to stop.',
       inputSchema: z.object({ runId: id }),
-      execute: input => steps.stopRun(userId, input),
+      execute: ( input) => steps.stopRun(userId, input),
     }),
   }
 }

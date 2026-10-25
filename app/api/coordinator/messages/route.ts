@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
-  return NextResponse.json({ enabled: coordinatorEnabled(), ...(await chatView(session.user.id)) }, { headers: { 'Cache-Control': 'private, no-store' } })
+  return NextResponse.json({ enabled: coordinatorEnabled(), ...(await chatView(session.user.id)) }, { headers: { 'Cache-Control': 'private, no-store' } },)
 }
 
 /**
@@ -24,10 +24,19 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
-  const parsed = z.object({ text: z.string().trim().min(1).max(10_000) }).safeParse(await request.json().catch(() => null))
+  const parsed = z.object({ text: z.string().trim().min(1).max(10_000),
+      questionId: z.uuid().optional(), }).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'messageRequired' }, { status: 400 })
   const userId = session.user.id
-  await recordCoordinatorEvent(db, userMessageEvent(userId, parsed.data.text))
+  const event = userMessageEvent(userId, parsed.data.text)
+  event.payload = {
+    ...event.payload,
+    ...(!request.headers.has('authorization') && request.headers.get('cookie')
+      ? { humanSessionId: session.session.id }
+      : {}),
+    ...(parsed.data.questionId ? { questionId: parsed.data.questionId } : {}),
+  }
+  await recordCoordinatorEvent(db, event)
   after(() => wakeCoordinator(userId))
-  return NextResponse.json({ queued: true, enabled: coordinatorEnabled() }, { status: 202 })
+  return NextResponse.json({ queued: true, enabled: coordinatorEnabled() }, { status: 202 },)
 }

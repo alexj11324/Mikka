@@ -362,6 +362,10 @@ export function createFactoryStore(
             AND status IN ('queued','preparing','running','waiting_input','finishing')`,
             [task.id, userId, task.issueId],
           );
+          await tx.query(
+            "UPDATE factory_questions SET status='cancelled',reason=$2,revision=revision+1,\"updatedAt\"=now() WHERE \"taskId\"=$1 AND status IN ('open','waiting_user','answered','resuming')",
+            [task.id, task.reason],
+          );
         } else if (change.action === "resolve") {
           if (task.stage !== "clarify" || task.status !== "waiting")
             fail("factoryTransition");
@@ -607,6 +611,11 @@ export function createFactoryStore(
           await freshAttempt(tx, task, change.stage, change.reason);
         } else if (change.action === "retry" || change.action === "repair") {
           if (task.stage === "clarify") fail("factoryTransition");
+          const pendingQuestion = await tx.query(
+            "SELECT id FROM factory_questions WHERE \"taskId\"=$1 AND \"attemptId\"=$2 AND status IN ('open','waiting_user') LIMIT 1",
+            [task.id, attempt.id],
+          );
+          if (pendingQuestion.rows.length) fail("factoryQuestionPending");
           // A completed monitor observation can open another observation of the
           // same candidate. freshAttempt retains the candidate, never run evidence.
           const nextMonitorCycle =

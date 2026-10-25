@@ -86,13 +86,84 @@ export async function readRun(userId: string, runId: string): Promise<RunDetail 
 }
 
 /** A message to the running agent; the daemon delivers it. */
-export async function addRunMessage(userId: string, input: { runId: string; text: string }): Promise<void> {
-  const parsed = z.object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) }).safeParse(input)
+export async function addRunMessage(
+  userId: string,
+  input: { runId: string; text: string },
+  source:
+    { source: 'human'; sessionId: string } | { source: 'orchestrator' } = {
+    source: 'orchestrator',
+  },
+): Promise<void> {
+  const parsed = z
+    .object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) })
+    .safeParse(input)
   if (!parsed.success) throw new ActionFailureError('messageRequired')
-  const [run] = await db.select({ id: agentRuns.id }).from(agentRuns)
-    .where(and(eq(agentRuns.id, parsed.data.runId), eq(agentRuns.userId, userId))).limit(1)
+  const [run] = await db
+    .select({ id: agentRuns.id, status: agentRuns.status })
+    .from(agentRuns)
+    .where(
+      and(eq(agentRuns.id, parsed.data.runId), eq(agentRuns.userId, userId)),
+    )
+    .limit(1)
   if (!run) throw new ActionFailureError('runNotFound')
-  await db.insert(runMessages).values({ id: crypto.randomUUID(), runId: run.id, userId, text: parsed.data.text })
+  if (
+    !['queued', 'preparing', 'running', 'waiting_input', 'finishing'].includes(
+      run.status,
+    )
+  ) {
+    const { factoryQuestions } = await import('@/lib/factory/server')
+    const { pool } = await import('@/lib/db')
+    const {
+      rows: [identity],
+    } = await pool.query(
+      'SELECT id FROM factory_questions WHERE "originRunId"=$1 AND "userId"=$2',
+      [run.id, userId],
+    )
+    if (!identity) throw new ActionFailureError('runNotActive')
+    const q = await factoryQuestions.read(userId, identity.id)
+    if (q.status === 'resolved' && q.continuationRunId) {
+      const previous = q.answer as {
+        input?: { text?: string; reference?: unknown }
+      } | null
+      if (previous?.input?.text !== parsed.data.text)
+        return addRunMessage(
+          userId,
+          { runId: q.continuationRunId, text: parsed.data.text },
+          source,
+        )
+    }
+    if (source.source !== 'human')
+      throw new ActionFailureError('factoryQuestionNeedsAnswerTool')
+    const { factoryEventId } = await import('@/lib/factory/event-id')
+    const { questionReference } = await import('@/lib/factory/questions/store')
+    const { questionFingerprint } =
+      await import('@/lib/factory/questions/contract')
+    const previous = q.answer as {
+      input?: { reference?: ReturnType<typeof questionReference> }
+    } | null
+    const answerId = factoryEventId(
+      'task-thread-question-answer',
+      questionFingerprint({ questionId: q.id, userId, text: parsed.data.text }),
+    )
+    await factoryQuestions.answer(
+      { source: 'human', userId, sessionId: source.sessionId },
+      {
+        reference:
+          q.answerId === answerId && previous?.input?.reference
+            ? previous.input.reference
+            : questionReference(q),
+        answerId,
+        text: parsed.data.text,
+      },
+    )
+    return
+  }
+  await db.insert(runMessages).values({
+    id: crypto.randomUUID(),
+    runId: run.id,
+    userId,
+    text: parsed.data.text,
+  })
 }
 
 /** Asks the daemon to stop the run; it repeats until the run has ended. */

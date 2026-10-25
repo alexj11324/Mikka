@@ -14,6 +14,7 @@ import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
 import type { Harness, RunKind } from "@mikka/protocol"
+import { runQuestion, type RunQuestion } from "@mikka/protocol/run"
 import { planHandoff, planSplitProblem } from "@mikka/protocol/plan"
 import {
   SKILL_BODY_FILE,
@@ -103,6 +104,7 @@ interface HandoffFile {
   summary?: string
   nextStep?: string | null
   openQuestions?: string[]
+  question?: RunQuestion
   blockedOn?: string
   /** A planning hand-in; see `planFromHandoff`. */
   plan?: unknown
@@ -118,7 +120,7 @@ interface HandoffFile {
 export function credentialDenyRead(
   /** Its own login stays readable; null (verify) hides every harness login. */
   harness: Exclude<Harness, "mock"> | null,
-  home = homedir()
+  home = homedir(),
 ): string[] {
   return [
     ".ssh",
@@ -195,7 +197,7 @@ export class RunContext {
       execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
         cwd: this.worktree,
         encoding: "utf8",
-      }).trim()
+      }).trim(),
     )
     // The run dir is the agent's to write: never follow what it put there.
     ownDir(options.runDir)
@@ -266,7 +268,7 @@ export class RunContext {
         ...HARNESS_DOMAINS[this.options.harness],
         ...runDomains(
           runPolicy(this.options.policy),
-          this.options.networkAllow ?? []
+          this.options.networkAllow ?? [],
         ),
       ],
     }
@@ -281,7 +283,7 @@ export class RunContext {
   instructions(): string {
     const skills = skillsPromptSection(
       this.options.skills ?? [],
-      this.skillsDir
+      this.skillsDir,
     )
     return [
       runInstructions(this.worktree, this.options.policy),
@@ -339,6 +341,9 @@ export class RunContext {
       ...(file.blockedOn ? { blockedOn: file.blockedOn } : {}),
       ...(plan ? { plan } : {}),
       ...(Array.isArray(file.criteria) ? { criteria: file.criteria } : {}),
+      ...(runQuestion.safeParse(file.question).success
+        ? { question: runQuestion.parse(file.question) }
+        : {}),
     }
     if (file.kind === "submit")
       return {
@@ -374,7 +379,7 @@ export class RunContext {
  */
 function planFromHandoff(
   raw: unknown,
-  log?: Logger
+  log?: Logger,
 ): AgentReport["plan"] | null {
   if (!raw) return null
   const parsed = planHandoff.safeParse(raw)
@@ -386,7 +391,7 @@ function planFromHandoff(
   if (problem) {
     log?.warn(
       { problem },
-      "planning hand-in proposes a split that cannot be built"
+      "planning hand-in proposes a split that cannot be built",
     )
     return null
   }
@@ -439,7 +444,7 @@ export function runInstructions(worktree: string, policy?: RunPolicy): string {
     "- Do not commit, push or switch branches. Mikka verifies, commits and pushes your work after you hand it in.",
     "- Run every command in the foreground. Nothing keeps running after your turn: when your turn ends, the run ends.",
     "- When the task is done and checked, call the `submit` tool of the `mikka` MCP server with a short summary. That is the only way to finish successfully.",
-    "- If you need a decision from a human, call `ask_human`. If something outside the code blocks you, call `report_blocked`.",
+    "- First use the issue and existing facts. For missing task context call `request_help`: the Orchestrator checks known facts before involving the person. Call `ask_human` only for a genuinely unresolved product decision or missing permission. Call `report_blocked` for an external condition. These preserve a durable question and stop this run; an answer continues its original worktree/session. Never invent authorization or start another task while waiting.",
     "- Ending your turn without calling one of these tools counts as unfinished work.",
   ].join("\n")
 }

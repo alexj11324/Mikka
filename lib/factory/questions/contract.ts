@@ -1,15 +1,11 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { runQuestion, RUN_QUESTION_KINDS } from "@mikka/protocol/run";
 import { bindingSchema } from "../contract";
 import { factoryEventId } from "../event-id";
 
 export const FACTORY_QUESTION_VERSION = 1 as const;
-export const QUESTION_KINDS = [
-  "context",
-  "decision",
-  "permission",
-  "external",
-] as const;
+export const QUESTION_KINDS = RUN_QUESTION_KINDS;
 export const QUESTION_STATUSES = [
   "open",
   "waiting_user",
@@ -26,15 +22,7 @@ export type QuestionStatus = (typeof QUESTION_STATUSES)[number];
 const text = z.string().trim().min(1).max(4000);
 
 /** Agent hand-in only; ownership and the session are derived from the actual run. */
-export const questionHandoffSchema = z
-  .object({
-    questionId: z.uuid(),
-    kind: z.enum(QUESTION_KINDS).default("decision"),
-    question: text,
-    context: z.string().trim().max(4000).optional(),
-    options: z.array(text).max(20).default([]),
-  })
-  .strict();
+export const questionHandoffSchema = runQuestion;
 export type QuestionHandoff = z.infer<typeof questionHandoffSchema>;
 
 export const questionReferenceSchema = z

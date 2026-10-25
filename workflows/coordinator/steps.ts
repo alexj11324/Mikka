@@ -17,7 +17,8 @@ import { tiptapToText } from '@/lib/tiptap-text'
 import { FactoryError, type FactoryBinding, type FactoryRoute } from '@/lib/factory/contract'
 import type { FactoryDispatchInput } from '@/lib/factory/dispatch'
 import { factoryEventId } from '@/lib/factory/event-id'
-import { dispatchFactoryRun, factoryMonitor, factoryStore, reconcileFactoryRuns } from '@/lib/factory/server'
+import { dispatchFactoryRun, factoryMonitor, factoryStore, factoryQuestions, reconcileFactoryRuns } from '@/lib/factory/server'
+import type { QuestionReference, ContextQuestionAnswer } from '@/lib/factory/questions/contract'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -146,9 +147,29 @@ export async function dispatchRun(userId: string, input: FactoryDispatchInput) {
 
 export async function listFactoryRequests(userId: string) {
   'use step'
-  return db.select({ sourceEventId: coordinatorEvents.id, text: coordinatorEvents.payload, createdAt: coordinatorEvents.createdAt })
-    .from(coordinatorEvents).where(and(eq(coordinatorEvents.userId,userId),eq(coordinatorEvents.kind,'user_message')))
-    .orderBy(desc(coordinatorEvents.createdAt)).limit(10)
+  const rows = await db
+    .select({
+      sourceEventId: coordinatorEvents.id,
+      payload: coordinatorEvents.payload,
+      createdAt: coordinatorEvents.createdAt,
+    })
+    .from(coordinatorEvents)
+    .where(
+      and(
+        eq(coordinatorEvents.userId, userId),
+        eq(coordinatorEvents.kind, 'user_message'),
+      ),
+    )
+    .orderBy(desc(coordinatorEvents.createdAt))
+    .limit(10)
+  return rows.map((row) => ({
+    sourceEventId: row.sourceEventId,
+    text: String(row.payload.text ?? ''),
+    createdAt: row.createdAt,
+    ...(typeof row.payload.questionId === 'string'
+      ? { questionId: row.payload.questionId }
+      : {}),
+  }))
 }
 
 export async function routeFactoryTask(userId: string, input: Omit<FactoryRoute,'eventId'>) {
@@ -156,9 +177,83 @@ export async function routeFactoryTask(userId: string, input: Omit<FactoryRoute,
   return asToolResult(() => factoryStore.route(userId,{...input,eventId:input.sourceEventId}))
 }
 
-export async function getFactoryTask(userId: string, input: { taskId: string }) {
+export async function getFactoryTask(
+  userId: string,
+  input: { taskId: string },
+) {
   'use step'
-  return asToolResult(() => factoryStore.read(userId,input.taskId))
+  return asToolResult(async () => ({
+    ...(await factoryStore.read(userId, input.taskId)),
+    questions: await factoryQuestions.list(userId, input.taskId),
+  }))
+}
+
+export async function listFactoryQuestions(
+  userId: string,
+  input: { taskId?: string },
+) {
+  'use step'
+  return asToolResult(() =>
+    input.taskId
+      ? factoryQuestions.list(userId, input.taskId)
+      : factoryQuestions.pending(userId),
+  )
+}
+
+export async function getFactoryQuestion(
+  userId: string,
+  input: { questionId: string },
+) {
+  'use step'
+  return asToolResult(() => factoryQuestions.read(userId, input.questionId))
+}
+
+export async function answerFactoryContext(
+  userId: string,
+  input: ContextQuestionAnswer,
+) {
+  'use step'
+  return asToolResult(() =>
+    factoryQuestions.answer({ source: 'orchestrator', userId }, input),
+  )
+}
+
+export async function escalateFactoryQuestion(
+  userId: string,
+  input: { reference: QuestionReference; eventId: string; reason: string },
+) {
+  'use step'
+  return asToolResult(() => factoryQuestions.escalate(userId, input))
+}
+
+export async function answerFactoryQuestionFromUser(
+  userId: string,
+  input: {
+    reference: QuestionReference
+    answerId: string
+    sourceEventId: string
+  },
+) {
+  'use step'
+  return asToolResult(async () => {
+    const [event] = await db
+      .select({ payload: coordinatorEvents.payload })
+      .from(coordinatorEvents)
+      .where(
+        and(
+          eq(coordinatorEvents.id, input.sourceEventId),
+          eq(coordinatorEvents.userId, userId),
+          eq(coordinatorEvents.kind, 'user_message'),
+        ),
+      )
+      .limit(1)
+    if (!event || typeof event.payload.text !== 'string')
+      throw new FactoryError('factoryHumanRequired')
+    return factoryQuestions.answer(
+      { source: 'human_event', userId },
+      { ...input, text: event.payload.text },
+    )
+  })
 }
 
 export async function resolveFactoryTask(userId: string, input: { binding: FactoryBinding; sourceEventId: string; rationale: string; missingInformation: string[]; missingPermissions: string[]; needsSpec: boolean }) {

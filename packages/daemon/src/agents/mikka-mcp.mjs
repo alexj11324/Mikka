@@ -11,7 +11,7 @@
 //
 // Protocol: MCP over stdio, newline-delimited JSON-RPC 2.0.
 import { randomUUID } from "node:crypto"
-import { writeFileSync, renameSync } from "node:fs"
+import { writeFileSync, renameSync, readFileSync } from "node:fs"
 import { createInterface } from "node:readline"
 
 const handoffIndex = process.argv.indexOf("--handoff")
@@ -153,6 +153,20 @@ const TOOLS = [
     },
   },
   {
+    name: "request_help",
+    description:
+      "Stop and request missing task context from the Orchestrator. It first checks the issue and existing facts; only genuinely unresolved input is escalated to the person. Work is preserved for the original session.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        question: { type: "string" },
+        context: { type: "string" },
+        summary: { type: "string" },
+      },
+      required: ["question"],
+    },
+  },
+  {
     name: "ask_human",
     description:
       "Stop and ask a human a question you cannot answer yourself (a product decision, missing access). Your work so far is kept; the run continues after the answer.",
@@ -160,6 +174,7 @@ const TOOLS = [
       type: "object",
       properties: {
         question: { type: "string" },
+        kind: { type: "string", enum: ["decision", "permission"] },
         summary: { type: "string", description: "Where you are so far." },
       },
       required: ["question"],
@@ -183,9 +198,10 @@ const TOOLS = [
   },
 ]
 
-const KINDS = { submit: "submit", ask_human: "ask", report_blocked: "blocked" }
+const KINDS = { submit: "submit",
+  request_help: "ask", ask_human: "ask", report_blocked: "blocked", }
 
-function record(kind, args) {
+function record(kind, args, toolName) {
   // A planning hand-in carries the spec and the split it proposes. The id is
   // generated here, once, so the cards the daemon puts in the conversation
   // and the row the server stores name the same spec.
@@ -197,8 +213,46 @@ function record(kind, args) {
     args.split !== null
       ? { specId: randomUUID(), spec: args.spec, split: args.split }
       : null
+  const questionText = String(
+    kind === "blocked"
+      ? (args.blockedOn ?? "External condition")
+      : (args.question ?? "Missing task input"),
+  )
+    .trim()
+    .slice(0, 4000)
+  const questionKind =
+    kind === "blocked"
+      ? "external"
+      : toolName === "request_help"
+        ? "context"
+        : args.kind === "permission"
+          ? "permission"
+          : "decision"
+  let questionId = randomUUID()
+  try {
+    const existing = JSON.parse(readFileSync(handoffFile, "utf8"))
+    if (
+      existing.kind === kind &&
+      existing.question?.question === questionText &&
+      existing.question.kind === questionKind
+    )
+      questionId = existing.question.questionId
+  } catch {
+    /* First durable hand-in; a retry reads the same id above. */
+  }
   const handoff = {
     kind,
+    ...(kind === "ask" || kind === "blocked"
+      ? {
+          question: {
+            questionId,
+            kind: questionKind,
+            question: questionText,
+            context: String(args.context ?? args.summary ?? "").slice(0, 4000),
+            options: [],
+          },
+        }
+      : {}),
     summary: typeof args.summary === "string" ? args.summary : "",
     nextStep: typeof args.nextStep === "string" ? args.nextStep : null,
     openQuestions: Array.isArray(args.openQuestions)
@@ -226,7 +280,7 @@ function reply(id, result) {
 
 function fail(id, code, message) {
   process.stdout.write(
-    `${JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } })}\n`
+    `${JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } })}\n`,
   )
 }
 
@@ -249,7 +303,7 @@ function handle(message) {
       if (!kind) return fail(id, -32602, `Unknown tool: ${params?.name}`)
       let planned
       try {
-        planned = record(kind, params.arguments ?? {})
+        planned = record(kind, params.arguments ?? {}, params.name)
       } catch (error) {
         return reply(id, {
           isError: true,

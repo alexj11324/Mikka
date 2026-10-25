@@ -71,5 +71,13 @@ export const dispatchFactoryRun = createFactoryDispatch(
   factoryStore,
   (tx, userId, input) => queueRun(userId, input, factoryDispatchDatabase(tx)),
 );
+import { createFactoryQuestions } from "./questions/store";
+export const factoryQuestions = createFactoryQuestions(
+  pool,
+  authorize,
+  factoryStore,
+  dispatchFactoryRun,
+);
 import { createFactoryReconciler } from "./reconcile";
-export const reconcileFactoryRuns = createFactoryReconciler(pool, factoryStore);
+export const reconcileFactoryRuns = createFactoryReconciler(pool, factoryStore,
+  factoryQuestions,);

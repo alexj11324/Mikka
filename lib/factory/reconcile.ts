@@ -4,6 +4,7 @@ import { factoryEventId } from "./event-id";
 import type { FactoryTask, createFactoryStore } from "./store";
 import { reconcileFactoryCheck } from "./reconcile-check";
 import { MAX_RUN_ATTEMPTS } from "../run-retry";
+import type { createFactoryQuestions } from "./questions/store";
 const binding = (task: FactoryTask): FactoryBinding => ({
   taskId: task.id,
   issueId: task.issueId,
@@ -16,6 +17,9 @@ const binding = (task: FactoryTask): FactoryBinding => ({
 export function createFactoryReconciler(
   pool: Pool,
   store: ReturnType<typeof createFactoryStore>,
+  questions?: Pick<
+    ReturnType<typeof createFactoryQuestions>,
+    "record" | "settle">,
 ) {
   return async (userId: string) => {
     const { rows: pending } = await pool.query(
@@ -103,13 +107,63 @@ export function createFactoryReconciler(
           await tx.query("COMMIT");
           continue;
         }
+        const eventId = factoryEventId("run-completion", run.id);
+        if (
+          !
+          run.stopRequestedAt &&
+          ["asked_human", "blocked"].includes(run.stopReason)
+        ) {
+          if (questions) {
+            await tx.query("SAVEPOINT question_recovery");
+            try {
+              await questions.settle(userId, run.id, tx);
+              await questions.record(userId, run.id, tx);
+            } catch (error) {
+              await tx.query("ROLLBACK TO SAVEPOINT question_recovery");
+              if (!(error instanceof FactoryError)) throw error;
+          await store.apply(
+            userId,
+            binding(task),
+                factoryEventId("question-recovery-blocked", run.id),
+            {
+              action: "finish",
+                  status: "blocked",
+              reason: `Question recovery blocked: ${error.code}`,
+                  evidence: [],
+                  output: { runId: run.id },
+                },
+                tx,
+              );
+            }
+          } else {
+            await store.apply(
+              userId,
+              binding(task),
+              eventId,
+              {
+                action: "finish",
+                status:
+                  run.stopReason === "asked_human" ? "waiting" : "blocked",
+                reason:
+                  run.report?.openQuestions?.join("\n").slice(0, 4000) ||
+                  run.report?.blockedOn ||
+                  "Execution needs input; question recovery is required",
+                evidence: [],
+                output: { runId: run.id },
+              },
+              tx,
+            );
+          }
+          await tx.query("COMMIT");
+          recovered++;
+          continue;
+        }
         if (task.stage === "review" || task.stage === "verify") {
           await reconcileFactoryCheck(tx, store, task, run);
           await tx.query("COMMIT");
           recovered++;
           continue;
         }
-        const eventId = factoryEventId("run-completion", run.id);
         if (
           run.stopRequestedAt ||
           ["stopped", "cancelled"].includes(run.status)

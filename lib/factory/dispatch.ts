@@ -30,13 +30,15 @@ export function createFactoryDispatch(
   store: ReturnType<typeof createFactoryStore>,
   queue: QueueFactoryRun,
 ) {
-  return async (userId: string, input: FactoryDispatchInput) => {
+  return async (userId: string, input: FactoryDispatchInput,
+    existingTransaction?: PoolClient,) => {
     const parsed = factoryDispatchSchema.safeParse(input);
     if (!parsed.success) throw new FactoryError("factoryInvalid");
     const { binding, agentId, deviceRepoId, note } = parsed.data;
     const eventId = binding.attemptId; // stable per attempt, including durable-step replay
-    const tx = await pool.connect();
+    const tx = existingTransaction ?? ( await pool.connect());
     try {
+      if (!existingTransaction)
       await tx.query("BEGIN");
       const task = await store.lockForDispatch(userId, binding, eventId, tx);
       const monitorPublication =
@@ -91,9 +93,10 @@ export function createFactoryDispatch(
         { action: "bind_run", runId: run.runId },
         tx,
       );
-      await tx.query("COMMIT");
+      if (!existingTransaction) await tx.query("COMMIT");
       return { ...run, ...state };
     } catch (error) {
+      if (existingTransaction) throw error;
       await tx.query("ROLLBACK");
       // Missing authorized inputs become durable blocked state, with no orphan queue row.
       const code =
@@ -134,7 +137,7 @@ export function createFactoryDispatch(
       }
       throw error;
     } finally {
-      tx.release();
+      if (!existingTransaction) tx.release();
     }
   };
 }

@@ -181,6 +181,7 @@ export const agentRuns = pgTable('agent_runs', {
   sessionId: text('sessionId'), worktreePath: text('worktreePath'),
   stopReason: text('stopReason'), error: text('error'),
   report: jsonb('report').$type<Record<string, unknown> | null>(),
+  questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true} | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   /** 1 for the first run; a retry after the device went offline counts up (lib/run-retry.ts). */
   attempt: integer('attempt').notNull().default(1),
