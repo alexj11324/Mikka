@@ -21,11 +21,11 @@ CREATE TABLE IF NOT EXISTS factory_candidates (
 );
 CREATE TABLE IF NOT EXISTS factory_attempts (
   id uuid PRIMARY KEY, "taskId" uuid NOT NULL REFERENCES factory_tasks(id) ON DELETE CASCADE,
-  stage text NOT NULL, ordinal integer NOT NULL CHECK (ordinal > 0), status text NOT NULL,
+  stage text NOT NULL, ordinal integer NOT NULL CHECK (ordinal > 0), position integer NOT NULL CHECK (position > 0), status text NOT NULL,
   "candidateId" uuid, "runId" uuid REFERENCES agent_runs(id), "sessionId" text,
   reason text NOT NULL, output jsonb NOT NULL DEFAULT '{}', evidence jsonb NOT NULL DEFAULT '[]',
   "createdAt" timestamptz NOT NULL DEFAULT now(), "finishedAt" timestamptz,
-  UNIQUE ("taskId", stage, ordinal), UNIQUE ("taskId", id),
+  UNIQUE ("taskId", stage, ordinal), UNIQUE ("taskId", position), UNIQUE ("taskId", id),
   FOREIGN KEY ("taskId", "candidateId") REFERENCES factory_candidates("taskId", id),
   CHECK (stage IN ('clarify','spec','execute','review','verify','approval','publish','monitor')),
   CHECK (status IN ('pending','running','waiting','passed','failed','blocked','cancelled','revoked'))

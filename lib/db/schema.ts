@@ -422,13 +422,13 @@ export const factoryCandidates = pgTable('factory_candidates', {
 
 export const factoryAttempts = pgTable('factory_attempts', {
   id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
-  stage: text('stage').$type<import('../factory/contract').FactoryStage>().notNull(), ordinal: integer('ordinal').notNull(),
+  stage: text('stage').$type<import('../factory/contract').FactoryStage>().notNull(), ordinal: integer('ordinal').notNull(), position: integer('position').notNull(),
   status: text('status').$type<import('../factory/contract').FactoryStatus>().notNull(), candidateId: uuid('candidateId'),
   runId: uuid('runId').references(() => agentRuns.id), sessionId: text('sessionId'), reason: text('reason').notNull(),
   output: jsonb('output').$type<Record<string, unknown>>().notNull().default({}),
   evidence: jsonb('evidence').$type<import('../factory/contract').FactoryEvidence[]>().notNull().default([]),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), finishedAt: timestamp('finishedAt', { withTimezone: true }),
-}, table => [unique('factory_attempts_task_stage_ordinal_key').on(table.taskId, table.stage, table.ordinal), index('factory_attempts_run_idx').on(table.runId)])
+}, table => [unique('factory_attempts_task_stage_ordinal_key').on(table.taskId, table.stage, table.ordinal), unique('factory_attempts_task_position_key').on(table.taskId, table.position), unique('factory_attempts_task_id_key').on(table.taskId, table.id), uniqueIndex('factory_attempts_one_run_key').on(table.runId).where(sql`${table.runId} IS NOT NULL`), index('factory_attempts_run_idx').on(table.runId)])
 
 export const factoryEvents = pgTable('factory_events', {
   taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }), eventId: uuid('eventId').notNull(),

@@ -33,6 +33,7 @@ export interface FactoryAttempt {
   taskId: string;
   stage: FactoryStage;
   ordinal: number;
+  position: number;
   status: FactoryStatus;
   candidateId: string | null;
   runId: string | null;
@@ -122,7 +123,7 @@ export function createFactoryStore(
     task: FactoryTask,
   ): Promise<FactorySnapshot> {
     const { rows: attempts } = await tx.query<FactoryAttempt>(
-      'SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY "createdAt", ordinal',
+      'SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY position',
       [task.id],
     );
     const { rows: candidates } = await tx.query<FactoryCandidate>(
@@ -177,8 +178,8 @@ export function createFactoryStore(
   ) {
     const id = randomUUID();
     await tx.query(
-      `INSERT INTO factory_attempts (id,"taskId",stage,ordinal,status,"candidateId",reason)
-      SELECT $1,$2,$3,coalesce(max(ordinal),0)+1,'pending',$4,$5 FROM factory_attempts WHERE "taskId"=$2 AND stage=$3`,
+      `INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,"candidateId",reason)
+      SELECT $1,$2,$3,coalesce(max(ordinal) FILTER (WHERE stage=$3),0)+1,coalesce(max(position),0)+1,'pending',$4,$5 FROM factory_attempts WHERE "taskId"=$2`,
       [id, task.id, stage, task.candidateId, reason],
     );
     task.attemptId = id;
@@ -245,7 +246,7 @@ export function createFactoryStore(
           ],
         );
         await tx.query(
-          'INSERT INTO factory_attempts (id,"taskId",stage,ordinal,status,reason) VALUES ($1,$2,$3,1,$4,$5)',
+          'INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,reason) VALUES ($1,$2,$3,1,1,$4,$5)',
           [task.attemptId, task.id, task.stage, task.status, task.reason],
         );
         return save(tx, task, route.eventId, route);
