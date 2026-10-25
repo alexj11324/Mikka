@@ -2,6 +2,7 @@ import { z } from "zod";
 import { FactoryError } from "./contract";
 import type { FactoryHuman } from "./approval-contract";
 import type { createFactoryApprovals } from "./approval";
+import { PublicationDeferred } from "./publication-operation";
 
 export interface ApprovalHttpRequest {
   actor: FactoryHuman | null;
@@ -49,7 +50,7 @@ export async function handleFactoryApproval(
     }
     const parsed = z
       .object({
-        operation: z.enum(["approve", "revoke", "publish"]),
+        operation: z.enum(["approve", "revoke", "publish", "reconcile"]),
         input: z
           .object({ binding: z.object({ taskId: z.uuid() }).passthrough() })
           .passthrough(),
@@ -61,6 +62,16 @@ export async function handleFactoryApproval(
     const { operation, input } = parsed.data;
     return { status: 200, body: await service[operation](req.actor, input) };
   } catch (error) {
+    if (error instanceof PublicationDeferred)
+      return {
+        status: error.state === "pending" ? 202 : 409,
+        body: {
+          error: error.code,
+          publicationId: error.publicationId,
+          status: error.state,
+          nextOperation: "reconcile",
+        },
+      };
     if (!(error instanceof FactoryError)) throw error;
     return {
       status:

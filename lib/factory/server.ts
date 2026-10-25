@@ -5,6 +5,7 @@ import { issueForUser } from "@/lib/issue-access";
 import { createFactoryStore } from "./store";
 import { approvalGate, publishGate, createFactoryApprovals } from "./approval";
 import { configuredLocalPublicationAdapters } from "./local-publication";
+import { configuredVercelPublicationAdapters } from "./vercel-publication";
 import { createFactoryCheckClaim, factoryCheckGates } from "./checks";
 import { createFactoryMonitor, monitorGate } from "./monitor";
 import { appendMonitorEvidence } from "./monitor-evidence";
@@ -32,7 +33,10 @@ export const factoryApprovals = createFactoryApprovals(
   pool,
   authorize,
   factoryStore,
-  configuredLocalPublicationAdapters(process.env),
+  [
+    ...configuredLocalPublicationAdapters(process.env),
+    ...configuredVercelPublicationAdapters(process.env),
+  ],
 );
 export const claimFactoryCheckRun = createFactoryCheckClaim(pool, authorize);
 export const factoryMonitor = createFactoryMonitor(
@@ -79,5 +83,8 @@ export const factoryQuestions = createFactoryQuestions(
   dispatchFactoryRun,
 );
 import { createFactoryReconciler } from "./reconcile";
-export const reconcileFactoryRuns = createFactoryReconciler(pool, factoryStore,
-  factoryQuestions,);
+export const reconcileFactoryRuns = createFactoryReconciler(
+  pool,
+  factoryStore,
+  factoryQuestions,
+);

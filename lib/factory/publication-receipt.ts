@@ -2,10 +2,29 @@ import { z } from "zod";
 import type { PoolClient } from "pg";
 import { candidateSchema, FactoryError } from "./contract";
 import { digest } from "./evidence";
+import { publicationBindingHash } from "./publication-operation";
+
+const provider = z
+  .object({
+    version: z.literal(2),
+    name: z.literal("vercel"),
+    teamId: z.string().regex(/^team_[\w]+$/),
+    projectId: z.string().regex(/^prj_[\w]+$/),
+    deploymentId: z.string().regex(/^dpl_[\w]+$/),
+    environment: z.enum(["preview", "production"]),
+    publicationId: z.uuid(),
+    bindingHash: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
 
 export const verifiedPublicationTarget = z
   .object({
-    kind: z.enum(["local-artifact", "preview-deployment", "merge"]),
+    kind: z.enum([
+      "local-artifact",
+      "preview-deployment",
+      "production-deployment",
+      "merge",
+    ]),
     operationId: z.string().min(1).max(2000),
     target: z.string().min(1).max(2000),
     environment: z.string().min(1).max(4000),
@@ -13,6 +32,7 @@ export const verifiedPublicationTarget = z
     sha: z.string().regex(/^[a-f0-9]{40}$/),
     reference: z.string().min(1).max(2000),
     observedAt: z.iso.datetime(),
+    provider: provider.optional(),
   })
   .strict();
 export const publicationAdapterReceipt = z
@@ -52,7 +72,7 @@ export function assertPublicationTarget(
       (publicationId && v.operationId !== publicationId))
   )
     throw new FactoryError("factoryPublicationReceiptMismatch");
-  if (v.kind === "preview-deployment") {
+  if (v.kind === "preview-deployment" || v.kind === "production-deployment") {
     let url: URL;
     try {
       url = new URL(v.reference);
@@ -60,12 +80,33 @@ export function assertPublicationTarget(
       throw new FactoryError("factoryPublicationReceiptMismatch");
     }
     if (
-      action !== "deploy_preview" ||
+      action !==
+        (v.kind === "production-deployment"
+          ? "deploy_production"
+          : "deploy_preview") ||
       url.protocol !== "https:" ||
       url.username ||
       url.password ||
       url.search ||
       url.hash
+    )
+      throw new FactoryError("factoryPublicationReceiptMismatch");
+  }
+  if (
+    v.kind === "production-deployment" ||
+    target.startsWith("vercel:") ||
+    v.provider
+  ) {
+    const p = v.provider;
+    if (
+      !p ||
+      v.kind !== `${p.environment}-deployment` ||
+      v.environment !== p.environment ||
+      v.target !== `vercel:${p.teamId}:${p.projectId}:${p.environment}` ||
+      v.operationId !== p.deploymentId ||
+      (publicationId && p.publicationId !== publicationId) ||
+      !/^https:\/\/[a-z0-9][a-z0-9.-]*\.vercel\.app$/.test(v.reference) ||
+      v.reference.includes("-git-")
     )
       throw new FactoryError("factoryPublicationReceiptMismatch");
   }
@@ -75,7 +116,7 @@ export function assertPublicationTarget(
  * Expiry after consumption does not erase a historical publication. Revocation,
  * task cancellation, candidate replacement and missing verified receipts do block it.
  */
-export async function readFactoryPublicationReceipt(
+export async function readFactoryPublicationReceiptV2(
   tx: PoolClient,
   userId: string,
   taskId: string,
@@ -85,7 +126,7 @@ export async function readFactoryPublicationReceipt(
     rows: [p],
   } = await tx.query(
     `
-    SELECT p.*,a.candidate,a.request AS "approvalRequest",a."revokedAt",t."issueId",c.sha,c.repository,c.environment,c.scope,
+    SELECT p.*,a.candidate,a.request AS "approvalRequest",a."humanSessionId",a."revokedAt",t."issueId",c.sha,c.repository,c.environment,c.scope,
       s.status AS "publishStatus",s.output AS "publishOutput",s."finishedAt" AS "publishFinishedAt"
     FROM factory_publications p
     JOIN factory_approvals a ON a.id=p."approvalId" AND a."taskId"=p."taskId" AND a."candidateId"=p."candidateId" AND a."userId"=$1
@@ -129,8 +170,28 @@ export async function readFactoryPublicationReceipt(
     p.request.targetEnvironment,
     p.id,
   );
+  if (
+    receipt.data.verifiedTarget.provider?.bindingHash !== undefined &&
+    receipt.data.verifiedTarget.provider.bindingHash !==
+      publicationBindingHash({
+        idempotencyKey: p.id,
+        candidate,
+        authorization: {
+          approvalId: p.approvalId,
+          ownerId: userId,
+          humanSessionId: p.humanSessionId,
+          expiresAt: p.approvalRequest.expiresAt,
+          binding: p.request.binding,
+          eventId: p.request.eventId,
+          action: p.action,
+          target: p.target,
+          targetEnvironment: p.request.targetEnvironment,
+        },
+      })
+  )
+    throw new FactoryError("factoryPublicationReceiptRequired");
   return {
-    version: 1 as const,
+    version: 2 as const,
     publicationId: p.id as string,
     approvalId: p.approvalId as string,
     taskId,
@@ -143,5 +204,31 @@ export async function readFactoryPublicationReceipt(
     publishedAt: (p.publishFinishedAt as Date).toISOString(),
     reference: receipt.data.reference,
     verifiedTarget: receipt.data.verifiedTarget,
+  };
+}
+
+/** Legacy monitor callers must explicitly adopt V2 before accepting production. */
+export async function readFactoryPublicationReceipt(
+  tx: PoolClient,
+  userId: string,
+  taskId: string,
+  candidateId: string,
+) {
+  const r = await readFactoryPublicationReceiptV2(
+    tx,
+    userId,
+    taskId,
+    candidateId,
+  );
+  if (
+    r.action === "deploy_production" ||
+    r.verifiedTarget.kind === "production-deployment"
+  )
+    throw new FactoryError("factoryPublicationReceiptRequired");
+  return {
+    ...r,
+    version: 1 as const,
+    action: r.action,
+    verifiedTarget: { ...r.verifiedTarget, kind: r.verifiedTarget.kind },
   };
 }
