@@ -95,7 +95,7 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
   const nextPriority = issuePriorityForLinear(remote.priority)
   let doneEvent = false
   const saved = await db.transaction(async tx => {
-    await tx.execute(sql`select set_config('orvilo.linear_sync_source', 'linear', true)`)
+    await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
     const [latest] = await tx.select().from(issues).where(and(eq(issues.id, link.issue.id), eq(issues.userId, team.ownerId))).for('update')
     if (!latest) return null
     const [currentLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.id, link.link.id)).for('update')
@@ -152,7 +152,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
   if (JSON.stringify(content).length > 250_000) throw new LinearSyncConflictError('Linear description is larger than Mikka supports')
   const assignee = await localAssigneeForRemote(team.ownerId, remote.id, remote, true)
   const created = await db.transaction(async tx => {
-    await tx.execute(sql`select set_config('orvilo.linear_sync_source', 'linear', true)`)
+    await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${linearId.data}, 0))`)
     const [sameId] = await tx.select().from(issues).where(and(eq(issues.id, linearId.data), eq(issues.userId, team.ownerId))).for('update').limit(1)
     if (sameId) {
@@ -163,6 +163,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
       const syncRemote = existingLink
         ? !existingLink.linearUpdatedAt || remote.updatedAt > existingLink.linearUpdatedAt.toISOString()
         : remote.updatedAt > sameId.updatedAt.toISOString()
+      if (sameId.scope !== 'workspace') await tx.update(issues).set({ scope: 'workspace' }).where(eq(issues.id, sameId.id))
       if (!existingLink) await tx.insert(linearIssueLinks).values({
         id: crypto.randomUUID(), issueId: sameId.id, ownerId: team.ownerId, teamSyncId: team.id,
         linearIssueId: remote.id, linearIdentifier: remote.identifier, linearDescriptionHash: syncRemote ? null : hashValue(remote.description ?? ''), syncStatus: 'synced',
@@ -184,7 +185,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
     const issueContent = withIssueMetadata(content, metadata)
     const now = new Date()
     const [issue] = await tx.insert(issues).values({
-      id, userId: team.ownerId, title: remote.title, content: issueContent,
+      id, userId: team.ownerId, scope: 'workspace', title: remote.title, content: issueContent,
       status: issueStatusForLinearType(remote.state?.type ?? '', 'todo', remote.state?.name), priority: issuePriorityForLinear(remote.priority),
       revision: 1, createdAt: now, updatedAt: now,
     }).returning()
@@ -211,7 +212,8 @@ export async function syncAppIssueToLinear(issueId: string) {
   if (!row) return
   const issue = row.issue
   const metadata = readIssueMetadata(issue.content)
-  if (metadata.deletedAt) return
+  // Personal issues never leave Mikka (MIK-46).
+  if (metadata.deletedAt || issue.scope !== 'workspace') return
   const [savedLink] = await db.select({ link: linearIssueLinks, team: linearTeamSyncs }).from(linearIssueLinks)
     .innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId)).where(eq(linearIssueLinks.issueId, issue.id)).limit(1)
   const link = savedLink?.link ?? null

@@ -43,7 +43,7 @@ export function TeamForm({ workspaceId, team, existingIdentifiers = [], editable
     try {
       const result = await saveTeam({ id: team?.id, workspaceId, name, identifier, description })
       if (!result.ok) { setError(result.error); return }
-      posthog.capture(team ? 'orvilo_team_updated' : 'orvilo_team_created')
+      posthog.capture(team ? 'mikka_team_updated' : 'mikka_team_created')
       onSaved(result.data.id)
     } catch { setError(i18nText("FeatureCopy.c_85f5c4d3")) }
     finally { busy.current = false; setPending(false) }

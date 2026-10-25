@@ -18,6 +18,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!workspace) return new NextResponse(i18nText("FeatureCopy.c_5893c8c0"), { status: 404, headers: { 'Cache-Control': 'private, no-store' } })
   const response = NextResponse.redirect(new URL(withBasePath('/'), request.url))
   response.headers.set('Cache-Control', 'private, no-store')
-  for (const name of ['mikka-workspace', 'orvilo-workspace']) response.cookies.set(name, workspace.id, { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' : 'lax', secure: true, path: '/', maxAge: 31536000 })
+  response.cookies.set('mikka-workspace', workspace.id, { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' : 'lax', secure: true, path: '/', maxAge: 31536000 })
   return response
 }

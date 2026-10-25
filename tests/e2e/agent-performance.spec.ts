@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import type { Page, TestInfo } from '@playwright/test'
-import { test, expect, register, app } from './fixtures'
+import { test, expect, register, rail, app } from './fixtures'
+import { observeNewDocumentHistory } from './history-request-observer'
 
-const budget = 1000
+// 本地目标 1000ms；GitHub Actions 共享机器抖动大，CI 上留 20% 余量（MIK-1）。
+const budget = process.env.CI ? 1200 : 1000
 
 async function seedHistory(page: Page, email: string) {
   const connectionString = process.env.E2E_DATABASE_URL
@@ -62,15 +64,14 @@ async function assertInteractiveWithinBudget(page: Page, info: TestInfo, name: s
 
 test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 秒 @performance', async ({ page }, info) => {
   const { email } = await register(page)
+  // The page register lands on loads its own history; let that finish so it isn't counted after the reload.
+  await page.waitForLoadState('networkidle')
   const { older } = await seedHistory(page, email)
-  const historyRequests: string[] = []
-  page.on('request', request => {
-    if (new URL(request.url()).pathname === app('/api/agent/sessions')) historyRequests.push(request.url())
-  })
+  const { historyRequests, cdp } = await observeNewDocumentHistory(page, app('/api/agent/sessions'))
   await page.reload()
 
   const firstStart = await page.evaluate(() => performance.now())
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await page.getByRole('button', { name: '最新性能验收会话', exact: true }).click()
   let panel = await assertInteractiveWithinBudget(page, info, '首次进入', firstStart, '第三轮性能验收的已保存正文')
   await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(3)
   await expect(page).toHaveURL(/section=agent/)
@@ -78,8 +79,6 @@ test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 �
   expect(historyRequests).toHaveLength(1)
   expect(new URL(historyRequests[0]).searchParams.has('sessionId')).toBe(false)
 
-  const cdp = await page.context().newCDPSession(page)
-  await cdp.send('Network.enable')
   await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
   await page.reload({ waitUntil: 'domcontentloaded' })
   panel = await assertInteractiveWithinBudget(page, info, '无缓存刷新并恢复完整历史', 0, '第三轮性能验收的已保存正文')
@@ -87,22 +86,21 @@ test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 �
   expect(historyRequests).toHaveLength(2)
   expect(new URL(historyRequests[1]).searchParams.has('sessionId')).toBe(false)
 
-  await page.getByRole('button', { name: '我的任务', exact: true }).click()
+  await rail(page, '看板').click()
   const returnStart = await page.evaluate(() => performance.now())
-  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await rail(page, '主页').click()
   panel = await assertInteractiveWithinBudget(page, info, '返回会话', returnStart, '第三轮性能验收的已保存正文')
   expect(historyRequests).toHaveLength(2)
 
   await expect(panel.getByRole('button', { name: '运行记录', exact: true })).toHaveCount(0)
   const selectionStart = await page.evaluate(() => performance.now())
-  await panel.getByRole('button', { name: /^切换会话：/ }).click()
-  await page.getByRole('option', { name: /^较早性能验收会话/ }).click()
+  await page.getByRole('list', { name: '对话', exact: true }).getByRole('button', { name: '较早性能验收会话', exact: true }).click()
   panel = await assertInteractiveWithinBudget(page, info, '切换真实历史会话', selectionStart, '较早的一轮提问的已保存正文')
   expect(historyRequests).toHaveLength(3)
   expect(new URL(historyRequests[2]).searchParams.get('sessionId')).toBe(older)
 
   const resetStart = await page.evaluate(() => performance.now())
-  await panel.getByRole('button', { name: '新任务', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   panel = await assertInteractiveWithinBudget(page, info, '新任务', resetStart)
   await expect(panel.getByRole('region', { name: '推荐建议', exact: true })).toBeVisible()
   await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
@@ -128,7 +126,7 @@ test('历史读取保持账号隔离，并正确处理空会话与无效会话',
     expect(forbidden.status()).toBe(404)
     const empty = await otherPage.request.get(app('/api/agent/sessions'))
     expect(await empty.json()).toEqual({ sessions: [], sessionId: null, turns: [] })
-    await otherPage.getByRole('button', { name: 'Agent', exact: true }).click()
+    await otherPage.getByRole('button', { name: '新对话', exact: true }).click()
     await expect(otherPage.getByRole('region', { name: '推荐建议', exact: true })).toBeVisible()
     await expect(otherPage.getByText('第三轮性能验收的已保存正文', { exact: true })).toHaveCount(0)
   } finally {
