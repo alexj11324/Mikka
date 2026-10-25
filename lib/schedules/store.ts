@@ -41,8 +41,12 @@ export class ScheduleStore {
     if (def.task.kind === 'agent_read' && !this.agent?.enabled()) throw new ScheduleError('scheduleAgentReadUnavailable', 403)
     if (def.task.kind === 'issue_snapshot') {
       // Match issue owner/member visibility, without granting future visibility.
-      const { rows } = await tx.query(`SELECT i.id,i.title,i.status,i.content FROM issues i WHERE i.id=$1 AND (i."userId"=$2 OR EXISTS (SELECT 1 FROM issue_members m WHERE m."issueId"=i.id AND m."memberId"=$2)) FOR SHARE OF i`, [def.task.issueId, ownerId])
+      const { rows } = await tx.query(`SELECT i.id,i.title,i.status,i.content,i."userId" FROM issues i WHERE i.id=$1 AND (i."userId"=$2 OR EXISTS (SELECT 1 FROM issue_members m WHERE m."issueId"=i.id AND m."memberId"=$2)) FOR SHARE OF i`, [def.task.issueId, ownerId])
       if (!rows.length || readIssueMetadata(rows[0].content).deletedAt) throw new ScheduleError('scheduleTaskAccessDenied', 403)
+      if (rows[0].userId !== ownerId) {
+        const membership = await tx.query('SELECT 1 FROM issue_members WHERE "issueId"=$1 AND "memberId"=$2 FOR SHARE', [def.task.issueId, ownerId])
+        if (!membership.rows.length) throw new ScheduleError('scheduleTaskAccessDenied', 403)
+      }
       return rows[0] as { id: string; title: string; status: string; content: unknown }
     }
     return null
