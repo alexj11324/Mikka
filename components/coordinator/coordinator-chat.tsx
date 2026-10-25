@@ -101,7 +101,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
                     {item.text && (item.from === 'coordinator'
                       ? <Bubble variant="muted" align="start" className={cn('min-w-0', compact ? 'max-w-full' : 'max-w-[min(35rem,85%)]')}><BubbleContent className="flex w-full min-w-0 flex-col gap-1 rounded-2xl bg-muted/60 px-4 py-3"><span className="text-xs font-medium text-muted-foreground">{t('label')}</span><CoordinatorReply text={item.text} citations={citations} /></BubbleContent></Bubble>
-                      : <Bubble variant="secondary" align="end" className={cn(compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.text}</BubbleContent></Bubble>)}
+                      : <Bubble variant="secondary" align="end" className={cn('*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.text}</BubbleContent></Bubble>)}
                     {item.tools.length > 0 && <MessageFooter>{t('usedTools', { tools: [...new Set(item.tools)].join(', ') })}</MessageFooter>}
                   </MessageContent></Message>}
             </MessageScrollerItem>)}
