@@ -74,7 +74,7 @@ try{
  await withDeviceDatabaseAuthority({userId:live.owner,tokenId:live.tokenId},async()=>{
   const pool=deviceScopedPool(db)
   await assert.rejects(pool.query('UPDATE devices SET name=$1 WHERE id=$2',['must not persist',live.device]))
-  await assert.rejects(drizzle(pool).transaction(tx=>tx.execute(sql`SELECT 1`)))
+  for(let i=0;i<8;i++) await assert.rejects(drizzle(pool).transaction(tx=>tx.execute(sql`SELECT 1`)))
   const c=await pool.connect();try{await assert.rejects(c.query('BEGIN'))}finally{c.release()}
  })
  assert.equal((await db.query('SELECT name FROM devices WHERE id=$1',[live.device])).rows[0].name,'Synthetic fault fixture')
@@ -84,6 +84,5 @@ try{
  writeFileSync('test-results/daemon-faults/device-revocation-fault-evidence.json',JSON.stringify(evidence,null,2))
  console.log(JSON.stringify(evidence))
 }finally{await db.end()}
-// Route imports initialize application background handles. All fixture queries
-// and the retained fixture pool have completed above; end this standalone runner.
 process.exit(0)
+

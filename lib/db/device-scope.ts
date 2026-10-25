@@ -35,17 +35,31 @@ function fencedClient(client: PoolClient, caller: DeviceAuthority): PoolClient {
   let transaction = false, released = false, broken = false
   const onError = () => { broken = true }
   client.on('error', onError)
+  const release = (error?: Error | boolean) => {
+    if (released) return
+    released = true
+    client.release(error || broken || transaction)
+    client.off('error', onError)
+  }
   const rawQuery = (...args: unknown[]) => Reflect.apply(client.query, client, args) as Promise<unknown>
   const query = async (...args: unknown[]) => {
     if (released || broken) throw new Error('Device database connection unavailable')
     const text = queryText(args)
     if (/^(?:begin|start\s+transaction)\b/i.test(text)) {
       if (transaction || text.includes(';')) throw new Error('Nested or batched BEGIN is not supported')
-      const result = await rawQuery(...args)
-      transaction = true
-      try { await lockAuthority(client, caller) }
-      catch (error) { await client.query('ROLLBACK').catch(() => { broken = true }); transaction = false; throw error }
-      return result
+      try {
+        const result = await rawQuery(...args)
+        transaction = true
+        await lockAuthority(client, caller)
+        return result
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => { broken = true })
+        transaction = false
+        // Drizzle issues BEGIN before its try/finally. Refused admission must
+        // return the checked-out connection here; caller release is idempotent.
+        release()
+        throw error
+      }
     }
     if (/^(?:commit|rollback)(?:\s+(?:work|transaction))?$/i.test(text)) {
       // Cleanup ROLLBACK after a refused BEGIN is harmless; never promote a
@@ -72,14 +86,7 @@ function fencedClient(client: PoolClient, caller: DeviceAuthority): PoolClient {
   return new Proxy(client, {
     get(target, property) {
       if (property === 'query') return query
-      if (property === 'release') return (error?: Error | boolean) => {
-        if (released) return
-        released = true
-        // A consumer releasing an open transaction must destroy it, not return
-        // its token lock or uncommitted writes to another request.
-        target.release(error || broken || transaction)
-        target.off('error', onError)
-      }
+      if (property === 'release') return release
       const value = Reflect.get(target, property, target)
       return typeof value === 'function' ? value.bind(target) : value
     },
