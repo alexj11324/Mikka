@@ -41,6 +41,10 @@ function defaultValue(value, dataType) {
 }
 
 try {
+  // Shared ordering defaults need their sequence before schema-derived tables.
+  // Production creates this in the session-mailboxes migration. Never reset it
+  // when re-running the disposable database setup.
+  await pool.query('CREATE SEQUENCE IF NOT EXISTS mikka_mailbox_sequence')
   const tables = [...Object.values(issueSchema), ...Object.values(workspaceSchema), ...Object.values(projectSchema), ...Object.values(teamSchema)]
   for (const table of tables.filter(value => is(value, PgTable))) {
     const config = getTableConfig(table)
