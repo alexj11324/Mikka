@@ -6,7 +6,7 @@ Base: coordinated #191+#192 `4cd3a1b5fa05773094722bab7774e15a8d49d018` (fast-for
 
 `lib/factory/server.ts` installs only `approvalGate` and `publishGate`. #193 must compose its own review/verify gates into that same store. They are absent on this candidate and remain closed. #194 never promotes executor self-report into an independent result. Existing daemon candidate commit/push is unchanged: it precedes candidate review and is not a merge/deployment approval.
 
-Migrations: #192 `20261025010001_factory_192_stages.sql`, imported #191 `20261025011347_run_dispatch_keys.sql`, new #194 `20261025012001_factory_194_approvals.sql`. The obsolete `20261025004500` and `20261025011101` filenames are not present. The new migration is reentrant and adds consumer ledgers only.
+Migrations: #192 `20261025013402_factory_192_stages.sql`, imported #191 `20261025013401_run_dispatch_keys.sql`, new #194 `20261025013403_factory_194_approvals.sql`. The obsolete `20261025004500` and `20261025011101` filenames are not present. The new migration is reentrant and adds consumer ledgers only.
 
 ## Browser API
 
