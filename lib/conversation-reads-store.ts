@@ -60,7 +60,7 @@ export function originAllowed(origin: string | null, host: string | null): boole
 /** Resolves a messageId (uuid or position string) to a persisted message in the owner's conversation. */
 export async function resolveMessage(q: Queryable, ownerId: string, messageId: unknown): Promise<{ id: string; position: number } | null> {
   if (typeof messageId !== 'string') return null
-  const where = UUID.test(messageId) ? 'id = $2::uuid' : POSITION.test(messageId) ? 'position = $2::int' : null
+  const where = UUID.test(messageId) ? 'id = $2::uuid' : POSITION.test(messageId) && Number(messageId) <= 2_147_483_647 ? 'position = $2::int' : null
   if (!where) return null
   const { rows } = await q.query<{ id: string; position: number }>(`select id::text as id, position from coordinator_messages where "userId" = $1 and ${where} limit 1`, [ownerId, messageId])
   return rows[0] ? { id: rows[0].id, position: Number(rows[0].position) } : null

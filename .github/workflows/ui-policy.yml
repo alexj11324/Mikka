@@ -84,6 +84,7 @@ jobs:
       - run: pnpm test:linear-sync
       - run: pnpm test:coordinator-events
       - run: pnpm test:auth-composio
+      - run: pnpm test:groups
       - run: pnpm test:integrations
       - run: pnpm test:csv
       - run: pnpm test:settings
@@ -155,9 +156,20 @@ jobs:
       - name: Generate ephemeral test-only auth secret
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
       - run: pnpm exec playwright install --with-deps chromium
+      - name: Bootstrap empty database using tracked migrations only
+        run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
+        env:
+          MIGRATION_BOOTSTRAP_CI: '1'
+      - name: Group conversation API and migrations (temporary Postgres 17 only)
+        run: pnpm test:groups
       - run: pnpm test:e2e:setup
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
+      - name: Conversation read API and concurrency (ephemeral Postgres only)
+        run: pnpm test:conversation-reads
+        env:
+          REQUIRE_DB: '1'
+          CONVERSATION_READS_REQUIRE_DB: '1'
       - run: pnpm build
         id: build
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)

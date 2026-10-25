@@ -2,7 +2,7 @@ import 'server-only'
 import { Composio } from '@composio/core'
 import { executeComposioAction, type ComposioActionName, type ComposioActionResult } from '@/lib/composio-actions'
 
-export const COMPOSIO_TOOLKITS = ['notion', 'slack'] as const
+export const COMPOSIO_TOOLKITS = ['gmail', 'notion', 'slack'] as const
 export type ComposioToolkit = (typeof COMPOSIO_TOOLKITS)[number]
 
 export function getComposio() {

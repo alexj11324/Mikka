@@ -27,6 +27,7 @@ before(async () => {
       await candidate.end().catch(() => {})
     }
   }
+  if (!pool && process.env.CONVERSATION_READS_REQUIRE_DB === '1') throw new Error('Required ephemeral read-route database unavailable')
   mock.module(new URL('./auth.ts', import.meta.url).href, {
     namedExports: { auth: { api: { getSession: async () => (sessionUser ? { user: { id: sessionUser } } : null) } } },
   })

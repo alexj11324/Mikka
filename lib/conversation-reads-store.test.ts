@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test, { after, before, type TestContext } from 'node:test'
 import { Pool } from 'pg'
-import { handleRead, originAllowed, requestHost, type ReadRequest } from './conversation-reads-store'
+import { handleRead, originAllowed, requestHost, resolveMessage, type ReadRequest } from './conversation-reads-store'
 
 // Pure checks always run. DB checks need a reachable MIKKA_DATABASE_URL whose
 // schema already has conversation_reads (applied by scripts/migrate.mjs; the
@@ -24,6 +24,13 @@ test('origin: missing allowed, same host allowed, cross host and garbage rejecte
   assert.equal(originAllowed('https://evil.example', 'mikka.app'), false)
   assert.equal(originAllowed('http://localhost:3101', 'localhost:3100'), false)
   assert.equal(originAllowed('null', 'mikka.app'), false)
+})
+
+test('positions outside PostgreSQL integer bounds are rejected before a query', async () => {
+  const q = { query: async () => { throw new Error('invalid position reached PostgreSQL') } }
+  for (const value of ['2147483648', '9999999999', '10000000000', '0', '-1']) {
+    assert.equal(await resolveMessage(q, 'owner', value), null)
+  }
 })
 
 async function probe(url: string | undefined): Promise<Pool | string> {
