@@ -1,3 +1,4 @@
+import { subscriptionRequestBudget } from './subscription-request-budget'
 // `mikka daemon | daemon login | daemon status` (ADR 0004). The desktop app
 // runs the same entry with `daemon --data-dir <userData>`.
 import { parseArgs } from "node:util"
@@ -16,7 +17,7 @@ import { MemoryServer, type DeviceRepo, type ServerLink } from "./server-link"
 import { HttpServerLink } from "./server-link-http"
 
 const USAGE = `Usage:
-  mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>] [--group-review-images <image-manifest.json>] [--hosted-subscriptions]
+  mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>] [--group-review-images <image-manifest.json>] [--hosted-subscriptions] [--subscription-request-budget <operator-file.json>]
   mikka daemon login [--server <url>] [--workspace <id>] [--token <session>] [--dev] [--data-dir <dir>]
   mikka daemon status [--dev] [--data-dir <dir>]`
 
@@ -53,6 +54,7 @@ export async function runCli(
       "group-review-images": { type: "string" },
       "fixtures-dir": { type: "string" },
       "stall-minutes": { type: "string" },
+      "subscription-request-budget": { type: "string" },
       "hosted-subscriptions": { type: "boolean", default: false },
       token: { type: "string" },
       workspace: { type: "string" },
@@ -63,6 +65,10 @@ export async function runCli(
   if (values.help || command !== "daemon") {
     io.out(USAGE)
     return values.help ? 0 : 2
+  }
+  if (values["subscription-request-budget"] && (!values["hosted-subscriptions"] || sub)) {
+    io.err("subscription-request-budget requires hosted daemon mode")
+    return 2
   }
   const flavor: Flavor = values.dev ? "dev" : "prod"
   const dataDir = values["data-dir"] ?? defaultDataDir(flavor)
@@ -171,6 +177,7 @@ export async function runCli(
       fixturesDir: values["fixtures-dir"],
       groupReviewImages: values["group-review-images"] ? groupReviewImages.parse(readJson(values["group-review-images"])) : undefined,
       hostedSubscriptions: values["hosted-subscriptions"],
+      subscriptionRequestBudget: values["subscription-request-budget"] ? subscriptionRequestBudget.parse(readJson(values["subscription-request-budget"])) : undefined,
       stallMs: values["stall-minutes"]
         ? Number(values["stall-minutes"]) * 60_000
         : undefined,

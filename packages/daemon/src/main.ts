@@ -1,3 +1,4 @@
+import type { SubscriptionRequestBudget } from './subscription-request-budget'
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
 //
@@ -122,6 +123,7 @@ export interface DaemonOptions {
   harnessBinaries?: Partial<Record<"claude_code" | "codex" | "cursor", string>>
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
+  subscriptionRequestBudget?: SubscriptionRequestBudget
   /** Long-poll wait for run commands, seconds (default 25; tests shorten). */
   commandsWaitSeconds?: number
   /** Called once the daemon stopped after `daemon.drain`. */
@@ -208,6 +210,7 @@ export class Daemon {
   private wakeCommands: (() => void) | null = null
 
   constructor(private readonly options: DaemonOptions) {
+    if (options.subscriptionRequestBudget && !options.hostedSubscriptions) throw new Error("subscription_request_budget_requires_hosted_mode")
     this.paths = daemonPaths(options.dataDir)
     this.log = options.log ?? createLogger({ dir: this.paths.logs })
   }
@@ -248,6 +251,7 @@ export class Daemon {
           stateDir: paths.adapterState,
           link: this.options.link,
           binaries: this.options.harnessBinaries,
+          requestBudget: this.options.subscriptionRequestBudget,
         })
       : undefined
     const adapters = (this.adapters = new Map<Harness, AgentAdapter>([

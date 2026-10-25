@@ -1,3 +1,4 @@
+import { createSubscriptionRequestBudget, type SubscriptionRequestBudget } from './subscription-request-budget';
 // Linux hosted mode reuses the existing CLI adapters and run supervisor. Provider
 // custody stays on Mikka; the container mounts only one task's broker socket.
 import { execFile, spawn } from "node:child_process";
@@ -48,6 +49,7 @@ const blockedSandbox: AgentSandbox = {
 
 export async function createHostedBotRunner(host: {
   stateDir: string;
+  requestBudget?: SubscriptionRequestBudget;
   link: ServerLink;
   binaries?: Partial<Record<"codex" | "claude_code", string>>;
 }) {
@@ -58,6 +60,7 @@ export async function createHostedBotRunner(host: {
     !host.link.nativeRequest
   )
     throw unavailable();
+  const reserveRequest = host.requestBudget ? createSubscriptionRequestBudget(host.stateDir, host.requestBudget) : undefined;
   // Do not pull, build or provision anything. The operator supplies installed
   // software; this read-only preflight cannot create a cloud resource.
   await exec("docker", ["image", "inspect", image, "--format", "{{.Id}}"], {
@@ -424,7 +427,7 @@ export async function createHostedBotRunner(host: {
             host.link.nativeRequest!(
               assignment.deviceId,
               assignment.runId,
-              payload,
+              reserveRequest ? reserveRequest(assignment, payload) : payload,
               signal,
             ),
         },

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Synthetic native-auth process only; no provider/network requests.
+// Synthetic native-auth process. PROBE_BUDGET uses only its hosted loopback broker.
 import { closeSync, existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
@@ -28,7 +28,7 @@ if (
 const sessionId = flag("--session-id") ?? flag("--resume")
 const out = (value) => process.stdout.write(`${JSON.stringify(value)}\n`)
 const lines = createInterface({ input: process.stdin })
-lines.on("line", (line) => {
+lines.on("line", async (line) => {
   const frame = JSON.parse(line)
   if (frame.type === "control_request") {
     out({
@@ -55,6 +55,17 @@ lines.on("line", (line) => {
   if(text==='PROBE_GIT') {
     const target=lstatSync('.git').isFile()?'.git':'.git/guard'
     try{writeFileSync(target,'synthetic metadata mutation');process.exit(2)}catch(error){if(!['EROFS','EBUSY','EACCES'].includes(error.code))process.exit(2)}
+  }
+  if(text==='PROBE_BUDGET') {
+    try {
+      const url=new URL('/v1/messages',process.env.ANTHROPIC_BASE_URL)
+      if(url.hostname!=='127.0.0.1')process.exit(2)
+      for(const expected of [200,200,503]) {
+        const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({model:'fixture-model',max_tokens:8192,messages:[{role:'user',content:'synthetic'}]})})
+        if(response.status!==expected)process.exit(2)
+        await response.text()
+      }
+    } catch {process.exit(2)}
   }
   out({ type: "system", subtype: "init", session_id: sessionId })
   if (text === "CRASH") {

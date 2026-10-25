@@ -115,3 +115,18 @@ for (const harness of ["codex", "claude_code"] as const) {
     );
   }, 45000);
 }
+
+it('hosted Claude process uses the configured durable request budget before server transport', async()=>{
+ const stateDir=tempDir('mnh-budget-'),deviceId=randomUUID(),runId=randomUUID(),consumerId=randomUUID(),workspaceId=randomUUID(),bindingId=randomUUID()
+ let calls=0
+ const link=Object.assign(new MemoryServer(deviceId).link(),{
+  nativeContext:async()=>({route:'claude_code_cli' as const,modelId:'fixture-model',revision:1,accountId:'synthetic-account',expiresAt:new Date(Date.now()+60000).toISOString()}),
+  nativeRequest:async(_device:string,_run:string,payload:{body:unknown})=>{expect(payload.body).toMatchObject({max_tokens:256});calls++;return {contentType:'application/json',body:new Response('{}').body!}}
+ })
+ const binary=resolve(import.meta.dirname,'fakes/fake-claude-subscription.mjs');chmodSync(binary,0o700)
+ const runner=await createHostedBotRunner({stateDir,link,binaries:{claude_code:binary},requestBudget:{id:randomUUID(),ownerId:'fixture-owner',workspaceId,consumerId,deviceId,route:'claude_code_cli',modelId:'fixture-model',expiresAt:new Date(Date.now()+600000).toISOString(),maxRequests:2,maxOutputTokens:256}})
+ const assignment={runId,deviceId,issueId:randomUUID(),repoId:randomUUID(),baseBranch:'main',harness:'claude_code',prompt:'PROBE_BUDGET',model:'fixture-model',subscriptionBinding:{bindingId,ownerId:'fixture-owner',workspaceId,consumerId,route:'claude_code_cli'}} as RunAssignment
+ const session=await runner.start(assignment,{runId,cwd:await makeRepo(),prompt:'PROBE_BUDGET',model:'fixture-model',env:buildChildEnv({host:{PATH:process.env.PATH,HOME:tempDir()}}),log:createLogger({level:'silent'})})
+ const events=[];for await(const event of session.events())events.push(event)
+ expect(events.at(-1)).toMatchObject({type:'exit',outcome:'succeeded'});expect(calls).toBe(2)
+},120000)
