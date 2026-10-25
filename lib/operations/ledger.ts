@@ -7,9 +7,10 @@ const identity = z.object({ operationId: z.uuid(), ownerId: text, workspaceId: t
 /** Trusted callers persist operationId with the logical intent, before any run attempt. */
 const intent = identity.extend({
   provider: text, accountId: text, action: text, target: text,
-  approvalId: text, candidateSha: z.string().regex(/^[a-f0-9]{40,64}$/),
+  approvalId: text, candidateSha: z.string().regex(/^[a-f0-9]{40,64}$/).optional(),
+  proposalDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
-}).strict()
+}).strict().refine(value => Boolean(value.candidateSha) !== Boolean(value.proposalDigest), 'exactly one candidate or proposal binding required')
 const receiptSchema = z.object({ providerObjectId: text, evidenceDigest: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
 export type OperationIdentity = z.infer<typeof identity>
 export type OperationIntent = z.infer<typeof intent>
@@ -27,7 +28,7 @@ export class OperationError extends Error {}
  * Authorization rows must be locked against concurrent revocation. No permissive default.
  * A returned receipt records historical fact, not permission for another effect.
  */
-export type OperationAuthorize = (tx: PoolClient, binding: OperationIntent, runId: string | null, phase: 'reserve' | 'claim' | 'read' | 'settle' | 'reconcile') => Promise<void>
+export type OperationAuthorize = (tx: PoolClient, binding: OperationIntent, runId: string | null, phase: 'reserve' | 'claim' | 'read' | 'settle' | 'reconcile' | 'invoke') => Promise<void>
 
 export function createOperationLedger(pool: Pool, authorize: OperationAuthorize) {
   if (typeof authorize !== 'function') throw new OperationError('operationAuthorizationRequired')
@@ -65,6 +66,28 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize)
         await authorize(tx, row.binding, runId, 'claim')
         if (row.status !== 'reserved') throw new OperationError('operationAlreadyClaimed')
         const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=\'executing\',"attemptToken"=$2,"runId"=$3,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, randomUUID(), runId])
+        return rows[0]
+      })
+    },
+    /** One durable invocation gate per claim; locks current authority through the
+     * bounded provider call. A crash after the gate commits requires reconciliation.
+     * Callers never receive an authority to invoke again after an unknown result.
+     */
+    async invoke(input: OperationIdentity, attemptToken: string, execute: (record: Readonly<OperationRecord>, beforeSend: () => Promise<void>) => Promise<OperationReceipt>) {
+      z.uuid().parse(attemptToken)
+      await transaction(async tx => {
+        const row = await owned(tx, input)
+        await authorize(tx, row.binding, row.runId, 'invoke')
+        if (row.attemptToken !== attemptToken || row.status !== 'executing') throw new OperationError('operationStaleAttempt')
+        const result = await tx.query('UPDATE operation_ledger SET "invokedAt"=clock_timestamp() WHERE "operationId"=$1 AND "invokedAt" IS NULL', [row.operationId])
+        if (!result.rowCount) throw new OperationError('operationAlreadyInvoked')
+      })
+      return transaction(async tx => {
+        const row = await owned(tx, input)
+        if (row.attemptToken !== attemptToken || row.status !== 'executing') throw new OperationError('operationStaleAttempt')
+        await authorize(tx, row.binding, row.runId, 'invoke')
+        const receipt = receiptSchema.parse(await execute(row, () => authorize(tx, row.binding, row.runId, 'invoke')))
+        const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=\'succeeded\',receipt=$2,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, receipt])
         return rows[0]
       })
     },

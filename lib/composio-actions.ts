@@ -151,7 +151,7 @@ export function parseActionInput(actionName: ComposioActionName, input: unknown)
   return parsed.success ? parsed.data as Record<string, unknown> : null
 }
 
-function actionArguments(actionName: ComposioActionName, input: Record<string, unknown>): Record<string, unknown> {
+export function actionArguments(actionName: ComposioActionName, input: Record<string, unknown>): Record<string, unknown> {
   const action = COMPOSIO_ACTIONS[actionName]
   return 'toArguments' in action ? (action.toArguments as (value: Record<string, unknown>) => Record<string, unknown>)(input) : input
 }
