@@ -53,8 +53,8 @@ test('in-flight old login cannot survive rotation or disable; no cached credenti
   await rejected(p.getAccessToken())
 })
 
-test('malformed/overlong/non-bearer/long-lived/slow responses fail closed and redact', async () => {
-  for (const body of [{ accessToken: 'synthetic', tokenType: 'Bearer', expiresIn: 2592000 }, { accessToken: 'bad\nvalue', tokenType: 'Bearer', expiresIn: 600 }, { accessToken: 'x', tokenType: 'Other', expiresIn: 600 }, { accessToken: 'x', tokenType: 'Bearer', expiresIn: 0 }, { accessToken: 'x'.repeat(16385), tokenType: 'Bearer', expiresIn: 600 }]) {
+test('malformed/overlong/non-bearer/invalid-expiry/slow responses fail closed and redact', async () => {
+  for (const body of [...[NaN, Infinity, -1, 1.5, '600', Number.MAX_SAFE_INTEGER].map(expiresIn => ({ accessToken: 'synthetic', tokenType: 'Bearer', expiresIn })), { accessToken: 'bad\nvalue', tokenType: 'Bearer', expiresIn: 600 }, { accessToken: 'x', tokenType: 'Other', expiresIn: 600 }, { accessToken: 'x', tokenType: 'Bearer', expiresIn: 0 }, { accessToken: 'x'.repeat(16385), tokenType: 'Bearer', expiresIn: 600 }]) {
     const p = universalAuthTokenProvider({ origin, credentials: () => credentials, fetch: async () => Response.json(body) })
     await rejected(p.getAccessToken())
   }
@@ -65,14 +65,14 @@ test('malformed/overlong/non-bearer/long-lived/slow responses fail closed and re
   await rejected(network.getAccessToken())
 })
 
-test('real loopback HTTP login/delete/denial and redirect refusal; no real Infisical identity', async () => {
+test('real loopback HTTP30-day cleaner login/delete/denial and redirect refusal; no real Infisical identity', async () => {
   let logins = 0, deletes = 0, rejectedToken = false, redirect = false
   const server = createServer(async (req, res) => {
     if (req.url === '/api/v1/auth/universal-auth/login') {
       logins++; let data = ''; for await (const chunk of req) data += chunk
       assert.deepEqual(JSON.parse(data), credentials)
       if (redirect) { res.writeHead(302, { location: '/must-not-follow' }); res.end(); return }
-      res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ accessToken: 'synthetic-http-token', tokenType: 'Bearer', expiresIn: 600 })); return
+      res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ accessToken: 'synthetic-http-token', tokenType: 'Bearer', expiresIn: 2592000 })); return
     }
     assert.equal(req.method, 'DELETE'); assert.equal(req.headers.authorization, 'Bearer synthetic-http-token')
     deletes++; res.writeHead(rejectedToken ? 403 : 200); res.end()
@@ -151,4 +151,23 @@ test('bounded worker lifetime requires enough validity and refreshes cached toke
   time=265000; assert.equal(await p.getAccessToken(),'lease-2')
   const short=universalAuthTokenProvider({origin,credentials:()=>credentials,minimumValidityMs:335000,fetch:async()=>token('too-short',300)})
   await rejected(short.getAccessToken())
+})
+
+test('issuer 30-day lifetime works for default cleaner and bounded BYOS leases, with early refresh and denial', async()=>{
+ for(const minimumValidityMs of [0,105000,335000]) {
+  let time=0,calls=0
+  const ttl=2592000,margin=Math.max(minimumValidityMs,60000)
+  const p=universalAuthTokenProvider({origin,credentials:()=>credentials,minimumValidityMs,now:()=>time,fetch:async()=>token(`long-${++calls}`,ttl)})
+  assert.equal(await p.getAccessToken(),'long-1')
+  time=ttl*1000-margin-1;assert.equal(await p.getAccessToken(),'long-1');assert.equal(calls,1)
+  time++;assert.equal(await p.getAccessToken(),'long-2');assert.equal(calls,2)
+  p.rejectAccessToken('long-2');await rejected(p.getAccessToken())
+ }
+})
+test('long issuer lifetime cannot survive elapsed expiry or unsafe deadline arithmetic',async()=>{
+ let time=0
+ const p=universalAuthTokenProvider({origin,credentials:()=>credentials,now:()=>time,fetch:async()=>{time=2592000001;return token('expired',2592000)}})
+ await rejected(p.getAccessToken())
+ const overflow=universalAuthTokenProvider({origin,credentials:()=>credentials,now:()=>Number.MAX_SAFE_INTEGER-10,fetch:async()=>token('overflow',600)})
+ await rejected(overflow.getAccessToken())
 })

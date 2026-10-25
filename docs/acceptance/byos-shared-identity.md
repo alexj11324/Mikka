@@ -16,24 +16,26 @@ receive it; compromise of the trusted app or worker has the identity's full blas
 radius. Owner/workspace/path/epoch checks are unchanged. No production setting
 was changed by this patch.
 
-## Token lifetime remains blocked
+## Issuer token lifetime
 
-Official Universal Auth login reference lists clientId, clientSecret and optional
-organizationSlug, with no per-login TTL override:
+The application accepts the issuer's valid lifetime, including the existing
+2592000-second (30-day) token, without an additional opt-in or one-hour ceiling.
+It still validates Bearer response shape, safe finite expiry arithmetic, elapsed
+request time and sufficient remaining validity for the worker lease. HTTPS origin,
+redirect refusal, credential rotation, denial fencing and separate caches remain.
+
+A token remains valid at Infisical until its actual expiry or server revocation.
+Early refresh, local cache eviction and local rejection do not revoke old tokens.
+In particular, refreshing does not make the previous30-day admin bearer short-lived.
+No Infisical TTL configuration, IAM privilege or production cleaner setting is
+changed. Official login documents no per-request TTL override:
 https://infisical.com/docs/api-reference/endpoints/universal-auth/login
 
-The existing reported 2592000-second token is still rejected by the unchanged
-3600-second ceiling. Local caching cannot shorten server validity. No invented
-TTL request field, token exchange, revoke loop or retry of the denied auth-config
-GET was introduced. This is not a deployable solution to the TTL mismatch alone.
+The shared Universal Auth helper is also used by the credential cleanup broker.
+It now accepts valid issuer lifetimes above one hour too, including in its default
+minimumValidityMs=0 mode. Its separate identity, configured paths, delete policy,
+401/403 invalidation and no-static-fallback behavior remain unchanged. The same
+long-lived bearer exposure applies if that issuer returns a long token.
 
-Release owner needs one explicit operational choice before activation:
-- Authorized change of the existing identity's server-side auth TTL/maxTTL to a
-  short duration (proposed600s), with review of effects on its other consumers;
-  current configuration GET403 must not be bypassed.
-- Explicit acceptance of a30-day admin bearer and a separately reviewed lifetime
-  policy code change. A leak could retain broad project access for up to30days
-  unless revoked server-side. This patch does not implement that option.
-
-Validation uses synthetic credentials and an isolated HTTP login server only;
+Validation uses synthetic credentials and isolated HTTP login servers only;
 there was no real Infisical login, IAM change, grant read or migration.

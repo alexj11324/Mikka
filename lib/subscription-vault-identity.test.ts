@@ -21,7 +21,7 @@ test('only exact server opt-in admits shared source and access; no credential fa
  env.MIKKA_BYOS_VAULT_AUTH='static'
  assert.equal(subscriptionVaultCredentials(env,'custody'),undefined)
 })
-test('real isolated HTTP: shared source denial isolates caches; 30-day tokens still refused',async()=>{
+test('real isolated HTTP: shared source denial isolates caches; issuer 30-day tokens accepted',async()=>{
  let ttl=600,calls=0
  const server=createServer(async(req,res)=>{
   let raw='';for await(const chunk of req)raw+=chunk
@@ -46,7 +46,7 @@ test('real isolated HTTP: shared source denial isolates caches; 30-day tokens st
   assert.equal(await tokens.get('custody'),custody);assert.equal(await tokens.get('access'),access)
   ttl=2592000
   const long=createSubscriptionVaultTokens(()=>env,fetcher)
-  await assert.rejects(long.get('custody'),/vault_auth_unavailable/)
-  await assert.rejects(long.get('access'),/vault_auth_unavailable/)
+  assert.equal(await long.get('custody'),'synthetic-identical-lease')
+  assert.equal(await long.get('access'),'synthetic-identical-lease')
  }finally{server.close();await once(server,'close')}
 })
