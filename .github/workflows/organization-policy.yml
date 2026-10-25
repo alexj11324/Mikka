@@ -56,20 +56,17 @@ jobs:
       - run: pnpm --filter @mikka/protocol typecheck
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/protocol test
-      - name: Install pinned hosted-runner test image
-        run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
       - run: pnpm --filter @mikka/daemon test
       - name: Generate isolated auth secret
         run: |
           node -e "const s=require('node:crypto').randomBytes(32).toString('hex'); console.log('::add-mask::'+s); require('node:fs').appendFileSync(process.env.GITHUB_ENV,'BETTER_AUTH_SECRET='+s+'\n')"
       - run: pnpm exec next build --webpack
       - run: git rev-parse HEAD > .next/policy-source-sha
-      - name: Compiled Next policy API regression
+      - name: Compiled community execution with management adapter absent
         run: |
           set -euo pipefail
           pnpm exec next start --hostname 127.0.0.1 --port 3130 > policy-next.log 2>&1 &
-          node scripts/policy/http-acceptance.mjs | tee policy-http.log
-          node -e "const a=require('./policy-http-evidence/acceptance.json'); if(a.results!=='passed'||a.requests.length<60||!a.oauthMcp?.events?.length) process.exit(1)"
+          POLICY_CORE_ORIGIN=http://127.0.0.1:3130 POLICY_SPLIT_EVIDENCE_DIR=policy-http-evidence node --import tsx scripts/policy/split-acceptance.mjs | tee policy-http.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
