@@ -532,7 +532,7 @@ export class RunSupervisor {
         }
         continue
       }
-      if (entry.assignment.leaseExpiresAt || this.deps.requireOnlineResumes) {
+      if (this.deps.requireOnlineResumes !== false && (entry.assignment.leaseExpiresAt || this.deps.requireOnlineResumes)) {
         try {
           if (!this.deps.revalidateRunLease) throw new Error('Current run authority unavailable')
           const expiry = Date.parse(await this.deps.revalidateRunLease(entry.assignment))

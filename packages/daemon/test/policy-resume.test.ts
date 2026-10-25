@@ -9,7 +9,7 @@ import { createLogger } from '../src/log'
 import { MemoryServer } from '../src/server-link'
 import { cleanupTempDirs, tempDir } from './helpers'
 afterEach(cleanupTempDirs)
-function fixture(revalidate?: (a:RunAssignment)=>Promise<string>, leased = true, remote = false) {
+function fixture(revalidate?: (a:RunAssignment)=>Promise<string>, leased = true, remote?: boolean) {
   const dir=tempDir('policy-resume-'), log=createLogger()
   const journal=new RunJournal(join(dir,'runs.json'))
   const assignment:RunAssignment={runId:'policy-run',issueId:'policy-issue',deviceId:'policy-device',repoId:'policy-repo',baseBranch:'main',harness:'mock',prompt:'synthetic',...(leased?{leaseExpiresAt:new Date(Date.now()+60000).toISOString()}:{})}
@@ -56,4 +56,8 @@ it('unleased local development runs keep their explicit local behavior',async()=
 
 it('older remote assignments without a lease cannot use the local development exemption',async()=>{
   const f=fixture(undefined,false,true);await f.supervisor.resumeAll();expect(f.launch).not.toHaveBeenCalled()
+})
+
+it('explicit local memory development mode can resume its non-persistent fixture runs',async()=>{
+  const f=fixture(undefined,true,false);await f.supervisor.resumeAll();expect(f.launch).toHaveBeenCalledTimes(1)
 })
