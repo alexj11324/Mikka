@@ -39,7 +39,7 @@ const nextConfig = {
   },
   transpilePackages: ['@mikka/protocol'],
   serverExternalPackages: ['ai', 'better-auth', 'drizzle-orm'],
-  // Build the pinned Linux worker before activating BYOS. The binary path is
+  // Default pnpm build compiles pinned Linux workers before Next tracing. The binary path is
   // private server configuration, so tracing cannot infer this asset from JS.
   outputFileTracingExcludes: {
     '*': ['./packages/subscription-worker/.upstream/**', './packages/subscription-worker/.cache/**', './packages/subscription-worker/bin/mikka-subscription-fixture'],

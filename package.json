@@ -8,7 +8,7 @@
   "scripts": {
     "generate:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs",
     "check:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
-    "build": "pnpm generate:agent-ui && pnpm lint && pnpm migrate && next build",
+    "build": "pnpm build:byos-workers && pnpm generate:agent-ui && pnpm lint && pnpm migrate && next build && node scripts/verify-subscription-worker-artifacts.mjs",
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
     "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs tests/factory-migration-order.test.mjs",
@@ -57,7 +57,8 @@
     "test:group-native": "MIKKA_TEST_NATIVE_GROUPS=1 node --import tsx --test lib/group-mailbox-runtime.test.ts",
     "test:mailboxes": "node --import tsx --test tests/session-mailbox.test.ts tests/orchestration-prompts.test.ts",
     "test:run-dispatch": "node --import tsx --test tests/run-dispatch.test.ts",
-    "test:byos-claim": "node scripts/test-byos-claim.mjs"
+    "test:byos-claim": "node scripts/test-byos-claim.mjs",
+    "build:byos-workers": "node scripts/build-subscription-workers.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",
