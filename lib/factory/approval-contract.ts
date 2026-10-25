@@ -14,6 +14,7 @@ export const approvalRequest = z
     candidate: candidateSchema,
     action: publicationAction,
     target: z.string().trim().min(1).max(2000),
+    targetEnvironment: z.string().trim().min(1).max(4000),
     expiresAt: z.iso.datetime(),
     // Returned by the authenticated evidence read, never an agent's assertion.
     evidenceDigest: z.string().regex(/^[a-f0-9]{64}$/),
@@ -31,6 +32,7 @@ export const publicationRequest = approvalControl
   .extend({
     action: publicationAction,
     target: z.string().trim().min(1).max(2000),
+    targetEnvironment: z.string().trim().min(1).max(4000),
   })
   .strict();
 

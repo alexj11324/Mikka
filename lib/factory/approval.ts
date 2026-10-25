@@ -21,6 +21,11 @@ import type {
   FactoryTask,
   createFactoryStore,
 } from "./store";
+import {
+  publicationAdapterReceipt,
+  assertPublicationTarget,
+  type PublicationAdapterReceipt,
+} from "./publication-receipt";
 
 function fail(code: string): never {
   throw new FactoryError(code);
@@ -74,6 +79,8 @@ async function validApproval(
   );
   if (
     !a ||
+    typeof a.request?.targetEnvironment !== "string" ||
+    !a.request.targetEnvironment ||
     (publish
       ? a.publishRevision !== task.revision ||
         a.publishAttemptId !== task.attemptId
@@ -119,6 +126,23 @@ export const publishGate: FactoryGate = async (tx, task, _attempt, change) => {
     `SELECT * FROM factory_publications WHERE id=$1 AND "approvalId"=$2 AND status='succeeded' AND receipt IS NOT NULL`,
     [parsed.data.publicationId, a.id],
   );
+  if (p) {
+    const receipt = publicationAdapterReceipt.safeParse(p.receipt);
+    if (!receipt.success) return false;
+    assertPublicationTarget(
+      receipt.data,
+      a.candidate,
+      a.action,
+      a.target,
+      a.request.targetEnvironment,
+      p.id,
+    );
+    if (
+      new Date(receipt.data.verifiedTarget.observedAt).getTime() <
+      p.createdAt.getTime()
+    )
+      return false;
+  }
   return Boolean(
     p &&
     p.taskId === task.id &&
@@ -133,10 +157,11 @@ export interface PublicationAdapter {
   // Registered by trusted backend code. Never accept a callback/command from a tool.
   action: z.infer<typeof publicationRequest>["action"];
   target: string;
+  environment: string;
   execute(input: {
     idempotencyKey: string;
     candidate: ReturnType<typeof candidateIdentity>;
-  }): Promise<{ reference: string }>;
+  }): Promise<PublicationAdapterReceipt>;
 }
 
 export function createFactoryApprovals(
@@ -187,11 +212,11 @@ export function createFactoryApprovals(
       return transaction(async (tx) => {
         const task = await owned(tx, actor, taskId, true);
         const { rows: approvals } = await tx.query(
-          'SELECT id,"candidateId","userId",candidate,action,target,"evidenceDigest",evidence,"expiresAt","revokedAt","createdAt" FROM factory_approvals WHERE "taskId"=$1 ORDER BY "createdAt"',
+          'SELECT id,"candidateId","userId",candidate,action,target,request->>\'targetEnvironment\' AS "targetEnvironment","evidenceDigest",evidence,"expiresAt","revokedAt","createdAt" FROM factory_approvals WHERE "taskId"=$1 ORDER BY "createdAt"',
           [task.id],
         );
         const { rows: publications } = await tx.query(
-          'SELECT id,"approvalId","candidateId",action,target,status,receipt,"createdAt","finishedAt" FROM factory_publications WHERE "taskId"=$1 ORDER BY "createdAt"',
+          'SELECT id,"approvalId","candidateId",action,target,request->>\'targetEnvironment\' AS "targetEnvironment",status,receipt,"createdAt","finishedAt" FROM factory_publications WHERE "taskId"=$1 ORDER BY "createdAt"',
           [task.id],
         );
         return { binding: bindingOf(task), approvals, publications };
@@ -397,7 +422,10 @@ export function createFactoryApprovals(
       if (req.action === "deploy_production")
         fail("factoryPublicationUnavailable");
       const adapter = adapters.find(
-        (a) => a.action === req.action && a.target === req.target,
+        (a) =>
+          a.action === req.action &&
+          a.target === req.target &&
+          a.environment === req.targetEnvironment,
       );
       if (!adapter) fail("factoryPublicationUnavailable");
       const reservation = await transaction(async (tx) => {
@@ -429,7 +457,7 @@ export function createFactoryApprovals(
           return {
             result: replay.result as {
               publicationId: string;
-              receipt: { reference: string };
+              receipt: PublicationAdapterReceipt;
               binding: FactoryBinding;
             },
           };
@@ -439,7 +467,11 @@ export function createFactoryApprovals(
         if (task.stage !== "publish" || task.status !== "pending")
           fail("factoryTransition");
         const { a } = await validApproval(tx, task, req.approvalId, true);
-        if (a.action !== req.action || a.target !== req.target)
+        if (
+          a.action !== req.action ||
+          a.target !== req.target ||
+          a.request.targetEnvironment !== req.targetEnvironment
+        )
           fail("factoryApprovalInvalid");
         const {
           rows: [prior],
@@ -479,15 +511,20 @@ export function createFactoryApprovals(
             req.approvalId,
             true,
           );
-          const receipt = z
-            .object({ reference: z.string().min(1).max(2000) })
-            .strict()
-            .parse(
-              await adapter.execute({
-                idempotencyKey: publicationId,
-                candidate: a.candidate,
-              }),
-            );
+          const receipt = publicationAdapterReceipt.parse(
+            await adapter.execute({
+              idempotencyKey: publicationId,
+              candidate: a.candidate,
+            }),
+          );
+          assertPublicationTarget(
+            receipt,
+            a.candidate,
+            a.action,
+            a.target,
+            a.request.targetEnvironment,
+            publicationId,
+          );
           await tx.query(
             `UPDATE factory_publications SET status='succeeded',receipt=$2,"finishedAt"=clock_timestamp() WHERE id=$1 AND status='reserved'`,
             [publicationId, JSON.stringify(receipt)],

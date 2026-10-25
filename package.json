@@ -23,7 +23,7 @@
     "i18n:check": "node scripts/check-i18n.mjs",
     "test:ssh-target": "node --import tsx --test lib/ssh-target.test.ts",
     "test:linear-sync": "node --import tsx --test lib/db/request-scope.test.ts lib/linear-sync/mapping.test.ts lib/linear-sync/markdown.test.ts lib/linear-sync/webhook.test.ts cloudflare/linear-sync/src/index.test.ts",
-    "test:factory": "node --import tsx --test lib/factory/contract.test.ts lib/factory/postgres.test.ts lib/factory/approval.test.ts",
+    "test:factory": "node --import tsx --test lib/factory/contract.test.ts lib/factory/postgres.test.ts lib/factory/approval.test.ts lib/factory/local-publication.test.ts",
     "test:coordinator-events": "node --import tsx --test lib/run-retry.test.ts lib/coordinator-events.test.ts lib/coordinator/context.test.ts lib/coordinator/model.test.ts lib/coordinator/triage.test.ts lib/coordinator/decision.test.ts lib/coordinator/group-routing.test.ts lib/coordinator/citations.test.ts lib/link-preview-parse.test.ts",
     "test:run-dispatch": "node --import tsx --test tests/run-dispatch.test.ts",
     "test:integrations": "node --import tsx --test lib/auth-callback.test.ts lib/composio-actions.test.ts lib/composio-pagination.test.ts lib/issue-owner-scope.test.ts lib/skills-search.test.ts",

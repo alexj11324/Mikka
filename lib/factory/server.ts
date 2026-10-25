@@ -5,6 +5,7 @@ import { issueForUser } from "@/lib/issue-access";
 import { createFactoryStore } from "./store";
 import { approvalGate, publishGate, createFactoryApprovals } from "./approval";
 import type { FactoryAuthorize } from "./store";
+import { configuredLocalPublicationAdapters } from "./local-publication";
 
 // Preserve existing personal/workspace/team/deletion access rules on every operation.
 const authorizeFactory: FactoryAuthorize = async (userId, issueId, tx) => {
@@ -17,12 +18,13 @@ export const factoryStore = createFactoryStore(pool, authorizeFactory, {
   approval: approvalGate,
   publish: publishGate,
 });
-// #193 owns review/verify. No publication adapter is installed: every external
-// publication remains unavailable until a separately authorized integration.
+// #193 owns review/verify. An explicitly configured local artifact target is
+// executable on loopback only. Cloud/production publication remains unavailable.
 export const factoryApprovals = createFactoryApprovals(
   pool,
   authorizeFactory,
   factoryStore,
+  configuredLocalPublicationAdapters(process.env),
 );
 
 import { queueRun } from "@/lib/agent-runs";

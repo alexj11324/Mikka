@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readFile, readdir, mkdtemp, appendFile, rm } from "node:fs/promises";
+import { readFile, readdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -21,6 +21,8 @@ import { approvalRequest } from "./approval-contract";
 import { createFactoryStore, type FactoryTask } from "./store";
 import { redactArtifact } from "./evidence";
 import { factoryBrowserHuman } from "./browser-human";
+import { createLocalPublicationAdapter } from "./local-publication";
+import { readFactoryPublicationReceipt } from "./publication-receipt";
 
 const binding = (task: FactoryTask): FactoryBinding => ({
   taskId: task.id,
@@ -80,7 +82,7 @@ test(
       options: `-c search_path=${schema}`,
     });
     const directory = await mkdtemp(join(tmpdir(), "mikka-194-"));
-    const effectPath = join(directory, "local-effects.jsonl");
+    const targetDirectory = join(directory, "target");
     const authorize = async (
       userId: string,
       issueId: string,
@@ -104,14 +106,13 @@ test(
     });
     const service = createFactoryApprovals(pool, authorize, store);
     const local = createFactoryApprovals(pool, authorize, store, [
-      {
-        action: "deploy_preview",
+      createLocalPublicationAdapter({
+        root: targetDirectory,
         target: "local-isolated-filesystem",
-        execute: async (input) => {
-          await appendFile(effectPath, `${JSON.stringify(input)}\n`);
-          return { reference: `local-file:${input.idempotencyKey}` };
-        },
-      },
+        repository: "fixture/Mikka",
+        environment: "local-contract",
+        candidateEnvironment: "local-contract",
+      }),
     ]);
     const actor = {
       userId: "fixture-owner",
@@ -157,7 +158,10 @@ test(
         `INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,'Fixture upstream','codex')`,
         [agentId, actor.userId],
       );
-      async function prepare(stopStage = "approval") {
+      async function prepare(
+        stopStage = "approval",
+        candidateEnvironment = "local-contract",
+      ) {
         const sourceEventId = randomUUID();
         await pool.query(
           `INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$2,'user_message',$3,'{"text":"contract fixture"}')`,
@@ -189,7 +193,7 @@ test(
               candidate: {
                 sha,
                 repository: "fixture/Mikka",
-                environment: "local-contract",
+                environment: candidateEnvironment,
                 scope: "fixture backend",
               },
             });
@@ -215,7 +219,7 @@ test(
             sessionId,
             candidateId: s.task.candidateId,
             sha,
-            environment: "local-contract",
+            environment: candidateEnvironment,
             recordedAt: new Date().toISOString(),
           };
           // PostgreSQL has microseconds; use a server-derived, later timestamp.
@@ -252,6 +256,7 @@ test(
           candidate: e.manifest.candidate,
           action: "deploy_preview" as const,
           target: "local-isolated-filesystem",
+          targetEnvironment: "local-contract",
           expiresAt: new Date(Date.now() + 600000).toISOString(),
           evidenceDigest: e.evidenceDigest,
           evidenceReadId: e.evidenceReadId,
@@ -262,6 +267,7 @@ test(
         eventId: randomUUID(),
         action: "deploy_preview" as const,
         target: "local-isolated-filesystem",
+        targetEnvironment: "local-contract",
       });
       const httpReq = (taskId: string, extra = {}) => ({
         actor,
@@ -410,6 +416,66 @@ test(
         },
       );
       await t.test(
+        "#193-shaped device provenance and a separately approved local destination remain distinct",
+        async () => {
+          const deviceEnvironment = `device:${randomUUID()}`;
+          const s = await prepare("approval", deviceEnvironment),
+            req = await request(s);
+          assert.equal(req.candidate.environment, deviceEnvironment);
+          assert.notEqual(req.targetEnvironment, deviceEnvironment);
+          const a = await service.approve(actor, req),
+            p = publication(a);
+          const deviceTarget = createFactoryApprovals(pool, authorize, store, [
+            createLocalPublicationAdapter({
+              root: join(directory, "device-target"),
+              target: p.target,
+              environment: p.targetEnvironment,
+              candidateEnvironment: deviceEnvironment,
+              repository: req.candidate.repository,
+            }),
+          ]);
+          await rejects(
+            () =>
+              deviceTarget.publish(actor, {
+                ...p,
+                targetEnvironment: deviceEnvironment,
+              }),
+            "factoryPublicationUnavailable",
+          );
+          const published = await deviceTarget.publish(actor, p);
+          assert.equal(
+            published?.receipt.verifiedTarget.environment,
+            req.targetEnvironment,
+          );
+          const tx = await pool.connect();
+          try {
+            const handoff = await readFactoryPublicationReceipt(
+              tx,
+              actor.userId,
+              s.task.id,
+              s.task.candidateId!,
+            );
+            assert.equal(handoff.candidate.environment, deviceEnvironment);
+            assert.equal(handoff.targetEnvironment, req.targetEnvironment);
+            assert.equal(
+              handoff.verifiedTarget.environment,
+              req.targetEnvironment,
+            );
+            sources.push({
+              taskId: s.task.id,
+              candidateId: s.task.candidateId,
+              publicationId: published?.publicationId,
+              candidateEnvironment: deviceEnvironment,
+              targetEnvironment: req.targetEnvironment,
+              layer:
+                "#193 device shape fixture, real local target write/readback",
+            });
+          } finally {
+            tx.release();
+          }
+        },
+      );
+      await t.test(
         "10 concurrent identical approvals produce one ledger and one advance; altered replay rejects",
         async () => {
           const s = await prepare(),
@@ -516,6 +582,14 @@ test(
             () => local.publish(actor, { ...p, target: "foreign" }),
             "factoryPublicationUnavailable",
           );
+          await rejects(
+            () =>
+              local.publish(actor, {
+                ...p,
+                targetEnvironment: "other-environment",
+              }),
+            "factoryPublicationUnavailable",
+          );
           let wrongEffects = 0;
           const wrongRegistered = createFactoryApprovals(
             pool,
@@ -525,17 +599,19 @@ test(
               {
                 action: "merge",
                 target: p.target,
+                environment: p.targetEnvironment,
                 execute: async () => {
                   wrongEffects++;
-                  return { reference: "must-not-run" };
+                  throw new Error("must-not-run");
                 },
               },
               {
                 action: p.action,
                 target: "foreign",
+                environment: p.targetEnvironment,
                 execute: async () => {
                   wrongEffects++;
-                  return { reference: "must-not-run" };
+                  throw new Error("must-not-run");
                 },
               },
             ],
@@ -621,7 +697,7 @@ test(
             "0",
           );
           await assert.rejects(
-            () => readFile(effectPath),
+            () => readdir(targetDirectory),
             (e: unknown) => (e as NodeJS.ErrnoException).code === "ENOENT",
           );
         },
@@ -730,15 +806,58 @@ test(
             ).size,
             1,
           );
-          assert.equal(
-            (await readFile(effectPath, "utf8")).trim().split("\n").length,
-            1,
-          );
+          assert.equal((await readdir(targetDirectory)).length, 1);
           assert.equal(
             (await store.read(actor.userId, s.task.id)).task.status,
             "passed",
           );
           const replay = await local.publish(actor, p);
+          const published = JSON.parse(
+            await readFile(
+              join(targetDirectory, `${replay?.publicationId}.json`),
+              "utf8",
+            ),
+          );
+          assert.deepEqual(published.candidate, approvalReq.candidate);
+          assert.equal(published.target, p.target);
+          assert.ok(
+            replay?.receipt.reference.startsWith(
+              `local-artifact:${replay.publicationId}:sha256:`,
+            ),
+          );
+          const tx = await pool.connect();
+          try {
+            await tx.query("BEGIN");
+            const handoff = await readFactoryPublicationReceipt(
+              tx,
+              actor.userId,
+              s.task.id,
+              s.task.candidateId!,
+            );
+            assert.equal(handoff.publicationId, replay?.publicationId);
+            assert.equal(handoff.action, p.action);
+            assert.equal(handoff.target, p.target);
+            assert.equal(handoff.targetEnvironment, p.targetEnvironment);
+            assert.deepEqual(handoff.candidate, approvalReq.candidate);
+            assert.equal(handoff.verifiedTarget.kind, "local-artifact");
+            assert.equal(
+              handoff.verifiedTarget.environment,
+              approvalReq.candidate.environment,
+            );
+            await rejects(
+              () =>
+                readFactoryPublicationReceipt(
+                  tx,
+                  "foreign",
+                  s.task.id,
+                  s.task.candidateId!,
+                ),
+              "factoryPublicationReceiptRequired",
+            );
+            await tx.query("COMMIT");
+          } finally {
+            tx.release();
+          }
           assert.equal(
             replay?.publicationId,
             (await service.ledger(actor, s.task.id)).publications[0].id,
@@ -747,10 +866,7 @@ test(
             () => local.publish(actor, { ...p, approvalId: randomUUID() }),
             "factoryReplayMismatch",
           );
-          assert.equal(
-            (await readFile(effectPath, "utf8")).trim().split("\n").length,
-            1,
-          );
+          assert.equal((await readdir(targetDirectory)).length, 1);
           sources.push({
             taskId: s.task.id,
             candidateId: s.task.candidateId,
@@ -842,6 +958,7 @@ test(
             {
               action: "deploy_preview",
               target: p.target,
+              environment: p.targetEnvironment,
               execute: async () => {
                 calls++;
                 throw new Error("uncertain local outcome");
@@ -866,9 +983,10 @@ test(
                 {
                   action: "deploy_preview",
                   target: p.target,
+                  environment: p.targetEnvironment,
                   execute: async () => {
                     calls++;
-                    return { reference: "must-not-run" };
+                    throw new Error("must-not-run");
                   },
                 },
               ],
@@ -898,16 +1016,15 @@ test(
           const s = await prepare(),
             a = await service.approve(actor, await request(s)),
             p = publication(a);
-          const uncertainPath = join(directory, "effect-before-rollback.jsonl");
+          const uncertainPath = join(directory, "effect-before-rollback");
           const effect = createFactoryApprovals(pool, authorize, store, [
-            {
-              action: p.action,
+            createLocalPublicationAdapter({
+              root: uncertainPath,
               target: p.target,
-              execute: async (input) => {
-                await appendFile(uncertainPath, `${JSON.stringify(input)}\n`);
-                return { reference: `local-file:${input.idempotencyKey}` };
-              },
-            },
+              repository: "fixture/Mikka",
+              environment: "local-contract",
+              candidateEnvironment: "local-contract",
+            }),
           ]);
           await pool.query(
             `CREATE TRIGGER reject_194 BEFORE INSERT ON factory_events FOR EACH ROW EXECUTE FUNCTION reject_194_event()`,
@@ -937,10 +1054,7 @@ test(
             () => effect.publish(actor, p),
             "factoryPublicationAlreadyClaimed",
           );
-          assert.equal(
-            (await readFile(uncertainPath, "utf8")).trim().split("\n").length,
-            1,
-          );
+          assert.equal((await readdir(uncertainPath)).length, 1);
         },
       );
       await t.test(
@@ -988,7 +1102,7 @@ test(
                     query: { disableCookieCache: true },
                   }),
               );
-              const result = await handleFactoryApproval(service, {
+              const result = await handleFactoryApproval(local, {
                 actor: authenticated,
                 authorization: request.headers.get("authorization"),
                 method: request.method,
@@ -1066,6 +1180,7 @@ test(
               evidenceReadId: e.evidenceReadId,
               action: "deploy_preview",
               target: "local-isolated-filesystem",
+              targetEnvironment: "local-contract",
               expiresAt: new Date(Date.now() + 600000).toISOString(),
             };
             assert.equal(
@@ -1094,6 +1209,36 @@ test(
               ).rows[0].userId,
               actor.userId,
             );
+            const published = await fetch(endpoint, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                operation: "publish",
+                input: {
+                  ...approval,
+                  action: input.action,
+                  target: input.target,
+                  targetEnvironment: input.targetEnvironment,
+                  eventId: randomUUID(),
+                },
+              }),
+            });
+            assert.equal(published.status, 200);
+            const publication = await published.json();
+            assert.match(publication.receipt.reference, /^local-artifact:/);
+            assert.equal(
+              publication.receipt.verifiedTarget.sha,
+              input.candidate.sha,
+            );
+            assert.deepEqual(
+              JSON.parse(
+                await readFile(
+                  join(targetDirectory, `${publication.publicationId}.json`),
+                  "utf8",
+                ),
+              ).candidate,
+              input.candidate,
+            );
             // Actual sign-out invalidates this session, not the unrelated fixture session.
             assert.equal(
               (
@@ -1109,8 +1254,10 @@ test(
             sources.push({
               taskId: s.task.id,
               approvalId: approval.approvalId,
+              publicationId: publication.publicationId,
               eventId: input.eventId,
-              request: "HTTP cookie read/approve/sign-out",
+              request:
+                "HTTP cookie read/approve/local-publish/readback/sign-out",
               origin: "loopback ephemeral port",
               auth: "real Better Auth with synthetic credential/OAuth-link fixtures; not actual human",
             });
