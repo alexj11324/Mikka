@@ -43,7 +43,7 @@ No question-specific answer may be silently appended to an ended run and reporte
 
 ## Planned files and integration ownership
 
-Independent new files: `lib/factory/questions/{contract,store,http}.ts`, focused tests, and `drizzle/20261025040500_factory_192_questions.sql`. This is a new migration after the coordinated dispatch/stage/approval/monitor files; none of those migrations is renamed or reapplied under an alias.
+Independent new files: `lib/factory/questions/{contract,store,http}.ts`, focused tests, and `drizzle/20261025051205_factory_192_questions.sql`. This is a new migration after the coordinated dispatch/stage/approval/monitor files; none of those migrations is renamed or reapplied under an alias.
 
 Shared #192 files: Factory store/reconcile/dispatch/server; schema; Coordinator tools/steps/context/instructions; run completion and claim adapters; existing authenticated send-message actions; protocol handoff/assignment fields. Reuse existing Factory `finish(waiting)`, `retry` and `bind_run` inside the caller-owned transaction; existing stage/candidate action schemas do not need replacement. Dispatch gains an optional existing-transaction argument, preserving its current callers and checks. Shared Harness files: local mikka-mcp, run-context, strict-resume options in supervisor and CC/Codex adapters. Query/reply metadata must be exposed through existing backend task/run APIs without frontend changes.
 

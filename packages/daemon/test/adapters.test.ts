@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it } from "vitest"
 import { NoSandbox } from "../src/agents/sandbox"
 import type { RunChunk } from "../src/chunks"
 import { Daemon } from "../src/main"
+import { RunJournal } from "../src/runs/journal"
 import { MemoryServer } from "../src/server-link"
 import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
 import { resolveAgentSettings } from "@mikka/protocol/agent-policy"
@@ -482,6 +483,37 @@ describe.each(["claude_code", "codex", "cursor"] as const)(
 )
 
 describe("resume after a daemon restart", () => {
+  it.each(["claude_code", "codex"] as const)(
+    "%s: uncertain question delivery fails closed without another CLI turn",
+    async (harness) => {
+      const { server, dataDir, daemon } = await setup()
+      const runId = queue(server, harness, harness === "codex" ? "WAIT please" : "HANG please")
+      await started(daemon, runId)
+      await waitFor(() => texts(server.chunksFor(runId)) !== "")
+      await daemon.stop()
+      daemons.splice(daemons.indexOf(daemon), 1)
+      const journal = new RunJournal(join(dataDir, "runs.json"))
+      const entry = journal.get(runId)!
+      journal.put({
+        ...entry,
+        assignment: {
+          ...entry.assignment,
+          requireSessionResume: true,
+          resumeSessionId: entry.sessionId!,
+          continuesRunId: "original-run",
+          followUp: "NEVER REPLAY THIS ANSWER",
+        },
+        questionResumeState: "starting",
+      })
+      const before = texts(server.chunksFor(runId))
+      const second = await boot(server, dataDir)
+      const run = await ended(second, runId)
+      expect(run.state).toBe("failed")
+      expect(run.error).toContain("delivery is uncertain")
+      expect(texts(server.chunksFor(runId))).toBe(before)
+    },
+  )
+
   it.each(["claude_code", "cursor"] as const)(
     "%s: the next daemon reopens the same session",
     async (harness) => {

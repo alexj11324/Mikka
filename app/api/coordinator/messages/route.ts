@@ -22,7 +22,17 @@ export async function GET(request: Request) {
  * the conversation.
  */
 export async function POST(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
+  // A browser message can attest a human answer. Validate its origin and
+  // current session before persisting that authority in an inbox event.
+  if (!request.headers.has('authorization') && request.headers.get('cookie')) {
+    try {
+      if (new URL(request.headers.get('origin') ?? '').origin !== new URL(request.url).origin)
+        return NextResponse.json({ error: 'originRejected' }, { status: 403 })
+    } catch {
+      return NextResponse.json({ error: 'originRejected' }, { status: 403 })
+    }
+  }
+  const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
   const parsed = z.object({ text: z.string().trim().min(1).max(10_000),
       questionId: z.uuid().optional(), }).safeParse(await request.json().catch(() => null))

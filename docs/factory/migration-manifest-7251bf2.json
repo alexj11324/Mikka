@@ -47,14 +47,15 @@
         "20261025014500_factory_195_monitor.sql"
       ],
       "sha256": "83c6454347229177133868a975054f5abc699bbfdc66ac0eee873f202cdb7acf"
-    }
-  ],
-  "reserved": [
+    },
     {
       "issue": 192,
-      "timestamp": "20261025051205",
-      "status": "Reserved only; questions increment absent from this candidate. Preserve its actual suffix on coordinated import.",
-      "fromTimestamp": "20261025040500"
+      "component": "questions",
+      "from": "20261025040500_factory_192_questions.sql",
+      "migration": "20261025051205_factory_192_questions.sql",
+      "sha256": "b29263653731169ae347c840f8d0a0ec5cfaa586c0016043e1de9ffc9d9fe40d",
+      "action": "Verified Library delivery integrated; coordinated timestamp retained."
     }
-  ]
+  ],
+  "reserved": []
 }

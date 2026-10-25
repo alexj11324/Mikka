@@ -345,6 +345,7 @@ export class RunSupervisor {
     const discardable = group.every((e) => {
       if (!isTerminalRunState(e.state)) return false
       if (e.assignment.runId === cancelledRunId) return true
+      if (e.waitingQuestionId) return false
       // A verified hand-in is under review; its work is published.
       if (e.state === "succeeded") return false
       return !e.stopReason || !KEEP_WORKTREE.includes(e.stopReason)
@@ -664,6 +665,14 @@ export class RunSupervisor {
       // nothing about it.
       if (!failed && !planning)
         error ??= "Submitted, but no verify command ran; the work is unverified"
+    }
+    if (
+      (stopReason === "asked_human" || stopReason === "blocked") &&
+      report.question
+    ) {
+      this.deps.journal.update(runId, {
+        waitingQuestionId: report.question.questionId,
+      })
     }
     this.setState(runId, state, {
       stopReason,

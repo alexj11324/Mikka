@@ -25,6 +25,6 @@ The parent appointed the #195 combined candidate as this batch’s naming owner.
 | 192 stages | 20261025013402 | 20261025051202 |
 | 194 approvals | 20261025013403 | 20261025051203 |
 | 195 monitor | 20261025014500 | 20261025051204 |
-| 192 questions (reserved, absent) | 20261025040500 | 20261025051205 |
+| 192 questions (integrated) | 20261025040500 | 20261025051205 |
 
-The questions slot preserves the source migration’s suffix when its separately frozen increment is imported. It is not an extra SQL file in this candidate. Other workers adopt this mapping instead of choosing fresh names. The manifest retains its original filename for downstream consumers; its main snapshot and contents are updated.
+The verified questions increment now occupies the reserved slot with its original SQL content. Other workers adopt this mapping instead of choosing fresh names. The manifest retains its original filename for downstream consumers; its main snapshot and contents are updated.

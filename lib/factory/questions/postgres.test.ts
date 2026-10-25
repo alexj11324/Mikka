@@ -75,7 +75,7 @@ test(
         await pool.query(await readFile(new URL(name, dir), "utf8"));
       await pool.query(
         await readFile(
-          new URL("20261025040500_factory_192_questions.sql", dir),
+          new URL("20261025051205_factory_192_questions.sql", dir),
           "utf8",
         ),
       );
@@ -325,6 +325,70 @@ test(
             "factoryQuestionStale",
           );
           assert.equal(await queued(f.issueId), 0);
+        },
+      );
+      await t.test(
+        "human-event answers require live attestation, exact text and question binding",
+        async () => {
+          const f = await fixture("permission");
+          const sourceEventId = randomUUID();
+          const request = {
+            reference: questionReference(f.q),
+            answerId: randomUUID(),
+            sourceEventId,
+            text: "Continue within existing permissions",
+          };
+          const actor = { source: "human_event" as const, userId };
+          await pool.query(
+            `INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey","issueId",payload) VALUES ($1,$2,'user_message',$5,$3,$4)`,
+            [
+              sourceEventId,
+              userId,
+              f.issueId,
+              JSON.stringify({ text: request.text, questionId: f.questionId }),
+              sourceEventId,
+            ],
+          );
+          await rejects(
+            () => questions.answer(actor, request),
+            "factoryHumanRequired",
+          );
+          const payload = {
+            text: request.text,
+            questionId: f.questionId,
+            humanSessionId: sessionId,
+          };
+          await pool.query(
+            "UPDATE coordinator_events SET payload=$2 WHERE id=$1",
+            [
+              sourceEventId,
+              JSON.stringify({ ...payload, questionId: randomUUID() }),
+            ],
+          );
+          await rejects(
+            () => questions.answer(actor, request),
+            "factoryQuestionStale",
+          );
+          await pool.query(
+            "UPDATE coordinator_events SET payload=$2 WHERE id=$1",
+            [sourceEventId, JSON.stringify(payload)],
+          );
+          await rejects(
+            () =>
+              questions.answer(actor, {
+                ...request,
+                text: "Model changed the permission",
+              }),
+            "factoryHumanRequired",
+          );
+          assert.equal(await queued(f.issueId), 0);
+          const result = await questions.answer(actor, request);
+          assert.equal(result.questionId, f.questionId);
+          assert.equal(
+            (await questions.answer(actor, request)).continuationRunId,
+            result.continuationRunId,
+          );
+          assert.equal(await queued(f.issueId), 1);
         },
       );
       await t.test(

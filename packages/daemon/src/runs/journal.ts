@@ -23,6 +23,8 @@ export interface JournalEntry {
   stopReason?: StopReason
   /** Fail closed on a crash in the external session-message delivery window. */
   questionResumeState?: "starting" | "accepted"
+  /** A durable help request still needs this worktree for its original session. */
+  waitingQuestionId?: string
   updatedAt: string
 }
 
