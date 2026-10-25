@@ -1,3 +1,4 @@
+import { subscriptionVaultCredentials } from './subscription-vault-identity'
 import { universalAuthTokenProvider } from './credentials/universal-auth'
 export type SubscriptionVaultRole = 'custody' | 'access'
 export interface SubscriptionVaultTokens {
@@ -14,11 +15,7 @@ export function createSubscriptionVaultTokens(env: () => NodeJS.ProcessEnv, fetc
     credentials: () => {
       const current = env()
       if (current.MIKKA_BYOS_VAULT_AUTH !== 'universal' || current.MIKKA_BYOS_INFISICAL_ORIGIN !== origin) return undefined
-      const prefix = role === 'custody' ? 'MIKKA_BYOS_CUSTODY' : 'MIKKA_BYOS_ACCESS'
-      const clientId = current[`${prefix}_CLIENT_ID`], clientSecret = current[`${prefix}_CLIENT_SECRET`]
-      if (!clientId || !clientSecret) return undefined
-      if (role === 'access' && clientId === current.MIKKA_BYOS_CUSTODY_CLIENT_ID) return undefined
-      return { clientId, clientSecret }
+      return subscriptionVaultCredentials(current, role)
     }
   })
   const custody = provider('custody'), access = provider('access')
