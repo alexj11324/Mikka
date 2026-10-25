@@ -10,7 +10,7 @@ export interface CredentialVault {
 export class InfisicalCredentialVault implements CredentialVault {
   constructor(private readonly config: {
     origin: string; projectId: string; environment: string; secretPath: string;
-    accessToken: () => Promise<string>; fetch?: typeof fetch
+    accessToken: () => Promise<string>; rejectAccessToken?: (token: string) => void; fetch?: typeof fetch
   }) {
     const url = new URL(config.origin)
     if (url.protocol !== 'https:' || url.origin !== config.origin || !config.projectId || !config.environment ||
@@ -23,11 +23,13 @@ export class InfisicalCredentialVault implements CredentialVault {
     const scope = { projectId: this.config.projectId, environment: this.config.environment, secretPath: this.config.secretPath, type: 'shared' }
     if (method === 'GET') url.search = new URLSearchParams({ ...scope, expandSecretReferences: 'false', viewSecretValue: 'true' }).toString()
     try {
+      const token = await this.config.accessToken()
       const response = await (this.config.fetch ?? fetch)(url, {
-        method, headers: { Authorization: `Bearer ${await this.config.accessToken()}`, 'Content-Type': 'application/json' },
+        method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         ...(method !== 'GET' ? { body: JSON.stringify({ ...scope, ...(secret === undefined ? {} : { secretValue: secret, skipMultilineEncoding: true }) }) } : {}),
         redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(5000),
       })
+      if (response.status === 401 || response.status === 403) this.config.rejectAccessToken?.(token)
       if (method === 'DELETE' && response.status === 404) { await response.body?.cancel(); return undefined }
       if (!response.ok) { await response.body?.cancel(); throw new Error() }
       if (method !== 'GET') { await response.body?.cancel(); return undefined }

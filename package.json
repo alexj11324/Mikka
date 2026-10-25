@@ -12,7 +12,7 @@
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
     "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs tests/factory-migration-order.test.mjs",
-    "test:credentials": "node scripts/test-credential-backend.mjs",
+    "test:credentials": "node --import tsx --test lib/credentials/universal-auth.test.ts && node scripts/test-credential-backend.mjs",
     "dev": "node scripts/dev-preview.mjs",
     "test:preview": "node --test tests/preview-ready.test.mjs",
     "format": "prettier --write \"**/*.{ts,tsx}\"",

@@ -7,6 +7,7 @@ import { CredentialBroker } from './broker'
 import { CredentialError } from './contracts'
 import { PostgresCredentialAuthority } from './authority'
 import { InfisicalCredentialVault } from './vault'
+import { universalAuthTokenProvider } from './universal-auth'
 import { credentialServices } from './services'
 import { credentialHttp } from './http'
 import { OwnedChromiumExecutor, type OwnedBrowserPolicy } from './owned-chromium'
@@ -38,7 +39,15 @@ function browserExecutor() {
   return state.browser
 }
 function buildBroker(cleanupOnly: boolean) {
-  if (!appOrigin || !process.env.DATABASE_URL || !process.env.MIKKA_CREDENTIAL_VAULT_TOKEN) throw new CredentialError('credential_configuration_missing', 503)
+  const universal = cleanupOnly && process.env.MIKKA_CREDENTIAL_CLEANUP_AUTH === 'universal'
+  if (!appOrigin || !process.env.DATABASE_URL || (!universal && !process.env.MIKKA_CREDENTIAL_VAULT_TOKEN)) throw new CredentialError('credential_configuration_missing', 503)
+  const tokenProvider = universal ? universalAuthTokenProvider({
+    origin: process.env.MIKKA_CREDENTIAL_VAULT_ORIGIN ?? 'https://us.infisical.com',
+    credentials: () => process.env.MIKKA_CREDENTIAL_CLEANUP_AUTH === 'universal' ? {
+      clientId: process.env.MIKKA_CREDENTIAL_CLEANUP_CLIENT_ID ?? '',
+      clientSecret: process.env.MIKKA_CREDENTIAL_CLEANUP_CLIENT_SECRET ?? '',
+    } : undefined,
+  }) : undefined
   return new CredentialBroker({
     pool, authority: new PostgresCredentialAuthority(pool, workspacePool()),
     // Cleanup never provisions a browser or depends on its admission configuration.
@@ -50,7 +59,9 @@ function buildBroker(cleanupOnly: boolean) {
       projectId: process.env.MIKKA_CREDENTIAL_VAULT_PROJECT_ID ?? '',
       environment: process.env.MIKKA_CREDENTIAL_VAULT_ENVIRONMENT ?? '',
       secretPath: process.env.MIKKA_CREDENTIAL_VAULT_PATH ?? '',
+      rejectAccessToken: tokenProvider?.rejectAccessToken,
       accessToken: async () => {
+        if (tokenProvider) return tokenProvider.getAccessToken()
         const token = process.env.MIKKA_CREDENTIAL_VAULT_TOKEN
         if (!token) throw new CredentialError('vault_unavailable', 503)
         return token
