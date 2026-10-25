@@ -9,7 +9,7 @@ export const users = pgTable('user', {
 export const issueMembers = pgTable('issue_members', {
   issueId: uuid('issueId').notNull(), userId: text('userId').notNull(), memberId: text('memberId').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [primaryKey({ columns: [table.issueId, table.memberId] })])
+}, table => [primaryKey({ columns: [table.issueId, table.memberId] }), index('issue_members_member_idx').on(table.memberId, table.issueId)])
 export const issueDocuments = pgTable('issue_documents', {
   issueId: uuid('issueId').primaryKey(), userId: text('userId').notNull(), state: text('state').notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
@@ -28,7 +28,7 @@ export const issues = pgTable('issues', {
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-})
+}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc())])
 // The personal issue prefix someone chose; without a row it comes from their email (MIK-46).
 export const issuePrefixes = pgTable('issue_prefixes', {
   userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
