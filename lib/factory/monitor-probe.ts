@@ -131,7 +131,6 @@ try {
  out.errorCode=ok?null:'content-mismatch';console.log(JSON.stringify(out));process.exitCode=ok?0:1;
 }catch(e){out.errorCode=e.code==='ENOENT'?'missing':e.message==='unsafe-target'?'unsafe-target':'read-error';console.log(JSON.stringify(out));process.exitCode=1;}
 `;
-const runFile = promisify(execFile);
 export function createLocalMonitorProbe(config: {
   root: string;
   target: string;
@@ -144,6 +143,7 @@ export function createLocalMonitorProbe(config: {
     kind: "local-artifact",
     ...config,
     async execute(receipt) {
+      const runFile = promisify(execFile);
       const command = `node factory-local-artifact-readback:${createHash("sha256").update(localProgram).digest("hex")}`;
       let stdout = "",
         stderr = "",
