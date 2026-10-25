@@ -3,9 +3,10 @@ import { DEVICE_ONLINE_WINDOW_MS } from "@mikka/protocol/device";
 import { FactoryError } from "./contract";
 import type { FactoryTask } from "./store";
 import { digest } from "./evidence";
-import { readFactoryPublicationReceipt } from "./publication-receipt";
+import { readFactoryPublicationReceiptV2 } from "./publication-receipt";
+import { monitorPublicationSupported } from "./monitor-probe";
 
-type Publication = Awaited<ReturnType<typeof readFactoryPublicationReceipt>>;
+type Publication = Awaited<ReturnType<typeof readFactoryPublicationReceiptV2>>;
 const live = ["queued", "preparing", "running", "waiting_input", "finishing"];
 function fail(code: string): never {
   throw new FactoryError(code);
@@ -39,17 +40,14 @@ export async function readMonitorDispatchPublication(
     !current.candidateId
   )
     fail("factoryTransition");
-  const receipt = await readFactoryPublicationReceipt(
+  const receipt = await readFactoryPublicationReceiptV2(
     tx,
     task.userId,
     task.id,
     current.candidateId,
   );
-  // This increment supports already-authorized preview observation only.
-  if (
-    receipt.action !== "deploy_preview" ||
-    receipt.verifiedTarget.kind === "merge"
-  )
+  // V2 production requires a real, explicitly bound provider receipt.
+  if (!monitorPublicationSupported(receipt))
     fail("factoryMonitorProbeUnavailable");
   return receipt;
 }

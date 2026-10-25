@@ -6,17 +6,21 @@ import { z } from "zod";
 import { bindingSchema, FactoryError, type FactoryBinding } from "./contract";
 import type { FactoryAuthorize, FactoryTask, FactoryAttempt } from "./store";
 import { digest } from "./evidence";
-import { readFactoryPublicationReceipt } from "./publication-receipt";
+import {
+  readFactoryPublicationReceiptV2,
+  verifiedPublicationTarget,
+} from "./publication-receipt";
+import { configuredVercelMonitorProbes } from "./vercel-monitor";
 import { configuredLocalPublicationAdapters } from "./local-publication";
 import { factoryEventId } from "./event-id";
 
 export type MonitorPublication = Awaited<
-  ReturnType<typeof readFactoryPublicationReceipt>
+  ReturnType<typeof readFactoryPublicationReceiptV2>
 >;
 const iso = z.iso.datetime();
 export const monitorAuditSchema = z
   .object({
-    version: z.literal(1),
+    version: z.union([z.literal(1), z.literal(2)]),
     publicationId: z.uuid(),
     approvalId: z.uuid(),
     candidateId: z.uuid(),
@@ -24,10 +28,26 @@ export const monitorAuditSchema = z
     repository: z.string(),
     environment: z.string(),
     scope: z.string(),
-    action: z.literal("deploy_preview"),
+    action: z.enum(["deploy_preview", "deploy_production"]),
     target: z.string(),
     targetEnvironment: z.string(),
-    kind: z.enum(["local-artifact", "preview-deployment"]),
+    kind: z.enum([
+      "local-artifact",
+      "preview-deployment",
+      "production-deployment",
+    ]),
+    provider: verifiedPublicationTarget.shape.provider,
+    health: z
+      .object({
+        path: z.literal("/mikka/api/health"),
+        immutableStatus: z.number().int(),
+        aliasOrigin: z.string().nullable(),
+        aliasBefore: z.string().nullable(),
+        aliasAfter: z.string().nullable(),
+        aliasStatus: z.number().int().nullable(),
+      })
+      .strict()
+      .optional(),
     operationId: z.string(),
     checkedReference: z.string(),
     requestId: z.uuid(),
@@ -60,7 +80,7 @@ const proofSchema = z
   .strict();
 export type MonitorProof = z.infer<typeof proofSchema>;
 export interface MonitorProbeAdapter {
-  kind: "local-artifact" | "preview-deployment";
+  kind: "local-artifact" | "preview-deployment" | "production-deployment";
   target: string;
   environment: string;
   repository: string;
@@ -77,6 +97,8 @@ export interface MonitorProbeAdapter {
     errorCode: string | null;
     stdout: string;
     stderr: string;
+    provider?: MonitorAudit["provider"];
+    health?: MonitorAudit["health"];
   }>;
 }
 const bindingFor = (t: FactoryTask): FactoryBinding => ({
@@ -190,8 +212,10 @@ export function configuredMonitorProbes(
   env: Record<string, string | undefined>,
 ): MonitorProbeAdapter[] {
   const publication = configuredLocalPublicationAdapters(env);
-  if (!publication.length) return [];
+  const cloud = configuredVercelMonitorProbes(env);
+  if (!publication.length) return cloud;
   return [
+    ...cloud,
     createLocalMonitorProbe({
       root: env.FACTORY_LOCAL_PUBLICATION_ROOT!,
       target: publication[0].target,
@@ -241,16 +265,13 @@ export function createMonitorProbeRecorder(
         run.stopRequestedAt
       )
         throw new FactoryError("factoryMonitorProbeRunRequired");
-      const receipt = await readFactoryPublicationReceipt(
+      const receipt = await readFactoryPublicationReceiptV2(
         tx,
         userId,
         task.id,
         task.candidateId,
       );
-      if (
-        receipt.action !== "deploy_preview" ||
-        receipt.verifiedTarget.kind === "merge"
-      )
+      if (!monitorPublicationSupported(receipt))
         throw new FactoryError("factoryMonitorProbeUnavailable");
       const {
         rows: [attempt],
@@ -285,7 +306,7 @@ export function createMonitorProbeRecorder(
       const artifactId = randomUUID(),
         artifact = `run-chunk:${artifactId}`;
       const audit = monitorAuditSchema.parse({
-        version: 1,
+        version: receipt.verifiedTarget.provider ? 2 : 1,
         publicationId: receipt.publicationId,
         approvalId: receipt.approvalId,
         candidateId: task.candidateId,
@@ -311,6 +332,8 @@ export function createMonitorProbeRecorder(
         observedOperationId: result.observedOperationId,
         observedReference: result.observedReference,
         errorCode: result.errorCode,
+        ...(result.provider ? { provider: result.provider } : {}),
+        ...(result.health ? { health: result.health } : {}),
         logArtifacts: [artifact],
       });
       const chunk = {
@@ -360,12 +383,7 @@ export async function validatedMonitorProof(
   },
 ) {
   const parsed = proofSchema.safeParse(attempt.output.monitorProof);
-  if (
-    !parsed.success ||
-    receipt.action !== "deploy_preview" ||
-    receipt.verifiedTarget.kind === "merge"
-  )
-    return;
+  if (!parsed.success || !monitorPublicationSupported(receipt)) return;
   const proof = parsed.data,
     a = proof.audit,
     v = receipt.verifiedTarget;
@@ -390,6 +408,15 @@ export async function validatedMonitorProof(
     a.logArtifacts[0] !== proof.artifact
   )
     return;
+  if (
+    v.provider &&
+    (!a.provider ||
+      a.version !== 2 ||
+      digest(a.provider) !== digest(v.provider) ||
+      !a.health)
+  )
+    return;
+  if (!v.provider && (a.version !== 1 || a.provider || a.health)) return;
   const start = Date.parse(a.startedAt),
     end = Date.parse(a.finishedAt);
   if (
@@ -423,6 +450,22 @@ export async function validatedMonitorProof(
 }
 export function monitorProbePassed(a: MonitorAudit, r: MonitorPublication) {
   return (
+    monitorPublicationSupported(r) &&
+    (!r.verifiedTarget.provider ||
+      (a.provider !== undefined &&
+        a.version === 2 &&
+        digest(a.provider) === digest(r.verifiedTarget.provider) &&
+        a.health?.path === "/mikka/api/health" &&
+        a.health.immutableStatus === 200 &&
+        (r.action === "deploy_production"
+          ? a.health.aliasOrigin === "https://app.aspectlylabs.com" &&
+            a.health.aliasBefore === r.verifiedTarget.operationId &&
+            a.health.aliasAfter === r.verifiedTarget.operationId &&
+            a.health.aliasStatus === 200
+          : a.health.aliasOrigin === null &&
+            a.health.aliasBefore === null &&
+            a.health.aliasAfter === null &&
+            a.health.aliasStatus === null))) &&
     a.exitCode === 0 &&
     !a.signal &&
     !a.timedOut &&
@@ -432,5 +475,52 @@ export function monitorProbePassed(a: MonitorAudit, r: MonitorPublication) {
     a.observedEnvironment === r.targetEnvironment &&
     a.observedOperationId === r.verifiedTarget.operationId &&
     a.observedReference === r.reference
+  );
+}
+
+/** Only established target health faults trigger repair. Unknown identity,
+ * moved production aliases, missing credentials and transport uncertainty block. */
+export function monitorProbeFailed(
+  a: MonitorAudit,
+  r: MonitorPublication,
+): boolean {
+  if (a.timedOut || a.signal || !monitorPublicationSupported(r)) return false;
+  if (r.verifiedTarget.kind === "local-artifact")
+    return ["content-mismatch", "missing"].includes(a.errorCode ?? "");
+  return Boolean(
+    a.provider &&
+    r.verifiedTarget.provider &&
+    a.version === 2 &&
+    digest(a.provider) === digest(r.verifiedTarget.provider) &&
+    a.observedSha === r.candidate.sha &&
+    a.observedTarget === r.target &&
+    a.observedEnvironment === r.targetEnvironment &&
+    a.observedOperationId === r.verifiedTarget.operationId &&
+    a.observedReference === r.reference &&
+    a.health?.path === "/mikka/api/health" &&
+    (r.action !== "deploy_production" ||
+      (a.health.aliasOrigin === "https://app.aspectlylabs.com" &&
+        a.health.aliasBefore === r.verifiedTarget.operationId &&
+        a.health.aliasAfter === r.verifiedTarget.operationId)) &&
+    (/^health-http-5\d\d$/.test(a.errorCode ?? "") ||
+      a.errorCode === "health-invalid"),
+  );
+}
+
+/** Explicit V2 adoption; old preview/local receipts can never represent production. */
+export function monitorPublicationSupported(r: MonitorPublication): boolean {
+  const v = r.verifiedTarget;
+  if (v.kind === "local-artifact")
+    return r.action === "deploy_preview" && !v.provider;
+  if (!v.provider || r.version !== 2) return false;
+  return (
+    (r.action === "deploy_production" &&
+      v.kind === "production-deployment" &&
+      r.targetEnvironment === "production" &&
+      v.provider.environment === "production") ||
+    (r.action === "deploy_preview" &&
+      v.kind === "preview-deployment" &&
+      r.targetEnvironment === "preview" &&
+      v.provider.environment === "preview")
   );
 }

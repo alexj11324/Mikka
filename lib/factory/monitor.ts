@@ -4,11 +4,12 @@ import { z } from "zod";
 import { bindingSchema, FactoryError, type FactoryBinding } from "./contract";
 import { factoryEventId } from "./event-id";
 import { monitorFingerprint } from "./monitor-fingerprint";
-import { readFactoryPublicationReceipt } from "./publication-receipt";
+import { readFactoryPublicationReceiptV2 } from "./publication-receipt";
 import { digest } from "./evidence";
 import {
   createMonitorProbeRecorder,
   monitorProbePassed,
+  monitorProbeFailed,
   validatedMonitorProof,
   type MonitorProbeAdapter,
   type MonitorPublication,
@@ -100,7 +101,7 @@ export const monitorGate: FactoryGate = async (tx, task, attempt, change) => {
     return false;
   let publication: MonitorPublication;
   try {
-    publication = await readFactoryPublicationReceipt(
+    publication = await readFactoryPublicationReceiptV2(
       tx,
       task.userId,
       task.id,
@@ -290,7 +291,7 @@ export function createFactoryMonitor(
         fail("factoryMonitorSourceMismatch");
       let publication: MonitorPublication | undefined;
       try {
-        publication = await readFactoryPublicationReceipt(
+        publication = await readFactoryPublicationReceiptV2(
           tx,
           userId,
           task.id,
@@ -317,10 +318,7 @@ export function createFactoryMonitor(
         ? await validatedMonitorProof(tx, task, attempt, publication, source)
         : undefined;
       const failed = Boolean(
-        proof &&
-        !proof.audit.timedOut &&
-        !proof.audit.signal &&
-        ["content-mismatch", "missing"].includes(proof.audit.errorCode ?? ""),
+        proof && publication && monitorProbeFailed(proof.audit, publication),
       );
       const initialOutcome: MonitorNotice["outcome"] = failed
         ? "failed"

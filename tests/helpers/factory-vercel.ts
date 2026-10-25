@@ -14,6 +14,8 @@ export async function vercelProtocolFixture() {
     dropCreateResponse: false,
     aliasAssigned: true,
     projectDelayMs: 0,
+    healthStatus: 200,
+    aliasOverride: null as string | null,
     project: {
       id: MIKKA_VERCEL.projectId,
       accountId: MIKKA_VERCEL.teamId,
@@ -22,12 +24,25 @@ export async function vercelProtocolFixture() {
     },
   };
   const server = createServer(async (req, res) => {
+    const url = new URL(req.url!, "http://localhost");
+    if (url.pathname.startsWith("/health/")) {
+      requests.push({
+        method: req.method!,
+        path: url.pathname,
+        body: undefined,
+      });
+      res.writeHead(req.headers.authorization ? 403 : state.healthStatus, {
+        "Content-Type": "application/json",
+      });
+      res.end(JSON.stringify({ status: "ok", service: "mikka" }));
+      return;
+    }
+    if (url.pathname.startsWith("/api/")) url.pathname = url.pathname.slice(4);
     if (req.headers.authorization !== "Bearer disposable-protocol-fixture") {
       res.writeHead(401);
       res.end();
       return;
     }
-    const url = new URL(req.url!, "http://localhost");
     if (url.searchParams.get("teamId") !== MIKKA_VERCEL.teamId) {
       res.writeHead(403);
       res.end();
@@ -70,7 +85,15 @@ export async function vercelProtocolFixture() {
         })),
         pagination: { next: null },
       };
-    else data = deployments.get(url.pathname.split("/").at(-1)!);
+    else if (url.pathname.endsWith("/app.aspectlylabs.com")) {
+      const current = [...deployments.values()]
+        .filter((d) => d.target === "production")
+        .at(-1);
+      data = current && {
+        ...current,
+        ...(state.aliasOverride ? { id: state.aliasOverride } : {}),
+      };
+    } else data = deployments.get(url.pathname.split("/").at(-1)!);
     if (!data) {
       res.writeHead(404);
       res.end();

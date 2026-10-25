@@ -28,6 +28,10 @@ test("Factory HTTP API isolates owners, requires sessions/origins and atomically
   const anonymous = await playwright.request.newContext({ baseURL });
   const pool = new Pool({ connectionString: target.toString(), max: 3 });
   try {
+    const health = await anonymous.get(app("/api/health"));
+    expect(health.status()).toBe(200);
+    expect(await health.json()).toEqual({ status: "ok", service: "mikka" });
+    expect(health.headers()["cache-control"]).toContain("no-store");
     const register = async (client: typeof owner) => {
       const response = await client.post(app("/api/auth/sign-up/email"), {
         headers: { origin },

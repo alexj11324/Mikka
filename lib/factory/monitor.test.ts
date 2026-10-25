@@ -21,8 +21,15 @@ import {
 } from "./checks";
 import { approvalGate, publishGate, createFactoryApprovals } from "./approval";
 import { createLocalPublicationAdapter } from "./local-publication";
+import {
+  createVercelPublicationAdapter,
+  MIKKA_VERCEL,
+  vercelTarget,
+} from "./vercel-publication";
+import { createVercelMonitorProbe } from "./vercel-monitor";
+import { vercelProtocolFixture } from "../../tests/helpers/factory-vercel";
 import { createLocalMonitorProbe } from "./monitor-probe";
-import { readFactoryPublicationReceipt } from "./publication-receipt";
+import { readFactoryPublicationReceiptV2 } from "./publication-receipt";
 import { readFactoryArtifact } from "./evidence";
 import { registerHooks } from "node:module";
 import test from "node:test";
@@ -192,7 +199,8 @@ test(
     );
     const publicationTarget = "local-monitor-target",
       targetEnvironment = "local-monitor-acceptance",
-      repository = "fixture-repository";
+      repository = MIKKA_VERCEL.repository;
+    const cloud = await vercelProtocolFixture();
     const actualProbes: unknown[] = [];
     const ownerFixtures = new Map<
       string,
@@ -213,6 +221,11 @@ test(
           appendCount++;
         },
         [
+          createVercelMonitorProbe(
+            "production",
+            () => "disposable-protocol-fixture",
+            { testOrigin: cloud.origin },
+          ),
           createLocalMonitorProbe({
             root: targetRoot,
             target: publicationTarget,
@@ -369,7 +382,7 @@ test(
         await tx.query("SELECT id FROM factory_tasks WHERE id=$1 FOR UPDATE", [
           task.id,
         ]);
-        const r = await readFactoryPublicationReceipt(
+        const r = await readFactoryPublicationReceiptV2(
           tx,
           owner,
           task.id,
@@ -395,7 +408,11 @@ test(
         targetRoot,
         receipt.verifiedTarget.operationId + ".json",
       );
-      if (failure) {
+      if (receipt.verifiedTarget.provider) {
+        cloud.state.healthStatus = failure === "cloud-health" ? 503 : 200;
+        cloud.state.aliasOverride =
+          failure === "cloud-alias" ? "dpl_moved" : null;
+      } else if (failure) {
         const original = await readFile(path, "utf8");
         if (
           [
@@ -453,6 +470,7 @@ test(
       issueId: string,
       failure: string | null = "controlled local artifact fault",
       initial?: FactorySnapshot,
+      production = false,
     ) => {
       let state =
         initial ??
@@ -562,23 +580,35 @@ test(
         reason: "Independent gates passed",
       });
       const actor = { userId: owner, sessionId: f.sessionId };
+      const selectedTarget = production
+        ? vercelTarget({ ...MIKKA_VERCEL, environment: "production" })
+        : publicationTarget;
+      const selectedEnvironment = production ? "production" : targetEnvironment;
+      const action = production
+        ? ("deploy_production" as const)
+        : ("deploy_preview" as const);
       const service = createFactoryApprovals(pool, authorize, store, [
-        createLocalPublicationAdapter({
-          root: targetRoot,
-          target: publicationTarget,
-          repository,
-          environment: targetEnvironment,
-          candidateEnvironment: `device:${f.deviceId}`,
-        }),
+        production
+          ? createVercelPublicationAdapter(
+              { ...MIKKA_VERCEL, environment: "production" },
+              cloud.client,
+            )
+          : createLocalPublicationAdapter({
+              root: targetRoot,
+              target: publicationTarget,
+              repository,
+              environment: targetEnvironment,
+              candidateEnvironment: `device:${f.deviceId}`,
+            }),
       ]);
       const inventory = await service.evidence(actor, state.task.id);
       const approved = await service.approve(actor, {
         binding: inventory.binding,
         eventId: randomUUID(),
         candidate: inventory.manifest.candidate,
-        action: "deploy_preview",
-        target: publicationTarget,
-        targetEnvironment,
+        action,
+        target: selectedTarget,
+        targetEnvironment: selectedEnvironment,
         expiresAt: new Date(Date.now() + 600000).toISOString(),
         evidenceDigest: inventory.evidenceDigest,
         evidenceReadId: inventory.evidenceReadId,
@@ -586,9 +616,9 @@ test(
       await service.publish(actor, {
         ...approved,
         eventId: randomUUID(),
-        action: "deploy_preview",
-        target: publicationTarget,
-        targetEnvironment,
+        action,
+        target: selectedTarget,
+        targetEnvironment: selectedEnvironment,
       });
       state = await store.read(owner, state.task.id);
       state = await store.apply(owner, binding(state.task), randomUUID(), {
@@ -1354,6 +1384,123 @@ test(
           );
         },
       );
+      await t.test(
+        "V2 production publisher/reader/normal dispatch/probe: actual HTTP fixture health and alias failure, replay and recovery",
+        async () => {
+          const productionIssue = await issue();
+          const sample = await toMonitor(
+            "owner",
+            productionIssue,
+            null,
+            undefined,
+            true,
+          );
+          const receipt = await publicationFor("owner", sample.task);
+          assert.equal(receipt.version, 2);
+          assert.equal(receipt.action, "deploy_production");
+          assert.equal(receipt.verifiedTarget.kind, "production-deployment");
+          assert.ok(receipt.verifiedTarget.provider);
+          const posts = cloud.posts();
+          assert.equal(
+            (await monitor.consume("owner", sample.input)).outcome,
+            "passed",
+          );
+          const f = await ensureOwner("owner");
+          const cycle = async (fault: string | null) => {
+            const previous = await store.read("owner", sample.task.id);
+            const next = await store.apply(
+              "owner",
+              binding(previous.task),
+              randomUUID(),
+              {
+                action: "retry",
+                reason: "Next V2 bound production observation",
+              },
+            );
+            const dispatch = createFactoryDispatch(
+              pool,
+              store,
+              (tx, owner, input) =>
+                insertRunOnce(factoryDispatchDatabase(tx), owner, input, {
+                  deviceId: f.deviceId,
+                  baseBranch: "main",
+                  prompt: "Explicit provider protocol fixture",
+                }),
+            );
+            const bound = await dispatch("owner", {
+              binding: binding(next.task),
+              agentId: f.agentId,
+              deviceRepoId: f.repoId,
+            });
+            const assignment = await createFactoryCheckClaim(pool, authorize)(
+              "owner",
+              f.deviceId,
+              bound.runId,
+              new Date(Date.now() + 60000).toISOString(),
+            );
+            assert.equal(assignment.policy.readOnly, true);
+            await pool.query(
+              'UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1',
+              [bound.runId, `session:${bound.runId}`],
+            );
+            const audit = await probeAndComplete(
+              "owner",
+              bound.task,
+              bound.runId,
+              fault,
+            );
+            assert.equal(audit.version, 2);
+            assert.equal(
+              audit.provider?.bindingHash,
+              receipt.verifiedTarget.provider!.bindingHash,
+            );
+            const input = {
+              binding: binding(bound.task),
+              sourceEventId: await source(
+                "owner",
+                productionIssue,
+                bound.runId,
+                "run_finished",
+              ),
+            };
+            return {
+              input,
+              audit,
+              result: await monitor.consume("owner", input),
+            };
+          };
+          for (const fault of ["cloud-health", "cloud-alias"]) {
+            const failed = await cycle(fault);
+            assert.equal(
+              failed.result.outcome,
+              fault === "cloud-health" ? "failed" : "blocked",
+            );
+            assert.equal(failed.result.issueId, productionIssue);
+            for (let delivery = 0; delivery < 10; delivery++) {
+              const replay = await monitor.consume("owner", failed.input);
+              assert.equal(replay.incidentId, failed.result.incidentId);
+              assert.equal(replay.replayed, true);
+            }
+            const recovered = await cycle(null);
+            assert.equal(recovered.result.outcome, "passed");
+            if (fault === "cloud-health")
+              assert.equal(
+                (
+                  await pool.query(
+                    "SELECT status FROM factory_monitor_incidents WHERE id=$1",
+                    [failed.result.incidentId],
+                  )
+                ).rows[0].status,
+                "recovered",
+              );
+          }
+          assert.equal(
+            cloud.posts(),
+            posts,
+            "probe and recovery must never create another deployment",
+          );
+        },
+      );
       if (process.env.FACTORY_MONITOR_EVIDENCE_DIR) {
         await mkdir(process.env.FACTORY_MONITOR_EVIDENCE_DIR, {
           recursive: true,
@@ -1398,6 +1545,7 @@ test(
         }),
       );
     } finally {
+      await cloud.close();
       await rm(targetRoot, { recursive: true, force: true });
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
