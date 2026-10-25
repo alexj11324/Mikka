@@ -1,4 +1,5 @@
 import { pruneMessages, type ModelMessage } from 'ai'
+import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema'
 import { splitQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 
@@ -192,6 +193,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date })[]
   for (const { position, message, createdAt } of rows) {
     if (message.role === 'user') {
       const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
+      // The request for its welcome is for the Coordinator only.
+      if (raw.startsWith(COORDINATOR_WELCOME_MARK)) continue
       const event = raw.startsWith('[Event]')
       if (event) {
         const cited = takeArtifacts(raw.split('\n')[0])

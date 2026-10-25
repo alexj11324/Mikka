@@ -1,4 +1,5 @@
 import 'server-only'
+import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
@@ -195,7 +196,7 @@ export async function chatView(userId: string, limit = 200): Promise<ChatView> {
     .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt)))
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const last = rows[0]?.position ?? 0
-  const pending = waiting.filter(event => event.kind === 'user_message').map((event, index) => ({
+  const pending = waiting.filter(event => event.kind === 'user_message' && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
     position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage,
   }))
   const leased = Boolean(session?.leaseUntil && session.leaseUntil.getTime() > Date.now())

@@ -11,9 +11,7 @@ design changes, this document is updated, not forked.
 
 ## 1. What the user sees
 
-Every bot has "its own computer", the way Grok Bot does it. Bot and thread
-are defined in [glossary.md](glossary.md): the threads (runs) a bot starts
-use that bot's computer.
+Every bot has "its own computer" (its own desktop on the workspace's one cloud machine), the way Grok Bot does it; bot and thread are defined in [glossary.md](glossary.md). The computer is keyed by `bots.id`, never `agents.id`:
 
 - **Agent 详情页**: the bot's live screen ("Mikka Frontend 的屏幕") with a state
   badge. A centered 打开 button opens a full-window viewer.
@@ -39,7 +37,7 @@ workspace ──1:1── cloud machine (E2B sandbox, Linux)
                     ├─ mikka daemon (registered as a device, kind = "cloud")
                     ├─ shared:  /workspace (repos, files)   $HOME (CLI logins)
                     ├─ bot A:   Xvfb :1 + WM + x11vnc + websockify  → noVNC
-                    │           Chrome profile ~/.mikka/profiles/<agentId>
+                    │           Chrome profile ~/.mikka/profiles/<botId>
                     ├─ bot B:   Xvfb :2 + …
                     └─ cookie sync between the bot profiles
 ```
@@ -119,7 +117,7 @@ Report findings in the issue before building on an assumption that failed.
 
 - `cloud_machines`: workspaceId (unique), sandboxId, deviceId, state
   (`sleeping | waking | running | error`), lastActiveAt.
-- `bot_desktops`: workspaceId, agentId (unique pair), display number, control
+- `bot_desktops`: workspaceId, botId (references `bots.id`; unique pair), display number, control
   (`agent | user | idle`), controlledBy (userId, nullable), lastActiveAt.
 - Approval rows: reuse the #161 ledger. Add `scope: once | run` so that
   本任务内都允许 auto-approves later operations of the same run on the same
@@ -136,7 +134,7 @@ import them.
 
 ### Computer state
 
-`GET /api/agents/:agentId/computer`
+`GET /api/bots/:botId/computer`
 
 ```ts
 {
@@ -153,12 +151,12 @@ The frontend draws the blue target ring and cursor from `lastAction`, in screen
 coordinates of a fixed 1280×800 desktop, and the orange ring from
 `pendingApproval`.
 
-`POST /api/agents/:agentId/computer/wake` returns `202` and drives
+`POST /api/bots/:botId/computer/wake` returns `202` and drives
 `machine: waking → running`.
 
 ### Live view
 
-`POST /api/agents/:agentId/computer/viewer` with body `{ mode: "view" | "control" }`
+`POST /api/bots/:botId/computer/viewer` with body `{ mode: "view" | "control" }`
 returns:
 
 ```ts
@@ -171,10 +169,10 @@ thumbnail, the chat card and the full-window viewer all use `view`.
 
 ### Takeover
 
-- `POST /api/agents/:agentId/computer/takeover` sets `control: "user"`. It pauses
+- `POST /api/bots/:botId/computer/takeover` sets `control: "user"`. It pauses
   the bot's computer tool calls, which wait and do not fail, and returns a
   control viewer URL.
-- `POST /api/agents/:agentId/computer/handback` sets `control: "agent"`. Waiting
+- `POST /api/bots/:botId/computer/handback` sets `control: "agent"`. Waiting
   tool calls resume.
 - Only one user can hold control at a time. A second takeover gets `409` with
   `controlledBy`.
@@ -183,7 +181,7 @@ thumbnail, the chat card and the full-window viewer all use `view`.
 
 ```ts
 type ApprovalView = {
-  id: string, digest: string, runId: string, agentId: string,
+  id: string, digest: string, runId: string, botId: string,
   action: { tool: "click" | "type" | "key" | "scroll", x?: number, y?: number, text?: string },
   summary: string,     // e.g. 点击「登录」 — short, from the operation, no screenshot
   expiresAt: string,
@@ -201,7 +199,7 @@ The UI needs push, not polling. Emit these as run events (AI SDK
 `UIMessageChunk` data parts on the existing `/v1/runs/:runId/events` path) so
 that they land in the conversation:
 
-- `data-computer` with `{ agentId, runId, task: string, state: "working" | "approval" | "done" | "failed", approvalId? }`.
+- `data-computer` with `{ botId, runId, task: string, state: "working" | "approval" | "done" | "failed", approvalId? }`.
   This is one card per computer task. `task` is the one-sentence task shown on
   the card.
 
@@ -211,9 +209,9 @@ run. The app has no realtime channel yet, so add one: an SSE stream at
 acceptable first step. The stream carries:
 
 - `computer.machine`: `{ state }`
-- `computer.control`: `{ agentId, control, controlledBy? }`
-- `computer.action`: `{ agentId, lastAction }`, throttled to at most 4/s
-- `computer.approval`: `{ agentId, approval | null }`
+- `computer.control`: `{ botId, control, controlledBy? }`
+- `computer.action`: `{ botId, lastAction }`, throttled to at most 4/s
+- `computer.approval`: `{ botId, approval | null }`
 
 ### Add device (user's own machines)
 

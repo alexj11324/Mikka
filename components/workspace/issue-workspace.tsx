@@ -11,7 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Columns3, List, Plus, Search } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IconRail, type RailDestination } from '@/components/nav/icon-rail'
-import { ConversationList, type Conversation } from '@/components/nav/conversation-list'
+import { BotList, type ChatTarget } from '@/components/nav/bot-list'
+import { NewBotDialog } from '@/components/nav/new-bot-dialog'
 import type { AgentSessionRequest } from './agent-panel'
 import { TeamHome } from '@/components/teams/team-home'
 import { AppFrame, AppShell, AppShellContent, SignOutBoundary, WindowBar } from '@/components/app-shell'
@@ -20,7 +21,10 @@ import { BoardPage } from './board-page'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { GlobalSearch, SearchPill } from '@/components/nav/global-search'
 import { ContextPanel } from '@/components/nav/context-panel'
-import { listTaskRuns } from '@/app/actions/task-runs'
+import type { CoordinatorPrefill } from '@/components/coordinator/coordinator-chat'
+import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
+import { listThreads } from '@/app/actions/task-runs'
+import { listBots } from '@/app/actions/bots'
 import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'
 import { sessionPreview } from '@/lib/agent-history'
 import { PanelRight } from 'lucide-react'
@@ -117,12 +121,14 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)
   const { data: teams = [] } = useSWR('teams', listTeams)
   const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams)
-  const { data: taskRuns = [] } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: boardBusy ? 0 : 15000, revalidateOnFocus: false })
+  const { data: bots = [] } = useSWR('bots', listBots, { revalidateOnFocus: false })
+  const { data: threads = [] } = useSWR('threads', () => listThreads(), { refreshInterval: boardBusy ? 0 : 15000, revalidateOnFocus: false })
+  const [creatingBot, setCreatingBot] = useState(false)
   const { data: coordinatorChat } = useSWR<CoordinatorChatView>('coordinator-chat', () => getCoordinatorChat(), { revalidateOnFocus: false })
   const [panelOpen, setPanelOpen] = useState(true)
   useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])
   function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem('mikka:context-panel', next ? '1' : '0') } catch { /* storage unavailable */ } }
-  const [coordinatorPrefill, setCoordinatorPrefill] = useState<{ text: string; nonce: number }>()
+  const [coordinatorPrefill, setCoordinatorPrefill] = useState<CoordinatorPrefill>()
   const [teamId, setTeamId] = useState<string | null>(params.get('team'))
   const activeTeam = teams.find(team => team.id === teamId)
   const [section, setSection] = useState<WorkspaceSection>(params.get('team') ? 'team-home' : initialSection)
@@ -135,9 +141,11 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   const [agentRequest, setAgentRequest] = useState<AgentSessionRequest>()
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
+  // The bot whose chat is in the center; null for the Coordinator or an older chat with no bot.
+  const [activeBotId, setActiveBotId] = useState<string | null>(null)
   // Sessions the open Agent panel knows about, including ones still streaming and not saved yet.
   const [liveSessions, setLiveSessions] = useState<SavedAgentSession[]>([])
-  const lastConversation = useRef<Conversation>(initialSection === 'agent' ? { kind: 'agent', sessionId: null } : { kind: 'coordinator' })
+  const lastChat = useRef<ChatTarget>(initialSection === 'agent' ? { kind: 'agent', sessionId: null } : { kind: 'coordinator' })
   const [projectId, setProjectId] = useState<string | null>(null)
   const [creationProject, setCreationProject] = useState<string | null>(null)
   const [layout, setLayout] = useState<'board' | 'list'>('board')
@@ -274,24 +282,30 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     void leave(() => { applySelection(null, 'replace'); changeSection(next); if (!next.startsWith('team-')) setTeamId(null); setProjectId(null); setView(next === 'my-issues' ? 'mine' : 'all'); setQuery('') })
     return true
   }
-  function openConversation(conversation: Conversation) {
+  /** `created` is a bot made a moment ago that the bot list hasn't loaded yet. */
+  function openChat(target: ChatTarget, created?: { id: string; name: string; color: string; shape: string }) {
     if (boardBusy || leaving.current) return
+    const bot = target.kind === 'bot' ? bots.find(item => item.id === target.botId) ?? (created?.id === target.botId ? created : undefined) : undefined
+    if (target.kind === 'bot' && !bot) return
     void leave(() => {
-      lastConversation.current = conversation
-      applySelection(null, 'replace'); changeSection(conversation.kind); setTeamId(null); setProjectId(null)
-      if (conversation.kind === 'agent') setAgentRequest(current => ({ sessionId: conversation.sessionId, nonce: (current?.nonce ?? 0) + 1 }))
+      lastChat.current = target
+      applySelection(null, 'replace'); changeSection(target.kind === 'coordinator' ? 'coordinator' : 'agent'); setTeamId(null); setProjectId(null)
+      setActiveBotId(bot?.id ?? null)
+      if (bot) setAgentRequest(current => ({ sessionId: null, bot: { id: bot.id, name: bot.name, color: bot.color, shape: bot.shape }, nonce: (current?.nonce ?? 0) + 1 }))
+      else if (target.kind === 'agent') setAgentRequest(current => ({ sessionId: target.sessionId, nonce: (current?.nonce ?? 0) + 1 }))
     })
   }
   function openRail(destination: RailDestination) {
-    if (destination === 'conversations') {
-      // Coming back from the board reopens the conversation that was showing, not a fresh one.
-      const last = lastConversation.current
-      openConversation(last.kind === 'agent' ? { kind: 'agent', sessionId: activeAgentId ?? last.sessionId } : last)
+    if (destination === 'chats') {
+      // Coming back from the board reopens the chat that was showing, not a fresh one.
+      const last = lastChat.current
+      openChat(last.kind === 'agent' ? { kind: 'agent', sessionId: activeAgentId ?? last.sessionId } : last)
     } else if (destination === 'board') { if (navigateSection('all-issues')) setLayout('board') }
     else navigateSection('plugins')
   }
-  const rail: RailDestination | null = section === 'coordinator' || section === 'agent' ? 'conversations' : section === 'plugins' ? 'plugins' : ['all-issues', 'my-issues', 'team-issues'].includes(section) ? 'board' : null
-  const activeConversation: Conversation | null = section === 'coordinator' ? { kind: 'coordinator' } : section === 'agent' ? { kind: 'agent', sessionId: activeAgentId } : null
+  const rail: RailDestination | null = section === 'coordinator' || section === 'agent' ? 'chats' : section === 'plugins' ? 'plugins' : ['all-issues', 'my-issues', 'team-issues'].includes(section) ? 'board' : null
+  const activeChat: ChatTarget | null = section === 'coordinator' ? { kind: 'coordinator' } : section === 'agent' ? activeBotId ? { kind: 'bot', botId: activeBotId } : { kind: 'agent', sessionId: activeAgentId } : null
+  const activeBot = activeBotId ? bots.find(bot => bot.id === activeBotId) ?? (agentRequest?.bot?.id === activeBotId ? agentRequest.bot : undefined) : undefined
   const beforeChange = (action: () => Promise<void>) => { if (!boardBusy && !leaving.current) void leave(action) }
   const openSettings = (href = '/settings') => { if (!boardBusy && !leaving.current) void leave(() => { if (!pushSettingsHistory(href)) router.push(href) }) }
   const isProjects = section === 'projects' || section === 'team-projects'
@@ -316,25 +330,26 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const conversationSessions = [...savedSessions.values()]
   const activeSession = section === 'agent' ? conversationSessions.find(session => session.id === activeAgentId) : undefined
   const lastCoordinatorItem = coordinatorChat?.items.findLast(item => item.from !== 'event')
-  function arrange(prompt: string) {
-    openConversation({ kind: 'coordinator' })
-    setCoordinatorPrefill(current => ({ text: prompt, nonce: (current?.nonce ?? 0) + 1 }))
+  function arrange(prompt: string, suggestionId?: string) {
+    openChat({ kind: 'coordinator' })
+    setCoordinatorPrefill(current => ({ text: prompt, nonce: (current?.nonce ?? 0) + 1, suggestionId }))
   }
   const dialogs = <>
     <NewTaskDialog open={creating} project={creationProject ? scopedProjects.find(project => project.id === creationProject)?.name : null} initialText={typedAhead} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />
-    {searchOpen && <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} sessions={conversationSessions} coordinatorLine={lastCoordinatorItem ? sessionPreview(lastCoordinatorItem.text.replace(/\[\[(?:issue|run):[0-9a-f-]{36}\]\]/gi, ''), null) : undefined} issues={tasks} projects={projects}
-      onConversation={openConversation} onIssue={open} onCreateIssue={() => create()}
+    <NewBotDialog open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />
+    {searchOpen && <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} bots={bots} sessions={conversationSessions.filter(session => !session.botId)} coordinatorLine={lastCoordinatorItem ? sessionPreview(lastCoordinatorItem.text.replace(/\[\[(?:issue|run):[0-9a-f-]{36}\]\]/gi, ''), null) : undefined} issues={tasks} projects={projects}
+      onChat={openChat} onNewBot={() => setCreatingBot(true)} onIssue={open} onCreateIssue={() => create()}
       onProject={id => { void leave(() => { applySelection(null, 'replace'); changeSection('projects'); setTeamId(null); setProjectId(id) }) }} />}
   </>
   if (settingsOpen) return <SignOutBoundary pending={signingOut}><AppShell>
     <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} googleEnabled={googleEnabled} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
     {dialogs}
   </AppShell></SignOutBoundary>
-  return <SignOutBoundary pending={signingOut}><AppFrame
+  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><AppFrame
     bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={isConversation && !panelOpen && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="hidden text-muted-foreground xl:inline-flex" aria-label={i18nText('Shell.panel.open')} onClick={() => showPanel(true)} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>} />}
     rail={<IconRail active={rail} onNavigate={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}>
     {/* The board keeps only the rail on its left (MIK-45). */}
-    {rail !== 'board' && <ConversationList sessions={conversationSessions} active={activeConversation} onOpen={openConversation} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}
+    {rail !== 'board' && <BotList bots={bots} threads={threads} sessions={conversationSessions} active={activeChat} onOpen={openChat} onNewBot={() => setCreatingBot(true)} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}
     <AppShellContent listToggle={rail !== 'board'} hideHeader={!!selected || section === 'agent'} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : workspaceContext?.workspace.name ?? i18nText("Settings.sections.workspace.title")} title={sectionTitles[section]} actions={section === 'plugins' ? undefined : <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} aria-keyshortcuts="Control+k Meta+k" disabled={boardBusy} onClick={() => setSearchOpen(true)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText("Workspace.search.title")}<ShortcutKeys keys={['mod', 'K']} /></TooltipContent></Tooltip>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {selected ? <TaskDetail key={draftKey} id={selected} workspaceName={workspaceContext?.workspace.name ?? i18nText('Settings.sections.workspace.title')} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create()} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null, 'replace'); changeSection('team-projects'); setProjectId(id) }) }} /> : isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} agentRequest={agentRequest} onAgentActive={setActiveAgentId} onAgentSessions={setLiveSessions} coordinatorPrefill={coordinatorPrefill} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsSkillsView googleEnabled={googleEnabled} /> : tasksLoading ? <DetailLoading /> : layout === 'board' ? <BoardPage issues={filtered} userId={user.id} onOpen={open} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <>
@@ -345,8 +360,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
         <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={open} onCreate={() => create()} />
       </>}
     </AppShellContent>
-    {isConversation && panelOpen && <ContextPanel userName={user.name || user.email} issues={tasks} runs={taskRuns} onOpenIssue={id => { open(id) }} onArrange={arrange} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
-      conversation={section === 'coordinator' ? { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt } : { name: activeSession?.title || i18nText('Nav.untitledConversation'), kind: 'agent', updatedAt: activeSession?.updatedAt }} />}
+    {isConversation && panelOpen && <ContextPanel userName={user.name || user.email} issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onArrange={arrange} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
+      conversation={section === 'coordinator' ? { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt } : activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot', updatedAt: activeSession?.updatedAt } : { id: activeAgentId, name: activeSession?.title || i18nText('Nav.untitledConversation'), kind: 'agent', updatedAt: activeSession?.updatedAt }} />}
     {dialogs}
-  </AppFrame></SignOutBoundary>
+  </AppFrame></ComputerAgentsProvider></SignOutBoundary>
 }

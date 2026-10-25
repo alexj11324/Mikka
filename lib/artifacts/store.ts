@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { after } from 'next/server'
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { artifactShares, artifactVersions, artifacts, type ArtifactKind } from '@/lib/db/schema'
+import { agentRuns, artifactShares, artifactVersions, artifacts, bots, type ArtifactKind } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { artifactSubmittedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
@@ -82,12 +82,23 @@ export async function artifactSummaries(userId: string, ids: readonly string[]):
 }
 
 async function detail(where: ReturnType<typeof and>): Promise<ArtifactDetail | null> {
-  const [row] = await db.select({ id: artifacts.id, kind: artifacts.kind, title: artifacts.title, latestVersion: artifacts.latestVersion, runId: artifacts.runId, issueId: artifacts.issueId })
+  const [row] = await db.select({ id: artifacts.id, userId: artifacts.userId, kind: artifacts.kind, title: artifacts.title, latestVersion: artifacts.latestVersion, runId: artifacts.runId, issueId: artifacts.issueId })
     .from(artifacts).where(where).limit(1)
   if (!row) return null
   const versions = await db.select({ version: artifactVersions.version, authorName: artifactVersions.authorName, createdAt: artifactVersions.createdAt })
     .from(artifactVersions).where(eq(artifactVersions.artifactId, row.id)).orderBy(asc(artifactVersions.version))
-  return { ...row, versions: versions.map(version => ({ ...version, createdAt: version.createdAt.toISOString() })) }
+  // Authors are bots: shown with their own bloub, found by name, else by the run that handed the artifact over.
+  const names = [...new Set(versions.map(version => version.authorName.toLowerCase()))]
+  const named = names.length ? await db.select({ name: bots.name, color: bots.color, shape: bots.shape }).from(bots)
+    .where(and(eq(bots.userId, row.userId), inArray(sql`lower(${bots.name})`, names))) : []
+  const [runBot] = row.runId ? await db.select({ color: bots.color, shape: bots.shape }).from(agentRuns)
+    .innerJoin(bots, eq(bots.id, agentRuns.botId)).where(eq(agentRuns.id, row.runId)).limit(1) : []
+  const look = (name: string) => named.find(bot => bot.name.toLowerCase() === name.toLowerCase()) ?? runBot ?? null
+  const { userId: _owner, ...summary } = row
+  return { ...summary, versions: versions.map(version => {
+    const bot = look(version.authorName)
+    return { ...version, createdAt: version.createdAt.toISOString(), authorColor: bot?.color ?? null, authorShape: bot?.shape ?? null }
+  }) }
 }
 
 /** One of the person's artifacts with every version, oldest first. */

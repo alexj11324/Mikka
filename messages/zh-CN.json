@@ -128,9 +128,13 @@
     "rail": "主导航",
     "conversations": "对话",
     "board": "看板",
-    "collapseList": "收起对话列表",
+    "collapseList": "收起 Bot 列表",
+    "bots": "Bot",
+    "newBot": "新建 Bot",
+    "writingWelcome": "正在写欢迎语…",
+    "answerBot": "输入你的回答，或聊点别的",
+    "messageBot": "给 {name} 发消息",
     "newConversation": "新对话",
-    "pinned": "已置顶",
     "untitledConversation": "未命名对话"
   },
   "Plugins": {
@@ -652,7 +656,35 @@
     "editorAria": "{label}编辑器"
   },
   "Devices": {
+    "otherDevices": "Remote control",
+    "menu": "{name} 的更多操作",
+    "add": {
+      "title": "添加设备",
+      "description": "能用 SSH 登录的机器，Mikka 会自己装好。",
+      "trigger": "添加设备",
+      "host": "主机",
+      "hostPlaceholder": "主机名或 IP",
+      "user": "用户",
+      "userPlaceholder": "你在那台机器上的用户名",
+      "tailnet": "Tailnet 上",
+      "sshConfig": "SSH 配置里",
+      "configured": "已设置",
+      "sshNew": "ssh · 未设置",
+      "tailnetNew": "tailnet · 未设置",
+      "shortcut": "快捷键",
+      "cancel": "取消",
+      "setUp": "设置",
+      "settingUp": "正在设置 {host}",
+      "settingUpDescription": "用 SSH 登录，装好 Mikka，启动服务，记下主机密钥。",
+      "progress": "设置进度",
+      "interrupted": "连接中断。",
+      "back": "返回",
+      "done": "完成",
+      "emptyDescription": "添加一台能用 SSH 登录的机器。"
+    },
     "neverOnline": "从未上线",
+    "lastOnline": "最后在线 {time}",
+    "reconnect": "重新连接",
     "lastHeartbeat": "最后心跳 {time}",
     "installedWithVersion": "已安装 · {version}",
     "installed": "已安装",
@@ -702,7 +734,7 @@
       "steps": {
         "login": "登录",
         "check": "检查主机",
-        "install": "安装 daemon",
+        "install": "安装 Mikka",
         "start": "启动服务",
         "connect": "连接"
       },
@@ -860,6 +892,7 @@
     "deviceNotFound": "设备不存在。",
     "agentHarnessMissing": "这台设备上没有检测到该 harness。",
     "agentDuplicateName": "已有同名 Agent，请换一个名称。",
+    "botDuplicateName": "已有同名 Bot，请换一个名字。",
     "agentInvalidInput": "请检查填写内容。",
     "agentAddFailed": "添加失败，请重试。",
     "agentSaveFailed": "保存失败，请重试。",
@@ -1410,6 +1443,10 @@
         "title": "集成",
         "description": "管理已连接的应用与消息平台。"
       },
+      "devices": {
+        "title": "设备",
+        "description": "你自己接入的机器。"
+      },
       "workspace": {
         "title": "工作区",
         "description": "当前工作区的基本信息。"
@@ -1907,6 +1944,7 @@
     "unknownClient": "一个未命名的应用"
   },
   "Coordinator": {
+    "stop": "停止",
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
     "emptyTitle": "和你的 Coordinator 聊聊",
@@ -2169,13 +2207,108 @@
     "creating": "正在创建…",
     "createWorkspace": "创建工作区"
   },
+  "Computer": {
+    "status": {
+      "working": "Agent 操作中",
+      "approval": "等你审批",
+      "done": "完成",
+      "failed": "出错",
+      "sleeping": "休眠中",
+      "waking": "唤醒中",
+      "running": "运行中",
+      "user": "你在操作"
+    },
+    "screenOf": "{name} 的屏幕",
+    "screen": "屏幕",
+    "computerOf": "{name} 的电脑",
+    "cloud": "Mikka Cloud",
+    "card": "电脑任务",
+    "cardTitle": "电脑",
+    "openScreen": "全屏查看 {name} 的屏幕",
+    "open": "打开",
+    "sleeping": "电脑正在休眠",
+    "wake": "唤醒",
+    "waking": "唤醒中",
+    "machineError": "电脑没能启动",
+    "retry": "重试",
+    "wakeFailed": "唤醒失败，请重试。",
+    "viewer": {
+      "title": "{name} 的屏幕",
+      "close": "退出全屏",
+      "controls": "控制",
+      "viewOnly": "仅观看",
+      "otherControls": "别人在操作",
+      "youControl": "你在操作",
+      "takeover": "取得控制权",
+      "handback": "交还给 Agent",
+      "takenByOther": "别人正在操作这台电脑。",
+      "takeoverFailed": "没能取得控制权，请重试。",
+      "handbackFailed": "没能交还，请重试。"
+    },
+    "approval": {
+      "allowRun": "本任务内都允许",
+      "deny": "拒绝",
+      "allow": "允许",
+      "failed": "没有送达，请重试。"
+    }
+  },
   "Shell": {
-    "pinned": "置顶",
+    "threads": {
+      "title": "线程",
+      "empty": "还没有线程",
+      "untitled": "未命名线程",
+      "waiting": "等你回复",
+      "failed": "失败",
+      "screen": "屏幕"
+    },
+    "newBot": {
+      "title": "新建 Bot",
+      "description": "给 Bot 起名，选一个形状和颜色。",
+      "name": "名字",
+      "namePlaceholder": "名字",
+      "color": "颜色",
+      "colors": {
+        "encre": "墨色",
+        "brun": "棕色",
+        "rouge": "红色",
+        "orange": "橙色",
+        "ambre": "琥珀色",
+        "vert": "绿色",
+        "turquoise": "青色",
+        "bleu": "蓝色",
+        "violet": "紫色",
+        "rose": "粉色",
+        "gris": "灰色",
+        "creme": "奶油色"
+      },
+      "shape": "形状",
+      "shapes": {
+        "cercle": "圆形",
+        "galet": "卵石",
+        "squircle": "圆角方",
+        "capsule": "胶囊",
+        "triangle": "三角",
+        "hexagone": "六边形",
+        "nuage": "云朵",
+        "goutte": "水滴",
+        "coeur": "爱心",
+        "etoile": "星星",
+        "fleur": "花",
+        "chat": "猫",
+        "champignon": "蘑菇",
+        "fantome": "幽灵",
+        "feuille": "叶子",
+        "ecran": "屏幕"
+      },
+      "create": "创建",
+      "creating": "正在创建…"
+    },
     "searchPlaceholder": "搜索对话、任务、Agent、知识库",
     "searchLabel": "全局搜索",
     "searchDescription": "搜索对话、任务和项目，用方向键选择，按 Enter 打开。",
     "searchEmpty": "没有匹配的结果",
     "groups": {
+      "bots": "Bot",
       "conversations": "对话",
       "tasks": "任务",
       "projects": "项目",
@@ -2183,15 +2316,13 @@
     },
     "newTask": "新建任务",
     "newConversation": "新对话",
-    "openList": "展开对话列表",
+    "openList": "展开 Bot 列表",
     "back": "后退",
     "forward": "前进",
     "window": "应用窗口",
     "attach": "添加文件",
     "attachUnsupported": "只能附加 {max} 字以内的文本文件",
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
-    "whoIsWorking": "谁在工作",
-    "agentsWorking": "{count} 个 agent 正在处理任务",
     "panel": {
       "label": "右栏",
       "tabs": "右栏内容",
@@ -2209,7 +2340,6 @@
     "details": {
       "conversation": "当前对话",
       "kind": "类型",
-      "coordinatorKind": "Coordinator · 置顶",
       "agentKind": "Agent 对话",
       "updated": "最近活动",
       "none": "还没有消息"
@@ -2222,8 +2352,8 @@
       "briefing": "有 {count} 条新消息值得看，先看",
       "noneToday": "今天还没有新的建议。",
       "routine": "例行事项",
-      "emptyTitle": "这里是空的",
-      "emptyDescription": "Check back later",
+      "emptyTitle": "暂时没什么新鲜事",
+      "emptyDescription": "有值得看的会第一时间放到这里",
       "refresh": "刷新建议",
       "loadError": "建议加载失败。",
       "action": {
@@ -2264,7 +2394,7 @@
       "sendFailed": "没发出去，再试一次。"
     },
     "empty": {
-      "nothing": "这里是空的",
+      "nothing": "手头暂时没事",
       "arrange": "让 Agent 安排",
       "knowledgePrompt": "帮我把常用的资料整理进知识库：",
       "schedulesPrompt": "帮我设一个定时任务："
@@ -2279,6 +2409,8 @@
       "device": "运行的机器",
       "noDevice": "未连接机器",
       "offline": "离线",
+      "online": "在线",
+      "cloud": "Mikka Cloud",
       "contextProject": "项目：{project}",
       "contextSeparator": "，",
       "prompt": "帮我新建一个任务：{text}",

@@ -9,9 +9,10 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent } from '@/components/ui/popover'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { markdownDiff, remarkDiff } from '@/lib/artifacts/diff'
 import { remarkMarks, type TextMark } from '@/lib/artifacts/marks'
+import type { ArtifactVersionInfo } from '@/lib/artifacts/types'
+import { ArtifactAuthorAvatar } from './artifact-card'
 
 // A Markdown artifact as a page: title, who and when, then the body. Raw
 // HTML in the Markdown stays text (react-markdown never renders it) and links
@@ -67,7 +68,7 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
   markdown: string
   /** The newer version's text: when given, its changes are marked into this one. */
   compareWith?: string | null
-  author: string
+  author: Pick<ArtifactVersionInfo, 'authorName' | 'authorColor' | 'authorShape'>
   /** 「Mikka Frontend · 10月24日 17:20 更新」 */
   meta: string
   /** Texts already quoted from this version, underlined. */
@@ -117,7 +118,7 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
   return <div className="min-h-0 flex-1 overflow-y-auto" onMouseUp={readSelection} onKeyUp={readSelection}>
     <article className="mx-auto w-full max-w-[40rem] px-6 pt-10 pb-16 md:px-10">
       <h1 className="text-xl leading-7 font-semibold text-foreground">{title}</h1>
-      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground"><LetterAvatar name={author} size="row" />{meta}</p>
+      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">{author.authorName && <ArtifactAuthorAvatar author={author} />}{meta}</p>
       <div ref={articleRef} data-slot="artifact-document" className="mt-4">
         <Markdown remarkPlugins={plugins} components={parts}>{source}</Markdown>
       </div>

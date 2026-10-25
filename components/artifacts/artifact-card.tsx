@@ -3,13 +3,19 @@
 import { AppWindow, ChevronRight, FileText, type LucideProps } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
-import type { ArtifactSummary } from '@/lib/artifacts/types'
+import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
+import type { ArtifactSummary, ArtifactVersionInfo } from '@/lib/artifacts/types'
 import type { ArtifactKind } from '@/lib/db/schema'
 import { cn } from '@/lib/utils'
 
 export function ArtifactKindIcon({ kind, ...props }: { kind: ArtifactKind } & LucideProps) {
   const Icon = kind === 'html' ? AppWindow : FileText
   return <Icon aria-hidden="true" {...props} />
+}
+
+/** The bot that wrote a version, as its bloub; a name with no bot gets a steady colour from the name. */
+export function ArtifactAuthorAvatar({ author, size = 'row' }: { author: Pick<ArtifactVersionInfo, 'authorName' | 'authorColor' | 'authorShape'>; size?: 'row' | 'pill' }) {
+  return <BotAvatar color={author.authorColor ?? colorFor(author.authorName)} shape={author.authorShape} size={size} still />
 }
 
 /** 文档 · v2 */

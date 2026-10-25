@@ -12,6 +12,9 @@ export interface ArtifactSummary {
 export interface ArtifactVersionInfo {
   version: number
   authorName: string
+  /** The author bot's bloub colour and shape; null when no bot by that name, so the reader derives a colour from the name. */
+  authorColor: string | null
+  authorShape: string | null
   createdAt: string
 }
 

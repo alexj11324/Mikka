@@ -128,9 +128,13 @@
     "rail": "Main navigation",
     "conversations": "Conversations",
     "board": "Board",
-    "collapseList": "Collapse conversation list",
+    "collapseList": "Collapse bot list",
+    "bots": "Bots",
+    "newBot": "New bot",
+    "writingWelcome": "Writing a welcome…",
+    "answerBot": "Type your answer, or ask anything",
+    "messageBot": "Message {name}",
     "newConversation": "New conversation",
-    "pinned": "Pinned",
     "untitledConversation": "Untitled conversation"
   },
   "Plugins": {
@@ -652,7 +656,35 @@
     "editorAria": "{label} editor"
   },
   "Devices": {
+    "otherDevices": "Remote control",
+    "menu": "More for {name}",
+    "add": {
+      "title": "Add device",
+      "description": "Any machine you can SSH into. Mikka installs itself.",
+      "trigger": "Add device",
+      "host": "Host",
+      "hostPlaceholder": "Hostname or IP",
+      "user": "User",
+      "userPlaceholder": "Your username on that machine",
+      "tailnet": "On your Tailnet",
+      "sshConfig": "In your SSH config",
+      "configured": "Set up",
+      "sshNew": "ssh · not set up",
+      "tailnetNew": "tailnet · not set up",
+      "shortcut": "Shortcut",
+      "cancel": "Cancel",
+      "setUp": "Set up",
+      "settingUp": "Setting up {host}",
+      "settingUpDescription": "Log in over SSH, install Mikka, start the service and record the host key.",
+      "progress": "Setup progress",
+      "interrupted": "The connection dropped.",
+      "back": "Back",
+      "done": "Done",
+      "emptyDescription": "Add a machine you can SSH into."
+    },
     "neverOnline": "Never online",
+    "lastOnline": "Last online {time}",
+    "reconnect": "Reconnect",
     "lastHeartbeat": "Last heartbeat {time}",
     "installedWithVersion": "Installed · {version}",
     "installed": "Installed",
@@ -702,7 +734,7 @@
       "steps": {
         "login": "Sign in",
         "check": "Check host",
-        "install": "Install daemon",
+        "install": "Install Mikka",
         "start": "Start service",
         "connect": "Connect"
       },
@@ -860,6 +892,7 @@
     "deviceNotFound": "This device does not exist.",
     "agentHarnessMissing": "The selected harness is not installed on this device.",
     "agentDuplicateName": "An agent with this name already exists. Choose another name.",
+    "botDuplicateName": "A bot with this name already exists. Choose another name.",
     "agentInvalidInput": "Please check the information you entered.",
     "agentAddFailed": "Could not add the agent. Please try again.",
     "agentSaveFailed": "Could not save the agent. Please try again.",
@@ -1410,6 +1443,10 @@
         "title": "Integrations",
         "description": "Manage connected apps and message platforms."
       },
+      "devices": {
+        "title": "Devices",
+        "description": "Machines you connected."
+      },
       "workspace": {
         "title": "Workspace",
         "description": "Basic information about the current workspace."
@@ -1907,6 +1944,7 @@
     "unknownClient": "An unnamed app"
   },
   "Coordinator": {
+    "stop": "Stop",
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
     "emptyTitle": "Talk to your Coordinator",
@@ -2169,13 +2207,108 @@
     "creating": "Creating…",
     "createWorkspace": "Create workspace"
   },
+  "Computer": {
+    "status": {
+      "working": "Agent working",
+      "approval": "Needs your approval",
+      "done": "Done",
+      "failed": "Error",
+      "sleeping": "Asleep",
+      "waking": "Waking",
+      "running": "Running",
+      "user": "You're in control"
+    },
+    "screenOf": "{name}'s screen",
+    "screen": "Screen",
+    "computerOf": "{name}'s computer",
+    "cloud": "Mikka Cloud",
+    "card": "Computer task",
+    "cardTitle": "Computer",
+    "openScreen": "Open {name}'s screen full window",
+    "open": "Open",
+    "sleeping": "The computer is asleep",
+    "wake": "Wake",
+    "waking": "Waking",
+    "machineError": "The computer didn't start",
+    "retry": "Retry",
+    "wakeFailed": "Couldn't wake it. Try again.",
+    "viewer": {
+      "title": "{name}'s screen",
+      "close": "Exit full window",
+      "controls": "Control",
+      "viewOnly": "View only",
+      "otherControls": "Someone else is in control",
+      "youControl": "You're in control",
+      "takeover": "Take control",
+      "handback": "Hand back to Agent",
+      "takenByOther": "Someone else is controlling this computer.",
+      "takeoverFailed": "Couldn't take control. Try again.",
+      "handbackFailed": "Couldn't hand back. Try again."
+    },
+    "approval": {
+      "allowRun": "Allow for this task",
+      "deny": "Deny",
+      "allow": "Allow",
+      "failed": "Not delivered. Try again."
+    }
+  },
   "Shell": {
-    "pinned": "Pinned",
+    "threads": {
+      "title": "Threads",
+      "empty": "No threads yet",
+      "untitled": "Untitled thread",
+      "waiting": "Needs you",
+      "failed": "Failed",
+      "screen": "Screen"
+    },
+    "newBot": {
+      "title": "New bot",
+      "description": "Name the bot and pick a shape and colour.",
+      "name": "Name",
+      "namePlaceholder": "Name",
+      "color": "Colour",
+      "colors": {
+        "encre": "Ink",
+        "brun": "Brown",
+        "rouge": "Red",
+        "orange": "Orange",
+        "ambre": "Amber",
+        "vert": "Green",
+        "turquoise": "Turquoise",
+        "bleu": "Blue",
+        "violet": "Violet",
+        "rose": "Pink",
+        "gris": "Grey",
+        "creme": "Cream"
+      },
+      "shape": "Shape",
+      "shapes": {
+        "cercle": "Circle",
+        "galet": "Pebble",
+        "squircle": "Squircle",
+        "capsule": "Capsule",
+        "triangle": "Triangle",
+        "hexagone": "Hexagon",
+        "nuage": "Cloud",
+        "goutte": "Drop",
+        "coeur": "Heart",
+        "etoile": "Star",
+        "fleur": "Flower",
+        "chat": "Cat",
+        "champignon": "Mushroom",
+        "fantome": "Ghost",
+        "feuille": "Leaf",
+        "ecran": "Screen"
+      },
+      "create": "Create",
+      "creating": "Creating…"
+    },
     "searchPlaceholder": "Search conversations, tasks, agents, knowledge",
     "searchLabel": "Search everything",
     "searchDescription": "Search conversations, tasks and projects. Use the arrow keys to choose and Enter to open.",
     "searchEmpty": "Nothing matches",
     "groups": {
+      "bots": "Bots",
       "conversations": "Conversations",
       "tasks": "Tasks",
       "projects": "Projects",
@@ -2183,15 +2316,13 @@
     },
     "newTask": "New task",
     "newConversation": "New conversation",
-    "openList": "Show conversations",
+    "openList": "Expand bot list",
     "back": "Back",
     "forward": "Forward",
     "window": "App window",
     "attach": "Add file",
     "attachUnsupported": "Only text files up to {max} characters can be attached",
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
-    "whoIsWorking": "Who's working",
-    "agentsWorking": "{count, plural, one {# agent is} other {# agents are}} on tasks",
     "panel": {
       "label": "Right panel",
       "tabs": "Right panel content",
@@ -2209,7 +2340,6 @@
     "details": {
       "conversation": "This conversation",
       "kind": "Type",
-      "coordinatorKind": "Coordinator · pinned",
       "agentKind": "Agent conversation",
       "updated": "Last activity",
       "none": "No messages yet"
@@ -2222,8 +2352,8 @@
       "briefing": "{count, plural, one {# new message is} other {# new messages are}} worth a look, starting with",
       "noneToday": "No new suggestions today.",
       "routine": "Routine",
-      "emptyTitle": "Nothing here",
-      "emptyDescription": "Check back later",
+      "emptyTitle": "All quiet for now",
+      "emptyDescription": "Anything worth a look will land here first",
       "refresh": "Refresh suggestions",
       "loadError": "Suggestions failed to load.",
       "action": {
@@ -2264,7 +2394,7 @@
       "sendFailed": "That didn't send. Try again."
     },
     "empty": {
-      "nothing": "Nothing here",
+      "nothing": "Nothing on your plate",
       "arrange": "Let an agent set it up",
       "knowledgePrompt": "Help me put the documents I use often into the knowledge base: ",
       "schedulesPrompt": "Help me set up a scheduled task: "
@@ -2279,6 +2409,8 @@
       "device": "Machine",
       "noDevice": "No machine connected",
       "offline": "Offline",
+      "online": "Online",
+      "cloud": "Mikka Cloud",
       "contextProject": "project: {project}",
       "contextSeparator": ", ",
       "prompt": "Create a task for me: {text}",

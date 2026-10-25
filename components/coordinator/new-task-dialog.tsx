@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
 import { ChevronRight, Laptop, Paperclip } from 'lucide-react'
-import { listDevices } from '@/app/actions/agents'
+import { listAgents, listDevices } from '@/app/actions/agents'
 import { sendCoordinatorMessage } from '@/app/actions/coordinator'
 import { useActionError } from '@/lib/use-action-error'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
@@ -13,10 +13,27 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { DeviceIcon } from '@/components/devices/device-icon'
+import { useComputer } from '@/hooks/use-computer'
 
 const MAX_LENGTH = 8000
+
+type Machine = { value: string; label: string; cloud?: boolean; online?: boolean; server?: boolean }
+
+/** A machine's icon with its state dot. Mikka Cloud stays green asleep, since picking it wakes it; red only when it failed (the workspace has one, so any bot's computer reports it). */
+function MachineIcon({ machine, cloudAgentId }: { machine: Machine; cloudAgentId: string | undefined }) {
+  const t = useTranslations('Shell.newTaskDialog')
+  const tStatus = useTranslations('Computer.status')
+  const { data: state } = useComputer(machine.cloud ? cloudAgentId : null)
+  if (machine.cloud) return <DeviceIcon kind="cloud" state={state?.machine === 'error' ? 'error' : 'online'} label={state ? tStatus(state.machine === 'error' ? 'failed' : state.machine) : t('cloud')} />
+  return <DeviceIcon kind={machine.server ? 'server' : 'personal'} state={machine.online ? 'online' : 'offline'} label={machine.online ? t('online') : t('offline')} />
+}
+
+function MachineLabel({ machine, cloudAgentId }: { machine: Machine; cloudAgentId: string | undefined }) {
+  return <><MachineIcon machine={machine} cloudAgentId={cloudAgentId} /><span className="min-w-0 flex-1 truncate pr-3">{machine.label}</span></>
+}
 
 /**
  * 新建任务 the Comma way: say what needs doing in a sentence, on which machine,
@@ -34,6 +51,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
 }) {
   const t = useTranslations('Shell.newTaskDialog')
   const tShell = useTranslations('Shell')
+  const tDevices = useTranslations('Devices')
   const tCommon = useTranslations('Common')
   const actionError = useActionError()
   const { mutate } = useSWRConfig()
@@ -43,8 +61,16 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const fileId = useId()
 
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
+  const { data: bots = [] } = useSWR(open ? 'agents' : null, listAgents)
+  // Mikka Cloud first and by default: there the Coordinator picks the bot, so no bot is named.
+  // Then 本机 (the user's own computers), then Remote control (servers such as a VPS), as in 设置 › 设备.
+  const cloud: Machine = { value: 'cloud', label: t('cloud'), cloud: true }
+  const own: Machine[] = devices.filter(item => (item as typeof item & { kind?: string }).kind !== 'cloud').map(item => ({ value: item.id, label: item.name, online: item.online, server: item.platform !== 'darwin' && item.platform !== 'win32' }))
+  const local = own.filter(item => !item.server)
+  const remote = own.filter(item => item.server)
+  const machines = [cloud, ...local, ...remote]
   const [picked, setPicked] = useState<string | null>(null)
-  const device = devices.find(item => item.id === picked) ?? devices.find(item => item.online && item.enabled) ?? devices[0]
+  const device = machines.find(item => item.value === picked) ?? cloud
   useEffect(() => { if (open && initialText) setDraft(current => current || initialText) }, [open, initialText])
 
   async function attach(files: File[]) {
@@ -62,7 +88,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
     if (!text || sending) return
     setSending(true)
     try {
-      const context = [device && t('contextDevice', { device: device.name }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
+      const context = [device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
       const result = await sendCoordinatorMessage(context ? t('promptWithContext', { context, text }) : t('prompt', { text }))
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       setDraft('')
@@ -77,14 +103,16 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   }
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="gap-3 p-4 sm:max-w-xl" closeLabel={tCommon('close')}>
+    <DialogContent className="gap-3 p-5 sm:max-w-2xl" closeLabel={tCommon('close')}>
       <div className="flex items-center gap-2 pr-8 text-sm">
         {device
-          ? <Select value={device.id} onValueChange={value => setPicked(value)} items={devices.map(item => ({ value: item.id, label: item.name }))}>
-            <SelectTrigger size="sm" className="h-7 gap-1.5 rounded-full px-2.5" aria-label={t('device')}><Laptop aria-hidden="true" className="text-muted-foreground" /><SelectValue /></SelectTrigger>
-            <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-48"><SelectGroup>
-              {devices.map(item => <SelectItem key={item.id} value={item.id}><Laptop aria-hidden="true" />{item.name}{!item.online && <span className="ml-auto pl-3 text-xs text-muted-foreground">{t('offline')}</span>}</SelectItem>)}
-            </SelectGroup></SelectContent>
+          ? <Select value={device.value} onValueChange={value => setPicked(value)} items={machines.map(({ value, label }) => ({ value, label }))}>
+            <SelectTrigger size="sm" className="h-7 gap-1.5 rounded-full px-2.5" aria-label={t('device')}><MachineIcon machine={device} cloudAgentId={bots[0]?.id} /><SelectValue /></SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-60">
+              <SelectGroup><SelectItem value={cloud.value}><MachineLabel machine={cloud} cloudAgentId={bots[0]?.id} /></SelectItem></SelectGroup>
+              {local.length > 0 && <><SelectGroup><SelectLabel>{tDevices('thisMachine')}</SelectLabel>{local.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudAgentId={bots[0]?.id} /></SelectItem>)}</SelectGroup></>}
+              {remote.length > 0 && <><SelectGroup><SelectLabel>{tDevices('otherDevices')}</SelectLabel>{remote.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudAgentId={bots[0]?.id} /></SelectItem>)}</SelectGroup></>}
+            </SelectContent>
           </Select>
           : <span className="flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{t('noDevice')}</span>}
         <ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
@@ -95,7 +123,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="new-issue-title" className="sr-only">{t('label')}</FieldLabel>
-          <Textarea id="new-issue-title" autoFocus value={draft} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-24 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 dark:bg-transparent" onChange={event => setDraft(event.target.value)} onKeyDown={event => {
+          <Textarea id="new-issue-title" autoFocus value={draft} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-32 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 dark:bg-transparent" onChange={event => setDraft(event.target.value)} onKeyDown={event => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) { event.preventDefault(); void submit() }
           }} />
         </Field>

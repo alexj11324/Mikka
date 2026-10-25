@@ -1,22 +1,15 @@
 'use client'
 
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import useSWR from 'swr'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import useSWR, { useSWRConfig } from 'swr'
+import { withBasePath } from '@/lib/base-path'
 import { useTranslations } from 'next-intl'
-import { ArrowUp, Plus, Send } from 'lucide-react'
-import { toast } from 'sonner'
-import { getCoordinatorChat, sendCoordinatorMessage, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
-import { listTaskRuns } from '@/app/actions/task-runs'
-import { LetterAvatar } from '@/components/nav/letter-avatar'
+import { getCoordinatorChat, sendCoordinatorMessage, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
-import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
-import { Input } from '@/components/ui/input'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { useActionError } from '@/lib/use-action-error'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from '@/components/ui/message-scroller'
 import { Spinner } from '@/components/ui/spinner'
@@ -24,6 +17,7 @@ import { useLinkPreviews, type AgentCitations } from '@/components/workspace/age
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
 import { AgentThemeProvider } from '@/components/workspace/agent-theme'
 import { CoordinatorReply } from './coordinator-reply'
+import { ChatComposer } from './chat-composer'
 import dynamic from 'next/dynamic'
 import { ArtifactCard, ArtifactChip } from '@/components/artifacts/artifact-card'
 import { ArtifactQuoteChip, ArtifactQuoteLine } from '@/components/artifacts/artifact-quote'
@@ -31,22 +25,20 @@ import type { ArtifactChatSlot } from '@/components/artifacts/artifact-viewer'
 
 const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
 
+/** Text put into the composer from elsewhere; `suggestionId` when it came from a 建议 item. */
+export type CoordinatorPrefill = { text: string; nonce: number; suggestionId?: string }
+
 /**
  * The person's conversation with their Coordinator, which dispatches agents to
  * issues. Artifacts agents hand over show as cards under a reply and open the
  * reader; inside the reader the same chat runs `embedded`, with chips instead
  * of cards and the quote from the artifact in the composer.
  */
-export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded }: { onOpenIssue: (id: string) => void; prefill?: { text: string; nonce: number }; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot }) {
+export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot }) {
   const t = useTranslations('Coordinator')
   const tNav = useTranslations('Nav')
   const [viewing, setViewing] = useState<string | null>(null)
-  const tShell = useTranslations('Shell')
-  const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000, revalidateOnFocus: false })
-  const working = [...new Map((runs ?? []).filter(run => ['preparing', 'running', 'finishing'].includes(run.status)).map(run => [run.agentId, run.agentName])).values()]
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const fileId = useId()
   const actionError = useActionError()
   const { data, mutate, error: loadError } = useSWR<Chat>('coordinator-chat', () => getCoordinatorChat(), {
     refreshInterval: latest => latest?.working ? 2000 : 10000,
@@ -54,14 +46,24 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
-  // 「让 Agent 安排」 puts its sentence here for the person to finish (MIK-39).
+  const { mutate: mutateAll } = useSWRConfig()
+  // The 建议 item whose text is in the composer: once sent, the Coordinator dispatches a thread for it and it leaves 建议.
+  const suggestion = useRef<string | null>(null)
+  // 「让 Agent 安排」 and 建议 items put their sentence here for the person to finish (MIK-39).
   useEffect(() => {
     if (!prefill) return
+    suggestion.current = prefill.suggestionId ?? null
     setDraft(prefill.text)
     const input = inputRef.current
     if (input) { input.focus(); input.setSelectionRange(prefill.text.length, prefill.text.length) }
   }, [prefill])
   const items = data?.items ?? []
+  const welcomed = useRef(false)
+  useEffect(() => {
+    if (!data?.enabled || items.length || data.working || welcomed.current) return
+    welcomed.current = true
+    void welcomeCoordinator().then(() => mutate())
+  })
   const previews = useLinkPreviews(items.filter(item => item.from === 'coordinator').map(item => item.text))
   const sources = data?.sources
   const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue }), [sources, previews, onOpenIssue])
@@ -83,42 +85,35 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       return true
     } catch { setSendError(actionError()); return false } finally { setSending(false) }
   }
-  async function attach(files: File[]) {
-    let next = draft
-    for (const file of files) {
-      const block = await textAttachment(file, 10_000 - next.length - 2)
-      if (!block) { toast.error(tShell('attachUnsupported', { max: 10_000 })); continue }
-      next = next.trim() ? `${next.trimEnd()}\n\n${block}` : block
-    }
-    setDraft(next)
-    inputRef.current?.focus()
-  }
-
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
-    if (await post(text)) setDraft(current => current.trim() === text ? '' : current)
+    if (!await post(text)) return
+    setDraft(current => current.trim() === text ? '' : current)
+    const id = suggestion.current
+    suggestion.current = null
+    if (id) {
+      await fetch(withBasePath(`/api/suggestions/${id}`), { method: 'DELETE', credentials: 'same-origin' }).catch(() => undefined)
+      void mutateAll(key => typeof key === 'string' && key.includes('/api/suggestions'))
+      void mutateAll('threads')
+    }
   }
-  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
-    event.preventDefault()
-    void send()
-  }
-
-  const attachButton = <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
   <section aria-label={t('label')} className="orvilo-agent flex min-h-0 flex-1 flex-col">
     <MessageScrollerProvider defaultScrollPosition="end">
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={t('conversation')}>
           <MessageScrollerContent className={cn('mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 pb-6', compact ? 'pt-4' : 'pt-18')}>
-            {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyMedia variant="icon"><Send /></EmptyMedia><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty>}
+            {/* Like every bot, the Coordinator has no empty chat: it writes its welcome first. */}
+            {data && !items.length && (data.enabled
+              ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><CoordinatorAvatar size="pill" mood="thinking" />{tNav('writingWelcome')}</p>
+              : <div className="flex flex-1 flex-col items-center justify-center gap-3"><CoordinatorAvatar size="profile" /><p className="text-sm font-medium">{t('label')}</p></div>)}
             {items.map(item => <MessageScrollerItem key={item.position} messageId={String(item.position)} scrollAnchor={item.from === 'person'}>
               {item.from === 'event'
                 ? <p className="text-center text-xs text-muted-foreground">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
                     {item.text && (item.from === 'coordinator'
-                      ? <Bubble variant="muted" align="start" className={cn('min-w-0', compact ? 'max-w-full' : 'max-w-[min(35rem,85%)]')}><BubbleContent className="flex w-full min-w-0 flex-col gap-1 rounded-2xl bg-muted/60 px-4 py-3">{!embedded && <span className="text-xs font-medium text-muted-foreground">{t('label')}</span>}<CoordinatorReply text={item.text} citations={citations} /></BubbleContent></Bubble>
+                      ? <CoordinatorReply text={item.text} citations={citations} />
                       : <Bubble variant="secondary" align="end" className={cn(compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.text}</BubbleContent></Bubble>)}
                     {item.artifacts.length > 0 && <div className={cn('flex flex-col gap-2', embedded ? 'items-start gap-1.5' : 'w-full')}>
                       {item.artifacts.flatMap(id => { const artifact = data?.artifacts[id]; return artifact ? [embedded
@@ -128,32 +123,21 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {item.tools.length > 0 && <MessageFooter>{t('usedTools', { tools: [...new Set(item.tools)].join(', ') })}</MessageFooter>}
                   </MessageContent></Message>}
             </MessageScrollerItem>)}
-            {data?.working && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />{t('working')}</p>}
+            {data?.working && items.length > 0 && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />{t('working')}</p>}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <MessageScrollerButton />
       </MessageScroller>
     </MessageScrollerProvider>
     <div className={cn('mx-auto flex w-full max-w-3xl flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4')}>
-      {!compact && working.length > 0 && <p className="flex items-center gap-3 px-2 text-xs text-muted-foreground"><span>{tShell('whoIsWorking')}</span><span className="flex [&>*+*]:-ml-1.5">{working.slice(0, 5).map(name => <LetterAvatar key={name} name={name} size="stack" />)}</span><span>{tShell('agentsWorking', { count: working.length })}</span></p>}
       {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
       {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
-      {/* Grok-style composer: one rounded bar, attach on the left, send on the right. */}
-      <form onSubmit={send}>
-        <FieldGroup className="sr-only"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
-        <InputGroup className={cn('min-h-12 rounded-3xl bg-background shadow-xs', embedded?.quote && 'rounded-2xl')}>
-          {embedded?.quote && <InputGroupAddon align="block-start" className="px-2 pt-2 pb-0"><ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} /></InputGroupAddon>}
-          {!embedded?.quote && <InputGroupAddon align="inline-start" className="self-end pb-2">{attachButton}</InputGroupAddon>}
-          <InputGroupTextarea ref={inputRef} aria-label={t('input')} placeholder={placeholder ?? t('input')} className={cn('max-h-48 py-3.5', embedded?.quote ? 'min-h-10 pb-1' : 'min-h-12')} value={draft} maxLength={10_000} rows={1} disabled={sending} onChange={event => setDraft(event.target.value)} onKeyDown={onKeyDown} />
-          {embedded?.quote
-            ? <InputGroupAddon align="block-end" className="justify-between px-2 pt-0 pb-2">{attachButton}<InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" aria-label={t('send')} disabled={sending || !draft.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton></InputGroupAddon>
-            : <InputGroupAddon align="inline-end" className="self-end pb-2"><InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" aria-label={t('send')} disabled={sending || !draft.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton></InputGroupAddon>}
-        </InputGroup>
-      </form>
+      <ChatComposer ref={inputRef} label={t('input')} placeholder={placeholder} value={draft} onChange={setDraft} sending={sending} onSubmit={() => { void send() }}
+        quote={embedded?.quote ? <ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} /> : undefined} />
     </div>
     {!embedded && viewing && <ArtifactViewer artifactId={viewing} onArtifactChange={setViewing} onClose={() => setViewing(null)}
-      bot={{ name: tNav('coordinator'), tone: 'coordinator' }} quotes={quotes}
+      bot={{ name: tNav('coordinator'), avatar: <CoordinatorAvatar size="pill" /> }} quotes={quotes}
       chat={slot => <CoordinatorChat onOpenIssue={onOpenIssue} compact embedded={slot} />} />}
   </section>
   </AgentInteractionContext></AgentThemeProvider>

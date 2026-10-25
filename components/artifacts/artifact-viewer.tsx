@@ -15,12 +15,11 @@ import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { LetterAvatar, type AvatarTone } from '@/components/nav/letter-avatar'
 import type { ArtifactQuote } from '@/lib/artifacts/quote'
 import type { ArtifactDetail } from '@/lib/artifacts/types'
 import { withBasePath } from '@/lib/base-path'
 import { cn } from '@/lib/utils'
-import { ArtifactKindIcon } from './artifact-card'
+import { ArtifactAuthorAvatar, ArtifactKindIcon } from './artifact-card'
 import { ArtifactDocument } from './artifact-document'
 import { ArtifactFrame } from './artifact-frame'
 
@@ -45,7 +44,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
   onArtifactChange: (id: string) => void
   onClose: () => void
   /** The bot whose chat sits on the right. */
-  bot: { name: string; tone?: AvatarTone }
+  bot: { name: string; avatar: ReactNode }
   /** Every quote sent from artifacts in this chat; this reader underlines its own. */
   quotes: readonly ArtifactQuote[]
   chat: (slot: ArtifactChatSlot) => ReactNode
@@ -98,7 +97,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
           <DropdownMenuContent align="start" className="w-72 p-1">
             <DropdownMenuRadioGroup value={version} onValueChange={value => pickVersion(Number(value))}>
               {[...detail.versions].reverse().map(item => <DropdownMenuRadioItem key={item.version} value={item.version} closeOnClick className="items-start gap-2.5 rounded-md py-2 pl-2">
-                <LetterAvatar name={item.authorName} size="pill" />
+                <ArtifactAuthorAvatar author={item} size="pill" />
                 <span className="flex min-w-0 flex-col">
                   <span className="flex items-center gap-1.5 text-sm font-medium">{t('version', { version: item.version })}{item.version === latest && <Badge variant="secondary" className="h-4 rounded-sm px-1">{t('current')}</Badge>}</span>
                   <span className="truncate text-xs text-muted-foreground">{t('versionMeta', { author: item.authorName, time: when(item.createdAt) })}</span>
@@ -131,7 +130,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
             ? <Empty className="flex-1"><EmptyHeader><EmptyTitle>{t('loadError')}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={() => void mutate()}>{t('retry')}</Button></Empty>
             : !detail || (markdown && text === undefined) ? <div className="flex flex-1 items-center justify-center"><Spinner /></div>
             : markdown ? <ArtifactDocument key={`${artifactId}:${version}`} title={detail.title} markdown={text ?? ''} compareWith={old && showDiff ? latestText ?? null : null}
-                author={info?.authorName ?? ''} meta={info ? t(old ? 'versionMeta' : 'updated', { author: info.authorName, time: when(info.createdAt) }) : ''}
+                author={info ?? { authorName: '', authorColor: null, authorShape: null }} meta={info ? t(old ? 'versionMeta' : 'updated', { author: info.authorName, time: when(info.createdAt) }) : ''}
                 quoted={mine.filter(item => item.kind === 'text').map(item => item.text)} quoting={quote?.kind === 'text' && quote.artifactId === artifactId && quote.version === version ? quote.text : null}
                 onQuote={quoteText} />
             : <ArtifactFrame src={versionPath(artifactId, version, 'frame')} title={t('frameTitle', { title: detail.title })} selecting={selecting}
@@ -141,7 +140,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
         </main>
         <aside aria-label={bot.name} className={cn('w-full flex-col bg-muted/50 md:flex md:w-[25rem] md:shrink-0', pane === 'chat' ? 'flex' : 'hidden')}>
           <div className="flex h-12 shrink-0 items-center gap-2 px-4">
-            <LetterAvatar name={bot.name} tone={bot.tone} size="pill" />
+            {bot.avatar}
             <span className="truncate text-sm font-medium">{bot.name}</span>
           </div>
           {chat({ quote, clearQuote: () => setQuote(null), activeArtifactId: artifactId, openArtifact: switchArtifact })}
