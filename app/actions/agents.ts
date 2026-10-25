@@ -15,6 +15,7 @@ import {
 } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/device-link'
 import { listSshHosts } from '@/lib/ssh'
+import { citationSources } from '@/lib/coordinator/store'
 import { addRunMessage, queueRun, readRun, requestRunStop, type RunDetail, type RunView } from '@/lib/agent-runs'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
@@ -230,6 +231,21 @@ export async function listRuns(issueId: string): Promise<RunView[]> {
 
 export async function getRun(runId: string): Promise<RunDetail | null> {
   return readRun(await getUserId(), runId)
+}
+
+/**
+ * A thread's name: the task it works on, as "MIK-11 群聊建表" (glossary:
+ * a thread is one run, named for its work, never for its bot). Null when the
+ * run is not this person's or works on no task.
+ */
+export async function getThreadName(runId: string): Promise<string | null> {
+  const userId = await getUserId()
+  const parsed = z.uuid().safeParse(runId)
+  if (!parsed.success) return null
+  const source = (await citationSources(userId, [`[[run:${parsed.data}]]`]))[parsed.data]
+  if (source?.kind !== 'run' || !source.issue) return null
+  const key = source.issue.identifier ?? (source.issue.number === null ? null : `#${source.issue.number}`)
+  return key ? `${key} ${source.issue.title}` : source.issue.title
 }
 
 /** A message a person sends the running agent; the daemon delivers it. */

@@ -19,14 +19,23 @@ export const RETRY_QUEUE_WAIT_MS = 30 * 60_000
 
 const RETRY_HEADING = '## This run is a retry'
 
-/** The brief for the retry: the original one, with a note on what happened. */
-export function retryPrompt(prompt: string, attempt: number): string {
-  const base = prompt.split(`\n\n${RETRY_HEADING}`)[0]
-  const note = [
+/**
+ * What the retry is told. The daemon continues the lost attempt's worktree
+ * (and its session, when the harness can resume), so its files are usually
+ * still there; a new machine starts from the base branch instead.
+ */
+export function retryNote(attempt: number): string {
+  return [
     RETRY_HEADING,
     `This is attempt ${attempt} of ${MAX_RUN_ATTEMPTS}. The previous attempt stopped because its machine went offline, not because of anything it did.`,
-    'It may have left work behind: a branch, commits, a pushed branch or an open pull request. Check for them first and continue from there; do not repeat a push, a pull request or a message that already happened.',
+    'Its work is usually still here: check the files and `git status` first and continue from them. Do not repeat a push, a pull request or a message that already happened.',
   ].join('\n\n')
+}
+
+/** The brief for the retry: the original one, with the note on what happened. */
+export function retryPrompt(prompt: string, attempt: number): string {
+  const base = prompt.split(`\n\n${RETRY_HEADING}`)[0]
+  const note = retryNote(attempt)
   return `${base.slice(0, 100_000 - note.length - 2)}\n\n${note}`
 }
 
@@ -46,3 +55,34 @@ export function lostRunOutcome(run: { attempt: number; stopRequestedAt: Date | n
 
 /** The error on a retry that waited too long for its device. */
 export const DEVICE_STAYED_OFFLINE = 'The device stayed offline, so the retry could not start.'
+
+/** A git remote as `host/owner/repo`, so https and ssh spellings of one repo match. */
+export function remoteKey(url: string): string {
+  return url.trim().toLowerCase()
+    .replace(/^[a-z+]+:\/\//, '')
+    .replace(/^[^@/]+@/, '')
+    .replace(/^([^/:]+):(?!\d+\/)/, '$1/')
+    .replace(/:\d+\//, '/')
+    .replace(/\/+$/, '')
+    .replace(/\.git$/, '')
+}
+
+export interface TakeoverCandidate {
+  deviceId: string
+  deviceRepoId: string
+  remoteUrl: string | null
+  harnesses: readonly { harness: string; installed: boolean }[]
+}
+
+/**
+ * Another machine that can go on with a run whose device went offline: it
+ * has the same repository (by remote) and the agent's harness installed.
+ * Candidates come online, enabled and most recently seen first.
+ */
+export function pickTakeover(candidates: readonly TakeoverCandidate[], run: { remoteUrl: string | null; harness: string; lostDeviceId: string | null }): TakeoverCandidate | null {
+  if (!run.remoteUrl) return null
+  const remote = remoteKey(run.remoteUrl)
+  return candidates.find(candidate => candidate.deviceId !== run.lostDeviceId
+    && candidate.remoteUrl !== null && remoteKey(candidate.remoteUrl) === remote
+    && candidate.harnesses.some(info => info.harness === run.harness && info.installed)) ?? null
+}

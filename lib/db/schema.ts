@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -196,6 +196,21 @@ export const runChunks = pgTable('run_chunks', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('run_chunks_run_seq_key').on(table.runId, table.seq)])
 
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' })
+
+/**
+ * The latest work in progress of a run, saved by the daemon so another
+ * machine can take the run over (lib/run-leases.ts). `patch` is a gzipped
+ * `git diff --binary` against `baseCommit`.
+ */
+export const runCheckpoints = pgTable('run_checkpoints', {
+  runId: uuid('runId').primaryKey().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(), baseCommit: text('baseCommit').notNull(),
+  patch: bytea('patch').notNull(), files: integer('files').notNull(),
+  takenAt: timestamp('takenAt', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
 /**
  * A token the agent inside one run uses for the worker tools of the MCP
  * server. Handed to the daemon with the claim; good only while the run is
@@ -216,10 +231,11 @@ export const runTokens = pgTable('run_tokens', {
  * `dedupeKey` keeps a repeated write to one row.
  */
 /**
+ * `action_decided` follows the person approving or declining a pending action.
  * `run_report`, `run_question` and `run_blocked` come from the agent inside a
  * run, through the worker tools of the MCP server (lib/mcp/worker.ts).
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth
@@ -395,3 +411,22 @@ export const conversationLinks = pgTable('conversation_links', {
   anchorPosition: bigint('anchorPosition', { mode: 'bigint' }).notNull(), firstPosition: bigint('firstPosition', { mode: 'bigint' }).notNull(),
   lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull(), messageCount: bigint('messageCount', { mode: 'bigint' }).notNull(),
 }, t => [index('conversation_links_source_idx').on(t.sourceConversationId, t.anchorPosition)])
+
+/**
+ * Something an agent wants to do in the person's own accounts (send an email,
+ * create or change a calendar event). It stays `pending` until the person
+ * approves or declines it; approving runs exactly `input` (lib/pending-actions.ts).
+ * `context` is what the card shows besides the input, such as the event being changed.
+ */
+export const PENDING_ACTION_STATUSES = ['pending', 'running', 'done', 'failed', 'declined'] as const
+export type PendingActionStatus = (typeof PENDING_ACTION_STATUSES)[number]
+export const pendingActions = pgTable('pending_actions', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  action: text('action').notNull(),
+  input: jsonb('input').$type<Record<string, unknown>>().notNull(),
+  context: jsonb('context').$type<Record<string, unknown> | null>(),
+  status: text('status').$type<PendingActionStatus>().notNull().default('pending'),
+  result: jsonb('result').$type<Record<string, unknown> | null>(), error: text('error'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  decidedAt: timestamp('decidedAt', { withTimezone: true }),
+}, table => [index('pending_actions_user_status_idx').on(table.userId, table.status, table.createdAt)])

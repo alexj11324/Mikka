@@ -39,7 +39,7 @@ interface StepEvent {
  * available for arbitrary machines.
  */
 async function isAllowedSshHost(hostname: string): Promise<boolean> {
-  const allowlist = (process.env.MIKKA_SSH_HOSTS ?? process.env.ORVILO_SSH_HOSTS ?? '')
+  const allowlist = (process.env.MIKKA_SSH_HOSTS ?? '')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean)

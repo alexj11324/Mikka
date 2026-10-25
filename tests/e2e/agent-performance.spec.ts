@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import type { Page, TestInfo } from '@playwright/test'
 import { test, expect, register, rail, app } from './fixtures'
+import { observeNewDocumentHistory } from './history-request-observer'
 
 // 本地目标 1000ms；GitHub Actions 共享机器抖动大，CI 上留 20% 余量（MIK-1）。
 const budget = process.env.CI ? 1200 : 1000
@@ -63,11 +64,10 @@ async function assertInteractiveWithinBudget(page: Page, info: TestInfo, name: s
 
 test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 秒 @performance', async ({ page }, info) => {
   const { email } = await register(page)
+  // The page register lands on loads its own history; let that finish so it isn't counted after the reload.
+  await page.waitForLoadState('networkidle')
   const { older } = await seedHistory(page, email)
-  const historyRequests: string[] = []
-  page.on('request', request => {
-    if (new URL(request.url()).pathname === app('/api/agent/sessions')) historyRequests.push(request.url())
-  })
+  const { historyRequests, cdp } = await observeNewDocumentHistory(page, app('/api/agent/sessions'))
   await page.reload()
 
   const firstStart = await page.evaluate(() => performance.now())
@@ -79,8 +79,6 @@ test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 �
   expect(historyRequests).toHaveLength(1)
   expect(new URL(historyRequests[0]).searchParams.has('sessionId')).toBe(false)
 
-  const cdp = await page.context().newCDPSession(page)
-  await cdp.send('Network.enable')
   await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
   await page.reload({ waitUntil: 'domcontentloaded' })
   panel = await assertInteractiveWithinBudget(page, info, '无缓存刷新并恢复完整历史', 0, '第三轮性能验收的已保存正文')

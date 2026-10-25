@@ -93,7 +93,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
       ].filter(Boolean).join('\n')
     case 'run_retried':
       return [
-        `[Event] Run ${event.runId} lost its machine (the device went offline), so it was queued again as run ${payload.retryRunId}, attempt ${payload.attempt} of ${payload.maxAttempts}.`,
+        `[Event] Run ${event.runId} lost its machine (the device went offline), so it was ${payload.movedToDeviceId ? `handed to device ${payload.movedToDeviceId}` : 'queued again'} as run ${payload.retryRunId}, attempt ${payload.attempt} of ${payload.maxAttempts}.`,
         event.issueId ? `Issue: ${event.issueId}.` : null,
         'Nothing to do; follow the new run.',
         note,
@@ -110,6 +110,17 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         'The run keeps going. Ask the person, then pass their answer on with send_to_run.',
         note,
       ].filter(Boolean).join('\n')
+    case 'action_decided': {
+      const what = `${payload.action} (proposal ${payload.actionId})`
+      const outcome = payload.outcome && typeof payload.outcome === 'object' && Object.keys(payload.outcome).length ? ` Result: ${JSON.stringify(payload.outcome)}.` : ''
+      return [
+        payload.status === 'done' ? `[Event] The person approved ${what} and it is done.${outcome}`
+          : payload.status === 'failed' ? `[Event] The person approved ${what} but it failed: ${payload.error}.`
+          : `[Event] The person declined ${what}. It did not happen.`,
+        `What it was: ${JSON.stringify(payload.input).slice(0, 2000)}`,
+        note,
+      ].filter(Boolean).join('\n')
+    }
     case 'run_blocked':
       return [
         `[Event] The agent in run ${event.runId} is blocked: ${payload.reason}`,
