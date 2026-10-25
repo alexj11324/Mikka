@@ -54,7 +54,7 @@ export const issueVersions = pgTable('issue_versions', {
   id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull(), userId: text('userId').notNull(),
   revision: integer('revision').notNull(), title: varchar('title', { length: 200 }).notNull(),
   content: jsonb('content').$type<JSONContent>().notNull(), status: text('status').notNull(), priority: text('priority').notNull(),
-  // Who made the change; set on the server only. Null on rows written before 20261023222228.
+  // Who made the change; set on the server only. Null on rows written before 20261025200000_activity_version_actor.
   actorType: text('actor_type').$type<'user' | 'agent' | 'system'>(), actorId: text('actor_id'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
