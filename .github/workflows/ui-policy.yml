@@ -23,7 +23,8 @@ concurrency:
 jobs:
   cloud-secret-access:
     name: Cloud credential access (OIDC)
-    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka'
+    # This isolated ledger candidate is authorized for synthetic tests only.
+    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref != 'refs/heads/codex/208-operation-ledger'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
