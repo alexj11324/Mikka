@@ -76,10 +76,18 @@ import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
 
+import { createNativeGroupProcessor, type GroupReviewImages } from './adapters/group-review'
+import { runGroupReviewBatch, type GroupReviewAssignment, type GroupReviewOutput } from './runs/group-review-worker'
+
 export * from "./server-link"
 export { DAEMON_VERSION, daemonPaths, defaultDataDir } from "./paths"
 
 export interface DaemonOptions {
+  /** Explicit isolated processor only. Omitted: group work stays queued; no
+   * inherited repository adapters, native CLI credentials or provider calls. */
+  groupReviewImages?: GroupReviewImages
+  groupReviewProcessor?: (input: GroupReviewAssignment, signal: AbortSignal) => Promise<GroupReviewOutput>
+
   dataDir: string
   flavor: Flavor
   link: ServerLink
@@ -170,6 +178,10 @@ export class Daemon {
   private timer: NodeJS.Timeout | null = null
   private tick: Promise<void> = Promise.resolve()
   private draining = false
+  private nativeGroupDispose: (()=>Promise<void>) | undefined
+  private groupProcessor: DaemonOptions['groupReviewProcessor']
+  private groupReviewTask: Promise<unknown> | null = null
+  private groupReviewAbort = new AbortController()
   private stopped = false
   private adapters = new Map<Harness, AgentAdapter>()
   /** Registered (or re-registered) with the server since this start. */
@@ -199,6 +211,12 @@ export class Daemon {
 
   async start() {
     const { paths } = this
+    if(this.options.groupReviewProcessor&&this.options.groupReviewImages)throw new Error('Choose an isolated group processor or native group images, not both')
+    if(this.options.groupReviewImages){
+      const processor=await createNativeGroupProcessor(this.options.groupReviewImages)
+      this.groupProcessor=processor;this.nativeGroupDispose=processor.dispose
+    }else this.groupProcessor=this.options.groupReviewProcessor
+    try {
     mkdirSync(paths.dataDir, { recursive: true, mode: 0o700 })
     // `mode` only applies on creation; tighten a dir that already existed.
     if (process.platform !== "win32") chmodSync(paths.dataDir, 0o700)
@@ -310,6 +328,7 @@ export class Daemon {
     this.commandsLoop = this.pollCommands()
     this.fsLoop = this.pollFolderRequests()
     return this
+    } catch(error) { await this.nativeGroupDispose?.();throw error }
   }
 
   /**
@@ -634,7 +653,12 @@ export class Daemon {
       this.saveDevice({ repos: await link.listRepos(deviceId) })
       this.server = "online"
       await this.outbox.flushAll()
-      if (!this.draining) {
+      if (!this.draining && !this.stopped) {
+        if (this.groupProcessor && link.groupReviews && !this.groupReviewTask) {
+          this.groupReviewTask = runGroupReviewBatch(link.groupReviews(deviceId,this.groupReviewAbort.signal),this.groupProcessor,this.groupReviewAbort.signal)
+            .catch((error:unknown)=>this.log.warn({err:error},'group review worker stopped'))
+            .finally(()=>{this.groupReviewTask=null})
+        }
         for (const runId of await link.pendingRuns(deviceId)) {
           if (this.refusedRuns.has(runId)) continue
           await this.claimAndStart(runId).catch((error: unknown) =>
@@ -886,6 +910,10 @@ export class Daemon {
     if (this.stopped) return
     this.stopped = true
     if (this.timer) clearTimeout(this.timer)
+    this.groupReviewAbort.abort()
+    await this.groupReviewTask
+    let nativeCleanupError:unknown
+    try{await this.nativeGroupDispose?.()}catch(error){nativeCleanupError=error;this.log.error({err:error},'native group container cleanup unconfirmed')}
     await this.quota?.stop()
     this.commandsAbort.abort()
     await this.commandsLoop.catch(() => undefined)
@@ -903,6 +931,7 @@ export class Daemon {
     this.log.info("daemon stopped")
     // Close the log file only if this daemon opened it.
     if (!this.options.log) await closeLogger(this.log)
+    if(nativeCleanupError)throw nativeCleanupError
   }
 }
 

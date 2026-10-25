@@ -163,6 +163,15 @@ export const agents = pgTable('agents', {
 export const RUN_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing', 'succeeded', 'stopped', 'failed', 'cancelled'] as const
 export type RunStatus = (typeof RUN_STATUSES)[number]
 
+/** Logical address and owner policy; execution attempts and role configs are separate. */
+export const sessionMailboxes = pgTable('session_mailboxes', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(), workspaceId: text('workspaceId').notNull(),
+  kind: text('kind').$type<'run' | 'coordinator' | 'bot' | 'group'>().notNull(), sessionKey: text('sessionKey').notNull(),
+  harness: text('harness'), latestRunId: uuid('latestRunId'), wakeBudget: integer('wakeBudget').notNull().default(0),
+  disabled: boolean('disabled').notNull().default(false),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('session_mailboxes_identity').on(table.userId, table.workspaceId, table.kind, table.sessionKey)])
+
 /** One execution of one agent. The daemon claims it, runs it and reports back. */
 export const agentRuns = pgTable('agent_runs', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
@@ -175,6 +184,8 @@ export const agentRuns = pgTable('agent_runs', {
   prompt: text('prompt').notNull().default(''),
   baseBranch: text('baseBranch').notNull().default('main'),
   sessionId: text('sessionId'), worktreePath: text('worktreePath'),
+  mailboxId: uuid('mailboxId'), continuesRunId: uuid('continuesRunId'),
+  resumeSessionId: text('resumeSessionId'), followUp: text('followUp'),
   stopReason: text('stopReason'), error: text('error'),
   report: jsonb('report').$type<Record<string, unknown> | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
@@ -248,6 +259,7 @@ export const coordinatorEvents = pgTable('coordinator_events', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   kind: text('kind').$type<CoordinatorEventKind>().notNull(),
   dedupeKey: text('dedupeKey').notNull().unique('coordinator_events_dedupe_key'),
+  sequence: bigint('sequence', { mode: 'number' }).notNull().default(sql`nextval('mikka_mailbox_sequence')`),
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
   runId: uuid('runId').references(() => agentRuns.id, { onDelete: 'cascade' }),
   payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
@@ -340,8 +352,14 @@ export const coordinatorMessages = pgTable('coordinator_messages', {
 
 /** A message a person sent a running agent, delivered on its next poll. */
 export const runMessages = pgTable('run_messages', {
-  id: uuid('id').primaryKey(), runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  id: uuid('id').primaryKey(), runId: uuid('runId').references(() => agentRuns.id, { onDelete: 'cascade' }),
   userId: text('userId').notNull(), text: text('text').notNull(),
+  mailboxId: uuid('mailboxId').references(() => sessionMailboxes.id),
+  senderMailboxId: uuid('senderMailboxId').references(() => sessionMailboxes.id),
+  replyTo: uuid('replyTo'), dedupeKey: uuid('dedupeKey'),
+  acknowledgedAt: timestamp('acknowledgedAt', { withTimezone: true }), failure: text('failure'),
+  origin: text('origin').$type<'owner' | 'peer'>().notNull().default('owner'),
+  sequence: bigint('sequence', { mode: 'number' }).notNull().default(sql`nextval('mikka_mailbox_sequence')`),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('run_messages_run_idx').on(table.runId, table.createdAt)])

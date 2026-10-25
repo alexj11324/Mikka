@@ -25,11 +25,11 @@
     "i18n:check": "node scripts/check-i18n.mjs",
     "test:ssh-target": "node --import tsx --test lib/ssh-target.test.ts",
     "test:linear-sync": "node --import tsx --test lib/db/request-scope.test.ts lib/linear-sync/mapping.test.ts lib/linear-sync/markdown.test.ts lib/linear-sync/webhook.test.ts cloudflare/linear-sync/src/index.test.ts",
-    "test:coordinator-events": "node --import tsx --test lib/run-retry.test.ts lib/coordinator-events.test.ts lib/coordinator/context.test.ts lib/coordinator/model.test.ts lib/coordinator/triage.test.ts lib/coordinator/decision.test.ts lib/coordinator/group-routing.test.ts lib/coordinator/citations.test.ts lib/link-preview-parse.test.ts",
+    "test:coordinator-events": "node --import tsx --test lib/run-retry.test.ts lib/coordinator-events.test.ts lib/coordinator/context.test.ts lib/coordinator/model.test.ts lib/coordinator/triage.test.ts lib/coordinator/decision.test.ts lib/coordinator/group-routing.test.ts lib/coordinator/citations.test.ts lib/link-preview-parse.test.ts tests/orchestration-prompts.test.ts",
     "test:integrations": "node --import tsx --test lib/auth-callback.test.ts lib/composio-actions.test.ts lib/pending-action-view.test.ts lib/composio-pagination.test.ts lib/issue-owner-scope.test.ts lib/skills-search.test.ts",
     "test:e2e": "playwright test",
     "test:performance": "playwright test tests/e2e/navigation-performance.spec.ts tests/e2e/agent-performance.spec.ts --grep @performance",
-    "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
+    "test:e2e:setup": "node --test scripts/setup-e2e-db.test.mjs && node --experimental-strip-types scripts/setup-e2e-db.mjs",
     "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
     "test:analytics": "node --experimental-strip-types --test tests/analytics-policy.test.mjs",
     "test:settings": "node --experimental-strip-types --test tests/settings-navigation.test.mjs tests/team-identifier.test.mjs",
@@ -46,7 +46,9 @@
     "typecheck": "tsgo --noEmit",
     "daemon": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon --server http://localhost:3000",
     "daemon:login": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon login --server http://localhost:3000",
-    "test:groups": "node --import tsx --test lib/group-conversations.test.ts"
+    "test:groups": "node --import tsx --test lib/group-conversations.test.ts lib/group-artifact-review.test.ts lib/group-mailbox-runtime.test.ts lib/group-worker-authority.test.ts",
+    "test:group-native": "MIKKA_TEST_NATIVE_GROUPS=1 node --import tsx --test lib/group-mailbox-runtime.test.ts",
+    "test:mailboxes": "node --import tsx --test tests/session-mailbox.test.ts tests/orchestration-prompts.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

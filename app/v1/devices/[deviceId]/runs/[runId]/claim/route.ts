@@ -1,5 +1,6 @@
+import { mailboxes } from '@/lib/mailbox-runtime'
 import { NextResponse } from 'next/server'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { RUN_LEASE_MS } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
@@ -27,9 +28,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const [run] = await db
     .select()
     .from(agentRuns)
-    .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
     .limit(1)
   if (!run) return NextResponse.json({ error: 'Run is not queued for this device.' }, { status: 409 })
+  if (run.kind === 'group_review') return NextResponse.json({ error: 'Use the isolated group-review worker.' }, { status: 409 })
   const [agent] = await db.select().from(agents).where(eq(agents.id, run.agentId)).limit(1)
   const [repo] = run.deviceRepoId
     ? await db.select().from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
@@ -40,16 +42,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       .where(eq(agentRuns.id, runId))
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
+  // Prepare mailbox identity while the attempt is still queued. A transient
+  // failure here must remain retryable rather than strand a preparing run.
+  await mailboxes.conversation(run.userId, 'coordinator')
+  await mailboxes.run(run.userId, runId)
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   const claimed = await db.update(agentRuns)
     .set({ status: 'preparing', startedAt: new Date(), leaseExpiresAt: new Date(leaseExpiresAt), updatedAt: new Date() })
-    .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt),
+      sql`(${agentRuns.mailboxId} is null or exists (select 1 from session_mailboxes m where m.id=${agentRuns.mailboxId} and not m.disabled))`))
     .returning({ id: agentRuns.id })
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
+  if (!claimed.length) return NextResponse.json({ error: 'Run already claimed.' }, { status: 409 })
   const mcp = claimed.length
     ? await issueRunToken(run)
-      .then(({ token }) => ({ url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token }))
+      .then(({ token }) => ({ url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token, mailboxUrl: new URL(withBasePath('/v1/mailbox'), request.url).toString() }))
       .catch((error: unknown) => { console.error('Could not issue a run token', error instanceof Error ? error.message : error); return undefined })
     : undefined
   // A retry after a lost lease works on in the lost attempt's worktree and,
@@ -71,6 +79,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
     baseBranch: repo.baseBranch, harness: agent.harness, prompt: run.prompt,
     kind: run.kind, leaseExpiresAt,
+    ...(run.continuesRunId ? { continuesRunId: run.continuesRunId } : {}),
+    ...(run.resumeSessionId ? { resumeSessionId: run.resumeSessionId } : {}),
+    ...(run.followUp ? { followUp: run.followUp } : {}),
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
     ...retry,

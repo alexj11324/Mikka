@@ -64,6 +64,12 @@ test('worker MCP rechecks current issue authority after queueing and revocation'
     await call(privateRun.token,'personal owner without workspace link',200)
     const noIssue = await runFor(owner,null)
     await call(noIssue.token,'orphan run fails closed',401)
+    // Dedicated group work cannot acquire generic MCP or credential tools by
+    // attaching an otherwise authorized issue to its persisted run.
+    const groupKind = await runFor(owner,personal)
+    await pool.query("update agent_runs set kind='group_review' where id=$1",[groupKind.run])
+    for (const tool of ['report','ask','blocked']) await call(groupKind.token,'group kind rejects generic '+tool,401,tool)
+    expect(await events(groupKind.run)).toBe(0)
     await pool.query('update mikka_workspace_members set status=$1 where "workspaceId"=$2 and "userId"=$3',['suspended',workspaceA,member])
     await call(active.token,'running member revoked before next request',401)
     await call(active.token,'revoked member ask',401,'ask')

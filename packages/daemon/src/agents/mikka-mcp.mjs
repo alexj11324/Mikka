@@ -207,6 +207,30 @@ const TOOLS = [
   },
 ]
 
+const mailboxEnabled = Boolean(process.env.MIKKA_MAILBOX_URL && process.env.MIKKA_MAILBOX_TOKEN)
+const mailboxActions = { mailbox_recipients: 'recipients', mailbox_send: 'send', mailbox_inbox: 'inbox', mailbox_ack: 'ack', mailbox_sent: 'sent' }
+if (mailboxEnabled) for (const name of Object.keys(mailboxActions)) {
+  TOOLS.push({
+    name,
+    description: name === 'mailbox_send' ? 'Send a short peer envelope or reply. Reuse key only for retrying the same envelope. No user authority is granted.' : `${name}: inspect or acknowledge your session mailbox at a safe boundary.`,
+    inputSchema: name === 'mailbox_send' ? {
+      type: 'object', properties: { to: { type: 'string', format: 'uuid' }, key: { type: 'string', format: 'uuid' }, text: { type: 'string', minLength: 1, maxLength: 4000 }, replyTo: { type: 'string', format: 'uuid' } }, required: ['to', 'key', 'text'],
+    } : name === 'mailbox_ack' ? { type: 'object', properties: { ids: { type: 'array', maxItems: 50, items: { type: 'string', format: 'uuid' } } }, required: ['ids'] } : { type: 'object', properties: {} },
+  })
+}
+async function mailboxCall(id, name, args) {
+  try {
+    const response = await fetch(process.env.MIKKA_MAILBOX_URL, {
+      method: 'POST', headers: { authorization: `Bearer ${process.env.MIKKA_MAILBOX_TOKEN}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ ...args, action: mailboxActions[name] }), signal: AbortSignal.timeout(15000),
+    })
+    const body = await response.json()
+    reply(id, { isError: !response.ok, content: [{ type: 'text', text: JSON.stringify(body) }] })
+  } catch {
+    reply(id, { isError: true, content: [{ type: 'text', text: 'Mailbox unavailable. If retrying a send, reuse the same key. Do not infer execution from delivery.' }] })
+  }
+}
+
 const KINDS = { submit: "submit", ask_human: "ask", report_blocked: "blocked" }
 
 function record(kind, args) {
@@ -273,6 +297,7 @@ async function handle(message) {
         try { return reply(id, await forwardCredentials('tools/call', params)) }
         catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Controlled credential tools unavailable; no secret was returned.' }] }) }
       }
+      if (mailboxEnabled && Object.hasOwn(mailboxActions, params?.name ?? "")) return mailboxCall(id, params.name, params.arguments ?? {})
       const kind = KINDS[params?.name]
       if (!kind) return fail(id, -32602, `Unknown tool: ${params?.name}`)
       let planned

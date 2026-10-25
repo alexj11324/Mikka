@@ -8,6 +8,7 @@ import { readJson, writeJsonAtomic } from "./fs-util"
 import { DaemonAlreadyRunningError } from "./lock"
 import { createLogger } from "./log"
 import { deviceLogin } from "./login"
+import { groupReviewImages } from './adapters/group-review'
 import { startDaemon } from "./main"
 import { DAEMON_VERSION, daemonPaths, defaultDataDir } from "./paths"
 import { connectDaemonInDataDir, isNoDaemon } from "./rpc/client"
@@ -15,7 +16,7 @@ import { MemoryServer, type DeviceRepo, type ServerLink } from "./server-link"
 import { HttpServerLink } from "./server-link-http"
 
 const USAGE = `Usage:
-  mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>]
+  mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>] [--group-review-images <image-manifest.json>]
   mikka daemon login [--server <url>] [--workspace <id>] [--token <session>] [--dev] [--data-dir <dir>]
   mikka daemon status [--dev] [--data-dir <dir>]`
 
@@ -49,6 +50,7 @@ export async function runCli(
       "data-dir": { type: "string" },
       server: { type: "string" },
       "mock-speed": { type: "string" },
+      "group-review-images": { type: "string" },
       "fixtures-dir": { type: "string" },
       "stall-minutes": { type: "string" },
       token: { type: "string" },
@@ -167,6 +169,7 @@ export async function runCli(
       log,
       mockSpeed: speed,
       fixturesDir: values["fixtures-dir"],
+      groupReviewImages: values["group-review-images"] ? groupReviewImages.parse(readJson(values["group-review-images"])) : undefined,
       stallMs: values["stall-minutes"]
         ? Number(values["stall-minutes"]) * 60_000
         : undefined,

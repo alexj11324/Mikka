@@ -85,6 +85,8 @@ export interface SessionOptions {
    * default. A harness that cannot express one ignores it.
    */
   model?: string
+  /** Run-scoped messaging endpoint; never the device credential. */
+  mcp?: { url: string; token: string; mailboxUrl?: string }
 }
 
 export interface StartOptions extends SessionOptions {

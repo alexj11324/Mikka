@@ -51,7 +51,7 @@ export async function revokeRunTokens(runId: string): Promise<void> {
 async function currentRun(bearerToken?: string, executor: Pick<typeof db, 'select'> = db, workspaceExecutor: Pick<typeof workspaceDb, 'select'> = workspaceDb, lock = false) {
   if (!bearerToken?.startsWith(RUN_TOKEN_PREFIX)) return undefined
   const query = executor
-    .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId })
+    .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId, kind: agentRuns.kind })
     .from(runTokens)
     .innerJoin(agentRuns, eq(agentRuns.id, runTokens.runId))
     .where(and(
@@ -61,7 +61,7 @@ async function currentRun(bearerToken?: string, executor: Pick<typeof db, 'selec
     ))
     .limit(1)
   const [row] = await (lock ? query.for('share') : query)
-  if (!row?.issueId || !await issueForUser(row.userId, row.issueId, false, executor, workspaceExecutor) || row.expiresAt.getTime() <= Date.now()) return undefined
+  if (!row?.issueId || row.kind === 'group_review' || !await issueForUser(row.userId, row.issueId, false, executor, workspaceExecutor) || row.expiresAt.getTime() <= Date.now()) return undefined
   return row
 }
 
