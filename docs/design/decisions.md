@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-25 | The issue page follows Linear: assignee is a person with the bot handed the work under it; comments are bordered cards with replies inside; events are plain lines; @ a person or a bot, never a thread; talk to a thread by opening it on the right (「Linear的做法是应该被我们奉为瑰宝的东西」) | R-27, R-28, R-29, R-30a, R-30b, R-31 | Bot as assignee; comments as grey blocks; a 回复线程 chip in the comment box |
 | 2026-10-25 | Input boxes go only where there is a conversation. The ban was about the thread list and the computer screen, which are not chats; an open thread is a conversation with its agent and ends in the standard composer (「那个地方根本不是聊天界面，但他写上去了…结果就变成了所有地方的右边都不能加输入框了」) | R-10 | "Right panel never has an input box" (2026-10-24) |
 | 2026-10-25 | Any thread may edit the Figma file and the design docs; no single design thread owns them. New Figma work goes on its own page (「readme 相关的只由设计线程维护，你可以把它删掉」) | `README.md` | Figma owned by the design thread only |
 | 2026-10-24 21:57 | Clef is fully replaced by the OpenAI Decisions API, including the first auto-approval screen (「10月22日那个东西已经过时了，已经完全换成了 OpenAI 的 decisions API」) | R-20 | Clef (2026-10-22) |
@@ -51,6 +52,7 @@ Only these frames count as a source (file `zPe5LKycb2XuT1ivCLRw07`).
 | 新建 Bot dialog | `195:3225` | in review |
 | Group chat | `205:4488` | in review |
 | Artifact viewer | `178:11626` | in review |
+| Issue detail, threads and comments | page `220:5022`, frames `220:5023`, `220:5199` | 2026-10-25 |
 
 ## Open
 

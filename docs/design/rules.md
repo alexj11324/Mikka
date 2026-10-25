@@ -88,6 +88,30 @@ source wins in a conflict is in [`README.md`](README.md).
   a personal one (its Linear issue is archived; issue #184). Teammates see agent runs on workspace issues only, never left-column
   chats or private memory.
 
+## Issue detail
+
+Linear is the reference for the issue page; when this section is silent,
+do what Linear does. Figma: `220:5022` (MIK-25).
+
+- **R-27** The assignee is always a person. Handing the issue to a bot shows
+  the bot on its own line under the assignee, joined by an elbow line, and
+  the activity records 「<人> 把任务交给 <Bot>，自己负责」 (Linear's delegate).
+- **R-28** The page has a header line under the breadcrumb and one vertical
+  line before the properties column or an open thread. Nothing else gets a
+  line; sections are separated by space.
+- **R-29** 线程 lists the threads working on the issue: bot avatar, thread
+  name, one line on what it is doing, status, time. Clicking one opens it on
+  the right as a conversation that ends in the composer (R-10); people and
+  the agent talk there. Teammates on a workspace issue see the same thread
+  (R-26).
+- **R-30a** Activity: events (created, handed to, dispatched a thread,
+  status changes) are plain one-line rows. A comment is a card with a 1px
+  border; its replies sit inside the same card above a 「留下回复…」 row. The
+  comment box at the bottom is the same bordered card.
+- **R-30b** In a comment you can @ a person or a bot. @ a bot asks it to step
+  in; it may dispatch a thread. You never @ a thread: open the thread and
+  talk there.
+
 ## Look
 
 - **R-30** Greys are pure neutral: `rgba(0,0,0,a)` and `#737373 / #A3A3A3 /
@@ -98,7 +122,9 @@ source wins in a conflict is in [`README.md`](README.md).
   sources to watch: shadcn `border-input` (dark `--input` is
   `oklch(1 0 0 / 15%)`), `ring-foreground/10` on dialogs and popovers,
   Comma's 0.5px hairlines, and column `border-l/r`. Inputs are decided;
-  the app-wide sweep is open in `decisions.md`.
+  the app-wide sweep is open in `decisions.md`. Exception: a comment card
+  and the comment box (R-30a) carry a 1px `--border` line, which must be a
+  dark grey in dark mode, never white at low opacity.
 - **R-32** Font Geist, Chinese falls back to the system font. Only these text
   styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
   (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium
