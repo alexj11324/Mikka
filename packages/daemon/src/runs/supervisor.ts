@@ -78,7 +78,6 @@ import type { Logger } from "../log"
 import type { Outbox } from "../outbox"
 import { runPolicy } from "../permissions"
 import {
-  DEFAULT_LEASE_MS,
   type DeviceRepo,
   type RunAssignment,
 } from "../server-link"
@@ -96,6 +95,10 @@ export interface SupervisorDeps {
   /** The device's current allow-list (`device_repo`). */
   repos: () => DeviceRepo[]
   log: Logger
+  /** Remote journals also require validation when an older assignment omitted its lease. */
+  requireOnlineResumes?: boolean
+  /** Every persisted server-leased run needs fresh server authority before restart. */
+  revalidateRunLease?:(assignment:RunAssignment)=>Promise<string>
   revalidateSkillAssignment?:(assignment:RunAssignment)=>Promise<SkillReceiptRevalidation>
   /** Watchdog: no progress for this long stops the run (`timeout`). */
   stallMs?: number
@@ -194,6 +197,7 @@ export class RunSupervisor {
   /** Aborted by `stop()`: kills a running verify command. */
   private stopController = new AbortController()
   private blockedSkillResumes = new Set<string>()
+  private blockedLeaseResumes = new Set<string>()
 
   constructor(private readonly deps: SupervisorDeps) {}
 
@@ -476,7 +480,7 @@ export class RunSupervisor {
     const entries=this.deps.journal.active().sort((a,b)=>Number(Boolean(a.assignment.skillReceipt))-Number(Boolean(b.assignment.skillReceipt)))
     for (const entry of entries) {
       if (this.stopping) return
-      if (receiptedOnly && !this.blockedSkillResumes.has(entry.assignment.runId)) continue
+      if (receiptedOnly && !this.blockedSkillResumes.has(entry.assignment.runId) && !this.blockedLeaseResumes.has(entry.assignment.runId)) continue
       if (this.active.has(entry.assignment.runId)) continue
       // A crash between the outbox append and the journal write leaves the
       // outbox one chunk ahead; continue after it so seqs neither repeat nor gap.
@@ -528,9 +532,29 @@ export class RunSupervisor {
         }
         continue
       }
-      // The old lease is stale; give the first heartbeat time to renew it.
-      if (entry.assignment.leaseExpiresAt)
-        this.leases.set(entry.assignment.runId, Date.now() + DEFAULT_LEASE_MS)
+      if (entry.assignment.leaseExpiresAt || this.deps.requireOnlineResumes) {
+        try {
+          if (!this.deps.revalidateRunLease) throw new Error('Current run authority unavailable')
+          const expiry = Date.parse(await this.deps.revalidateRunLease(entry.assignment))
+          if (this.stopping) return
+          const latest = this.deps.journal.get(entry.assignment.runId)
+          if (!latest || isTerminalRunState(latest.state) || this.active.has(entry.assignment.runId)) {
+            this.blockedLeaseResumes.delete(entry.assignment.runId)
+            continue
+          }
+          if (!Number.isFinite(expiry) || expiry <= Date.now() || latest.state !== entry.state || latest.sessionId !== entry.sessionId || latest.worktree !== entry.worktree) throw new Error('Current run lease or local resume fence changed')
+          this.leases.set(entry.assignment.runId, expiry)
+          this.blockedLeaseResumes.delete(entry.assignment.runId)
+          this.deps.journal.update(entry.assignment.runId, { error: null })
+        } catch {
+          const latest = this.deps.journal.get(entry.assignment.runId)
+          if (!latest || isTerminalRunState(latest.state)) { this.blockedLeaseResumes.delete(entry.assignment.runId); continue }
+          this.leases.delete(entry.assignment.runId)
+          this.blockedLeaseResumes.add(entry.assignment.runId)
+          this.deps.journal.update(entry.assignment.runId, { error: 'Run resume blocked: current online policy authorization and lease required.' })
+          continue
+        }
+      }
       this.launch(entry.assignment.runId, repo)
     }
   }

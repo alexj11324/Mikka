@@ -318,6 +318,18 @@ export class Daemon {
       repos: () => this.device.repos ?? [],
       log: this.log,
       stallMs: this.options.stallMs,
+      requireOnlineResumes: !this.options.memoryServer || this.options.flavor !== "dev",
+      revalidateRunLease:async assignment=>{
+        if (!this.device.credential) throw new Error('Current device authorization unavailable')
+        if (!this.registered || !this.device.deviceId) await this.register(this.device.credential)
+        const result = await this.options.link.heartbeat(this.device.deviceId as string, {
+          harnesses: this.harnesses,
+          runs: [{ runId: assignment.runId, lastProgressAt: new Date().toISOString() }],
+          worktreeDiskBytes: await this.worktrees.diskUsage(),
+        })
+        if (result.revoked?.includes(assignment.runId) || !result.leases[assignment.runId]) throw new Error('Current run authority refused')
+        return result.leases[assignment.runId]
+      },
       revalidateSkillAssignment:async assignment=>{
         const link=this.options.link
         if (!assignment.skillReceipt||!link.validateSkillReceipt||!this.device.credential) throw new Error('Current Skill receipt validation unavailable')
@@ -740,7 +752,7 @@ export class Daemon {
             .catch((error:unknown)=>this.log.warn({err:error},'group review worker stopped'))
             .finally(()=>{this.groupReviewTask=null})
         }
-        // Resume receipted runs only after current server permission revalidation.
+        // Retry blocked journal resumes only through current server authority.
         await this.supervisor.resumeAll(true)
         for (const runId of await link.pendingRuns(deviceId)) {
           if (this.refusedRuns.has(runId)) continue
