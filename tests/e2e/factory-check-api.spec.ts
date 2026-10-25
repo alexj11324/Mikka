@@ -120,7 +120,7 @@ test("Factory check claim pins SHA/read-only/command and preserves trusted recei
     const assignment = await claim.json();
     expect(assignment).toMatchObject({
       baseBranch: sha,
-      kind: "check",
+      kind: "acceptance",
       verifyCommand: "node acceptance.mjs",
       policy: { readOnly: true },
     });

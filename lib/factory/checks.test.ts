@@ -8,7 +8,12 @@ import { FactoryError, type FactoryBinding } from "./contract";
 import { createFactoryStore, type FactoryTask } from "./store";
 import { createFactoryDispatch } from "./dispatch";
 import { createFactoryReconciler } from "./reconcile";
-import { factoryCheckAssignment, factoryCheckGates } from "./checks";
+import {
+  createFactoryCheckClaim,
+  factoryCheckAssignment,
+  factoryCheckGates,
+  isFactoryCheckRun,
+} from "./checks";
 import { factoryDispatchDatabase } from "./transaction";
 import { insertRunOnce } from "../run-dispatch";
 
@@ -116,6 +121,7 @@ test(
           command?: string;
           noCriteria?: boolean;
           timeout?: boolean;
+          noRuntime?: boolean;
         } = {},
       ) => {
         const run = (
@@ -136,7 +142,7 @@ test(
             signal: null,
             timedOut: false,
           },
-          ...(run.kind === "check"
+          ...(run.kind === "acceptance"
             ? options.selfReport
               ? {}
               : { check: { sha: options.checkSha ?? sha, readOnly: true } }
@@ -170,6 +176,31 @@ test(
             JSON.stringify(report),
           ],
         );
+        if (run.kind === "acceptance" && !options.noRuntime) {
+          const toolCallId = randomUUID();
+          await pool.query(
+            `INSERT INTO run_chunks (id,"runId",seq,chunk) VALUES ($1,$2,1,$3),($4,$2,2,$5)`,
+            [
+              randomUUID(),
+              runId,
+              JSON.stringify({
+                type: "tool-input-available",
+                toolCallId,
+                toolName: "bash",
+                input: { command: "/bin/bash -lc 'node acceptance.mjs'" },
+              }),
+              randomUUID(),
+              JSON.stringify({
+                type: "tool-output-available",
+                toolCallId,
+                output: {
+                  exitCode: options.failed ? 1 : 0,
+                  output: "Explicit fixture runtime observation",
+                },
+              }),
+            ],
+          );
+        }
         return { report, sessionId };
       };
       const sha1 = "1".repeat(40),
@@ -194,6 +225,20 @@ test(
       );
       assert.equal(assignment.baseBranch, sha1);
       assert.equal(assignment.policy.readOnly, true);
+      const claim = createFactoryCheckClaim(pool, authorize);
+      assert.equal(await isFactoryCheckRun(pool, "owner", review.runId), true);
+      const claims = await Promise.allSettled(
+        Array.from({ length: 10 }, () =>
+          claim(
+            "owner",
+            deviceId,
+            review.runId,
+            new Date(Date.now() + 90000).toISOString(),
+          ),
+        ),
+      );
+      assert.equal(claims.filter((r) => r.status === "fulfilled").length, 1);
+
       await rejects(
         () => factoryCheckAssignment(pool, "foreign", review.runId),
         "factoryCheckBindingMismatch",
@@ -239,7 +284,7 @@ test(
       const failure = state.attempts.find((a) => a.stage === "verify")!;
       assert.equal(failure.status, "failed");
       assert.equal((failure.output.completion as any).verify.exitCode, 1);
-      assert.equal(failure.evidence.length, 1);
+      assert.equal(failure.evidence.length, 3);
       const repair = await dispatch(state.task);
       const repairRun = (
         await pool.query(`SELECT prompt FROM agent_runs WHERE id=$1`, [
@@ -352,6 +397,54 @@ test(
         (await store.read("owner", same.task.id)).task.status,
         "blocked",
       );
+
+      const cancelled = await route();
+      const cancelledExecute = await dispatch(cancelled.task);
+      await complete(cancelledExecute.runId, sha1);
+      await reconcile("owner");
+      const cancelState = await store.read("owner", cancelled.task.id);
+      const cancelledCheck = await dispatch(cancelState.task);
+      await store.apply("owner", binding(cancelledCheck.task), randomUUID(), {
+        action: "cancel",
+        reason: "Withdrawn during claim",
+      });
+      await rejects(
+        () =>
+          claim(
+            "owner",
+            deviceId,
+            cancelledCheck.runId,
+            new Date(Date.now() + 90000).toISOString(),
+          ),
+        "factoryCheckBindingMismatch",
+      );
+      assert.equal(
+        (
+          await pool.query(`SELECT status FROM agent_runs WHERE id=$1`, [
+            cancelledCheck.runId,
+          ])
+        ).rows[0].status,
+        "queued",
+      );
+      await pool.query(`UPDATE agent_runs SET status='cancelled' WHERE id=$1`, [
+        cancelledCheck.runId,
+      ]);
+
+      const inspectionOnly = await route();
+      const inspectImpl = await dispatch(inspectionOnly.task);
+      await complete(inspectImpl.runId, sha1);
+      await reconcile("owner");
+      let inspected = await store.read("owner", inspectionOnly.task.id);
+      const inspectReview = await dispatch(inspected.task);
+      await complete(inspectReview.runId, sha1);
+      await reconcile("owner");
+      inspected = await store.read("owner", inspected.task.id);
+      const inspection = await dispatch(inspected.task);
+      await complete(inspection.runId, sha1, { noRuntime: true });
+      await reconcile("owner");
+      inspected = await store.read("owner", inspected.task.id);
+      assert.equal(inspected.task.stage, "verify");
+      assert.equal(inspected.task.status, "blocked");
 
       const noHarness = await route();
       const harnessImpl = await dispatch(noHarness.task);

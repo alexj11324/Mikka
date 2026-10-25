@@ -700,7 +700,7 @@ export class RunSupervisor {
     const publisher = this.deps.publisher
     let before: string | undefined
     try {
-      if (assignment.kind === "check") {
+      if (fixedCandidateCheck(assignment)) {
         if (runPolicy(assignment.policy).readOnly !== true)
           throw new Error("Check assignment is missing its read-only policy")
         const fixed = await fixedCheckSnapshot(
@@ -733,14 +733,13 @@ export class RunSupervisor {
     const output = result.output.slice(-4000)
     if (result.exitCode !== 0 || result.timedOut)
       return failed(output, verifyFailure(command, result))
-    const after =
-      assignment.kind === "check"
-        ? await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
-            .then((fixed) => fixed.tree)
-            .catch(() => null)
-        : publisher
-          ? await publisher.snapshot({ worktree, repo }).catch(() => null)
-          : undefined
+    const after = fixedCandidateCheck(assignment)
+      ? await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
+          .then((fixed) => fixed.tree)
+          .catch(() => null)
+      : publisher
+        ? await publisher.snapshot({ worktree, repo }).catch(() => null)
+        : undefined
     if (after !== before)
       return failed(
         output,
@@ -909,7 +908,7 @@ export class RunSupervisor {
     }
     if (this.stopping) return
 
-    if (assignment.kind === "check") {
+    if (fixedCandidateCheck(assignment)) {
       if (runPolicy(assignment.policy).readOnly !== true)
         throw new Error("Check assignment is missing its read-only policy")
       await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
@@ -1217,4 +1216,13 @@ function verifyFailure(
 
 export function baseReport(summary = ""): HandoffReport {
   return emptyRunReport(summary.slice(0, 10_000))
+}
+
+/** Existing acceptance runs remain compatible; Factory checks are exact-SHA read-only runs. */
+function fixedCandidateCheck(assignment: RunAssignment) {
+  return (
+    assignment.kind === "acceptance" &&
+    runPolicy(assignment.policy).readOnly === true &&
+    /^[a-f0-9]{40}$/.test(assignment.baseBranch)
+  )
 }

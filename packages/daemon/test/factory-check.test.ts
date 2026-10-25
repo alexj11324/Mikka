@@ -75,7 +75,7 @@ it("checks real SHA, blocks dirty/head replacement, and produces actual command/
       repoId: "fixture-repo",
       baseBranch: sha,
       harness: "mock",
-      kind: "check",
+      kind: "acceptance",
       fixture: "check-pass",
       prompt: "Explicit simulated independent check",
       verifyCommand: "node acceptance.mjs",

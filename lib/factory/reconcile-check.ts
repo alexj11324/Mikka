@@ -6,7 +6,7 @@ import {
   type FactoryBinding,
   type FactoryEvidence,
 } from "./contract";
-import { factoryCheckAssignment } from "./checks";
+import { factoryCheckAssignment, verifierCommandEvidence } from "./checks";
 import { factoryEventId } from "./event-id";
 import type { FactoryTask, createFactoryStore } from "./store";
 
@@ -82,6 +82,23 @@ export async function reconcileFactoryCheck(
   } = await tx.query(`SELECT output FROM factory_attempts WHERE id=$1`, [
     task.attemptId,
   ]);
+  if (
+    task.stage === "verify" &&
+    evidence.length &&
+    attempt.output.check?.command
+  ) {
+    for (const id of await verifierCommandEvidence(
+      tx,
+      run.id,
+      attempt.output.check.command,
+      true,
+    ))
+      evidence.push({
+        ...evidence[0],
+        artifact: `run-chunk:${id}`,
+        kind: "log",
+      });
+  }
   const completion = { ...attempt.output, completion: output };
   let status: "passed" | "failed" | "blocked" | "waiting" = "passed";
   let reason =

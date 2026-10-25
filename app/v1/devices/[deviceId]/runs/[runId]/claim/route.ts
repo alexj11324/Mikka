@@ -9,7 +9,8 @@ import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
 import { retryNote } from '@/lib/run-retry'
 import { pool } from '@/lib/db'
-import { factoryCheckAssignment } from '@/lib/factory/checks'
+import { isFactoryCheckRun } from '@/lib/factory/checks'
+import { claimFactoryCheckRun } from '@/lib/factory/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,20 +42,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       .where(eq(agentRuns.id, runId))
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
+  const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let checkAssignment
-  if (run.kind === 'check') {
-    try { checkAssignment = await factoryCheckAssignment(pool, caller.userId, runId) }
-    catch {
+  let claimed
+  if (run.kind === 'acceptance' && await isFactoryCheckRun(pool, caller.userId, runId)) {
+    try {
+      checkAssignment = await claimFactoryCheckRun(caller.userId, deviceId, runId, leaseExpiresAt)
+      claimed = [{ id: runId }]
+    } catch {
       await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Independent check binding is unavailable or stale.', finishedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
       return NextResponse.json({ error: 'Independent check binding is unavailable or stale.' }, { status: 409 })
     }
+  } else {
+    claimed = await db.update(agentRuns)
+      .set({ status: 'preparing', startedAt: new Date(), leaseExpiresAt: new Date(leaseExpiresAt), updatedAt: new Date() })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
+      .returning({ id: agentRuns.id })
   }
-  const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
-  const claimed = await db.update(agentRuns)
-    .set({ status: 'preparing', startedAt: new Date(), leaseExpiresAt: new Date(leaseExpiresAt), updatedAt: new Date() })
-    .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
-    .returning({ id: agentRuns.id })
   if (!claimed.length) return NextResponse.json({ error: 'Run is already claimed.' }, { status: 409 })
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
