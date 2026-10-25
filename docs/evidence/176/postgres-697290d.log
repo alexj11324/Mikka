@@ -1,0 +1,26 @@
+697290d197cf22f15a4e9c2768f70f836b612787
+▶ formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoint, exhaustion and authority
+  ✔ legacy staged events require reconciliation; migration replay preserves decisions (1092.933744ms)
+  ✔ three transport failures persist; ten duplicate claims lead to one atomic response (471.140468ms)
+  ✔ accepted start whose ACK is lost after consumption never reopens completed event (89.627308ms)
+{"evidence":"actual child SIGKILL","phase":"staged","eventId":"45ccfc86-955d-4249-8a04-36c37455b450","state":"completed","generation":"returned"}
+  ✔ actual SIGKILL after staged: fenced restart and no blind generation resend (816.876516ms)
+{"evidence":"actual child SIGKILL","phase":"checkpoint","eventId":"c7f925c3-baf6-40e1-a520-e72b92b858b8","state":"completed","generation":"returned"}
+  ✔ actual SIGKILL after checkpoint: fenced restart and no blind generation resend (1164.37563ms)
+{"evidence":"actual child SIGKILL","phase":"effect","eventId":"acb5c9e2-3022-4013-a1fc-efe30ccaa02f","state":"failed","generation":"uncertain"}
+  ✔ actual SIGKILL after effect: fenced restart and no blind generation resend (910.720671ms)
+  ✔ publication PG failure keeps checkpoint; fresh lease ACK reuses result without effect (289.392841ms)
+  ✔ exhaustion and owner-scoped replay preserve operation ID and never grant new approval (394.885658ms)
+  ✔ current workspace revocation and scope mismatch prevent consumption and publication (144.676703ms)
+  ✔ persisted output publishes without a new resource admission or generation (175.865077ms)
+  ✔ stop committed after staging fences generation and recovered notice has zero effects (223.6845ms)
+  ✔ budget deferral neither sends nor burns retry; late start ACK preserves defer (143.436348ms)
+✔ formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoint, exhaustion and authority (5959.29269ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6766.207008

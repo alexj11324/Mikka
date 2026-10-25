@@ -1,0 +1,51 @@
+{"phase":"controlled transport ready","port":6176,"realWorkflow":false,"realModel":false}
+{"at":"2026-10-25T19:54:09.354Z","phase":"three transport failures persisted; no additional user message","eventId":"e28a746e-58d5-4502-a34f-2f8598c8bcc8","attempts":3,"nextRetryAt":"2026-10-25T19:54:09.743Z","slaMs":15000}
+{"phase":"staged","eventId":"e28a746e-58d5-4502-a34f-2f8598c8bcc8","token":"a56a0508-fbe4-4704-b1e5-170687d562f6","recovery":true}
+{"phase":"effect_committed","eventId":"e28a746e-58d5-4502-a34f-2f8598c8bcc8"}
+{"phase":"checkpointed","eventId":"e28a746e-58d5-4502-a34f-2f8598c8bcc8"}
+{"phase":"result_committed","eventId":"e28a746e-58d5-4502-a34f-2f8598c8bcc8"}
+{"at":"2026-10-25T19:54:13.806Z","phase":"real Next restart and ten HTTP sweeps recovered original chat","eventId":"e28a746e-58d5-4502-a34f-2f8598c8bcc8","elapsedMs":5089}
+{"phase":"staged","eventId":"c927a87b-2512-4c8c-93c1-ea50aa836260","token":"20cbe7df-0db7-4f0e-8970-eb531a043ca9","recovery":false}
+{"phase":"effect_committed","eventId":"c927a87b-2512-4c8c-93c1-ea50aa836260"}
+{"phase":"checkpointed","eventId":"c927a87b-2512-4c8c-93c1-ea50aa836260"}
+{"phase":"result_committed","eventId":"c927a87b-2512-4c8c-93c1-ea50aa836260"}
+{"phase":"staged","eventId":"57bfc355-5abc-42b8-96e3-7ef90c2d70a0","token":"28ba2b9b-5fd8-4f83-97d3-f02320c3146e","recovery":false}
+{"at":"2026-10-25T19:54:14.097Z","phase":"actual transport consumer SIGKILL","atBoundary":"hold_staged","eventId":"57bfc355-5abc-42b8-96e3-7ef90c2d70a0"}
+{"phase":"controlled transport ready","port":6176,"realWorkflow":false,"realModel":false}
+{"phase":"staged","eventId":"57bfc355-5abc-42b8-96e3-7ef90c2d70a0","token":"28ba2b9b-5fd8-4f83-97d3-f02320c3146e","recovery":true}
+{"phase":"effect_committed","eventId":"57bfc355-5abc-42b8-96e3-7ef90c2d70a0"}
+{"phase":"checkpointed","eventId":"57bfc355-5abc-42b8-96e3-7ef90c2d70a0"}
+{"phase":"result_committed","eventId":"57bfc355-5abc-42b8-96e3-7ef90c2d70a0"}
+{"phase":"staged","eventId":"7df3d0e2-3f8c-41f1-b950-5bfa8737098c","token":"d7f28bff-aab7-4cd3-bc52-5870be20b149","recovery":false}
+{"phase":"effect_committed","eventId":"7df3d0e2-3f8c-41f1-b950-5bfa8737098c"}
+{"phase":"checkpointed","eventId":"7df3d0e2-3f8c-41f1-b950-5bfa8737098c"}
+{"at":"2026-10-25T19:54:14.993Z","phase":"actual transport consumer SIGKILL","atBoundary":"hold_checkpoint","eventId":"7df3d0e2-3f8c-41f1-b950-5bfa8737098c"}
+{"phase":"controlled transport ready","port":6176,"realWorkflow":false,"realModel":false}
+{"phase":"staged","eventId":"7df3d0e2-3f8c-41f1-b950-5bfa8737098c","token":"d7f28bff-aab7-4cd3-bc52-5870be20b149","recovery":true}
+{"phase":"result_committed","eventId":"7df3d0e2-3f8c-41f1-b950-5bfa8737098c"}
+{"phase":"staged","eventId":"03b14ef6-29b1-4422-884d-ec9e7ad38309","token":"d8cf74cf-2a99-4f84-a610-79600c600d4e","recovery":false}
+{"phase":"effect_committed","eventId":"03b14ef6-29b1-4422-884d-ec9e7ad38309"}
+{"phase":"checkpointed","eventId":"03b14ef6-29b1-4422-884d-ec9e7ad38309"}
+{"phase":"result_committed","eventId":"03b14ef6-29b1-4422-884d-ec9e7ad38309"}
+{"at":"2026-10-25T19:54:15.873Z","phase":"actual transport consumer SIGKILL","atBoundary":"hold_result_ack","eventId":"03b14ef6-29b1-4422-884d-ec9e7ad38309"}
+{"phase":"controlled transport ready","port":6176,"realWorkflow":false,"realModel":false}
+{"phase":"staged","eventId":"f5b92bf5-fd01-46aa-9620-4b352aea9dd5","token":"6739d74a-9513-42a7-a050-4e01153a538b","recovery":false}
+{"phase":"effect_committed","eventId":"f5b92bf5-fd01-46aa-9620-4b352aea9dd5"}
+{"at":"2026-10-25T19:54:16.535Z","phase":"actual transport consumer SIGKILL","atBoundary":"hold_effect","eventId":"f5b92bf5-fd01-46aa-9620-4b352aea9dd5"}
+{"phase":"controlled transport ready","port":6176,"realWorkflow":false,"realModel":false}
+{"phase":"staged","eventId":"f5b92bf5-fd01-46aa-9620-4b352aea9dd5","token":"6739d74a-9513-42a7-a050-4e01153a538b","recovery":true}
+{"phase":"staged","eventId":"a6d9682a-123d-4e3a-8a0b-9b738136be44","token":"209ecba0-fbda-483e-80c7-6c5b5744c87a","recovery":true}
+{"phase":"effect_committed","eventId":"a6d9682a-123d-4e3a-8a0b-9b738136be44"}
+{"phase":"checkpointed","eventId":"a6d9682a-123d-4e3a-8a0b-9b738136be44"}
+{"phase":"result_committed","eventId":"a6d9682a-123d-4e3a-8a0b-9b738136be44"}
+{"phase":"staged","eventId":"aa7bbc1e-c4cd-4609-aafe-e57038c72459","token":"db027d97-b40e-4a8b-ad79-a412b8d1891e","recovery":false}
+{"at":"2026-10-25T19:54:19.974Z","phase":"actual completion process SIGKILL","atBoundary":"before_commit","runId":"816d1279-f7b7-45cc-99e4-2799a414f3e7","status":"running","revoked":false,"events":[]}
+{"phase":"staged","eventId":"f02a00f6-0f4c-4eef-b8d4-cb95d1368e36","token":"300dbae2-a4c6-43e2-b689-cf449f866d11","recovery":false}
+{"phase":"effect_committed","eventId":"f02a00f6-0f4c-4eef-b8d4-cb95d1368e36"}
+{"phase":"checkpointed","eventId":"f02a00f6-0f4c-4eef-b8d4-cb95d1368e36"}
+{"phase":"result_committed","eventId":"f02a00f6-0f4c-4eef-b8d4-cb95d1368e36"}
+{"at":"2026-10-25T19:54:20.384Z","phase":"actual completion process SIGKILL","atBoundary":"after_commit","runId":"750373df-99e0-40eb-bd05-26c5ed128234","status":"succeeded","revoked":true,"events":["f02a00f6-0f4c-4eef-b8d4-cb95d1368e36","4f9419b2-ba8e-4dee-9c35-c868e129f96c"]}
+{"phase":"staged","eventId":"9b591361-15f6-4c9f-b445-9f97feaacd69","token":"eb64fe1b-d930-4f3c-83a9-e29eae96492e","recovery":false}
+{"phase":"controlled transport ready","port":6176,"realWorkflow":false,"realModel":false}
+{"at":"2026-10-25T19:54:21.233Z","phase":"real HTTP current workspace revocation refused replay/read/new submission","eventId":"9b591361-15f6-4c9f-b445-9f97feaacd69","workspaceId":"f7592b93-e337-4252-91e1-8937507c9b3d","effects":0}
+{"at":"2026-10-25T19:54:21.233Z","result":"PASS isolated real Next/PG/process; controlled transport, NOT cloud Workflow/model/harness acceptance","evidence":[{"eventId":"e28a746e-58d5-4502-a34f-2f8598c8bcc8","status":"completed","attempts":4,"processedAt":"2026-10-25T19:54:13.501Z","checkpoint":"28767a566012b12bba44ad4db9339187c2007fe90f5568be426df83b03ce65cd","effects":1},{"eventId":"e28a746e-58d5-4502-a34f-2f8598c8bcc8","status":"completed","attempts":4,"processedAt":"2026-10-25T19:54:13.501Z","checkpoint":"28767a566012b12bba44ad4db9339187c2007fe90f5568be426df83b03ce65cd","effects":1},{"eventId":"c927a87b-2512-4c8c-93c1-ea50aa836260","status":"completed","attempts":1,"processedAt":"2026-10-25T19:54:13.907Z","checkpoint":"edc134202ebe599f4b54ef95140f27214fb1a38cac35f0249259cc5b0b415566","effects":1},{"eventId":"57bfc355-5abc-42b8-96e3-7ef90c2d70a0","status":"completed","attempts":1,"processedAt":"2026-10-25T19:54:14.751Z","checkpoint":"b7facc6dbaad64bac78720d6e663e79e7007d30c098e84f71287d496fc71049b","effects":1},{"eventId":"7df3d0e2-3f8c-41f1-b950-5bfa8737098c","status":"completed","attempts":1,"processedAt":"2026-10-25T19:54:15.637Z","checkpoint":"30c250604abc449ed19575047ebb3837c00be541d0171da3abfddb463068b92f","effects":1},{"eventId":"03b14ef6-29b1-4422-884d-ec9e7ad38309","status":"completed","attempts":1,"processedAt":"2026-10-25T19:54:15.783Z","checkpoint":"20c6ad0987d36926bb4b7dee12fe704c929fa0478ea8a7d18aa08996ba1f0fa8","effects":1},{"eventId":"f5b92bf5-fd01-46aa-9620-4b352aea9dd5","status":"failed","generationState":"uncertain","effects":1,"replayStatus":409},{"eventId":"a6d9682a-123d-4e3a-8a0b-9b738136be44","status":"completed","attempts":1,"processedAt":"2026-10-25T19:54:19.354Z","checkpoint":"880169e4c4a323390fe6e1ec431e9d4f33bed7a57a5193e5ed798c982ba69c5b","effects":1},{"eventId":"aa7bbc1e-c4cd-4609-aafe-e57038c72459","status":"completed","attempts":1,"processedAt":"2026-10-25T19:54:19.931Z","checkpoint":"91e352be14972e142e93df29408892a63c88b72c08f2623a5be69ecf164f59de","effects":0},{"eventId":"f02a00f6-0f4c-4eef-b8d4-cb95d1368e36","status":"completed","attempts":1,"processedAt":"2026-10-25T19:54:20.343Z","checkpoint":"133059249b4c2911e7a157216fcb292b414d41ac2fce07cdf8e96800b8971501","effects":1}]}

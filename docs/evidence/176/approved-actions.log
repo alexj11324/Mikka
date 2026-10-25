@@ -1,0 +1,29 @@
+▶ trusted submission -> durable batch -> new workflow -> run retry -> daemon read-only recovery
+  ✔ ten submission retries reuse source, changed request conflicts, intentional identical request differs (264.181366ms)
+  ✔ actual tool wrapper persists entire batch before first proposal and distinct identical slots survive concurrency (528.479397ms)
+  ✔ migration replay after SQL commit preserves persisted source slots and operation identity (27.536423ms)
+  ✔ new workflow replays persisted calls before model; regenerated call cannot create another intent (284.653415ms)
+  ✔ SIGKILL after batch commit before proposal: separate process and new holder recover original slots (819.134453ms)
+  ✔ background events still ride with one foreground source; expired preflight cannot create a proposal (522.607713ms)
+  ✔ real Factory dispatch snapshots references in its transaction; device-loss retry copies them (446.911063ms)
+  ✔ actual HTTP worker route checks token, owner, bound reference and live lease without provider writes (285.707986ms)
+  ✔ real daemon journal restart preserves references; local MCP tool reads actual HTTP endpoint (490.43253ms)
+✔ trusted submission -> durable batch -> new workflow -> run retry -> daemon read-only recovery (9979.52829ms)
+▶ actual proposal/decision entrypoints -> ledger -> local calendar HTTP provider
+  ✔ step retry and ten concurrent proposals reuse persisted identity; actual approval invokes once (1035.629769ms)
+  ✔ lost provider response with historical missing input reconciles without resending (532.006443ms)
+  ✔ lost provider response with historical null input reconciles without resending (479.445446ms)
+  ✔ revocation committed after invocation reservation fences the actual send (178.953243ms)
+  ✔ provider succeeds then real SQL writeback fails; retry only reads back (306.061871ms)
+  ✔ legacy unbound proposal cannot execute but can be safely declined (155.965432ms)
+  ✔ session expiry during provider preflight prevents the actual HTTP write (1348.329199ms)
+  ✔ decline, expiry, wrong owner and changed pinned account do not invoke provider (751.587008ms)
+✔ actual proposal/decision entrypoints -> ledger -> local calendar HTTP provider (13364.861973ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16512.53219

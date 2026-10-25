@@ -1,0 +1,56 @@
+▶ formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoint, exhaustion and authority
+  ✖ legacy staged events require reconciliation; migration replay preserves decisions (1199.95561ms)
+  ✔ three transport failures persist; ten duplicate claims lead to one atomic response (427.720597ms)
+  ✔ accepted start whose ACK is lost after consumption never reopens completed event (77.324916ms)
+{"evidence":"actual child SIGKILL","phase":"staged","eventId":"916d262f-54b7-4add-8217-b4f5718d22f0","state":"completed","generation":"returned"}
+  ✔ actual SIGKILL after staged: fenced restart and no blind generation resend (629.03704ms)
+{"evidence":"actual child SIGKILL","phase":"checkpoint","eventId":"ff2a173b-b4fb-4789-acd7-e4ae5d9240ea","state":"completed","generation":"returned"}
+  ✔ actual SIGKILL after checkpoint: fenced restart and no blind generation resend (658.985324ms)
+{"evidence":"actual child SIGKILL","phase":"effect","eventId":"81aafa89-6451-4eba-82ce-1fc52e3f86a9","state":"failed","generation":"uncertain"}
+  ✔ actual SIGKILL after effect: fenced restart and no blind generation resend (541.748086ms)
+  ✔ publication PG failure keeps checkpoint; fresh lease ACK reuses result without effect (138.501586ms)
+  ✔ exhaustion and owner-scoped replay preserve operation ID and never grant new approval (323.149367ms)
+  ✔ current workspace revocation and scope mismatch prevent consumption and publication (113.812821ms)
+  ✔ persisted output publishes without a new resource admission or generation (139.977341ms)
+  ✔ stop committed after staging fences generation and recovered notice has zero effects (134.802623ms)
+  ✔ budget deferral neither sends nor burns retry; late start ACK preserves defer (78.166245ms)
+✖ formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoint, exhaustion and authority (4490.601198ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 11
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5161.452955
+
+✖ failing tests:
+
+test at lib/coordinator/inbox-postgres.test.ts:1:2277
+✖ legacy staged events require reconciliation; migration replay preserves decisions (1199.95561ms)
+  error: inconsistent types deduced for parameter $1
+      at /workspace/Mikka-176/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/inbox-postgres.test.ts:68:11)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/inbox-postgres.test.ts:55:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    length: 142,
+    severity: 'ERROR',
+    code: '42P08',
+    detail: 'text versus uuid',
+    hint: undefined,
+    position: '112',
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'parse_param.c',
+    line: '219',
+    routine: 'variable_coerce_param_hook'
+  }

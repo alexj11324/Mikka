@@ -1,0 +1,25 @@
+▶ isolated PostgreSQL mailbox vertical slice
+  ✔ two independent same-role sessions send, reply, read, ACK and reconnect without duplicate envelopes (91.508988ms)
+  ✔ one sender/key racing across recipients produces one envelope and an explicit 409 conflict (36.230205ms)
+  ✔ an inbox read waiting on an ACK row lock does not return the newly acknowledged envelope (24.01998ms)
+  ✔ owner/workspace/revocation boundaries and discovery do not expose another inbox (25.409923ms)
+  ✔ actual worker-token authentication rejects revoked/expired/stopped/disabled and forged-owner credentials (41.14659ms)
+  ✔ Bot and Coordinator are addressable; peer events retain provenance and are not user messages (26.887329ms)
+  ✔ completion persists result before notification atomically and duplicate completion is harmless (22.099106ms)
+  ✔ late messages queue by default, bounded policy resumes the exact prior session, concurrent late sends share one attempt (71.506898ms)
+  ✔ owner cancellation fences racing continuations, disables automatic wakes and exposes failure (36.301087ms)
+  ✔ human gates require explicit owner resume; peers cannot forge owner provenance or change wake policy (71.645853ms)
+  ✔ concurrent late send and owner stop cannot leave a runnable continuation; harness changes prevent wrong-session resume (60.964754ms)
+  ✔ failed mailbox setup rolls back while an unclaimed attempt stays queued and retryable (19.040995ms)
+  ✔ disabling a mailbox blocks an already queued continuation until the owner explicitly re-enables it (51.977979ms)
+  ✔ Factory-bound mailbox cannot dispatch an unadopted continuation, including owner resume (125.083447ms)
+  ✔ result/terminal update roll back together if event persistence fails (20.664414ms)
+✔ isolated PostgreSQL mailbox vertical slice (2245.322449ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3310.031795
