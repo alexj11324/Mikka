@@ -31,6 +31,7 @@ import {
   runEventsAccepted,
   type HeartbeatResult,
   type RunCommand,
+  type RunCheckpoint,
   type RunCompletion,
   type RunPatch,
 } from "@mikka/protocol"
@@ -226,6 +227,12 @@ export class HttpServerLink implements ServerLink {
     return this.call("POST", devicePaths.runEvents(checkId(runId)), {
       body: batch,
       schema: runEventsAccepted,
+    })
+  }
+
+  async checkpointRun(runId: string, checkpoint: RunCheckpoint) {
+    await this.call("POST", devicePaths.runCheckpoint(checkId(runId)), {
+      body: checkpoint,
     })
   }
 
