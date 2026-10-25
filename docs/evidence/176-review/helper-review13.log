@@ -1,0 +1,28 @@
+▶ review: background terminal fairness, protocol scope, cached guard and quiet triage
+  ✔ follow-up migration upgrades the previous receipt schema without changing terminal scopes or granting membership (957.991348ms)
+{"evidence":"actual PG + actual authority child SIGKILL","prefix":49,"parent":"2f2ff637-485a-4819-b4e1-fe2daed962b6","legal":"ee4109db-ef67-43ee-87d5-dfa04289da3b","terminalRowsNotRevived":true}
+  ✔ 49 denied background rows cannot starve a later legal child across actual child SIGKILL (2603.807009ms)
+  ✔ failed, cancelled and legacy_review background rows remain terminal (72.418099ms)
+  ✔ protocol mailbox partition is not a real tenant grant (97.634977ms)
+  ✔ real tenant capture, mismatch, withdrawal and personal issue/device authority remain enforced (550.225578ms)
+{"evidence":"controlled cached-guard substitute; real effect handler and PG","name":"remember","denied":true,"memoryUnchanged":true,"messageWrites":0}
+  ✔ cached successful guard cannot authorize a later stale remember effect (97.278617ms)
+{"evidence":"controlled cached-guard substitute; real effect handler and PG","name":"forget","denied":true,"memoryUnchanged":true,"messageWrites":0}
+  ✔ cached successful guard cannot authorize a later stale forget effect (87.459112ms)
+{"evidence":"controlled cached-guard substitute; real effect handler and PG","name":"mailboxAction","denied":true,"memoryUnchanged":true,"messageWrites":0}
+  ✔ cached successful guard cannot authorize a later stale mailboxAction effect (82.111005ms)
+{"evidence":"synthetic SDK metadata; actual getStepMetadata/effect handlers/PG transactions","eventId":"929ed1c0-2487-4316-9d6d-b8f8234a2904","tenReplays":1,"mailboxWrites":1,"receiptFaultRolledMemoryBack":true}
+  ✔ fresh internal effects and SDK-step receipts commit together and replay without duplicate memory/message writes (462.50758ms)
+  ✔ quiet run_report triages before any transport start (25.331537ms)
+  ✔ quiet run_retried triages before any transport start (19.737193ms)
+{"evidence":"actual core delivery/positive controlled admission; no model called","held":false,"generationWouldStart":false}
+  ✔ late delivery whose tier became background never stages or starts generation (42.540296ms)
+✔ review: background terminal fairness, protocol scope, cached guard and quiet triage (11038.750132ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12655.385652

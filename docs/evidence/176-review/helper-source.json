@@ -1,0 +1,8 @@
+{
+  "runtimeAndMigrationSha": "5a7197d0b51d514b38e8a57c14203c7c8da51583",
+  "helperCommit": "5e59d53d72c30daba2a6956b2b34b9730913add4",
+  "localRunState": "2b0ab38 HEAD plus this exact helper delta before its commit",
+  "helperPath": "lib/coordinator/wake-test-helpers.ts",
+  "sha256": "fbc03462334a7e756480ae1680231992d53128012126b7b9efb7d1178c5dc9b6",
+  "gitBlob": "e31b384c1eb401c3642228d7cfef18cd970bb5b9"
+}
