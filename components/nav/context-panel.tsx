@@ -19,6 +19,7 @@ import { LetterAvatar } from './letter-avatar'
 import { StatusDot } from './status-dot'
 import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
+import { useCloudComputer } from '@/hooks/use-feature-availability'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type PanelTab = 'details' | 'tasks' | 'browser' | 'knowledge' | 'schedules'
@@ -167,7 +168,8 @@ export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue
   const now = useNow({ updateInterval: 60_000 })
   const [tab, setTab] = useState<PanelTab>('tasks')
   const [wide, setWide] = useState(false)
-  const thread = useConversationThread(conversation.kind === 'agent' ? conversation.id : null)
+  const cloudComputer = useCloudComputer()
+  const thread = useConversationThread(cloudComputer && conversation.kind === 'agent' ? conversation.id : null)
   // A conversation whose bot works on its computer opens on that thread's 详情, where the screen is (Figma 103:64).
   useEffect(() => { if (thread?.runId) setTab('details') }, [thread?.runId])
   const waiting = runs.filter(run => run.status === 'waiting_input' && issues.some(issue => issue.id === run.issueId)).length
