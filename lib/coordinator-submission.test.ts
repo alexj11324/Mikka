@@ -54,6 +54,48 @@ function setup(options?: { enabled?: boolean }) {
   return { server, submitter }
 }
 
+// Regressions found by the backend against fc319bf with the first client and an
+// in-memory fetch: in both, a plain retry went from id1 to id2.
+test('regression: a plain retry after a 409 used to get id2; now it makes no request and keeps id1', async () => {
+  const { server, submitter } = setup()
+  server.fail(409)
+  assert.deepEqual(await submitter.submit('move the meeting'), { kind: 'conflict' })
+  const id1 = server.lastId()
+  for (let attempt = 0; attempt < 3; attempt++) assert.deepEqual(await submitter.submit('move the meeting'), { kind: 'conflict' })
+  assert.equal(server.requests.length, 1)
+  assert.equal(submitter.held('user-a', 'move the meeting')?.submission.submissionId, id1)
+})
+
+test('regression: a send before the account was known used to go out under owner "" and retry as id2; now nothing is sent until it is known', async () => {
+  const server = fakeServer()
+  // The cookie belongs to user-a, but the account has not been resolved yet.
+  let resolved = false
+  const submitter = createCoordinatorSubmitter({ currentOwner: async () => resolved ? server.currentOwner() : null, fetch: server.fetch, newId: ids() })
+  assert.deepEqual(await submitter.submit('book the room'), { kind: 'authRequired' })
+  assert.equal(server.requests.length, 0)
+
+  resolved = true
+  server.fail('drop-response')
+  assert.deepEqual(await submitter.submit('book the room'), { kind: 'uncertain' })
+  const id1 = server.lastId()
+  assert.deepEqual(await submitter.submit('book the room'), { kind: 'accepted', enabled: true, sourceEventId: 'event-1', replayed: true })
+  assert.equal(server.lastId(), id1)
+  assert.equal(server.events.size, 1)
+})
+
+test('same content: a retry of an unsettled submission keeps its id; a new submission after it settled gets a new id', async () => {
+  const { server, submitter } = setup()
+  server.fail(500)
+  assert.deepEqual(await submitter.submit('call Sam'), { kind: 'uncertain' })
+  const id1 = server.lastId()
+  assert.equal((await submitter.submit('call Sam')).kind, 'accepted')
+  assert.equal(server.lastId(), id1)
+  // Settled: the person sending the same words again means a second message.
+  assert.equal((await submitter.submit('call Sam')).kind, 'accepted')
+  assert.notEqual(server.lastId(), id1)
+  assert.equal(server.events.size, 2)
+})
+
 test('concurrent sends of one submission make one request and one event', async () => {
   const { server, submitter } = setup()
   const [first, second] = await Promise.all([submitter.submit(' hello '), submitter.submit('hello')])

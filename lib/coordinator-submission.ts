@@ -10,6 +10,8 @@
 // rejected, the same text sent again is a new submission with a new id. After a
 // 409 the body is closed for good: sending it again makes no request.
 // Nothing here retries on its own; every request follows a person's action.
+// Ids live only in this submitter's memory: after a reload or once the
+// composer unmounts, a resend is a new submission and may be stored twice.
 
 import { withBasePath } from '@/lib/base-path'
 

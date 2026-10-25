@@ -1944,7 +1944,7 @@
     "input": "给 Coordinator 发消息",
     "placeholder": "让 Coordinator 开始处理一个 issue…",
     "send": "发送",
-    "sendUncertain": "没能确认是否送达。再发一次不会重复。",
+    "sendUncertain": "未能确认消息是否送达。在当前页面原样重发不会产生重复；刷新或离开后重发则可能重复。",
     "citation": {
       "issue": "Issue",
       "run": "运行",
