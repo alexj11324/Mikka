@@ -9,6 +9,7 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import { ActionFailureError } from '../lib/action-error'
 import { dispatchInput, insertRunOnce, type DispatchInput } from '../lib/run-dispatch'
 import { agentRuns, agents, deviceRepos, devices, issues } from '../lib/db/schema'
+import * as databaseSchema from '../lib/db/schema'
 
 const run = promisify(execFile)
 test('dispatch keys are optional, bounded and normalized with caller parameters', () => {
@@ -31,7 +32,7 @@ test('real Postgres dispatch transactions and recovery', {
   scoped.searchParams.set('options', `-c search_path=${schema}`)
   const connectionString = scoped.toString()
   const client = new Pool({ connectionString, max: 12 })
-  const db = drizzle(client)
+  const db = drizzle(client, { schema: databaseSchema })
   const owner = `dispatch-owner-${randomUUID()}`
   const deviceId = randomUUID(), agentId = randomUUID(), deviceRepoId = randomUUID()
   const brief = { deviceId, baseBranch: 'main', prompt: 'Controlled dispatch acceptance; no external actions.' }
