@@ -1,0 +1,119 @@
+{
+  "sha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+  "runs": [
+    {
+      "conclusion": "skipped",
+      "databaseId": 40211915842,
+      "headSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "name": "CI",
+      "status": "completed",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/40211915842"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 40211915855,
+      "headSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "name": "Session mailbox contracts",
+      "status": "completed",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/40211915855"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 40211915817,
+      "headSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "name": "BYOS backend integration",
+      "status": "completed",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/40211915817"
+    },
+    {
+      "conclusion": "skipped",
+      "databaseId": 40211915829,
+      "headSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "name": "Controlled Skill improvement",
+      "status": "completed",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/40211915829"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 40211914892,
+      "headSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "name": "CLA",
+      "status": "completed",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/40211914892"
+    },
+    {
+      "conclusion": "skipped",
+      "databaseId": 40211915876,
+      "headSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "name": "Run dispatch transactions",
+      "status": "completed",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/40211915876"
+    },
+    {
+      "conclusion": "skipped",
+      "databaseId": 40211915850,
+      "headSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "name": "Security audit PostgreSQL",
+      "status": "completed",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/40211915850"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 40211913439,
+      "headSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "name": "Controlled Skill improvement",
+      "status": "completed",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/40211913439"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 40211913436,
+      "headSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "name": "Run dispatch transactions",
+      "status": "completed",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/40211913436"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 40211913517,
+      "headSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "name": "Security audit PostgreSQL",
+      "status": "completed",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/40211913517"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 40211913444,
+      "headSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "name": "Session mailbox contracts",
+      "status": "completed",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/40211913444"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 40211913485,
+      "headSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "name": "CI",
+      "status": "completed",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/40211913485"
+    }
+  ],
+  "performance": {
+    "passed": 5,
+    "failed": 0,
+    "retries": 0
+  },
+  "browser": {
+    "passed": 86,
+    "skipped": 1,
+    "failed": 0,
+    "retries": 0
+  },
+  "countsSource": "GitHub job log for run 40211913485",
+  "artifactZipInspection": {
+    "artifact": "browser-test-report",
+    "artifactId": 12606630992,
+    "state": "download denied: HTTP 403 from artifact storage; no zip contents inspected",
+    "fallback": "Job logs and successful job status verified; no signed download URL published"
+  }
+}
