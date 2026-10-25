@@ -196,6 +196,34 @@ test(
             prompt: "Fixture dispatch with real #191 transaction",
           }),
       );
+      const planned = await dispatcher("owner", {
+        binding: binding(spec.task),
+        agentId,
+        deviceRepoId: repoId,
+      });
+      const planRun = (
+        await pool.query("SELECT kind,prompt FROM agent_runs WHERE id=$1", [
+          planned.runId,
+        ])
+      ).rows[0];
+      assert.equal(planRun.kind, "plan");
+      assert.match(planRun.prompt, /Factory stage: spec/);
+      await pool.query(
+        'UPDATE agent_runs SET status=\'succeeded\',"stopReason"=\'submitted\',"sessionId"=$2,report=$3,"finishedAt"=now() WHERE id=$1',
+        [
+          planned.runId,
+          `plan-${randomUUID()}`,
+          JSON.stringify({
+            summary: "Persisted planning fixture output",
+            verify: { status: "not_run" },
+          }),
+        ],
+      );
+      const reconcile = createFactoryReconciler(pool, store);
+      await reconcile("owner");
+      const plannedState = await store.read("owner", spec.task.id);
+      assert.equal(plannedState.task.stage, "execute");
+      assert.equal(plannedState.task.candidateId, null);
       const dispatchTask = await route();
       const dispatchInput = {
         binding: binding(dispatchTask.task),
@@ -271,7 +299,6 @@ test(
           }),
         ],
       );
-      const reconcile = createFactoryReconciler(pool, store);
       assert.equal((await reconcile("owner")).recovered, 1);
       dispatched = await store.read("owner", dispatchRollback.task.id);
       assert.equal(dispatched.task.stage, "review");

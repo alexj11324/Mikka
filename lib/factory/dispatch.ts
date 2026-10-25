@@ -32,7 +32,7 @@ export function createFactoryDispatch(
     const tx = await pool.connect();
     try {
       await tx.query("BEGIN");
-      await store.lockForDispatch(userId, binding, eventId, tx);
+      const task = await store.lockForDispatch(userId, binding, eventId, tx);
       const run = await queue(tx, userId, {
         issueId: binding.issueId,
         agentId,
@@ -40,6 +40,25 @@ export function createFactoryDispatch(
         note,
         requestKey: `factory:${binding.taskId}:${binding.attemptId}`,
       });
+      if (task.stage === "spec" && !run.replayed) {
+        // Reuse the existing Harness planning run. The queue gate and caller
+        // parameter fingerprint remain unchanged; the stage is server-owned.
+        const {
+          rows: [queued],
+        } = await tx.query(
+          "SELECT prompt FROM agent_runs WHERE id=$1 FOR UPDATE",
+          [run.runId],
+        );
+        const instruction =
+          "Factory stage: spec. Produce the specification needed for this request and hand in the planning output. Implementation waits for the next execute attempt.";
+        await tx.query(
+          "UPDATE agent_runs SET kind='plan',prompt=$2 WHERE id=$1",
+          [
+            run.runId,
+            `${instruction}\n\n${queued.prompt.slice(0, 100000 - instruction.length - 2)}`,
+          ],
+        );
+      }
       const state = await store.apply(
         userId,
         binding,

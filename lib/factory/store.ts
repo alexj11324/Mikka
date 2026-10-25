@@ -274,13 +274,13 @@ export function createFactoryStore(
       const {
         rows: [prior],
       } = await tx.query(
-        "SELECT request->'change' AS change, request->'binding'=$3::jsonb AS same FROM factory_events WHERE \"taskId\"=$1 AND \"eventId\"=$2",
+        "SELECT result, request->'change' AS change, request->'binding'=$3::jsonb AS same FROM factory_events WHERE \"taskId\"=$1 AND \"eventId\"=$2",
         [task.id, eventId, JSON.stringify(binding)],
       );
       if (prior) {
         if (!prior.same || prior.change.action !== "bind_run")
           fail("factoryReplayMismatch");
-        return;
+        return prior.result.task as FactoryTask;
       }
       if (
         task.revision !== binding.revision ||
@@ -293,6 +293,7 @@ export function createFactoryStore(
         !["spec", "execute"].includes(task.stage)
       )
         fail("factoryTransition");
+      return task;
     },
     /** Trusted backend only. Do not expose finish/advance/bind/candidate to model or worker tools. */
     async apply(
