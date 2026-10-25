@@ -33,7 +33,10 @@ export function createLocalPublicationAdapter(
     target: config.target,
     environment: config.environment,
     async execute(input) {
-      const parsed = payloadSchema.safeParse(input);
+      const parsed = payloadSchema.safeParse({
+        idempotencyKey: input.idempotencyKey,
+        candidate: input.candidate,
+      });
       if (!parsed.success) throw new FactoryError("factoryLocalTargetInvalid");
       const payload = parsed.data;
       if (

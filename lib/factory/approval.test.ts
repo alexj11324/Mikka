@@ -23,6 +23,14 @@ import { redactArtifact } from "./evidence";
 import { factoryBrowserHuman } from "./browser-human";
 import { createLocalPublicationAdapter } from "./local-publication";
 import { readFactoryPublicationReceipt } from "./publication-receipt";
+import { readFactoryPublicationReceiptV2 } from "./publication-receipt";
+import { vercelProtocolFixture } from "../../tests/helpers/factory-vercel";
+import {
+  createVercelPublicationAdapter,
+  MIKKA_VERCEL,
+  vercelTarget,
+} from "./vercel-publication";
+import { PublicationDeferred } from "./publication-operation";
 
 const binding = (task: FactoryTask): FactoryBinding => ({
   taskId: task.id,
@@ -161,6 +169,7 @@ test(
       async function prepare(
         stopStage = "approval",
         candidateEnvironment = "local-contract",
+        repository = "fixture/Mikka",
       ) {
         const sourceEventId = randomUUID();
         await pool.query(
@@ -192,7 +201,7 @@ test(
               runId,
               candidate: {
                 sha,
-                repository: "fixture/Mikka",
+                repository,
                 environment: candidateEnvironment,
                 scope: "fixture backend",
               },
@@ -1058,6 +1067,297 @@ test(
         },
       );
       await t.test(
+        "Vercel HTTP protocol + PG17 durable pending/uncertain reconciliation (not cloud deployment)",
+        async (t) => {
+          for (const window of [
+            "queued",
+            "lost-response",
+            "sql-rollback",
+          ] as const)
+            await t.test(window, async () => {
+              const f = await vercelProtocolFixture();
+              try {
+                const environment =
+                  window === "sql-rollback"
+                    ? ("production" as const)
+                    : ("preview" as const);
+                const action =
+                  environment === "production"
+                    ? ("deploy_production" as const)
+                    : ("deploy_preview" as const);
+                const target = vercelTarget({ ...MIKKA_VERCEL, environment });
+                const adapter = createVercelPublicationAdapter(
+                  { ...MIKKA_VERCEL, environment },
+                  f.client,
+                );
+                const provider = createFactoryApprovals(
+                  pool,
+                  authorize,
+                  store,
+                  [adapter],
+                );
+                const s = await prepare(
+                  "approval",
+                  `device:${randomUUID()}`,
+                  MIKKA_VERCEL.repository,
+                );
+                const approvalReq = {
+                  ...(await request(s)),
+                  action,
+                  target,
+                  targetEnvironment: environment,
+                };
+                const a = await provider.approve(actor, approvalReq);
+                const p = {
+                  ...publication(a),
+                  action,
+                  target,
+                  targetEnvironment: environment,
+                };
+                f.state.readyState = window === "queued" ? "BUILDING" : "READY";
+                f.state.dropCreateResponse = window === "lost-response";
+                if (window === "sql-rollback")
+                  await pool.query(
+                    `CREATE TRIGGER reject_194 BEFORE INSERT ON factory_events FOR EACH ROW EXECUTE FUNCTION reject_194_event()`,
+                  );
+                try {
+                  const response = await handleFactoryApproval(
+                    provider,
+                    httpReq(s.task.id, {
+                      method: "POST",
+                      body: { operation: "publish", input: p },
+                    }),
+                  );
+                  assert.notEqual(window, "sql-rollback");
+                  assert.equal(
+                    response.status,
+                    window === "queued" ? 202 : 409,
+                  );
+                } catch (e) {
+                  if (window !== "sql-rollback") throw e;
+                  assert.match(String(e), /injected rollback/);
+                } finally {
+                  if (window === "sql-rollback")
+                    await pool.query(
+                      "DROP TRIGGER reject_194 ON factory_events",
+                    );
+                }
+                assert.equal(f.posts(), 1);
+                assert.equal(
+                  (await store.read(actor.userId, s.task.id)).task.status,
+                  "pending",
+                );
+                const ledger = await provider.ledger(actor, s.task.id),
+                  operation = ledger.publications[0];
+                assert.equal(
+                  operation.status,
+                  window === "queued" ? "reserved" : "uncertain",
+                );
+                assert.deepEqual(operation.request, p);
+                await rejects(
+                  () => provider.publish(actor, p),
+                  "factoryPublicationAlreadyClaimed",
+                );
+                await rejects(
+                  () =>
+                    provider.reconcile(actor, {
+                      ...p,
+                      publicationId: operation.id,
+                      receipt: { reference: "https://forged.example" },
+                    }),
+                  "factoryInvalid",
+                );
+                for (const d of f.deployments.values()) d.readyState = "READY";
+                // Constructing a fresh service simulates an application reconnect/restart;
+                // operation identity and the trusted checkpoint come from SQL only.
+                const reconnect = createFactoryApprovals(
+                  pool,
+                  authorize,
+                  store,
+                  [adapter],
+                );
+                const outcomes = await Promise.all(
+                  Array.from({ length: 5 }, () =>
+                    reconnect.reconcile(actor, {
+                      ...p,
+                      publicationId: operation.id,
+                    }),
+                  ),
+                );
+                assert.ok(
+                  outcomes.every((r) => r.publicationId === operation.id),
+                );
+                assert.equal(f.posts(), 1);
+                assert.equal(
+                  (await store.read(actor.userId, s.task.id)).task.status,
+                  "passed",
+                );
+                const tx = await pool.connect();
+                try {
+                  const receipt = await readFactoryPublicationReceiptV2(
+                    tx,
+                    actor.userId,
+                    s.task.id,
+                    p.binding.candidateId!,
+                  );
+                  assert.equal(receipt.version, 2);
+                  assert.equal(receipt.action, action);
+                  assert.equal(receipt.targetEnvironment, environment);
+                  assert.equal(
+                    receipt.verifiedTarget.provider?.publicationId,
+                    operation.id,
+                  );
+                  if (environment === "production")
+                    await rejects(
+                      () =>
+                        readFactoryPublicationReceipt(
+                          tx,
+                          actor.userId,
+                          s.task.id,
+                          p.binding.candidateId!,
+                        ),
+                      "factoryPublicationReceiptRequired",
+                    );
+                } finally {
+                  tx.release();
+                }
+              } finally {
+                await f.close();
+              }
+            });
+          await t.test(
+            "approval/session expiration during provider preflight prevents POST",
+            async () => {
+              const f = await vercelProtocolFixture();
+              try {
+                const adapter = createVercelPublicationAdapter(
+                    { ...MIKKA_VERCEL, environment: "production" },
+                    f.client,
+                  ),
+                  provider = createFactoryApprovals(pool, authorize, store, [
+                    adapter,
+                  ]);
+                f.state.projectDelayMs = 1000;
+                for (const field of ["approval", "session"]) {
+                  const s = await prepare(
+                    "approval",
+                    `device:${randomUUID()}`,
+                    MIKKA_VERCEL.repository,
+                  );
+                  const req = {
+                    ...(await request(s)),
+                    action: "deploy_production" as const,
+                    target: adapter.target,
+                    targetEnvironment: "production",
+                  };
+                  if (field === "approval")
+                    req.expiresAt = new Date(Date.now() + 500).toISOString();
+                  const a = await provider.approve(actor, req),
+                    p = {
+                      ...publication(a),
+                      action: req.action,
+                      target: req.target,
+                      targetEnvironment: req.targetEnvironment,
+                    };
+                  if (field === "session")
+                    await pool.query(
+                      'UPDATE "session" SET "expiresAt"=now()+interval \'500 milliseconds\' WHERE id=$1',
+                      [actor.sessionId],
+                    );
+                  try {
+                    await rejects(
+                      () => provider.publish(actor, p),
+                      field === "approval"
+                        ? "factoryApprovalInvalid"
+                        : "factoryHumanRequired",
+                    );
+                    assert.equal(f.posts(), 0);
+                  } finally {
+                    await pool.query(
+                      'UPDATE "session" SET "expiresAt"=now()+interval \'1 hour\' WHERE id=$1',
+                      [actor.sessionId],
+                    );
+                  }
+                }
+              } finally {
+                await f.close();
+              }
+            },
+          );
+          await t.test(
+            "revoked/expired/stale grants cannot inspect or complete an operation",
+            async () => {
+              const f = await vercelProtocolFixture();
+              try {
+                const adapter = createVercelPublicationAdapter(
+                    { ...MIKKA_VERCEL, environment: "preview" },
+                    f.client,
+                  ),
+                  provider = createFactoryApprovals(pool, authorize, store, [
+                    adapter,
+                  ]);
+                for (const invalid of ["expired", "revoked", "stale"]) {
+                  const s = await prepare(
+                      "approval",
+                      `device:${randomUUID()}`,
+                      MIKKA_VERCEL.repository,
+                    ),
+                    target = adapter.target;
+                  const a = await provider.approve(actor, {
+                    ...(await request(s)),
+                    target,
+                    targetEnvironment: "preview",
+                  });
+                  const p = {
+                    ...publication(a),
+                    target,
+                    targetEnvironment: "preview",
+                  };
+                  f.state.readyState = "QUEUED";
+                  await assert.rejects(
+                    () => provider.publish(actor, p),
+                    (e) => e instanceof PublicationDeferred,
+                  );
+                  const ledger = await provider.ledger(actor, s.task.id),
+                    id = ledger.publications[0].id,
+                    before = f.requests.length;
+                  if (invalid === "expired")
+                    await pool.query(
+                      "UPDATE factory_approvals SET \"expiresAt\"=now()-interval '1 minute' WHERE id=$1",
+                      [a.approvalId],
+                    );
+                  else if (invalid === "revoked")
+                    await provider.revoke(actor, {
+                      binding: p.binding,
+                      eventId: randomUUID(),
+                      approvalId: a.approvalId,
+                    });
+                  else
+                    await pool.query(
+                      "UPDATE factory_tasks SET revision=revision+1 WHERE id=$1",
+                      [s.task.id],
+                    );
+                  await rejects(
+                    () =>
+                      provider.reconcile(actor, { ...p, publicationId: id }),
+                    invalid === "stale"
+                      ? "factoryStale"
+                      : "factoryApprovalInvalid",
+                  );
+                  assert.equal(f.requests.length, before);
+                  assert.equal(
+                    f.posts(),
+                    invalid === "expired" ? 1 : invalid === "revoked" ? 2 : 3,
+                  );
+                }
+              } finally {
+                await f.close();
+              }
+            },
+          );
+        },
+      );
+      await t.test(
         "real HTTP + Better Auth + PG cookie authentication (synthetic account, no human OAuth acceptance)",
         async () => {
           await pool.query(
@@ -1118,8 +1418,13 @@ test(
               res.end(JSON.stringify(result.body));
             } catch (error) {
               // Preserve failure classification without printing session/token bodies.
-              console.error("isolated-auth-fixture", error instanceof Error ? error.name : typeof error,
-                error && typeof error === "object" && "code" in error ? String(error.code) : "no-code");
+              console.error(
+                "isolated-auth-fixture",
+                error instanceof Error ? error.name : typeof error,
+                error && typeof error === "object" && "code" in error
+                  ? String(error.code)
+                  : "no-code",
+              );
               res.writeHead(500);
               res.end("local fixture failure");
             }
@@ -1140,8 +1445,12 @@ test(
               }),
             });
             if (signin.status !== 200) {
-              const body = await signin.json().catch(() => null) as {code?:unknown} | null;
-              assert.fail(`Isolated sign-in HTTP ${signin.status}; code=${typeof body?.code === "string" ? body.code : "unclassified"}`);
+              const body = (await signin.json().catch(() => null)) as {
+                code?: unknown;
+              } | null;
+              assert.fail(
+                `Isolated sign-in HTTP ${signin.status}; code=${typeof body?.code === "string" ? body.code : "unclassified"}`,
+              );
             }
             const cookie = signin.headers
               .getSetCookie()

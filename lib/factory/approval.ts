@@ -10,7 +10,6 @@ import {
 } from "./approval-contract";
 import {
   approvalEvidence,
-  candidateIdentity,
   digest,
   readFactoryArtifact,
   redactArtifact,
@@ -26,6 +25,46 @@ import {
   assertPublicationTarget,
   type PublicationAdapterReceipt,
 } from "./publication-receipt";
+import {
+  PublicationDeferred,
+  publicationBindingHash,
+  type PublicationInput,
+} from "./publication-operation";
+
+function providerInput(
+  task: FactoryTask,
+  a: any,
+  req: any,
+  publicationId: string,
+): PublicationInput {
+  return {
+    idempotencyKey: publicationId,
+    candidate: a.candidate,
+    authorization: {
+      approvalId: a.id,
+      ownerId: task.userId,
+      humanSessionId: a.humanSessionId,
+      expiresAt: a.request.expiresAt,
+      binding: req.binding,
+      eventId: req.eventId,
+      action: req.action,
+      target: req.target,
+      targetEnvironment: req.targetEnvironment,
+    },
+  };
+}
+function providerBinding(
+  receipt: PublicationAdapterReceipt,
+  input: PublicationInput,
+) {
+  const provider = receipt.verifiedTarget.provider;
+  if (
+    provider &&
+    (provider.publicationId !== input.idempotencyKey ||
+      provider.bindingHash !== publicationBindingHash(input))
+  )
+    throw new FactoryError("factoryPublicationReceiptMismatch");
+}
 
 function fail(code: string): never {
   throw new FactoryError(code);
@@ -129,6 +168,7 @@ export const publishGate: FactoryGate = async (tx, task, _attempt, change) => {
   if (p) {
     const receipt = publicationAdapterReceipt.safeParse(p.receipt);
     if (!receipt.success) return false;
+    providerBinding(receipt.data, providerInput(task, a, p.request, p.id));
     assertPublicationTarget(
       receipt.data,
       a.candidate,
@@ -158,10 +198,12 @@ export interface PublicationAdapter {
   action: z.infer<typeof publicationRequest>["action"];
   target: string;
   environment: string;
-  execute(input: {
-    idempotencyKey: string;
-    candidate: ReturnType<typeof candidateIdentity>;
-  }): Promise<PublicationAdapterReceipt>;
+  execute(input: PublicationInput): Promise<PublicationAdapterReceipt>;
+  /** Read-only inspection. This method must never create/promote a deployment. */
+  reconcile?(
+    input: PublicationInput,
+    checkpoint: unknown,
+  ): Promise<PublicationAdapterReceipt>;
 }
 
 export function createFactoryApprovals(
@@ -206,6 +248,71 @@ export function createFactoryApprovals(
   function fence(task: FactoryTask, binding: FactoryBinding) {
     if (digest(bindingOf(task)) !== digest(binding)) fail("factoryStale");
   }
+  async function defer(error: unknown, publicationId: string): Promise<never> {
+    const state =
+      error instanceof PublicationDeferred ? error.state : "uncertain";
+    const checkpoint =
+      error instanceof PublicationDeferred ? error.checkpoint : null;
+    await pool.query(
+      `UPDATE factory_publications SET status=$2,receipt=coalesce($3::jsonb,receipt),"finishedAt"=clock_timestamp() WHERE id=$1 AND status<>'succeeded'`,
+      [
+        publicationId,
+        state === "pending" ? "reserved" : "uncertain",
+        checkpoint == null ? null : JSON.stringify(checkpoint),
+      ],
+    );
+    if (error instanceof PublicationDeferred)
+      throw new PublicationDeferred(publicationId, state, checkpoint);
+    if (error instanceof FactoryError && error.code.startsWith("factoryVercel"))
+      throw new PublicationDeferred(publicationId, "uncertain");
+    throw error;
+  }
+  async function complete(
+    tx: PoolClient,
+    task: FactoryTask,
+    req: any,
+    a: any,
+    current: Awaited<ReturnType<typeof approvalEvidence>>,
+    receipt: PublicationAdapterReceipt,
+    publicationId: string,
+  ) {
+    assertPublicationTarget(
+      receipt,
+      a.candidate,
+      a.action,
+      a.target,
+      a.request.targetEnvironment,
+      publicationId,
+    );
+    providerBinding(receipt, providerInput(task, a, req, publicationId));
+    await tx.query(
+      `UPDATE factory_publications SET status='succeeded',receipt=$2,"finishedAt"=clock_timestamp() WHERE id=$1 AND status IN ('reserved','uncertain')`,
+      [publicationId, JSON.stringify(receipt)],
+    );
+    const result = await store.apply(
+      task.userId,
+      req.binding,
+      req.eventId,
+      {
+        action: "finish",
+        status: "passed",
+        reason: "Trusted publication adapter returned a verified receipt",
+        evidence: current.evidence,
+        output: { approvalId: a.id, publicationId },
+      },
+      tx,
+    );
+    const response = {
+      publicationId,
+      receipt,
+      binding: bindingOf(result.task),
+    };
+    await tx.query("UPDATE factory_publications SET result=$2 WHERE id=$1", [
+      publicationId,
+      JSON.stringify(response),
+    ]);
+    return response;
+  }
   return {
     async ledger(actor: FactoryHuman, taskId: string) {
       if (!z.uuid().safeParse(taskId).success) fail("factoryInvalid");
@@ -216,7 +323,7 @@ export function createFactoryApprovals(
           [task.id],
         );
         const { rows: publications } = await tx.query(
-          'SELECT id,"approvalId","candidateId",action,target,request->>\'targetEnvironment\' AS "targetEnvironment",status,receipt,"createdAt","finishedAt" FROM factory_publications WHERE "taskId"=$1 ORDER BY "createdAt"',
+          'SELECT id,"approvalId","candidateId",action,target,request,request->>\'targetEnvironment\' AS "targetEnvironment",status,receipt,"createdAt","finishedAt" FROM factory_publications WHERE "taskId"=$1 ORDER BY "createdAt"',
           [task.id],
         );
         return { binding: bindingOf(task), approvals, publications };
@@ -418,9 +525,6 @@ export function createFactoryApprovals(
       const parsed = publicationRequest.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
       const req = parsed.data;
-      // No production publication implementation is supplied by this issue.
-      if (req.action === "deploy_production")
-        fail("factoryPublicationUnavailable");
       const adapter = adapters.find(
         (a) =>
           a.action === req.action &&
@@ -505,59 +609,104 @@ export function createFactoryApprovals(
         return await transaction(async (tx) => {
           const task = await owned(tx, actor, req.binding.taskId);
           fence(task, req.binding);
+          const {
+            rows: [claim],
+          } = await tx.query(
+            "SELECT status,receipt FROM factory_publications WHERE id=$1 FOR UPDATE",
+            [publicationId],
+          );
+          if (claim?.status !== "reserved" || claim.receipt != null)
+            fail("factoryPublicationAlreadyClaimed");
           const { a, current } = await validApproval(
             tx,
             task,
             req.approvalId,
             true,
           );
-          const receipt = publicationAdapterReceipt.parse(
-            await adapter.execute({
-              idempotencyKey: publicationId,
-              candidate: a.candidate,
-            }),
-          );
-          assertPublicationTarget(
-            receipt,
-            a.candidate,
-            a.action,
-            a.target,
-            a.request.targetEnvironment,
-            publicationId,
-          );
-          await tx.query(
-            `UPDATE factory_publications SET status='succeeded',receipt=$2,"finishedAt"=clock_timestamp() WHERE id=$1 AND status='reserved'`,
-            [publicationId, JSON.stringify(receipt)],
-          );
-          const result = await store.apply(
-            actor.userId,
-            req.binding,
-            req.eventId,
-            {
-              action: "finish",
-              status: "passed",
-              reason: "Trusted publication adapter returned a receipt",
-              evidence: current.evidence,
-              output: { approvalId: a.id, publicationId },
-            },
-            tx,
-          );
-          const response = {
-            publicationId,
-            receipt,
-            binding: bindingOf(result.task),
+          const trustedInput = providerInput(task, a, req, publicationId);
+          trustedInput.beforeCreate = async () => {
+            await human(tx, actor);
+            await validApproval(tx, task, req.approvalId, true);
           };
-          await tx.query(
-            "UPDATE factory_publications SET result=$2 WHERE id=$1",
-            [publicationId, JSON.stringify(response)],
+          const receipt = publicationAdapterReceipt.parse(
+            await adapter.execute(trustedInput),
           );
-          return response;
+          return complete(tx, task, req, a, current, receipt, publicationId);
         });
       } catch (error) {
-        await pool.query(
-          `UPDATE factory_publications SET status='uncertain',"finishedAt"=clock_timestamp() WHERE id=$1 AND status='reserved'`,
-          [publicationId],
-        );
+        return defer(error, publicationId);
+      }
+    },
+    async reconcile(actor: FactoryHuman, input: unknown) {
+      const parsed = publicationRequest
+        .extend({ publicationId: z.uuid() })
+        .strict()
+        .safeParse(input);
+      if (!parsed.success) fail("factoryInvalid");
+      const { publicationId, ...req } = parsed.data;
+      try {
+        return await transaction(async (tx) => {
+          const task = await owned(tx, actor, req.binding.taskId);
+          const {
+            rows: [p],
+          } = await tx.query(
+            'SELECT * FROM factory_publications WHERE id=$1 AND "taskId"=$2 AND "approvalId"=$3 FOR UPDATE',
+            [publicationId, task.id, req.approvalId],
+          );
+          if (!p) fail("factoryPublicationReceiptRequired");
+          if (digest(p.request) !== digest(req)) fail("factoryReplayMismatch");
+          if (p.status === "succeeded") {
+            if (
+              task.stage !== "publish" ||
+              task.status !== "passed" ||
+              digest(bindingOf(task)) !== digest(p.result?.binding)
+            )
+              fail("factoryStale");
+            await validApproval(
+              tx,
+              { ...task, revision: req.binding.revision },
+              req.approvalId,
+              true,
+            );
+            return p.result as {
+              publicationId: string;
+              receipt: PublicationAdapterReceipt;
+              binding: FactoryBinding;
+            };
+          }
+          fence(task, req.binding);
+          if (task.stage !== "publish" || task.status !== "pending")
+            fail("factoryTransition");
+          const { a, current } = await validApproval(
+            tx,
+            task,
+            req.approvalId,
+            true,
+          );
+          const adapter = adapters.find(
+            (x) =>
+              x.action === a.action &&
+              x.target === a.target &&
+              x.environment === a.request.targetEnvironment,
+          );
+          if (!adapter?.reconcile) fail("factoryPublicationUnavailable");
+          const receipt = publicationAdapterReceipt.parse(
+            await adapter.reconcile(
+              providerInput(task, a, req, publicationId),
+              p.receipt,
+            ),
+          );
+          return complete(tx, task, req, a, current, receipt, publicationId);
+        });
+      } catch (error) {
+        // Only actual provider/deferred failures update an existing reservation.
+        // Invalid ownership/fence/request errors must not mutate another grant.
+        if (
+          error instanceof PublicationDeferred ||
+          (error instanceof FactoryError &&
+            error.code.startsWith("factoryVercel"))
+        )
+          return defer(error, publicationId);
         throw error;
       }
     },
