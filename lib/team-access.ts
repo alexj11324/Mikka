@@ -26,5 +26,5 @@ export async function requireTeam(tx: WorkspaceTransaction, id: string, userId: 
 }
 export async function lockTeamRelations(tx: WorkspaceTransaction) {
   // Tasks and projects share a relation lock because their records live in separate databases.
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('orvilo-team-relations', 0))`)
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('mikka-team-relations', 0))`)
 }

@@ -6,7 +6,7 @@ import { recoverAcceptanceSession } from '../lib/acceptance-recovery.ts'
 
 test('预览分区 Cookie 保持 HttpOnly、Secure 和 SameSite=None', async () => {
   const source = await readFile(new URL('../lib/auth.ts', import.meta.url), 'utf8')
-  assert.match(source, /process\.env\.NODE_ENV === 'development' \? \{ advanced:/)
+  assert.match(source, /process\.env\.NODE_ENV === 'development' && authBaseURL\?\.startsWith\('https:\/\/'\) \? \{ advanced:/)
   assert.match(source, /defaultCookieAttributes: \{ sameSite: 'none' as const, secure: true, partitioned: true \}/)
   const { sessionToken } = getCookies({
     baseURL: 'https://preview.example.com',

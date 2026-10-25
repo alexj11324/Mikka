@@ -29,6 +29,18 @@ export function runFinishedEvent(run: { id: string; userId: string; issueId: str
   }
 }
 
+/** A run lost its device and was queued again as `retryRunId`. Background: nobody needs to act. */
+export function runRetriedEvent(run: { id: string; userId: string; issueId: string | null }, retry: { runId: string; attempt: number; maxAttempts: number; movedToDeviceId?: string | null }): CoordinatorEventInput {
+  return {
+    userId: run.userId,
+    kind: 'run_retried',
+    dedupeKey: `run_retried:${run.id}`,
+    issueId: run.issueId,
+    runId: run.id,
+    payload: { retryRunId: retry.runId, attempt: retry.attempt, maxAttempts: retry.maxAttempts, ...(retry.movedToDeviceId ? { movedToDeviceId: retry.movedToDeviceId } : {}) },
+  }
+}
+
 /**
  * An issue moved to done, or null when this save is not that move. Keyed by
  * the revision that made the move, so reopening and finishing again is a new
@@ -70,4 +82,15 @@ export function runQuestionEvent(run: WorkerRun, question: { question: string; o
 /** The agent inside a run cannot go on (MCP `blocked`). */
 export function runBlockedEvent(run: WorkerRun, reason: string): CoordinatorEventInput {
   return workerEvent('run_blocked', run, { reason })
+}
+
+/** The person approved or declined something an agent proposed in their accounts (lib/pending-actions.ts). */
+export function actionDecidedEvent(
+  action: { id: string; userId: string; action: string; input: Record<string, unknown> },
+  decision: { status: 'done' | 'failed' | 'declined'; error: string | null; outcome: Record<string, string> },
+): CoordinatorEventInput {
+  return {
+    userId: action.userId, kind: 'action_decided', dedupeKey: `action_decided:${action.id}`, issueId: null, runId: null,
+    payload: { actionId: action.id, action: action.action, input: action.input, status: decision.status, ...(decision.error ? { error: decision.error } : {}), outcome: decision.outcome },
+  }
 }

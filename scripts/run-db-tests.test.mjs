@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { BOOTSTRAP, REQUIRED_SUITES, checkSummary, inventory, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
+import { BOOTSTRAP, REQUIRED_SUITES, SELF_MANAGED, checkSummary, inventory, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
 
 const target = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
 const env = { CI: 'true', GITHUB_ACTIONS: 'true', E2E_DATABASE_URL: target, MIKKA_DATABASE_URL: target, DATABASE_URL: target }
@@ -45,6 +45,19 @@ test('discovers every present pg/DB suite and rejects unregistered or ambiguous 
   assert.throws(() => inventory(tree, full, ['test:not-present']), /Expected DB script not enrolled/)
   assert.throws(() => inventory(tree, { ...full, 'test:duplicate': `node --test ${extra}` }), /found 2/)
 })
+test('self-managed suites are excluded only with a reason and a live dedicated runner', () => {
+  const own = { file: 'lib/own-db.test.ts', runner: 'scripts/test-own-db.mjs', reason: 'starts its own Postgres' }
+  const tree = { ...files, [own.file]: "import { Pool } from 'pg'", [own.runner]: `spawn('node', ['--test', '${own.file}'])` }
+  assert.throws(() => inventory(tree, scripts), /needs one explicit/, 'without the exclusion it must be enrolled')
+  const plan = inventory(tree, scripts, [], REQUIRED_SUITES, [own])
+  assert.deepEqual(plan.scripts, [sample.script])
+  assert.deepEqual(plan.selfManaged, [own.file])
+  assert.throws(() => inventory({ ...tree, [own.runner]: '' }, scripts, [], REQUIRED_SUITES, [own]), /no longer runs/)
+  assert.throws(() => inventory(tree, scripts, [], REQUIRED_SUITES, [{ ...own, runner: 'scripts/gone.mjs' }]), /missing/)
+  assert.throws(() => inventory(tree, scripts, [], REQUIRED_SUITES, [{ ...own, reason: '' }]), /needs a reason/)
+  assert.throws(() => inventory({ ...tree, [own.runner]: sample.file }, scripts, [], REQUIRED_SUITES, [{ ...own, file: sample.file }]), /both required and self-managed/)
+  for (const entry of SELF_MANAGED) assert.ok(entry.reason && entry.runner)
+})
 test('this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates', () => {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8')).scripts
   const tree = readTree()
@@ -52,7 +65,14 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   const plan = inventory(tree, pkg)
   assert.ok(plan.scripts.includes('test:groups'))
   assert.ok(plan.scripts.includes('test:workspace-migration-db'))
+  assert.ok(plan.scripts.includes('test:relation-cycle'))
+  assert.ok(plan.selfManaged.includes('lib/auth-email.test.ts'))
   const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
+  const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
+  for (const script of plan.scripts) {
+    if (script !== 'test:groups') assert.ok(!workflow.includes(`pnpm ${script}`), `${script} runs once, through pnpm test:db`)
+  }
+  assert.ok(!/node --test tests\/workspace-migration\.test\.mjs/.test(workflow), 'workspace migration runs once, through pnpm test:db')
   const pinned = workflow.match(/DB_TEST_EXPECTED: ([^\n]+)/)?.[1].split(',').sort()
   assert.deepEqual(pinned, plan.scripts, 'workflow explicitly pins every suite expected on this tree')
   for (const script of ['test:active-agents', 'test:group-turns', 'test:issue-search']) {
@@ -66,8 +86,8 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(workflow.indexOf('- run: pnpm test:e2e:setup') < workflow.indexOf('run: pnpm test:db\n'))
   assert.match(workflow, /MIGRATION_BOOTSTRAP_CI: '1'/)
   assert.match(workflow, /REQUIRE_DB: '1'/)
-  assert.match(workflow, /pnpm test:performance --output=performance-results/)
-  assert.match(workflow, /pnpm test:e2e --grep-invert @performance/)
+  assert.match(browser, /pnpm test:performance --output=performance-results/)
+  assert.match(browser, /pnpm test:e2e --grep-invert @performance/)
   assert.match(workflow, /image: postgres:17/)
   for (const name of ['test:agent', 'test:suggestions', 'test:integrations', 'test:issues', 'test:db-runner']) {
     assert.ok(workflow.includes(`pnpm ${name}`), `${name} strict gate retained`)

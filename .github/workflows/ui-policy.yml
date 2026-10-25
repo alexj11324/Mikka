@@ -6,6 +6,8 @@ name: CI
 # - postsubmit: every push to main runs CI again.
 # A PR from a branch in this repo is already covered by its push run, so the
 # pull_request run is kept only for PRs from forks (see the job conditions).
+# Browser tests (Playwright) are the slow part and live in browser-tests.yml,
+# which runs only on the way into main. See CONTRIBUTING.md, "How changes are tested".
 on:
   push:
     branches-ignore: ['gh-readonly-queue/**']
@@ -87,6 +89,7 @@ jobs:
       - run: pnpm test:groups
       - run: pnpm test:integrations
       - run: pnpm test:agent
+      - run: pnpm test:acceptance
       - run: pnpm test:suggestions
       - run: pnpm test:db-runner
       - run: pnpm test:csv
@@ -121,6 +124,7 @@ jobs:
         if: always()
 
   browser-tests:
+    # Name kept so the existing required check still reports; browser tests moved to browser-tests.yml.
     name: Production build and browser interactions
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
@@ -160,7 +164,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Generate ephemeral test-only auth secret
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
-      - run: pnpm exec playwright install --with-deps chromium
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
@@ -170,25 +173,5 @@ jobs:
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:groups,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:groups,test:relation-cycle,test:workspace-migration-db
       - run: pnpm build
-        id: build
-      - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
-        run: pnpm test:performance --output=performance-results
-        env:
-          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
-      - name: Browser functionality regression
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: pnpm test:e2e --grep-invert @performance
-      - name: Upload browser failure evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: browser-test-report
-          path: |
-            playwright-report/
-            test-results/
-            playwright-performance-report/
-            performance-results/
-          if-no-files-found: ignore
-          retention-days: 7

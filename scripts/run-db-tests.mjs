@@ -16,6 +16,12 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/run-visibility.ts', file: 'tests/team-visibility.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/issue-search.ts', file: 'tests/issue-search.db.test.ts', script: 'test:issue-search-db' },
   { marker: 'tests/workspace-migration.test.mjs', file: 'tests/workspace-migration.test.mjs', script: 'test:workspace-migration-db' },
+  { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
+]
+// Suites that provision their own throwaway database and refuse the shared mikka_e2e service.
+// Each entry names its dedicated runner; the runner must exist and still invoke the file.
+export const SELF_MANAGED = [
+  { file: 'lib/auth-email.test.ts', runner: 'scripts/test-auth-email.mjs', reason: 'starts its own Docker Postgres and refuses any application database' },
 ]
 // This destructive empty-database bootstrap must stay BEFORE test:e2e:setup.
 // Its workflow invocation is independently checked, not silently omitted.
@@ -44,11 +50,19 @@ export function validateTarget(env) {
   if (env.ORVILO_DATABASE_URL && env.ORVILO_DATABASE_URL !== env.E2E_DATABASE_URL) throw new Error('Legacy database fallback must not point outside ephemeral service')
 }
 
-export function inventory(files, scripts, expected = [], required = REQUIRED_SUITES) {
+export function inventory(files, scripts, expected = [], required = REQUIRED_SUITES, selfManaged = SELF_MANAGED) {
   const has = path => Object.hasOwn(files, path)
   const selected = new Set()
   const covered = new Set()
   const commandHas = (command, file) => command?.split(/\s+/).includes(file)
+  const excluded = new Set()
+  for (const { file, runner, reason } of selfManaged) {
+    if (!has(file)) continue
+    if (!reason) throw new Error(`Self-managed DB suite ${file} needs a reason`)
+    if (!files[runner]?.includes(file)) throw new Error(`Self-managed DB suite ${file}: runner ${runner} missing or no longer runs it`)
+    if (required.some(suite => suite.file === file)) throw new Error(`DB suite ${file} cannot be both required and self-managed`)
+    excluded.add(file)
+  }
   for (const { marker, file, script } of required) {
     if (!has(marker) && !has(file) && !expected.includes(script)) continue
     if (!has(file)) throw new Error(`Expected DB suite missing: ${file} (${marker})`)
@@ -59,7 +73,7 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
     // Playwright DB fixtures run in the preserved server-backed browser/performance gates.
     if (!/\.(test|spec)\.(ts|mjs|js)$/.test(file) || file === BOOTSTRAP || file === 'scripts/run-db-tests.test.mjs' || file.startsWith('tests/e2e/')) continue
     const databaseBacked = /(?:\.db\.test\.|-db\.test\.)/.test(file) || /(?:from\s*['"]pg['"]|import\(['"]pg['"]\)|REQUIRE_DB|CONVERSATION_READS_REQUIRE_DB)/.test(source)
-    if (!databaseBacked || covered.has(file)) continue
+    if (!databaseBacked || covered.has(file) || excluded.has(file)) continue
     const matches = Object.entries(scripts).filter(([name, command]) => name.startsWith('test:') && commandHas(command, file))
     if (matches.length !== 1) throw new Error(`DB test ${file} needs one explicit package test script (found ${matches.length})`)
     selected.add(matches[0][0]); covered.add(file)
@@ -68,7 +82,7 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
     if (!selected.has(name)) throw new Error(`Expected DB script not enrolled: ${name}`)
   }
   if (!selected.size) throw new Error('No database suites enrolled')
-  return { scripts: [...selected].sort(), files: [...covered].sort() }
+  return { scripts: [...selected].sort(), files: [...covered].sort(), selfManaged: [...excluded].sort() }
 }
 
 export function readTree(root = '.') {
