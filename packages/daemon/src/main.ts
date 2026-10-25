@@ -424,6 +424,7 @@ export class Daemon {
     let backoff = 1_000
     while (!this.stopped) {
       const deviceId = this.device.deviceId
+      const credential = this.device.credential
       try {
         if (!this.registered || !deviceId) {
           await this.pauseCommands(1_000, signal)
@@ -444,6 +445,7 @@ export class Daemon {
           signal,
           skipRuns,
         })
+        if (credential !== this.device.credential) continue
         const acted = await this.applyCommands(commands)
         if (this.unacked.size > 0) continue // ack right away
         backoff = 1_000
@@ -452,6 +454,7 @@ export class Daemon {
         if (commands.length > 0 && !acted) await this.pauseCommands(500, signal)
       } catch (error) {
         if (this.stopped || signal.aborted) return
+        if (error instanceof SessionRejectedError) this.rejectDeviceSession(credential)
         if (!(error instanceof ServerUnreachableError))
           this.log.warn({ err: error }, "fetching run commands failed")
         await this.pauseCommands(backoff, signal)
@@ -685,6 +688,7 @@ export class Daemon {
       },
       this.device.deviceId
     )
+    if (credential !== this.device.credential) return
     if (deviceId !== this.device.deviceId) {
       this.saveDevice({ deviceId })
       this.log.info({ device_id: deviceId }, "device registered")
@@ -717,6 +721,7 @@ export class Daemon {
       if (!this.registered || !this.device.deviceId) {
         await this.register(credential)
       }
+      if (credential !== this.device.credential) return
       const deviceId = this.device.deviceId as string
       // Heartbeat first: lease renewal must not wait on anything else.
       const quotas = this.quota?.snapshot().quotas
@@ -726,6 +731,7 @@ export class Daemon {
         worktreeDiskBytes: await this.worktrees.diskUsage(),
         ...(quotas ? { quotas } : {}),
       })
+      if (credential !== this.device.credential) return
       this.supervisor.renewLeases(leases)
       if (revoked) this.supervisor.revokeLeases(revoked)
       // Work in progress leaves the machine, so another can take over.
@@ -754,17 +760,23 @@ export class Daemon {
     } catch (error) {
       this.server = "offline"
       if (error instanceof SessionRejectedError) {
-        // Signed out on the server: drop the dead credential and wait for
-        // `mikka daemon login` (or the app, which signs in again when it
-        // sees no credential, ADR 0026).
-        this.server = "unregistered"
-        this.registered = false
-        this.saveDevice({ credential: undefined })
-        this.log.warn("server refused the device session; sign in again")
+        this.rejectDeviceSession(credential)
       } else if (!(error instanceof ServerUnreachableError)) {
         this.log.error({ err: error }, "server sync failed")
       }
     }
+  }
+
+  private rejectDeviceSession(credential: string | undefined) {
+    // A delayed rejection from the old session must not discard a fresh login.
+    if (!credential || credential !== this.device.credential) return
+    this.supervisor.revokeLeases(this.supervisor.heartbeatRuns().map(run => run.runId))
+    this.groupReviewAbort.abort()
+    this.groupReviewAbort = new AbortController()
+    this.server = "unregistered"
+    this.registered = false
+    this.saveDevice({ credential: undefined })
+    this.log.warn("server refused the device session; sign in again")
   }
 
   private async claimAndStart(runId: string) {
@@ -776,9 +788,13 @@ export class Daemon {
     if (!isSafeId(runId)) return this.refuseRun(runId)
     const existing = this.journal.get(runId)
     if (existing) return this.supervisor.summary(existing)
+    const credential = this.device.credential
+    if (!credential) throw new SessionRejectedError()
     const assignment = await this.options.link.claimRun(deviceId, runId)
+    if (credential !== this.device.credential) throw new SessionRejectedError()
     if (assignment.runId !== runId) return this.refuseRun(runId)
     await this.credentialBridge(assignment)
+    if (credential !== this.device.credential) throw new SessionRejectedError()
     return this.supervisor.start(assignment)
   }
 

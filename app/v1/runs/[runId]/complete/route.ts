@@ -1,3 +1,4 @@
+import { withDeviceAuthorization } from '@/lib/device-link'
 import { after, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { runStateForStop } from '@mikka/protocol/daemon'
@@ -23,7 +24,7 @@ const LIVE_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finis
  * moves to review, which is the only issue write this route makes. The
  * owner's Coordinator hears that the run ended.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ runId: string }> },) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ runId: string }> },) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { runId } = await params
@@ -101,3 +102,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   }
   return new NextResponse(null, { status: 204 })
 }
+
+export const POST = withDeviceAuthorization(handlePOST)

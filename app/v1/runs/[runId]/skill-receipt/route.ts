@@ -1,3 +1,4 @@
+import { withDeviceAuthorization } from '@/lib/device-link'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
@@ -6,7 +7,7 @@ import { skillAssignments } from '@/lib/self-improvement/server'
 import { ImprovementError } from '@/lib/self-improvement/contract'
 
 export const dynamic='force-dynamic'
-export async function GET(request:Request,{params}:{params:Promise<{runId:string}>}) {
+async function handleGET(request:Request,{params}:{params:Promise<{runId:string}>}) {
   const caller=await authenticateDevice(request)
   if (!caller) return NextResponse.json({error:'authRequired'},{status:401})
   const {runId}=await params, receiptId=new URL(request.url).searchParams.get('receiptId')
@@ -18,3 +19,5 @@ export async function GET(request:Request,{params}:{params:Promise<{runId:string
     return NextResponse.json({error:error.code},{status:error.code==='notFound'?404:409})
   }
 }
+
+export const GET = withDeviceAuthorization(handleGET)

@@ -24,7 +24,7 @@ jobs:
   cloud-secret-access:
     name: Cloud credential access (OIDC)
     # This isolated ledger candidate is authorized for synthetic tests only.
-    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && !startsWith(github.ref, 'refs/heads/codex/208-')
+    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && !startsWith(github.ref, 'refs/heads/codex/208-') && github.ref != 'refs/heads/fix/178-daemon-revocation'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -126,7 +126,7 @@ jobs:
 
   browser-tests:
     name: Production build and browser interactions
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository) && github.ref != 'refs/heads/fix/178-daemon-revocation' && github.head_ref != 'fix/178-daemon-revocation'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:

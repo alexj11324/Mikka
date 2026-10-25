@@ -1,4 +1,6 @@
 import 'server-only'
+import { NextResponse } from 'next/server'
+import { deviceRequestCaller, withDeviceAdmission } from '@/lib/device-revocation'
 import { createHash, randomBytes } from 'node:crypto'
 import { and, asc, eq, inArray, isNull, ne } from 'drizzle-orm'
 import { db } from '@/lib/db'
@@ -36,6 +38,8 @@ export interface DeviceCaller {
  * `null` means the token is missing, unknown or revoked.
  */
 export async function authenticateDevice(request: Request): Promise<DeviceCaller | null> {
+  const admitted = deviceRequestCaller.getStore()
+  if (admitted) return admitted
   const header = request.headers.get('authorization') ?? ''
   if (!header.startsWith('Bearer ')) return null
   const token = header.slice('Bearer '.length).trim()
@@ -115,4 +119,19 @@ export async function ackCommands(deviceId: string, delivered: readonly string[]
     .update(runMessages)
     .set({ deliveredAt: new Date() })
     .where(and(inArray(runMessages.id, owned.map(row => row.id)), isNull(runMessages.deliveredAt)))
+}
+
+/** Shared admission boundary; route-specific authorization remains in the handler. */
+export function withDeviceAuthorization<Args extends unknown[]>(handler: (request: Request, ...args: Args) => Promise<Response>) {
+  return async (request: Request, ...args: Args): Promise<Response> => {
+    const caller = await authenticateDevice(request)
+    if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Drain before locking. The original Request remains the handler's input.
+    if (request.body) {
+      const bytes = await request.arrayBuffer()
+      request = new Request(request.url, { method: request.method, headers: request.headers, body: bytes, signal: request.signal })
+    }
+    return await withDeviceAdmission(caller, () => handler(request, ...args))
+      ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 }

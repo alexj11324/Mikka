@@ -1,6 +1,6 @@
 import {turnReady,TURN_READY_SQL} from './group-mailbox-turns'
 import { lockedGroupRun } from './group-worker-authority'
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import { SessionMailbox } from './session-mailbox'
 import type { Directory } from './group-conversations-store'
 import { authorizedWork, completeReviewWork, dispatchReviewWork, lockedWork, runMessagesAdapter } from './group-review-runtime'
@@ -39,7 +39,7 @@ export async function pollGroupReviews(pool:Pool,directory:Directory,userId:stri
   }
   return {runIds:(await pool.query(`SELECT r.id FROM agent_runs r JOIN conversation_work w ON w."runId"=r.id JOIN session_mailboxes m ON m.id=r."mailboxId" WHERE r."userId"=$1 AND r."deviceId"=$2 AND r.kind='group_review' AND w.status='dispatched' AND w."uncertainAt" IS NULL AND r."stopRequestedAt" IS NULL AND NOT m.disabled AND (r.status='queued' OR (r.status='running' AND r."leaseExpiresAt"<now())) ORDER BY w."createdAt" LIMIT 20`,[userId,deviceId])).rows.map(row=>row.id as string)}
 }
-export async function claimGroupReview(pool:Pool,directory:Directory,userId:string,deviceId:string,runId:string) {
+export async function claimGroupReview(pool:Pool,directory:Directory,userId:string,deviceId:string,runId:string,onClaim?:(client:PoolClient)=>Promise<void>) {
   return transaction(pool,async client=>{
     const identity=(await client.query('SELECT id FROM conversation_work WHERE "runId"=$1',[runId])).rows[0]
     if (!identity) return reject(404,'not_found')
@@ -61,6 +61,7 @@ export async function claimGroupReview(pool:Pool,directory:Directory,userId:stri
     if (messages.length!==1 || messages[0].id!==work.id) return reject(409,'isolated_input_required')
     const epoch=(await client.query('UPDATE conversation_work SET "claimEpoch"="claimEpoch"+1 WHERE id=$1 RETURNING "claimEpoch"',[work.id])).rows[0].claimEpoch as number
     await client.query(`UPDATE agent_runs SET status='running',"startedAt"=coalesce("startedAt",now()),"leaseExpiresAt"=now()+interval '90 seconds',"updatedAt"=now() WHERE id=$1`,[runId])
+    await onClaim?.(client)
     if (!['claude_code','codex'].includes(run.harness)) return reject(409,'unsupported_group_harness')
     return {status:'claimed' as const,runId,harness:run.harness as 'claude_code'|'codex',claimEpoch:epoch,envelope:JSON.parse(messages[0].text) as unknown,capabilities:{tools:[] as string[],history:[] as string[],repository:null,credentials:null}}
   })

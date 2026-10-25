@@ -1,3 +1,4 @@
+import { withDeviceAuthorization } from '@/lib/device-link'
 import { mailboxes } from '@/lib/mailbox-runtime'
 import { MailboxError } from '@/lib/session-mailbox'
 import { NextResponse } from 'next/server'
@@ -35,7 +36,7 @@ export const dynamic = 'force-dynamic'
  * it needs to run. 409 means the run is not queued for this device — the
  * daemon's `RunNotPinnedHereError`, and it stops asking.
  */
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: { params: Promise<{ deviceId: string; runId: string }> },
 ) {
@@ -129,7 +130,10 @@ export async function POST(
   if (subscription && !device.harnesses.some(harness => harness.harness === agent.harness && harness.subscriptionBroker)) {
     return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   }
-  const onClaim = subscription ? (tx: import('pg').PoolClient) => bindSubscriptionClaim(tx, runId, subscription) : undefined
+  const onClaim = async (tx: import('pg').PoolClient) => {
+    await tx.query('UPDATE agent_runs SET "deviceTokenId"=$2 WHERE id=$1 AND "userId"=$3', [runId, caller.tokenId, caller.userId])
+    if (subscription) await bindSubscriptionClaim(tx, runId, subscription)
+  }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
   try {
@@ -291,3 +295,5 @@ export async function POST(
     ...(subscription ? { model:subscription.modelId, subscriptionBinding:{bindingId:subscription.id,ownerId:subscription.ownerId,workspaceId:subscription.workspaceId,consumerId:subscription.consumerId,route:subscription.route} } : {}),
   })
 }
+
+export const POST = withDeviceAuthorization(handlePOST)
