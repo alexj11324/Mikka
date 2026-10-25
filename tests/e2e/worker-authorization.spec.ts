@@ -152,6 +152,24 @@ test('worker MCP rechecks current issue authority after queueing and revocation'
         blocker.release(); revoker.release()
       }
     }
+    // The expiry comparison must use time after a contested token lock.
+    const expiring = await runFor(otherMember,issueB)
+    const tokenLocker = await pool.connect()
+    let expiringResponse: ReturnType<typeof request.post> | undefined
+    try {
+      const pid = (await tokenLocker.query('select pg_backend_pid() as pid')).rows[0].pid
+      await tokenLocker.query('begin')
+      await tokenLocker.query('select id from run_tokens where "runId"=$1 for update',[expiring.run])
+      expiringResponse = request.post('/mikka/api/mcp',{headers:{authorization:`Bearer ${expiring.token}`,accept:'application/json, text/event-stream'},data:{jsonrpc:'2.0',id:++sequence,method:'tools/call',params:{name:'report',arguments:{text:'Contested expiry fixture'}}}})
+      void expiringResponse.catch(() => {})
+      await expect.poll(async () => Number((await pool.query('select count(*) from pg_stat_activity where $1 = any(pg_blocking_pids(pid))',[pid])).rows[0].count),{timeout:10000}).toBeGreaterThan(0)
+      await tokenLocker.query('update run_tokens set "expiresAt"=clock_timestamp() where "runId"=$1',[expiring.run])
+      await tokenLocker.query('commit')
+      const result = await expiringResponse
+      expect(result.status()).toBe(200)
+      expect(await result.text()).toContain('MCP run authorization is no longer valid')
+      expect(await events(expiring.run)).toBe(0)
+    } finally { await tokenLocker.query('commit'); await expiringResponse?.catch(() => {}); tokenLocker.release() }
     await Promise.all(Array.from({length:6},(_,index) => call(independent.token,`bounded pools concurrent request ${index}`,200)))
     expect(await events(independent.run)).toBe(8)
     await testInfo.attach('worker-authorization-evidence',{body:JSON.stringify({sha:process.env.GITHUB_SHA,environment:'CI isolated PG17 + built Next HTTP',workspaceA,workspaceB,evidence}),contentType:'application/json'})
