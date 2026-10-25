@@ -1,3 +1,5 @@
+import { mailboxCompletionLockAcceptance } from './mailbox-lock-order'
+import { retryMcpAcceptance } from './mailbox-retry-mcp'
 import { createFactoryStore } from '../lib/factory/store'
 import { createExecutionClaim } from '../lib/factory/execution-claim'
 import assert from 'node:assert/strict'
@@ -282,6 +284,10 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
       await assert.rejects(createExecutionClaim(pool,async()=>true)(owner,device,child,new Date(Date.now()+60000).toISOString()),/factoryStopped/)
       assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[child])).rows[0].status,'queued')
     })
+    await t.test('owner send and completion preserve both envelopes across the FK lock barrier', async () => {
+      await mailboxCompletionLockAcceptance(pool, workspace, { owner, issue, role, device, repo })
+      await mailboxCompletionLockAcceptance(pool, workspace, { owner, issue, role, device, repo, mailboxFirst: true })
+    })
     await t.test('result/terminal update roll back together if event persistence fails', async () => {
       await pool.query(`create function reject_finish() returns trigger language plpgsql as $$ begin if new.kind='run_finished' then raise exception 'injected completion failure'; end if; return new; end $$`)
       await pool.query('create trigger reject_finish before insert on coordinator_events for each row execute function reject_finish()')
@@ -289,9 +295,67 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
       assert.equal((await pool.query('select status from agent_runs where id=$1', [runA])).rows[0].status, 'running')
       assert.equal((await pool.query('select count(*) from coordinator_events where "dedupeKey"=$1', [`run_result:${runA}`])).rows[0].count, '0')
     })
+    await t.test('infrastructure retry keys span attempts, but never independent senders', async () => {
+      const root = randomUUID(), retry = randomUUID(), sibling = randomUUID()
+      const insert = async (id: string, parent: string | null, attempt: number) => pool.query(`insert into agent_runs
+        (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"retryOf",attempt)
+        values ($1,$2,$3,$4,$5,$6,'running',$7,$8)`, [id, owner, issue, role, device, repo, parent, attempt])
+      await insert(root, null, 1)
+      const first = await store.run(owner, root)
+      const input = { to: coordinator.mailboxId, key: randomUUID(), text: 'One logical retry operation' }
+      const incoming = await store.ownerSend(owner, { to: first.mailboxId, key: randomUUID(), text: 'Please reply after recovery', resume: false })
+      const original = await store.send(first, input)
+      await pool.query(`update agent_runs set status='failed',"stopReason"='device_lost' where id=$1`, [root])
+      await insert(retry, root, 2); await insert(sibling, root, 2)
+      const second = await store.run(owner, retry), third = await store.run(owner, sibling)
+      assert.notEqual(first.mailboxId, second.mailboxId)
+      const replyAfterRecovery = await store.send(second, { to: coordinator.mailboxId, key: randomUUID(), text: 'Recovered reply without a prior receipt', replyTo: incoming.id })
+      assert.equal(replyAfterRecovery.duplicate, false)
+      await assert.rejects(store.send(second, { to: b.mailboxId, key: randomUUID(), text: 'Wrong recipient for reference', replyTo: incoming.id }), /Reply/)
+      const replay = await Promise.all(Array.from({ length: 10 }, (_, i) => store.send(i % 2 ? second : third, input)))
+      assert.ok(replay.every(result => result.id === original.id && result.duplicate))
+      assert.equal((await pool.query('select count(*) from coordinator_events where "dedupeKey"=$1', [`mailbox:${original.id}`])).rows[0].count, '1')
+      await assert.rejects(store.send(first, input), /authorized/)
+      await assert.rejects(store.send(second, { ...input, text: 'Different payload' }), /Idempotency/)
+      const unrelated = randomUUID()
+      await insert(unrelated, null, 1)
+      const independent = await store.send(await store.run(owner, unrelated), input)
+      assert.notEqual(independent.id, original.id)
+      const concurrent = { ...input, key: randomUUID() }
+      const race = await Promise.all([store.send(second, concurrent), store.send(third, concurrent)])
+      assert.equal(race[0].id, race[1].id)
+      // Retry of a continuation must canonicalize through the shared mailbox,
+      // rather than making the continuation run a new logical sender.
+      const continuation = randomUUID(), continuationRetry = randomUUID()
+      await pool.query(`insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"stopReason","mailboxId","continuesRunId")
+        values ($1,$2,$3,$4,$5,$6,'failed','device_lost',$7,$8)`, [continuation,owner,issue,role,device,repo,first.mailboxId,root])
+      await insert(continuationRetry, continuation, 2)
+      const continued = await store.run(owner, continuationRetry)
+      const continuedInput = { ...input, key: randomUUID() }
+      const continuedSent = await store.send(continued, continuedInput)
+      assert.equal((await store.send(third, continuedInput)).id, continuedSent.id)
+      const continuedRace = { ...input, key: randomUUID() }
+      const joined = await Promise.all([store.send(continued, continuedRace), store.send(third, continuedRace)])
+      assert.equal(joined[0].id, joined[1].id)
+      // Existing pre-upgrade duplicates require reconciliation, never silent success.
+      await pool.query(`insert into run_messages (id,"userId",text,"mailboxId","senderMailboxId","dedupeKey",origin)
+        values ($1,$2,$3,$4,$5,$6,'peer')`, [randomUUID(),owner,input.text,input.to,second.mailboxId,input.key])
+      await assert.rejects(store.send(third, input), /reconciliation required/)
+      await pool.query('update session_mailboxes set "workspaceId"=$1 where id=$2', ['foreign-workspace', first.mailboxId])
+      await assert.rejects(store.send(second, { ...input, key: randomUUID() }), /scope mismatch/)
+      await pool.query('update session_mailboxes set "workspaceId"=$1 where id=$2', [workspace, first.mailboxId])
+      await pool.query('update session_mailboxes set disabled=true where id=$1', [first.mailboxId])
+      await assert.rejects(store.send(second, concurrent), /disabled/)
+      await pool.query('update session_mailboxes set disabled=false where id=$1', [first.mailboxId])
+      await pool.query(`update agent_runs set "stopRequestedAt"=now() where id=$1`, [retry])
+      await assert.rejects(store.send(second, concurrent), /authorized/)
+    })
+    await t.test('shipped MCP subprocess survives lost receipt and infrastructure retry without duplicate publication', async () => {
+      await retryMcpAcceptance(pool, store, { owner, issue, role, device, repo, to: coordinator.mailboxId })
+    })
   } finally {
     await pool.end()
-    await admin.query(`drop schema "${schema}" cascade`)
+    if (process.env.KEEP_MAILBOX_TEST_FIXTURES !== '1') await admin.query(`drop schema "${schema}" cascade`)
     await admin.end()
   }
 })

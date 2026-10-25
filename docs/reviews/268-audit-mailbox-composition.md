@@ -1,0 +1,9 @@
+# Audit259 / mailbox270 composition
+
+Frozen inputs: #268 a3294781eae74d824087c9c80bfc3f6093f196d7; #259 1b39b709ce361b9643524aea983860e6de818ff6; #270 287368daf6e1286afb8b461642a577e5bae17cfb. Merge c76be2e retains both source histories. Source PRs are unchanged.
+
+#270 alone fixes the old completion FK cycle, but #259 introduces an explicit sorted coordinator/run-mailbox prelock. In the uncorrected combination, completion can hold coordinator C and wait for target M; ownerSend holds M and waits for FK KEY SHARE on C. The new real PostgreSQL17 barrier reproduces40P01 on this combination. Its initial harness run also exposed an explicit parameter cast error and a fixture incorrectly adding continuesRunId by UPDATE; those failed runs are retained. The fixture now creates lineage at INSERT, as production does, without disabling triggers.
+
+Keep the complete/stop sorted full mailbox lock set before run mutation and audit-head writes. Use FOR NO KEY UPDATE consistently for these locks and sendEnvelope recipient locks. This still serializes row writers and retains the shared coordinator prelock that fixed the audit-H stop/completion cycle, but permits FK KEY SHARE references. No audit lock, FK, trigger, permission check or event is removed and no deadlock retry is hidden. Barrier coverage forces both C<M and M<C UUID orders. Existing #259 stop/complete audit barrier, tenant/scope inheritance tests and #270 retry/MCP tests are required on the actual combination.
+
+No new migration: the two unchanged #259 audit SQL increments remain unapproved for production. Their local execution is confined to explicitly named disposable PostgreSQL databases for acceptance. No production deploy, live provider or IAM operation is authorized by this source combination. Existing post-check authorization/revocation races remain separate; do not treat send dedupe as atomic authority or external exactly-once execution.

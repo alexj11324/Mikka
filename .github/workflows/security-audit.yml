@@ -1,7 +1,7 @@
 name: Security audit PostgreSQL
 on:
   push:
-    branches: ['codex/enterprise-audit-210', 'codex/byos-product-revocation']
+    branches: ['codex/enterprise-audit-210', 'codex/byos-product-revocation', 'integrate/268-audit-mailbox-locks', 'integrate/280-mailbox-workspace']
   pull_request:
     paths: ['lib/audit/**', 'drizzle/*security_audit*.sql', 'app/api/audit/**', '.github/workflows/security-audit.yml']
 permissions:
