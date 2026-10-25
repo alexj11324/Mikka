@@ -1,3 +1,4 @@
+import { runCredentialCleanup } from './credential-cleanup'
 import { parseLinearWebhookRequest, verifyBearer } from '@/lib/linear-sync/webhook'
 
 const WEBHOOK_PATH = '/mikka/api/webhooks/linear'
@@ -6,6 +7,7 @@ const CRON_PATH = '/mikka/api/cron/linear-sync'
 export interface Env {
   HYPERDRIVE?: { connectionString: string }
   CRON_SECRET?: string
+  CREDENTIAL_CLEANUP_ENABLED?: string
   LINEAR_CLIENT_ID?: string
   LINEAR_CLIENT_SECRET?: string
   LINEAR_TOKEN_ENCRYPTION_KEY?: string
@@ -112,12 +114,19 @@ export async function handleRequest(request: Request, env: Env, ctx: WorkerConte
   return new Response(null, { status: 404 })
 }
 
-export default {
-  fetch: handleRequest,
-  scheduled(_controller: WorkerSchedule, env: Env, ctx: WorkerContext) {
+export function createScheduledHandler(loadRuntime = loadSyncRuntime) {
+  return function scheduled(controller: WorkerSchedule, env: Env, ctx: WorkerContext) {
+    if (controller.cron === '* * * * *') {
+      // Rejections remain visible to the scheduler. Next tick retries durable
+      // tombstones; never log provider responses or follow redirects with auth.
+      if (env.CREDENTIAL_CLEANUP_ENABLED === '1') ctx.waitUntil(runCredentialCleanup(env))
+      return
+    }
     if (!env.CRON_SECRET || !syncConfigured(env)) return
-    ctx.waitUntil(loadSyncRuntime(env).then(runtime => withRequestDatabase(runtime, env.HYPERDRIVE!.connectionString, () => runtime.processLinearSyncBatch())).catch(() => {
+    ctx.waitUntil(loadRuntime(env).then(runtime => withRequestDatabase(runtime, env.HYPERDRIVE!.connectionString, () => runtime.processLinearSyncBatch())).catch(() => {
       console.error('Linear sync scheduled batch failed')
     }))
-  },
+  }
 }
+
+export default { fetch: handleRequest, scheduled: createScheduledHandler() }
