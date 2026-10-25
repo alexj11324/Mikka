@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { ArtifactAuthorAvatar, ArtifactKindIcon } from './artifact-card'
 import { ArtifactDocument } from './artifact-document'
 import { ArtifactFrame } from './artifact-frame'
+import { ArtifactShare } from './artifact-share'
 
 /** What the reader hands the chat beside it. */
 export interface ArtifactChatSlot {
@@ -107,6 +108,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
           </DropdownMenuContent>
         </DropdownMenu>}
         <span className="flex-1" />
+        {detail && <ArtifactShare artifactId={artifactId} shared={Boolean(detail.shared)} onChange={() => { void mutate() }} />}
         {detail?.kind === 'markdown' && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" nativeButton={false} aria-label={t('download')} render={<a href={versionPath(artifactId, version, 'download')} download />} />}><Download data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('download')}</TooltipContent></Tooltip>}
         {detail?.kind === 'html' && <>
           <Button variant="ghost" size="sm" aria-pressed={selecting} onClick={() => setSelecting(on => !on)} className={cn('hidden md:inline-flex', selecting && 'bg-sidebar-primary-soft text-sidebar-primary-soft-foreground hover:bg-sidebar-primary-soft hover:text-sidebar-primary-soft-foreground')}><SquareDashedMousePointer data-icon="inline-start" />{t('selectElement')}</Button>

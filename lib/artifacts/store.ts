@@ -103,7 +103,11 @@ async function detail(where: ReturnType<typeof and>): Promise<ArtifactDetail | n
 
 /** One of the person's artifacts with every version, oldest first. */
 export async function readArtifact(userId: string, artifactId: string): Promise<ArtifactDetail | null> {
-  return detail(and(eq(artifacts.id, artifactId), eq(artifacts.userId, userId)))
+  const found = await detail(and(eq(artifacts.id, artifactId), eq(artifacts.userId, userId)))
+  if (!found) return null
+  const [live] = await db.select({ id: artifactShares.id }).from(artifactShares)
+    .where(and(eq(artifactShares.artifactId, artifactId), isNull(artifactShares.revokedAt))).limit(1)
+  return { ...found, shared: Boolean(live) }
 }
 
 /** The file of one version, or null when the artifact or version is not there. */

@@ -22,4 +22,6 @@ export interface ArtifactDetail extends ArtifactSummary {
   runId: string | null
   issueId: string | null
   versions: ArtifactVersionInfo[]
+  /** A share link is live. Only the owner's reads say; tokens are stored hashed, so a link can't be shown again. */
+  shared?: boolean
 }

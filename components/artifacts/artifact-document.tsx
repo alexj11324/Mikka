@@ -75,7 +75,8 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
   quoted: readonly string[]
   /** The text being quoted in the composer right now, tinted. */
   quoting: string | null
-  onQuote: (text: string) => void
+  /** Without it (the share page) selecting text offers nothing. */
+  onQuote?: (text: string) => void
 }) {
   const t = useTranslations('Artifact')
   const articleRef = useRef<HTMLDivElement>(null)
@@ -105,7 +106,7 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
 
   function quote() {
     if (!selection) return
-    onQuote(selection.text)
+    onQuote?.(selection.text)
     window.getSelection()?.removeAllRanges()
     setSelection(null)
   }
@@ -123,12 +124,12 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
         <Markdown remarkPlugins={plugins} components={parts}>{source}</Markdown>
       </div>
     </article>
-    <Popover open={selection != null} onOpenChange={open => { if (!open) setSelection(null) }}>
+    {onQuote && <Popover open={selection != null} onOpenChange={open => { if (!open) setSelection(null) }}>
       {selection && <PopoverContent anchor={selectionAnchor(selection.range)} side="top" sideOffset={8} initialFocus={false} finalFocus={false} aria-label={t('quote')}
         className="w-auto flex-row gap-0.5 p-1" onMouseUp={event => event.stopPropagation()}>
         <Button size="sm" variant="ghost" onMouseDown={event => event.preventDefault()} onClick={quote}><TextQuote data-icon="inline-start" />{t('quote')}</Button>
         <Button size="sm" variant="ghost" onMouseDown={event => event.preventDefault()} onClick={() => void copy()}><Copy data-icon="inline-start" />{t('copy')}</Button>
       </PopoverContent>}
-    </Popover>
+    </Popover>}
   </div>
 }
