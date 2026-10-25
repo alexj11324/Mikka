@@ -6,6 +6,9 @@ import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
+import { readFile, readdir } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { Pool } from 'pg'
 import { CoordinatorInbox, wakeFixture } from './wake-test-helpers'
 import { SessionMailbox } from '../session-mailbox'
@@ -81,6 +84,95 @@ test('review: background terminal fairness, protocol scope, cached guard and qui
   server.listen(6176, '127.0.0.1')
   await once(server, 'listening')
   try {
+    await t.test(
+      'follow-up migration upgrades the previous receipt schema without changing terminal scopes or granting membership',
+      async () => {
+        const namespace = `wake_upgrade_${randomUUID().replaceAll('-', '')}`
+        await pool.query(`CREATE SCHEMA ${namespace}`)
+        const fixture = new Pool({ connectionString: url, options: `-c search_path=${namespace}` })
+        try {
+          const initial = '20261025191001_coordinator_consumption_receipts.sql',
+            followup = '20261025213501_coordinator_effect_fences.sql'
+          const names = orderMigrations(
+            (await readdir(new URL('../../drizzle/', import.meta.url))).filter((n) => n.endsWith('.sql')),
+          )
+          for (const name of names.filter((n) => n !== initial && n !== followup))
+            await fixture.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
+          // Exact previously reviewed migration, not a reconstructed auth mock.
+          await fixture.query(
+            execFileSync('git', ['show', `6c725df72f4fd4e70d85271bc0666529615a0496:drizzle/${initial}`], {
+              encoding: 'utf8',
+            }),
+          )
+          const owner = `upgrade-${randomUUID()}`,
+            device = randomUUID(),
+            agent = randomUUID(),
+            runId = randomUUID(),
+            box = randomUUID(),
+            old = randomUUID(),
+            protocol = '00000000-0000-4000-8000-000000000001'
+          await fixture.query(
+            'INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())',
+            [owner, `${owner}@example.invalid`],
+          )
+          await fixture.query('INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,\'upgrade fixture\')', [
+            device,
+            owner,
+          ])
+          await fixture.query(
+            'INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,\'upgrade fixture\',\'codex\',$3)',
+            [agent, owner, device],
+          )
+          await fixture.query(
+            'INSERT INTO session_mailboxes(id,"userId","workspaceId",kind,"sessionKey") VALUES($1,$2,$3,\'run\',$4)',
+            [box, owner, protocol, runId],
+          )
+          await fixture.query(
+            'INSERT INTO agent_runs(id,"userId","agentId","deviceId","mailboxId",status) VALUES($1,$2,$3,$4,$5,\'succeeded\')',
+            [runId, owner, agent, device, box],
+          )
+          await fixture.query(
+            `INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,tier,"runId") VALUES($1::uuid,$2,'run_report',$1::text,'{}','result',$3)`,
+            [old, owner, runId],
+          )
+          await fixture.query(
+            "UPDATE coordinator_events SET wake_status='cancelled',wake_error='wakeWorkspaceAccessDenied' WHERE id=$1",
+            [old],
+          )
+          const snapshot = async () =>
+            (
+              await fixture.query(
+                'SELECT id,wake_workspace_id,wake_status,wake_error,processed_at FROM coordinator_events WHERE id=$1',
+                [old],
+              )
+            ).rows[0]
+          const before = await snapshot()
+          assert.equal(before.wake_workspace_id, protocol)
+          const migration = await readFile(new URL(`../../drizzle/${followup}`, import.meta.url), 'utf8')
+          await fixture.query(migration)
+          await fixture.query(migration)
+          assert.deepEqual(await snapshot(), before)
+          const fresh = randomUUID()
+          await fixture.query(
+            `INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,tier,"runId") VALUES($1::uuid,$2,'run_report',$1::text,'{}','result',$3)`,
+            [fresh, owner, runId],
+          )
+          const current = (
+            await fixture.query('SELECT wake_workspace_id,wake_tool_receipts FROM coordinator_events WHERE id=$1', [
+              fresh,
+            ])
+          ).rows[0]
+          assert.equal(current.wake_workspace_id, null)
+          assert.deepEqual(current.wake_tool_receipts, {})
+          assert.equal(
+            (await fixture.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1', [protocol])).rowCount,
+            0,
+          )
+        } finally {
+          await fixture.end()
+        }
+      },
+    )
     await t.test(
       '49 denied background rows cannot starve a later legal child across actual child SIGKILL',
       async () => {

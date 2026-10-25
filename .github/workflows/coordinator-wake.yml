@@ -3,7 +3,7 @@ on:
   push:
     branches: ['codex/176-durable-inbox-recovery']
   pull_request:
-    paths: ['lib/coordinator/**', 'workflows/coordinator/**', 'app/api/coordinator/**', 'drizzle/*coordinator_consumption_receipts.sql', '.github/workflows/coordinator-wake.yml']
+    paths: ['lib/coordinator/**', 'workflows/coordinator/**', 'app/api/coordinator/**', 'drizzle/*coordinator_consumption_receipts.sql', 'drizzle/*coordinator_effect_fences.sql', '.github/workflows/coordinator-wake.yml']
 permissions:
   contents: read
 jobs:
@@ -28,6 +28,8 @@ jobs:
       WAKE_REVIEW_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 10.34.3

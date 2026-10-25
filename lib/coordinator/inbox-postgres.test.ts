@@ -61,7 +61,8 @@ test('formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoi
           (await readdir(new URL('../../drizzle/', import.meta.url))).filter((n) => n.endsWith('.sql')),
         )
         const current = '20261025191001_coordinator_consumption_receipts.sql'
-        for (const name of names.filter((n) => n !== current))
+        const followup = '20261025213501_coordinator_effect_fences.sql'
+        for (const name of names.filter((n) => n !== current && n !== followup))
           await fixture.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
         const ids = Array.from({ length: 4 }, () => randomUUID())
         for (let i = 0; i < ids.length; i++)
@@ -75,10 +76,12 @@ test('formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoi
           )
         const migration = await readFile(new URL(`../../drizzle/${current}`, import.meta.url), 'utf8')
         await fixture.query(migration)
+        await fixture.query(await readFile(new URL(`../../drizzle/${followup}`, import.meta.url), 'utf8'))
         const snapshot = async () =>
           (await fixture.query('SELECT id,wake_status,processed_at FROM coordinator_events ORDER BY id')).rows
         const before = await snapshot()
         await fixture.query(migration)
+        await fixture.query(await readFile(new URL(`../../drizzle/${followup}`, import.meta.url), 'utf8'))
         assert.deepEqual(await snapshot(), before)
         const states = new Map(before.map((e) => [e.id, e]))
         assert.equal(states.get(ids[0]).wake_status, 'pending')

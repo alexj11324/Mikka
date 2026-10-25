@@ -29,7 +29,6 @@ ALTER TABLE coordinator_events ADD COLUMN IF NOT EXISTS wake_generation_state te
 ALTER TABLE coordinator_events ADD COLUMN IF NOT EXISTS wake_generation_holder text;
 ALTER TABLE coordinator_events ADD COLUMN IF NOT EXISTS wake_checkpoint jsonb;
 ALTER TABLE coordinator_events ADD COLUMN IF NOT EXISTS wake_checkpoint_digest text;
-ALTER TABLE coordinator_events ADD COLUMN IF NOT EXISTS wake_tool_receipts jsonb NOT NULL DEFAULT '{}';
 DO $$ BEGIN
  IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='coordinator_events'::regclass AND conname='coordinator_generation_state_check') THEN
  ALTER TABLE coordinator_events ADD CONSTRAINT coordinator_generation_state_check CHECK(wake_generation_state IN ('not_started','sending','returned','uncertain'));
@@ -69,7 +68,6 @@ DO $$ BEGIN
  END IF;
 END $$;
 CREATE OR REPLACE FUNCTION preserve_coordinator_event_scope() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
- IF EXISTS(SELECT 1 FROM jsonb_each(OLD.wake_tool_receipts) r WHERE NEW.wake_tool_receipts->r.key IS DISTINCT FROM r.value) THEN RAISE EXCEPTION 'coordinator effect receipt is immutable'; END IF;
  IF OLD.wake_checkpoint IS NOT NULL AND (OLD.wake_checkpoint IS DISTINCT FROM NEW.wake_checkpoint OR OLD.wake_checkpoint_digest IS DISTINCT FROM NEW.wake_checkpoint_digest) THEN RAISE EXCEPTION 'coordinator checkpoint is immutable'; END IF;
  IF OLD."userId" IS DISTINCT FROM NEW."userId" OR OLD.wake_workspace_id IS DISTINCT FROM NEW.wake_workspace_id THEN RAISE EXCEPTION 'coordinator event scope is immutable'; END IF;
  RETURN NEW;
@@ -80,9 +78,6 @@ DO $$ BEGIN
  END IF;
  IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='coordinator_events'::regclass AND tgname='coordinator_checkpoint_immutable') THEN
  CREATE TRIGGER coordinator_checkpoint_immutable BEFORE UPDATE OF wake_checkpoint,wake_checkpoint_digest ON coordinator_events FOR EACH ROW EXECUTE FUNCTION preserve_coordinator_event_scope();
- END IF;
- IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='coordinator_events'::regclass AND tgname='coordinator_effect_receipts_immutable') THEN
- CREATE TRIGGER coordinator_effect_receipts_immutable BEFORE UPDATE OF wake_tool_receipts ON coordinator_events FOR EACH ROW EXECUTE FUNCTION preserve_coordinator_event_scope();
  END IF;
 END $$;
 COMMIT;

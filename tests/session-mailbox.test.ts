@@ -26,7 +26,7 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
     const dir = new URL('../drizzle/', import.meta.url)
     const names = orderMigrations((await readdir(dir)).filter(name => name.endsWith('.sql')))
     for (const name of names) {
-      if (['20261025052031_session_mailboxes.sql','20261025052033_group_review_mailboxes.sql','20261025191001_coordinator_consumption_receipts.sql'].includes(name)) continue
+      if (['20261025052031_session_mailboxes.sql','20261025052033_group_review_mailboxes.sql','20261025191001_coordinator_consumption_receipts.sql','20261025213501_coordinator_effect_fences.sql'].includes(name)) continue
       const sql = await readFile(new URL(name, dir), 'utf8')
       if (/^--\s*target:\s*DATABASE_URL/m.test(sql)) continue
       await pool.query(sql)
@@ -48,6 +48,7 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
     // Receipt indexes depend on the sequence introduced by the mailbox migration.
     // Keep the pre-mailbox legacy fixture, then apply its dependent migration.
     await pool.query(await readFile(new URL('20261025191001_coordinator_consumption_receipts.sql', dir), 'utf8'))
+    await pool.query(await readFile(new URL('20261025213501_coordinator_effect_fences.sql', dir), 'utf8'))
     const firstIdentities = (await pool.query('select id,kind,"sessionKey","latestRunId",harness from session_mailboxes order by id')).rows
     await pool.query(migration)
     assert.deepEqual((await pool.query('select id,kind,"sessionKey","latestRunId",harness from session_mailboxes order by id')).rows, firstIdentities, 'migration replay must preserve every address and continuation pointer')
