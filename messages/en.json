@@ -177,7 +177,7 @@
     "welcomeDescription": "Sign in to Mikka and continue with your tasks and documents.",
     "continueGoogle": "Continue with Google",
     "googleScope": "Only your basic profile and email are requested for sign-in.",
-    "googleLinkHint": "If this email already has a Mikka account, sign in with your password and link Google under Settings → Integrations.",
+    "googleLinkHint": "If this email already has a Mikka account, sign in with your password and link Google under Settings → Account.",
     "googleNotConfigured": "Google sign-in is not configured yet. Continue with email.",
     "viewGoogleCallback": "View the Google OAuth callback URL",
     "continueGithub": "Continue with GitHub",
@@ -193,7 +193,7 @@
     "submitCreate": "Create account and continue",
     "submitSignIn": "Sign in to the workspace",
     "oauthFailed": "OAuth sign-in did not finish. It may have been canceled or expired; please try again.",
-    "googleAccountNotLinked": "This Google account is not linked to Mikka. Sign in with your existing method, then link Google in Settings → Integrations.",
+    "googleAccountNotLinked": "This Google account is not linked to Mikka. Sign in with your existing method, then link Google in Settings → Account.",
     "githubAccountNotLinked": "This GitHub account is not linked to Mikka. Sign in with the method already linked to your account, or create a Mikka account first.",
     "continueNotice": "Click the provider button to finish OAuth authorization in this tab.",
     "tabOpened": "Finish sign-in in the new tab; refresh this preview when done.",
@@ -210,7 +210,30 @@
     "testIssueLayoutTitle": "[Test] Issue detail layout and reading",
     "testIssueLayoutDescription": "A standalone test task for checking title editing, body layout, property changes, and autosave. It does not affect other accounts.",
     "testIssueSwitchTitle": "[Test] Task switching and session reuse",
-    "testIssueSwitchDescription": "Used to check previous/next task switching. Re-entering the test workspace reuses the account and existing tasks."
+    "testIssueSwitchDescription": "Used to check previous/next task switching. Re-entering the test workspace reuses the account and existing tasks.",
+    "forgotPassword": "Forgot password?",
+    "forgotTitle": "Reset your password",
+    "forgotDescription": "Enter the email you signed up with and we will send a reset link.",
+    "sendResetLink": "Send reset link",
+    "resendLink": "Send again",
+    "backToSignIn": "Back to sign in",
+    "resetTitle": "Set a new password",
+    "resetDescription": "Use at least 8 characters.",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "submitReset": "Save new password",
+    "passwordLength": "Use 8 to 128 characters.",
+    "passwordMismatch": "The passwords do not match.",
+    "resetDone": "Your password has been updated and your other sign-ins have ended. Sign in with the new password.",
+    "resetLinkInvalid": "This reset link is invalid or has expired. Request a new one.",
+    "requestNewLink": "Request a new link",
+    "verifyTitle": "Verify your email",
+    "sendVerification": "Send verification link",
+    "recoveryUnavailable": "This is not available right now. Try again later.",
+    "requestProcessed": "Request processed. If the account qualifies, check your inbox. This does not confirm that an email was delivered.",
+    "retryIn": "Try again in {seconds}s",
+    "verifyDescription": "Enter the email you signed up with to get a new verification link. It works for 15 minutes.",
+    "verifyEmailLink": "Verify your email or resend the link"
   },
   "Metadata": {
     "title": "Mikka · Tasks and documents workspace",
@@ -350,7 +373,13 @@
     "settingsPreviewTitle": "Settings preview · Mikka",
     "settingsPreviewDescription": "A signed-out settings preview with demo data.",
     "oauthConsentTitle": "Authorize agent · Mikka",
-    "oauthConsentDescription": "Let an external agent use Mikka as you."
+    "oauthConsentDescription": "Let an external agent use Mikka as you.",
+    "forgotPasswordTitle": "Reset password · Mikka",
+    "forgotPasswordDescription": "Reset your Mikka password by email.",
+    "resetPasswordTitle": "Set a new password · Mikka",
+    "resetPasswordDescription": "Set a new password for your Mikka account.",
+    "verifyEmailTitle": "Verify email · Mikka",
+    "verifyEmailDescription": "Verify the email for your Mikka account."
   },
   "NotFound": {
     "title": "Page not found",
@@ -1405,6 +1434,10 @@
       "profile": {
         "title": "Profile",
         "description": "See the account details used in your workspace."
+      },
+      "account": {
+        "title": "Account",
+        "description": "Manage how you sign in to Mikka."
       },
       "integrations": {
         "title": "Integrations",
