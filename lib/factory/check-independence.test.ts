@@ -9,6 +9,7 @@ import { createFactoryStore, type FactoryTask } from "./store";
 import { createFactoryDispatch } from "./dispatch";
 import { createFactoryReconciler } from "./reconcile";
 import { factoryCheckGates } from "./checks";
+import { approvalEvidence } from "./evidence";
 import { factoryDispatchDatabase } from "./transaction";
 import { insertRunOnce } from "../run-dispatch";
 import { createFactoryQuestions, questionReference } from "./questions/store";
@@ -186,6 +187,12 @@ test(
             ],
           );
         }
+        // Persist terminal time after the fixture adapter's chunks, as in the
+        // normal completion path. Downstream evidence keeps truthful ordering.
+        await pool.query(
+          `UPDATE agent_runs SET "finishedAt"=clock_timestamp() WHERE id=$1`,
+          [runId],
+        );
         return { report, sessionId };
       };
 
@@ -302,6 +309,33 @@ test(
                 (await questions.read("owner", second.question.id)).status,
                 "resolved",
               );
+              if (stage === "verify" && !failed) {
+                const tx = await pool.connect();
+                try {
+                  await tx.query("BEGIN");
+                  const inventory = await approvalEvidence(tx, state.task);
+                  const verify = inventory.manifest.artifacts.filter(
+                    (a) => a.stage === "verify",
+                  );
+                  assert.ok(verify.length > 1);
+                  assert.ok(
+                    verify.every(
+                      (a) =>
+                        a.runId === second.answer.continuationRunId &&
+                        a.sessionId === f.session,
+                    ),
+                  );
+                  assert.equal(
+                    new Set(
+                      inventory.manifest.artifacts.map((a) => a.sessionId),
+                    ).size,
+                    3,
+                  );
+                } finally {
+                  await tx.query("ROLLBACK");
+                  tx.release();
+                }
+              }
               if (failed) {
                 assert.equal(state.task.candidateId, null);
                 assert.match(JSON.stringify(finished.output), /AssertionError/);
