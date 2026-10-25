@@ -14,7 +14,8 @@ in private evidence; use consistent opaque labels in public summaries/videos.
 
 - [x] Candidate `9035b3e`: remote CI code checks, build, navigation and browser regression passed.
 - [x] Scoped independent backend integration/cleanup review completed for that candidate.
-- [ ] CLA resolved by an authorized signer/maintainer; no impersonation or attribution rewrite.
+- [x] Maintainer-approved exact Codex CLA exemption merged in #226 (`c0f702f`).
+- [ ] New synchronize run confirms CLA success; no impersonation or attribution rewrite.
 - [ ] Parent's single integration SHA includes backend, Claude form and dependencies.
 - [ ] Independent review and CI pass on that integrated SHA.
 - [ ] Dedicated runner isolation, ingress/body/trace exclusions and crash reclamation verified.
