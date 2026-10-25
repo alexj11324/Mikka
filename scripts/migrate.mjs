@@ -8,6 +8,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
 import { orderMigrations } from './migration-order.mjs'
+import { configureMigrationSession } from './migration-session.mjs'
 
 const shouldRun = process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production'
 if (!shouldRun) {
@@ -41,23 +42,25 @@ for (const [target, pending] of byTarget) {
   const url = targets[target]
   if (!url) throw new Error(`migrate: ${target} is not set`)
   const pool = new Pool({ connectionString: url, max: 1 })
+  let client
   try {
-    await pool.query('create table if not exists schema_migrations (name text primary key, "appliedAt" timestamptz not null default now())')
-    const { rows } = await pool.query('select name from schema_migrations')
+    client = await pool.connect()
+    // Includes ledger DDL and reads, not only the individual migration files.
+    await configureMigrationSession(client)
+    await client.query('create table if not exists schema_migrations (name text primary key, "appliedAt" timestamptz not null default now())')
+    const { rows } = await client.query('select name from schema_migrations')
     const applied = new Set(rows.map((row) => row.name))
     for (const { name, sql } of pending) {
       if (applied.has(name)) continue
-      const client = await pool.connect()
-      try {
-        // Files may manage their own transaction; the record is written after.
-        await client.query(sql)
-        await client.query('insert into schema_migrations (name) values ($1)', [name])
-        console.log(`migrate: applied ${name} to ${target}`)
-      } finally {
-        client.release()
-      }
+      // Files may manage their own transaction; the record is written after.
+      // A timeout throws, stops this build and never marks the file applied.
+      await client.query(sql)
+      await client.query('insert into schema_migrations (name) values ($1)', [name])
+      console.log(`migrate: applied ${name} to ${target}`)
     }
   } finally {
+    // Destroy the session even if a self-managed SQL transaction was aborted.
+    client?.release(true)
     await pool.end()
   }
 }

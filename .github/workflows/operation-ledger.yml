@@ -33,6 +33,9 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: node --test scripts/migration-session.test.mjs
+        env:
+          MIGRATION_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_208_test
       - run: node --test scripts/verify-operation-acceptance.test.mjs
       - run: node --import tsx --test lib/operations/ledger.test.ts lib/operations/session-authorization.test.ts
         env:
