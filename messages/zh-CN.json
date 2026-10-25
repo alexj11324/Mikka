@@ -113,6 +113,7 @@
     "myTasks": "我的任务",
     "agent": "Agent",
     "coordinator": "Coordinator",
+    "coordinatorWorking": "Coordinator，正在工作",
     "yourTeams": "你的团队",
     "home": "主页",
     "tasks": "任务",
@@ -2118,6 +2119,10 @@
     "organizingResponseContent": "正在整理回复内容",
     "preparingAResponse": "正在准备回复",
     "waitingForAResponse": "正在等待回复",
+    "agentStatusThinking": "正在思考…",
+    "agentStatusSearching": "正在搜索…",
+    "agentStatusReading": "正在读取网页…",
+    "agentStatusWorking": "正在调用工具…",
     "requestFailedPleaseTryAgain": "请求失败，请稍后重试。",
     "yourInputHasBeenPreserved": "你的输入已保留。",
     "retryThisResponse": "重试此回复",
@@ -2326,7 +2331,6 @@
     }
   },
   "Shell": {
-    "pinned": "置顶",
     "searchPlaceholder": "搜索对话、任务、Agent、知识库",
     "searchLabel": "全局搜索",
     "searchDescription": "搜索对话、任务和项目，用方向键选择，按 Enter 打开。",
@@ -2346,8 +2350,6 @@
     "attach": "添加文件",
     "attachUnsupported": "只能附加 {max} 字以内的文本文件",
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
-    "whoIsWorking": "谁在工作",
-    "agentsWorking": "{count} 个 agent 正在处理任务",
     "panel": {
       "label": "右栏",
       "tabs": "右栏内容",
@@ -2365,7 +2367,7 @@
     "details": {
       "conversation": "当前对话",
       "kind": "类型",
-      "coordinatorKind": "Coordinator · 置顶",
+      "coordinatorKind": "Coordinator",
       "agentKind": "Agent 对话",
       "updated": "最近活动",
       "none": "还没有消息"
@@ -2464,6 +2466,8 @@
       "property": { "identifier": "编号", "priority": "优先级", "assignee": "负责人", "labels": "标签", "pullRequests": "PR", "subtasks": "子任务", "agentState": "Agent 状态", "project": "项目", "dueDate": "截止日期", "createdAt": "创建时间" },
       "hiddenColumns": "隐藏的列",
       "hiddenLane": "已隐藏",
+      "expandColumn": "展开{status}列",
+      "foldColumn": "收起成窄条",
       "hideColumn": "隐藏此列",
       "hideColumnNamed": "隐藏{status}列",
       "showColumn": "显示{status}列",

@@ -17,8 +17,8 @@ import { statusIconTints } from '@/lib/status-appearance'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from '@/components/workspace/issue-properties'
 
 export const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destructive-light' | 'warning-light' | 'secondary'> = {
-  queued: 'secondary', preparing: 'info-light', running: 'info-light', waiting_input: 'warning-light', finishing: 'info-light',
-  succeeded: 'success-light', stopped: 'secondary', failed: 'destructive-light', cancelled: 'secondary',
+  queued: 'secondary', preparing: 'success-light', running: 'success-light', waiting_input: 'warning-light', finishing: 'success-light',
+  succeeded: 'info-light', stopped: 'secondary', failed: 'destructive-light', cancelled: 'secondary',
 }
 
 /** A task chip is wider than a source chip: it carries the title too. */
