@@ -40,11 +40,13 @@ cannot.
 2. **Every push and pull request** (minutes, CI): production build, every unit
    test, database migrations and integration tests such as thread privacy.
    This is the gate review waits on.
-3. **Before merging into main** (merge queue, CI): the full browser suite
-   (Playwright, functionality and performance), run on your change on top of
-   the latest main, so two changes that each pass but break together are
-   caught. To run it earlier on a branch, start CI by hand: Actions → CI →
-   Run workflow.
+3. **Before merging into main** (CI job "Browser tests (before merge)"): the
+   full browser suite (Playwright, functionality and performance). It runs on
+   a pull request once it is ready for review, and again on every push while
+   it stays ready, against the PR merged with the latest main, so two changes
+   that each pass but break together are caught. Keep a PR as a draft while it
+   is in progress to skip it. To run it on a branch without a PR, start CI by
+   hand: Actions → CI → Run workflow.
 4. **After merging** (CI): the same suite on main, and again every night.
 
 ## Contributor License Agreement

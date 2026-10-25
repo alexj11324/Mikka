@@ -6,14 +6,17 @@ name: CI
 # - postsubmit: every push to main runs CI again.
 # A PR from a branch in this repo is already covered by its push run, so the
 # pull_request run is kept only for PRs from forks (see the job conditions).
-# Browser tests (Playwright) are the slow part, so they run only on the way
-# into main: in the merge queue, on main itself, every night on main, or when
-# started by hand (Actions → CI → Run workflow). Branch pushes still build and
-# check the database. See CONTRIBUTING.md, "How changes are tested".
+# Browser tests (Playwright) are the slow part, so they have their own job,
+# "Browser tests (before merge)", which runs only on the way into main: on a
+# pull request once it is ready for review (not a draft), on main itself,
+# every night on main, or when started by hand (Actions → CI → Run workflow).
+# Branch pushes still build and check the database.
+# See CONTRIBUTING.md, "How changes are tested".
 on:
   push:
     branches-ignore: ['gh-readonly-queue/**']
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
   schedule:
@@ -126,6 +129,7 @@ jobs:
         if: always()
 
   browser-tests:
+    # Name kept so the existing required check still reports; browser tests moved to browser-e2e.
     name: Production build and browser interactions
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
@@ -163,11 +167,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Generate ephemeral test-only auth secret
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
-      - name: Decide whether browser tests run
-        id: browser
-        run: echo "run=${{ github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.ref == 'refs/heads/main' }}" >> "$GITHUB_OUTPUT"
-      - run: pnpm exec playwright install --with-deps chromium
-        if: steps.browser.outputs.run == 'true'
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
@@ -178,14 +177,63 @@ jobs:
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
       - run: pnpm build
+
+
+  browser-e2e:
+    name: Browser tests (before merge)
+    if: >-
+      (github.event_name == 'pull_request' && !github.event.pull_request.draft) ||
+      github.event_name == 'merge_group' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate ephemeral test-only auth secret
+        run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Bootstrap empty database using tracked migrations only
+        run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
+        env:
+          MIGRATION_BOOTSTRAP_CI: '1'
+      - run: pnpm test:e2e:setup
+      - run: pnpm build
         id: build
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
-        if: steps.browser.outputs.run == 'true'
         run: pnpm test:performance --output=performance-results
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
       - name: Browser functionality regression
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: pnpm test:e2e --grep-invert @performance
       - name: Upload browser failure evidence
         if: always()
