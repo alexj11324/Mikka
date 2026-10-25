@@ -18,7 +18,8 @@ for (const name of [
   "ALL_PROXY",
   "NO_PROXY",
   "SSL_CERT_FILE",
-  "SSL_CERT_DIR"
+  "SSL_CERT_DIR",
+  "GIT_SSL_CAINFO"
 ])
   if (process.env[name]) env[name] = process.env[name]
 const git = (...args) => {

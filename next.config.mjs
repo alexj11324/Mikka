@@ -42,7 +42,7 @@ const nextConfig = {
   // Default pnpm build compiles pinned Linux workers before Next tracing. The binary path is
   // private server configuration, so tracing cannot infer this asset from JS.
   outputFileTracingExcludes: {
-    '*': ['./packages/subscription-worker/.upstream/**', './packages/subscription-worker/.cache/**', './packages/subscription-worker/bin/mikka-subscription-fixture'],
+    '*': ['./packages/subscription-worker/.upstream/**', './packages/subscription-worker/.cache/**', './packages/subscription-worker/bin/mikka-subscription-fixture', './packages/subscription-worker/**/*.go', './packages/subscription-worker/testfixture/**', './packages/subscription-worker/compat/**'],
   },
   outputFileTracingIncludes: {
     '/api/agent': ['./packages/subscription-worker/bin/mikka-subscription-worker'],

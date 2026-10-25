@@ -1,4 +1,4 @@
-import { readFileSync, statSync, mkdtempSync, mkdirSync, copyFileSync, rmSync } from 'node:fs'
+import { readFileSync, statSync, mkdtempSync, mkdirSync, copyFileSync, rmSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -7,6 +7,17 @@ const root=fileURLToPath(new URL('../',import.meta.url))
 const routes=[['api/agent','worker'],['api/subscriptions','worker'],['api/subscriptions/callback','worker'],['api/cron/subscriptions','worker'],['v1/devices/[deviceId]/runs/[runId]/subscription','worker'],['api/subscriptions/enrollments','enrollment'],['api/subscriptions/enrollments/handoff','enrollment'],['api/subscriptions/enrollments/bind','enrollment']]
 const stage=mkdtempSync(join(tmpdir(),'mikka-worker-artifacts-'))
 try {
+ const appRoot=join(root,'.next/server/app')
+ let manifests=0
+ for(const entry of readdirSync(appRoot,{recursive:true})){
+  if(!entry.endsWith('.nft.json'))continue
+  const manifest=join(appRoot,entry),files=JSON.parse(readFileSync(manifest,'utf8')).files
+  for(const file of files){
+   const path=resolve(dirname(manifest),file)
+   if(/\/subscription-worker\/(\.cache|\.upstream|testfixture|compat)\//.test(path)||/\/subscription-worker\/.*\.go$/.test(path)||path.endsWith('/mikka-subscription-fixture'))throw new Error(`build-only payload in route trace: ${entry}`)
+  }
+  manifests++
+ }
  for(const [route,kind] of routes){
   const manifest=resolve(root,'.next/server/app',route,'route.js.nft.json')
   const files=JSON.parse(readFileSync(manifest,'utf8')).files.map(p=>resolve(dirname(manifest),p))
@@ -19,5 +30,5 @@ try {
   const result=spawnSync(target,['--version'],{cwd:routeRoot,env:{LANG:'C.UTF-8'},encoding:'utf8',timeout:5000})
   if(result.status!==0||!result.stdout.includes(name))throw new Error('isolated traced binary failed')
  }
- console.log('8 route traces verified; both traced workers started from isolated artifact root; no build-only payloads')
+ console.log(`${manifests} route traces exclude build-only payloads; 8 BYOS traces verified; both traced workers started from isolated artifact root`)
 }finally{rmSync(stage,{recursive:true,force:true})}
