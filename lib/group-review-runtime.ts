@@ -78,7 +78,7 @@ export async function dispatchReviewWork(pool: Pool, directory: Directory, adapt
     const trigger = (await client.query('SELECT id,body,"authorType","authorId" FROM conversation_messages WHERE id=$1 AND "conversationId"=$2', [work.triggerMessageId, work.conversationId])).rows[0]
     const request = (await client.query(`SELECT r.*, v.content, v.hash, a."mediaType", t.anchor FROM artifact_change_requests r
       JOIN artifact_versions v ON v.id=r."baseVersionId" JOIN artifacts a ON a.id=r."artifactId" JOIN artifact_threads t ON t.id=r."threadId" WHERE r."workId"=$1`, [work.id])).rows[0]
-    const earlier=(await client.query(`SELECT m."authorId" AS author,m.body AS text FROM conversation_work w JOIN conversation_messages m ON m.id=w."replyMessageId" WHERE w."triggerMessageId"=$1 AND w.status='completed' ORDER BY w.round,w.ordinal LIMIT 100`,[work.triggerMessageId])).rows
+    const earlier=(await client.query(`SELECT m."authorId" AS author,left(m.body,2000) AS text FROM conversation_work w JOIN conversation_messages m ON m.id=w."replyMessageId" WHERE w."triggerMessageId"=$1 AND w.status='completed' ORDER BY w.round DESC,w.ordinal DESC LIMIT 100`,[work.triggerMessageId])).rows.reverse()
     const members=(await client.query(`SELECT "memberId" AS id FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='agent' AND "leftAt" IS NULL ORDER BY "memberId"`,[work.conversationId])).rows
     const data = JSON.stringify({
       contract: 'mikka.group-review.v1', workId: work.id, runId: work.id, conversationId: work.conversationId, triggerMessageId: trigger.id,

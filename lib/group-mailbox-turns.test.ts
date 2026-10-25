@@ -53,12 +53,12 @@ test('single durable group executor: concurrency, replay, rounds and uncertainty
    const polls=await Promise.all(Array.from({length:4},()=>worker({action:'poll'})));const id=polls[0].body.runIds[0];assert.ok(id)
    assert.ok(polls.every(p=>p.body.runIds.length===1&&p.body.runIds[0]===id))
    const claims=await Promise.all([worker({action:'claim',runId:id}),worker({action:'claim',runId:id})]);assert.equal(claims.filter(c=>c.status===200).length,1)
-   const c=claims.find(c=>c.status===200)!.body
+   const c=claims.find(c=>c.status===200)!.body,text='controlled'+'x'.repeat(4000)
    // Commit the reply, then actually sever HTTP before its response; reconnect using the same identity.
-   await assert.rejects(fetch(origin+'/worker',{method:'POST',headers:{'x-fixture-user':'owner','content-type':'application/json','x-drop-response':'yes'},body:JSON.stringify({action:'complete',runId:c.runId,reply:{workId:c.runId,triggerMessageId:c.envelope.triggerMessageId,claimEpoch:c.claimEpoch,body:'controlled',mentions:[]}})}))
-   const results=await Promise.all([complete(c),complete(c)]);assert.equal(results[0].body.replyMessageId,results[1].body.replyMessageId)
+   await assert.rejects(fetch(origin+'/worker',{method:'POST',headers:{'x-fixture-user':'owner','content-type':'application/json','x-drop-response':'yes'},body:JSON.stringify({action:'complete',runId:c.runId,reply:{workId:c.runId,triggerMessageId:c.envelope.triggerMessageId,claimEpoch:c.claimEpoch,body:text,mentions:[]}})}))
+   const results=await Promise.all([complete(c,text),complete(c,text)]);assert.equal(results[0].body.replyMessageId,results[1].body.replyMessageId)
    assert.equal((await complete(c,'different')).status,409)
-   const second=await claim();assert.equal(second.envelope.untrustedData.earlier.length,1)
+   const second=await claim();assert.equal(second.envelope.untrustedData.earlier.length,1);assert.equal(second.envelope.untrustedData.earlier[0].text.length,2000)
    assert.equal((await complete(second)).status,200)
    assert.equal((await pool.query(`SELECT count(*) FROM conversation_messages WHERE "conversationId"=$1 AND "authorType"='agent'`,[g])).rows[0].count,'2')
   })
