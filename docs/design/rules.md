@@ -52,8 +52,9 @@ source wins in a conflict is in [`README.md`](README.md).
   (`accent/default`); a bot's text sits in the light grey bubble. Charts, OpenUI cards
   and choice cards have no bubble. Bordered cards (document, computer) sit
   below the text bubble, never inside it.
-- **R-15** A task mentioned in chat is an inline chip with the board's status
-  icon, not a large card.
+- **R-15** A task or thread mentioned in chat is an inline chip, not a large
+  card (a task chip carries the board's status icon). A thread the reply
+  dispatches is different: it is a thread card under that reply (R-66).
 - **R-16** The computer card in chat shows a title, a status, one sentence
   about the task and a big screen. Approval is part of that card. It never
   shows an operation log, a step checklist, or OS and spec lines.
@@ -126,6 +127,17 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the right column, as an open thread does; closing it brings the properties
   back. The home page is already that conversation and has no button.
   Figma: page 「AI 侧栏 · 全局」.
+- **R-66** When the Coordinator dispatches a thread, the chat shows one
+  thread card under its reply: bot avatar, thread name and status badge,
+  then one line (运行中: 「交给 Codex · 第 N 步」; 完成: the result, then the
+  outputs such as a PR, folding extras into +N). The coding agent appears only
+  in that step line (R-62). The card updates in place, so a thread has one
+  card in a chat; a later change of state is a sentence from the Coordinator,
+  not a second card. The card has no log, input box or buttons. Clicking it
+  opens the thread conversation: on desktop the centre column switches to it
+  with 「‹ Coordinator」 to go back, on a phone it pushes in full screen.
+  Figma: page 「线程卡片 · 聊天里派出线程」.
+
 ## Look
 
 - **R-30** Greys are pure neutral: `rgba(0,0,0,a)` and `#737373 / #A3A3A3 /
