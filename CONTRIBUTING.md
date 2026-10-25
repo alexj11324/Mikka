@@ -25,9 +25,27 @@ Thank you for helping improve Mikka.
   pnpm check
   ```
 
-- CI runs the full gate on every pull request, including the production build
-  and browser tests. A pull request merges once the required checks pass.
+- A pull request merges once the required checks pass. See "How changes are
+  tested" below for which checks run when.
 - Never commit credentials. Project secrets live in Infisical Cloud.
+
+## How changes are tested
+
+Slow checks run less often and later. Each layer catches what the one before
+cannot.
+
+1. **While writing** (seconds, on your machine or the agent's container):
+   `pnpm typecheck`, `pnpm lint` and the unit tests for what you changed. Run a
+   browser test only for the flow you changed, and only if you can.
+2. **Every push and pull request** (minutes, CI): production build, every unit
+   test, database migrations and integration tests such as thread privacy.
+   This is the gate review waits on.
+3. **Before merging into main** (merge queue, CI): the full browser suite
+   (Playwright, functionality and performance), run on your change on top of
+   the latest main, so two changes that each pass but break together are
+   caught. To run it earlier on a branch, start CI by hand: Actions → CI →
+   Run workflow.
+4. **After merging** (CI): the same suite on main, and again every night.
 
 ## Contributor License Agreement
 

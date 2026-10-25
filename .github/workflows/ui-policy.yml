@@ -7,14 +7,18 @@ name: CI
 # A PR from a branch in this repo is already covered by its push run, so the
 # pull_request run is kept only for PRs from forks (see the job conditions).
 # Browser tests (Playwright) are the slow part, so they run only on the way
-# into main: in the merge queue, on main itself, or when started by hand
-# (Actions → CI → Run workflow). Branch pushes still build and check the database.
+# into main: in the merge queue, on main itself, every night on main, or when
+# started by hand (Actions → CI → Run workflow). Branch pushes still build and
+# check the database. See CONTRIBUTING.md, "How changes are tested".
 on:
   push:
     branches-ignore: ['gh-readonly-queue/**']
   pull_request:
   merge_group:
   workflow_dispatch:
+  schedule:
+    # Nightly full regression on main, 03:17 Beijing time.
+    - cron: '17 19 * * *'
 
 permissions:
   contents: read
@@ -161,7 +165,7 @@ jobs:
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
       - name: Decide whether browser tests run
         id: browser
-        run: echo "run=${{ github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' }}" >> "$GITHUB_OUTPUT"
+        run: echo "run=${{ github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.ref == 'refs/heads/main' }}" >> "$GITHUB_OUTPUT"
       - run: pnpm exec playwright install --with-deps chromium
         if: steps.browser.outputs.run == 'true'
       - name: Bootstrap empty database using tracked migrations only
