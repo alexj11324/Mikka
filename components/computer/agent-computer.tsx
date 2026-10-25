@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Maximize2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
-import { BotAvatar } from '@/components/nav/bot-avatar'
+import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import type { ComputerThread } from './computer-agents'
 import { ComputerScreen } from './computer-screen'
 import { ComputerViewer } from './computer-viewer'
@@ -19,7 +19,7 @@ export function AgentComputer({ thread }: { thread: ComputerThread }) {
   const t = useTranslations('Computer')
   const [viewing, setViewing] = useState(false)
   return <div className="flex flex-col items-center gap-3 pt-6">
-    <BotAvatar id={thread.botId} size="profile" />
+    <BotAvatar color={colorFor(thread.botName)} size="profile" />
     <h2 className="max-w-full truncate pb-3 text-xl font-semibold">{thread.botName}</h2>
     <ComputerScreen botId={thread.botId} name={thread.botName}>
       <Button size="sm" className="h-9 rounded-full bg-screen/80 px-3.5 text-screen-foreground backdrop-blur-sm hover:bg-screen/90" onClick={() => setViewing(true)}><Maximize2 data-icon="inline-start" />{t('open')}</Button>
