@@ -8,6 +8,23 @@
 // and `agent_run.report` stores exactly this shape.
 import { z } from "zod"
 
+export const RUN_QUESTION_KINDS = [
+  "context",
+  "decision",
+  "permission",
+  "external",
+] as const
+export const runQuestion = z
+  .object({
+    questionId: z.uuid(),
+    kind: z.enum(RUN_QUESTION_KINDS).default("decision"),
+    question: z.string().trim().min(1).max(4000),
+    context: z.string().trim().max(4000).optional(),
+    options: z.array(z.string().trim().min(1).max(4000)).max(20).default([]),
+  })
+  .strict()
+export type RunQuestion = z.infer<typeof runQuestion>
+
 import { planHandoff } from "./plan"
 
 /** Why a run stopped. Must match `agent_run.stop_reason` in packages/db. */
@@ -68,14 +85,26 @@ export const runReport = z.object({
   verify: z.object({
     status: verifyStatus,
     command: z.string().max(2_000).optional(),
+    /** Actual process outcome from the daemon, never the agent. */
+    exitCode: z.number().int().nullable().optional(),
+    signal: z.string().max(100).nullable().optional(),
+    timedOut: z.boolean().optional(),
     /** Tail of the command output. */
     output: z.string().max(10_000).optional(),
   }),
   openQuestions: z.array(z.string().max(2_000)).max(50),
+  question: runQuestion.optional(),
   /** What should happen next, from the agent's point of view. */
   nextStep: z.string().max(2_000).nullable(),
   /** For `blocked`: the external condition, e.g. `quota_exhausted`. */
   blockedOn: z.string().max(500).optional(),
+  /** Daemon-owned receipt for an exact, unchanged read-only candidate. */
+  check: z
+    .object({
+      sha: z.string().regex(/^[a-f0-9]{40}$/),
+      readOnly: z.literal(true),
+    })
+    .optional(),
   /** Acceptance criteria the agent checked, with evidence. */
   criteria: z
     .array(
@@ -84,7 +113,7 @@ export const runReport = z.object({
         text: z.string().max(2_000).optional(),
         passed: z.boolean(),
         evidence: z.string().max(10_000).optional(),
-      })
+      }),
     )
     .max(200)
     .optional(),
@@ -104,7 +133,7 @@ export const runReport = z.object({
         title: z.string().trim().min(1).max(500),
         goal: z.string().max(2_000).optional(),
         reason: z.string().max(2_000).optional(),
-      })
+      }),
     )
     .max(50)
     .optional(),
@@ -152,7 +181,7 @@ export type RunCompleteRequest = z.infer<typeof runCompleteRequest>
  */
 export function reachesReview(
   stopReason: RunStopReason,
-  report: Pick<RunReport, "verify"> | undefined
+  report: Pick<RunReport, "verify"> | undefined,
 ): boolean {
   return (
     stopReason === "submitted" && !!report && report.verify.status !== "failed"

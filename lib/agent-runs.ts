@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { agents, agentRuns, deviceRepos, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
+import { dispatchInput, insertRunOnce, type DispatchInput, type DispatchResult } from '@/lib/run-dispatch'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -44,24 +45,21 @@ export const runViewColumns = {
  * next poll, claims it, and reports back through `/v1/runs/:runId/complete`.
  * `note` is extra direction for this run only, after the issue.
  */
-export async function queueRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }): Promise<{ runId: string }> {
-  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), deviceRepoId: z.uuid(), note: z.string().trim().max(10_000).optional() }).safeParse(input)
+export async function queueRun(userId: string, input: DispatchInput, executor: Pick<typeof db, 'select' | 'transaction'> = db): Promise<DispatchResult> {
+  const parsed = dispatchInput.safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
-  const issue = await issueForUser(userId, parsed.data.issueId)
+  const issue = await issueForUser(userId, parsed.data.issueId, false, executor)
   if (!issue) throw new ActionFailureError('issueNotFound')
-  const [agent] = await db.select().from(agents)
+  const [agent] = await executor.select().from(agents)
     .where(and(eq(agents.id, parsed.data.agentId), eq(agents.userId, userId))).limit(1)
   if (!agent?.deviceId) throw new ActionFailureError('agentNoDevice')
-  const [repo] = await db.select().from(deviceRepos)
+  const [repo] = await executor.select().from(deviceRepos)
     .where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.deviceId, agent.deviceId), eq(deviceRepos.userId, userId))).limit(1)
   if (!repo) throw new ActionFailureError('agentRepoMissing')
-  const runId = crypto.randomUUID()
-  await db.insert(agentRuns).values({
-    id: runId, userId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
+  return insertRunOnce(executor, userId, parsed.data, {
+    deviceId: agent.deviceId, baseBranch: repo.baseBranch,
     prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note),
   })
-  return { runId }
 }
 
 /** The brief the agent starts from: the issue, any note for this run, then the agent's own role. */
@@ -88,13 +86,84 @@ export async function readRun(userId: string, runId: string): Promise<RunDetail 
 }
 
 /** A message to the running agent; the daemon delivers it. */
-export async function addRunMessage(userId: string, input: { runId: string; text: string }): Promise<void> {
-  const parsed = z.object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) }).safeParse(input)
+export async function addRunMessage(
+  userId: string,
+  input: { runId: string; text: string },
+  source:
+    { source: 'human'; sessionId: string } | { source: 'orchestrator' } = {
+    source: 'orchestrator',
+  },
+): Promise<void> {
+  const parsed = z
+    .object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) })
+    .safeParse(input)
   if (!parsed.success) throw new ActionFailureError('messageRequired')
-  const [run] = await db.select({ id: agentRuns.id }).from(agentRuns)
-    .where(and(eq(agentRuns.id, parsed.data.runId), eq(agentRuns.userId, userId))).limit(1)
+  const [run] = await db
+    .select({ id: agentRuns.id, status: agentRuns.status })
+    .from(agentRuns)
+    .where(
+      and(eq(agentRuns.id, parsed.data.runId), eq(agentRuns.userId, userId)),
+    )
+    .limit(1)
   if (!run) throw new ActionFailureError('runNotFound')
-  await db.insert(runMessages).values({ id: crypto.randomUUID(), runId: run.id, userId, text: parsed.data.text })
+  if (
+    !['queued', 'preparing', 'running', 'waiting_input', 'finishing'].includes(
+      run.status,
+    )
+  ) {
+    const { factoryQuestions } = await import('@/lib/factory/server')
+    const { pool } = await import('@/lib/db')
+    const {
+      rows: [identity],
+    } = await pool.query(
+      'SELECT id FROM factory_questions WHERE "originRunId"=$1 AND "userId"=$2',
+      [run.id, userId],
+    )
+    if (!identity) throw new ActionFailureError('runNotActive')
+    const q = await factoryQuestions.read(userId, identity.id)
+    if (q.status === 'resolved' && q.continuationRunId) {
+      const previous = q.answer as {
+        input?: { text?: string; reference?: unknown }
+      } | null
+      if (previous?.input?.text !== parsed.data.text)
+        return addRunMessage(
+          userId,
+          { runId: q.continuationRunId, text: parsed.data.text },
+          source,
+        )
+    }
+    if (source.source !== 'human')
+      throw new ActionFailureError('factoryQuestionNeedsAnswerTool')
+    const { factoryEventId } = await import('@/lib/factory/event-id')
+    const { questionReference } = await import('@/lib/factory/questions/store')
+    const { questionFingerprint } =
+      await import('@/lib/factory/questions/contract')
+    const previous = q.answer as {
+      input?: { reference?: ReturnType<typeof questionReference> }
+    } | null
+    const answerId = factoryEventId(
+      'task-thread-question-answer',
+      questionFingerprint({ questionId: q.id, userId, text: parsed.data.text }),
+    )
+    await factoryQuestions.answer(
+      { source: 'human', userId, sessionId: source.sessionId },
+      {
+        reference:
+          q.answerId === answerId && previous?.input?.reference
+            ? previous.input.reference
+            : questionReference(q),
+        answerId,
+        text: parsed.data.text,
+      },
+    )
+    return
+  }
+  await db.insert(runMessages).values({
+    id: crypto.randomUUID(),
+    runId: run.id,
+    userId,
+    text: parsed.data.text,
+  })
 }
 
 /** Asks the daemon to stop the run; it repeats until the run has ended. */

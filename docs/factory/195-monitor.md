@@ -1,0 +1,53 @@
+# Factory monitor consumer (#195)
+
+This independent candidate composes the frozen common issue-query baseline `87696d6344f65a6369117e8145759462f0e59ef7`, monitor-cycle increment `6509bf19fc2043b990026f0aced8098a5e40a5b2`, #193 checks `750dcd07f44fe840edd006578ce04bfca42dc0bc` and #194 publication receipt `2df5354753be0cf5ce10218237ec13bdf23a7d01`. It originally branched from PR #197 `605bf086d4371e19f2df2e2857a487f1decd649d`. Query and monitor HTTP commands, documents and tests remain available. Read the full [issue](https://github.com/alexj11324/Mikka/issues/195), `AGENTS.md`, `192-contract-v1.md`, `contract.ts` and the frozen [publication handoff](194-195-publication-handoff.md). Neither the checkout nor the frozen tree contains `.agents/skills`.
+
+## System integration and receipt provenance
+
+`server.ts` composes the existing #193 review/verify, #194 approval/publish and #195 monitor gates through `createFactoryStore(pool, authorize, gates)`. Their independent implementations remain unchanged. Existing Coordinator prompt preparation calls `factoryMonitor.reconcile(userId)` after run reconciliation, consuming durable `run_finished` events for the bound monitor attempt. No scheduler, new wake mechanism, public pass endpoint or model tool is added; #176 supplies reliable wakes.
+
+The existing device-authenticated run-complete route calls the private `factoryMonitor.probeRun` before a submitted run becomes terminal. Nonmonitor runs are a no-op. The recorder checks access, current monitor attempt/candidate binding and live owned run/session, then calls the actual #194 `readFactoryPublicationReceipt(tx,userId,taskId,candidateId)`. There is no fixture receipt fallback. Missing, uncertain, revoked or inconsistent publication records cannot produce recovery. Only registered trusted probe adapters execute; a model/report cannot select code, filesystem paths or network destinations. Factory validation errors leave reconciliation to record a blocked outcome; unexpected database errors propagate.
+
+The receipt binds the actual publication/approval, candidate SHA/repository/scope and device provenance, action, target, target environment, verified operation and reference. Candidate `environment=device:<id>` is **not** the deployed environment. The audit records these separately and requires probe start at or after both `publishedAt` and target `observedAt`, within the bound run. A monitor report may have `publish.commit=null`; the deployed SHA comes from the receipt and actual probe instead.
+
+The installed adapter is actual local artifact readback only, reusing #194's explicit loopback/nonproduction local-publication configuration. A static Node child reads the registered target's operation file with bounded bytes and symlink rejection, hashes its actual bytes and checks SHA, repository, device provenance, scope, operation, target, environment and reference. It records actual command identity, request/run/session, start/end, exit code, signal, timeout, safe observed values and raw output. No credentials or network calls are used. Missing/content-mismatched targets fail; operational/provenance errors block. No cloud probe is installed, and local artifact success cannot prove cloud recovery. Merge receipts cannot establish a deployed-monitor pass.
+
+The backend stores one atomic raw `factory-monitor-probe` artifact and hashed proof in the existing bound run and attempt output. Daemon event ingestion requires `fromSeq>=1`; reserved sequence zero holds this private same-run artifact without advancing producer offsets. Retried completion returns the same bound proof rather than rerunning a side effect. The gate validates the original raw artifact/hash, full binding and real receipt again; overwritten, missing, cross-run or stale evidence fails closed. This adds no schema, parallel stage state or validator API to the frozen Factory contract.
+
+## Incidents, existing issue association and recovery
+
+`consume(userId,{binding,sourceEventId})` rechecks issue access, owner, stop state, full candidate/attempt/revision fence and actual completed run/session/source event. Workspace identity comes from the existing workspace issue/team link. Legacy issues use their persisted Linear team mapping; an unknown workspace is isolated by issue ID. Actual personal issues partition by owner. Caller-supplied workspace/owner is never accepted.
+
+Fingerprints hash owner/workspace, repository, actual target environment, target kind/name, candidate scope, registered check and normalized failure signature. Device provenance, operation IDs, publication IDs and candidate SHAs do not fragment repeated failures at the same actual target. Local/cloud kinds remain separate even for equal target names/environments. Raw daemon output is never copied into observations/comments/notices. Probe output contains only checked identifiers, hashes of mismatched opaque fields and fixed error codes.
+
+One transaction records observation, incident count, shared Factory `apply`, original-issue Yjs evidence comment, existing document-trigger outbox and safe Coordinator notice. The original issue remains the logical backlog item. Identical event replay increments deliveries only; distinct failures increment occurrences and reuse the original issue. A check-level lock serializes competing tasks and original issue access is rechecked. Notices use existing `run_blocked`/`run_report` kinds and cannot echo back as monitor inputs. Existing Linear links and sync worker remain the mapping/sync source; this consumer makes no external issue API calls. There is no durable GitHub issue mapping equivalent to `linear_issue_links`; do not infer one from a PR URL.
+
+A recovery pass requires the same current candidate, actual healthy target proof, completed unchanged-worktree run and prior passed review, independent verify, human approval and publication. Execute/review/verify/monitor run and session identities must all be independent. A successful daemon report alone is insufficient. Recovery marks matching target incidents recovered, preserving their original issue and history; it neither closes the issue nor dispatches repair.
+
+The parent-frozen monitor-cycle increment allows existing `retry` from `monitor/passed` with the unchanged nonnull candidate and current full binding. It creates an empty fresh pending monitor attempt, retaining immutable history; no run/wake/publication is created. Old run/proof cannot pass a fresh cycle. A fresh failure uses existing `repair` to open a fresh execute attempt and clear candidate eligibility. Other passed stages and repair-from-passed stay rejected. A new observation delivered directly to a terminal attempt records attention with `transitionBlocked=true`.
+
+## Reproducible layer validation
+
+In the isolated Linux execution environment, using a disposable database rather than application URLs or CLI credentials:
+
+```sh
+docker run --name mikka-monitor-195-pg --rm -d \
+  -e POSTGRES_USER=monitor -e POSTGRES_PASSWORD=disposable-local-only \
+  -e POSTGRES_DB=mikka_monitor_195 -p 127.0.0.1:55495:5432 postgres:17
+FACTORY_MONITOR_TEST_URL=postgresql://monitor:disposable-local-only@127.0.0.1:55495/mikka_monitor_195 \
+  node --import tsx --test lib/factory/monitor.test.ts
+node --import tsx --test lib/factory/contract.test.ts lib/coordinator-events.test.ts
+node_modules/.bin/oxlint lib/factory/monitor*.ts lib/factory/server.ts 'app/v1/runs/[runId]/complete/route.ts' --deny-warnings
+node scripts/check-migrations.mjs
+docker stop mikka-monitor-195-pg
+```
+
+Tests bootstrap all tracked SQL in a fresh PG17 schema, use the **actual #193/#194/#195 validators**, actual #194 approval/publication service and ledger reader, actual local publication adapter and child-process readback. They exercise concurrent replay/dedupe, rollback/restart, fences, issue association/deletion, repair/cycles, malformed target/environment/SHA/operation/reference, timing, uncertain publication, actual approval revocation, raw evidence tampering and local/cloud separation. Disposable OAuth identities and Harness/review conclusions are explicitly fixtures; running a local command or real publication adapter does not establish actual OAuth or CC/Codex Harness acceptance. Optional `FACTORY_MONITOR_EVIDENCE_DIR` saves sanitized local receipt/probe artifacts privately. CI runs temporary PG17 checks plus remote typecheck/build/browser regressions. Neither CI nor these local layers constitute final system acceptance.
+
+Migration ordering remains exactly #191 `20261025051201_run_dispatch_keys.sql`, #192 `20261025051202_factory_192_stages.sql`, #194 `20261025051203_factory_194_approvals.sql`, #195 `20261025051204_factory_195_monitor.sql`. Superseded names are absent; no migration SQL or naming is changed by this handoff.
+
+## Remaining real acceptance
+
+This batch's Preview deployment was denied by automatic approval review in the parent thread; user authorization remains pending. Do not retry deployment or use another path. No deployed acceptance URL exists for this candidate. Actual OAuth/Harness execution and a registered real deployment/probe adapter are still required for cloud recovery acceptance.
+
+After an authorized fixed Preview, run actual chat/Harness on the exact candidate/environment, inject/recover a real deployed fault, deliver ten concurrent/replayed actual events, verify existing GitHub/Linear mapping/echo behavior, cancellation/revocation, independent verification/publication approval and restart/compensation. Preserve sanitized logs and necessary UI captures for private Pages/#181. Public local task/session detail comments were denied and must not be republished by another route. External issue writes require explicit inclusion in #195's acceptance scope. No third-party contact, paid resources, IAM grants, persistent access or secret transport are authorized here. Final real acceptance remains incomplete.

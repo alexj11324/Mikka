@@ -99,7 +99,7 @@ export function claudeProjectDirName(cwd: string): string {
  * which bypass mode auto-allows.
  */
 export function claudeSandboxSettings(
-  policy: SandboxPolicy
+  policy: SandboxPolicy,
 ): NonNullable<Settings["sandbox"]> {
   const anyHost = policy.allowDomains.includes("*")
   return {
@@ -135,7 +135,7 @@ export function claudeSandboxSettings(
  */
 export function claudeSettings(
   policy: SandboxPolicy,
-  workspace?: RunPolicy
+  workspace?: RunPolicy,
 ): Settings {
   return {
     sandbox: claudeSandboxSettings(policy),
@@ -153,13 +153,13 @@ export function claudeChunks(message: SDKMessage): RunChunk[] {
         chunks.push(
           { type: "text-start", id },
           { type: "text-delta", id, delta: block.text },
-          { type: "text-end", id }
+          { type: "text-end", id },
         )
       } else if (block.type === "thinking" && block.thinking) {
         chunks.push(
           { type: "reasoning-start", id },
           { type: "reasoning-delta", id, delta: block.thinking },
-          { type: "reasoning-end", id }
+          { type: "reasoning-end", id },
         )
       } else if (block.type === "tool_use") {
         chunks.push({
@@ -187,7 +187,7 @@ export function claudeChunks(message: SDKMessage): RunChunk[] {
               type: "tool-output-available",
               toolCallId: block.tool_use_id,
               output,
-            }
+            },
       )
     }
   } else if (message.type === "result") {
@@ -218,7 +218,7 @@ function toolResultText(content: unknown): string {
   if (Array.isArray(content)) {
     return content
       .map((part: { text?: unknown }) =>
-        typeof part?.text === "string" ? part.text : ""
+        typeof part?.text === "string" ? part.text : "",
       )
       .join("\n")
       .slice(-4000)
@@ -339,6 +339,10 @@ export class ClaudeAdapter implements AgentAdapter {
 
   start(options: StartOptions): Promise<AgentSession> {
     const continued = options.continueSession
+    if (options.requireSessionResume && !continued)
+      return Promise.reject(
+        new Error("Original Claude question session is required"),
+      )
     return continued
       ? this.open(continued.sessionId, "continue", continued.message, options)
       : this.open(randomUUID(), "new", options.prompt, options)
@@ -358,7 +362,7 @@ export class ClaudeAdapter implements AgentAdapter {
     sessionId: string,
     mode: "new" | "restart" | "continue",
     firstMessage: string,
-    options: SessionOptions & { prompt?: string }
+    options: SessionOptions & { prompt?: string },
   ): Promise<AgentSession> {
     const configDir = this.options.configDir ?? join(homedir(), ".claude")
     const paths = runPaths(this.options.stateDir, options.runId)
@@ -377,7 +381,7 @@ export class ClaudeAdapter implements AgentAdapter {
         join(
           configDir,
           "projects",
-          claudeProjectDirName(realpathSync(options.cwd))
+          claudeProjectDirName(realpathSync(options.cwd)),
         ),
       ],
     })
@@ -461,7 +465,7 @@ export class ClaudeAdapter implements AgentAdapter {
       void end(
         lastError
           ? { outcome: "failed", error: lastError }
-          : { outcome: "succeeded" }
+          : { outcome: "succeeded" },
       )
     }
     const diedEarly = (error: string) => {
@@ -471,13 +475,20 @@ export class ClaudeAdapter implements AgentAdapter {
         handoff ?? {
           outcome: "failed",
           error: `claude exited before the turn ended: ${error}`,
-        }
+        },
       )
     }
 
     void (async () => {
       try {
         for await (const message of session) {
+          if (
+            options.requireSessionResume &&
+            "session_id" in message &&
+            typeof message.session_id === "string" &&
+            message.session_id !== sessionId
+          )
+            throw new Error("Claude resumed a different question session")
           if (provesSession(message)) spoke(true)
           // A new turn (the queued message) produces its own result.
           if (message.type === "assistant" || message.type === "user")
@@ -512,9 +523,15 @@ export class ClaudeAdapter implements AgentAdapter {
     prompts.push(firstMessage)
     written++
     if (mode === "continue" && !(await untilSpoken(spoken))) {
+      if (options.requireSessionResume) {
+        await end(null)
+        throw new Error(
+          "Original Claude question session is unavailable; refusing a fresh session",
+        )
+      }
       log.info(
         { stderr: stderrTail() },
-        "could not continue the earlier claude session; starting a new one"
+        "could not continue the earlier claude session; starting a new one",
       )
       await end(null)
       return this.open(randomUUID(), "new", options.prompt ?? "", options)
