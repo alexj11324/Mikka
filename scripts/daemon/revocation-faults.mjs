@@ -84,3 +84,6 @@ try{
  writeFileSync('test-results/daemon-faults/device-revocation-fault-evidence.json',JSON.stringify(evidence,null,2))
  console.log(JSON.stringify(evidence))
 }finally{await db.end()}
+// Route imports initialize application background handles. All fixture queries
+// and the retained fixture pool have completed above; end this standalone runner.
+process.exit(0)
