@@ -36,6 +36,16 @@ export function composioCalendarProvider(client: ComposioActionClient | null): C
       const result = await client!.tools.execute(COMPOSIO_ACTIONS.create_calendar_event.slug, {
         userId: input.ownerId, connectedAccountId: input.accountId, version: input.version,
         arguments: actionArguments('create_calendar_event', input.payload),
+      }, {
+        signal: input.signal,
+        // The SDK fetches its schema asynchronously inside execute(). This hook
+        // runs after that preflight and immediately before its non-retrying write.
+        beforeExecute: async ({ params }) => {
+          input.signal.throwIfAborted()
+          await input.beforeSend()
+          input.signal.throwIfAborted()
+          return params
+        },
       })
       if (!result.successful) throw new OperationError('operationUncertain')
       const data = result.data as Record<string, unknown> | undefined

@@ -52,7 +52,10 @@ session are rechecked before claim and invoke. An invokedAt marker commits befor
 provider call, so an invocation cannot be repeated after uncertain persistence.
 The actual provider call runs while authority locks are held. The native adapter
 rechecks current authority through the same transaction AFTER asynchronous account
-lookup and immediately before tools.execute; expiry during preflight cannot send. Revocation committed
+lookup and in the SDK beforeExecute hook after its own schema preflight; expiry
+during either preflight cannot send. AbortSignal is passed into the SDK request.
+The pinned installed SDK uses withoutRetries for tool writes; this does not imply
+provider/backend idempotency or the ability to recall in-flight requests. Revocation committed
 before that transaction rejects the send. A later revocation waits and cannot claim
 to cancel an already invoked action. Session expiry is checked before send; in-flight
 requests cannot be recalled if authorization expires afterward.
