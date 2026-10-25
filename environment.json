@@ -73,5 +73,12 @@
     "browserPassed": 86,
     "performancePassed": 5,
     "verifiedUtc": "2026-10-25T18:33:03.836Z"
+  },
+  "fullCheck": {
+    "sourceSha": "80f3cab2b15ad967d1a27e45e6f833435d4de72e",
+    "command": "pnpm check",
+    "result": "failed: 3 unchanged baseline Agent frontend/static assertions; 51 source Agent checks passed",
+    "log": "full-check-80.log",
+    "capturedUtc": "2026-10-25T18:36:13.581Z"
   }
 }
