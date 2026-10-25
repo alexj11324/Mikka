@@ -55,6 +55,23 @@ test('generic heartbeat cannot revive expired group epochs or ordinary leases',a
   expect(body.leases[ids.live]).toBeTruthy()
   for(const mode of ['expired','stopped']){expect(body.leases[ids[mode]]).toBeUndefined();expect(body.revoked).toContain(ids[mode])}
   evidence.push({ordinary:{live:'renewed',expired:'revoked',stopped:'revoked'}})
+  // A valid lease can expire while renewal waits for the row. The database
+  // must evaluate expiry after that wait, not use the request's old timestamp.
+  const waitingId=randomUUID(),tx=await pool.connect()
+  try{
+   await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,"leaseExpiresAt") VALUES($1,$2,$3,$4,'running',now()+interval '1 second')`,[waitingId,owner,agentId,deviceId])
+   await tx.query('BEGIN');await tx.query('SELECT id FROM agent_runs WHERE id=$1 FOR UPDATE',[waitingId])
+   const pid=(await tx.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+   const pending=heartbeat([waitingId]);let blocked=false
+   for(let i=0;i<100&&!blocked;i++){
+    blocked=(await pool.query('SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE $1::int=ANY(pg_blocking_pids(pid))) AS blocked',[pid])).rows[0].blocked
+    if(!blocked)await new Promise(r=>setTimeout(r,20))
+   }
+   await new Promise(r=>setTimeout(r,1100));await tx.query('COMMIT')
+   const response=await pending;expect(blocked).toBe(true);expect(response.status()).toBe(200)
+   const result=await response.json();expect(result.leases[waitingId]).toBeUndefined();expect(result.revoked).toContain(waitingId)
+   evidence.push({ordinaryExpiryDuringRowLock:'revoked',blocked})
+  }finally{await tx.query('ROLLBACK');tx.release()}
   await info.attach('heartbeat-lease-boundary',{contentType:'application/json',body:JSON.stringify({sha:process.env.GITHUB_SHA,layer:'actual Next HTTP and isolated PG; synthetic replies; no CLI/provider',evidence})})
  }finally{await pool.end()}
 })
