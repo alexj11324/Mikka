@@ -74,20 +74,76 @@ export class SessionMailbox {
     const actor = await this.conversation(userId, 'coordinator')
     return this.sendEnvelope(actor, input, true, input.resume)
   }
+  /** A retry changes the transport address, not the identity of an outgoing operation.
+   * Only persisted infrastructure-retry edges participate. No peer-supplied scope,
+   * Agent-role grouping or ordinary continuation edge can join independent senders.
+   */
+  private async sendScope(client: PoolClient, actor: MailboxActor, box: Mailbox) {
+    if (box.kind !== 'run') return { lock: `mailbox:${box.id}`, senders: [box.id] }
+    type RunIdentity = { id: string; userId: string; issueId: string | null; agentId: string; kind: string; retryOf: string | null; mailboxId: string | null; status: string; stopReason: string | null; attempt: number }
+    const read = async (id: string) => (await client.query<RunIdentity>('select * from agent_runs where id=$1 and "userId"=$2', [id, actor.userId])).rows[0]
+    // A mailbox continuation deliberately keeps its original session identity.
+    let root = await read(box.sessionKey)
+    if (!root || root.mailboxId !== box.id || root.kind === 'group_review') throw new MailboxError('Invalid mailbox operation identity')
+    const seen = new Set<string>()
+    while (root.retryOf) {
+      if (seen.has(root.id) || seen.size >= 64) throw new MailboxError('Invalid retry operation lineage')
+      seen.add(root.id)
+      const parent = await read(root.retryOf)
+      if (!parent || parent.agentId !== root.agentId || parent.issueId !== root.issueId || !root.issueId
+        || parent.kind !== root.kind || parent.status !== 'failed' || parent.stopReason !== 'device_lost'
+        || root.attempt !== parent.attempt + 1) throw new MailboxError('Invalid retry operation lineage')
+      if (parent.mailboxId) {
+        const { rows: [parentBox] } = await client.query<Mailbox>('select * from session_mailboxes where id=$1', [parent.mailboxId])
+        if (!parentBox || parentBox.userId !== actor.userId || parentBox.workspaceId !== actor.workspaceId || parentBox.kind !== 'run') throw new MailboxError('Retry mailbox scope mismatch')
+        const initial = await read(parentBox.sessionKey)
+        if (!initial || initial.mailboxId !== parentBox.id || initial.agentId !== parent.agentId || initial.issueId !== parent.issueId || initial.kind !== parent.kind) throw new MailboxError('Invalid retry mailbox identity')
+        root = initial
+      } else root = parent
+    }
+    // Historical envelopes remain at their original addresses. Include every
+    // validated retry branch, so concurrent siblings cannot publish twice either.
+    const { rows } = await client.query<{ mailboxId: string | null; workspaceId: string | null; mailboxOwner: string | null; disabled: boolean | null }>(`
+      WITH RECURSIVE family AS (
+        SELECT id,"userId","agentId","issueId",kind,status,"stopReason",attempt,"mailboxId"
+        FROM agent_runs WHERE id=$1 AND "userId"=$2
+        UNION
+        SELECT r.id,r."userId",r."agentId",r."issueId",r.kind,r.status,r."stopReason",r.attempt,r."mailboxId"
+        FROM agent_runs r JOIN family f ON
+          (r."mailboxId"=f."mailboxId" OR
+           (r."retryOf"=f.id AND f.status='failed' AND f."stopReason"='device_lost' AND r.attempt=f.attempt+1))
+        WHERE r."userId"=f."userId" AND r."agentId"=f."agentId" AND r."issueId" IS NOT DISTINCT FROM f."issueId"
+          AND r.kind=f.kind
+      ) SELECT DISTINCT f."mailboxId",m."workspaceId",m."userId" AS "mailboxOwner",m.disabled
+        FROM family f LEFT JOIN session_mailboxes m ON m.id=f."mailboxId"`, [root.id, actor.userId])
+    if (rows.some(row => row.mailboxId && (row.workspaceId !== actor.workspaceId || row.mailboxOwner !== actor.userId))) throw new MailboxError('Retry mailbox scope mismatch')
+    if (rows.some(row => row.disabled)) throw new MailboxError('Retry mailbox disabled')
+    const senders = rows.flatMap(row => row.mailboxId ? [row.mailboxId] : [])
+    if (!senders.includes(box.id)) throw new MailboxError('Invalid retry operation lineage')
+    return { lock: `retry:${root.id}`, senders }
+  }
   private async sendEnvelope(actor: MailboxActor, input: { to: string; key: string; text: string; replyTo?: string }, owner: boolean, resume = false): Promise<MailboxReceipt> {
     return this.transaction<MailboxReceipt>(async client => {
-      await this.authorize(client, actor)
-      // Serialize this sender/key before selecting a recipient. The unique
+      const box = await this.authorize(client, actor)
+      let scope = await this.sendScope(client, actor, box)
+      // Serialize this logical sender/key before selecting a recipient. The unique
       // index alone would turn cross-recipient races into an unhandled 23505.
-      await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))', [`${actor.mailboxId}:${input.key}`])
+      await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))', [`${actor.workspaceId}:${actor.userId}:${scope.lock}:${input.key}`])
       const { rows: [target] } = await client.query<Mailbox>('select * from session_mailboxes where id=$1 and "userId"=$2 and "workspaceId"=$3 for update', [input.to, actor.userId, this.workspaceId])
       if (!target || target.kind === 'group') throw new MailboxError('Recipient unavailable')
-      const { rows: [prior] } = await client.query('select * from run_messages where "senderMailboxId"=$1 and "dedupeKey"=$2', [actor.mailboxId, input.key])
+      await this.authorize(client, actor)
+      const refreshed = await this.sendScope(client, actor, box)
+      if (refreshed.lock !== scope.lock) throw new MailboxError('Retry identity changed', 409)
+      scope = refreshed
+      const { rows: priors } = await client.query('select * from run_messages where "senderMailboxId"=any($1::uuid[]) and "dedupeKey"=$2', [scope.senders, input.key])
+      // Do not hide or delete duplicates produced by older deployments.
+      if (priors.length > 1) throw new MailboxError('Ambiguous historical retry delivery; reconciliation required', 409)
+      const prior = priors[0]
       if (prior) {
         if (prior.mailboxId !== input.to || prior.text !== input.text || (prior.replyTo ?? undefined) !== input.replyTo || prior.origin !== (owner ? 'owner' : 'peer')) throw new MailboxError('Idempotency key already used for another message', 409)
         return { id: prior.id, queued: true, duplicate: true, failure: prior.failure }
       }
-      if (input.replyTo && !(await client.query('select 1 from run_messages where id=$1 and "mailboxId"=$2 and "senderMailboxId"=$3', [input.replyTo, actor.mailboxId, target.id])).rowCount) throw new MailboxError('Reply is not to a message in this inbox')
+      if (input.replyTo && !(await client.query('select 1 from run_messages where id=$1 and "mailboxId"=any($2::uuid[]) and "senderMailboxId"=$3', [input.replyTo, scope.senders, target.id])).rowCount) throw new MailboxError('Reply is not to a message in this inbox')
       if (!input.text.trim() || input.text.length > 4000) throw new MailboxError('Message must be 1–4000 characters', 400)
       const id = randomUUID()
       await client.query('insert into run_messages (id,"userId",text,"mailboxId","senderMailboxId","dedupeKey","replyTo",origin) values ($1,$2,$3,$4,$5,$6,$7,$8)', [id, actor.userId, input.text, target.id, actor.mailboxId, input.key, input.replyTo ?? null, owner ? 'owner' : 'peer'])
