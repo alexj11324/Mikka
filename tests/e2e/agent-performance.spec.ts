@@ -65,9 +65,24 @@ test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 �
   const { email } = await register(page)
   const { older } = await seedHistory(page, email)
   const historyRequests: string[] = []
-  page.on('request', request => {
-    if (new URL(request.url()).pathname === app('/api/agent/sessions')) historyRequests.push(request.url())
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Network.enable')
+  const { frameTree } = await cdp.send('Page.getFrameTree')
+  const documents = new Set<string>()
+  cdp.on('Network.requestWillBeSent', event => {
+    if (event.frameId !== frameTree.frame.id) return
+    if (event.type === 'Document') documents.add(event.loaderId)
+    // register() only waits for the URL. Its old document can still start a
+    // history request while the fixture is being seeded, before reload().
+    // Count the documents under test, keeping duplicate reads within each.
+    if (documents.has(event.loaderId) && new URL(event.request.url).pathname === app('/api/agent/sessions')) historyRequests.push(event.request.url)
   })
+  // Prove pre-navigation fixture traffic is outside the measured documents.
+  await page.evaluate(async url => {
+    const response = await fetch(url)
+    if (!response.ok) throw new Error(`Fixture history read failed: HTTP ${response.status}`)
+  }, app('/api/agent/sessions'))
+  expect(historyRequests).toHaveLength(0)
   await page.reload()
 
   const firstStart = await page.evaluate(() => performance.now())
@@ -79,8 +94,6 @@ test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 �
   expect(historyRequests).toHaveLength(1)
   expect(new URL(historyRequests[0]).searchParams.has('sessionId')).toBe(false)
 
-  const cdp = await page.context().newCDPSession(page)
-  await cdp.send('Network.enable')
   await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
   await page.reload({ waitUntil: 'domcontentloaded' })
   panel = await assertInteractiveWithinBudget(page, info, '无缓存刷新并恢复完整历史', 0, '第三轮性能验收的已保存正文')
