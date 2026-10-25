@@ -95,7 +95,7 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
   const nextPriority = issuePriorityForLinear(remote.priority)
   let doneEvent = false
   const saved = await db.transaction(async tx => {
-    await tx.execute(sql`select set_config('orvilo.linear_sync_source', 'linear', true)`)
+    await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
     const [latest] = await tx.select().from(issues).where(and(eq(issues.id, link.issue.id), eq(issues.userId, team.ownerId))).for('update')
     if (!latest) return null
     const [currentLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.id, link.link.id)).for('update')
@@ -152,7 +152,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
   if (JSON.stringify(content).length > 250_000) throw new LinearSyncConflictError('Linear description is larger than Mikka supports')
   const assignee = await localAssigneeForRemote(team.ownerId, remote.id, remote, true)
   const created = await db.transaction(async tx => {
-    await tx.execute(sql`select set_config('orvilo.linear_sync_source', 'linear', true)`)
+    await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${linearId.data}, 0))`)
     const [sameId] = await tx.select().from(issues).where(and(eq(issues.id, linearId.data), eq(issues.userId, team.ownerId))).for('update').limit(1)
     if (sameId) {
