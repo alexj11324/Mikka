@@ -163,6 +163,8 @@ jobs:
           MIGRATION_BOOTSTRAP_CI: '1'
       - name: Factory state and API isolation (temporary Postgres 17 only)
         run: pnpm test:factory
+        env:
+          FACTORY_MONITOR_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       - name: Group conversation API and migrations (temporary Postgres 17 only)
         run: pnpm test:groups
       - run: pnpm test:e2e:setup

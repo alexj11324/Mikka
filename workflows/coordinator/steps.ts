@@ -17,7 +17,7 @@ import { tiptapToText } from '@/lib/tiptap-text'
 import { FactoryError, type FactoryBinding, type FactoryRoute } from '@/lib/factory/contract'
 import type { FactoryDispatchInput } from '@/lib/factory/dispatch'
 import { factoryEventId } from '@/lib/factory/event-id'
-import { dispatchFactoryRun, factoryStore, reconcileFactoryRuns } from '@/lib/factory/server'
+import { dispatchFactoryRun, factoryMonitor, factoryStore, reconcileFactoryRuns } from '@/lib/factory/server'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -62,6 +62,7 @@ export async function appendMessages(userId: string, holder: string, messages: M
 export async function preparePrompt(userId: string): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
   await reconcileFactoryRuns(userId)
+  await factoryMonitor.reconcile(userId)
   let { summary, memory, messages } = await store.loadConversation(userId)
   const cut = compactionCut(summary, messages)
   if (cut !== null) {
