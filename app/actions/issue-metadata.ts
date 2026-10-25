@@ -11,6 +11,7 @@ import { listProjects } from '@/app/actions/projects'
 import { issueView } from '@/lib/task-identifier-server'
 import { assigneeSchema, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
+import { activityActor } from '@/lib/activity-actor'
 
 const patchSchema = z.object({
   assignee: assigneeSchema.pick({ kind: true, id: true }).nullable().optional(),
@@ -82,7 +83,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         next.pullRequests = [...new Map(next.pullRequests.map(pr => [pr.url.replace(/\/$/, ''), { ...pr, url: pr.url.replace(/\/$/, '') }])).values()]
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, next), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId), eq(issues.revision, latest.revision))).returning()
         if (!saved) return { error: 'issueOutdated' }
-        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
+        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
         return { issue: await issueView(saved, tx) }
       })
       if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
