@@ -21,6 +21,8 @@ export interface JournalEntry {
   error: string | null
   /** Set once the run reached a terminal state. */
   stopReason?: StopReason
+  /** Fail closed on a crash in the external session-message delivery window. */
+  questionResumeState?: "starting" | "accepted"
   updatedAt: string
 }
 
@@ -28,8 +30,7 @@ export class RunJournal {
   private entries: Record<string, JournalEntry>
 
   constructor(private readonly file: string) {
-    const raw = readJson(file) as
-      | { runs?: Record<string, JournalEntry> }
+    const raw = readJson(file) as { runs?: Record<string, JournalEntry> }
       | undefined
     this.entries = raw?.runs ?? {}
   }

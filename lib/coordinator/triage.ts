@@ -27,6 +27,7 @@ export function ruleTier(event: TriageEvent): CoordinatorEventTier | null {
     // An agent that asks or is stuck waits on the person.
     case 'run_question':
     case 'run_blocked':
+      if (event.payload.questionId && !event.payload.needsUser) return 'result'
       return 'attention'
     // A progress note is background unless the decision model sees something in it.
     case 'run_report':
