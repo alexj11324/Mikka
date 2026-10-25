@@ -89,12 +89,12 @@ jobs:
           WRANGLER_SEND_METRICS: 'false'
           WRANGLER_LOG: error
         run: |
-          pnpm exec wrangler deploy --dry-run --config cloudflare/linear-sync/wrangler.jsonc --outdir "$PWD/worker-build"
-          node scripts/ci/worker-build-receipt.mjs
+          pnpm exec wrangler deploy --dry-run --config cloudflare/linear-sync/wrangler.jsonc --outdir "$RUNNER_TEMP/mikka-worker-build"
+          node scripts/ci/worker-build-receipt.mjs "$RUNNER_TEMP/mikka-worker-build"
       - uses: actions/upload-artifact@v4
         with:
           name: cloudflare-worker-build-${{ github.sha }}
-          path: worker-build/receipt.json
+          path: ${{ runner.temp }}/mikka-worker-build/receipt.json
           if-no-files-found: error
       - run: pnpm test:coordinator-events
       - run: pnpm test:auth-composio
