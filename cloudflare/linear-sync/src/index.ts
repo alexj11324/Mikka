@@ -114,9 +114,8 @@ export async function handleRequest(request: Request, env: Env, ctx: WorkerConte
   return new Response(null, { status: 404 })
 }
 
-export default {
-  fetch: handleRequest,
-  scheduled(controller: WorkerSchedule, env: Env, ctx: WorkerContext) {
+export function createScheduledHandler(loadRuntime = loadSyncRuntime) {
+  return function scheduled(controller: WorkerSchedule, env: Env, ctx: WorkerContext) {
     if (controller.cron === '* * * * *') {
       // Rejections remain visible to the scheduler. Next tick retries durable
       // tombstones; never log provider responses or follow redirects with auth.
@@ -124,8 +123,10 @@ export default {
       return
     }
     if (!env.CRON_SECRET || !syncConfigured(env)) return
-    ctx.waitUntil(loadSyncRuntime(env).then(runtime => withRequestDatabase(runtime, env.HYPERDRIVE!.connectionString, () => runtime.processLinearSyncBatch())).catch(() => {
+    ctx.waitUntil(loadRuntime(env).then(runtime => withRequestDatabase(runtime, env.HYPERDRIVE!.connectionString, () => runtime.processLinearSyncBatch())).catch(() => {
       console.error('Linear sync scheduled batch failed')
     }))
-  },
+  }
 }
+
+export default { fetch: handleRequest, scheduled: createScheduledHandler() }

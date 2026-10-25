@@ -84,6 +84,18 @@ jobs:
       - run: pnpm i18n:check
       - run: pnpm test:ssh-target
       - run: pnpm test:linear-sync
+      - name: Build Cloudflare Worker without deployment credentials
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+          WRANGLER_LOG: error
+        run: |
+          pnpm exec wrangler deploy --dry-run --config cloudflare/linear-sync/wrangler.jsonc --outdir worker-build
+          node scripts/ci/worker-build-receipt.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-worker-build-${{ github.sha }}
+          path: worker-build/receipt.json
+          if-no-files-found: error
       - run: pnpm test:coordinator-events
       - run: pnpm test:auth-composio
       - run: pnpm test:groups

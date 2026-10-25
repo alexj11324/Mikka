@@ -68,3 +68,53 @@ test('scheduled minute dispatch is opt-in and daily Linear path is not redirecte
     assert.equal(requests, 1)
   } finally { globalThis.fetch = previous }
 })
+
+test('fully configured daily schedule enters the original batch runtime; minute never loads Linear', async () => {
+  const { createScheduledHandler } = await import('./index')
+  const configured = {
+    CRON_SECRET: 'synthetic-test-only', HYPERDRIVE: { connectionString: 'postgresql://fixture@127.0.0.1/fixture_e2e' },
+    LINEAR_CLIENT_ID: 'synthetic-client', LINEAR_CLIENT_SECRET: 'synthetic-secret',
+    LINEAR_TOKEN_ENCRYPTION_KEY: '0'.repeat(64), CREDENTIAL_CLEANUP_ENABLED: '1',
+  }
+  const calls: string[] = []
+  const pending: Promise<unknown>[] = []
+  const ctx = { waitUntil(promise: Promise<unknown>) { pending.push(promise) } }
+  type Runtime = Awaited<ReturnType<NonNullable<Parameters<typeof createScheduledHandler>[0]>>>
+  // Controlled runtime, not a live Linear or PostgreSQL acceptance claim.
+  // The production scheduler and scope lifecycle are exercised unchanged.
+  const runtime = {
+    createRequestDatabaseScope(url: string) {
+      assert.equal(url, configured.HYPERDRIVE.connectionString)
+      calls.push('scope')
+      return {
+        async run(callback: () => unknown) { calls.push('enter'); return callback() },
+        async close() { calls.push('close') },
+      }
+    },
+    async processLinearSyncBatch() { calls.push('batch'); return { processed: 1 } },
+  } as unknown as Runtime
+  const scheduled = createScheduledHandler(async env => {
+    assert.equal(env, configured)
+    calls.push('load')
+    return runtime
+  })
+  const previous = globalThis.fetch
+  globalThis.fetch = async url => {
+    assert.equal(url, CLEANUP_ENDPOINT)
+    calls.push('cleanup')
+    return Response.json({ checked: 0 })
+  }
+  try {
+    scheduled({ cron: '0 4 * * *' }, configured, ctx)
+    await Promise.all(pending.splice(0))
+    assert.deepEqual(calls, ['load', 'scope', 'enter', 'batch', 'close'])
+    calls.length = 0
+    scheduled({ cron: '* * * * *' }, configured, ctx)
+    await Promise.all(pending.splice(0))
+    assert.deepEqual(calls, ['cleanup'])
+    calls.length = 0
+    scheduled({ cron: '* * * * *' }, { ...configured, CREDENTIAL_CLEANUP_ENABLED: '0' }, ctx)
+    assert.equal(pending.length, 0)
+    assert.deepEqual(calls, [])
+  } finally { globalThis.fetch = previous }
+})
