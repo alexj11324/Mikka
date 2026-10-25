@@ -193,7 +193,6 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
         onSelect={onSelect}
         onReset={onReset}
         onDemo={onDemo}
-        onSuggestion={prompt => { updateDraft(prompt); inputRef.current?.focus() }}
         composer={<AgentComposer ref={inputRef} isEmpty={!question} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} />}
       />
     </ComputerConversation></AgentInteractionContext>
