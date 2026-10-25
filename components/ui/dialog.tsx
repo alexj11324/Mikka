@@ -45,15 +45,18 @@ function DialogContent({
   children,
   showCloseButton = true,
   closeLabel,
+  overlay = "blur",
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
   closeLabel?: string
+  /** "dim" darkens the page without blurring it (⌘K, Figma 56:8). */
+  overlay?: "blur" | "dim"
 }) {
   const t = useTranslations('Common')
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay className={cn(overlay === "dim" && "bg-black/40 supports-backdrop-filter:backdrop-blur-none")} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
