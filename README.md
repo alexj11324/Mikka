@@ -29,22 +29,6 @@ review the result.
 - **Work from other tools.** Drive Mikka from Claude Code or Codex through its
   MCP server, or create tasks from Telegram.
 
-## How it works
-
-- **Bots are long-running and cheap to keep around.** Each bot runs on
-  Mikka's own agent runtime, built on the Vercel AI SDK and durable workflows.
-  A bot sleeps while nothing is happening and wakes when you write to it, a
-  task changes, or an agent reports back.
-- **Real coding agents do the work.** Mikka does not reimplement Claude Code or
-  Codex. A small daemon starts the official command line tools on the chosen
-  machine, signed in with your own account, and streams what they do back into
-  the task's thread.
-- **One record of everything.** Chats, tasks, runs and their events live in one
-  Postgres database, so the board, the threads, Linear sync and the MCP server
-  all read the same state.
-- **Agents act as you, with your permissions.** Tools reached over MCP go
-  through the same checks as the app itself.
-
 ## Get started
 
 Mikka is in early access. Email
