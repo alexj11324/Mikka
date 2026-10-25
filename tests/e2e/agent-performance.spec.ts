@@ -64,6 +64,8 @@ async function assertInteractiveWithinBudget(page: Page, info: TestInfo, name: s
 
 test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 秒 @performance', async ({ page }, info) => {
   const { email } = await register(page)
+  // The page register lands on loads its own history; let that finish so it isn't counted after the reload.
+  await page.waitForLoadState('networkidle')
   const { older } = await seedHistory(page, email)
   const { historyRequests, cdp } = await observeNewDocumentHistory(page, app('/api/agent/sessions'))
   await page.reload()

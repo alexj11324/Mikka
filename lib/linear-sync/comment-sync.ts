@@ -127,7 +127,7 @@ export async function applyLinearCommentToApp(input: {
   const body = linearMarkdownToPlainText(input.body)
   if (body.length > 2000) throw new Error('Linear comment is larger than Mikka supports')
   await db.transaction(async tx => {
-    await tx.execute(sql`select set_config('orvilo.linear_sync_source', 'linear', true)`)
+    await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
     const [latestIssue] = await tx.select({ updatedAt: issues.updatedAt }).from(issues).where(eq(issues.id, input.issue.id)).for('update').limit(1)
     const [currentLink] = await tx.select({ appSyncedAt: linearIssueLinks.appSyncedAt }).from(linearIssueLinks).where(eq(linearIssueLinks.id, input.issueLink.id)).for('update').limit(1)
     if (!latestIssue || !currentLink) return
