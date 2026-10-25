@@ -105,6 +105,10 @@ export const agentComponentCatalog = {
     description: '内联网页来源，例如 pull request 或文档。url 为 http(s) 地址，label 为简短名称，可选；悬停显示网页预览。放在 InlineText 的 parts 里。',
     props: z.object({ url: z.string().url().max(2000).refine(value => /^https?:\/\//i.test(value)), label: z.string().min(1).max(80).optional() }),
   },
+  ComputerCard: {
+    description: '电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。botId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working；thread 可选，是这次运行（线程）的名字，例如「#66 预览部署检查」，不是 bot 名。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。',
+    props: z.object({ botId: z.string().min(1).max(80), runId: z.string().min(1).max(80), task: z.string().min(1).max(200), state: z.enum(['working', 'approval', 'done', 'failed']).optional(), botName: z.string().min(1).max(80).optional(), thread: z.string().min(1).max(80).optional() }),
+  },
   ShadcnCard: {
     description: '本地 shadcn 卡片。用于有标题的建议、说明或内容分组，可嵌套已注册组件。',
     props: z.object({ title: text, children, description: text.optional() }),
@@ -161,7 +165,7 @@ export const agentComponentGroups: { name: string; components: AgentComponentNam
   { name: '审批与问题', components: ['BeApproval', 'BeQuestions'], notes: ['Confirmation → ApprovalCard；选择问题复用 ApprovalCard 提问模式。在回答区直接提交并继续对话，不执行工具、不持久保存审批。ToolApproval 已安装但仅供未来真实工具授权流程使用，不开放给模型伪造授权。'] },
   { name: '任务与进度', components: ['BeTodoList', 'BeStat', 'ShadcnProgress'], notes: ['Plan/Task → TodoList；Loader/Shimmer → AgentProgress、ReasoningText、ThinkingShimmer，由宿主根据请求状态控制。建议计划保持待开始；数字只能来自用户输入。'] },
   { name: '图标状态与操作', components: ['AgentIcon', 'BeBadge', 'BeButton', 'BeFollowUps'], notes: ['Lucide 提供图标；beUI AnimatedBadge 提供动态状态图标；Button 提供操作反馈。不得用动态图标伪造执行结果。'] },
-  { name: '任务与来源引用', components: ['InlineText', 'TaskChip', 'RunChip', 'SourceChip'], notes: ['引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。'] },
+  { name: '任务与来源引用', components: ['InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'ComputerCard'], notes: ['引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。', 'Agent 用自己的电脑做事时放一张 ComputerCard，画面、状态和审批都在卡片里，正文不再复述操作过程。'] },
   { name: '本地内容与兼容组件', components: ['TextContent', 'BeCodeBlock', 'BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame'], notes: ['复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock 用于代码回复；FileDiff、ToolResult、AgentActivity、Citations、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不自动生成虚构工具记录。'] },
 ]
 

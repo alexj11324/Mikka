@@ -57,9 +57,9 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
             {pending ? <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" /> : <Google className="size-4" />}
             {t('continueGoogle')}
           </Button>
-          <p className="text-muted-foreground text-xs leading-5">{googleEnabled ? t('googleScope') : t('googleNotConfigured')}</p>
+          {!googleEnabled && <p className="text-muted-foreground text-xs leading-5">{t('googleNotConfigured')}</p>}
           {showGoogleLinkHint && <p className="text-muted-foreground text-xs leading-5">{t('googleLinkHint')}</p>}
-          {googleCallbackURL && <details className="text-muted-foreground text-xs"><summary className="cursor-pointer">{t('viewGoogleCallback')}</summary><code className="mt-2 block break-all select-all">{googleCallbackURL}</code></details>}
+          {!googleEnabled && googleCallbackURL && <details className="text-muted-foreground text-xs"><summary className="cursor-pointer">{t('viewGoogleCallback')}</summary><code className="mt-2 block break-all select-all">{googleCallbackURL}</code></details>}
           <Button type="button" variant="outline" className="w-full justify-center px-4" disabled={pending || !githubEnabled} onClick={onGitHubSignIn}>
             {pending ? <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" /> : <>
               <span aria-hidden="true" className="dark:hidden"><GithubLight className="size-4" /></span>
@@ -67,7 +67,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
             </>}
             {t('continueGithub')}
           </Button>
-          <p className="text-muted-foreground text-xs leading-5">{githubEnabled ? t('githubScope') : t('githubNotConfigured')}</p>
+          {!githubEnabled && <p className="text-muted-foreground text-xs leading-5">{t('githubNotConfigured')}</p>}
           {!githubEnabled && githubCallbackURL && <details className="text-muted-foreground text-xs"><summary className="cursor-pointer">{t('viewCallback')}</summary><code className="mt-2 block break-all select-all">{githubCallbackURL}</code></details>}
           {notice && <p role="status" className="text-xs leading-5">{notice}</p>}
         </div>

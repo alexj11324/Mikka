@@ -32,7 +32,7 @@ export function safeAuthReturn(value?: string) {
   if (url.pathname === '/settings') {
     const section = url.searchParams.get('section')
     return hasOnlyQueryKeys(url, ['section', 'workspace']) &&
-      (section === null || ['preferences', 'profile', 'account', 'workspace', 'integrations'].includes(section)) &&
+      (section === null || ['preferences', 'profile', 'account', 'workspace', 'integrations', 'devices'].includes(section)) &&
       optionalUuid(url, 'workspace') ? `${url.pathname}${url.search}` : '/'
   }
 
