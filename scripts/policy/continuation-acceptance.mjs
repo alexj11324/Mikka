@@ -29,7 +29,7 @@ export async function continuationPolicyAcceptance({app,workspace,owner,userId,d
   assert.equal(response.status,403);assert.equal(response.body.error,'policyScopeMismatch')
   assert.equal((await app.query(`SELECT status FROM agent_runs WHERE id=$1`,[child])).rows[0].status,'queued')
   assert.equal((await app.query(`SELECT count(*)::int count FROM run_tokens WHERE "runId"=$1`,[child])).rows[0].count,0)
-  receipts.push({utc:new Date().toISOString(),probe:'ordinary continuation moved A to unmanaged B cannot bypass captured A policy',status:response.status,expected:'policyScopeMismatch'})
+  Object.assign(receipts.at(-1),{probe:'ordinary continuation moved A to unmanaged B cannot bypass captured A policy',expected:'policyScopeMismatch'})
   const historical=randomUUID(), retry=randomUUID(), question=randomUUID()
   // Old ordinary runs without a trusted organization capture can legitimately
   // have personal projections. Neither resume representation proves that past.
