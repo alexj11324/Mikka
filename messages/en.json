@@ -1469,7 +1469,7 @@
     },
     "linear": {
       "title": "Linear",
-      "description": "Connect a Linear account to sync issues and comments with Orvilo.",
+      "description": "Connect a Linear account to sync issues and comments with Mikka.",
       "connected": "Connected",
       "connectedTo": "Connected to {organization}",
       "connect": "Connect Linear",
@@ -1489,7 +1489,7 @@
       "retry": "Retry sync",
       "loadError": "Could not load Linear settings.",
       "operationError": "The Linear sync action failed. Try again.",
-      "teamAlreadyLinked": "This Linear team is already connected to another Orvilo account."
+      "teamAlreadyLinked": "This Linear team is already connected to another Mikka account."
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",

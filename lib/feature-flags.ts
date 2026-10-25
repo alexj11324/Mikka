@@ -1,8 +1,8 @@
 export const upcomingFeatures = {
-  product: { key: 'orvilo-upcoming-product-features', implemented: false },
-  integrations: { key: 'orvilo-upcoming-integrations', implemented: false },
-  administration: { key: 'orvilo-upcoming-administration', implemented: false },
-  teamSettings: { key: 'orvilo-upcoming-team-settings', implemented: false },
+  product: { key: 'mikka-upcoming-product-features', implemented: false },
+  integrations: { key: 'mikka-upcoming-integrations', implemented: false },
+  administration: { key: 'mikka-upcoming-administration', implemented: false },
+  teamSettings: { key: 'mikka-upcoming-team-settings', implemented: false },
 } satisfies Record<string, { key: string; implemented: boolean }>
 
 export type UpcomingFeature = keyof typeof upcomingFeatures
