@@ -1,6 +1,6 @@
 import 'server-only'
 import { after } from 'next/server'
-import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, agents, deviceRepos, devices, runCheckpoints } from '@/lib/db/schema'
@@ -26,7 +26,12 @@ export async function renewRunLeases(deviceId: string, runIds: readonly string[]
   const leaseExpiresAt = new Date(now.getTime() + RUN_LEASE_MS)
   const renewed = await db.update(agentRuns)
     .set({ leaseExpiresAt, updatedAt: now })
-    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, [...runIds]), inArray(agentRuns.status, [...LEASED_RUN_STATUSES])))
+    // Group claims belong to the dedicated epoch-bound worker protocol. A
+    // generic device heartbeat must neither extend those claims nor resurrect
+    // an ordinary attempt whose lease expired while waiting for this row lock.
+    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, [...runIds]),
+      inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), ne(agentRuns.kind, 'group_review'),
+      isNull(agentRuns.stopRequestedAt), gt(agentRuns.leaseExpiresAt, sql`clock_timestamp()`)))
     .returning({ id: agentRuns.id })
   const held = new Set(renewed.map(run => run.id))
   const revoked = runIds.filter(id => !held.has(id))
