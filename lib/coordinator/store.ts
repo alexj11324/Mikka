@@ -1,11 +1,12 @@
+import { coordinatorInbox } from './inbox-runtime'
+import type { WakeDelivery } from './inbox-receipts'
 import 'server-only'
-import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
-import type { ActionContext, ActionBatch } from '../operations/action-intents'
+import { and, asc, desc, eq, gt, inArray, isNull, ne, or } from 'drizzle-orm'
+import type { ActionContext } from '../operations/action-intents'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
 import { agentRuns, agents, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, type CoordinatorEventTier } from '@/lib/db/schema'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
-import { eventsForInbox } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
@@ -14,22 +15,12 @@ import { taskIdentifiers } from '@/lib/task-identifier-server'
 // inbox into the conversation, answers, and lets go; a wake that finds the
 // lease taken leaves its events for the turn that holds it.
 
-/** How long a turn may hold the lease before another wake may take over. */
-const LEASE_MS = 10 * 60_000
 /** Inbox events moved into the conversation per take. */
 const INBOX_BATCH = 50
 
-type Executor = Pick<typeof db, 'select' | 'insert'>
-
-async function nextPosition(executor: Executor, userId: string): Promise<number> {
-  const [row] = await executor.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })
-    .from(coordinatorMessages).where(eq(coordinatorMessages.userId, userId))
-  return Number(row?.last ?? 0) + 1
-}
-
 /** Undelivered events that should start a turn; issue_done is background even before triage. */
 function waking(userId: string) {
-  return and(eq(coordinatorEvents.userId, userId), or(isNull(coordinatorEvents.deliveredAt), sql`${coordinatorEvents.accountActionBatch}->>'closed' = 'false'`), ne(coordinatorEvents.kind, 'issue_done'), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background')))
+  return and(eq(coordinatorEvents.userId, userId), and(isNull(coordinatorEvents.processedAt), inArray(coordinatorEvents.wakeStatus, ['pending','running'])), ne(coordinatorEvents.kind, 'issue_done'), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background')))
 }
 
 /** Whether any undelivered event should start a turn. */
@@ -44,38 +35,8 @@ export async function hasWakingEvents(userId: string): Promise<boolean> {
  * but do not count: with nothing else waiting, nothing moves. `held` is false
  * when another turn holds the lease; that turn will pick the events up.
  */
-export async function takeInbox(userId: string, holder: string): Promise<{ held: boolean; added: number; actionContext?: ActionContext }> {
-  return db.transaction(async tx => {
-    const now = new Date()
-    await tx.insert(coordinatorSessions).values({ userId }).onConflictDoNothing()
-    const [taken] = await tx.update(coordinatorSessions)
-      .set({ leaseHolder: holder, leaseUntil: new Date(now.getTime() + LEASE_MS), updatedAt: now })
-      .where(and(eq(coordinatorSessions.userId, userId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
-      .returning({ userId: coordinatorSessions.userId })
-    if (!taken) return { held: false, added: 0 }
-    const due = await tx.select().from(coordinatorEvents).where(waking(userId))
-      .orderBy(asc(coordinatorEvents.sequence)).limit(1)
-    if (!due.length) return { held: true, added: 0 }
-    const backgroundLimit = INBOX_BATCH - due.length
-    const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
-      .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
-      .orderBy(asc(coordinatorEvents.sequence)).limit(backgroundLimit) : []
-    const events = eventsForInbox(due, background, INBOX_BATCH)
-    if (!events.length) return { held: true, added: 0 }
-    const source = due[0]
-    const actionContext = source.kind === 'user_message' ? { sourceEventId: source.id, holder } : undefined
-    if (actionContext && (!source.accountActionBatch || !source.accountActionBatch.batches.length)) {
-      await tx.update(coordinatorEvents).set({ accountActionBatch: { holder, closed: false, batches: [] } satisfies ActionBatch }).where(eq(coordinatorEvents.id, source.id))
-    }
-    const first = await nextPosition(tx, userId)
-    const undelivered = events.filter(event => !event.deliveredAt)
-    if (undelivered.length) await tx.insert(coordinatorMessages).values(undelivered.map((event, index) => ({
-      id: crypto.randomUUID(), userId, position: first + index,
-      message: { role: 'user', content: eventPrompt(event) } satisfies ModelMessage,
-    })))
-    await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
-    return { held: true, added: events.length, actionContext }
-  })
+export async function takeInbox(userId: string, holder: string, delivery?: WakeDelivery) {
+  return coordinatorInbox().take(userId, holder, delivery)
 }
 
 /** Lets go of the lease. Returns whether events that need a turn arrived meanwhile, so the caller can take them. */
@@ -97,30 +58,25 @@ export async function setEventTier(id: string, tier: CoordinatorEventTier): Prom
 }
 
 /**
- * Appends the turn's new messages and renews the lease. `warning` says why the
+ * Checkpoints the result, then atomically publishes it and acknowledges its event. `warning` says why the
  * reply may be cut short; it shows in the chat until a turn ends cleanly.
  */
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, actionContext?: ActionContext): Promise<void> {
-  await db.transaction(async tx => {
-    const lease = await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "leaseHolder"=${holder} AND "leaseUntil">clock_timestamp() FOR UPDATE`)
-    if (!lease.rows.length) throw new Error('accountActionLeaseLost')
-    if (actionContext) await tx.execute(sql`UPDATE coordinator_events SET "accountActionBatch"=jsonb_set("accountActionBatch",'{closed}','true') WHERE id=${actionContext.sourceEventId} AND "userId"=${userId}`)
-    if (messages.length) {
-      const first = await nextPosition(tx, userId)
-      await tx.insert(coordinatorMessages).values(messages.map((message, index) => ({
-        id: crypto.randomUUID(), userId, position: first + index, message: message as unknown as Record<string, unknown>,
-      })))
-    }
-    const now = new Date()
-    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning, lastErrorAt: warning ? now : null, updatedAt: now })
-      .where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.leaseHolder, holder)))
-  })
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, actionContext?: ActionContext, delivery?: WakeDelivery): Promise<void> {
+  const inbox=coordinatorInbox()
+  const id=delivery?.eventId??actionContext?.sourceEventId??await inbox.active(userId)
+  if(!id)throw new Error('wakeReceiptRequired')
+  const event=await inbox.read(userId,id)
+  const token=delivery?.token??event.wake_delivery_token
+  if(!token)throw new Error('wakeReceiptRequired')
+  await inbox.acknowledge(userId,holder,{eventId:id,token},messages,warning)
 }
 
-/** Records why a turn failed and lets go of the lease. */
-export async function failTurn(userId: string, holder: string, error: string): Promise<void> {
-  await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, lastError: error.slice(0, 1000), lastErrorAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.leaseHolder, holder)))
+/** An unacknowledged staged input remains in the durable retry set. */
+export async function failTurn(userId: string, holder: string, _error: string, delivery?: WakeDelivery): Promise<void> {
+  const inbox=coordinatorInbox(),id=delivery?.eventId??await inbox.active(userId)
+  if(!id)return
+  const event=await inbox.read(userId,id),token=delivery?.token??event.wake_delivery_token
+  if(token)await inbox.fail(userId,holder,{eventId:id,token})
 }
 
 /** The summary so far, the memory, and every message after the summary, oldest first. */
@@ -199,10 +155,10 @@ export async function chatView(userId: string, limit = 200): Promise<ChatView> {
     .orderBy(desc(coordinatorMessages.position)).limit(limit)
   // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.
   const waiting = await db.select().from(coordinatorEvents)
-    .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt)))
+    .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.processedAt), inArray(coordinatorEvents.wakeStatus, ['pending','running'])))
     .orderBy(asc(coordinatorEvents.sequence)).limit(INBOX_BATCH)
   const last = rows[0]?.position ?? 0
-  const pending = waiting.filter(event => event.kind === 'user_message').map((event, index) => ({
+  const pending = waiting.filter(event => event.kind === 'user_message' && !event.deliveredAt).map((event, index) => ({
     position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage,
   }))
   const leased = Boolean(session?.leaseUntil && session.leaseUntil.getTime() > Date.now())

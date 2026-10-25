@@ -32,7 +32,11 @@ test('trusted submission -> durable batch -> new workflow -> run retry -> daemon
   process.env.MIKKA_DATABASE_URL = url.toString(); process.env.DATABASE_URL = url.toString(); process.env.CI = 'true'; process.env.BETTER_AUTH_URL = 'http://127.0.0.1:3000'; process.env.BETTER_AUTH_SECRET = randomUUID() + randomUUID()
   const hooks = registerHooks({ resolve(specifier, context, next) { return specifier === 'server-only' ? { url: 'data:text/javascript,export{}', shortCircuit: true } : next(specifier, context) } })
   const database = await import('../db/request-scope'), scope = database.createRequestDatabaseScope(url.toString())
-  const { recordUserSubmission } = await import('../coordinator-event-store')
+  const submissions = await import('../coordinator-event-store')
+  const recordUserSubmission: typeof submissions.recordUserSubmission = async (owner, ...args) => {
+    await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now()) ON CONFLICT DO NOTHING', [owner, `${owner}@example.invalid`])
+    return submissions.recordUserSubmission(owner, ...args)
+  }
   const store = await import('../coordinator/store')
   const runtime = await import('./action-intent-runtime'), calendar = await import('./calendar-runtime')
   const worker = await import('../mcp/worker'), route = await import('../../app/api/worker/account-actions/route')

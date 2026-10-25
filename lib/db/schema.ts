@@ -271,6 +271,8 @@ export const coordinatorEvents = pgTable('coordinator_events', {
   payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
   /** Null until triaged; an untriaged event wakes the Coordinator. */
   tier: text('tier').$type<CoordinatorEventTier>(),
+  wakeStatus: text('wake_status').notNull().default('pending'),
+  processedAt: timestamp('processed_at', { withTimezone: true }),
   accountActionBatch: jsonb('accountActionBatch').$type<import('../operations/action-intents').ActionBatch | null>(),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),

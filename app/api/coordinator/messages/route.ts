@@ -1,3 +1,8 @@
+import { cookies } from 'next/headers'
+import { scheduleOriginAllowed } from '@/lib/schedules/http'
+import { appOrigin } from '@/lib/mcp/resource'
+import { workspaceDb } from '@/lib/workspace-db'
+import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { after, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
@@ -23,24 +28,22 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   // A browser message can attest a human answer. Validate its origin and
   // current session before persisting that authority in an inbox event.
-  if (!request.headers.has('authorization') && request.headers.get('cookie')) {
-    try {
-      if (new URL(request.headers.get('origin') ?? '').origin !== new URL(request.url).origin)
-        return NextResponse.json({ error: 'originRejected' }, { status: 403 })
-    } catch {
-      return NextResponse.json({ error: 'originRejected' }, { status: 403 })
-    }
-  }
+  if(!scheduleOriginAllowed(request,appOrigin))return NextResponse.json({error:'originRejected'},{status:403})
   const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
   const parsed = z.object({ text: z.string().trim().min(1).max(10_000),
-      questionId: z.uuid().optional(), submissionId: z.uuid().optional(), }).safeParse(await request.json().catch(() => null))
+      workspaceId: z.uuid().optional(), questionId: z.uuid().optional(), submissionId: z.uuid().optional(), }).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'messageRequired' }, { status: 400 })
   const userId = session.user.id
+  const selected = parsed.data.workspaceId ?? (await cookies()).get('mikka-workspace')?.value
+  if(selected&&!z.uuid().safeParse(selected).success)return NextResponse.json({error:'workspaceAccessDenied'},{status:403})
+  const workspaceId = selected
+  if(workspaceId){try{await workspaceDb.transaction(tx=>requireWorkspace(tx,workspaceId,userId))}catch(error){if(error instanceof WorkspaceError)return NextResponse.json({error:'workspaceAccessDenied'},{status:403});throw error}}
   let submission: { sourceEventId: string; replayed: boolean }
   try {
     submission = await recordUserSubmission(userId, parsed.data.text, parsed.data.submissionId, {
       ...(!request.headers.has('authorization') && request.headers.get('cookie') ? { humanSessionId: session.session.id } : {}),
+      ...(workspaceId ? {workspaceId} : {}),
       ...(parsed.data.questionId ? { questionId: parsed.data.questionId } : {}),
     })
   } catch (error) {

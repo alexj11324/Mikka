@@ -1,3 +1,4 @@
+import type { WakeDelivery } from '@/lib/coordinator/inbox-receipts'
 import { scheduleTools } from '@/lib/schedules/tools'
 import { WorkflowAgent } from '@ai-sdk/workflow'
 import { isStepCount, tool } from 'ai'
@@ -18,47 +19,42 @@ import { commandSchema } from '@/lib/self-improvement/contract'
 import { createCredentialAITools } from '@/lib/credentials/ai-tools'
 import { mailboxAck, mailboxSend } from '@/lib/mailbox-tools'
 
-/** Rounds of inbox per run; later events wait for the next wake. */
-const MAX_ROUNDS = 10
-
-/**
- * One wake of a person's Coordinator. Takes the lease, answers everything in
- * the inbox, and keeps going while new events arrive. A second wake that finds
- * the lease held exits at once, since the holder drains the inbox before it
- * lets go.
- */
-export async function coordinatorTurn(userId: string) {
+/** One fenced event per durable run. The shared dispatcher starts its successor;
+ * an accepted transport start never substitutes for the atomic consumption ACK. */
+export async function coordinatorTurn(userId: string, delivery: WakeDelivery) {
   'use workflow'
   const holder = getWorkflowMetadata().workflowRunId
-  for (let round = 0; round < MAX_ROUNDS; round++) {
-    const inbox = await steps.takeInbox(userId, holder)
-    if (!inbox.held) return
-    if (!inbox.added) {
-      if (await steps.releaseLease(userId, holder)) continue
-      return
-    }
-    try {
+  const inbox = await steps.takeInbox(userId, holder, delivery)
+  if (!inbox.held || !inbox.added) return
+  try {
+    if(inbox.hasCheckpoint){
+      const checkpoint=await steps.wakeCheckpoint(userId,delivery)
+      if(!checkpoint)throw new Error('wakeCheckpointRequired')
+      await steps.appendMessages(userId,holder,checkpoint.messages,checkpoint.warning,inbox.actionContext,delivery)
+    }else if(inbox.notifyOnly){
+      await steps.appendMessages(userId,holder,[{role:'assistant',content:'The run is stopped; it has not been resumed. '+inbox.notification}],null,undefined,delivery)
+    }else{
+      await steps.assertWakeCurrent(userId,holder,delivery)
       const recovered = inbox.actionContext ? await steps.recoverAccountActions(userId, inbox.actionContext) : []
-      const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, tools: coordinatorTools(userId, inbox.actionContext) })
+      const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, tools: coordinatorTools(userId,inbox.actionContext,holder,delivery,inbox.recovery) })
+      // Fence the compaction model as well as the agent model before either sends.
+      const generation=await steps.beginWakeGeneration(userId,holder,delivery)
+      if(!generation.generate)return
       const { instructions, messages } = await steps.preparePrompt(userId)
       messages.push(...recovered)
-      const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep, })
-      // Every step's messages, not only the final step's: the tool calls and
-      // results are history the next turn needs.
-      await steps.appendMessages(userId, holder, [...recovered, ...result.responseMessages], turnWarning(result.finishReason, result.text), inbox.actionContext)
-    } catch (error) {
-      // The messages stay in the conversation; the next wake answers them.
-      await steps.failTurn(userId, holder, error instanceof Error ? error.message : String(error),)
-      throw error
+      const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep })
+      await steps.appendMessages(userId,holder,[...recovered,...result.responseMessages],turnWarning(result.finishReason,result.text),inbox.actionContext,delivery)
     }
+    await steps.continueInbox(userId)
+  }catch{
+    await steps.failTurn(userId,holder,'coordinatorTurnUnavailable',delivery)
   }
-  await steps.releaseLease(userId, holder)
 }
 
 /** The Coordinator's tools. Each one runs as a step scoped to the person. */
-function coordinatorTools(userId: string, context?: ActionContext) {
+function coordinatorTools(userId: string, context: ActionContext | undefined, holder: string, delivery: WakeDelivery, recovery = false) {
   const id = z.uuid()
-  return {
+  const tools = {
     ...scheduleTools(command => steps.scheduleCommand(userId, command, context)),
     ...createCredentialAITools((name, input) => steps.credentialTool(userId, name, input)),
     mailbox_recipients: tool({ description: 'Find authorized session mailbox addresses.', inputSchema: z.object({}), execute: () => steps.mailboxAction(userId, 'recipients') }),
@@ -204,4 +200,10 @@ function coordinatorTools(userId: string, context?: ActionContext) {
       execute: ( input) => steps.stopRun(userId, input),
     }),
   }
+  const readTools = new Set(['list_issues','get_issue','list_agents','list_factory_requests','get_factory_task','list_factory_questions','get_factory_question','list_runs','get_run','get_run_improvements','get_skill_improvement_factory','mailbox_recipients','mailbox_inbox','mailbox_sent','schedule_list','schedule_history','search_notion_pages','read_notion_page_blocks','search_slack_messages','read_slack_thread','search_gmail','list_calendar_events','get_calendar_event'])
+  return Object.fromEntries(Object.entries(tools).filter(([name])=>!recovery||readTools.has(name)).map(([name,value])=>[name,{...value,execute:async(...args:unknown[])=>{
+    await steps.assertWakeCurrent(userId,holder,delivery)
+    return (value.execute as (...input:unknown[])=>unknown)(...args)
+  }}]))
+
 }

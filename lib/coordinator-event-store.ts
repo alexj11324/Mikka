@@ -24,13 +24,13 @@ export async function markCoordinatorEventsDelivered(userId: string, ids: string
 
 /** Authenticated transport calls this. submissionId is identity, never authority.
  * Legacy callers omit it and create a new event for each accepted request. */
-export async function recordUserSubmission(userId: string, text: string, submissionId?: string, metadata: { questionId?: string; humanSessionId?: string } = {}) {
+export async function recordUserSubmission(userId: string, text: string, submissionId?: string, metadata: { questionId?: string; humanSessionId?: string; workspaceId?: string } = {}) {
   const { pool } = await import('./db')
   const { intentDigest } = await import('./operations/action-intents')
   const { OperationError } = await import('./operations/ledger')
   const { randomUUID } = await import('node:crypto')
   const key = `user_message:${userId}:${submissionId ?? randomUUID()}`
-  const fingerprint = intentDigest({ text, questionId: metadata.questionId ?? null })
+  const fingerprint = intentDigest({ text, questionId: metadata.questionId ?? null, ...(metadata.workspaceId ? { workspaceId: metadata.workspaceId } : {}) })
   const tx = await pool.connect()
   try {
     await tx.query('BEGIN')
@@ -41,7 +41,7 @@ export async function recordUserSubmission(userId: string, text: string, submiss
       await tx.query('COMMIT'); return { sourceEventId: old.id as string, replayed: true }
     }
     const id = randomUUID()
-    await tx.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$2,'user_message',$3,$4)`, [id, userId, key, { text, ...metadata, submissionDigest: fingerprint }])
+    await tx.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload,wake_workspace_id) VALUES ($1,$2,'user_message',$3,$4,$5)`, [id, userId, key, { text, ...metadata, submissionDigest: fingerprint }, metadata.workspaceId ?? null])
     await tx.query('COMMIT'); return { sourceEventId: id, replayed: false }
   } catch (error) { await tx.query('ROLLBACK'); throw error }
   finally { tx.release() }

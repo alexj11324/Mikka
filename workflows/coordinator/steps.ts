@@ -1,3 +1,5 @@
+import { coordinatorInbox } from '@/lib/coordinator/inbox-runtime'
+import type { WakeDelivery } from '@/lib/coordinator/inbox-receipts'
 import { executeScheduleCommand } from '@/lib/schedules/runtime'
 import { ScheduleError, SCHEDULE_INSTRUCTIONS, type Command } from '@/lib/schedules/contract'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -55,9 +57,9 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   }
 }
 
-export async function takeInbox(userId: string, holder: string) {
+export async function takeInbox(userId: string, holder: string, delivery?: WakeDelivery) {
   'use step'
-  return store.takeInbox(userId, holder)
+  return store.takeInbox(userId, holder, delivery)
 }
 
 export async function releaseLease(userId: string, holder: string) {
@@ -65,14 +67,14 @@ export async function releaseLease(userId: string, holder: string) {
   return store.releaseLease(userId, holder)
 }
 
-export async function failTurn(userId: string, holder: string, error: string) {
+export async function failTurn(userId: string, holder: string, error: string, delivery?: WakeDelivery) {
   'use step'
-  await store.failTurn(userId, holder, error)
+  await store.failTurn(userId, holder, error, delivery)
 }
 
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, actionContext?: ActionContext) {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, actionContext?: ActionContext, delivery?: WakeDelivery) {
   'use step'
-  await store.appendMessages(userId, holder, messages, warning, actionContext)
+  await store.appendMessages(userId, holder, messages, warning, actionContext, delivery)
 }
 
 /**
@@ -123,6 +125,7 @@ export async function composioAction(userId: string, action: ComposioActionName,
 
 export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, context?: ActionContext, options?: Pick<ToolExecutionOptions<unknown>, 'messages' | 'toolCallId'>) {
   'use step'
+  if(context?.recovery && action!=='create_calendar_event')return {error:'accountActionRecoveryRequiresReconciliation'}
   if (action === 'create_calendar_event') {
     if (!context || !options) return { error: 'accountActionSourceRequired' }
     try { return await proposeCalendarBatch(userId, context, options) }
@@ -397,4 +400,24 @@ export async function scheduleCommand(userId: string, command: Command, context?
   if (choices.length !== 1) return { error: 'scheduleExplicitWorkspaceRequired' }
   try { return await executeScheduleCommand({ ownerId: userId, workspaceId: choices[0].id, conversation: 'coordinator', sessionId: userId, sourceId: context?.sourceEventId ?? '' }, command) }
   catch (error) { if (error instanceof ScheduleError) return { error: error.code }; throw error }
+}
+
+export async function assertWakeCurrent(userId: string, holder: string, delivery: WakeDelivery) {
+  'use step'
+  await coordinatorInbox().assertCurrent(userId,holder,delivery)
+}
+
+export async function continueInbox(userId: string) {
+  'use step'
+  const { wakeCoordinator } = await import('@/lib/coordinator/wake')
+  await wakeCoordinator(userId)
+}
+
+export async function beginWakeGeneration(userId: string,holder: string,delivery: WakeDelivery) {
+  'use step'
+  return coordinatorInbox().beginGeneration(userId,holder,delivery)
+}
+export async function wakeCheckpoint(userId: string,delivery: WakeDelivery) {
+  'use step'
+  return coordinatorInbox().cached(userId,delivery)
 }

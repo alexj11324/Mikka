@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { once } from 'node:events'
-import { readFile } from 'node:fs/promises'
+import { orderMigrations } from '../../scripts/migration-order.mjs'
+import { readFile, readdir } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { registerHooks } from 'node:module'
 import test from 'node:test'
@@ -20,11 +21,10 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
   await admin.query(`CREATE SCHEMA ${schema}`)
   url.searchParams.set('options', `-c search_path=${schema}`)
   const pool = new Pool({ connectionString: url.toString() })
-  for (const name of ['20261023221259_application_baseline.sql', '0001_agents_devices.sql', '0007_coordinator_events.sql', '0011_coordinator_event_tier.sql', '0008_coordinator_sessions.sql', '0010_coordinator_session_error.sql', '0009_oauth_provider.sql', '20261025043000_pending_actions.sql', '20261025052001_operation_ledger.sql', '20261025060001_calendar_operation_binding.sql', '20261025070001_account_action_intents.sql', '20261025052031_session_mailboxes.sql']) {
-    await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
-  }
+  for (const name of orderMigrations((await readdir(new URL('../../drizzle/', import.meta.url))).filter(n => n.endsWith('.sql')))) await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
   await pool.query('CREATE RULE retain_test_sessions AS ON DELETE TO "session" DO INSTEAD NOTHING')
   process.env.MIKKA_DATABASE_URL = url.toString()
+  process.env.DATABASE_URL = url.toString()
   process.env.CI = 'true'
   process.env.BETTER_AUTH_URL = 'http://127.0.0.1:3000'
   process.env.BETTER_AUTH_SECRET = randomUUID() + randomUUID()
@@ -117,7 +117,7 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
   })
   for (const historicalInput of ['missing', 'null'] as const) await t.test(`lost provider response with historical ${historicalInput} input reconciles without resending`, async () => {
     const holder = randomUUID()
-    while ((await scope.run(() => inboxStore.takeInbox(owner, holder))).added) {}
+    for (;;) { const receipt = await scope.run(() => inboxStore.takeInbox(owner, holder)); if (!receipt.added) break; await scope.run(() => inboxStore.appendMessages(owner, holder, [], null, receipt.actionContext, receipt.delivery)) }
     const { actionId: id } = await propose(); loseResponse = true; const before = writes
     const first = await (await call('/decide', { id, approve: true })).json(); assert.equal(first.status, 'running')
     assert.ok((await scope.run(() => listPendingActions(owner))).some(row => row.id === id))
@@ -135,6 +135,7 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
     const text = (await pool.query('SELECT message FROM coordinator_messages WHERE "userId"=$1 ORDER BY position DESC LIMIT 1', [owner])).rows[0].message.content
     assert.match(text, /outcome.*unknown/); assert.match(text, /may already have happened/)
     assert.doesNotMatch(text, /person declined|It did not happen/)
+    await scope.run(() => inboxStore.appendMessages(owner, holder, [], null, firstInbox.actionContext, firstInbox.delivery))
     const nextInbox = await scope.run(() => inboxStore.takeInbox(owner, holder))
     assert.equal(nextInbox.added, 1)
     await scope.run(() => inboxStore.appendMessages(owner, holder, [], null, nextInbox.actionContext))
@@ -153,7 +154,7 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
     const confirmed = (await pool.query('SELECT message FROM coordinator_messages WHERE "userId"=$1 ORDER BY position DESC LIMIT 1', [owner])).rows[0].message.content
     assert.match(confirmed, /and it is done/)
     assert.equal(writes, before + 1)
-    await scope.run(() => inboxStore.releaseLease(owner, holder))
+    await scope.run(() => inboxStore.appendMessages(owner, holder, []))
 
   })
   await t.test('revocation committed after invocation reservation fences the actual send', async () => {

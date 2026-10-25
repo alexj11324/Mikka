@@ -1,8 +1,11 @@
+import { coordinatorInboxOptions } from './inbox-runtime'
+import { controlledWakeConfiguration, startControlledWake } from './wake-controlled'
+import type { WakeDelivery } from './inbox-receipts'
 import { retryInboxWakes } from './inbox-retry'
 import { pool } from '@/lib/db'
 import 'server-only'
 import { start } from 'workflow/api'
-import { hasWakingEvents, setEventTier, untriagedEvents } from '@/lib/coordinator/store'
+import { setEventTier, untriagedEvents } from '@/lib/coordinator/store'
 import { decide } from '@/lib/coordinator/decide'
 import { decisionInput } from '@/lib/coordinator/decision'
 import { ruleTier, tierFromDecision, triageQuestions, triageState } from '@/lib/coordinator/triage'
@@ -15,7 +18,7 @@ import { coordinatorTurn } from '@/workflows/coordinator/workflow'
  * events still collect in the inbox and wait.
  */
 export function coordinatorEnabled(): boolean {
-  return process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY)
+  return Boolean(controlledWakeConfiguration()) || process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY)
 }
 
 /** Asks the decision model whether an event needs the person. When it does not answer, the event gets its quiet tier. */
@@ -40,20 +43,22 @@ async function triageInbox(userId: string): Promise<void> {
 export async function wakeCoordinator(userId: string): Promise<void> {
   if (!coordinatorEnabled()) return
   try {
-    await deliverCoordinatorWake(userId)
-  } catch (error) {
-    console.error('Failed to wake the Coordinator', error instanceof Error ? error.message : error)
+    await retryInboxWakes(pool, deliverCoordinatorWake, true, 1, { ...coordinatorInboxOptions(), onlyOwner: userId })
+  } catch {
+    console.error('Coordinator wake unavailable; the persisted inbox will retry')
   }
 }
 
 /** Shared delivery entry. Compensation must observe failures; request-side
  * wakeCoordinator keeps its historical best-effort response contract. */
-async function deliverCoordinatorWake(userId: string) {
+async function deliverCoordinatorWake(userId: string, delivery: WakeDelivery) {
   await triageInbox(userId)
-  if (await hasWakingEvents(userId)) await start(coordinatorTurn, [userId])
+  if(controlledWakeConfiguration())return startControlledWake(userId,delivery)
+  const run=await start(coordinatorTurn,[userId,delivery])
+  return{runId:run.runId}
 }
 
 /** The runtime sweep shares the existing inbox delivery mechanism. */
 export async function retryCoordinatorInbox(limit = 25) {
-  return retryInboxWakes(pool, deliverCoordinatorWake, coordinatorEnabled(), limit)
+  return retryInboxWakes(pool, deliverCoordinatorWake, coordinatorEnabled(), limit, coordinatorInboxOptions())
 }

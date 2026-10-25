@@ -1,0 +1,61 @@
+name: Coordinator durable consumption
+on:
+  push:
+    branches: ['codex/176-durable-inbox-recovery']
+  pull_request:
+    paths: ['lib/coordinator/**', 'workflows/coordinator/**', 'app/api/coordinator/**', 'drizzle/*coordinator_consumption_receipts.sql', '.github/workflows/coordinator-wake.yml']
+permissions:
+  contents: read
+jobs:
+  postgres:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mikka_ci_176
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mikka_ci_176"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+      WAKE_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply tracked migrations to fresh disposable PostgreSQL
+        run: MIGRATE=1 node scripts/migrate.mjs
+      - run: pnpm test:wake
+      - run: pnpm test:wake:postgres
+      - name: Schedule integration and both recovery safety regressions
+        run: |
+          psql postgresql://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE mikka_179_recovery'
+          MIGRATE=1 node scripts/migrate.mjs
+          pnpm test:schedules:postgres
+          pnpm test:schedules:recovery
+        env:
+          MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+          DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+          SCHEDULE_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+          SCHEDULE_RECOVERY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+      - name: Preserve approved action slots and uncertain Calendar results
+        run: |
+          psql postgresql://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE mikka_208_test'
+          node --conditions=react-server --import tsx --test lib/operations/calendar-integration.test.ts lib/operations/action-intents.test.ts
+        env:
+          NODE_ENV: test
+          OPERATION_DB_TESTS: '1'
+          OPERATION_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_208_test
+      - run: pnpm typecheck

@@ -5,7 +5,7 @@ import { parseActionInput } from '../composio-actions'
 import { OperationError } from './ledger'
 import type { AccountActionRef } from '../../packages/protocol/src/device'
 
-export type ActionContext = { sourceEventId: string; holder: string }
+export type ActionContext = { sourceEventId: string; holder: string; recovery?: boolean }
 type Call = { toolCallId: string; toolName: string; input: unknown }
 type Slot = { actionSlotId: string; toolCallId: string; input: Record<string, unknown> }
 export type ActionBatch = { holder: string; closed: boolean; batches: { callsDigest: string; slots: Slot[] }[] }
