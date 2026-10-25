@@ -1,13 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { chatItems, eventPrompt } from '@/lib/coordinator/context'
 import { ruleTier } from '@/lib/coordinator/triage'
 import { markdownDiff, remarkDiff, stripDiffMarkers } from './diff'
-import { frameDocument, frameHeaders } from './frame'
+import { remarkMarks } from './marks'
+import { frameDocument, frameHeaders } from '@mikka/protocol/artifact-frame'
 import { artifactFileName, cleanTitle, utf8Bytes } from './limits'
 import { splitQuote, withQuote } from './quote'
 
@@ -50,7 +50,7 @@ test('artifact events are results', () => {
   assert.equal(ruleTier({ kind: 'artifact_submitted', payload: {} }), 'result')
 })
 
-const render = (markdown: string) => renderToStaticMarkup(createElement(Markdown, { remarkPlugins: [remarkGfm, remarkDiff] }, markdown))
+const render = (markdown: string) => renderToStaticMarkup(<Markdown remarkPlugins={[remarkGfm, remarkDiff]}>{markdown}</Markdown>)
 
 test('the diff marks dropped and added words in place, inside table cells too', () => {
   const older = '## 结果\n\n| 检查项 | 结果 |\n| --- | --- |\n| 首页截图 | 待补充 |\n\n登录页面已打开；首页截图待补充。'
@@ -85,4 +85,10 @@ test('titles and file names stay tidy', () => {
   assert.equal(cleanTitle('  a\n b  '), 'a b')
   assert.equal(artifactFileName('报告/最终: v?', 'markdown', 3), '报告 最终 v v3.md')
   assert.equal(utf8Bytes('中'), 3)
+})
+
+test('quoted text is marked even across emphasis and line breaks', () => {
+  const html = renderToStaticMarkup(<Markdown remarkPlugins={[remarkGfm, [remarkMarks, [{ text: '核对首页并 保存截图', kind: 'quoted' }, { text: '跳转', kind: 'quoting' }]]]}>{'使用测试账号，核对**首页**并保存截图。\n\n首页跳转'}</Markdown>)
+  assert.match(html, /<span data-mark="quoted">核对<\/span><strong><span data-mark="quoted">首页<\/span><\/strong><span data-mark="quoted">并保存截图<\/span>。/)
+  assert.match(html, /首页<span data-mark="quoting">跳转<\/span>/)
 })

@@ -24,10 +24,23 @@ import { useLinkPreviews, type AgentCitations } from '@/components/workspace/age
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
 import { AgentThemeProvider } from '@/components/workspace/agent-theme'
 import { CoordinatorReply } from './coordinator-reply'
+import dynamic from 'next/dynamic'
+import { ArtifactCard, ArtifactChip } from '@/components/artifacts/artifact-card'
+import { ArtifactQuoteChip, ArtifactQuoteLine } from '@/components/artifacts/artifact-quote'
+import type { ArtifactChatSlot } from '@/components/artifacts/artifact-viewer'
 
-/** The person's conversation with their Coordinator, which dispatches agents to issues. */
-export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false }: { onOpenIssue: (id: string) => void; prefill?: { text: string; nonce: number }; placeholder?: string; compact?: boolean }) {
+const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
+
+/**
+ * The person's conversation with their Coordinator, which dispatches agents to
+ * issues. Artifacts agents hand over show as cards under a reply and open the
+ * reader; inside the reader the same chat runs `embedded`, with chips instead
+ * of cards and the quote from the artifact in the composer.
+ */
+export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded }: { onOpenIssue: (id: string) => void; prefill?: { text: string; nonce: number }; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot }) {
   const t = useTranslations('Coordinator')
+  const tNav = useTranslations('Nav')
+  const [viewing, setViewing] = useState<string | null>(null)
   const tShell = useTranslations('Shell')
   const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000, revalidateOnFocus: false })
   const working = [...new Map((runs ?? []).filter(run => ['preparing', 'running', 'finishing'].includes(run.status)).map(run => [run.agentId, run.agentName])).values()]
@@ -52,6 +65,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const previews = useLinkPreviews(items.filter(item => item.from === 'coordinator').map(item => item.text))
   const sources = data?.sources
   const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue }), [sources, previews, onOpenIssue])
+  const quotes = useMemo(() => items.flatMap(item => item.quote ? [item.quote] : []), [items])
+  const openArtifact = embedded?.openArtifact ?? setViewing
+  // A quote just picked in the reader: put the cursor where the request goes.
+  useEffect(() => { if (embedded?.quote) inputRef.current?.focus() }, [embedded?.quote])
 
   /** Sends `text` to the Coordinator; false if it did not go. */
   async function post(text: string) {
@@ -59,8 +76,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     setSending(true)
     setSendError(null)
     try {
-      const result = await sendCoordinatorMessage(text)
+      const result = await sendCoordinatorMessage(text, embedded?.quote)
       if (result.error) { setSendError(actionError(result.error)); return false }
+      embedded?.clearQuote()
       await mutate()
       return true
     } catch { setSendError(actionError()); return false } finally { setSending(false) }
@@ -87,6 +105,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     void send()
   }
 
+  const attachButton = <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
   <section aria-label={t('label')} className="orvilo-agent flex min-h-0 flex-1 flex-col">
     <MessageScrollerProvider defaultScrollPosition="end">
@@ -99,8 +118,13 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 ? <p className="text-center text-xs text-muted-foreground">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
                     {item.text && (item.from === 'coordinator'
-                      ? <Bubble variant="muted" align="start" className={cn('min-w-0', compact ? 'max-w-full' : 'max-w-[min(35rem,85%)]')}><BubbleContent className="flex w-full min-w-0 flex-col gap-1 rounded-2xl bg-muted/60 px-4 py-3"><span className="text-xs font-medium text-muted-foreground">{t('label')}</span><CoordinatorReply text={item.text} citations={citations} /></BubbleContent></Bubble>
-                      : <Bubble variant="secondary" align="end" className={cn(compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.text}</BubbleContent></Bubble>)}
+                      ? <Bubble variant="muted" align="start" className={cn('min-w-0', compact ? 'max-w-full' : 'max-w-[min(35rem,85%)]')}><BubbleContent className="flex w-full min-w-0 flex-col gap-1 rounded-2xl bg-muted/60 px-4 py-3">{!embedded && <span className="text-xs font-medium text-muted-foreground">{t('label')}</span>}<CoordinatorReply text={item.text} citations={citations} /></BubbleContent></Bubble>
+                      : <Bubble variant="secondary" align="end" className={cn(compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.text}</BubbleContent></Bubble>)}
+                    {item.artifacts.length > 0 && <div className={cn('flex flex-col gap-2', embedded ? 'items-start gap-1.5' : 'w-full')}>
+                      {item.artifacts.flatMap(id => { const artifact = data?.artifacts[id]; return artifact ? [embedded
+                        ? <ArtifactChip key={id} artifact={artifact} active={id === embedded.activeArtifactId} onOpen={openArtifact} />
+                        : <ArtifactCard key={id} artifact={artifact} onOpen={openArtifact} />] : [] })}
+                    </div>}
                     {item.tools.length > 0 && <MessageFooter>{t('usedTools', { tools: [...new Set(item.tools)].join(', ') })}</MessageFooter>}
                   </MessageContent></Message>}
             </MessageScrollerItem>)}
@@ -118,17 +142,19 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {/* Grok-style composer: one rounded bar, attach on the left, send on the right. */}
       <form onSubmit={send}>
         <FieldGroup className="sr-only"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
-        <InputGroup className="min-h-12 rounded-3xl bg-background shadow-xs">
-          <InputGroupAddon align="inline-start" className="self-end pb-2">
-            <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
-          </InputGroupAddon>
-          <InputGroupTextarea ref={inputRef} aria-label={t('input')} placeholder={placeholder ?? t('input')} className="max-h-48 min-h-12 py-3.5" value={draft} maxLength={10_000} rows={1} disabled={sending} onChange={event => setDraft(event.target.value)} onKeyDown={onKeyDown} />
-          <InputGroupAddon align="inline-end" className="self-end pb-2">
-            <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" aria-label={t('send')} disabled={sending || !draft.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>
-          </InputGroupAddon>
+        <InputGroup className={cn('min-h-12 rounded-3xl bg-background shadow-xs', embedded?.quote && 'rounded-2xl')}>
+          {embedded?.quote && <InputGroupAddon align="block-start" className="px-2 pt-2 pb-0"><ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} /></InputGroupAddon>}
+          {!embedded?.quote && <InputGroupAddon align="inline-start" className="self-end pb-2">{attachButton}</InputGroupAddon>}
+          <InputGroupTextarea ref={inputRef} aria-label={t('input')} placeholder={placeholder ?? t('input')} className={cn('max-h-48 py-3.5', embedded?.quote ? 'min-h-10 pb-1' : 'min-h-12')} value={draft} maxLength={10_000} rows={1} disabled={sending} onChange={event => setDraft(event.target.value)} onKeyDown={onKeyDown} />
+          {embedded?.quote
+            ? <InputGroupAddon align="block-end" className="justify-between px-2 pt-0 pb-2">{attachButton}<InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" aria-label={t('send')} disabled={sending || !draft.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton></InputGroupAddon>
+            : <InputGroupAddon align="inline-end" className="self-end pb-2"><InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" aria-label={t('send')} disabled={sending || !draft.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton></InputGroupAddon>}
         </InputGroup>
       </form>
     </div>
+    {!embedded && viewing && <ArtifactViewer artifactId={viewing} onArtifactChange={setViewing} onClose={() => setViewing(null)}
+      bot={{ name: tNav('coordinator'), tone: 'coordinator' }} quotes={quotes}
+      chat={slot => <CoordinatorChat onOpenIssue={onOpenIssue} compact embedded={slot} />} />}
   </section>
   </AgentInteractionContext></AgentThemeProvider>
 }

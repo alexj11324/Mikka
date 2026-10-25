@@ -1,4 +1,4 @@
-import { frameDocument, frameHeaders } from '@/lib/artifacts/frame'
+import { frameDocument, frameHeaders } from '@mikka/protocol/artifact-frame'
 import { routeArtifact } from '@/lib/artifacts/route'
 
 export const dynamic = 'force-dynamic'

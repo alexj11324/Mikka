@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-25 00:39 | Artifact viewer design accepted (「设计稿我批了」); files in R2, versions in Neon, HTML in an opaque-origin sandbox iframe with no separate usercontent domain, 选择元素 through an injected script and `postMessage` | R-31, `docs/mcp.md` § Artifacts | Codex's drafts (2026-10-24) |
 | 2026-10-24 21:57 | Clef is fully replaced by the OpenAI Decisions API, including the first auto-approval screen (「10月22日那个东西已经过时了，已经完全换成了 OpenAI 的 decisions API」) | R-20 | Clef (2026-10-22) |
 | 2026-10-24 21:57 | Right panel = 建议 + 任务; 任务 = threads started by the orchestrator or a bot, all kept, not the board's issues; a clicked suggestion fills the composer, the bot dispatches a thread, and the item moves from 建议 down to 任务 | R-21 | 建议 / bot threads / 我的任务 (20:46); 任务 tab = flat board list (2026-10-23) |
 | 2026-10-24 21:57 | bloub keeps all 16 shapes | R-36 | |
@@ -48,7 +49,7 @@ Only these frames count as a source (file `zPe5LKycb2XuT1ivCLRw07`).
 | Style guide | `98:2` (rule 8 out of date, see R-36) | 2026-10-24 |
 | 新建 Bot dialog | `195:3225` | in review |
 | Group chat | `205:4488` | in review |
-| Artifact viewer | `178:11626` | in review |
+| Artifact viewer | `178:11626` | 2026-10-25 00:39 |
 
 ## Open
 

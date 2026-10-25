@@ -2337,5 +2337,47 @@
       "expand": "Show conversation",
       "unassigned": "Unassigned"
     }
+  },
+  "Artifact": {
+    "kindDocument": "Document",
+    "kindPage": "Web page",
+    "cardMeta": "{kind} · v{version}",
+    "version": "v{version}",
+    "versions": "Versions",
+    "current": "Current",
+    "versionMeta": "{author} · {time}",
+    "updated": "{author} · updated {time}",
+    "viewingOld": "Viewing v{version} · {time}",
+    "showDiff": "Show changes in v{latest}",
+    "backToLatest": "Back to v{latest}",
+    "download": "Download",
+    "selectElement": "Select element",
+    "openInBrowser": "Open in browser",
+    "close": "Close",
+    "quote": "Quote",
+    "copy": "Copy",
+    "copied": "Copied",
+    "removeQuote": "Remove quote",
+    "quoteLabel": "Quote: {text}",
+    "loadError": "This artifact can't be opened.",
+    "retry": "Retry",
+    "showChat": "Chat",
+    "showContent": "Content",
+    "frameTitle": "{title} (web page)",
+    "notFoundTitle": "This link no longer works",
+    "roles": {
+      "image": "Image",
+      "button": "Button",
+      "link": "Link",
+      "table": "Table",
+      "row": "Row",
+      "heading": "Heading",
+      "paragraph": "Paragraph",
+      "listItem": "List item",
+      "list": "List",
+      "field": "Field",
+      "card": "Card",
+      "block": "Block"
+    }
   }
 }

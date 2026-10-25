@@ -9,29 +9,13 @@ import { artifactSubmittedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { ARTIFACT_CONTENT_TYPES, ARTIFACT_EXTENSIONS, ARTIFACT_MAX_BYTES, cleanTitle, utf8Bytes } from '@/lib/artifacts/limits'
 import { stripDiffMarkers } from '@/lib/artifacts/diff'
+import type { ArtifactDetail, ArtifactSummary } from '@/lib/artifacts/types'
 import { artifactStorage, getArtifactObject, putArtifactObject } from '@/lib/artifacts/storage'
 
 // Artifacts in Neon (who, which version, share links) with their files in R2.
 // Every read is scoped to the owner, or to a live share token.
 
-export interface ArtifactSummary {
-  id: string
-  kind: ArtifactKind
-  title: string
-  latestVersion: number
-}
-
-export interface ArtifactVersionInfo {
-  version: number
-  authorName: string
-  createdAt: string
-}
-
-export interface ArtifactDetail extends ArtifactSummary {
-  runId: string | null
-  issueId: string | null
-  versions: ArtifactVersionInfo[]
-}
+export type { ArtifactDetail, ArtifactSummary, ArtifactVersionInfo } from '@/lib/artifacts/types'
 
 /** Who is handing an artifact over: the run's agent, or an agent signed in with OAuth. */
 export interface ArtifactSubmitter {

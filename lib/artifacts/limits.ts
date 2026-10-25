@@ -26,6 +26,6 @@ export function cleanTitle(title: string): string {
 
 /** A file name for downloads: the title without characters file systems reject. */
 export function artifactFileName(title: string, kind: ArtifactKind, version: number): string {
-  const base = cleanTitle(title).replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim() || 'artifact'
+  const base = cleanTitle(title).replace(/[\\/:*?"<>|\p{Cc}]+/gu, ' ').replace(/\s+/g, ' ').trim() || 'artifact'
   return `${base} v${version}.${ARTIFACT_EXTENSIONS[kind]}`
 }
