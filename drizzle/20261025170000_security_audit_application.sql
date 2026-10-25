@@ -84,7 +84,7 @@ BEGIN
        IF NOT FOUND OR parent_run."userId" IS DISTINCT FROM owner_id OR parent_run."issueId" IS DISTINCT FROM (r->>'issueId')::uuid THEN
          RAISE EXCEPTION 'security_audit_lineage_invalid';
        END IF;
-       IF parent_id=(r->>'continuesRunId')::uuid AND (parent_run."mailboxId" IS NULL OR parent_run."mailboxId" IS DISTINCT FROM (r->>'mailboxId')::uuid) THEN
+       IF parent_id=(r->>'continuesRunId')::uuid AND (parent_run."mailboxId" IS DISTINCT FROM (r->>'mailboxId')::uuid) THEN
          RAISE EXCEPTION 'security_audit_lineage_invalid';
        END IF;
        parent_tenant:=parent_run.tenant;
