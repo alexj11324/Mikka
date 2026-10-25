@@ -5,9 +5,10 @@ import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { CalendarClock, Mail } from 'lucide-react'
 import { toast } from 'sonner'
-import { decidePendingAction, listPendingActions } from '@/app/actions/pending-actions'
+import { decidePendingAction } from '@/app/actions/pending-actions'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { withBasePath } from '@/lib/base-path'
 import type { PendingActionView } from '@/lib/pending-action-view'
 import { useActionError } from '@/lib/use-action-error'
 
@@ -27,6 +28,12 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   return <div className="flex gap-3 text-xs"><dt className="w-14 shrink-0 text-muted-foreground">{label}</dt><dd className="min-w-0 break-words">{children}</dd></div>
 }
 
+async function fetchPendingActions(): Promise<PendingActionView[]> {
+  const response = await fetch(withBasePath('/api/pending-actions'), { cache: 'no-store' })
+  if (!response.ok) throw new Error(String(response.status))
+  return response.json() as Promise<PendingActionView[]>
+}
+
 /**
  * What the person's agents want to do in their mail and calendar, one card
  * each, above the composer. Nothing runs until the person approves.
@@ -34,7 +41,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 export function PendingActions() {
   const t = useTranslations('Coordinator.pendingActions')
   const actionError = useActionError()
-  const { data, mutate } = useSWR('pending-actions', () => listPendingActions(), { refreshInterval: 5000 })
+  const { data, mutate } = useSWR('pending-actions', fetchPendingActions, { refreshInterval: 10000 })
   const [busy, setBusy] = useState<string | null>(null)
   if (!data?.length) return null
 

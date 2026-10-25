@@ -5,19 +5,12 @@ import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
-import { listPendingActions as listForUser } from '@/lib/pending-action-store'
 import { decidePendingAction as decideForUser } from '@/lib/pending-actions'
-import type { PendingActionView } from '@/lib/pending-action-view'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   return session.user.id
-}
-
-/** What the person's agents want to do in their accounts and wait to be approved. */
-export async function listPendingActions(): Promise<PendingActionView[]> {
-  return listForUser(await getUserId())
 }
 
 /** Approves (runs) or declines one proposal. */
