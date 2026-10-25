@@ -106,3 +106,13 @@ retention flag; sign-out expires retained synthetic sessions instead of deleting
 Factory test files run serially to avoid concurrent schema create/drop during auth
 schema introspection. This is a fixture-isolation fix candidate, not a proven root
 cause until exact-head full CI completes. No publication implementation is changed.
+
+On c6e3304, full CI's production build and browser regressions passed, including
+all Factory PostgreSQL tests; the 42P01 did not recur. Dedicated ledger/intent and
+dispatch CI passed too. The remaining failure was the inherited daemon lease test:
+its 300ms lease expired before an assertion after a fixed 600ms sleep. The test now
+observes a real heartbeat renewal with a setup-safe lease, then drives the existing
+watchdog at the lease boundary and one millisecond after it. It still checks the
+actual device_lost stop and ownership recovery, without depending on CI scheduling.
+The selected local test passed (one selected, 27 filtered tests not run); its schema
+and temporary artifacts are retained. Production lease behavior is unchanged.
