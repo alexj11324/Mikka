@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	core "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"net/url"
 	"strings"
@@ -125,7 +126,10 @@ func (b *EnrollmentBinder) Bind(ctx context.Context, principal, id, owner, works
 			return Metadata{}, ErrStale
 		}
 		if existing.Bound || current.State == "connected" {
-			if verifyEnrollmentClaim(ctx, b.Enrollment, existing) != nil {
+			if claimErr := verifyEnrollmentClaim(ctx, b.Enrollment, existing); claimErr != nil {
+				if errors.Is(claimErr, ErrSourceStoreDenied) {
+					return Metadata{}, ErrSourceStoreDenied
+				}
 				return Metadata{}, ErrStale
 			}
 			if current.State != "connected" {
@@ -136,6 +140,9 @@ func (b *EnrollmentBinder) Bind(ctx context.Context, principal, id, owner, works
 	}
 	// Check the source principal receipt before reading any full escrow payload.
 	state, err := b.Enrollment.Status(ctx, principal, id)
+	if errors.Is(err, ErrSourceStoreDenied) {
+		return Metadata{}, ErrSourceStoreDenied
+	}
 	if err != nil || state.State != "pending_unbound" {
 		return Metadata{}, ErrUnavailable
 	}
@@ -159,7 +166,13 @@ func (b *EnrollmentBinder) Bind(ctx context.Context, principal, id, owner, works
 	// This immutable claim is global to the escrow, including across preview DBs.
 	claim, _ := json.Marshal(t)
 	if err = b.Enrollment.Claims.Create(ctx, bindingClaimName(id), claim); err != nil {
+		if errors.Is(err, ErrSourceStoreDenied) {
+			return Metadata{}, ErrSourceStoreDenied
+		}
 		stored, readErr := b.Enrollment.Claims.Read(ctx, bindingClaimName(id))
+		if errors.Is(readErr, ErrSourceStoreDenied) {
+			return Metadata{}, ErrSourceStoreDenied
+		}
 		if readErr != nil || !bytes.Equal(stored, claim) {
 			return Metadata{}, ErrStale
 		}

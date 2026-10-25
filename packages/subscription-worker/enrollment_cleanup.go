@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"time"
 )
 
@@ -40,6 +41,9 @@ func verifyEnrollmentClaim(ctx context.Context, e *Enrollment, t enrollmentTrans
 	}
 	expected, _ := json.Marshal(t)
 	actual, err := e.Claims.Read(ctx, bindingClaimName(t.EnrollmentID))
+	if errors.Is(err, ErrSourceStoreDenied) {
+		return ErrSourceStoreDenied
+	}
 	if err != nil || !bytes.Equal(expected, actual) {
 		return ErrStale
 	}

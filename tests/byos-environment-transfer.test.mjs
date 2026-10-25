@@ -11,6 +11,7 @@ import { createServer as httpsServer } from 'node:https'
 import { createServer as httpServer } from 'node:http'
 import { connect } from 'node:net'
 import { Pool } from 'pg'
+import { universalAuthTokenProvider } from '../lib/credentials/universal-auth.ts'
 import { EnrollmentClient } from '../lib/subscription-enrollment.ts'
 import { enrollmentBindHTTP } from '../lib/subscription-enrollment-bind.ts'
 import { enrollmentBindingDatabaseIdentity } from '../lib/subscription-enrollment-binding-proof.ts'
@@ -25,7 +26,7 @@ test('authenticated transfer route carries separate leases through production wo
  const id=randomUUID(),owner=`fixture-${randomUUID()}`,workspace=randomUUID(),principal='operator:'+'a'.repeat(64)
  const source=JSON.stringify({schema:'mikka.byos.unbound-grant.v1',principal,id,bindingState:'pending_unbound',provider:'claude',createdAt:new Date().toISOString(),payload:{type:'claude',access_token:'fixture-cross-env-access',refresh_token:'fixture-cross-env-refresh',expired:new Date(Date.now()+3600000).toISOString(),account_uuid:'fixture-account',organization_uuid:'fixture-org'}})
  const values=new Map([[`staging/byos/pending-grants/mikka-byos-${id}`,source],[`staging/byos/enrollment-claims/mikka-byos-${id}`,JSON.stringify({schema:'mikka.byos.claim.v1',principal,id})]])
- let deletes=0
+ let deletes=0, destinationWrites=0, bindingClaimReads=0, denial=''
  const vault=httpsServer({key:await readFile(key),cert:await readFile(cert)},async(req,res)=>{
   const u=new URL(req.url,'https://app.infisical.com');let body={}
   if(req.method!=='GET'){let raw='';for await(const c of req)raw+=c;body=JSON.parse(raw)}
@@ -33,9 +34,20 @@ test('authenticated transfer route carries separate leases through production wo
   const path=req.method==='GET'?u.searchParams.get('secretPath'):body.secretPath
   assert.equal(req.headers.authorization,`Bearer ${env==='staging'?'fixture-source-lease':'fixture-destination-lease'}`)
   const lookup=`${env}${path}/${u.pathname.split('/').at(-1)}`
+  if(env==='staging' && path==='/byos/enrollment-claims') {
+   const receipt=u.pathname.endsWith(`/mikka-byos-${id}`)
+   if(req.method==='GET' && !receipt)bindingClaimReads++
+   // Even an exact readable proof must not conceal a denied create.
+   if(denial==='claim-create' && req.method==='POST')values.set(lookup,body.secretValue)
+   if((denial==='receipt-get' && req.method==='GET' && receipt) ||
+      (denial==='claim-create' && req.method==='POST') ||
+      (['claim-read','existing-claim-get'].includes(denial) && req.method==='GET' && !receipt)) {res.writeHead(403).end();return}
+   if(denial==='claim-read' && req.method==='POST'){res.writeHead(503).end();return}
+  }
   if(req.method==='DELETE'){deletes++;res.writeHead(403).end();return}
   if(req.method==='POST'){
    assert.ok((env==='staging' && path==='/byos/enrollment-claims') || (env==='prod' && ['/byos/grants','/byos/access'].includes(path)))
+   if(env==='prod')destinationWrites++
    if(values.has(lookup)){res.writeHead(409).end();return}values.set(lookup,body.secretValue)
   }else{assert.equal(req.method,'GET');assert.equal(u.searchParams.get('version'),'1')}
   if(!values.has(lookup)){res.writeHead(404).end();return}
@@ -56,14 +68,38 @@ test('authenticated transfer route carries separate leases through production wo
   await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,\'Fixture\',\'fixture@example.invalid\',\'admin\')',[workspace,owner])
   const common={origin:'https://app.infisical.com',projectId:'89850d6a-f020-4936-863e-df77380dfe40'}
   const approval={transferId:randomUUID(),enrollmentId:id,ownerId:owner,workspaceId:workspace,sourcePrincipal:principal,provider:'claude',providerSubject:JSON.stringify(['fixture-account','fixture-org']),source:{...common,environment:'staging',grantPath:'/byos/pending-grants'},destination:{...common,environment:'prod',grantPath:'/byos/grants'},destinationOrigin:'https://app.aspectlylabs.com',destinationDatabaseIdentity:enrollmentBindingDatabaseIdentity(databaseUrl),sourceDigest:createHash('sha256').update(source).digest('hex'),sourceRevision:1,expiresAt:new Date(Date.now()+600000).toISOString(),deleteSource:false}
-  const client=new EnrollmentClient({binary:resolve('packages/subscription-worker/bin/mikka-subscription-enrollment'),infisicalOrigin:common.origin,project:common.projectId,environment:'prod',workloadToken:'',tokens:{get:async()=> 'fixture-destination-lease',reject:()=>{}},sourceTokens:{getAccessToken:async()=> 'fixture-source-lease',rejectAccessToken:()=>{}},attemptPath:'/byos/enrollment-attempts',claimPath:'/byos/enrollment-claims',grantPath:'/byos/pending-grants',databaseUrl,canonicalGrantPath:'/byos/grants',accessPath:'/byos/access',transferApproval:approval,runtimeOrigin:'https://app.aspectlylabs.com'})
+  let sourceGeneration=0, sourceLogins=0, custodyLogins=0
+  const sourceTokens=universalAuthTokenProvider({origin:common.origin,credentials:()=>({clientId:'fixture-source',clientSecret:`fixture-source-${sourceGeneration}`}),fetch:async()=>{sourceLogins++;return Response.json({accessToken:'fixture-source-lease',tokenType:'Bearer',expiresIn:600})}})
+  const custodyTokens=universalAuthTokenProvider({origin:common.origin,credentials:()=>({clientId:'fixture-custody',clientSecret:'fixture-custody-bootstrap'}),fetch:async()=>{custodyLogins++;return Response.json({accessToken:'fixture-destination-lease',tokenType:'Bearer',expiresIn:600})}})
+  const client=new EnrollmentClient({binary:resolve('packages/subscription-worker/bin/mikka-subscription-enrollment'),infisicalOrigin:common.origin,project:common.projectId,environment:'prod',workloadToken:'',tokens:{get:()=>custodyTokens.getAccessToken(),reject:(_role,token)=>custodyTokens.rejectAccessToken(token)},sourceTokens,attemptPath:'/byos/enrollment-attempts',claimPath:'/byos/enrollment-claims',grantPath:'/byos/pending-grants',databaseUrl,canonicalGrantPath:'/byos/grants',accessPath:'/byos/access',transferApproval:approval,runtimeOrigin:'https://app.aspectlylabs.com'})
   const route=enrollmentBindHTTP({operator:async()=> 'operator:'+ 'b'.repeat(64),session:async req=>req.headers.get('cookie')==='fixture=valid'?{userId:owner}:null,workspace:async(user,ws)=>{const r=await pool.query('select 1 from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2 and status=\'active\'',[ws,user]);assert.equal(r.rowCount,1)},client:()=>client})
   const post=(session,body={id,workspaceId:workspace})=>route(new Request('https://app.aspectlylabs.com/mikka/api/subscriptions/enrollments/bind',{method:'POST',headers:{'content-type':'application/json',cookie:session?'fixture=valid':''},body:JSON.stringify(body)}))
   assert.equal((await post(false)).status,401);assert.equal((await post(true,{id,workspaceId:workspace,ownerId:'forged'})).status,409)
+  for(const mode of ['receipt-get','claim-create','claim-read']) {
+   denial=mode
+   const beforeClaimReads=bindingClaimReads
+   const denied=await post(true);assert.equal(denied.status,409)
+   assert.deepEqual(await denied.json(),{error:'subscription_binding_unavailable'})
+   await assert.rejects(sourceTokens.getAccessToken(),/vault_auth_unavailable/,`${mode} must invalidate source cache`)
+   assert.equal(await custodyTokens.getAccessToken(),'fixture-destination-lease')
+   assert.equal(custodyLogins,1);assert.equal(destinationWrites,0)
+   if(mode==='claim-create')assert.equal(bindingClaimReads,beforeClaimReads,'denied create must not fall through to readable proof')
+   assert.equal([...values.keys()].filter(k=>k.startsWith('prod/')).length,0)
+   sourceGeneration++
+  }
+  denial=''
   const response=await post(true);assert.equal(response.status,200);const result=await response.json();assert.equal(result.state,'connected');assert.equal(result.cleanup.enrollment.state,'external_source_retained')
+  const beforeDeniedRetry=destinationWrites
+  denial='existing-claim-get'
+  assert.equal((await post(true)).status,409)
+  await assert.rejects(sourceTokens.getAccessToken(),/vault_auth_unavailable/)
+  assert.equal(await custodyTokens.getAccessToken(),'fixture-destination-lease')
+  assert.equal(destinationWrites,beforeDeniedRetry);assert.equal(custodyLogins,1)
+  sourceGeneration++;denial=''
   const repeat=await post(true);assert.equal(repeat.status,200);assert.equal((await repeat.json()).id,result.id)
   const serialized=JSON.stringify(result);assert.ok(!serialized.includes('fixture-cross-env'));assert.equal(values.get(`staging/byos/pending-grants/mikka-byos-${id}`),source);assert.equal(deletes,0)
   assert.equal([...values.keys()].filter(k=>k.startsWith('prod/')).length,2)
+  assert.equal(sourceLogins,5);assert.equal(custodyLogins,1)
  }finally{
   for(const k of keys){if(saved[k]===undefined)delete process.env[k];else process.env[k]=saved[k]}
   for(const s of sockets)s.destroy();proxy.closeAllConnections();vault.closeAllConnections();await Promise.all([new Promise(r=>proxy.close(r)),new Promise(r=>vault.close(r))]);await pool.end();await rm(dir,{recursive:true,force:true})

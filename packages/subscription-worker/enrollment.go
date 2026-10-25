@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"net/url"
 	"strings"
 	"time"
@@ -153,7 +154,9 @@ func (e *Enrollment) complete(ctx context.Context, principal, id, callback, hand
 	// A duplicate or uncertain claim is NEVER permission to repeat token exchange.
 	claim, _ := json.Marshal(map[string]any{"schema": "mikka.byos.claim.v1", "principal": principal, "id": id, "claimedAt": e.now()})
 	if err = e.Claims.Create(ctx, name, claim); err != nil {
-		if err == ErrStoreDenied { return EnrollmentStatus{}, err }
+		if err == ErrStoreDenied {
+			return EnrollmentStatus{}, err
+		}
 		return EnrollmentStatus{}, ErrStale
 	}
 	grant, err := e.OAuth.Exchange(ctx, q.Get("code"), a.State, a.Verifier)
@@ -213,6 +216,9 @@ func (e *Enrollment) Status(ctx context.Context, principal, id string) (Enrollme
 		return EnrollmentStatus{}, ErrUnsupported
 	}
 	claim, err := e.Claims.Read(ctx, name)
+	if errors.Is(err, ErrSourceStoreDenied) {
+		return EnrollmentStatus{}, ErrSourceStoreDenied
+	}
 	if err != nil {
 		return EnrollmentStatus{}, ErrUnavailable
 	}
@@ -227,6 +233,9 @@ func (e *Enrollment) Status(ctx context.Context, principal, id string) (Enrollme
 	raw, err := e.Grants.Read(ctx, name)
 	if err == ErrMissing {
 		return EnrollmentStatus{id, "claude", "custody_unconfirmed", false}, nil
+	}
+	if errors.Is(err, ErrSourceStoreDenied) {
+		return EnrollmentStatus{}, ErrSourceStoreDenied
 	}
 	if err != nil {
 		return EnrollmentStatus{}, ErrUnavailable
