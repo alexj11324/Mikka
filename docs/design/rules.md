@@ -33,10 +33,12 @@ source wins in a conflict is in [`README.md`](README.md).
 
 ## Chat
 
-- **R-10** There is one composer: the centre composer used by the Coordinator
-  chat (Grok style, attachment button). The right panel never has an input
-  box. Every instruction, including one about a thread or a screen, goes
-  through the centre composer.
+- **R-10** An input box goes only where there is a conversation, and it is
+  always the same composer (the Coordinator chat's: Grok style, attachment
+  button). Views that are not a conversation never get one: the thread list
+  and a bot's computer screen send instructions through the centre composer.
+  An open thread is a conversation with the agent running it, so its detail
+  ends in that composer and what is typed there goes to that agent.
 - **R-11** The composer has no model picker. The model is our default;
   BYOK users will choose it in Settings later.
 - **R-12** No starter or suggestion cards in any chat ("试试从这些事情开始").
