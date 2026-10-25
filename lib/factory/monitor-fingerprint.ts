@@ -1,5 +1,21 @@
 import { createHash } from "node:crypto";
 
+/** Missing workspace linkage must narrow dedupe, never merge unrelated workspaces. */
+export function monitorWorkspacePartition(input: {
+  userId: string;
+  issueId: string;
+  workspaceId: string | null;
+  issueScope: string;
+  linearTeamSyncId: string | null;
+}) {
+  if (input.workspaceId) return `workspace:${input.workspaceId}`;
+  if (input.issueScope === "workspace")
+    return input.linearTeamSyncId
+      ? `linear-team:${input.linearTeamSyncId}`
+      : `unlinked-workspace-issue:${input.issueId}`;
+  return `personal:${input.userId}`;
+}
+
 /** Only the digest leaves this function. Never persist or echo raw failure output. */
 export function normalizeMonitorFailure(value: string): string {
   return value

@@ -19,7 +19,34 @@ import {
 import {
   monitorFingerprint,
   normalizeMonitorFailure,
+  monitorWorkspacePartition,
 } from "./monitor-fingerprint";
+
+test("legacy and unlinked workspace issues never collapse into a personal-owner partition", () => {
+  const base = {
+    userId: "owner",
+    issueId: "issue-a",
+    workspaceId: null,
+    issueScope: "workspace",
+    linearTeamSyncId: null,
+  };
+  assert.notEqual(
+    monitorWorkspacePartition(base),
+    monitorWorkspacePartition({ ...base, issueId: "issue-b" }),
+  );
+  assert.notEqual(
+    monitorWorkspacePartition({ ...base, linearTeamSyncId: "team-a" }),
+    monitorWorkspacePartition({ ...base, linearTeamSyncId: "team-b" }),
+  );
+  assert.equal(
+    monitorWorkspacePartition({ ...base, workspaceId: "workspace-a" }),
+    "workspace:workspace-a",
+  );
+  assert.equal(
+    monitorWorkspacePartition({ ...base, issueScope: "personal" }),
+    "personal:owner",
+  );
+});
 
 test("fingerprints strip volatile IDs and secret output; owner/workspace/component/candidate environment isolate failures", () => {
   const base = {

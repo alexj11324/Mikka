@@ -141,7 +141,11 @@ export function createFactoryMonitor(
   pool: Pool,
   store: ReturnType<typeof createFactoryStore>,
   authorize: FactoryAuthorize,
-  workspaceKey: (userId: string, issueId: string) => Promise<string>,
+  workspaceKey: (
+    userId: string,
+    issueId: string,
+    tx: PoolClient,
+  ) => Promise<string>,
   appendEvidence: (
     tx: PoolClient,
     notice: MonitorNotice,
@@ -179,7 +183,7 @@ export function createFactoryMonitor(
         fail("factoryNotFound");
       if (["cancelled", "revoked"].includes(task.status))
         fail("factoryStopped");
-      const scope = await workspaceKey(userId, task.issueId);
+      const scope = await workspaceKey(userId, task.issueId, tx);
       const {
         rows: [prior],
       } = await tx.query(

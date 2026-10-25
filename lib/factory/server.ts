@@ -9,6 +9,7 @@ import { workspaceDb } from "@/lib/workspace-db";
 import { teamIssues } from "@/lib/db/team-schema";
 import { eq } from "drizzle-orm";
 import type { FactoryAuthorize } from "./store";
+import { monitorWorkspacePartition } from "./monitor-fingerprint";
 
 // Preserve existing personal/workspace/team/deletion access rules on every operation.
 const authorize: FactoryAuthorize = async (userId, issueId, tx) => {
@@ -24,13 +25,25 @@ export const factoryMonitor = createFactoryMonitor(
   pool,
   factoryStore,
   authorize,
-  async (userId, issueId) => {
+  async (userId, issueId, tx) => {
     const [link] = await workspaceDb
       .select({ workspaceId: teamIssues.workspaceId })
       .from(teamIssues)
       .where(eq(teamIssues.issueId, issueId))
       .limit(1);
-    return link ? `workspace:${link.workspaceId}` : `personal:${userId}`;
+    const {
+      rows: [issue],
+    } = await tx.query(
+      'SELECT i.scope,l."teamSyncId" FROM issues i LEFT JOIN linear_issue_links l ON l."issueId"=i.id WHERE i.id=$1',
+      [issueId],
+    );
+    return monitorWorkspacePartition({
+      userId,
+      issueId,
+      workspaceId: link?.workspaceId ?? null,
+      issueScope: issue.scope,
+      linearTeamSyncId: issue.teamSyncId ?? null,
+    });
   },
   appendMonitorEvidence,
 );
