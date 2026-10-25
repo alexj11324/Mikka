@@ -22,6 +22,7 @@ export interface WorkerConfiguration {
   enrollmentAttemptPath?: string
   enrollmentClaimPath?: string
   enrollmentGrantPath?: string
+  retainEnrollmentSources?: boolean
   use?: { bindingId: string; consumerId: string; runId?: string }
   executionOnly?: boolean
   enableCodexOAuth?: boolean

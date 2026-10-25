@@ -6,6 +6,10 @@ Infisical project. Users do not install or sign into Infisical, grant a website
 access to an Infisical localhost service, or export native CLI credentials.
 The Mac may host the user's browser; it is not a credential-custody service.
 
+Current Web delivery retains source copies pending a separately approved
+cleanup scope; see **Explicit source-retention policy** below. No real deletion
+is implicitly authorized by a synthetic acceptance test.
+
 ## Current receiver
 
 `POST /mikka/api/subscriptions/enrollments` is a disabled-by-default private
@@ -240,3 +244,76 @@ The application test checks this pending count instead of falsely asserting all
 copies are gone. Real OAuth, provider compatibility/revocation and deployment
 acceptance remain separate, unrun gates. Current Preview/team configuration
 approval is pending; no real authorization link has been generated.
+
+## Scoped Claude browser handoff
+
+The private operator start response now includes an independent random
+`handoffKey`. Its SHA256 digest is bound to the original principal, enrollment
+ID, Claude provider, state, server PKCE verifier and expiry. Only the scoped key
+is delivered to the browser/loopback transport. Global operator and Infisical
+credentials remain on Mikka's server. This is still pending-unbound custody,
+not an authenticated Mikka user/task authorization.
+
+`POST /mikka/api/subscriptions/enrollments/handoff` accepts exactly enrollment
+ID, `provider:claude`, the scoped key and the complete registered callback URL.
+The Go worker loads the original principal from the protected attempt; the
+browser cannot supply or replace it. It checks the full capability binding,
+five-minute expiry, exact callback origin/path, single matching state and the
+original verifier. Scoped and legacy operator completion share the same durable
+one-use claim before exchange, including concurrent calls and uncertain writes.
+Old v1 attempts without a capability retain operator completion support and
+cannot use the public handoff route. No upstream URL/model/vault/bind selection
+is exposed by this route.
+
+The route's GET response is a minimal transport document, not a product frontend
+redesign. Launch fields (`id`, `provider`, `handoffKey`, `authorizationUrl`) go
+only in the browser fragment. The page removes the fragment before navigation,
+checks the fixed official Claude client/redirect/scopes, retains only the scoped
+completion context in sessionStorage, then opens the official provider page.
+After the registered loopback callback, the relay redirects to the same Mikka
+page with the callback in a fragment. The page clears its saved context and
+POSTs on its own origin. Same-document hash navigation is handled explicitly.
+It displays only fixed outcomes, with no-store/no-referrer and a nonce CSP.
+There are no external scripts, callback values in server URLs, or token logging.
+
+`scripts/byos-claude-loopback-relay.mjs` is optional browser transport only. Start
+it with the exact new Preview's HTTPS handoff URL and the original state in
+`MIKKA_BYOS_RELAY_STATE` (process memory only, never chat/logs). Preflight the
+port with synthetic state before creating the real attempt. It binds localhost:54545, validates Host, expected state and callback shape, forwards
+only to the fixed Mikka Preview path, and releases its port after the matching callback or at most ten minutes.
+It reads no CLI auth file/Keychain, provider access/refresh token, operator key or
+Infisical identity. A conflicting listener is reported; it is never killed or
+reused. Preflight deployment protection/browser access before starting the
+five-minute OAuth attempt. Private launch data must go directly to the intended
+browser, never ordinary chat or logs. The Mac/browser owner remains the parent
+thread's existing task; no second provider flow is started here.
+
+### Explicit source-retention policy
+
+The deployed Web configuration now sets `retainSources:true`; custody worker
+configuration sets `retainEnrollmentSources:true`. Successful completion does
+not delete its temporary attempt, and bind/cleanup/disconnect cannot delete
+escrow/attempt copies through the shared cleanup boundary in this mode. Pending
+source cleanup reports `deletion_not_authorized` and rotates fairly rather than
+claiming physical deletion. Logical disconnect still fences use immediately.
+No broad deletion-enable environment flag is introduced. Exact external cleanup
+requires a separately approved record scope. Local in-memory/isolated fixtures
+exercise both retained and specifically authorized cleanup behavior.
+
+This retention hold follows the owner's clarified deletion rule; it does not
+remove the previously tested cleanup implementation or claim provider revoke.
+Retained attempts remain expired/consumed for authorization purposes. Real grants
+are persistent and are never synthetic-test cleanup targets.
+
+Scoped handoff Linux checks passed: 55 top-level Go race tests plus vet and
+production builds; all 34 disposable Postgres migrations/replay and three app
+fixtures; 15 Node enrollment/binding/model/production-receiver tests; three
+handoff HTTP tests and one browser transport test; root/daemon type checks,
+lint; actual Next operator/handoff routes with the production binary and a TLS
+vault fixture; original-config webpack build with eight worker asset traces.
+The browser test uses intercepted synthetic HTTPS destinations and separately
+checks the real loopback 303 before applying its Location in the browser, because
+Playwright interception does not repeat across a redirect chain. This does not
+claim real provider/browser acceptance. The private Pages evidence must capture
+only the final scrubbed Mikka outcome and non-secret run metadata, never login,
+password/MFA, authorization code, callback, capability or token content.

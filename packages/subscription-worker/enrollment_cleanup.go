@@ -64,6 +64,8 @@ func (w *Worker) enrollmentCleanupStatus(ctx context.Context) (*EnrollmentCleanu
 		s.State = "awaiting_publication"
 	case w.Enrollment == nil || w.DatabaseIdentity == "":
 		s.State = "configuration_required"
+	case w.Enrollment.RetainSources:
+		s.State = "deletion_not_authorized"
 	case ownershipFailed:
 		s.State = "ownership_unconfirmed"
 	case s.Failed > 0:
@@ -80,8 +82,8 @@ func (w *Worker) cleanupEnrollment(ctx context.Context) error {
 	if err != nil || status == nil || status.Pending == 0 || status.Protected == status.Pending {
 		return err
 	}
-	if w.Enrollment == nil || w.DatabaseIdentity == "" {
-		// Unconfigured jobs remain visible but must not occupy every first
+	if w.Enrollment == nil || w.DatabaseIdentity == "" || w.Enrollment.RetainSources {
+		// Unconfigured/retained jobs remain visible but must not occupy every first
 		// batch forever ahead of connections whose cleanup can make progress.
 		if _, err = w.Repo.DB.ExecContext(ctx, `update byos_enrollment_sources set "lastAttemptAt"=now() where "connectionId"=$1 and "deletedAt" is null`, w.Scope.ConnectionID); err != nil {
 			return ErrDatabase

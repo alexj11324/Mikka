@@ -33,7 +33,7 @@ func TestEnrollmentActualPlainClaudeAdapterWithoutSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = e.Complete(context.Background(), "operator:fixture-principal", start.ID, enrollmentCallback(start)); err != nil || calls.Load() != 1 {
+	if _, err = e.Handoff(context.Background(), start.ID, "claude", start.HandoffKey, enrollmentCallback(start)); err != nil || calls.Load() != 1 {
 		t.Fatal("plain acquisition failed", err)
 	}
 }

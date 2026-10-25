@@ -42,24 +42,25 @@ func run() error {
 		return worker.ErrUnsupported
 	}
 	var config struct {
-		Scope                 worker.Scope       `json:"scope"`
-		Use                   *worker.RuntimeUse `json:"use"`
-		ExecutionOnly         bool               `json:"executionOnly"`
-		AccessPath            string             `json:"accessPath"`
-		AccessToken           string             `json:"accessToken"`
-		DatabaseURL           string             `json:"databaseUrl"`
-		Origin                string             `json:"infisicalOrigin"`
-		Project               string             `json:"project"`
-		Environment           string             `json:"environment"`
-		Path                  string             `json:"path"`
-		Token                 string             `json:"workloadToken"`
-		EnableCodexOAuth      bool               `json:"enableCodexOAuth"`
-		EnableRuntime         bool               `json:"enableRuntime"`
-		EnablePlainModels     bool               `json:"enablePlainModels"`
-		EnableClaudeOAuth     bool               `json:"enableClaudeOAuth"`
-		EnrollmentAttemptPath string             `json:"enrollmentAttemptPath"`
-		EnrollmentClaimPath   string             `json:"enrollmentClaimPath"`
-		EnrollmentGrantPath   string             `json:"enrollmentGrantPath"`
+		Scope                   worker.Scope       `json:"scope"`
+		Use                     *worker.RuntimeUse `json:"use"`
+		ExecutionOnly           bool               `json:"executionOnly"`
+		AccessPath              string             `json:"accessPath"`
+		AccessToken             string             `json:"accessToken"`
+		DatabaseURL             string             `json:"databaseUrl"`
+		Origin                  string             `json:"infisicalOrigin"`
+		Project                 string             `json:"project"`
+		Environment             string             `json:"environment"`
+		Path                    string             `json:"path"`
+		Token                   string             `json:"workloadToken"`
+		EnableCodexOAuth        bool               `json:"enableCodexOAuth"`
+		EnableRuntime           bool               `json:"enableRuntime"`
+		EnablePlainModels       bool               `json:"enablePlainModels"`
+		EnableClaudeOAuth       bool               `json:"enableClaudeOAuth"`
+		EnrollmentAttemptPath   string             `json:"enrollmentAttemptPath"`
+		EnrollmentClaimPath     string             `json:"enrollmentClaimPath"`
+		EnrollmentGrantPath     string             `json:"enrollmentGrantPath"`
+		RetainEnrollmentSources bool               `json:"retainEnrollmentSources"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(frame))
 	decoder.DisallowUnknownFields()
@@ -137,7 +138,7 @@ func run() error {
 			if err != nil {
 				return nil
 			}
-			return &worker.Enrollment{Attempts: a, Claims: c, Grants: g}
+			return &worker.Enrollment{Attempts: a, Claims: c, Grants: g, RetainSources: config.RetainEnrollmentSources}
 		}
 		w.Enrollment = makeEnrollment()
 		if w.Enrollment != nil {

@@ -234,3 +234,32 @@ func TestEnrollmentCleanupUnknownAndLateCreatesNeverReportFullyDeleted(t *testin
 		})
 	}
 }
+
+func TestEnrollmentRetentionBlocksImplicitBindingAndCleanupDeletion(t *testing.T) {
+	b, _, id, _, _ := enrollmentBindingFixture(t)
+	b.Enrollment.RetainSources = true
+	ctx := context.Background()
+	attempts := b.Enrollment.Attempts.(*enrollmentMemory)
+	before := attempts.deletes
+	owner, workspace := "fixture-owner-"+newID(), newID()
+	meta, err := b.Bind(ctx, "operator:fixture-principal", id, owner, workspace)
+	if err != nil || meta.Cleanup.Enrollment.State != "deletion_not_authorized" || meta.Cleanup.Enrollment.Pending != 2 {
+		t.Fatal("binding bypassed explicit retention", meta, err)
+	}
+	w := enrollmentWorker(b, Scope{OwnerID: owner, WorkspaceID: workspace, ConnectionID: meta.ID, Provider: "claude"})
+	disconnected, err := w.Disconnect(ctx, meta.Revision)
+	if err != nil || disconnected.State != "disconnected" || disconnected.Cleanup.Enrollment.State != "deletion_not_authorized" {
+		t.Fatal("disconnect retention/status regressed", err)
+	}
+	if _, err = w.Cleanup(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if attempts.deletes != before || b.Enrollment.Grants.(*enrollmentMemory).deletes != 0 {
+		t.Fatal("cleanup bypassed retained source policy")
+	}
+	b.Enrollment.RetainSources = false // Local synthetic fixture simulates a later specifically approved cleanup.
+	status, err := w.Cleanup(ctx)
+	if err != nil || status.Pending != 0 {
+		t.Fatal("explicitly authorized cleanup regressed", status, err)
+	}
+}

@@ -37,10 +37,15 @@ try {
   const certificate = join(directory, 'cert.pem'), key = join(directory, 'key.pem')
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', certificate, '-days', '1', '-subj', '/CN=Synthetic Mikka vault', '-addext', 'subjectAltName=IP:127.0.0.1', '-addext', 'basicConstraints=critical,CA:TRUE'], { stdio: 'ignore' })
   const records = new Map()
+  let claimAttempts = 0
   vault = createServer({ key: await readFile(key), cert: await readFile(certificate) }, async (request, response) => {
-    if (request.method !== 'POST' || request.headers.authorization !== 'Bearer fixture-custody-only') { response.writeHead(403).end(); return }
+    if (request.headers.authorization !== 'Bearer fixture-custody-only') { response.writeHead(403).end(); return }
+    const target = new URL(request.url,'https://fixture.invalid'), key = target.pathname.split('/').at(-1)
+    if(request.method==='GET'){const value=records.get(key);if(target.searchParams.get('secretPath')!=='/attempts'||!value){response.writeHead(404).end();return};response.setHeader('content-type','application/json');response.end(JSON.stringify({secret:{secretKey:key,secretValue:JSON.stringify(value),version:1}}));return}
+    if(request.method!=='POST'){response.writeHead(403).end();return}
     let raw = ''; for await (const part of request) raw += part
     const body = JSON.parse(raw), name = request.url.split('/').at(-1)
+    if(body.secretPath==='/claims'){claimAttempts++;response.writeHead(409).end();return}
     if (body.secretPath !== '/attempts' || records.has(name)) { response.writeHead(409).end(); return }
     records.set(name, JSON.parse(body.secretValue))
     response.setHeader('content-type', 'application/json')
@@ -84,7 +89,15 @@ try {
   assert.equal(result.taskUseAllowed, false)
   assert.equal(records.size, 1)
   assert.equal(new URL(result.authorizationUrl).searchParams.get('state'), records.get(`mikka-byos-${result.id}`).state)
-  console.log('PASS: actual Next startup/route -> production custody worker -> TLS fixture; no SQL/reader/native/E2B; no external OAuth request')
+  const handoff=endpoint+'/handoff'
+  const page=await fetch(handoff,{signal:AbortSignal.timeout(10000)});assert.equal(page.status,200);assert.match(page.headers.get('content-security-policy'),/connect-src 'self'/);assert.ok(!(await page.text()).includes(operator))
+  const scoped=body=>fetch(handoff,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(10000)})
+  assert.equal((await scoped({})).status,409)
+  const state=records.get(`mikka-byos-${result.id}`).state
+  const completion={id:result.id,provider:'claude',handoffKey:result.handoffKey,callbackUrl:'http://localhost:54545/callback?code=fixture-code&state='+state}
+  assert.equal((await scoped({...completion,handoffKey:'x'.repeat(43)})).status,409);assert.equal(claimAttempts,0)
+  assert.equal((await scoped(completion)).status,409);assert.equal(claimAttempts,1)
+  console.log('PASS: actual Next operator and scoped handoff routes -> production custody worker -> TLS fixture; valid proof reaches refused replay latch; no SQL/reader/native/E2B/external OAuth request')
 } finally {
   if (started) await run('docker', ['rm', '-f', name])
   if (vault) { vault.closeAllConnections(); await new Promise(resolve => vault.close(resolve)) }

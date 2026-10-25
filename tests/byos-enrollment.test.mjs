@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createServer } from 'node:https'
 import { EnrollmentClient, enrollmentHTTP, enrollmentOperator } from '../lib/subscription-enrollment.ts'
+import { enrollmentHandoffHTTP } from '../lib/subscription-enrollment-handoff.ts'
 
 test('production receiver persists PKCE before returning a link with no SQL or inference configuration', { timeout: 20000 }, async () => {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-enrollment-'))
@@ -17,16 +18,18 @@ test('production receiver persists PKCE before returning a link with no SQL or i
   const methods = []
   const vault = createServer({ key: await readFile(key), cert: await readFile(certificate) }, async (request, response) => {
     assert.equal(request.headers.authorization, 'Bearer fixture-custody-only')
-    assert.equal(request.method, 'POST')
     const url = new URL(request.url, 'https://127.0.0.1')
     assert.match(url.pathname, /^\/api\/v4\/secrets\/mikka-byos-[a-f0-9-]{36}$/)
+    const name = url.pathname.split('/').at(-1)
+    if(request.method==='GET'){assert.equal(url.searchParams.get('secretPath'),'/attempts');const value=values.get(name);if(!value){response.writeHead(404).end();return};response.setHeader('content-type','application/json');response.end(JSON.stringify({secret:{secretKey:name,secretValue:JSON.stringify(value),version:1}}));return}
+    assert.equal(request.method,'POST')
     let raw = ''; for await (const chunk of request) raw += chunk
     const body = JSON.parse(raw)
     assert.equal(body.projectId, 'fixture-project')
     assert.equal(body.environment, 'staging')
+    if(body.secretPath==='/claims'){methods.push('POST:claimed');response.writeHead(409).end();return}
     assert.equal(body.secretPath, '/attempts')
     methods.push(request.method)
-    const name = url.pathname.split('/').at(-1)
     if (values.has(name)) { response.writeHead(409).end(); return }
     values.set(name, JSON.parse(body.secretValue))
     response.setHeader('content-type', 'application/json')
@@ -59,6 +62,18 @@ test('production receiver persists PKCE before returning a link with no SQL or i
     assert.ok(!JSON.stringify(result).includes(stored.verifier))
     assert.ok(!JSON.stringify(result).includes('fixture-custody-only'))
     assert.deepEqual(methods, ['POST'])
+    assert.equal(stored.provider,'claude');assert.equal(stored.handoffDigest.length,64)
+    assert.ok(!JSON.stringify(stored).includes(result.handoffKey))
+    const handoff=enrollmentHandoffHTTP({enabled:()=>true,client:()=>client})
+    const complete=body=>handoff(new Request('https://mikka.example/api/subscriptions/enrollments/handoff',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}))
+    const body={id:result.id,provider:'claude',handoffKey:result.handoffKey,callbackUrl:'http://localhost:54545/callback?code=fixture-code&state='+stored.state}
+    assert.equal((await complete({...body,handoffKey:'x'.repeat(43)})).status,409)
+    assert.equal((await complete({...body,callbackUrl:body.callbackUrl+'&state=x'})).status,409)
+    assert.deepEqual(methods,['POST'])
+    // A valid scoped proof reaches the actual production shared claim latch;
+    // the fake vault refuses it as already claimed, so no provider is contacted.
+    assert.equal((await complete(body)).status,409);assert.deepEqual(methods,['POST','POST:claimed'])
+
   } finally {
     if (oldCA === undefined) delete process.env.SSL_CERT_FILE; else process.env.SSL_CERT_FILE = oldCA
     if (oldNoProxy === undefined) delete process.env.NO_PROXY; else process.env.NO_PROXY = oldNoProxy

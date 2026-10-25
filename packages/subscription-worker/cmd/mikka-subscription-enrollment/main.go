@@ -38,6 +38,7 @@ func run() error {
 		DatabaseURL        string `json:"databaseUrl"`
 		CanonicalGrantPath string `json:"canonicalGrantPath"`
 		AccessPath         string `json:"accessPath"`
+		RetainSources      bool   `json:"retainSources"`
 	}
 	if !input.Scan() || json.Unmarshal(input.Bytes(), &config) != nil || config.Token == "" || config.AttemptPath == config.ClaimPath || config.AttemptPath == config.GrantPath || config.ClaimPath == config.GrantPath {
 		return worker.ErrUnsupported
@@ -57,13 +58,15 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	e := worker.Enrollment{Attempts: attempts, Claims: claims, Grants: grants, OAuth: worker.CPAClaudeOAuth{}}
+	e := worker.Enrollment{Attempts: attempts, Claims: claims, Grants: grants, OAuth: worker.CPAClaudeOAuth{}, RetainSources: config.RetainSources}
 	var request struct {
 		Method      string `json:"method"`
 		ID          string `json:"id"`
 		CallbackURL string `json:"callbackUrl"`
 		OwnerID     string `json:"ownerId"`
 		WorkspaceID string `json:"workspaceId"`
+		Provider    string `json:"provider"`
+		HandoffKey  string `json:"handoffKey"`
 	}
 	if !input.Scan() || json.Unmarshal(input.Bytes(), &request) != nil {
 		return worker.ErrUnsupported
@@ -74,6 +77,8 @@ func run() error {
 	switch request.Method {
 	case "start":
 		result, err = e.Start(ctx, config.Principal)
+	case "handoff":
+		result, err = e.Handoff(ctx, request.ID, request.Provider, request.HandoffKey, request.CallbackURL)
 	case "complete":
 		result, err = e.Complete(ctx, config.Principal, request.ID, request.CallbackURL)
 	case "status":

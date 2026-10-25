@@ -14,5 +14,6 @@ export function enrollmentConfiguration(): EnrollmentConfiguration {
     grantPath: process.env.MIKKA_BYOS_ENROLLMENT_GRANT_PATH,
   }
   if (Object.values(config).some(value => !value)) throw new Error('subscription_enrollment_unavailable')
-  return config as EnrollmentConfiguration
+  // Real-vault deletion needs a separately approved cleanup scope.
+  return { ...config, retainSources: true } as EnrollmentConfiguration
 }

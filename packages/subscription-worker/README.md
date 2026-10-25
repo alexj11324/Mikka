@@ -20,7 +20,7 @@ can receive consent before SQL/reader/native setup. Its private bind route then
 requires actual Mikka session/workspace authorization plus source operator
 authority, publishes through the same Store lifecycle and fences one-time source
 ownership globally. No user-side Infisical install/login is needed. Redundant escrow/PKCE copies
-are deleted after canonical publication; owner-directed disconnect and the shared
+are eligible for authorized deletion after canonical publication; owner-directed disconnect and the shared
 retry queue cover all recorded copies. Unknown remote writes remain explicitly
 pending. Live account/provider/deployment acceptance remains separate from
 synthetic canonical publication and deletion tests.
@@ -99,7 +99,10 @@ Enrollment source copies have their own path-aware journal. Canonical publicatio
 records evidence atomically; before that point the sole recovery copy is protected
 unless explicit disconnect/reconnect advances the epoch. Fresh global claim and
 database identity checks prevent a losing preview from deleting the shared source.
-Source-only failures are eligible for the same bounded cron. Token-free immutable
+Source-only failures are eligible for the same bounded cron. Current Web
+configuration holds source deletion and reports `deletion_not_authorized` until
+a separate exact cleanup scope is approved; callback handoff never needs a global
+operator/vault key in the browser or Mac. Token-free immutable
 claims remain for replay protection; unknown/uncertain creates stay pending after
 404 to catch late commits. Status exposes missing configuration, ownership proof
 and deletion failures. Cleanup/status/disconnect custody works without an inference

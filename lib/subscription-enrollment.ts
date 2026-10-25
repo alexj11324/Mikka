@@ -4,7 +4,7 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 
 const status = z.object({ id: z.uuid(), provider: z.literal('claude'), state: z.enum(['pending_unbound', 'custody_unconfirmed']), taskUseAllowed: z.literal(false) }).strict()
-const started = z.object({ id: z.uuid(), provider: z.literal('claude'), state: z.literal('awaiting_consent'), taskUseAllowed: z.literal(false), authorizationUrl: z.url(), expiresAt: z.iso.datetime() }).strict()
+const started = z.object({ id: z.uuid(), provider: z.literal('claude'), state: z.literal('awaiting_consent'), taskUseAllowed: z.literal(false), authorizationUrl: z.url(), expiresAt: z.iso.datetime(), handoffKey: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict()
 const input = z.discriminatedUnion('action', [
   z.object({ action: z.literal('start') }).strict(),
   z.object({ action: z.literal('complete'), id: z.uuid(), callbackUrl: z.string().min(1).max(8192) }).strict(),
@@ -22,6 +22,7 @@ export interface EnrollmentConfiguration {
   databaseUrl?: string
   canonicalGrantPath?: string
   accessPath?: string
+  retainSources?: boolean
 }
 export function enrollmentOperator(request: Request, token: string | undefined): string | null {
   if (!token || token.length < 32) return null
@@ -36,8 +37,11 @@ export class EnrollmentClient {
   async call(principal: string, body: z.infer<typeof input>) {
     return this.invoke(principal, { method: body.action, ...('id' in body ? { id: body.id } : {}), ...('callbackUrl' in body ? { callbackUrl: body.callbackUrl } : {}) }, body.action === 'start' ? started : status)
   }
+  async handoff(body: {id: string; provider: 'claude'; handoffKey: string; callbackUrl: string}) {
+    return this.invoke('', {method:'handoff',...body}, status)
+  }
   async bind(principal: string, id: string, ownerId: string, workspaceId: string) {
-    const sourceCleanup = z.object({ pending: z.number().int().nonnegative(), failed: z.number().int().nonnegative(), protected: z.number().int().nonnegative(), uncertainCreates: z.number().int().nonnegative(), state: z.enum(['complete', 'awaiting_publication', 'configuration_required', 'ownership_unconfirmed', 'creation_outcome_unknown', 'deletion_failed', 'pending']) }).strict()
+    const sourceCleanup = z.object({ pending: z.number().int().nonnegative(), failed: z.number().int().nonnegative(), protected: z.number().int().nonnegative(), uncertainCreates: z.number().int().nonnegative(), state: z.enum(['complete', 'awaiting_publication', 'configuration_required', 'ownership_unconfirmed', 'creation_outcome_unknown', 'deletion_failed', 'deletion_not_authorized', 'pending']) }).strict()
     const cleanup = z.object({ pending: z.number().int().nonnegative(), failed: z.number().int().nonnegative(), providerRevocation: z.literal('not_implemented'), uncertainCreates: z.number().int().nonnegative(), enrollment: sourceCleanup.optional() }).strict()
     return this.invoke(principal, { method: 'bind', id, ownerId, workspaceId }, z.object({ id: z.uuid(), provider: z.literal('claude'), state: z.literal('connected'), revision: z.number().int().positive(), credentialVersion: z.number().int().positive(), cleanup: cleanup.optional() }).strict())
   }

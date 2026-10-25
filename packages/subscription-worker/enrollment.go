@@ -5,6 +5,7 @@ package worker
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/json"
 	"net/url"
 	"strings"
@@ -15,14 +16,17 @@ type Enrollment struct {
 	Attempts, Claims, Grants SecretStore
 	OAuth                    OAuthProvider
 	Now                      func() time.Time
+	RetainSources            bool
 }
 type enrollmentAttempt struct {
-	Schema    string    `json:"schema"`
-	Principal string    `json:"principal"`
-	ID        string    `json:"id"`
-	State     string    `json:"state"`
-	Verifier  string    `json:"verifier"`
-	ExpiresAt time.Time `json:"expiresAt"`
+	Schema        string    `json:"schema"`
+	Principal     string    `json:"principal"`
+	ID            string    `json:"id"`
+	State         string    `json:"state"`
+	Verifier      string    `json:"verifier"`
+	ExpiresAt     time.Time `json:"expiresAt"`
+	Provider      string    `json:"provider,omitempty"`
+	HandoffDigest string    `json:"handoffDigest,omitempty"`
 }
 type enrollmentGrant struct {
 	Schema       string         `json:"schema"`
@@ -56,6 +60,7 @@ type EnrollmentStart struct {
 	EnrollmentStatus
 	AuthorizationURL string    `json:"authorizationUrl"`
 	ExpiresAt        time.Time `json:"expiresAt"`
+	HandoffKey       string    `json:"handoffKey"`
 }
 
 func (e *Enrollment) now() time.Time {
@@ -86,17 +91,37 @@ func (e *Enrollment) Start(ctx context.Context, principal string) (EnrollmentSta
 	if err != nil || u.Scheme != "https" || u.Host != "claude.ai" || u.Path != "/oauth/authorize" || u.User != nil || u.Fragment != "" || u.Query().Get("state") != state || u.Query().Get("redirect_uri") != claudeCallbackURI || u.Query().Get("code_challenge_method") != "S256" {
 		return EnrollmentStart{}, ErrUnsupported
 	}
-	a := enrollmentAttempt{"mikka.byos.attempt.v1", principal, id, state, verifier, e.now().Add(5 * time.Minute)}
+	handoffKey := randomCode()
+	a := enrollmentAttempt{Schema: "mikka.byos.attempt.v1", Principal: principal, ID: id, State: state, Verifier: verifier, ExpiresAt: e.now().Add(5 * time.Minute), Provider: "claude"}
+	a.HandoffDigest = a.handoffDigest(handoffKey)
 	raw, _ := json.Marshal(a)
 	// Do not release a provider link until PKCE/state has a confirmed durable home.
 	if err = e.Attempts.Create(ctx, "mikka-byos-"+id, raw); err != nil {
 		return EnrollmentStart{}, ErrStore
 	}
-	return EnrollmentStart{EnrollmentStatus{id, "claude", "awaiting_consent", false}, authorization, a.ExpiresAt}, nil
+	return EnrollmentStart{EnrollmentStatus{id, "claude", "awaiting_consent", false}, authorization, a.ExpiresAt, handoffKey}, nil
+}
+func (a enrollmentAttempt) handoffDigest(key string) string {
+	// Bind the scoped capability to the complete original ceremony. A capability
+	// copied to another owner/attempt/state/verifier/provider/expiry cannot work.
+	raw, _ := json.Marshal([]string{"mikka.byos.handoff.v1", a.Principal, a.ID, a.Provider, a.State, a.Verifier, a.ExpiresAt.UTC().Format(time.RFC3339Nano), key})
+	return hashText(string(raw))
+}
+func (e *Enrollment) Handoff(ctx context.Context, id, provider, key, callback string) (EnrollmentStatus, error) {
+	if provider != "claude" || !validState(key) {
+		return EnrollmentStatus{}, ErrUnsupported
+	}
+	return e.complete(ctx, "", id, callback, key)
 }
 func (e *Enrollment) Complete(ctx context.Context, principal, id, callback string) (EnrollmentStatus, error) {
+	if !validPrincipal(principal) {
+		return EnrollmentStatus{}, ErrUnsupported
+	}
+	return e.complete(ctx, principal, id, callback, "")
+}
+func (e *Enrollment) complete(ctx context.Context, principal, id, callback, handoffKey string) (EnrollmentStatus, error) {
 	name, err := enrollmentName(id)
-	if err != nil || !validPrincipal(principal) || len(callback) > 8192 || e.OAuth == nil {
+	if err != nil || len(callback) > 8192 || e.OAuth == nil {
 		return EnrollmentStatus{}, ErrUnsupported
 	}
 	raw, err := e.Attempts.Read(ctx, name)
@@ -104,7 +129,16 @@ func (e *Enrollment) Complete(ctx context.Context, principal, id, callback strin
 		return EnrollmentStatus{}, ErrStale
 	}
 	var a enrollmentAttempt
-	if json.Unmarshal(raw, &a) != nil || a.Schema != "mikka.byos.attempt.v1" || a.Principal != principal || a.ID != id || !e.now().Before(a.ExpiresAt) || !validState(a.State) || len(a.Verifier) != 43 {
+	if json.Unmarshal(raw, &a) != nil {
+		return EnrollmentStatus{}, ErrStale
+	}
+	if handoffKey != "" {
+		if a.Provider != "claude" || !validPrincipal(a.Principal) || len(a.HandoffDigest) != 64 || subtle.ConstantTimeCompare([]byte(a.HandoffDigest), []byte(a.handoffDigest(handoffKey))) != 1 {
+			return EnrollmentStatus{}, ErrStale
+		}
+		principal = a.Principal // Original stored principal, never browser input/current operator key.
+	}
+	if !validPrincipal(principal) || a.Schema != "mikka.byos.attempt.v1" || a.Principal != principal || a.ID != id || !e.now().Before(a.ExpiresAt) || !validState(a.State) || len(a.Verifier) != 43 {
 		return EnrollmentStatus{}, ErrStale
 	}
 	u, err := url.Parse(callback)
@@ -167,7 +201,9 @@ func (e *Enrollment) Complete(ctx context.Context, principal, id, callback strin
 	// Only temporary PKCE/state is removed; the real grant and one-use claim stay.
 	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
-	_ = e.Attempts.Delete(cleanup, name)
+	if !e.RetainSources {
+		_ = e.Attempts.Delete(cleanup, name)
+	}
 	return EnrollmentStatus{id, "claude", "pending_unbound", false}, nil
 }
 func (e *Enrollment) Status(ctx context.Context, principal, id string) (EnrollmentStatus, error) {
