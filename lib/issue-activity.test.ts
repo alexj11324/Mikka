@@ -72,3 +72,20 @@ test('joins events in the same minute into one row', () => {
   ])
   assert.deepEqual(groups.map(group => group.map(event => event.id)), [['a', 'b'], ['c'], ['d']])
 })
+
+test('events by different people in the same minute stay on separate rows', () => {
+  const groups = groupActivityByMinute([
+    { id: 'a', at: '2026-10-22T10:00:05.000Z', kind: 'created', actorKey: 'user:u1' },
+    { id: 'b', at: '2026-10-22T10:00:20.000Z', kind: 'assigned', assigneeName: 'Ada', actorKey: 'user:u1' },
+    { id: 'c', at: '2026-10-22T10:00:40.000Z', kind: 'status', status: 'doing', actorKey: 'agent:a1' },
+  ])
+  assert.deepEqual(groups.map(group => group.map(event => event.id)), [['a', 'b'], ['c']])
+})
+
+test('derived events carry the version actor', () => {
+  const events = deriveIssueActivity([
+    { id: 'v1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:00:00.000Z', actorType: 'user', actorId: 'u1' },
+    { id: 'v2', revision: 2, title: 'A', status: 'doing', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:00:30.000Z', actorType: 'agent', actorId: 'a1' },
+  ], [])
+  assert.deepEqual(events.map(event => event.actorKey), ['user:u1', 'agent:a1'])
+})
