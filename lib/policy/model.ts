@@ -16,10 +16,18 @@ export async function authorizeModelRequest(
   route: ModelRoute,
 ) {
   const result = await transaction(store.pool, async (tx) => {
-    const bindings = await store.bindings(tx, userId);
+    const bindings = await store.bindings(
+      tx,
+      userId,
+      undefined,
+      undefined,
+      true,
+    );
     if (!bindings.length) return null;
     let error = new PolicyError("policyBudgetUnavailable", 503);
     try {
+      if (bindings.some((b) => b.revoked))
+        throw new PolicyError("policyRevoked", 403);
       for (const b of bindings) admitModel(b.effective, route);
     } catch (failure) {
       if (!(failure instanceof PolicyError)) throw failure;
@@ -56,6 +64,8 @@ export function modelFetch(
     } catch {
       throw new PolicyError("modelPayloadInvalid", 403);
     }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload))
+      throw new PolicyError("modelPayloadInvalid", 403);
     if (payload.model !== route.model)
       throw new PolicyError("modelAliasDenied", 403);
     init.signal?.throwIfAborted();

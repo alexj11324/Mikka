@@ -88,7 +88,7 @@ try {
   await app.query(`INSERT INTO device_tokens(id,"userId","tokenHash") VALUES($1,$2,$3)`,[randomUUID(),userId,hash(deviceToken)])
   await app.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,$3,'/synthetic/policy')`,[repoId,deviceId,userId])
   await app.query(`INSERT INTO agents(id,"userId",harness,name,"deviceId") VALUES($1,$2,'codex','Synthetic policy worker',$3)`,[agentId,userId,deviceId])
-  await app.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,'Synthetic policy issue','{"type":"doc","content":[]}','todo','none','workspace')`,[issueId,userId])
+  await app.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,'Synthetic policy issue','{"type":"doc","content":[]}','todo','normal','workspace')`,[issueId,userId])
   await workspace.query(`INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,'Synthetic','POLICY')`,[teamId,w,userId])
   await workspace.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)`,[issueId,teamId,w,userId])
   await app.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"leaseExpiresAt") VALUES($1,$2,$3,$4,$5,$6,'queued','Synthetic policy worker',now()+interval '90 seconds')`,[runId,userId,issueId,agentId,deviceId,repoId])
@@ -134,8 +134,11 @@ try {
   }
   const versions=(await workspace.query('SELECT workspace_id,version,actor_id,rollback_of,published_at FROM organization_policy_versions WHERE workspace_id=ANY($1::uuid[]) ORDER BY workspace_id,version',[[w,other]])).rows
   const events=(await workspace.query(`SELECT tenant,seq,event,hash FROM security_audit_events WHERE tenant=ANY($1::text[]) AND event->>'action' LIKE 'policy.%' ORDER BY tenant,seq`,[[w,other]])).rows
-  await writeFile(`${evidence}/acceptance.json`,JSON.stringify({sha,utc:new Date().toISOString(),environment:'dedicated cloud Linux; compiled Next; separate loopback PG17 databases; synthetic sessions; no external provider keys',requests:receipts,versions,events,limitations:['not deployed Preview or production acceptance','no real OAuth/provider/CLI allowed path','#215 reservation and verified managed worker transport remain unavailable']},null,2))
+  await writeFile(`${evidence}/acceptance.json`,JSON.stringify({sha,results:"passed",utc:new Date().toISOString(),environment:'dedicated cloud Linux; compiled Next; separate loopback PG17 databases; synthetic sessions; no external provider keys',requests:receipts,versions,events,limitations:['not deployed Preview or production acceptance','no real OAuth/provider/CLI allowed path','#215 reservation and verified managed worker transport remain unavailable']},null,2))
   console.log(JSON.stringify({sha,requests:receipts.length,results:'passed',video:process.env.POLICY_RECORD_VIDEO==='1',evidence}))
+} catch (error) {
+  await writeFile(`${evidence}/failed-attempt.json`,JSON.stringify({sha,utc:new Date().toISOString(),error:error instanceof Error?error.message:"acceptanceFailed",requests:receipts},null,2));
+  throw error
 } finally {
   await browser?.close();if(runtime)await docker('stop','--timeout','10',name).catch(()=>{})
   await app.end();await workspace.end()

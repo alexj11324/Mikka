@@ -144,3 +144,14 @@ test("every HTTP attempt rechecks policy, endpoint, model aliases, redirect and 
   assert.equal(checks, 2);
   assert.equal(sends, 1);
 });
+
+test("signatures survive JSON persistence with optional undefined values", () => {
+  const signer = policySigner("test-only-secret-long-enough-0000000000");
+  const document = doc();
+  document.layers[0].defaults = { network: undefined };
+  const signed = signer.sign(workspaceId, 1, document);
+  assert.equal(
+    signer.verify(JSON.parse(JSON.stringify(signed))).payload.hash,
+    signed.payload.hash,
+  );
+});

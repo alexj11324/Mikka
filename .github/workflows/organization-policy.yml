@@ -11,6 +11,9 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
     services:
       postgres:
         image: postgres:17
@@ -61,8 +64,10 @@ jobs:
       - run: git rev-parse HEAD > .next/policy-source-sha
       - name: Compiled Next policy API regression
         run: |
+          set -euo pipefail
           pnpm exec next start --hostname 127.0.0.1 --port 3130 > policy-next.log 2>&1 &
           node scripts/policy/http-acceptance.mjs | tee policy-http.log
+          node -e "const a=require('./policy-http-evidence/acceptance.json'); if(a.results!=='passed'||a.requests.length<30) process.exit(1)"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,5 +1,6 @@
 import "server-only";
 import { auth } from "@/lib/auth";
+import { pool } from "@/lib/db";
 import { workspacePool } from "@/lib/workspace-db";
 import { appOrigin } from "@/lib/mcp/resource";
 import { policySigner } from "./signing";
@@ -43,6 +44,18 @@ export async function authorizePolicyWorker(
   issueId?: string,
   workspaceId?: string,
 ) {
+  // #210 captures the original tenant across retry and later task moves.
+  const captured = (
+    await pool.query(
+      "SELECT tenant FROM security_audit_resource_scopes WHERE source='agent_runs' AND resource=$1 AND owner_id=$2",
+      [runId, userId],
+    )
+  ).rows[0];
+  if (captured?.tenant && !captured.tenant.startsWith("personal:")) {
+    if (workspaceId && workspaceId !== captured.tenant)
+      throw new PolicyError("policyScopeMismatch", 403);
+    workspaceId = captured.tenant;
+  }
   return policyStore().denyWorker(userId, runId, issueId, workspaceId);
 }
 /** Existing tool/native transports cannot attest to all model/network child calls. */
@@ -50,6 +63,5 @@ export async function authorizePolicyTool(
   userId: string,
   workspaceId?: string,
 ) {
-  if ((await policyStore().current(userId, workspaceId)).length)
-    throw new PolicyError("toolEnforcementUnavailable", 409);
+  return policyStore().denyTool(userId, workspaceId);
 }

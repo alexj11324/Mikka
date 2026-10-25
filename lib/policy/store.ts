@@ -14,6 +14,7 @@ import type { PolicySigner, SignedPolicy } from "./signing";
 
 export type PolicyBinding = {
   signed: SignedPolicy;
+  revoked: boolean;
   effective: EffectivePolicy;
 };
 export class PolicyStore {
@@ -65,7 +66,13 @@ export class PolicyStore {
           )
         ).rows[0];
         if (!target) throw new PolicyError("policyVersionNotFound", 404);
-        input = this.signer.verify(target.signed).payload.document;
+        const verified = this.signer.verify(target.signed);
+        if (
+          verified.payload.workspaceId !== workspaceId ||
+          verified.payload.version !== rollbackOf
+        )
+          throw new PolicyError("policyScopeMismatch", 403);
+        input = verified.payload.document;
       }
       const document = documentSchema.parse(input);
       if (
@@ -112,11 +119,16 @@ export class PolicyStore {
       await this.member(tx, workspaceId, userId);
       const row = (
         await tx.query(
-          "SELECT v.signed, v.version FROM organization_policy_versions v JOIN organization_policy_heads h USING(workspace_id) WHERE v.workspace_id=$1 AND v.version=COALESCE($2,h.version)",
+          "SELECT v.signed, v.version FROM organization_policy_heads h LEFT JOIN organization_policy_versions v ON v.workspace_id=h.workspace_id AND v.version=COALESCE($2,h.version) WHERE h.workspace_id=$1",
           [workspaceId, version ?? null],
         )
       ).rows[0];
       if (!row) return null;
+      if (!row.signed) {
+        if (version === undefined)
+          throw new PolicyError("policyVersionUnavailable", 503);
+        return null;
+      }
       const signed = this.signer.verify(row.signed);
       if (
         signed.payload.workspaceId !== workspaceId ||
@@ -140,7 +152,11 @@ export class PolicyStore {
           )
         ).rows
       : [];
-    if (links.length) workspaceId = links[0].workspaceId;
+    if (links.length) {
+      if (workspaceId && workspaceId !== links[0].workspaceId)
+        throw new PolicyError("policyScopeMismatch", 403);
+      workspaceId = links[0].workspaceId;
+    }
     if (workspaceId) await this.member(tx, workspaceId, userId);
     // Without a trusted tenant, intersect all enrolled memberships. Omitting scope cannot bypass policy.
     const memberships = workspaceId
@@ -183,6 +199,7 @@ export class PolicyStore {
     userId: string,
     workspaceId?: string,
     issueId?: string,
+    includeRevoked = false,
   ): Promise<PolicyBinding[]> {
     const contexts = await this.contexts(tx, userId, workspaceId, issueId);
     const bindings: PolicyBinding[] = [];
@@ -205,9 +222,16 @@ export class PolicyStore {
         signed.payload.version !== row.version
       )
         throw new PolicyError("policyScopeMismatch", 403);
+      const revoked = signed.payload.document.state === "revoked";
+      if (revoked && !includeRevoked)
+        throw new PolicyError("policyRevoked", 403);
       bindings.push({
         signed,
-        effective: resolvePolicy(signed.payload.document, context),
+        revoked,
+        effective: resolvePolicy(
+          { ...signed.payload.document, state: "enforce" },
+          context,
+        ),
       });
     }
     return bindings;
@@ -224,28 +248,58 @@ export class PolicyStore {
       return bindings;
     });
   }
+  private async denyExecution(
+    userId: string,
+    runId: string,
+    issueId?: string,
+    workspaceId?: string,
+    tool = false,
+  ) {
+    const result = await transaction(this.pool, async (tx) => {
+      const bindings = await this.bindings(
+        tx,
+        userId,
+        workspaceId,
+        issueId,
+        true,
+      );
+      if (!bindings.length) return null;
+      const reason = bindings.some((b) => b.revoked)
+        ? "policyRevoked"
+        : tool
+          ? "toolEnforcementUnavailable"
+          : "workerEnforcementUnavailable";
+      for (const b of bindings)
+        await appendAudit(tx, b.signed.payload.workspaceId, {
+          actorId: userId,
+          actorType: tool ? "system" : "worker",
+          resourceId: runId,
+          ...(tool ? {} : { runId }),
+          action: tool ? "policy.tool" : "policy.worker",
+          outcome: "denied",
+          reason,
+          requestId: randomUUID(),
+        });
+      return reason;
+    });
+    if (result)
+      throw new PolicyError(result, result === "policyRevoked" ? 403 : 409);
+  }
   async denyWorker(
     userId: string,
     runId: string,
     issueId?: string,
     workspaceId?: string,
   ) {
-    const result = await transaction(this.pool, async (tx) => {
-      const bindings = await this.bindings(tx, userId, workspaceId, issueId);
-      if (!bindings.length) return false;
-      for (const b of bindings)
-        await appendAudit(tx, b.signed.payload.workspaceId, {
-          actorId: userId,
-          actorType: "worker",
-          resourceId: runId,
-          runId,
-          action: "policy.worker",
-          outcome: "denied",
-          reason: "workerEnforcementUnavailable",
-          requestId: randomUUID(),
-        });
-      return true;
-    });
-    if (result) throw new PolicyError("workerEnforcementUnavailable", 409);
+    return this.denyExecution(userId, runId, issueId, workspaceId);
+  }
+  async denyTool(userId: string, workspaceId?: string) {
+    return this.denyExecution(
+      userId,
+      "unscoped-tool",
+      undefined,
+      workspaceId,
+      true,
+    );
   }
 }

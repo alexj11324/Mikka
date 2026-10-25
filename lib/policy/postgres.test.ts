@@ -186,6 +186,10 @@ test(
             /workerEnforcementUnavailable/,
           );
           await assert.rejects(
+            store.denyTool(userId, workspaceId),
+            /toolEnforcementUnavailable/,
+          );
+          await assert.rejects(
             store.publish(workspaceId, userId, 1, {
               ...document(),
               layers: [
@@ -208,6 +212,27 @@ test(
           await assert.rejects(
             store.current(userId, workspaceId),
             /policyRevoked/,
+          );
+          await assert.rejects(
+            authorizeModelRequest(store, userId, AGENT_ROUTE),
+            /policyRevoked/,
+          );
+          await assert.rejects(
+            store.denyWorker(userId, randomUUID(), undefined, workspaceId),
+            /policyRevoked/,
+          );
+          await assert.rejects(
+            store.denyTool(userId, workspaceId),
+            /policyRevoked/,
+          );
+          assert.equal(
+            (
+              await pool.query(
+                "SELECT count(*) FROM security_audit_events WHERE tenant=$1 AND event->>'reason'='policyRevoked'",
+                [workspaceId],
+              )
+            ).rows[0].count,
+            "3",
           );
           const restored = await store.publish(
             workspaceId,
@@ -297,6 +322,10 @@ test(
           try {
             await assert.rejects(
               store.current(userId, workspaceId),
+              /policyVersionUnavailable/,
+            );
+            await assert.rejects(
+              store.read(workspaceId, userId),
               /policyVersionUnavailable/,
             );
           } finally {

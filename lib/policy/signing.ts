@@ -12,6 +12,7 @@ export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value && typeof value === "object")
     return `{${Object.keys(value)
+      .filter((k) => (value as Record<string, unknown>)[k] !== undefined)
       .sort()
       .map(
         (k) =>
