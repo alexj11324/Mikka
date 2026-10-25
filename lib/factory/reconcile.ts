@@ -30,7 +30,9 @@ export function createFactoryReconciler(
     if (questions) {
       let cursor: string | null = null;
       while (true) {
-        const { rows: endedQuestions } = await pool.query(
+        const { rows: endedQuestions }: {
+          rows: { id: string; continuationRunId: string }[];
+        } = await pool.query(
           `SELECT q.id,q."continuationRunId" FROM factory_questions q
          LEFT JOIN agent_runs r ON r.id=q."continuationRunId" AND r."userId"=q."userId" AND r."issueId"=q."issueId"
          WHERE q."userId"=$1 AND q.status='resuming' AND (r.id IS NULL OR r.status IN ('succeeded','failed','stopped','cancelled'))
