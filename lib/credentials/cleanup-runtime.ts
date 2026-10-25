@@ -27,6 +27,7 @@ export function getCredentialCleanupBroker() {
     environment: process.env.MIKKA_CREDENTIAL_VAULT_ENVIRONMENT ?? '',
     secretPath: process.env.MIKKA_CREDENTIAL_VAULT_PATH ?? '',
     accessToken: () => tokens.getAccessToken(), rejectAccessToken: tokens.rejectAccessToken,
+    onFailure: failure => console.warn('credential_cleanup_vault_failure', failure),
   })
   const workspace = new Pool({ connectionString: process.env.DATABASE_URL, max: 2,
     connectionTimeoutMillis: 5000, idleTimeoutMillis: 10000 })
