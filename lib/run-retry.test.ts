@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { lostRunOutcome, MAX_RUN_ATTEMPTS, retryPrompt } from './run-retry'
+import { lostRunOutcome, MAX_RUN_ATTEMPTS, retryNote, retryPrompt } from './run-retry'
 
 const run = { attempt: 1, stopRequestedAt: null, issueId: 'issue-1', deviceRepoId: 'repo-1' }
 
@@ -36,4 +36,10 @@ test('the retry brief stays within the prompt limit and keeps its note', () => {
   const prompt = retryPrompt('x'.repeat(100_000), 2)
   assert.ok(prompt.length <= 100_000)
   assert.match(prompt, /## This run is a retry/)
+})
+
+test('a resumed session gets only the note on what happened', () => {
+  const note = retryNote(2)
+  assert.match(note, /^## This run is a retry/)
+  assert.ok(retryPrompt('# Fix login', 2).endsWith(note))
 })

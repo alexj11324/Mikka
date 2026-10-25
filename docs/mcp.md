@@ -3,57 +3,27 @@
 Agents such as Claude Code and Codex can drive Mikka through its MCP server at
 `https://app.aspectlylabs.com/mikka/api/mcp` (Streamable HTTP).
 
-## Connecting
-
-Claude Code:
-
-```sh
-claude mcp add --transport http mikka https://app.aspectlylabs.com/mikka/api/mcp
-```
-
-Codex (`~/.codex/config.toml`):
-
-```toml
-[mcp_servers.mikka]
-url = "https://app.aspectlylabs.com/mikka/api/mcp"
-```
-
-then `codex mcp login mikka`.
-
-The first connection opens a browser: sign in to Mikka and allow the agent.
-The agent then acts as you.
+How to connect and the tool list for users are in the public docs:
+[aspectlylabs.com/mikka/docs/mcp](https://aspectlylabs.com/mikka/docs/mcp)
+(`mikka-web/content/docs/mcp.mdx`). This page covers the implementation.
 
 ## Tools
-
-| Tool | What it does |
-| --- | --- |
-| `send_to_coordinator` | Sends a message to your Coordinator, as if typed in the chat, and wakes it. Returns `after`. |
-| `read_coordinator_messages` | Reads the conversation after a position; `waitSeconds` waits for the Coordinator's reply. |
-| `list_issues`, `get_issue` | Your issues, and one issue with its text and latest runs. |
-| `list_runs`, `get_run` | Recent agent runs, and one run with its summary and latest events. |
-| `get_run_events` | A run's full event stream, a page at a time. |
-| `search_issues` | Issues whose title or text contains the words. |
-| `list_projects`, `list_labels`, `list_agents` | Your projects, the labels in use, and your agents with their devices and repositories. |
-| `create_issue`, `update_issue` | Create an issue, or change its title, status, priority, project, labels or assigned agent. |
-| `link_issues` | Add or remove a parent, child, related, blocked-by, blocks or duplicate link. |
-| `dispatch_run`, `send_to_run`, `stop_run` | Queue a run for an agent, message a running agent, ask a run to stop. |
-
-`dispatch_run` accepts an optional `requestKey` (1–200 characters). Keep the
-same key when retrying one logical request after a timeout or lost response.
-The key belongs to the authenticated user and is bound to the issue, agent,
-repository and normalized note. Reusing it with changed parameters returns
-`runDispatchKeyConflict`. An exact replay returns the original `runId`, its
-current `status`, and `replayed: true`, even after that run ends. New requests
-return `replayed: false`. Current access is checked before every replay.
-Without a key, older callers still work, but cannot recover a lost response
-after the run ends. All callers receive `runAlreadyActive` if a new dispatch
-would overlap another active run by that user on the same issue.
-| `read_coordinator_memory`, `remember`, `forget` | Read and edit the notes your Coordinator keeps about you. |
 
 `get_issue` also returns the issue's project, labels, assignee and relations.
 Writes run the app's own server actions inside `actAs` (`lib/acting-user.ts`),
 so an agent gets the same validation and access checks as the UI; a refused
 write returns the action's error code (`issueNotFound`, `issueParentCycle`…).
+
+## Dispatch transactions
+
+The shared `queueRun` path accepts an optional `requestKey` (1–200 characters).
+The owner/key binds the issue, agent, repository and normalized note. A
+transactional advisory lock serializes each key, and another serializes new
+dispatches by owner/issue. A matching replay returns the original `runId`, its
+current `status` and `replayed: true`, including terminal runs. Changed
+parameters return `runDispatchKeyConflict`; an overlapping new run returns
+`runAlreadyActive`. Access checks run before replay lookup. Unkeyed legacy
+callers use the same overlap gate but cannot replay after a run ends.
 
 ## How sign-in works
 
