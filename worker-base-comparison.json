@@ -1,0 +1,28 @@
+{
+  "utc": "2026-10-25T18:23:17.471Z",
+  "mode": "two actual Next development runtimes and separate fresh PG17 databases; complete real HTTP test, no assertions removed",
+  "baseSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+  "baseResult": "passed in 5.2s",
+  "baseMigrations": 59,
+  "headSha": "80f3cab2b15ad967d1a27e45e6f833435d4de72e",
+  "headResult": "passed in 5.2s",
+  "headMigrations": 60,
+  "boundary": "request-correlated committed worker.authenticated audit event; existing current-role/token/stop/expiry/lock-wait/six-concurrent assertions retained",
+  "case": "tests/e2e/worker-authorization.spec.ts: worker MCP rechecks current issue authority after queueing and revocation",
+  "commands": [
+    {
+      "source": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+      "baseURL": "http://127.0.0.1:3132",
+      "database": "isolated loopback :55431/mikka_e2e",
+      "command": "playwright test --config /tmp/policy-worker-base.config.mjs",
+      "result": "1 passed (5.2s)"
+    },
+    {
+      "source": "80f3cab2b15ad967d1a27e45e6f833435d4de72e",
+      "baseURL": "http://127.0.0.1:3131",
+      "database": "isolated loopback :55430/mikka_e2e",
+      "command": "playwright test --config /tmp/policy-worker-80.config.mjs",
+      "result": "1 passed (5.2s)"
+    }
+  ]
+}

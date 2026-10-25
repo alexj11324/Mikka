@@ -1,0 +1,9 @@
+
+Running 1 test using 1 worker
+
+(node:27298) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/1] tests/e2e/worker-authorization.spec.ts:8:1 › worker MCP rechecks current issue authority after queueing and revocation
+  1 passed (5.2s)

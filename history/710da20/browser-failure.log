@@ -1,0 +1,628 @@
+Production build and browser interactions	Browser functionality regression	﻿2026-10-25T17:45:18.7907364Z ##[group]Run pnpm test:e2e --grep-invert @performance
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:18.7907824Z [36;1mpnpm test:e2e --grep-invert @performance[0m
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:18.7970424Z shell: /usr/bin/bash -e {0}
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:18.7970696Z env:
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:18.7970882Z   CI: true
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:18.7971568Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:18.7972049Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:18.7972489Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:18.7972801Z   BETTER_AUTH_URL: http://localhost:3100
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:18.7973091Z   NEXT_TELEMETRY_DISABLED: 1
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:18.7973410Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:18.7973891Z   BETTER_AUTH_SECRET: [ephemeral test value omitted]
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:18.7974328Z ##[endgroup]
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:19.1340189Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:19.1340873Z > next-app@0.0.1 test:e2e /home/runner/work/Mikka/Mikka
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:19.1341897Z > playwright test --grep-invert @performance
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:19.1342232Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:25.2722491Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:25.2723128Z Running 87 tests using 1 worker
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:25.2723724Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:30.5212094Z [WebServer] 2026-10-25T17:45:30.518Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:30.5213386Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:30.5213781Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:30.5214318Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:30.5214786Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:30.5216099Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:31.9729838Z [WebServer] Yjs was already imported. This breaks constructor checks and will lead to issues! - https://github.com/yjs/yjs/issues/438
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:36.8987313Z [WebServer] 2026-10-25T17:45:36.897Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:36.8988154Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:36.8988531Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:36.8988803Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:36.8989073Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:36.8989319Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:38.3340610Z   ✓   1 [chromium] › tests/e2e/agent-performance.spec.ts:109:1 › 历史读取保持账号隔离，并正确处理空会话与无效会话 (12.5s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:38.3825250Z   -   2 [chromium] › tests/e2e/agent.spec.ts:4:1 › 开发预览验收入口不跳转到内部主机
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:38.4105376Z   ✓   3 [chromium] › tests/e2e/agent.spec.ts:13:1 › Agent 接口拒绝未登录请求与跨站请求 (17ms)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:42.9780471Z [WebServer] 2026-10-25T17:45:42.977Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:42.9782222Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:42.9782819Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:42.9783291Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:42.9783673Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:42.9783923Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:43.8785728Z   ✓   4 [chromium] › tests/e2e/agent.spec.ts:20:1 › Agent 接口验证输入且不接受客户端密钥 (5.5s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:48.4324362Z [WebServer] 2026-10-25T17:45:48.431Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:48.4325819Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:48.4326407Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:48.4326869Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:48.4327324Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:48.4328018Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:50.8005120Z   ✓   5 [chromium] › tests/e2e/agent.spec.ts:32:1 › Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区导航 (6.9s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:55.3540650Z [WebServer] 2026-10-25T17:45:55.353Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:55.3542020Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:55.3542375Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:55.3542664Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:55.3543421Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:55.3543668Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:45:58.6438017Z   ✓   6 [chromium] › tests/e2e/agent.spec.ts:110:1 › 组件演示的 LaTeX 字体、复杂排版与窄屏滚动正确，返回后保留草稿 (7.8s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:03.2661761Z [WebServer] 2026-10-25T17:46:03.265Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:03.2702138Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:03.2703121Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:03.2703844Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:03.2704523Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:03.2705225Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:05.2384071Z   ✓   7 [chromium] › tests/e2e/agent.spec.ts:164:1 › Agent 输入完整显示单行文字，超过四行才显示自定义滚动条 (6.6s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:09.8162298Z [WebServer] 2026-10-25T17:46:09.815Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:09.8163443Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:09.8163843Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:09.8164294Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:09.8164565Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:09.8164811Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:11.8423877Z   ✓   8 [chromium] › tests/e2e/agent.spec.ts:198:3 › 停止生成在 headers 阶段取消请求且不重新提交 (6.6s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:16.3897784Z [WebServer] 2026-10-25T17:46:16.388Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:16.3899763Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:16.3900962Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:16.3901901Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:16.3902438Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:16.3902872Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:18.5095807Z   ✓   9 [chromium] › tests/e2e/agent.spec.ts:198:3 › 停止生成在 body 阶段取消请求且不重新提交 (6.7s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:23.0711484Z [WebServer] 2026-10-25T17:46:23.070Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:23.0712783Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:23.0713328Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:23.0713778Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:23.0714209Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:23.0714609Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:25.2395081Z   ✓  10 [chromium] › tests/e2e/agent.spec.ts:238:1 › 生成期间可新建和切换任务，独立保留草稿、回复与停止状态 (6.7s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:29.7876564Z [WebServer] 2026-10-25T17:46:29.786Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:29.7877973Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:29.7878818Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:29.7879538Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:29.7880144Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:29.7880680Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:32.1662710Z   ✓  11 [chromium] › tests/e2e/agent.spec.ts:306:1 › 左侧列表与 ⌘K 切换历史，标题胶囊跟随当前对话 (6.9s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:36.7793590Z [WebServer] 2026-10-25T17:46:36.778Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:36.7795001Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:36.7795608Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:36.7796118Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:36.7796580Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:36.7796994Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:38.2865187Z   ✓  12 [chromium] › tests/e2e/agent.spec.ts:363:1 › beUI 注册组件展示用户数字且动效按钮直���提问并保留草稿 (6.1s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:42.8198218Z [WebServer] 2026-10-25T17:46:42.819Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:42.8200991Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:42.8202420Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:42.8203319Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:42.8204056Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:42.8205338Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:45.0532307Z   ✓  13 [chromium] › tests/e2e/agent.spec.ts:398:1 › beUI 功能组展示回复与计划，审批和多步回答直接继续且不覆盖草稿 (6.8s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:49.5879310Z [WebServer] 2026-10-25T17:46:49.586Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:49.5881346Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:49.5881967Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:49.5882439Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:49.5882919Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:49.5883417Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:51.5675762Z   ✓  14 [chromium] › tests/e2e/agent.spec.ts:455:1 › beUI 内联回答失败与停止后���留选择，可在原卡片重试且不重复提交 (6.5s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:56.1144949Z [WebServer] 2026-10-25T17:46:56.113Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:56.1146189Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:56.1146811Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:56.1147294Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:56.1147736Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:56.1148147Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:46:58.2516441Z   ✓  15 [chromium] › tests/e2e/agent.spec.ts:514:1 › 旧按钮直接提问，纯文本在原卡片回答且失败可重试 (6.7s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:02.7755472Z [WebServer] 2026-10-25T17:47:02.774Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:02.7765220Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:02.7765993Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:02.7766707Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:02.7767290Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:02.7767787Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:04.4620429Z   ✓  16 [chromium] › tests/e2e/agent.spec.ts:563:1 › 真实配图异步展示来源，支持放大缩放和 Escape 关闭，失败不影响正文 (6.2s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:09.0111704Z [WebServer] 2026-10-25T17:47:09.010Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:09.0112788Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:09.0113134Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:09.0113414Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:09.0113686Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:09.0113921Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:10.6143945Z   ✓  17 [chromium] › tests/e2e/agent.spec.ts:596:1 › 紧凑图文卡片使用 beUI Card、来源可展开、无冗余等待文案 (6.1s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:15.1682232Z [WebServer] 2026-10-25T17:47:15.167Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:15.1684976Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:15.1689447Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:15.1690270Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:15.1690814Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:15.1691507Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:16.8370572Z   ✓  18 [chromium] › tests/e2e/agent.spec.ts:630:1 › 可恢复格式不报错，真正缺段可原位重试且不覆盖草稿 (6.2s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:21.3681576Z [WebServer] 2026-10-25T17:47:21.367Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:21.3682868Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:21.3683448Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:21.3683975Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:21.3684378Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:21.3684746Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:23.1516971Z   ✓  19 [chromium] › tests/e2e/agent.spec.ts:669:1 › 代码块按需高亮，正文和复制功能保持可用 (6.3s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:27.6803426Z [WebServer] 2026-10-25T17:47:27.679Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:27.6804978Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:27.6805719Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:27.6806251Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:27.6806713Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:27.6807132Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:31.4380398Z   ✓  20 [chromium] › tests/e2e/agent.spec.ts:696:1 › OpenUI 表格、Tabs 和表单直接提交，兼容按钮续问且会话稳定 (8.3s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:35.9857966Z [WebServer] 2026-10-25T17:47:35.985Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:35.9859186Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:35.9859555Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:35.9859843Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:35.9860108Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:35.9860353Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:39.2269401Z   ✓  21 [chromium] › tests/e2e/avatar.spec.ts:4:1 › 中文姓名不参与头像，账号图片优先，加载失败回退邮箱首字母 (7.8s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:43.3918228Z   ✓  22 [chromium] › tests/e2e/control-audit.spec.ts:5:3 › 点击断言拒绝无效果控件：空处理函数 (4.1s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:47.5456167Z   ✓  23 [chromium] › tests/e2e/control-audit.spec.ts:5:3 › 点击断言拒绝无效果控件：console.log("没有业务效果") (4.1s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:51.7063289Z   ✓  24 [chromium] › tests/e2e/control-audit.spec.ts:5:3 › 点击断言拒绝无效果控件：void fetch("/poll") (4.2s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:51.9867590Z   ✓  25 [chromium] › tests/e2e/control-audit.spec.ts:16:1 › 点击断言接受原生文件选择器 (272ms)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:52.2522097Z   ✓  26 [chromium] › tests/e2e/control-audit.spec.ts:24:1 › 点击断言接受真实界面变化 (257ms)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:56.7829333Z [WebServer] 2026-10-25T17:47:56.782Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:56.7830874Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:56.7831743Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:56.7834250Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:56.7835136Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:47:56.7836031Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:48:33.2588285Z   ✓  27 [chromium] › tests/e2e/controls.spec.ts:40:3 › 自动发现可见控件并验证点击效果：工作台 (41.0s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:48:37.7973511Z [WebServer] 2026-10-25T17:48:37.796Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:48:37.7975182Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:48:37.7976105Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:48:37.7976634Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:48:37.7977069Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:48:37.7977477Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:00.2733017Z   ✓  28 [chromium] › tests/e2e/controls.spec.ts:40:3 › 自动发现可见控件并验证点击效果：成员管理 (27.0s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:04.8341495Z [WebServer] 2026-10-25T17:49:04.833Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:04.8343036Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:04.8344245Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:04.8344804Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:04.8345313Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:04.8345998Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:13.5320688Z   ✓  29 [chromium] › tests/e2e/controls.spec.ts:40:3 › 自动发现可见控件并验证点击效果：邀请弹窗 (13.2s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:18.1044715Z [WebServer] 2026-10-25T17:49:18.103Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:18.1046314Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:18.1046879Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:18.1047330Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:18.1047777Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:18.1048210Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:23.9950521Z   ✓  30 [chromium] › tests/e2e/controls.spec.ts:40:3 › 自动发现可见控件并验证点击效果：新建任务 (10.5s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:28.5314214Z [WebServer] 2026-10-25T17:49:28.530Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:28.5315922Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:28.5316867Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:28.5317700Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:28.5318277Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:28.5318565Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:40.8111983Z   ✓  31 [chromium] › tests/e2e/controls.spec.ts:40:3 › 自动发现可见控件并验证点击效果：看板筛选菜单 (16.8s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:45.3489186Z [WebServer] 2026-10-25T17:49:45.348Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:45.3490490Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:45.3491305Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:45.3491821Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:45.3492301Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:45.3492789Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.1620392Z   ✓  32 [chromium] › tests/e2e/controls.spec.ts:40:3 › 自动发现可见控件并验证点击效果：工作区菜单 (9.3s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.7974775Z [WebServer] 2026-10-25T17:49:50.796Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.7976191Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.7976792Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.7977291Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.7977759Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.7978313Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.8837769Z [WebServer] 2026-10-25T17:49:50.883Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.8839221Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.8839805Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.8840301Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.8840787Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:50.8841814Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:51.3133793Z   ✓  33 [chromium] › tests/e2e/coordinator-submission.spec.ts:32:1 › frozen client against real HTTP/session/PG: concurrent retry, conflict, owner and Origin fences (602ms)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:51.4783682Z [WebServer] 2026-10-25T17:49:51.476Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:51.4785030Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:51.4785667Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:51.4786233Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:51.4786753Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:51.4787208Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:52.9677145Z   ✓  34 [chromium] › tests/e2e/coordinator-submission.spec.ts:154:3 › browser chat: committed response loss retries the frozen submission once (1.6s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:53.1076787Z [WebServer] 2026-10-25T17:49:53.107Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:53.1078044Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:53.1078601Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:53.1079465Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:53.1080219Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:53.1080491Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:55.3843681Z   ✓  35 [chromium] › tests/e2e/coordinator-submission.spec.ts:154:3 › browser task-dialog: committed response loss retries the frozen submission once (2.4s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:55.5178208Z [WebServer] 2026-10-25T17:49:55.517Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:55.5179934Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:55.5180299Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:55.5180848Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:55.5181589Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:55.5182085Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:56.8702710Z   ✓  36 [chromium] › tests/e2e/coordinator-submission.spec.ts:154:3 › browser command-panel: committed response loss retries the frozen submission once (1.5s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:56.9781575Z [WebServer] 2026-10-25T17:49:56.977Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:56.9782698Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:56.9783056Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:56.9783501Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:56.9783780Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:56.9784029Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:57.0642354Z [WebServer] 2026-10-25T17:49:57.062Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:57.0643861Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:57.0644487Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:57.0645001Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:57.0645511Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:57.0645946Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:57.3448632Z   ✓  37 [chromium] › tests/e2e/factory-api.spec.ts:8:1 › Factory HTTP API isolates owners, requires sessions/origins and atomically cancels a bound run (460ms)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:57.6157079Z   ✓  38 [chromium] › tests/e2e/factory-check-api.spec.ts:12:1 › Factory check claim pins SHA/read-only/command and preserves trusted receipt through completion (251ms)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:57.9738472Z   ✓  39 [chromium] › tests/e2e/factory-execution-claim.spec.ts:11:1 › Factory execution claims reject stopped tasks and unadopted retry children before token issuance (342ms)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:49:59.8175092Z   ✓  40 [chromium] › tests/e2e/group-heartbeat-fence.spec.ts:7:1 › generic heartbeat cannot revive expired group epochs or ordinary leases (1.8s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:00.0453576Z   ✓  41 [chromium] › tests/e2e/group-worker-authority.spec.ts:7:1 › dedicated group HTTP admits persisted issue-less assignment but never generic MCP (217ms)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:04.5616141Z [WebServer] 2026-10-25T17:50:04.560Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:04.5617585Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:04.5618328Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:04.5618896Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:04.5619294Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:04.5619657Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:06.0738411Z   ✓  42 [chromium] › tests/e2e/history-request-observer.spec.ts:4:1 › history observer excludes the fixture document and catches a real duplicate in the measured document (6.0s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:10.6729045Z [WebServer] 2026-10-25T17:50:10.672Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:10.6730356Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:10.6739780Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:10.6740578Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:10.6741300Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:10.6742107Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:13.9659643Z   ✓  43 [chromium] › tests/e2e/issue-menu-collision.spec.ts:14:3 › 任务操作菜单使用组件默认碰撞限高，首尾与状态子菜单可访问 1280x720 (7.9s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:18.4908266Z [WebServer] 2026-10-25T17:50:18.490Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:18.4909907Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:18.4910698Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:18.4911600Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:18.4912301Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:18.4913421Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:21.6959582Z   ✓  44 [chromium] › tests/e2e/issue-menu-collision.spec.ts:14:3 › 任务操作菜单使用组件默认碰撞限高，首尾与状态子菜单可访问 1280x900 (7.7s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:26.2475848Z [WebServer] 2026-10-25T17:50:26.246Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:26.2477219Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:26.2477781Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:26.2478237Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:26.2478685Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:26.2479135Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:29.3880152Z   ✓  45 [chromium] › tests/e2e/issue-menu-collision.spec.ts:14:3 › 任务操作菜单使用组件默认碰撞限高，首尾与状态子菜单可访问 1280x480 (7.7s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:34.0078339Z [WebServer] 2026-10-25T17:50:34.007Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:34.0079943Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:34.0080764Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:34.0081448Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:34.0081873Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:34.0082123Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:35.5474508Z   ✓  46 [chromium] › tests/e2e/members.spec.ts:4:1 › 旧设置预览地址跳转到真实成员设置并保留参数 (6.1s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:40.1078812Z [WebServer] 2026-10-25T17:50:40.107Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:40.1079724Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:40.1080124Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:40.1080505Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:40.1080819Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:40.1096599Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:44.2582835Z   ✓  47 [chromium] › tests/e2e/members.spec.ts:19:1 › 成员导航、邀请取消、角色选择、创建和撤销邀请、管理员保护 (8.7s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:48.7903396Z [WebServer] 2026-10-25T17:50:48.787Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:48.7904766Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:48.7905328Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:48.7905803Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:48.7906259Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:48.7906670Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:50.7353462Z   ✓  48 [chromium] › tests/e2e/members.spec.ts:102:1 › CSV 拖拽去重、导入错误保护、批量邀请和导出 (6.5s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:55.2996910Z [WebServer] 2026-10-25T17:50:55.299Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:55.2998262Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:55.2998617Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:55.2998892Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:55.2999147Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:50:55.2999380Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:01.3003205Z [WebServer] 2026-10-25T17:51:01.299Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:01.3004693Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:01.3005191Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:01.3005633Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:01.3006026Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:01.3006372Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:04.8959647Z   ✓  49 [chromium] › tests/e2e/members.spec.ts:172:1 › 受邀邮箱加入后，管理员可停用并恢复成员 (14.1s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:09.4024347Z [WebServer] 2026-10-25T17:51:09.401Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:09.4025686Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:09.4034141Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:09.4037047Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:09.4037887Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:09.4038336Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:11.3633330Z   ✓  50 [chromium] › tests/e2e/navigation-performance.spec.ts:4:1 › 移动侧栏在水合与尺寸检测完成前不可点击，就绪后首次点击即可打开 (6.5s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:15.9270145Z [WebServer] 2026-10-25T17:51:15.926Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:15.9271609Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:15.9272699Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:15.9273186Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:15.9273585Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:15.9273827Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:17.6569810Z   ✓  51 [chromium] › tests/e2e/progressive-loading.spec.ts:3:1 › 聊天历史未返回时壳子已可导航，恢复后显示真实会话 (6.3s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:22.1912228Z [WebServer] 2026-10-25T17:51:22.190Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:22.1914050Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:22.1915004Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:22.1915832Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:22.1916381Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:22.1916895Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:23.6942552Z   ✓  52 [chromium] › tests/e2e/progressive-loading.spec.ts:30:1 › 任务与项目请求未返回时聊天可独立加载 (6.0s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:28.3273072Z [WebServer] 2026-10-25T17:51:28.326Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:28.3274618Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:28.3275467Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:28.3275967Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:28.3276428Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:28.3276778Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:30.8073773Z [WebServer] (node:9713) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:30.8075973Z [WebServer] (Use `node --trace-deprecation ...` to show where the warning was created)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:31.4560677Z [WebServer] Yjs was already imported. This breaks constructor checks and will lead to issues! - https://github.com/yjs/yjs/issues/438
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:49.5622805Z   ✓  53 [chromium] › tests/e2e/relations.spec.ts:28:3 › 子任务与阻塞关系的创建、循环校验、解除和刷新持久化 402 (25.9s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:54.1326668Z [WebServer] 2026-10-25T17:51:54.131Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:54.1333407Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:54.1334508Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:54.1335476Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:54.1340763Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:51:54.1342021Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:15.5352700Z   ✓  54 [chromium] › tests/e2e/relations.spec.ts:28:3 › 子任务与阻塞关系的创建、循环校验、解除和刷新持久化 1280 (26.0s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:15.6180098Z   ✓  55 [chromium] › tests/e2e/routes.spec.ts:4:1 › 旧预览入口和设置入口均跳转到正式页面 (61ms)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:16.6215814Z   ✓  56 [chromium] › tests/e2e/routes.spec.ts:22:1 › 匿名访问旧设置入口会重定向到登录页并保留设置路径 (993ms)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:21.1732542Z [WebServer] 2026-10-25T17:52:21.172Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:21.1734808Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:21.1735575Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:21.1736090Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:21.1736565Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:21.1736988Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:23.3381407Z   ✓  57 [chromium] › tests/e2e/self-improvement-api.spec.ts:17:1 › Skill baseline selection, actual claim receipt and feedback provenance use real authenticated routes (6.7s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:27.8777783Z [WebServer] 2026-10-25T17:52:27.877Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:27.8779023Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:27.8779559Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:27.8780069Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:27.8780489Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:27.8780884Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:29.4585606Z   ✓  58 [chromium] › tests/e2e/settings-surface.spec.ts:12:1 › settings row dividers span the grouped card edges (6.1s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:34.0227994Z [WebServer] 2026-10-25T17:52:34.022Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:34.0229259Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:34.0229843Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:34.0230331Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:34.0230866Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:34.0231594Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:36.6929064Z   ✓  59 [chromium] › tests/e2e/settings.spec.ts:3:1 › 从工作台打开设置不等待 RSC，成员读取未完成时仍可立即切走 (7.2s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:41.2274873Z [WebServer] 2026-10-25T17:52:41.226Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:41.2276668Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:41.2277515Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:41.2278082Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:41.2278602Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:41.2279036Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:42.3263143Z   ✓  60 [chromium] › tests/e2e/settings.spec.ts:67:1 › 工作区访问拒绝 › 工作区数据等待和拒绝访问时不泄漏上一工作区内容 (5.6s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:46.8798402Z [WebServer] 2026-10-25T17:52:46.879Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:46.8807190Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:46.8807872Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:46.8808342Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:46.8808797Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:46.8809206Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:48.5332321Z   ✓  61 [chromium] › tests/e2e/settings.spec.ts:80:1 › 个人设置切换不请求服务端，并保持 URL、历史记录与跨页导航一致 (6.2s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:53.0866205Z [WebServer] 2026-10-25T17:52:53.085Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:53.0867708Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:53.0868632Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:53.0869355Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:53.0869867Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:53.0870282Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:55.3697886Z   ✓  62 [chromium] › tests/e2e/settings.spec.ts:120:1 › 团队子页切换复用目录，历史记录和刷新可恢复当前视图 (6.8s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:59.9324146Z [WebServer] 2026-10-25T17:52:59.931Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:59.9325945Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:59.9326735Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:59.9327242Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:59.9327719Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:52:59.9328141Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:01.6039019Z   ✓  63 [chromium] › tests/e2e/settings.spec.ts:154:1 › 成员首屏使用服务端结果，不立即重复读取成员 API (6.2s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:06.1219220Z [WebServer] 2026-10-25T17:53:06.121Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:06.1220760Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:06.1221692Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:06.1222598Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:06.1223440Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:06.1224214Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:09.9802559Z   ✓  64 [chromium] › tests/e2e/settings.spec.ts:167:1 › 团队创建、常规设置与成员管理都在同一设置页内完成 (8.4s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:14.5386596Z [WebServer] 2026-10-25T17:53:14.537Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:14.5388291Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:14.5389241Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:14.5390823Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:14.5392037Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:14.5392955Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:16.3189033Z   ✓  65 [chromium] › tests/e2e/settings.spec.ts:282:1 › 移动端页内创建不横向溢出，返回和侧栏切换保护未保存内容 (6.3s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:20.8482107Z [WebServer] 2026-10-25T17:53:20.847Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:20.8483619Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:20.8484281Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:20.8484863Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:20.8485454Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:20.8486051Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:22.7822913Z   ✓  66 [chromium] › tests/e2e/sign-out.spec.ts:7:3 › sign-out hides private UI while pending, restores failures, and revokes the session: / (6.4s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:27.3251958Z [WebServer] 2026-10-25T17:53:27.324Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:27.3253294Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:27.3253857Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:27.3254321Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:27.3254764Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:27.3255168Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:29.3303090Z   ✓  67 [chromium] › tests/e2e/sign-out.spec.ts:7:3 › sign-out hides private UI while pending, restores failures, and revokes the session: /settings/members (6.5s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:33.8672861Z [WebServer] 2026-10-25T17:53:33.866Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:33.8674611Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:33.8675256Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:33.8675766Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:33.8676252Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:33.8676706Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:35.4000331Z   ✓  68 [chromium] › tests/e2e/sign-out.spec.ts:7:3 › sign-out hides private UI while pending, restores failures, and revokes the session: /en/devices (6.1s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:39.9434028Z [WebServer] 2026-10-25T17:53:39.942Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:39.9435339Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:39.9435868Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:39.9436320Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:39.9436773Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:39.9437201Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:43.0190586Z   ✓  69 [chromium] › tests/e2e/sign-out.spec.ts:7:3 › sign-out hides private UI while pending, restores failures, and revokes the session: /devices (7.6s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:47.6316829Z [WebServer] 2026-10-25T17:53:47.629Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:47.6318191Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:47.6318851Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:47.6319884Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:47.6320374Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:47.6320805Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:51.3963249Z   ✓  70 [chromium] › tests/e2e/sign-out.spec.ts:84:1 › sign-out waits for editor validation and preserves saved edits when revocation fails (8.4s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:55.9207070Z [WebServer] 2026-10-25T17:53:55.919Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:55.9208352Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:55.9208972Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:55.9209465Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:55.9209924Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:55.9210213Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:53:59.3043648Z   ✓  71 [chromium] › tests/e2e/sign-out.spec.ts:125:1 › failed sign-out preserves an invalid project draft and its validation error (7.9s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:03.8558183Z [WebServer] 2026-10-25T17:54:03.855Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:03.8559883Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:03.8561484Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:03.8562228Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:03.8562767Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:03.8563224Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:14.0101412Z   ✓  72 [chromium] › tests/e2e/teams.spec.ts:47:1 › 公开团队创建、搜索、编辑、负责人保护、任务归属和项目多团队关联 (14.7s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:18.5735409Z [WebServer] 2026-10-25T17:54:18.572Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:18.5736778Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:18.5742342Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:18.5743103Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:18.5764453Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:18.5764941Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:27.7444476Z [WebServer] 2026-10-25T17:54:27.743Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:27.7445890Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:27.7446635Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:27.7447179Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:27.7447764Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:27.7448218Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:33.3070444Z   ✓  73 [chromium] › tests/e2e/teams.spec.ts:119:1 › 公开范围限于工作区，未加入团队可访问，停用成员后撤销访问 (19.3s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:37.8534289Z [WebServer] 2026-10-25T17:54:37.852Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:37.8535849Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:37.8536213Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:37.8536498Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:37.8536773Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:37.8537026Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:47.8887419Z [WebServer] 2026-10-25T17:54:47.887Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:47.8888807Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:47.8890848Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:47.8892623Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:47.8893155Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:47.8893588Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:54:54.8181792Z   ✓  74 [chromium] › tests/e2e/teams.spec.ts:179:1 › 非创建者成员在他人公开任务上改父子关系，关系区与选择器立即刷新 (21.5s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:05.2253273Z   ✘  75 [chromium] › tests/e2e/worker-authorization.spec.ts:8:1 › worker MCP rechecks current issue authority after queueing and revocation (10.3s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:11.0056807Z [WebServer] 2026-10-25T17:55:11.004Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:11.0058174Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:11.0058556Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:11.0059172Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:11.0059457Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:11.0059710Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:16.6406496Z   ✓  76 [chromium] › tests/e2e/workspace-menu.spec.ts:30:1 › 菜单与参考一致，创建持久工作区、切换并同步成员上下文 (10.4s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:21.1807088Z [WebServer] 2026-10-25T17:55:21.179Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:21.1808319Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:21.1808830Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:21.1809383Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:21.1809890Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:21.1810378Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:24.3597986Z [WebServer] 2026-10-25T17:55:24.359Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:24.3599065Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:24.3599426Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:24.3599751Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:24.3600018Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:24.3600252Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:28.6330588Z   ✓  77 [chromium] › tests/e2e/workspace-menu.spec.ts:66:1 › 添加账户保留旧会话，可切回两个账户，退出后撤销全部设备会话 (12.0s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:33.1951935Z [WebServer] 2026-10-25T17:55:33.194Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:33.1952904Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:33.1953368Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:33.1953693Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:33.1953964Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:33.1954210Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:39.1487147Z [WebServer] 2026-10-25T17:55:39.143Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:39.1522239Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:39.1541873Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:39.1583710Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:39.1584612Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:39.1585321Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:42.2390115Z   ✓  78 [chromium] › tests/e2e/workspace-menu.spec.ts:105:1 › 仅从专属邀请页面加入工作区，菜单不再提供手动加入 (13.6s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:46.8051906Z [WebServer] 2026-10-25T17:55:46.804Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:46.8052726Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:46.8053106Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:46.8053706Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:46.8053983Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:46.8054224Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:48.6242729Z   ✓  79 [chromium] › tests/e2e/workspace-shortcuts.spec.ts:8:3 › macOS 自动识别设备，每个快捷键使用独立键帽 (6.4s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:53.1663395Z [WebServer] 2026-10-25T17:55:53.164Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:53.1666384Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:53.1667196Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:53.1667682Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:53.1668128Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:53.1668468Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:54.9092152Z   ✓  80 [chromium] › tests/e2e/workspace-shortcuts.spec.ts:8:3 › Windows 自动识别设备，每个快捷键使用独立键帽 (6.3s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:59.4648330Z [WebServer] 2026-10-25T17:55:59.463Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:59.4650014Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:59.4650848Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:59.4651726Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:59.4652238Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:55:59.4652685Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:01.3054959Z   ✓  81 [chromium] › tests/e2e/workspace-shortcuts.spec.ts:8:3 › Linux 自动识别设备，每个快捷键使用独立键帽 (6.4s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:05.8641741Z [WebServer] 2026-10-25T17:56:05.863Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:05.8643327Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:05.8644137Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:05.8644740Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:05.8645319Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:05.8645847Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:07.2914953Z   ✓  82 [chromium] › tests/e2e/workspace-shortcuts.spec.ts:29:1 › KBD 提示匹配真实快捷键，输入内容不会误触新建或设置 (6.0s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:08.2087340Z   ✓  83 [chromium] › tests/e2e/workspace.spec.ts:4:1 › 未登录访问受保护页面、注册和登录链接 (900ms)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:12.7635238Z [WebServer] 2026-10-25T17:56:12.760Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:12.7636362Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:12.7637018Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:12.7637512Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:12.7637977Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:12.7638394Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:20.7872360Z   ✓  84 [chromium] › tests/e2e/workspace.spec.ts:14:1 › 移动端设置菜单和工作区切换保持一致 (12.6s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:25.3264909Z [WebServer] 2026-10-25T17:56:25.325Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:25.3266652Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:25.3267244Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:25.3267745Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:25.3268261Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:25.3268699Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:30.3053224Z   ✓  85 [chromium] › tests/e2e/workspace.spec.ts:66:1 › 注册、创建任务、菜单、搜索、视图切换和退出登录 (9.5s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:35.5996726Z [WebServer] 2026-10-25T17:56:35.598Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:35.5997917Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:35.5998289Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:35.5998585Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:35.5998854Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:35.5999113Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:48.0310734Z   ✓  86 [chromium] › tests/e2e/offline-layout.spec.ts:9:5 › offline refresh keeps board bounds stable at 1280px (16.9s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:52.5909065Z [WebServer] 2026-10-25T17:56:52.590Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:52.5910935Z [WebServer]   status: 'SERVICE_UNAVAILABLE',
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:52.5911793Z [WebServer]   body: [Object],
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:52.5912299Z [WebServer]   headers: {},
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:52.5912764Z [WebServer]   statusCode: 503
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:56:52.5913195Z [WebServer] }
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.8132512Z   ✓  87 [chromium] › tests/e2e/offline-layout.spec.ts:9:5 › offline refresh keeps board bounds stable at 402px (16.7s)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9312198Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9322114Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9346596Z   1) [chromium] › tests/e2e/worker-authorization.spec.ts:8:1 › worker MCP rechecks current issue authority after queueing and revocation 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9361760Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9362351Z     Error: expect(received).toBeGreaterThan(expected)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9362773Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9362942Z     Expected: > 0
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9363359Z     Received:   0
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9363514Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9363704Z     Call Log:
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9364270Z     - Timeout 10000ms exceeded while waiting on the predicate
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9364797Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9364983Z       113 |       try {
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9365549Z       114 |         send.write(body.slice(0,1)); send.flushHeaders()
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9367929Z     > 115 |         await expect.poll(async () => Number((await pool.query(`select count(*) from pg_stat_activity where pid <> pg_backend_pid() and query_start > $1::timestamptz and state='idle' and query like 'select %"issues"%' and query like '%left join "issue_members"%'`,[marker])).rows[0].count),{timeout:10000}).toBeGreaterThan(0)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9370880Z           |                                                                                                                                                                                                                                                                                                                    ^
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9373137Z       116 |         await pool.query('update mikka_workspace_members set status=$1 where "workspaceId"=$2 and "userId"=$3',['suspended',workspaceA,member])
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9374422Z       117 |         send.end(body.slice(1))
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9375075Z       118 |         const result = await response
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9376027Z         at /home/runner/work/Mikka/Mikka/tests/e2e/worker-authorization.spec.ts:115:308
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9376655Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9377573Z     Error Context: test-results/worker-authorization-worke-1e667-ter-queueing-and-revocation-chromium/error-context.md
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9378582Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9379524Z     attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9380939Z     test-results/worker-authorization-worke-1e667-ter-queueing-and-revocation-chromium/trace.zip
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9383145Z     Usage:
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9383383Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9384394Z         pnpm exec playwright show-trace test-results/worker-authorization-worke-1e667-ter-queueing-and-revocation-chromium/trace.zip
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9385477Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9386245Z     ────────────────────────────────────────────────────────────────────────────────────────────────
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9386822Z 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9386983Z   1 failed
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9387910Z     [chromium] › tests/e2e/worker-authorization.spec.ts:8:1 › worker MCP rechecks current issue authority after queueing and revocation 
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9388542Z   1 skipped
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:04.9388745Z   85 passed (11.8m)
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:05.1748127Z  ELIFECYCLE  Command failed with exit code 1.
+Production build and browser interactions	Browser functionality regression	2026-10-25T17:57:05.1989452Z ##[error]Process completed with exit code 1.

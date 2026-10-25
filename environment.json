@@ -1,7 +1,7 @@
 {
-  "sourceSha": "710da20f2f2f9767a989ceb7ab105efa9baafda9",
+  "sourceSha": "80f3cab2b15ad967d1a27e45e6f833435d4de72e",
   "baseSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
-  "utc": "2026-10-25T17:50:59.772Z",
+  "utc": "2026-10-25T18:23:17.471Z",
   "environment": {
     "os": "Linux 6.18.55 x86_64",
     "node": "v24.19.0",
@@ -17,9 +17,9 @@
     "nextProcessRestarts": 1
   },
   "ci": {
-    "policy": "https://github.com/alexj11324/Mikka/actions/runs/40217397265",
-    "sourceSha": "710da20f2f2f9767a989ceb7ab105efa9baafda9",
-    "postgres": 13,
+    "policy": "https://github.com/alexj11324/Mikka/actions/runs/40219786591",
+    "sourceSha": "80f3cab2b15ad967d1a27e45e6f833435d4de72e",
+    "postgres": 15,
     "protocol": 224,
     "daemonPassed": 247,
     "daemonExplicitSkips": 9,
@@ -54,5 +54,15 @@
   "redaction": {
     "ephemeralAuthEnvironmentLines": 4,
     "rawVideoUnchanged": true
+  },
+  "workerRegression": {
+    "mode": "two actual Next development runtimes and separate fresh PG17 databases; complete real HTTP test, no assertions removed",
+    "baseSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+    "baseResult": "passed in 5.2s",
+    "baseMigrations": 59,
+    "headSha": "80f3cab2b15ad967d1a27e45e6f833435d4de72e",
+    "headResult": "passed in 5.2s",
+    "headMigrations": 60,
+    "boundary": "request-correlated committed worker.authenticated audit event; existing current-role/token/stop/expiry/lock-wait/six-concurrent assertions retained"
   }
 }
