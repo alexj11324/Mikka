@@ -19,7 +19,7 @@ test('聊天历史未返回时壳子已可导航，恢复后显示真实会话',
     await expect(page.getByRole('region', { name: 'Agent 对话工作区', exact: true })).toHaveAttribute('aria-busy', 'true')
     await rail(page, '看板').click()
     await expect(page).not.toHaveURL(/section=agent/)
-    await rail(page, '对话').click()
+    await rail(page, '主页').click()
     release()
     await expect(page.getByRole('textbox', { name: '向 Agent 提问', exact: true })).toBeVisible()
   } finally {
