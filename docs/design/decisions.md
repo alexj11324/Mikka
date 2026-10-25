@@ -12,6 +12,8 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-25 | One-to-one chats keep the grey bubble for a bot's text; an artifact, interactive chart or other rich card has no bubble (「一对一的聊天里，BOT回复应该是会说气泡…可以显示交互式图表的，是不需要气泡的」). The board's Coordinator sidebar was drawn without bubbles and with a different composer; fixed to match | R-14, R-10 | Board sidebar with bare text and a boxed composer |
+| 2026-10-25 | A running thread is the same green badge with a dot everywhere (board card, thread list, thread card) | R-14, R-25, R-66 | Blue 「运行中」 on board cards |
 | 2026-10-25 | A thread the Coordinator dispatches is a card under its reply (bot, name, status, one step line, outputs); clicking it opens the thread conversation in the centre, ‹ Coordinator goes back. One card per thread, updated in place (「交给 Codex 写代码…应该做成一种卡片的形式…点进卡片里面，进入到另外一个 chat 界面」) | R-15, R-66 | Run as an inline chip with the Codex icon |
 | 2026-10-25 | Board cards keep labels, PRs and the latest run's state next to status, priority and avatar (option A over the slim option B, 「这个版本挺好的」); no column `+` | R-25, R-22 | Cards with status, priority and avatar only |
 | 2026-10-25 | A global AI sidebar on every non-conversation page: top-right button, Coordinator by default, the current page as context (「方便我们把 AI 调出来…默认的话，我们一般选择 coordinator」→「我觉得这非常好」) | R-65 | Board-only Coordinator sidebar |

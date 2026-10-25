@@ -51,7 +51,8 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-14** The user's messages sit in an accent-blue bubble with white text
   (`accent/default`); a bot's text sits in the light grey bubble. Charts, OpenUI cards
   and choice cards have no bubble. Bordered cards (document, computer) sit
-  below the text bubble, never inside it.
+  below the text bubble, never inside it. This holds in every one-to-one
+  chat, the board's Coordinator sidebar and the AI sidebar included.
 - **R-15** A task or thread mentioned in chat is an inline chip, not a large
   card (a task chip carries the board's status icon). A thread the reply
   dispatches is different: it is a thread card under that reply (R-66).
