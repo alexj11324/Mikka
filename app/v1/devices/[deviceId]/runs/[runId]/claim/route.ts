@@ -24,6 +24,8 @@ import { skillAssignments } from '@/lib/self-improvement/server'
 import { ImprovementError } from '@/lib/self-improvement/contract'
 
 import { FactoryError } from '@/lib/factory/contract'
+import { bindSubscriptionClaim } from '@/lib/subscription-claim'
+import { subscriptionRuntime } from '@/lib/subscription-runtime'
 
 export const dynamic = 'force-dynamic'
 
@@ -115,6 +117,14 @@ export async function POST(
     if (!(error instanceof MailboxError)) throw error
     return NextResponse.json({ error: 'Run mailbox is unavailable or stale.' }, { status: 409 })
   }
+  const subscription = process.env.MIKKA_BYOS_ENABLED === '1'
+    ? await subscriptionRuntime().repository.nativeBinding(caller.userId, agent.id, agent.harness) : null
+  if (subscription && run.questionContinuation) return NextResponse.json({error:'Hosted subscription question continuation is not yet supported.'},{status:409})
+  if(subscription && (run.userId!==caller.userId || agent.userId!==caller.userId || repo.userId!==caller.userId)) return NextResponse.json({error:'Run owner mismatch.'},{status:409})
+  if (subscription && !device.harnesses.some(harness => harness.harness === agent.harness && harness.subscriptionBroker)) {
+    return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
+  }
+  const onClaim = subscription ? (tx: import('pg').PoolClient) => bindSubscriptionClaim(tx, runId, subscription) : undefined
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
   try {
@@ -132,6 +142,7 @@ export async function POST(
         deviceId,
         runId,
         leaseExpiresAt,
+        onClaim,
       )
       claimed = [{ id: runId }]
     } catch {
@@ -162,6 +173,7 @@ export async function POST(
         deviceId,
         runId,
         leaseExpiresAt,
+        onClaim,
       )
       claimed = [{ id: runId }]
     } catch {
@@ -187,6 +199,7 @@ export async function POST(
         deviceId,
         runId,
         leaseExpiresAt,
+        onClaim,
       )
     } catch (error) {
       if (!(error instanceof FactoryError)) throw error
@@ -270,5 +283,6 @@ export async function POST(
     ...retry,
     ...checkAssignment,
     ...skillAssignment,
+    ...(subscription ? { model:subscription.modelId, subscriptionBinding:{bindingId:subscription.id,ownerId:subscription.ownerId,workspaceId:subscription.workspaceId,consumerId:subscription.consumerId,route:subscription.route} } : {}),
   })
 }

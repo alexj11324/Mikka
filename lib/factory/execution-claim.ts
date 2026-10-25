@@ -12,6 +12,7 @@ export function createExecutionClaim(pool: Pool, authorize: FactoryAuthorize) {
     deviceId: string,
     runId: string,
     leaseExpiresAt: string,
+    onClaim?: (tx: import("pg").PoolClient) => Promise<void>,
   ) => {
     const tx = await pool.connect();
     try {
@@ -35,6 +36,7 @@ export function createExecutionClaim(pool: Pool, authorize: FactoryAuthorize) {
            AND ("mailboxId" IS NULL OR EXISTS (SELECT 1 FROM session_mailboxes m WHERE m.id=agent_runs."mailboxId" AND NOT m.disabled)) RETURNING id`,
         [runId, userId, deviceId, leaseExpiresAt],
       );
+      if (rows.length) await onClaim?.(tx);
       await tx.query("COMMIT");
       return rows;
     } catch (error) {

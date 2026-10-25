@@ -32,6 +32,7 @@ import {
 } from "@mikka/protocol"
 
 import type { RunChunk } from "./chunks"
+import type { NativeBrokerContext, NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
 
 export type {
@@ -81,6 +82,9 @@ export interface ServerLink {
   claimRun(deviceId: string, runId: string): Promise<RunAssignment>
   /** Receipted resumes require a current online source/access/lease fence. */
   validateSkillReceipt?(runId:string,receiptId:string):Promise<SkillReceiptRevalidation>
+  /** Private hosted-run channel; these methods never return provider tokens. */
+  nativeContext?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeBrokerContext>
+  nativeRequest?(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal):Promise<{contentType:string;body:ReadableStream<Uint8Array>}>
   /** Appends to the run's event stream; returns the new tail offset. */
   appendRunChunks(runId: string, batch: ChunkBatch): Promise<{ offset: string }>
   updateRun(runId: string, patch: RunPatch): Promise<void>

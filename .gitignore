@@ -40,3 +40,8 @@ next-env.d.ts
 # Workflow SDK local world
 /.workflow-data/
 /.swc
+
+# Verified CPA source and generated Go artifacts.
+/packages/subscription-worker/.upstream/
+/packages/subscription-worker/.cache
+/packages/subscription-worker/bin/

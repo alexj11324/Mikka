@@ -7,6 +7,13 @@
 export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access"
 export type AskForApproval = "untrusted" | "on-request" | "never"
 
+/** Experimental official app-server host-managed auth. Private runner RPC only. */
+export interface ChatGPTAuthTokens {
+  accessToken: string
+  chatgptAccountId: string
+  chatgptPlanType?: string
+}
+
 export type UserInput = {
   type: "text"
   text: string

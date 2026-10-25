@@ -1,0 +1,37 @@
+name: BYOS backend integration
+on:
+  pull_request:
+    paths:
+      - 'lib/subscription*'
+      - 'lib/credentials/universal-auth*'
+      - 'lib/factory/**'
+      - 'app/api/subscriptions/**'
+      - 'app/v1/devices/**'
+      - 'packages/**'
+      - 'drizzle/*byos*'
+      - 'scripts/test-subscription-worker.mjs'
+      - 'scripts/test-byos-claim.mjs'
+      - '.github/workflows/byos.yml'
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:byos
+      - run: node --import tsx --test lib/credentials/universal-auth.test.ts
+      - run: pnpm test:byos-claim
+      - run: pnpm test:byos-worker
+        env:
+          MIKKA_BYOS_BACKEND_ONLY: '1'
+      - run: pnpm --filter @mikka/daemon exec vitest run test/subscription-worker-client.test.ts test/subscription-native-broker.test.ts test/claude-subscription.test.ts test/codex-subscription.test.ts

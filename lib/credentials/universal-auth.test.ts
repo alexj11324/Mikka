@@ -142,3 +142,13 @@ test('delayed old-identity denial does not latch rotated credentials while login
   assert.equal(await rotated, 'synthetic-2')
   assert.equal(await p.getAccessToken(), 'synthetic-2'); assert.equal(calls, 2)
 })
+
+test('bounded worker lifetime requires enough validity and refreshes cached tokens before dispatch', async () => {
+  let time=0, calls=0
+  const p=universalAuthTokenProvider({origin,credentials:()=>credentials,minimumValidityMs:335000,now:()=>time,fetch:async()=>token(`lease-${++calls}`)})
+  assert.equal(await p.getAccessToken(),'lease-1')
+  time=264999; assert.equal(await p.getAccessToken(),'lease-1')
+  time=265000; assert.equal(await p.getAccessToken(),'lease-2')
+  const short=universalAuthTokenProvider({origin,credentials:()=>credentials,minimumValidityMs:335000,fetch:async()=>token('too-short',300)})
+  await rejected(short.getAccessToken())
+})

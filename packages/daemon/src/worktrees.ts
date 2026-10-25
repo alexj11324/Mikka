@@ -75,16 +75,21 @@ export class WorktreeManager {
     const path = this.pathFor(runId)
     if (existsSync(join(path, ".git"))) return path
     mkdirSync(this.root, { recursive: true })
-    await simpleGit(repoPath).raw([
-      "worktree",
-      "add",
-      "-B",
-      runBranch(runId),
-      path,
-      // The base branch comes from the server: never let it read as an option.
-      "--end-of-options",
-      baseBranch,
-    ])
+    await execa(
+      "git",
+      [
+        ...FETCH_GIT,
+        "worktree",
+        "add",
+        "-B",
+        runBranch(runId),
+        path,
+        // The base branch comes from the server: never let it read as an option.
+        "--end-of-options",
+        baseBranch,
+      ],
+      { cwd: repoPath, stdin: "ignore" }
+    )
     return path
   }
 
@@ -172,8 +177,28 @@ export class WorktreeManager {
 
   /** Paths changed in the worktree (tracked and untracked), for the report. */
   async changedFiles(worktree: string): Promise<string[]> {
-    const status = await simpleGit(worktree).status()
-    return status.files.map((file) => file.path)
+    const { stdout } = await execa(
+      "git",
+      [
+        ...FETCH_GIT,
+        "-c",
+        "core.untrackedCache=false",
+        "status",
+        "--porcelain=v1",
+        "-z",
+      ],
+      { cwd: worktree, stdin: "ignore", stripFinalNewline: false }
+    )
+    const records = stdout.split("\0")
+    const files: string[] = []
+    for (let i = 0; i < records.length; i++) {
+      const record = records[i]
+      if (!record) continue
+      files.push(record.slice(3))
+      // In -z mode a rename/copy has destination then source, each NUL-ended.
+      if (/R|C/.test(record.slice(0, 2))) i++
+    }
+    return files
   }
 
   /**

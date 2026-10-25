@@ -15,6 +15,7 @@
 import { z } from "zod"
 import { groupReviewHttpLink } from "./runs/group-review-worker"
 import { SKILL_ARTIFACT_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
+import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 
 import {
   CLIENT_VERSION_HEADER,
@@ -231,6 +232,18 @@ export class HttpServerLink implements ServerLink {
   }
   async validateSkillReceipt(runId:string,receiptId:string) {
     return this.call('GET',`/v1/runs/${seg(runId)}/skill-receipt?receiptId=${encodeURIComponent(checkId(receiptId))}`,{schema:skillReceiptRevalidationSchema})
+  }
+  async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
+    return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})
+  }
+  async nativeRequest(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal) {
+    const response=await this.send('POST',`${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`,{action:'request',payload},this.credential,{signal,timeoutMs:275_000})
+    const contentType=response.headers.get('content-type')?.split(';')[0]
+    if(!response.ok || !response.body || (contentType!=='text/event-stream' && contentType!=='application/json')) {
+      await response.body?.cancel()
+      throw new Error('subscription_native_unavailable')
+    }
+    return {contentType,body:response.body}
   }
 
   async appendRunChunks(runId: string, batch: ChunkBatch) {

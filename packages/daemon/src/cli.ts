@@ -16,7 +16,7 @@ import { MemoryServer, type DeviceRepo, type ServerLink } from "./server-link"
 import { HttpServerLink } from "./server-link-http"
 
 const USAGE = `Usage:
-  mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>] [--group-review-images <image-manifest.json>]
+  mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>] [--group-review-images <image-manifest.json>] [--hosted-subscriptions]
   mikka daemon login [--server <url>] [--workspace <id>] [--token <session>] [--dev] [--data-dir <dir>]
   mikka daemon status [--dev] [--data-dir <dir>]`
 
@@ -53,6 +53,7 @@ export async function runCli(
       "group-review-images": { type: "string" },
       "fixtures-dir": { type: "string" },
       "stall-minutes": { type: "string" },
+      "hosted-subscriptions": { type: "boolean", default: false },
       token: { type: "string" },
       workspace: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
@@ -144,8 +145,7 @@ export async function runCli(
     }
     memoryServer = new MemoryServer("dev-device")
     const seed = readJson(daemonPaths(dataDir).devRepos) as
-      | { repos?: DeviceRepo[] }
-      | undefined
+      { repos?: DeviceRepo[] } | undefined
     for (const repo of seed?.repos ?? [])
       memoryServer.addRepo("dev-device", repo)
     link = memoryServer.link()
@@ -170,6 +170,7 @@ export async function runCli(
       mockSpeed: speed,
       fixturesDir: values["fixtures-dir"],
       groupReviewImages: values["group-review-images"] ? groupReviewImages.parse(readJson(values["group-review-images"])) : undefined,
+      hostedSubscriptions: values["hosted-subscriptions"],
       stallMs: values["stall-minutes"]
         ? Number(values["stall-minutes"]) * 60_000
         : undefined,

@@ -239,6 +239,7 @@ export function createFactoryCheckClaim(
     deviceId: string,
     runId: string,
     leaseExpiresAt: string,
+    onClaim?: (tx: import("pg").PoolClient) => Promise<void>,
   ) => {
     const tx = await pool.connect();
     try {
@@ -257,6 +258,7 @@ export function createFactoryCheckClaim(
         [runId, userId, deviceId, leaseExpiresAt],
       );
       if (!rows.length) throw new FactoryError("factoryCheckBindingMismatch");
+      await onClaim?.(tx);
       await tx.query("COMMIT");
       return assignment;
     } catch (error) {

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import { buildChildEnv, isDeniedEnvName } from "./env"
 
 const PLANTED = {
+  E2B_API_KEY: "e2b-test-placeholder",
   CLAUDE_CONFIG_DIR: "/home/me/.claude",
   CLAUDE_CODE_USE_BEDROCK: "1",
   MCP_SERVERS: "{}",
@@ -44,11 +45,17 @@ describe("buildChildEnv", () => {
   it("passes adapter-declared vars but never denied ones", () => {
     const env = buildChildEnv({
       host: { ...host, CURSOR_CONFIG: "x" },
-      adapterAllow: ["CURSOR_CONFIG", "ANTHROPIC_API_KEY", "CLAUDE_CONFIG_DIR"],
+      adapterAllow: [
+        "CURSOR_CONFIG",
+        "ANTHROPIC_API_KEY",
+        "CLAUDE_CONFIG_DIR",
+        "E2B_API_KEY",
+      ],
     })
     expect(env.CURSOR_CONFIG).toBe("x")
     expect(env).not.toHaveProperty("ANTHROPIC_API_KEY")
     expect(env).not.toHaveProperty("CLAUDE_CONFIG_DIR")
+    expect(env).not.toHaveProperty("E2B_API_KEY")
   })
 
   it("classifies names", () => {

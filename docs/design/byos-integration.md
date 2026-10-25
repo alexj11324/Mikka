@@ -1,0 +1,271 @@
+# BYOS: source integration and live-validation handoff
+
+## Hosted broker update, 2026-10-24
+
+This section supersedes the earlier native access-lease descriptions below.
+The Bot claim route now pins a native binding in `byos_native_runs`, in the
+same transaction that claims the run. The private device subscription route
+checks the authenticated device, owner, harness capability, server allow-list,
+run status, stop flag and live lease. Go repeats run/binding/model authorization
+before credential-store access and while streaming. The additive migration is
+`20261024201500_byos_native_runs.sql` (32 migrations total).
+
+The opt-in Linux daemon `--hosted-subscriptions` reuses the existing supervisor
+and Claude/Codex adapters. It suppresses local credential detection/quota reads,
+does not import native auth files, and refuses a missing subscription binding.
+Each task runs in a constrained Docker container with no external network,
+read-only Git metadata, a separate home and one private broker socket. Setup and
+verification commands use the same container boundary. Container creation and
+command execution have separate budgets; a timed-out command remains a failure.
+Durable resource receipts fence uncertain creation/cleanup. A session ledger
+outside the worktree binds resumption to its exact owner/account/binding epoch.
+
+The official CLI receives a public placeholder, not a provider token. Its local
+HTTP shim sends protocol requests over the private socket. The external Go
+broker injects the real access token at a fixed provider destination; neither
+the CLI nor its shell tools receive an Infisical identity or refresh/access
+grant. The socket itself is task-scoped model authority. Same-container parent
+memory is not isolated from its tools, so placing a real token there would be
+unsafe. An actual installed Claude Code 2.1.305 Bash probe reproduced that
+negative boundary; the subsequent external-broker probe passed with synthetic
+credentials and no external network. This is real CLI/offline acceptance, not
+real Anthropic account acceptance. Codex real offline managed-login validation
+and fake app-server broker tests do not establish real Codex inference support.
+
+Raw production `nativeAuth` export remains disabled. Routine CPA refresh stays
+outside the CLI and can be reused by later native requests; reconnect,
+disconnect, stop and lease expiry halt use. No provider-side revocation endpoint
+is implemented. The new Docker transport does not implement E2B, browser/CUA or
+choose a multi-owner sandbox topology. Native vendor compatibility, actual
+Infisical reader policy and real system acceptance remain release gates.
+
+The fresh independent native review reported a writable Git-metadata boundary;
+the patch protects that mount and disables host Git helpers on the relevant
+status/create calls. The review agent then stopped with a safety flag before
+completing its remaining work. No complete independent review pass is claimed,
+and the blocked validation was not retried through another agent.
+
+Current implementation record, 2026-10-24. Backend security hardening now adds
+access-only storage/execution identities, worker task authorization, token-free
+quota results and durable fair cleanup. See the subscription worker README for
+current configuration and exact remaining native/provider-revocation gates. This supersedes phase-two statements
+that OAuth, streaming, UI entry and private launcher wiring are absent. The
+feature remains off by default; no real account or E2B resource was used.
+
+## User-driven connection
+
+Settings → Integrations → Connect subscription starts a NEW authorization.
+Codex now follows pinned CPA's device flow: Mikka shows the official device page
+and user code, keeps device_auth_id private, enforces the returned poll interval,
+and exchanges the resulting code with the provider-owned device callback URI.
+Its opaque application attempt handle is owner/session-bound; device authorization
+uses the provider-returned PKCE verifier/challenge, not a fabricated web redirect.
+
+Claude preserves CPA's registered http://localhost:54545/callback URI and S256
+PKCE. The user signs in in a separate tab, then pastes the complete final callback
+URL into the authenticated Mikka form. A refused localhost connection is expected
+without a local listener; the address bar still provides the handoff. Mikka never
+fetches this URL. It requires the exact origin/path, one code and one matching
+state, original owner/session, five-minute TTL, and atomic one-time consumption.
+Raw codes, fragments, duplicate query keys, arbitrary callbacks and URL redirects
+are refused. This is an explicit manual ceremony, not seamless HTTPS callback
+support. Codex attempts expire after 15 minutes.
+
+Neither provider password nor access/refresh token reaches the browser. OAuth
+code/state and the user-facing device code are temporary ceremony data. They must
+stay out of logs, screenshots and assistant chat; production request-body logging
+and provider-page handling still require deployment acceptance. The old GET
+callback now returns 410; native clients cannot configure a Mikka HTTPS redirect.
+
+Existing local Claude/Codex credentials are not an acquisition source. The new
+feature has no file, Keychain, cookie or native-login import endpoint. Existing
+local-daemon native login/quota readers remain separate and can still read their
+local auth state; that does not mean the whole repository has removed local auth.
+
+The complete provider bundle and temporary PKCE verifier stay in Infisical.
+Neon stores ownership, status, authorization epoch, secret reference/digest,
+attempt/session hashes, consumer bindings and quota observations. There is no
+new general-purpose vault or custom cryptography. Platform secrets such as
+E2B_API_KEY stay on the control plane and never enter an agent environment.
+
+## Implemented request paths
+
+| Path | Current source and evidence | Real-world status |
+| --- | --- | --- |
+| Connect/callback/reconnect | Authenticated HTTP handlers, workspace authorization, durable attempts, CPA-compatible acquisition/store, Infisical publication | Production device/code-return adapters tested with synthetic grants. Actual provider acceptance/eligibility remains unverified |
+| Own Mikka harness | Agent route → persisted binding → membership/capability/quota checks → AI SDK stream → private access-only Go RPC → CPA converters and plain Mikka HTTP adapter | Text, tool calls/results, errors, cancellation and revocation tested through native provider SSE fixtures. Actual provider acceptance/eligibility unverified |
+| Hosted Codex | Service native dispatch → trusted runner factory → private access lease → existing CodexAdapter host-managed auth/refresh | Library/fake app-server and actual SDK Store exercised; production export now blocked. Real runtime isolation/native safety remains unverified |
+| Hosted Claude Code | Same dispatch/broker → access-only OAuth lease → existing SDK adapter with isolated runtime home, account-mode check and expiry stop | Library/fake CLI exercised; production export now blocked. Actual shell/environment boundary and token scope/native compatibility unverified |
+
+The binding, model and workspace come from owner-scoped server records. A
+selected chat binding is remembered for later turns; disconnect/reconnect never
+silently selects the default paid model. Routine credential refresh preserves
+the authorization epoch. Account reconnect/replacement invalidates old bindings;
+they require explicit rebinding. Two consumers can reuse one provider connection.
+
+The public API accepts only connection/binding references and safe ceremony
+inputs. It exposes no native lease, secret reference, token import or arbitrary
+upstream URL. The private worker is permanently owner-bound. Its nativeAuth RPC
+is for the trusted launcher, not model tools or browser clients. Cancellation
+closes provider transport; active streams and native sessions observe revocation.
+There is no account pool, limit-evasion logic or fallback credential.
+
+## Why the plain CPA adapters differ
+
+Pinned CPA is 8289ec4c71ad914d0612c2776352b76ba3d355a6, MIT.
+The upstream Claude constructor selects a Firefox fingerprint transport in
+internal/auth/claude/anthropic_auth.go. Its exchange generates a device pool and
+replays native companion calls. Its model executor invokes applyCloakingInternal
+and forces CLI identity for OAuth in claude_fingerprint_policy.go. The Codex
+executor supplies native Codex identity headers in codex_executor_request.go.
+Those built-in model executors are not registered.
+
+Mikka instead supplies bounded ordinary HTTP clients, fixed upstream targets,
+Mikka identity headers and no redirects. Codex acquisition/refresh uses the
+actual CPA service. A small original Claude exchange uses CPA's response/storage
+types without fingerprint construction, device generation or roles replay;
+refresh reuses CPA through the ordinary client. Plain profile lookup is allowed
+when needed to verify account identity.
+
+Inference reuses CPA's actual request and stream converters through its
+ProviderExecutor interface. Claude conversion gets an explicit Mikka application
+marker before the converter's derived-ID path, then all identity metadata is
+removed before transport. Tests assert the final wire has no native identity
+metadata and identifies Mikka. No cloaking algorithm or Comma AGPL source is
+copied. Narrow original bridge files are added beside the pinned source; tracked
+upstream files and their license are preserved.
+
+The fixed Codex backend-api inference target remains an unverified provider route,
+not an officially supported public independent-harness API. SIWC is a distinct
+optional capability, not a reinterpretation of arbitrary Codex tokens. Honest
+Mikka requests may be refused; the adapter returns an error rather than imitating
+an official client, changing accounts or using API credits.
+
+Quota probes now execute in the access-only worker, returning only projected
+usage/billing metadata to existing decoding functions. Node no longer receives
+provider access tokens for quota; no local credential readers are used. Missing or enabled provider credit/extra-usage fallback
+evidence remains unknown and refuses use. Native OAuth mode alone is not proof
+that provider-side spending controls are disabled. These controls require live
+compatibility validation before marking a route ready.
+
+## Feature and infrastructure configuration
+
+No settings below were written or enabled. Source configuration is deliberately
+separate from user consent and provider compatibility evidence:
+
+- MIKKA_BYOS_ENABLED enables the feature only after control-plane configuration.
+- MIKKA_BYOS_WORKER_BINARY selects a trusted Linux artifact; workload configuration
+  goes over private stdin, never process arguments or native CLI environments.
+  The acceptance script builds a static Linux production executable. Next tracing
+  includes that artifact for the subscription and agent routes; build/copy it
+  before activating the feature on an authorized deployment.
+- MIKKA_BYOS_INFISICAL_ORIGIN / PROJECT / ENVIRONMENT / PATH / TOKEN select a
+  dedicated managed workload scope. They are not per-user shared environment
+  variables. The worker fetches each owner's bundle by its opaque reference.
+- MIKKA_BYOS_CODEX_OAUTH / MIKKA_BYOS_CLAUDE_OAUTH control the acquisition
+  routes. Redirects are fixed to CPA protocol values, never runtime configuration.
+- MIKKA_BYOS_VALIDATED_MODEL_ROUTES and MIKKA_BYOS_VALIDATED_NATIVE_ROUTES are
+  trusted operator capability settings, not browser assertions or proof by
+  themselves. They default empty. The web process always has native isolation
+  set to none; flags cannot make Vercel a verified owner runtime.
+
+The app captures the selected request database query and URL together so a
+preview worker and later stream callbacks keep the same database boundary.
+
+E2B is the intended hosted compute backend. The native runner accepts a narrow
+private broker interface so Infisical workload credentials can stay outside
+untrusted compute. This phase tests local fake processes with a test-only
+runtime attestation; it does not prove E2B isolation. The topology decision
+(verified owner boundary versus shared project storage) remains open. No separate
+per-owner sandbox topology was silently selected, and the missing #161 machine/
+viewer implementation was not replaced with a new desktop UI.
+
+## Exact next live-validation boundary
+
+1. Review the source protocol evidence and manual UX in
+   [BYOS OAuth transport review](byos-oauth-transport.md). Codex now uses CPA's
+   device-code flow and its provider-owned redirect; Claude preserves CPA's
+   registered loopback redirect with an explicit URL handoff. No arbitrary Mikka
+   HTTPS registration is assumed. Source mocks prove parsing/state/lifecycle, not
+   actual provider acceptance of Mikka's honest HTTP identity or hosted custody.
+   Any live failure must stop that route; local CLI credentials are no substitute.
+2. Transfer the reviewed commit/patch to an authorized staging deployment and
+   build the pinned Linux worker there. Preserve the corrected owner-isolation
+   handoff when reconciling documentation PR #173. No push/deploy is authorized
+   or performed by this delivery.
+3. Obtain explicit approval for one user-initiated provider authorization and
+   storage of its access/refresh/identity/expiry bundle in a named dedicated
+   Infisical workload path, plus the corresponding metadata in an isolated Neon
+   branch. Include temporary PKCE records, workload permissions, retention and
+   disconnect/provider-revocation handling. No real token goes through chat,
+   screenshots, local auth files, the user's CLI cache or shared environment syncs.
+4. The user's browser may then follow Mikka Connect to the official provider
+   page and complete the device check or in-application callback URL handoff. This is a new consent flow. Verify account owner, callback replay refusal,
+   persistence and task reuse before any inference. Provider calls require their
+   own subscription-only, zero-API-credit test scope.
+5. Real hosted native inference additionally requires a pinned CLI compatibility
+   check and an authorized verified E2B owner boundary. The existing lifecycle-only
+   E2B proposal is one 2-vCPU/4-GiB sandbox, at most 600 aggregate running seconds,
+   estimated compute $0.0276 and proposed $0.05 cap. No E2B operation was run.
+
+Known-artifact cleanup now has durable retries and an authenticated daily BYOS
+cron. Unknown remote creation outcomes remain explicitly pending; deletion is
+not falsely confirmed on a pre-commit 404. Pre-journal orphan discovery, provider
+revocation, workload-token delivery/renewal, real E2B isolation and safe native
+credential delivery remain release work. Production native export stays disabled. Logical disconnect immediately fences Mikka
+use but cannot undo an already transmitted provider request.
+
+## Cloud Linux evidence
+
+Backend hardening rerun (no browser or real accounts):
+
+- Worker: 30 top-level tests, race detector, vet, production/fixture builds and
+  application-handler acceptance passed. Disposable Postgres applied all 31
+  migrations and replayed successfully. Synthetic vault/provider fixtures covered
+  access-only reads, binding refusals, normal rotation, disconnect, late writes,
+  uncertain remote commits and cleanup fairness across artifacts/connections.
+- Daemon: 211 passed, 7 real-agent tests skipped. Its unchanged permission test
+  requires an initial 0755 directory; the suite passed with `umask 022` after the
+  inherited 0077 mask caused that setup assertion to fail. Root/daemon type checks,
+  lint, migration policy and 8 model tests passed.
+- An isolated, credential-free Docker Next webpack production build passed;
+  all four agent/subscription/callback/cleanup routes trace the same worker
+  (SHA256 `75dde969f319a62add32781ebe7b15914936547a3b2c49780e27b1e1115b2007`).
+  Missing live Better Auth configuration emitted expected build-time diagnostics;
+  this is build/package validation, not live authentication acceptance.
+- Official Codex 0.163.0 accepted synthetic managed auth in a network-disabled
+  container with an empty home. The supplied token was absent from the inspected
+  process environment and owned home files. This did not test inference, shell
+  isolation, real accounts or E2B. Claude's executable was unavailable; production
+  native export remains blocked for both providers.
+
+The following records are retained from the earlier source candidate; browser,
+protocol-wide and root aggregate checks were not rerun for backend hardening:
+
+- Worker: 19 top-level tests plus 6 provider subtests; race detector, vet, build,
+  actual CPA Codex device exchange and plain Claude exchange/refresh against TLS
+  fixtures. Disposable Postgres applied all 30 migrations and replayed successfully.
+- Application acceptance: actual handlers → new consent attempt → owner/session
+  device poll / exact callback-URL handoff → Infisical fixture → binding → AI SDK → actual CPA converters/plain
+  provider SSE fixtures. Repeated tasks, tools, no retry/fallback, stream cancel,
+  active revocation, both native fake CLIs, reconnect and stale binding are covered.
+- Chromium: actual Settings component, synthetic Mikka session and provider
+  device page and registered callback-URL handoff; connected state and disconnect
+  passed with no page errors. This is
+  component/handler acceptance, not deployed authenticated Mikka acceptance.
+- Daemon: 209 passed, 7 real-agent tests skipped. Protocol: 223 passed. Model tests:
+  8 passed. Root/daemon types, lint/migration policy, UI policy and i18n passed.
+- Fresh Next production webpack build passed in isolated Docker Linux with 10 GiB
+  memory, no platform/provider keys and no environment files copied.
+- Root check still stops at the two unchanged baseline UI assertions. The separate
+  partition-cookie assertion also fails on the unchanged base; neither was fixed
+  as part of BYOS. Later root-check stages are not implied to pass.
+
+Historical phase-three logs: /tmp/mikka-byos-phase3-acceptance-final.log, -daemon.log, -protocol.log,
+-model.log, -types.log, -daemon-types.log, -lint.log, -build.log. Browser screenshot:
+/tmp/mikka-byos-phase3-browser.png. All disposable test containers were removed.
+No live grant, credential import, Infisical configuration/write, paid provider
+request, E2B sandbox, push, PR or deployment was performed.
+
+Current protocol review checks/logs are recorded in byos-oauth-transport.md; older
+phase-three evidence does not validate the new device transport by itself.

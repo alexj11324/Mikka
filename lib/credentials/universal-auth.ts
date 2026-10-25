@@ -3,10 +3,12 @@ import { CredentialError } from './contracts'
 type Credentials = { clientId: string; clientSecret: string } | undefined
 /** Server-side only, owned by runtime.ts. No credential/token is persisted or logged. */
 export function universalAuthTokenProvider(options: {
-  origin: string; credentials: () => Credentials; fetch?: typeof fetch; now?: () => number
+  origin: string; credentials: () => Credentials; fetch?: typeof fetch; now?: () => number; minimumValidityMs?: number
 }) {
   const origin = new URL(options.origin)
   if (origin.protocol !== 'https:' || origin.origin !== options.origin) throw new CredentialError('vault_configuration_invalid', 503)
+  const minimumValidity = options.minimumValidityMs ?? 0
+  if (!Number.isSafeInteger(minimumValidity) || minimumValidity < 0 || minimumValidity >= 3600000) throw new CredentialError('vault_configuration_invalid', 503)
   const now = options.now ?? (() => performance.now())
   let credentials: Credentials
   let cached: { value: string; refreshAt: number } | undefined
@@ -44,8 +46,8 @@ export function universalAuthTokenProvider(options: {
         const data = await response.json()
         // Require bounded short-lived credentials; do not silently accept default 30-day tokens.
         if (typeof data.accessToken !== 'string' || !data.accessToken || data.accessToken.length > 16384 || /[\s\0]/.test(data.accessToken) ||
-          data.tokenType !== 'Bearer' || !Number.isSafeInteger(data.expiresIn) || data.expiresIn < 30 || data.expiresIn > 3600) throw failure()
-        const refreshAt = startedAt + data.expiresIn * 1000 - Math.min(60000, data.expiresIn * 100)
+          data.tokenType !== 'Bearer' || !Number.isSafeInteger(data.expiresIn) || data.expiresIn < 30 || data.expiresIn > 3600 || data.expiresIn * 1000 <= minimumValidity) throw failure()
+        const refreshAt = startedAt + data.expiresIn * 1000 - Math.max(minimumValidity, Math.min(60000, data.expiresIn * 100))
         const current = options.credentials()
         if (epoch !== generation || denied || now() >= refreshAt || current?.clientId !== next.clientId || current?.clientSecret !== next.clientSecret) throw failure()
         issuedToken = data.accessToken

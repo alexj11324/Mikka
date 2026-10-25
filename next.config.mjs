@@ -39,6 +39,18 @@ const nextConfig = {
   },
   transpilePackages: ['@mikka/protocol'],
   serverExternalPackages: ['ai', 'better-auth', 'drizzle-orm'],
+  // Build the pinned Linux worker before activating BYOS. The binary path is
+  // private server configuration, so tracing cannot infer this asset from JS.
+  outputFileTracingIncludes: {
+    '/api/agent': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
+    '/api/subscriptions': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
+    '/api/subscriptions/callback': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
+    '/api/cron/subscriptions': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
+    '/v1/devices/**/subscription': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
+    '/api/subscriptions/enrollments': ['./packages/subscription-worker/bin/mikka-subscription-enrollment'],
+    '/api/subscriptions/enrollments/handoff': ['./packages/subscription-worker/bin/mikka-subscription-enrollment'],
+    '/api/subscriptions/enrollments/bind': ['./packages/subscription-worker/bin/mikka-subscription-enrollment'],
+  },
   async headers() {
     return [{ source: '/(.*)', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },

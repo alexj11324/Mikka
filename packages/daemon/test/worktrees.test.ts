@@ -12,6 +12,29 @@ afterEach(() => cleanupTempDirs())
 const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8" }).trim()
 
+it("reports renamed and untracked paths without Git quoting or source records", async () => {
+  const repo = await makeRepo()
+  const trees = new WorktreeManager(tempDir())
+  const tree = await trees.create("status-paths", repo, "main")
+  writeFileSync(join(tree, "before.txt"), "retained content\n")
+  git(tree, "add", "before.txt")
+  git(
+    tree,
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@mikka.invalid",
+    "commit",
+    "-qm",
+    "fixture"
+  )
+  git(tree, "mv", "before.txt", "after file.txt")
+  writeFileSync(join(tree, "new\nfile.txt"), "new content\n")
+  expect((await trees.changedFiles(tree)).sort()).toEqual(
+    ["after file.txt", "new\nfile.txt"].sort()
+  )
+})
+
 describe("starting on the issue branch", () => {
   /** A repo with an `origin` that has `main` and a person's commit on `mikka/orv-1`. */
   async function repoWithIssueBranch() {

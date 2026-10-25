@@ -1,0 +1,57 @@
+// Original Mikka adapter, compiled beside the pinned CPA OAuth types. The
+// upstream ExchangeCodeForTokens generates a device identity pool and replays
+// native companion calls. This exchange deliberately performs neither action.
+package claude
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+)
+
+func NewMikkaAuth(client *http.Client) *ClaudeAuth { return &ClaudeAuth{httpClient: client} }
+
+func (o *ClaudeAuth) ExchangeMikkaCodeForTokens(ctx context.Context, code, state, redirect string, pkce *PKCECodes) (*ClaudeAuthBundle, error) {
+	if pkce == nil || pkce.CodeVerifier == "" {
+		return nil, fmt.Errorf("PKCE required")
+	}
+	body, err := json.Marshal(map[string]string{"grant_type": "authorization_code", "code": code, "state": state, "redirect_uri": redirect, "client_id": ClientID, "code_verifier": pkce.CodeVerifier})
+	if err != nil {
+		return nil, fmt.Errorf("OAuth request unavailable")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, TokenURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("OAuth request unavailable")
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	response, err := o.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("OAuth exchange unavailable")
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("OAuth exchange refused")
+	}
+	var token tokenResponse
+	if json.NewDecoder(io.LimitReader(response.Body, 262145)).Decode(&token) != nil || token.ExpiresIn <= 0 {
+		return nil, fmt.Errorf("OAuth response unavailable")
+	}
+	data := ClaudeTokenData{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, Email: token.Account.EmailAddress, AccountUUID: token.Account.UUID, OrganizationUUID: token.Organization.UUID, OrganizationName: token.Organization.Name, Expire: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second).UTC().Format(time.RFC3339)}
+	// Profile is an identity lookup, not the native claude_cli roles replay.
+	if data.AccountUUID == "" || data.OrganizationUUID == "" {
+		profile, err := o.FetchOAuthProfile(ctx, data.AccessToken)
+		if err != nil {
+			return nil, fmt.Errorf("OAuth identity unavailable")
+		}
+		data.AccountUUID = profile.Account.UUID
+		data.OrganizationUUID = profile.Organization.UUID
+		data.OrganizationName = profile.Organization.Name
+		data.Email = profile.Account.Email
+	}
+	return &ClaudeAuthBundle{TokenData: data, LastRefresh: time.Now().UTC().Format(time.RFC3339)}, nil
+}

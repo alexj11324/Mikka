@@ -9,6 +9,7 @@
     "./bridge": "./src/bridge.ts",
     "./ipc": "./src/ipc.ts",
     "./accounts": "./src/accounts.ts",
+    "./subscription": "./src/subscription.ts",
     "./issue-share": "./src/issue-share.ts",
     "./auth": "./src/auth.ts",
     "./relay": "./src/relay.ts",

@@ -12,5 +12,7 @@ export const harnessInfoSchema = z.object({
   installed: z.boolean(),
   /** Version string reported by the CLI, null when not installed. */
   version: z.string().nullable(),
+  /** Host runner advertises this only after configuring its external broker. */
+  subscriptionBroker: z.literal(true).optional(),
 })
 export type HarnessInfo = z.infer<typeof harnessInfoSchema>

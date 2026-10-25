@@ -18,7 +18,8 @@
     "./login": "./src/login.ts",
     "./log": "./src/log.ts",
     "./sandbox": "./src/agents/sandbox.ts",
-    "./group-review-worker": "./src/runs/group-review-worker.ts"
+    "./group-review-worker": "./src/runs/group-review-worker.ts",
+    "./subscription": "./src/subscription.ts"
   },
   "scripts": {
     "daemon": "tsx bin/mikka.ts daemon",

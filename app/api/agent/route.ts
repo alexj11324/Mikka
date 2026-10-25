@@ -14,13 +14,17 @@ import { persistAgentStream } from '@/lib/agent-history'
 import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
 import { createCredentialAITools } from '@/lib/credentials/ai-tools'
 import { executeSystemCredentialTool } from '@/lib/credentials/runtime'
+import { agentModelSourceSchema, resolveAgentModel } from '@/lib/agent-model'
+import { SubscriptionRefusal } from '@mikka/protocol/subscription'
+import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
+import { resolveAgentSubscription } from '@/lib/agent-subscription'
 
 export const maxDuration = 300
 
 // Reuse the POST bundle: image lookup must not trigger a second cold route compilation.
 export { GET } from './images/route'
 
-const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional(), turnId: z.uuid().optional(), retry: z.boolean().optional() }).strict()
+const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional(), turnId: z.uuid().optional(), retry: z.boolean().optional(), modelSource: agentModelSourceSchema.optional() }).strict()
 const errorHeaders = { 'Cache-Control': 'private, no-store', 'Content-Type': 'text/plain; charset=utf-8' }
 
 function agentErrorMessage(error: unknown) {
@@ -77,11 +81,34 @@ export async function POST(request: Request) {
   })())
   if (!parsed.success) return new Response(agentCopy.enterAQuestionBetween1And8000, { status: 400, headers: errorHeaders })
 
-  const apiKey = process.env.OPENCODE_API_KEY
-  if (!apiKey) return new Response(agentCopy.opencodeapikeyIsNotConfiguredOnTheServer, { status: 503, headers: errorHeaders })
-
   const sessionId = parsed.data.sessionId ?? crypto.randomUUID()
   const turnId = parsed.data.turnId ?? crypto.randomUUID()
+  let model: Awaited<ReturnType<typeof resolveAgentModel>>
+  let modelSource = parsed.data.modelSource
+  try {
+    if (!modelSource && process.env.MIKKA_BYOS_ENABLED === '1') {
+      const saved = await subscriptionRuntime().repository.defaultModelBinding(session.user.id, sessionId)
+      if (saved) modelSource = { type: 'subscription', bindingId: saved }
+    }
+    model = await resolveAgentModel(modelSource, {
+      subscriptionModel: async bindingId => {
+        return resolveAgentSubscription(session.user.id, sessionId, bindingId, subscriptionRuntime(), authorizeSubscriptionWorkspace, request.signal)
+      },
+      defaultModel: () => {
+        const apiKey = process.env.OPENCODE_API_KEY
+        if (!apiKey) throw new Error('default_model_unavailable')
+        const opencode = createOpenAICompatible({
+          name: 'opencode', apiKey, baseURL: 'https://opencode.ai/zen/go/v1',
+          headers: { 'User-Agent': 'Mikka-UI-Agent/1.0', 'x-opencode-session': sessionId },
+        })
+        return opencode('deepseek-v4.1-flash')
+      },
+    })
+  } catch (error) {
+    if (error instanceof SubscriptionRefusal) return Response.json({ error: error.code }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } })
+    if (modelSource) return Response.json({ error: 'backend_unavailable' }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } })
+    return new Response(agentCopy.opencodeapikeyIsNotConfiguredOnTheServer, { status: 503, headers: errorHeaders })
+  }
   let turn: Awaited<ReturnType<typeof beginAgentTurn>>
   try {
     turn = await beginAgentTurn(session.user.id, sessionId, turnId, parsed.data.prompt, parsed.data.retry)
@@ -105,14 +132,9 @@ export async function POST(request: Request) {
     console.error('Could not prepare Bot mailbox; continuing without mailbox tools')
     return null
   })
-  const opencode = createOpenAICompatible({
-    name: 'opencode',
-    apiKey,
-    baseURL: 'https://opencode.ai/zen/go/v1',
-    headers: { 'User-Agent': 'Mikka-UI-Agent/1.0', 'x-opencode-session': sessionId },
-  })
+  const generationError = modelSource ? () => 'Subscription connection unavailable.' : agentErrorMessage
   const result = streamText({
-    model: opencode('deepseek-v4.1-flash'),
+    model,
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
     system: `${systemPrompt}\n\n${agentWebInstructions()}\n\n${mailboxActor ? MAILBOX_INSTRUCTIONS : ''}`,
     messages,
@@ -124,11 +146,11 @@ export async function POST(request: Request) {
     },
     stopWhen: isStepCount(5),
     prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
-    maxRetries: 1,
+    maxRetries: modelSource ? 0 : 1,
     timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
     abortSignal: request.signal,
     onError: ({ error }) => {
-      if (!request.signal.aborted) console.error('Agent generation failed:', agentErrorMessage(error))
+      if (!request.signal.aborted) console.error('Agent generation failed:', generationError(error))
     },
   })
   return createUIMessageStreamResponse({
@@ -139,7 +161,7 @@ export async function POST(request: Request) {
     stream: persistAgentStream(toUIMessageStream({
       stream: result.stream,
       sendReasoning: false,
-      onError: agentErrorMessage,
+      onError: generationError,
     }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),
   })
 }
