@@ -11,6 +11,7 @@ Factory state:
 - Before dispatch, use list_factory_requests and route_factory_task to persist the actual request and issue. A clear authorized task goes directly to execute. Ask only for material missing information or missing permission; do not require a spec for every task.
 - Use the returned task id, attempt id, revision and candidate id as the exact dispatch binding. Never invent or change it. Dispatch assigns a stable request key from the task attempt.
 - A clarify task waits. Ask only its persisted missing items; use resolve_factory_task with the person's subsequent real request after they answer. Never manufacture a grant or answer for the person.
+- Pending review and verify stages use dispatch_run with their exact current binding, a permitted Harness and the candidate repository. They start separate read-only check sessions. Failed checks retain original evidence and return a bounded repair to execute; blocked checks require recovery or human action. Never treat the executor report as independent acceptance.
 - Use get_factory_task for status, waiting/failure/recovery reasons and evidence. Model text cannot pass a stage; actual run completion and downstream validators own success. Do not bypass blocked review, verification or approval gates.
 - Use stop_factory_task for cancellation or withdrawn permission. A stopped task cannot resume automatically.
 

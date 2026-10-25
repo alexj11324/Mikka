@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import { FactoryError, type FactoryBinding } from "./contract";
 import { factoryEventId } from "./event-id";
 import type { FactoryTask, createFactoryStore } from "./store";
+import { reconcileFactoryCheck } from "./reconcile-check";
 import { MAX_RUN_ATTEMPTS } from "../run-retry";
 const binding = (task: FactoryTask): FactoryBinding => ({
   taskId: task.id,
@@ -18,7 +19,7 @@ export function createFactoryReconciler(
 ) {
   return async (userId: string) => {
     const { rows: pending } = await pool.query(
-      `SELECT t.id FROM factory_tasks t WHERE t."userId"=$1 AND t.stage IN ('spec','execute') AND (t.status='running' OR (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId"))) ORDER BY t."updatedAt" LIMIT 50`,
+      `SELECT t.id FROM factory_tasks t WHERE t."userId"=$1 AND t.stage IN ('spec','execute','review','verify') AND (t.status='running' OR (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId"))) ORDER BY t."updatedAt" LIMIT 50`,
       [userId],
     );
     let recovered = 0;
@@ -64,6 +65,7 @@ export function createFactoryReconciler(
         // Consume the existing bounded run-retry chain; never create a retry here.
         for (
           let retry = 1;
+          ["spec", "execute"].includes(task.stage) &&
           run?.stopReason === "device_lost" &&
           !run.stopRequestedAt &&
           retry < MAX_RUN_ATTEMPTS;
@@ -99,6 +101,12 @@ export function createFactoryReconciler(
           !["succeeded", "failed", "stopped", "cancelled"].includes(run.status)
         ) {
           await tx.query("COMMIT");
+          continue;
+        }
+        if (task.stage === "review" || task.stage === "verify") {
+          await reconcileFactoryCheck(tx, store, task, run);
+          await tx.query("COMMIT");
+          recovered++;
           continue;
         }
         const eventId = factoryEventId("run-completion", run.id);

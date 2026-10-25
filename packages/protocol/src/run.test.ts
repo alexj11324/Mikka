@@ -31,6 +31,28 @@ describe("run completion contract", () => {
     ).toEqual({ stopReason: "submitted", report })
   })
 
+  it("preserves the daemon check receipt and exact process failure without accepting malformed SHA", () => {
+    const checked = {
+      ...emptyRunReport(),
+      check: { sha: "a".repeat(40), readOnly: true },
+      verify: {
+        status: "failed",
+        command: "node acceptance.mjs",
+        output: "real failure",
+        exitCode: 17,
+        signal: null,
+        timedOut: false,
+      },
+    }
+    expect(runReport.parse(checked)).toEqual(checked)
+    expect(
+      runReport.safeParse({
+        ...checked,
+        check: { sha: "main", readOnly: true },
+      }).success
+    ).toBe(false)
+  })
+
   it("refuses the old done/partial-only shape and a submit without a report", () => {
     expect(
       runCompleteRequest.safeParse({

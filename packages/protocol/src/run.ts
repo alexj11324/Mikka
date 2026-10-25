@@ -68,6 +68,10 @@ export const runReport = z.object({
   verify: z.object({
     status: verifyStatus,
     command: z.string().max(2_000).optional(),
+    /** Actual process outcome from the daemon, never the agent. */
+    exitCode: z.number().int().nullable().optional(),
+    signal: z.string().max(100).nullable().optional(),
+    timedOut: z.boolean().optional(),
     /** Tail of the command output. */
     output: z.string().max(10_000).optional(),
   }),
@@ -76,6 +80,13 @@ export const runReport = z.object({
   nextStep: z.string().max(2_000).nullable(),
   /** For `blocked`: the external condition, e.g. `quota_exhausted`. */
   blockedOn: z.string().max(500).optional(),
+  /** Daemon-owned receipt for an exact, unchanged read-only candidate. */
+  check: z
+    .object({
+      sha: z.string().regex(/^[a-f0-9]{40}$/),
+      readOnly: z.literal(true),
+    })
+    .optional(),
   /** Acceptance criteria the agent checked, with evidence. */
   criteria: z
     .array(

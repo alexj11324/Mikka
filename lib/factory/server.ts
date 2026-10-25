@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { pool } from "@/lib/db";
 import { issueForUser } from "@/lib/issue-access";
 import { createFactoryStore } from "./store";
+import { createFactoryCheckClaim, factoryCheckGates } from "./checks";
 import { createFactoryMonitor, monitorGate } from "./monitor";
 import { appendMonitorEvidence } from "./monitor-evidence";
 import { workspaceDb } from "@/lib/workspace-db";
@@ -19,8 +20,10 @@ const authorize: FactoryAuthorize = async (userId, issueId, tx) => {
   return Boolean(await issueForUser(userId, issueId, false, drizzle(tx)));
 };
 export const factoryStore = createFactoryStore(pool, authorize, {
+  ...factoryCheckGates,
   monitor: monitorGate,
 });
+export const claimFactoryCheckRun = createFactoryCheckClaim(pool, authorize);
 export const factoryMonitor = createFactoryMonitor(
   pool,
   factoryStore,
