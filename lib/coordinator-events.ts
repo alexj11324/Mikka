@@ -29,6 +29,18 @@ export function runFinishedEvent(run: { id: string; userId: string; issueId: str
   }
 }
 
+/** A run lost its device and was queued again as `retryRunId`. Background: nobody needs to act. */
+export function runRetriedEvent(run: { id: string; userId: string; issueId: string | null }, retry: { runId: string; attempt: number; maxAttempts: number }): CoordinatorEventInput {
+  return {
+    userId: run.userId,
+    kind: 'run_retried',
+    dedupeKey: `run_retried:${run.id}`,
+    issueId: run.issueId,
+    runId: run.id,
+    payload: { retryRunId: retry.runId, attempt: retry.attempt, maxAttempts: retry.maxAttempts },
+  }
+}
+
 /**
  * An issue moved to done, or null when this save is not that move. Keyed by
  * the revision that made the move, so reopening and finishing again is a new
