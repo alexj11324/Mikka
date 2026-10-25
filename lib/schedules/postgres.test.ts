@@ -95,6 +95,17 @@ test('real PG schedule lifecycle, concurrency, fencing, recovery and original-ch
       now=new Date(now.getTime()+120000);await store().tick();assert.equal((await history(s.id)).length,1)
       await assert.rejects(store().command(actor,{action:'resume',scheduleId:s.id,version:resumed.schedule.version+1}),/scheduleCancelled/)
     })
+    await t.test('ten real cancellation-versus-execution races have one linearized outcome',async()=>{
+      for(let n=0;n<10;n++){
+        const s=await create();now=new Date(now.getTime()+60000);await store().materialize()
+        const claim=await store().claim();assert.ok(claim)
+        await Promise.all([store().execute(claim),store().command(actor,{action:'cancel',scheduleId:s.id,version:1})])
+        const rows=await history(s.id)
+        assert.equal(rows.length,1);assert.ok(['cancelled','succeeded'].includes(rows[0].status))
+        assert.equal((await pool.query('SELECT count(*)::int n FROM agent_turns WHERE id=$1',[rows[0].operation_id])).rows[0].n,1)
+        await store().tick();assert.equal((await history(s.id)).length,1)
+      }
+    })
     await t.test('late policy records skip; catch-up coalesces and records at most one backlog slot',async()=>{
       const def=base();def.misfire='skip';def.maxLatenessMinutes=1;const s=await create(def)
       now=new Date(now.getTime()+180001);await store().tick();assert.equal((await history(s.id))[0].status,'skipped')

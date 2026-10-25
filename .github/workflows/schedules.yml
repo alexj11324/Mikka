@@ -19,7 +19,7 @@ jobs:
           POSTGRES_DB: mikka_179
         ports: ['5432:5432']
         options: >-
-          --health-cmd 'pg_isready -U postgres -d mikka_179'
+          --health-cmd "pg_isready -U postgres -d mikka_179"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       SCHEDULE_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179
