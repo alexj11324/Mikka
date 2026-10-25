@@ -33,3 +33,9 @@ New migrations: 20261025200000 actor columns/checks, then 20261025200100–20040
 search extension/indexes. Apply through the existing serial migration runner before
 new code. Concurrent index files remain outside transactions. No production migration,
 merge, deployment, real-user/UI acceptance or redacted production video performed here.
+
+Integrated-schema regression: pg_trgm extension objects are explicitly installed
+in public and the title index references public.gin_trgm_ops. Two retained schemas
+with public excluded from search_path each build valid indexes. Production preflight
+must confirm any pre-existing pg_trgm uses public; this candidate does not relocate
+an existing extension or change production schema configuration.

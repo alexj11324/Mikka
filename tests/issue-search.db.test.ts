@@ -27,6 +27,21 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
       await pool.query(text)
       await pool.query(text) // idempotent migration replay, outside transactions
     }
+    // Shared pg_trgm is installed once; each retained isolated schema must
+    // still resolve its operator class when public is absent from search_path.
+    const client=await pool.connect()
+    try {
+      for(let i=0;i<2;i++){
+        const schema='search_index_'+randomUUID().replaceAll('-','')
+        await client.query(`CREATE SCHEMA "${schema}"`)
+        await client.query(`SET search_path TO "${schema}"`)
+        await client.query('CREATE TABLE issues(id uuid PRIMARY KEY,title text)')
+        await client.query(await readFile(new URL('../drizzle/20261025200100_issue_search_pg_trgm.sql',import.meta.url),'utf8'))
+        await client.query(await readFile(new URL('../drizzle/20261025200200_issue_search_title_idx.sql',import.meta.url),'utf8'))
+        const valid=await client.query('SELECT indisvalid FROM pg_index WHERE indexrelid=$1::regclass',[`${schema}.issues_title_search_trgm_idx`])
+        assert.equal(valid.rows[0].indisvalid,true)
+      }
+    } finally {await client.query('SET search_path TO public');client.release()}
     const indexes = await pool.query("select indexrelid::regclass::text name,indisvalid from pg_index where indexrelid::regclass::text like 'issues_%search%' or indexrelid::regclass::text='issues_owner_updated_id_idx'")
     assert.ok(indexes.rows.length>=3)
     assert.ok(indexes.rows.every(row=>row.indisvalid))
