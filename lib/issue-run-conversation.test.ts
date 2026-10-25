@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runIsActive, runListRefreshInterval, runDiscussionId, isRunDiscussion, runOutput, runDiscussionRunId } from './issue-run-conversation'
+import { runIsActive, runListRefreshInterval, runDiscussionId, isRunDiscussion, runSummaryText, runDiscussionRunId } from './issue-run-conversation'
 
 test('only active run states offer messages; completed history stays readable', () => {
   for (const state of ['queued', 'preparing', 'running', 'waiting_input', 'finishing']) assert.equal(runIsActive(state), true)
@@ -12,22 +12,11 @@ test('run comments use distinct existing collaborative discussion threads', () =
   assert.equal(isRunDiscussion(runDiscussionId('run-1')), true)
   assert.equal(isRunDiscussion('discussion-other'), false)
 })
-test('durable chunk replay merges deltas and preserves tools/errors in order', () => {
-  assert.deepEqual(runOutput([
-    { type: 'start' }, { type: 'reasoning-delta', id: 'r', delta: 'Think' },
-    { type: 'text-delta', id: 'a', delta: 'Hello ' }, { type: 'text-delta', id: 'a', delta: '世界' },
-    { type: 'tool-input-available', toolCallId: 't', toolName: 'read' },
-    { type: 'tool-output-available', toolCallId: 't', output: { ok: true } },
-    { type: 'tool-output-error', toolCallId: 'u', errorText: 'No access' },
-    { type: 'error', errorText: 'Interrupted' }, { type: 'unknown', data: 'ignored' },
-  ]), [
-    { id: 'reasoning:r', kind: 'reasoning', text: 'Think' },
-    { id: 'text:a', kind: 'text', text: 'Hello 世界' },
-    { id: 'tool:t', kind: 'tool', text: 'read\n{"ok":true}' },
-    { id: 'tool:u', kind: 'tool', text: 'No access' },
-    { id: 'error:7', kind: 'error', text: 'Interrupted' },
-  ])
-  assert.deepEqual(runOutput([]), [])
+test('a run row shows the report summary, else the first error line, else nothing', () => {
+  assert.equal(runSummaryText({ report: { summary: ' Fixed the login loop. ' }, error: null }), 'Fixed the login loop.')
+  assert.equal(runSummaryText({ report: { summary: '' }, error: '\nDevice offline\nretrying' }), 'Device offline')
+  assert.equal(runSummaryText({ report: 'raw', error: null }), null)
+  assert.equal(runSummaryText({ report: null, error: null }), null)
 })
 
 // Replicate the collaborative comment map's concurrent insertion semantics without a server.

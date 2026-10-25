@@ -1,15 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, rail, app } from './fixtures'
+import { test, expect, register, app, seedTask } from './fixtures'
 
 test('closing an issue opened from a project returns to that project, not the board', async ({ page }) => {
   await register(page)
-  await rail(page, '看板').click()
-  await page.getByRole('button', { name: '新建任务', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
   const title = `Project return ${randomUUID()}`
-  await dialog.getByLabel('任务标题', { exact: true }).fill(title)
-  await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
-  await expect(dialog).not.toBeVisible()
+  await seedTask(page, title)
   await page.goto(app('/?section=projects'))
   await page.getByRole('button', { name: '新建项目', exact: true }).first().click()
   const projectDialog = page.getByRole('dialog', { name: '新建项目', exact: true })

@@ -16,7 +16,7 @@ import { OpenAI } from '@/components/ui/svgs/openai'
 import { statusIconTints } from '@/lib/status-appearance'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from '@/components/workspace/issue-properties'
 
-const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destructive-light' | 'warning-light' | 'secondary'> = {
+export const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destructive-light' | 'warning-light' | 'secondary'> = {
   queued: 'secondary', preparing: 'info-light', running: 'info-light', waiting_input: 'warning-light', finishing: 'info-light',
   succeeded: 'success-light', stopped: 'secondary', failed: 'destructive-light', cancelled: 'secondary',
 }

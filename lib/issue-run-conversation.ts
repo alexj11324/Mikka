@@ -19,31 +19,12 @@ export function runDiscussionId(runId: string) { return `discussion-run-${runId}
 export function isRunDiscussion(id: string) { return id.startsWith('discussion-run-') }
 export function runDiscussionRunId(id: string) { return isRunDiscussion(id) ? id.slice('discussion-run-'.length).split(':')[0] : null }
 
-export type RunOutput = { id: string; kind: 'text' | 'reasoning' | 'tool' | 'error'; text: string }
-export function runOutput(chunks: readonly Record<string, unknown>[]): RunOutput[] {
-  const output: RunOutput[] = []
-  const blocks = new Map<string, RunOutput>()
-  for (const [index, chunk] of chunks.entries()) {
-    if (chunk.type === 'text-delta' || chunk.type === 'reasoning-delta') {
-      const kind = chunk.type === 'text-delta' ? 'text' : 'reasoning'
-      const id = `${kind}:${String(chunk.id ?? index)}`
-      let block = blocks.get(id)
-      if (!block) { block = { id, kind, text: '' }; blocks.set(id, block); output.push(block) }
-      if (typeof chunk.delta === 'string') block.text += chunk.delta
-    } else if (chunk.type === 'tool-input-available') {
-      const id = `tool:${String(chunk.toolCallId ?? index)}`
-      const block: RunOutput = { id, kind: 'tool', text: String(chunk.toolName ?? '') }
-      blocks.set(id, block); output.push(block)
-    } else if (chunk.type === 'tool-output-available' || chunk.type === 'tool-output-error') {
-      const id = `tool:${String(chunk.toolCallId ?? index)}`
-      const block = blocks.get(id)
-      const value = chunk.type === 'tool-output-error' ? chunk.errorText : chunk.output
-      const text = typeof value === 'string' ? value : JSON.stringify(value ?? '')
-      if (block) block.text += `\n${text}`
-      else output.push({ id, kind: 'tool', text })
-    } else if (chunk.type === 'error' && typeof chunk.errorText === 'string') {
-      output.push({ id: `error:${index}`, kind: 'error', text: chunk.errorText })
-    }
+/** One line about what a finished run did: the report's summary, else the first line of its error. */
+export function runSummaryText(run: { report: unknown; error: string | null }): string | null {
+  const report = run.report
+  if (report && typeof report === 'object' && !Array.isArray(report)) {
+    const summary = (report as Record<string, unknown>).summary
+    if (typeof summary === 'string' && summary.trim()) return summary.trim()
   }
-  return output.filter(block => block.text.trim())
+  return run.error?.split('\n').find(line => line.trim())?.trim() ?? null
 }
