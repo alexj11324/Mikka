@@ -12,10 +12,13 @@ Docker hosted adapter, without paid sandbox provisioning.
 2. Complete the existing enrollment transfer and binding using the real Mikka
    session and workspace authorization. Keep the source grant. The Mikka owner
    and Claude account can have different email addresses.
-3. Register this Linux daemon through the normal device login flow. This creates
-   persistent device access and must have the corresponding authorization. Add
-   that exact device ID to `MIKKA_BYOS_HOSTED_DEVICE_IDS`; do not manufacture a
-   device token or insert a session in SQL.
+3. Register this Linux daemon using a device token created through the real
+   authenticated Mikka Devices page. The CLI's default device-code flow is not
+   currently wired on the server (see below). Pass the approved token through a
+   private pipe to `daemon login --token-stdin`, not process arguments or chat.
+   This creates persistent device access and needs the corresponding authorization.
+   Add the registered device ID to `MIKKA_BYOS_HOSTED_DEVICE_IDS`; do not manufacture
+   a device token or insert a session in SQL.
 4. Create the owned Claude bot and subscription binding, then create/start the
    user task through Mikka's normal actions. `startRun` queues the run; the daemon
    claims it, the claim transaction binds the subscription run, and the hosted
@@ -93,3 +96,33 @@ umask plus the budget suite passed 16/16. The expanded run also timed out the
 existing Codex Docker test at 45 seconds; this is retained as an unresolved full
 suite result, not hidden by increasing its timeout. Independent review confirmed
 the startup-mode enforcement fix and found no further confirmed budget defect.
+
+
+## Actual device authorization contract (source audit)
+
+The current server accepts hashed `device_tokens` through `authenticateDevice`.
+Tokens are issued by the authenticated `createDeviceToken` server action on
+`/mikka/en/devices`. They belong to a user, not one device/workspace; they have no
+automatic expiry. A leaked token can call device APIs for that user's devices.
+The hosted allowlist limits native subscription calls but is not a general
+restriction on this credential. `setDeviceEnabled(false)` stops hosted use for
+that device; it does not revoke the token. The authentication query respects
+`revokedAt`, but this audit found no ordinary token-revocation product endpoint.
+Do not promise a complete revocation UI or resort to direct SQL in acceptance.
+
+The CLI default device-code flow references `/api/auth/device/code` and
+`/api/auth/device/token`; `lib/auth.ts` does not register that plugin, and device
+API authentication expects a device token, not a Better Auth session. Enabling
+the plugin alone would therefore not complete registration. Existing manual
+creation is the implemented alternative; no new OAuth subsystem was added here.
+
+Registration currently returns the legacy constant `WORKSPACE_ID`. Supplying a
+workspace to CLI login does not turn the user-wide token into workspace-scoped
+authorization. BYOS still checks the real run and subscription owner/workspace
+binding independently. This distinction must remain explicit during acceptance.
+
+`--token-stdin` accepts one bounded, noninteractive credential, refuses conflicting
+flags and malformed input without OAuth fallback, and writes through the existing
+0600 atomic store. It never prints the credential. Three synthetic tests cover
+input validation, private persistence/redaction, and mode rejection. No real
+credential was created or imported by these tests.

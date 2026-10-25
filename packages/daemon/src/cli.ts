@@ -18,7 +18,7 @@ import { HttpServerLink } from "./server-link-http"
 
 const USAGE = `Usage:
   mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>] [--group-review-images <image-manifest.json>] [--hosted-subscriptions] [--subscription-request-budget <operator-file.json>]
-  mikka daemon login [--server <url>] [--workspace <id>] [--token <session>] [--dev] [--data-dir <dir>]
+  mikka daemon login [--server <url>] [--workspace <id>] [--token <device-token>|--token-stdin] [--dev] [--data-dir <dir>]
   mikka daemon status [--dev] [--data-dir <dir>]`
 
 const SERVER_URLS: Record<Flavor, string> = {
@@ -31,6 +31,7 @@ const CLIENT = { name: "mikka-cli", version: DAEMON_VERSION }
 export interface CliIO {
   out: (line: string) => void
   err: (line: string) => void
+  credentialInput?: AsyncIterable<Uint8Array | string>
 }
 
 const defaultIO: CliIO = {
@@ -57,6 +58,7 @@ export async function runCli(
       "subscription-request-budget": { type: "string" },
       "hosted-subscriptions": { type: "boolean", default: false },
       token: { type: "string" },
+      "token-stdin": { type: "boolean", default: false },
       workspace: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -68,6 +70,10 @@ export async function runCli(
   }
   if (values["subscription-request-budget"] && (!values["hosted-subscriptions"] || sub)) {
     io.err("subscription-request-budget requires hosted daemon mode")
+    return 2
+  }
+  if (values["token-stdin"] && (sub !== "login" || values.token !== undefined)) {
+    io.err("token-stdin requires login and cannot be combined with token")
     return 2
   }
   const flavor: Flavor = values.dev ? "dev" : "prod"
@@ -92,6 +98,15 @@ export async function runCli(
     // Better Auth device authorization (RFC 8628), like `gh auth login`.
     // `--token` takes a session obtained elsewhere (tests, the desktop).
     let credential = values.token
+    if (values["token-stdin"]) {
+      try {
+        if (!io.credentialInput && process.stdin.isTTY) throw new Error("interactive_input_refused")
+        credential = await readCredentialInput(io.credentialInput ?? process.stdin)
+      } catch {
+        io.err("Could not read a device credential from protected standard input.")
+        return 2
+      }
+    }
     if (!credential) {
       const serverUrl =
         values.server ?? process.env.MIKKA_PUBLIC_URL ?? SERVER_URLS[flavor]
@@ -212,4 +227,19 @@ export function main(argv = process.argv.slice(2)) {
       process.exit(1)
     }
   )
+}
+
+/** Accept one bounded credential through a private pipe, never argv or console. */
+export async function readCredentialInput(input: AsyncIterable<Uint8Array | string>): Promise<string> {
+  const chunks: Buffer[] = []
+  let size = 0
+  for await (const chunk of input) {
+    const bytes = Buffer.from(chunk)
+    size += bytes.length
+    if (size > 8192) throw new Error("invalid_credential_input")
+    chunks.push(bytes)
+  }
+  const token = Buffer.concat(chunks).toString("utf8").replace(/\r?\n$/, "")
+  if (!token || /[\s\u0000-\u001f\u007f]/u.test(token)) throw new Error("invalid_credential_input")
+  return token
 }
