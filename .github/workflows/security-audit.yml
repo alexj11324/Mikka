@@ -1,0 +1,52 @@
+name: Security audit PostgreSQL
+on:
+  push:
+    branches: ['codex/enterprise-audit-210']
+  pull_request:
+    paths: ['lib/audit/**', 'drizzle/*security_audit*.sql', 'app/api/audit/**', '.github/workflows/security-audit.yml']
+permissions:
+  contents: read
+jobs:
+  audit:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: audit_app_e2e
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d audit_app_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/audit_app_e2e
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/audit_workspace_e2e
+      AUDIT_APP_TEST_URL: postgresql://postgres@127.0.0.1:5432/audit_app_e2e
+      AUDIT_WORKSPACE_TEST_URL: postgresql://postgres@127.0.0.1:5432/audit_workspace_e2e
+      REQUIRE_AUDIT_DB: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: psql "$MIKKA_DATABASE_URL" -c 'CREATE DATABASE audit_workspace_e2e'
+      - run: MIGRATE=1 node scripts/migrate.mjs
+      - name: Repeat migration must apply nothing
+        run: |
+          MIGRATE=1 node scripts/migrate.mjs > audit-migration-repeat.log
+          test ! -s audit-migration-repeat.log
+      - run: pnpm test:audit | tee audit-postgres.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-postgres-evidence
+          path: audit-*.log
+          retention-days: 14
