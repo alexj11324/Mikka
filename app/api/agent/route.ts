@@ -2,6 +2,7 @@ import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createUIMessageStreamResponse, isStepCount, streamText, toUIMessageStream } from 'ai'
 import { agentWebInstructions, createAgentWebTools } from '@/lib/agent-web-tools'
+import { agentSearchStatusStream } from '@/lib/agent-search-status'
 import { createComposioAITools } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
 import { z } from 'zod'
@@ -107,11 +108,11 @@ export async function POST(request: Request) {
     system: `${systemPrompt}\n\n${agentWebInstructions()}`,
     messages,
     tools: {
-      ...createAgentWebTools({ signal: request.signal }),
+      ...createAgentWebTools({ signal: request.signal, context: { userId: session.user.id, caller: 'agent-panel' } }),
       ...createComposioAITools((action, input) => runComposioAction(session.user.id, action, input)),
     },
-    stopWhen: isStepCount(5),
-    prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
+    stopWhen: isStepCount(3),
+    prepareStep: ({ stepNumber }) => stepNumber >= 2 ? { toolChoice: 'none' } : {},
     maxRetries: 1,
     timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
     abortSignal: request.signal,
@@ -128,6 +129,6 @@ export async function POST(request: Request) {
       stream: result.stream,
       sendReasoning: false,
       onError: agentErrorMessage,
-    }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),
+    }).pipeThrough(agentSearchStatusStream()).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),
   })
 }

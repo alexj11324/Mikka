@@ -2,28 +2,34 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { agentWebInstructions, createAgentWebTools, isPublicWebAddress, webUrlSchema } from '../lib/agent-web-tools.ts'
+import { createWebService } from '../lib/search/index.ts'
+import { createFirecrawlProvider } from '../lib/search/firecrawl.ts'
 
 const signal = new AbortController().signal
 const context = { toolCallId: 'test', messages: [], abortSignal: signal }
+const user = { userId: 'synthetic-agent', caller: 'agent-panel' }
+const failure = outcome => ({ ok: false, error: 'searchUnavailable', outcome })
+const toolsFor = options => createAgentWebTools({ signal, context: user, ...options })
 
-test('联网工具只暴露搜索和网页读取，保留 DS 聊天及认证', async () => {
-  const tools = createAgentWebTools({ signal })
-  assert.deepEqual(Object.keys(tools), ['web_search', 'read_webpage'])
+test('Agent uses the shared Firecrawl service with authenticated user context and bounded tool steps', async () => {
+  assert.deepEqual(Object.keys(toolsFor()), ['web_search', 'read_webpage'])
   const source = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
   assert.match(source, /opencode\('deepseek-v4\.1-flash'\)/)
   assert.match(source, /auth\.api\.getSession/)
-  assert.match(source, /tools:\s*\{\s*\.\.\.createAgentWebTools\(\{ signal: request\.signal \}\),/)
-  assert.match(source, /\.\.\.createComposioAITools\(\(action, input\) => runComposioAction\(session\.user\.id, action, input\)\)/)
-  assert.match(source, /stopWhen: isStepCount\(5\)/)
-  assert.match(source, /stepNumber >= 4 \? \{ toolChoice: 'none' \}/)
+  assert.match(source, /createAgentWebTools\(\{ signal: request.signal, context: \{ userId: session.user.id, caller: 'agent-panel' \}/)
+  assert.match(source, /agentSearchStatusStream\(\)/)
+  assert.match(source, /stopWhen: isStepCount\(3\)/)
+  assert.match(source, /stepNumber >= 2/)
   const instructions = agentWebInstructions(new Date('2026-10-21T00:00:00Z'))
   assert.match(instructions, /2026-10-21/)
   assert.match(instructions, /时区/)
   assert.match(instructions, /不可信数据/)
+  const implementation = await readFile(new URL('../lib/agent-web-tools.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(implementation, /perplexity|browserbase|generateText|billing_required/i)
 })
 
-test('拒绝非 HTTPS、凭据、内网地址、IP 及自定义端口', () => {
-  for (const url of ['http://example.org', 'https://user:pass@example.org', 'https://127.0.0.1', 'https://[::1]', 'https://2130706433', 'https://localhost', 'https://host.internal', 'https://site.local', 'https://example.org:8080']) {
+test('Reject non-HTTPS, credentials, private names, IP literals and custom ports', () => {
+  for (const url of ['http://example.org', 'https://user:pass@example.org', 'https://127.0.0.1', 'https://[::1]', 'https://2130706433', 'https://0x7f000001', 'https://localhost', 'https://host.internal', 'https://site.local', 'https://site.local.', 'https://example.org:8080']) {
     assert.equal(webUrlSchema.safeParse(url).success, false, url)
   }
   assert.equal(webUrlSchema.safeParse('https://www.weather.gov/').success, true)
@@ -32,68 +38,53 @@ test('拒绝非 HTTPS、凭据、内网地址、IP 及自定义端口', () => {
   assert.equal(isPublicWebAddress('2606:4700:4700::1111'), true)
 })
 
-test('搜索保留原始来源、日期和检索时间，裁剪内容', async () => {
-  const tools = createAgentWebTools({ signal, run: async (operation, input, passedSignal) => {
-    assert.equal(operation, 'search')
-    assert.equal(input, '匹兹堡明天天气')
-    assert.equal(passedSignal.aborted, false)
-    return { results: [{ title: '预报', url: 'https://www.weather.gov/', snippet: '气象资料'.repeat(4000), date: '2026-10-21' }] }
-  } })
-  const output = await tools.web_search.execute({ query: '匹兹堡明天天气' }, context)
-  assert.equal(output.ok, true)
-  assert.equal(output.results[0].url, 'https://www.weather.gov/')
-  assert.equal(output.results[0].date, '2026-10-21')
-  assert.equal(output.results[0].snippet.length, 7000)
-  assert.equal(output.untrustedContent, true)
-  assert.ok(Date.parse(output.retrievedAt))
+test('Actual Agent → shared service → Firecrawl adapter preserves search evidence and markdown', async () => {
+  const seen = []
+  const provider = createFirecrawlProvider(async (url, init) => {
+    seen.push({ url, input: JSON.parse(init.body) })
+    return url.endsWith('/search')
+      ? Response.json({ success: true, data: { web: [{ url: 'https://www.weather.gov/', title: 'Weather', description: 'Public weather' }] } })
+      : Response.json({ success: true, data: { markdown: '# Weather\nPublic weather', metadata: { sourceURL: 'https://www.weather.gov/', url: 'https://www.weather.gov/', statusCode: 200 } } })
+  }, { resolve: async () => [{ address: '8.8.8.8' }] })
+  const web = createWebService({ provider })
+  const tools = toolsFor({ search: web.search, scrape: web.scrape })
+  const found = await tools.web_search.execute({ query: 'public weather' }, context)
+  assert.equal(found.ok, true)
+  assert.equal(found.results[0].url, 'https://www.weather.gov/')
+  assert.equal(found.untrustedContent, true)
+  assert.ok(Date.parse(found.retrievedAt))
+  const page = await tools.read_webpage.execute({ url: found.results[0].url }, context)
+  assert.equal(page.content, '# Weather\nPublic weather')
+  assert.equal(page.url, found.results[0].url)
+  assert.equal(page.untrustedContent, true)
+  assert.deepEqual(seen.map(x => x.url), ['https://api.firecrawl.dev/v2/search', 'https://api.firecrawl.dev/v2/scrape'])
+  assert.deepEqual(Object.keys(seen[0].input).sort(), ['limit', 'query', 'sources'])
 })
 
-test('网页先检查 DNS，拒绝混合公共和私网解析', async () => {
+test('429 emits the reserved degradation notice and suppresses both tools for the rest of the turn', async () => {
   let calls = 0
-  const tools = createAgentWebTools({ signal, resolve: async () => [{ address: '8.8.8.8' }, { address: '10.0.0.1' }], run: async () => { calls++; return {} } })
-  const output = await tools.read_webpage.execute({ url: 'https://www.weather.gov/' }, context)
-  assert.equal(output.ok, false)
-  assert.equal(calls, 0)
-})
-
-test('网页只返回有效正文，不把重定向或上游错误当成资料', async () => {
-  let output = { content: '网页资料', statusCode: 200 }
-  const tools = createAgentWebTools({ signal, resolve: async () => [{ address: '8.8.8.8' }], run: async () => output })
-  const valid = await tools.read_webpage.execute({ url: 'https://www.weather.gov/' }, context)
-  assert.equal(valid.ok, true)
-  assert.equal(valid.content, '网页资料')
-  output = { content: 'redirect', statusCode: 302 }
-  assert.equal((await tools.read_webpage.execute({ url: 'https://www.weather.gov/' }, context)).ok, false)
-  output = { content: 'server failure', statusCode: 500 }
-  assert.equal((await tools.read_webpage.execute({ url: 'https://www.weather.gov/' }, context)).ok, false)
-})
-
-test('计费验证未完成时说明具体原因且不重复调用上游', async () => {
-  let calls = 0
-  const tools = createAgentWebTools({ signal, run: async () => {
-    calls++
-    throw new Error('AI Gateway requires a valid credit card on file to service requests.')
-  } })
-  for (let i = 0; i < 3; i++) {
-    const result = await tools.web_search.execute({ query: '天气' }, context)
+  const tools = toolsFor({ search: async (_q, ctx) => { assert.deepEqual(ctx, user); calls++; return failure('rate_limited') }, scrape: async () => { calls++; return failure('error') } })
+  for (const tool of [() => tools.web_search.execute({ query: 'public weather' }, context), () => tools.read_webpage.execute({ url: 'https://www.weather.gov/' }, context)]) {
+    const result = await tool()
     assert.equal(result.ok, false)
-    assert.equal(result.code, 'billing_required')
-    assert.match(result.error, /管理员.*绑定支付卡/)
+    assert.equal(result.notice, 'search_degraded')
+    assert.equal(result.outcome, 'rate_limited')
+    assert.match(result.error, /429/)
   }
   assert.equal(calls, 1)
 })
 
-test('上游失败不泄漏错误详情，限制每轮费用，取消传播', async () => {
+test('Timeout and upstream errors degrade explicitly, cap turn calls, and propagate cancellation', async () => {
   let calls = 0
-  const tools = createAgentWebTools({ signal, run: async () => { calls++; throw new Error('secret upstream error') } })
-  for (let i = 0; i < 5; i++) {
-    const result = await tools.web_search.execute({ query: '天气' }, context)
+  const tools = toolsFor({ search: async () => { calls++; return failure('timeout') } })
+  for (let i = 0; i < 4; i++) {
+    const result = await tools.web_search.execute({ query: 'public weather' }, context)
     assert.equal(result.ok, false)
-    assert.doesNotMatch(JSON.stringify(result), /secret/)
+    assert.equal(result.notice, 'search_degraded')
   }
-  assert.equal(calls, 4)
+  assert.equal(calls, 2)
   const controller = new AbortController()
   controller.abort()
-  const cancelled = createAgentWebTools({ signal: controller.signal, run: async () => { throw new Error('不应调用') } })
-  await assert.rejects(cancelled.web_search.execute({ query: '天气' }, context), { name: 'AbortError' })
+  const cancelled = toolsFor({ signal: controller.signal, search: async () => { throw new Error('must not run') } })
+  await assert.rejects(cancelled.web_search.execute({ query: 'public weather' }, context), { name: 'AbortError' })
 })

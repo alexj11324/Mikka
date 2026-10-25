@@ -1,0 +1,34 @@
+name: Agent web tools
+on:
+  push:
+    branches: ['codex/issue-100-agent-firecrawl-*']
+  pull_request:
+    paths:
+      - 'lib/search/**'
+      - 'lib/agent-web-tools.ts'
+      - 'lib/agent-search-status.ts'
+      - 'app/api/agent/route.ts'
+      - 'tests/agent-web-tools.test.mjs'
+      - 'tests/agent-search-status.test.mjs'
+      - '.github/workflows/agent-web-tools.yml'
+permissions:
+  contents: read
+jobs:
+  provider-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Agent/provider contracts (fixtures only, no live Firecrawl)
+        run: node --import tsx --test tests/agent-fetch.test.mjs tests/agent-history.test.mjs tests/agent-web-tools.test.mjs tests/agent-search-status.test.mjs lib/search/search.test.ts lib/search/firecrawl.test.ts
+      - run: pnpm lint
+      - run: pnpm exec next typegen
+      - run: pnpm typecheck
