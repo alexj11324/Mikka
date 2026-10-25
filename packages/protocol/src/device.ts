@@ -74,6 +74,7 @@ export const DEVICE_ROUTES = {
   commandsAck: "/v1/devices/:deviceId/commands/ack",
   runEvents: "/v1/runs/:runId/events",
   runPatch: "/v1/runs/:runId",
+  runCheckpoint: "/v1/runs/:runId/checkpoint",
 } as const
 
 export const devicePaths = {
@@ -97,6 +98,7 @@ export const devicePaths = {
     `/v1/devices/${seg(deviceId)}/commands/ack`,
   runEvents: (runId: string) => `/v1/runs/${seg(runId)}/events`,
   runPatch: (runId: string) => `/v1/runs/${seg(runId)}`,
+  runCheckpoint: (runId: string) => `/v1/runs/${seg(runId)}/checkpoint`,
 }
 
 // --- Registration ---------------------------------------------------------
@@ -162,6 +164,31 @@ export const heartbeatResultSchema = z.object({
   revoked: z.array(id).max(500).optional(),
 })
 export type HeartbeatResult = z.input<typeof heartbeatResultSchema>
+
+// --- Checkpoints ------------------------------------------------------------
+
+/** Largest gzipped checkpoint patch the server keeps. */
+export const RUN_CHECKPOINT_MAX_BYTES = 8 * 1024 * 1024
+
+/**
+ * A run's work in progress, saved by the daemon (never the agent) after
+ * tool calls and on a timer, so another machine can take the run over when
+ * this one goes offline. The server keeps the latest one per run.
+ */
+export const runCheckpointSchema = z.object({
+  /** The commit the run's worktree started from. */
+  baseCommit: z.string().regex(/^[0-9a-f]{40,64}$/),
+  /**
+   * `git diff --binary` from `baseCommit` to the whole worktree (tracked
+   * and untracked files, ignored ones left out, the agent's own commits
+   * included), gzipped, base64.
+   */
+  patch: z.string().max(Math.ceil((RUN_CHECKPOINT_MAX_BYTES * 4) / 3) + 4),
+  /** Files the patch touches. */
+  files: z.number().int().nonnegative(),
+  takenAt: isoTime,
+})
+export type RunCheckpoint = z.infer<typeof runCheckpointSchema>
 
 // --- Allow-listed repos ---------------------------------------------------
 
@@ -259,6 +286,13 @@ export const runAssignmentSchema = z.object({
    * branch, so nothing the earlier run left uncommitted is lost.
    */
   continuesRunId: id.optional(),
+  /**
+   * The latest checkpoint of the attempt this run takes over after its
+   * machine went offline. Used only for a new worktree (another machine, or
+   * the earlier worktree is gone): it starts at `baseCommit` (the base
+   * branch when that commit is not here) with the patch applied.
+   */
+  resumeFrom: runCheckpointSchema.optional(),
   /**
    * The harness session to continue. A daemon that cannot resume starts a
    * new session with `prompt`, which always carries the full brief.

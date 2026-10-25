@@ -1,12 +1,12 @@
 # Factory #194 approval/publish consumer v1
 
-Base: coordinated #191+#192 `4cd3a1b5fa05773094722bab7774e15a8d49d018` (fast-forwarded from frozen PR197 `605bf086d4371e19f2df2e2857a487f1decd649d`). The [#192 contract](192-contract-v1.md) and `lib/factory/contract.ts` are unchanged. `createFactoryApprovals` uses `createFactoryStore(pool, authorize, gates)` and its existing `read/apply` transaction boundary. There is no second stage source, scheduler, Harness or worker permission system.
+Base: coordinated #191+#192 `7e93b86277fbfeb1a5f19d41bcc0c03596484491`, with coordinator-supplied #194 filename compatibility `4d6f83c43639a26380e4cdc1587ce52ac0a5f4d9`. This preserves the earlier `4cd3a1b5` / frozen PR197 `605bf086` ancestry. The [#192 contract](192-contract-v1.md) and `lib/factory/contract.ts` are unchanged. `createFactoryApprovals` uses `createFactoryStore(pool, authorize, gates)` and its existing `read/apply` transaction boundary. There is no second stage source, scheduler, Harness or worker permission system.
 
 ## Dependencies and installation
 
 `lib/factory/server.ts` installs only `approvalGate` and `publishGate`. #193 must compose its own review/verify gates into that same store. They are absent on this candidate and remain closed. #194 never promotes executor self-report into an independent result. Existing daemon candidate commit/push is unchanged: it precedes candidate review and is not a merge/deployment approval. The concrete upstream rows and evidence requirements are in [the #193 handoff](194-upstream-evidence.md).
 
-Migrations: #192 `20261025010001_factory_192_stages.sql`, imported #191 `20261025011347_run_dispatch_keys.sql`, new #194 `20261025012001_factory_194_approvals.sql`. The obsolete `20261025004500` and `20261025011101` filenames are not present. The new migration is reentrant and adds consumer ledgers only.
+Migrations: #192 `20261025013402_factory_192_stages.sql`, imported #191 `20261025013401_run_dispatch_keys.sql`, new #194 `20261025013403_factory_194_approvals.sql`. The obsolete `20261025004500`, `20261025011101`, `20261025011347`, `20261025010001` and `20261025012001` candidate filenames are absent. The new migration is reentrant and adds consumer ledgers only.
 
 ## Browser API
 

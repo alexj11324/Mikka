@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -199,6 +199,21 @@ export const runChunks = pgTable('run_chunks', {
   seq: integer('seq').notNull(), chunk: jsonb('chunk').$type<Record<string, unknown>>().notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('run_chunks_run_seq_key').on(table.runId, table.seq)])
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' })
+
+/**
+ * The latest work in progress of a run, saved by the daemon so another
+ * machine can take the run over (lib/run-leases.ts). `patch` is a gzipped
+ * `git diff --binary` against `baseCommit`.
+ */
+export const runCheckpoints = pgTable('run_checkpoints', {
+  runId: uuid('runId').primaryKey().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(), baseCommit: text('baseCommit').notNull(),
+  patch: bytea('patch').notNull(), files: integer('files').notNull(),
+  takenAt: timestamp('takenAt', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
 
 /**
  * A token the agent inside one run uses for the worker tools of the MCP
