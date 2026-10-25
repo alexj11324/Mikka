@@ -24,7 +24,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     try {
       const result = await calendarOperations().decide({ userId, sessionId }, id, approve)
       if (result.status === 'running') {
-        await db.insert(coordinatorEvents).values({ id: crypto.randomUUID(), userId, kind: 'action_decided', dedupeKey: `action_uncertain:${id}`, issueId: null, runId: null, tier: 'attention', payload: { actionId: id, action: existing.action, status: 'uncertain', error: 'Outcome unknown. Check the provider or retry the approval to reconcile; no automatic resend.' } }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey })
+        await db.insert(coordinatorEvents).values({ id: crypto.randomUUID(), userId, kind: 'action_decided', dedupeKey: `action_uncertain:${id}`, issueId: null, runId: null, tier: 'attention', payload: { actionId: id, action: existing.action, input: existing.input, status: 'uncertain', error: 'Outcome unknown. Check the provider or retry the approval to reconcile; no automatic resend.' } }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey })
         await wakeCoordinator(userId)
       } else {
         const [completed] = await db.select().from(pendingActions).where(eq(pendingActions.id, id)).limit(1)

@@ -62,3 +62,9 @@ test('a worker question tells the Coordinator to relay the answer', () => {
   const text = eventPrompt({ kind: 'run_question', issueId: null, runId: 'r2', payload: { question: 'Keep v1?', options: ['Yes', 'No'] }, tier: 'attention' })
   assert.match(text, /asks the person: Keep v1\?\nOptions: Yes \/ No\n.*send_to_run/)
 })
+
+test('uncertain and unknown action outcomes remain attention while explicit decline is background', () => {
+  for (const status of ['uncertain', 'unknown', undefined, null]) assert.equal(ruleTier({ kind: 'action_decided', payload: { status } }), 'attention')
+  assert.equal(ruleTier({ kind: 'action_decided', payload: { status: 'done' } }), 'result')
+  assert.equal(ruleTier({ kind: 'action_decided', payload: { status: 'declined' } }), 'background')
+})

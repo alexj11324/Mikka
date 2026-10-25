@@ -20,7 +20,7 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
   await admin.query(`CREATE SCHEMA ${schema}`)
   url.searchParams.set('options', `-c search_path=${schema}`)
   const pool = new Pool({ connectionString: url.toString() })
-  for (const name of ['20261023221259_application_baseline.sql', '0001_agents_devices.sql', '0007_coordinator_events.sql', '0011_coordinator_event_tier.sql', '0009_oauth_provider.sql', '20261025043000_pending_actions.sql', '20261025052001_operation_ledger.sql', '20261025060001_calendar_operation_binding.sql', '20261025070001_account_action_intents.sql']) {
+  for (const name of ['20261023221259_application_baseline.sql', '0001_agents_devices.sql', '0007_coordinator_events.sql', '0011_coordinator_event_tier.sql', '0008_coordinator_sessions.sql', '0010_coordinator_session_error.sql', '0009_oauth_provider.sql', '20261025043000_pending_actions.sql', '20261025052001_operation_ledger.sql', '20261025060001_calendar_operation_binding.sql', '20261025070001_account_action_intents.sql']) {
     await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
   }
   await pool.query('CREATE RULE retain_test_sessions AS ON DELETE TO "session" DO INSTEAD NOTHING')
@@ -34,13 +34,15 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
   const hooks = registerHooks({ resolve(specifier, context, next) { return specifier === 'server-only' ? { url: 'data:text/javascript,export{}', shortCircuit: true } : next(specifier, context) } })
   const { proposeAction, listPendingActions } = await import('../pending-action-store')
   const { decidePendingAction } = await import('../pending-actions')
+  const inboxStore = await import('../coordinator/store')
+  const { recordUserSubmission } = await import('../coordinator-event-store')
   const runtime = await import('./calendar-runtime')
   const database = await import('../db/request-scope')
   const scope = database.createRequestDatabaseScope(url.toString())
   t.after(async () => { hooks.deregister(); await scope.close(); await database.pool.end(); await pool.end(); await admin.end() })
   const storage = (globalThis as unknown as Record<symbol, AsyncLocalStorage<unknown>>)[Symbol.for('WORKFLOW_STEP_CONTEXT_STORAGE')]
   assert.ok(storage, 'actual Workflow SDK step context must exist')
-  const objects = new Map<string, string>(); let writes = 0, account = 'fixture-account', loseResponse = false, preflightDelay = 0
+  const objects = new Map<string, string>(); let writes = 0, account = 'fixture-account', loseResponse = false, lookupMissing = false, preflightDelay = 0
   const providerServer = createServer((req, res) => {
     const key = req.url!.slice(1)
     if (req.method === 'POST') { writes++; objects.set(key, randomUUID()); if (loseResponse) { loseResponse = false; req.socket.destroy(); return } }
@@ -62,6 +64,7 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
       assert.equal(response.status, 200); return receipt((await response.json()).id)
     },
     async lookup(input) {
+      if (lookupMissing) return null
       const response = await fetch(`${remote}/${input.idempotencyKey}`, { signal: AbortSignal.timeout(3000) })
       return response.status === 404 ? null : receipt((await response.json()).id)
     },
@@ -112,13 +115,46 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
     assert.equal((await propose(stepId, 12)).actionId, id)
     assert.equal((await pool.query('SELECT count(*) FROM coordinator_events WHERE "dedupeKey"=$1', [`action_decided:${id}`])).rows[0].count, '1')
   })
-  await t.test('lost provider response reconciles on retry without resending', async () => {
+  for (const historicalInput of ['missing', 'null'] as const) await t.test(`lost provider response with historical ${historicalInput} input reconciles without resending`, async () => {
+    const holder = randomUUID()
+    while ((await scope.run(() => inboxStore.takeInbox(owner, holder))).added) {}
     const { actionId: id } = await propose(); loseResponse = true; const before = writes
     const first = await (await call('/decide', { id, approve: true })).json(); assert.equal(first.status, 'running')
     assert.ok((await scope.run(() => listPendingActions(owner))).some(row => row.id === id))
     assert.equal((await pool.query('SELECT count(*) FROM coordinator_events WHERE "dedupeKey"=$1', [`action_uncertain:${id}`])).rows[0].count, '1')
+    const uncertain = (await pool.query('SELECT * FROM coordinator_events WHERE "dedupeKey"=$1', [`action_uncertain:${id}`])).rows[0]
+    assert.deepEqual(uncertain.payload.input, input, 'new event retains the originally approved input')
+    await pool.query(historicalInput === 'missing'
+      ? `UPDATE coordinator_events SET payload=payload-'input' WHERE id=$1`
+      : `UPDATE coordinator_events SET payload=jsonb_set(payload, '{input}', 'null'::jsonb) WHERE id=$1`, [uncertain.id])
+    const ledgerBeforeConsume = (await pool.query('SELECT status FROM operation_ledger WHERE "operationId"=$1', [id])).rows[0].status
+    await scope.run(() => recordUserSubmission(owner, 'Continue the next unrelated task', randomUUID()))
+    const firstInbox = await scope.run(() => inboxStore.takeInbox(owner, holder))
+    assert.equal(firstInbox.added, 1)
+    assert.ok((await pool.query('SELECT "deliveredAt" FROM coordinator_events WHERE id=$1', [uncertain.id])).rows[0].deliveredAt)
+    const text = (await pool.query('SELECT message FROM coordinator_messages WHERE "userId"=$1 ORDER BY position DESC LIMIT 1', [owner])).rows[0].message.content
+    assert.match(text, /outcome.*unknown/); assert.match(text, /may already have happened/)
+    assert.doesNotMatch(text, /person declined|It did not happen/)
+    const nextInbox = await scope.run(() => inboxStore.takeInbox(owner, holder))
+    assert.equal(nextInbox.added, 1)
+    await scope.run(() => inboxStore.appendMessages(owner, holder, [], null, nextInbox.actionContext))
+    assert.equal((await pool.query('SELECT message FROM coordinator_messages WHERE "userId"=$1 ORDER BY position DESC LIMIT 1', [owner])).rows[0].message.content, 'Continue the next unrelated task')
+    assert.equal((await pool.query('SELECT status FROM operation_ledger WHERE "operationId"=$1', [id])).rows[0].status, ledgerBeforeConsume)
+    assert.equal(writes, before + 1, 'consuming uncertainty never resends')
+    lookupMissing = true
+    assert.equal((await (await call('/decide', { id, approve: true })).json()).status, 'running')
+    assert.equal(writes, before + 1, 'lookup null is not permission to resend')
+    assert.equal((await pool.query('SELECT count(*) FROM coordinator_events WHERE "dedupeKey"=$1', [`action_uncertain:${id}`])).rows[0].count, '1')
+    lookupMissing = false
     await pool.query('UPDATE pending_actions SET "createdAt"=clock_timestamp()-interval \'8 days\' WHERE id=$1', [id])
     const second = await (await call('/decide', { id, approve: true })).json(); assert.equal(second.status, 'done'); assert.equal(writes, before + 1)
+    assert.equal((await pool.query('SELECT count(*) FROM coordinator_events WHERE "dedupeKey" IN ($1,$2)', [`action_uncertain:${id}`, `action_decided:${id}`])).rows[0].count, '2')
+    assert.equal((await scope.run(() => inboxStore.takeInbox(owner, holder))).added, 1)
+    const confirmed = (await pool.query('SELECT message FROM coordinator_messages WHERE "userId"=$1 ORDER BY position DESC LIMIT 1', [owner])).rows[0].message.content
+    assert.match(confirmed, /and it is done/)
+    assert.equal(writes, before + 1)
+    await scope.run(() => inboxStore.releaseLease(owner, holder))
+
   })
   await t.test('revocation committed after invocation reservation fences the actual send', async () => {
     const { actionId: id } = await propose(), before = writes

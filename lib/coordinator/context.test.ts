@@ -93,3 +93,14 @@ test('the chat folds one reply\'s steps together and marks events', () => {
     ['event', '[Event] Run r1 ended with status succeeded (submitted).', []],
   ])
 })
+
+
+test('uncertain and unknown action events tolerate missing input without declaring failure or decline', () => {
+  for (const status of ['uncertain', 'unknown', undefined, null]) for (const input of [undefined, null]) {
+    const prompt = eventPrompt({ kind: 'action_decided', issueId: null, runId: null, payload: { action: 'create_calendar_event', actionId: 'existing-proposal', status, input } })
+    assert.match(prompt, /outcome.*unknown/)
+    assert.match(prompt, /may already have happened/)
+    assert.match(prompt, /do not automatically resend/)
+    assert.doesNotMatch(prompt, /person declined|It did not happen|and it is done/)
+  }
+})

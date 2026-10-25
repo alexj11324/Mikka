@@ -21,7 +21,7 @@ export function ruleTier(event: TriageEvent): CoordinatorEventTier | null {
       return 'background'
     // The person just clicked: a failure needs them, a success gets one line, a decline nothing.
     case 'action_decided':
-      return event.payload.status === 'failed' ? 'attention' : event.payload.status === 'done' ? 'result' : 'background'
+      return event.payload.status === 'done' ? 'result' : event.payload.status === 'declined' ? 'background' : 'attention'
     case 'run_finished':
       if (event.payload.status === 'failed') return 'attention'
       if (event.payload.status === 'stopped' || event.payload.status === 'cancelled') return 'background'

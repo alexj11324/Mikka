@@ -163,8 +163,9 @@ export function eventPrompt(event: {
       return [
         payload.status === 'done' ? `[Event] The person approved ${what} and it is done.${outcome}`
           : payload.status === 'failed' ? `[Event] The person approved ${what} but it failed: ${payload.error}.`
-          : `[Event] The person declined ${what}. It did not happen.`,
-        `What it was: ${JSON.stringify(payload.input).slice(0, 2000)}`,
+          : payload.status === 'declined' ? `[Event] The person declined ${what}. It did not happen.`
+          : `[Event] ${payload.status === 'uncertain' ? `The person approved ${what}, but its outcome is unknown.` : `The outcome of ${what} is unknown (status: ${String(payload.status ?? 'unknown')}).`} The external action may already have happened. Preserve the existing operation and ask the person to reconcile it with the provider; do not automatically resend or create a replacement action.`,
+        `What it was: ${((payload.input == null ? undefined : JSON.stringify(payload.input)) ?? 'Input was not recorded in this event; inspect the existing proposal.').slice(0, 2000)}`,
         note,
       ].filter(Boolean).join('\n')
     }
