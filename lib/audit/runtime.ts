@@ -1,9 +1,11 @@
+import { appOrigin } from "@/lib/mcp/resource";
 import "server-only";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { workspacePool } from "@/lib/workspace-db";
 import { auditHttp } from "./http";
 export const handleAudit = auditHttp({
+  origin: appOrigin ?? "",
   app: pool,
   workspace: workspacePool,
   authenticate: async (request) => {

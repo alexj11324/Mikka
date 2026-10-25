@@ -118,6 +118,7 @@ test(
         },
       );
       const http = auditHttp({
+        origin: "http://127.0.0.1",
         app,
         workspace,
         authenticate: async (req) => ({
@@ -202,6 +203,37 @@ test(
             ).status,
             403,
           );
+        },
+      );
+      await t.test(
+        "configured origin survives internal proxy URL without trusting foreign origins",
+        async () => {
+          const request = new Request(
+            `http://localhost/api/audit?workspaceId=${tenant}`,
+            {
+              method: "POST",
+              headers: {
+                cookie: "synthetic=1",
+                origin: "http://127.0.0.1",
+                "content-type": "application/json",
+              },
+              body: JSON.stringify({ operation: "verify" }),
+            },
+          );
+          assert.equal((await http(request)).status, 200);
+          const bad = new Request(
+            `http://localhost/api/audit?workspaceId=${tenant}`,
+            {
+              method: "POST",
+              headers: {
+                cookie: "synthetic=1",
+                origin: "http://localhost",
+                "content-type": "application/json",
+              },
+              body: JSON.stringify({ operation: "verify" }),
+            },
+          );
+          assert.equal((await http(bad)).status, 403);
         },
       );
       await t.test(

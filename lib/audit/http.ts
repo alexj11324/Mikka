@@ -46,6 +46,7 @@ async function smallBody(request: Request) {
 export function auditHttp(deps: {
   app: Pool;
   workspace: Pool;
+  origin?: string;
   authenticate: (req: Request) => Promise<Actor | null>;
 }) {
   return async (request: Request, exporting = false): Promise<Response> => {
@@ -67,7 +68,7 @@ export function auditHttp(deps: {
         throw new AuditError("methodNotAllowed", 405);
       if (
         request.method === "POST" &&
-        request.headers.get("origin") !== url.origin
+        request.headers.get("origin") !== (deps.origin ?? url.origin)
       )
         throw new AuditError("originRejected", 403);
       const work = async (ws: PoolClient) => {
