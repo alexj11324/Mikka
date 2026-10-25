@@ -33,6 +33,12 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Attest checkout before isolated integration tests
+        run: |
+          git rev-parse HEAD
+          git status --porcelain=v1
+          git diff --binary HEAD | sha256sum
+          git diff --exit-code HEAD
       - run: node --test scripts/migration-session.test.mjs
         env:
           MIGRATION_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_208_test
