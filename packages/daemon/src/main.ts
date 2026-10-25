@@ -240,6 +240,12 @@ export class Daemon {
       repos: () => this.device.repos ?? [],
       log: this.log,
       stallMs: this.options.stallMs,
+      revalidateSkillAssignment:async assignment=>{
+        const link=this.options.link
+        if (!assignment.skillReceipt||!link.validateSkillReceipt||!this.device.credential) throw new Error('Current Skill receipt validation unavailable')
+        if (!this.registered||!this.device.deviceId) await this.register(this.device.credential)
+        return link.validateSkillReceipt(assignment.runId,assignment.skillReceipt.id)
+      },
       verify: this.verifier(),
       publisher: {
         snapshot: ({ worktree, repo }) => snapshotTree(repo.path, worktree),
@@ -287,7 +293,7 @@ export class Daemon {
     const detected = this.options.harnesses ?? (await detectHarnesses())
     this.harnesses = detected.filter((info) => this.adapters.has(info.harness))
     // Runs survive restarts: pick up what the journal says was active.
-    this.supervisor.resumeAll()
+    await this.supervisor.resumeAll()
     if (this.options.quotaSource !== null) {
       this.quota = new QuotaPoller(
         this.options.quotaSource ??
@@ -633,6 +639,9 @@ export class Daemon {
       this.server = "online"
       await this.outbox.flushAll()
       if (!this.draining) {
+        // A receipted run blocked while offline may resume only after its
+        // server authorization is available; no second recovery scheduler.
+        await this.supervisor.resumeAll(true)
         for (const runId of await link.pendingRuns(deviceId)) {
           if (this.refusedRuns.has(runId)) continue
           await this.claimAndStart(runId).catch((error: unknown) =>

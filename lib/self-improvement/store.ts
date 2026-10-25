@@ -3,12 +3,13 @@ import type { Pool, PoolClient } from 'pg'
 import { commandSchema, digest, ImprovementError, type Feedback } from './contract'
 import { SCORER, SCORER_DIGEST, score } from './scorer'
 import { createSkillCandidate, SKILL_PATH, BASELINE } from './regression'
+import { assignedSkillForRun } from './assignments'
 
 type Authorize = (userId: string, issueId: string, tx: PoolClient) => Promise<boolean>
 interface Run {
   id: string; userId: string; issueId: string; agentId: string; deviceRepoId: string;
   deviceId: string; repository: string; sessionId: string; status: string; report: Record<string, unknown> | null;
-  stopRequestedAt: Date | null; finishedAt: Date; attempt: number; retryOf: string | null
+  stopRequestedAt: Date | null; startedAt: Date | null; finishedAt: Date; attempt: number; retryOf: string | null
 }
 
 function sameSource(snapshot: Record<string, unknown>, run: Run) {
@@ -22,20 +23,24 @@ export function createImprovementStore(pool: Pool, authorize: Authorize) {
     const tx = await pool.connect()
     try {
       await tx.query('BEGIN')
+      const { rows: [source] } = await tx.query('SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId, userId])
+      if (!source?.issueId) throw new ImprovementError('notFound')
+      await tx.query('SELECT id FROM issues WHERE id=$1 FOR SHARE', [source.issueId])
+      if (!await authorize(userId, source.issueId, tx)) throw new ImprovementError('notFound')
       const { rows: [run] } = await tx.query<Run>(
         `SELECT r.*, coalesce(repo."remoteUrl", repo."repoPath") AS repository
          FROM agent_runs r JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
          WHERE r.id=$1 AND r."userId"=$2 FOR SHARE OF r,repo`, [runId, userId])
-      if (!run?.issueId) throw new ImprovementError('notFound')
-      await tx.query('SELECT id FROM issues WHERE id=$1 FOR SHARE', [run.issueId])
-      if (!await authorize(userId, run.issueId, tx)) throw new ImprovementError('notFound')
+      if (!run?.issueId || run.issueId !== source.issueId) throw new ImprovementError('notFound')
       if (run.stopRequestedAt || !['succeeded', 'failed'].includes(run.status) || !run.sessionId || !run.finishedAt)
         throw new ImprovementError('runUnavailable')
       // Issue isolation is deliberately narrower than workspace access: feedback
       // never crosses an issue or guesses a workspace from user-supplied data.
+      const provenance = await assignedSkillForRun(tx, userId, run)
       const bucket = digest({ userId, issueId: run.issueId, agentId: run.agentId,
         repository: run.repository, deviceRepoId: run.deviceRepoId,
-        scorer: SCORER_DIGEST, skill: SKILL_PATH, baseline: digest(BASELINE) })
+        scorer: SCORER_DIGEST, skill: SKILL_PATH, baseline: digest(BASELINE),
+        ...(provenance.skillUsage === 'assigned' ? { assignedArtifact: provenance.skillArtifact } : {}) })
       const result = await work(tx, run, bucket)
       await tx.query('COMMIT')
       return result
@@ -75,7 +80,7 @@ export function createImprovementStore(pool: Pool, authorize: Authorize) {
         sessionId: run.sessionId, attempt: run.attempt, retryOf: run.retryOf,
         repository: run.repository, deviceRepoId: run.deviceRepoId, environment: `device:${run.deviceId}`, status: run.status,
         finishedAt: run.finishedAt, reportDigest: digest(run.report), reportedCommit: commit,
-        commitTrust: 'worker_report', skillUsage: 'unrecorded', scorer: SCORER,
+        commitTrust: 'worker_report', ...await assignedSkillForRun(tx,userId,run), scorer: SCORER,
         feedbackTrust: assessment.feedbackTrust, independentVerification: false }
       await tx.query(`INSERT INTO improvement_feedback(id,"userId","eventId","runId","issueId",fingerprint,verdict,note)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, [id, userId, feedback.eventId, run.id, run.issueId, fingerprint, feedback.verdict, feedback.note])

@@ -6,6 +6,10 @@ this proposed type and must continue to record `skillUsage: "unrecorded"`.
 Shape validation, feedback, a worker report or a content hash alone cannot
 establish that a run actually received or executed a particular Skill.
 
+The subsequent [minimal builtin assignment wiring](self-improvement-assignment-wiring.md)
+implements a narrow first source on a separate branch. It does not implement
+the complete #232 registry or prove candidate Harness regression/activation.
+
 ## Minimal reference
 
 The #232 owner should mint an immutable reference after its existing source,

@@ -250,6 +250,7 @@ export class CodexAdapter implements AgentAdapter {
       networkAllow: options.networkAllow,
       policy: options.policy,
       skills: options.skills,
+      skillReceipt: options.skillReceipt,
       runDir,
       privateDir: paths.privateDir,
       extraWrite: codexHome.authFile ? [codexHome.authFile] : [],

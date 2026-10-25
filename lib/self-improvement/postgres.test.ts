@@ -160,7 +160,7 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
     assert.equal(proposal.result.independentVerification, false)
     assert.equal(proposal.result.productionEligible, false)
     assert.ok(!proposal.candidate.content.includes('UNTRUSTED'))
-    assert.equal((await pool.query(`SELECT count(*) FROM information_schema.tables WHERE table_schema=$1 AND table_name LIKE 'factory_%'`, [schema])).rows[0].count, '0')
+    assert.equal((await pool.query('SELECT count(*) FROM factory_tasks')).rows[0].count, '0', 'Offline proposals must not write Factory state')
     await pool.end()
     pool = new Pool({ connectionString: target.toString(), max: 12 })
     store = createImprovementStore(pool, authorize)

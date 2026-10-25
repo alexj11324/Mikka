@@ -13,6 +13,7 @@
 // `RunNotPinnedHereError`; any other 4xx is a refusal (`DaemonError`) that
 // retrying cannot fix.
 import type { z } from "zod"
+import { SKILL_ARTIFACT_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
 
 import {
   CLIENT_VERSION_HEADER,
@@ -118,6 +119,7 @@ export class HttpServerLink implements ServerLink {
         headers: {
           "content-type": "application/json",
           [CLIENT_VERSION_HEADER]: this.clientVersion,
+          [SKILL_ARTIFACT_HEADER]: '1',
           ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -221,6 +223,9 @@ export class HttpServerLink implements ServerLink {
       devicePaths.claim(checkId(deviceId), checkId(runId)),
       { schema: runAssignmentSchema, claimOf: runId }
     )
+  }
+  async validateSkillReceipt(runId:string,receiptId:string) {
+    return this.call('GET',`/v1/runs/${seg(runId)}/skill-receipt?receiptId=${encodeURIComponent(checkId(receiptId))}`,{schema:skillReceiptRevalidationSchema})
   }
 
   async appendRunChunks(runId: string, batch: ChunkBatch) {
