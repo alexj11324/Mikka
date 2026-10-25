@@ -4,7 +4,7 @@ This supplements and supersedes the affected acceptance claims in [the original 
 
 All four reported P2s were reproduced against the old implementation before verification of the fix. These are isolated PostgreSQL 17 databases and built Next services in cloud Linux, without real model/provider credentials. The recordings are actual subprocess PTY output in asciinema v2 format. No production migration, cron, release, IAM, real external action or paid Workflow was used.
 
-Final local verification: 13 review PG tests, 14 original consumption/schedule-handler tests, 11 original schedule PG tests, 6 schedule safety recovery tests, 19 approved-action tests and 16 mailbox tests pass. Full `pnpm check` (including lint/types) and the actual Next build pass. That build ID is `PhV6PD3msW1BiIC8hdnY3`. Final HTTP recovery after the recorded failure and actual Next restart is 8,840ms against the predeclared 15-second limit. Individual logs and selected token-free PG records accompany the recordings; database records also contain earlier isolated runs retained for forensics.
+Final local verification: 13 review PG tests, 14 original consumption/schedule-handler tests, 11 original schedule PG tests, 6 schedule safety recovery tests, 19 approved-action tests and 16 mailbox tests pass. Full `pnpm check` (including lint/types) and the actual Next build pass. That build ID is `PhV6PD3msW1BiIC8hdnY3`. Final HTTP recovery after the recorded failure and actual Next restart is 9,628ms against the predeclared 15-second limit. Individual logs and selected token-free PG records accompany the recordings; database records also contain earlier isolated runs retained for forensics.
 
 | Finding | Fix and actual verification |
 | --- | --- |
