@@ -1,0 +1,93 @@
+▶ isolated PostgreSQL mailbox vertical slice
+  ✔ two independent same-role sessions send, reply, read, ACK and reconnect without duplicate envelopes (39.906363ms)
+  ✔ one sender/key racing across recipients produces one envelope and an explicit 409 conflict (16.429398ms)
+  ✔ an inbox read waiting on an ACK row lock does not return the newly acknowledged envelope (19.242358ms)
+  ✔ owner/workspace/revocation boundaries and discovery do not expose another inbox (19.670684ms)
+  ✔ actual worker-token authentication rejects revoked/expired/stopped/disabled and forged-owner credentials (14.012527ms)
+  ✔ Bot and Coordinator are addressable; peer events retain provenance and are not user messages (12.955451ms)
+  ✔ completion persists result before notification atomically and duplicate completion is harmless (10.567864ms)
+  ✔ late messages queue by default, bounded policy resumes the exact prior session, concurrent late sends share one attempt (23.235239ms)
+  ✔ owner cancellation fences racing continuations, disables automatic wakes and exposes failure (17.896665ms)
+  ✔ human gates require explicit owner resume; peers cannot forge owner provenance or change wake policy (35.374502ms)
+  ✔ concurrent late send and owner stop cannot leave a runnable continuation; harness changes prevent wrong-session resume (22.665088ms)
+  ✔ failed mailbox setup rolls back while an unclaimed attempt stays queued and retryable (9.877561ms)
+  ✔ disabling a mailbox blocks an already queued continuation until the owner explicitly re-enables it (24.748144ms)
+  ✔ Factory-bound mailbox cannot dispatch an unadopted continuation, including owner resume (36.198481ms)
+  ✖ owner send and completion preserve both envelopes across the FK lock barrier (1017.355117ms)
+  ✔ result/terminal update roll back together if event persistence fails (7.263447ms)
+  ✖ infrastructure retry keys span attempts, but never independent senders (24.67525ms)
+  ✖ shipped MCP subprocess survives lost receipt and infrastructure retry without duplicate publication (213.993764ms)
+✖ isolated PostgreSQL mailbox vertical slice (1996.604343ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 15
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2371.631349
+
+✖ failing tests:
+
+test at tests/session-mailbox.test.ts:1:22137
+✖ owner send and completion preserve both envelopes across the FK lock barrier (1017.355117ms)
+  AssertionError [ERR_ASSERTION]: [{"status":"fulfilled","value":{"id":"babb00db-e750-453a-9496-7ea56f585d7d","queued":true,"duplicate":false,"failure":null}},{"status":"rejected","reason":{"length":485,"name":"error","severity":"ERROR","code":"40P01","detail":"Process 164 waits for ShareLock on transaction 2737; blocked by process 163.\nProcess 163 waits for ShareLock on transaction 2738; blocked by process 164.","hint":"See server log for query details.","where":"while locking tuple (0,25) in relation \"session_mailboxes\"\nSQL statement \"SELECT 1 FROM ONLY \"mailbox_50a411c3d69e497e992880bc04134719\".\"session_mailboxes\" x WHERE \"id\" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x\"","file":"deadlock.c","line":"1130","routine":"DeadLockReport"}}]
+  + actual - expected
+  
+    [
+      'fulfilled',
+  +   'rejected'
+  -   'fulfilled'
+    ]
+  
+      at mailboxCompletionLockAcceptance (/workspace/mikka-268-mailbox-baseline/tests/mailbox-lock-order.ts:47:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/mikka-268-mailbox-baseline/tests/session-mailbox.test.ts:285:7)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/mikka-268-mailbox-baseline/tests/session-mailbox.test.ts:284:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'fulfilled', 'rejected' ],
+    expected: [ 'fulfilled', 'fulfilled' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/session-mailbox.test.ts:1:23115
+✖ infrastructure retry keys span attempts, but never independent senders (24.67525ms)
+  Error: Reply is not to a message in this inbox
+      at <anonymous> (/workspace/mikka-268-mailbox-baseline/lib/session-mailbox.ts:90:197)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async SessionMailbox.transaction (/workspace/mikka-268-mailbox-baseline/lib/session-mailbox.ts:16:54)
+      at async TestContext.<anonymous> (/workspace/mikka-268-mailbox-baseline/tests/session-mailbox.test.ts:308:34)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/mikka-268-mailbox-baseline/tests/session-mailbox.test.ts:294:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    status: 403
+  }
+
+test at tests/session-mailbox.test.ts:4:904
+✖ shipped MCP subprocess survives lost receipt and infrastructure retry without duplicate publication (213.993764ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '0cc20b6b-ebc8-446c-860e-bf56211363ee'
+  - 'cb4f8fba-b15a-42d7-adac-a95b1f502f9c'
+  
+      at retryMcpAcceptance (/workspace/mikka-268-mailbox-baseline/tests/mailbox-retry-mcp.ts:81:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/mikka-268-mailbox-baseline/tests/session-mailbox.test.ts:350:7)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/mikka-268-mailbox-baseline/tests/session-mailbox.test.ts:349:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '0cc20b6b-ebc8-446c-860e-bf56211363ee',
+    expected: 'cb4f8fba-b15a-42d7-adac-a95b1f502f9c',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

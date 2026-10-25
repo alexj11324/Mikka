@@ -1,0 +1,41 @@
+✔ Coordinator strategies match actual tools and preserve event/citation protocol (1.294245ms)
+✔ clear work skips planning; ambiguity needs approval without inventing plan dispatch support (0.312271ms)
+✔ revised goals, duplicate avoidance, resume limits and stop semantics are explicit (0.227624ms)
+✔ worker adaptations preserve finish, permission, foreground, skills and publication ownership contracts (0.661849ms)
+✔ source attribution includes full upstream MIT license and immutable pin (0.259151ms)
+✔ claim initializes mailboxes before the queued-to-preparing compare-and-set (0.177979ms)
+✔ Bot turns advertise messaging only when mailbox setup succeeds (0.177007ms)
+✔ device discovery and the final claim predicate both reject disabled mailboxes (0.334094ms)
+✔ Coordinator advances actionable goals and events through evidence-backed acceptance (0.37706ms)
+✔ Coordinator limits questions to essential decisions and preserves scope and human authority (0.280814ms)
+✔ Coordinator diagnoses transient failures without unsafe retries or terminal claims (0.1989ms)
+✔ proactive policy remains in the actual Coordinator instruction composition with memory and mailbox rules (0.258119ms)
+✔ ordinary recovery has evidence and budget bounds; the conditional one-retry rule applies only to actual denials (0.261756ms)
+▶ isolated PostgreSQL mailbox vertical slice
+  ✔ two independent same-role sessions send, reply, read, ACK and reconnect without duplicate envelopes (50.655395ms)
+  ✔ one sender/key racing across recipients produces one envelope and an explicit 409 conflict (13.745584ms)
+  ✔ an inbox read waiting on an ACK row lock does not return the newly acknowledged envelope (14.758484ms)
+  ✔ owner/workspace/revocation boundaries and discovery do not expose another inbox (14.807222ms)
+  ✔ actual worker-token authentication rejects revoked/expired/stopped/disabled and forged-owner credentials (15.619235ms)
+  ✔ Bot and Coordinator are addressable; peer events retain provenance and are not user messages (14.354314ms)
+  ✔ completion persists result before notification atomically and duplicate completion is harmless (11.364508ms)
+  ✔ late messages queue by default, bounded policy resumes the exact prior session, concurrent late sends share one attempt (26.647163ms)
+  ✔ owner cancellation fences racing continuations, disables automatic wakes and exposes failure (25.395762ms)
+  ✔ human gates require explicit owner resume; peers cannot forge owner provenance or change wake policy (44.060137ms)
+  ✔ concurrent late send and owner stop cannot leave a runnable continuation; harness changes prevent wrong-session resume (29.606513ms)
+  ✔ failed mailbox setup rolls back while an unclaimed attempt stays queued and retryable (10.804581ms)
+  ✔ disabling a mailbox blocks an already queued continuation until the owner explicitly re-enables it (28.941849ms)
+  ✔ Factory-bound mailbox cannot dispatch an unadopted continuation, including owner resume (34.233864ms)
+  ✔ owner send and completion preserve both envelopes across the FK lock barrier (44.909881ms)
+  ✔ result/terminal update roll back together if event persistence fails (6.307579ms)
+  ✔ infrastructure retry keys span attempts, but never independent senders (180.840894ms)
+  ✔ shipped MCP subprocess survives lost receipt and infrastructure retry without duplicate publication (513.457466ms)
+✔ isolated PostgreSQL mailbox vertical slice (1460.323743ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1747.374879

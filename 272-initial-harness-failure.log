@@ -1,0 +1,89 @@
+▶ isolated PostgreSQL mailbox vertical slice
+  ✔ two independent same-role sessions send, reply, read, ACK and reconnect without duplicate envelopes (50.605171ms)
+  ✔ one sender/key racing across recipients produces one envelope and an explicit 409 conflict (15.729159ms)
+  ✔ an inbox read waiting on an ACK row lock does not return the newly acknowledged envelope (16.052023ms)
+  ✔ owner/workspace/revocation boundaries and discovery do not expose another inbox (17.473294ms)
+  ✔ actual worker-token authentication rejects revoked/expired/stopped/disabled and forged-owner credentials (18.802712ms)
+  ✔ Bot and Coordinator are addressable; peer events retain provenance and are not user messages (16.111978ms)
+  ✔ completion persists result before notification atomically and duplicate completion is harmless (12.383386ms)
+  ✔ late messages queue by default, bounded policy resumes the exact prior session, concurrent late sends share one attempt (25.510535ms)
+  ✔ owner cancellation fences racing continuations, disables automatic wakes and exposes failure (21.934383ms)
+  ✔ human gates require explicit owner resume; peers cannot forge owner provenance or change wake policy (44.79848ms)
+  ✔ concurrent late send and owner stop cannot leave a runnable continuation; harness changes prevent wrong-session resume (32.27697ms)
+  ✔ failed mailbox setup rolls back while an unclaimed attempt stays queued and retryable (11.633253ms)
+  ✔ disabling a mailbox blocks an already queued continuation until the owner explicitly re-enables it (32.303676ms)
+  ✔ Factory-bound mailbox cannot dispatch an unadopted continuation, including owner resume (40.349395ms)
+  ✖ owner send and completion preserve both envelopes across the FK lock barrier (3.172001ms)
+  ✔ result/terminal update roll back together if event persistence fails (16.065688ms)
+  ✖ infrastructure retry keys span attempts, but never independent senders (145.836824ms)
+  ✔ shipped MCP subprocess survives lost receipt and infrastructure retry without duplicate publication (500.388912ms)
+✖ isolated PostgreSQL mailbox vertical slice (1471.0442ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 16
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1784.722418
+
+✖ failing tests:
+
+test at tests/session-mailbox.test.ts:1:22322
+✖ owner send and completion preserve both envelopes across the FK lock barrier (3.172001ms)
+  error: inconsistent types deduced for parameter $4
+      at /workspace/mikka-268-mailbox-retry/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async mailboxCompletionLockAcceptance (/workspace/mikka-268-audit-mailbox/tests/mailbox-lock-order.ts:16:3)
+      at async TestContext.<anonymous> (/workspace/mikka-268-audit-mailbox/tests/session-mailbox.test.ts:288:7)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/mikka-268-audit-mailbox/tests/session-mailbox.test.ts:287:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    length: 142,
+    severity: 'ERROR',
+    code: '42P08',
+    detail: 'text versus uuid',
+    hint: undefined,
+    position: '117',
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'parse_param.c',
+    line: '219',
+    routine: 'variable_coerce_param_hook'
+  }
+
+test at tests/session-mailbox.test.ts:1:23300
+✖ infrastructure retry keys span attempts, but never independent senders (145.836824ms)
+  error: security_audit_lineage_invalid
+      at /workspace/mikka-268-mailbox-retry/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/mikka-268-audit-mailbox/tests/session-mailbox.test.ts:330:7)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/mikka-268-audit-mailbox/tests/session-mailbox.test.ts:297:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    length: 156,
+    severity: 'ERROR',
+    code: 'P0001',
+    detail: undefined,
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: 'PL/pgSQL function security_audit_transition() line 12 at RAISE',
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'pl_exec.c',
+    line: '3897',
+    routine: 'exec_stmt_raise'
+  }

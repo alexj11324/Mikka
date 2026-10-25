@@ -1,0 +1,56 @@
+▶ isolated PostgreSQL mailbox vertical slice
+  ✔ two independent same-role sessions send, reply, read, ACK and reconnect without duplicate envelopes (50.849102ms)
+  ✔ one sender/key racing across recipients produces one envelope and an explicit 409 conflict (16.672884ms)
+  ✔ an inbox read waiting on an ACK row lock does not return the newly acknowledged envelope (18.729406ms)
+  ✔ owner/workspace/revocation boundaries and discovery do not expose another inbox (17.258013ms)
+  ✔ actual worker-token authentication rejects revoked/expired/stopped/disabled and forged-owner credentials (16.952962ms)
+  ✔ Bot and Coordinator are addressable; peer events retain provenance and are not user messages (14.81356ms)
+  ✔ completion persists result before notification atomically and duplicate completion is harmless (11.738494ms)
+  ✔ late messages queue by default, bounded policy resumes the exact prior session, concurrent late sends share one attempt (27.888443ms)
+  ✔ owner cancellation fences racing continuations, disables automatic wakes and exposes failure (27.946481ms)
+  ✔ human gates require explicit owner resume; peers cannot forge owner provenance or change wake policy (49.785844ms)
+  ✔ concurrent late send and owner stop cannot leave a runnable continuation; harness changes prevent wrong-session resume (32.067066ms)
+  ✔ failed mailbox setup rolls back while an unclaimed attempt stays queued and retryable (10.473063ms)
+  ✔ disabling a mailbox blocks an already queued continuation until the owner explicitly re-enables it (26.720177ms)
+  ✔ Factory-bound mailbox cannot dispatch an unadopted continuation, including owner resume (33.642336ms)
+  ✖ owner send and completion preserve both envelopes across the FK lock barrier (1015.080717ms)
+  ✔ result/terminal update roll back together if event persistence fails (11.898276ms)
+  ✔ infrastructure retry keys span attempts, but never independent senders (172.8962ms)
+  ✔ shipped MCP subprocess survives lost receipt and infrastructure retry without duplicate publication (470.59478ms)
+✖ isolated PostgreSQL mailbox vertical slice (2417.85286ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 17
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2681.391675
+
+✖ failing tests:
+
+test at tests/session-mailbox.test.ts:1:22322
+✖ owner send and completion preserve both envelopes across the FK lock barrier (1015.080717ms)
+  AssertionError [ERR_ASSERTION]: [{"status":"fulfilled","value":{"id":"cd87e67e-749c-408a-83b9-bf6a3b38559c","queued":true,"duplicate":false,"failure":null}},{"status":"rejected","reason":{"length":328,"name":"error","severity":"ERROR","code":"40P01","detail":"Process 206 waits for ShareLock on transaction 3161; blocked by process 207.\nProcess 207 waits for ShareLock on transaction 3162; blocked by process 206.","hint":"See server log for query details.","where":"while locking tuple (0,5) in relation \"session_mailboxes\"","file":"deadlock.c","line":"1130","routine":"DeadLockReport"}}]
+  + actual - expected
+  
+    [
+      'fulfilled',
+  +   'rejected'
+  -   'fulfilled'
+    ]
+  
+      at mailboxCompletionLockAcceptance (/workspace/mikka-268-audit-mailbox/tests/mailbox-lock-order.ts:63:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/mikka-268-audit-mailbox/tests/session-mailbox.test.ts:288:7)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/mikka-268-audit-mailbox/tests/session-mailbox.test.ts:287:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'fulfilled', 'rejected' ],
+    expected: [ 'fulfilled', 'fulfilled' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

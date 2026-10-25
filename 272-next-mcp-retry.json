@@ -1,0 +1,21 @@
+{
+  "source": "ee5ae6a0f1d8804fd58a18c80652545fc38cbaaa",
+  "utc": "2026-10-25T19:18:29.923Z",
+  "status": "passed",
+  "layer": "actual Next /v1/mailbox + shipped MCP stdio + socket loss; retry/token rows seeded by SQL fixture, not daemon reclaim",
+  "runIds": [
+    "b232debc-5057-4980-83b6-7d4f5dcd8bc7",
+    "0bf43e2f-8a90-4ffd-a99b-637192ebbaf5",
+    "6ce866b0-8071-42ec-b8db-01ace3b309c1"
+  ],
+  "statuses": [
+    200,
+    200,
+    200,
+    200,
+    401,
+    200,
+    401
+  ],
+  "rows": 2
+}
