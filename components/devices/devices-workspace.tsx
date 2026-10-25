@@ -11,7 +11,7 @@ import { listDevices, setDeviceEnabled, type DeviceView } from '@/app/actions/ag
 import { useActionError } from '@/lib/use-action-error'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
@@ -177,10 +177,7 @@ export function DevicesWorkspace({ user, localHostname, initialDevices }: {
           <div className="flex flex-col gap-6 px-4 py-6 sm:px-6">
             {accountError && <p role="alert" className="text-sm text-destructive">{accountError}</p>}
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex flex-col gap-0.5">
-                <h1 className="text-sm font-semibold tracking-tight">{t('title')}</h1>
-                <p className="text-xs text-muted-foreground">{t('description')}</p>
-              </div>
+              <h1 className="text-sm font-semibold tracking-tight">{t('title')}</h1>
               <ConnectDeviceDialog />
             </div>
 
@@ -196,7 +193,6 @@ export function DevicesWorkspace({ user, localHostname, initialDevices }: {
                 <EmptyHeader>
                   <EmptyMedia variant="icon"><Laptop aria-hidden="true" /></EmptyMedia>
                   <EmptyTitle>{t('emptyTitle')}</EmptyTitle>
-                  <EmptyDescription>{t('emptyDescription')}</EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent><ConnectDeviceDialog /></EmptyContent>
               </Empty>
@@ -208,9 +204,6 @@ export function DevicesWorkspace({ user, localHostname, initialDevices }: {
               </div>
             )}
 
-            <p className="text-xs text-muted-foreground">
-              {t('footer')}
-            </p>
           </div>
         </SidebarInset>
       </SidebarProvider>

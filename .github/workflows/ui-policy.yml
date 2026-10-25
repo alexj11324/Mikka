@@ -92,6 +92,8 @@ jobs:
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
       - run: pnpm test:integrations
+      - run: pnpm test:agent
+      - run: pnpm test:acceptance
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:issues
@@ -173,6 +175,14 @@ jobs:
         run: pnpm test:active-agents
         env:
           REQUIRE_DB: '1'
+      - name: Actor history writers and idempotent migration (temporary Postgres 17 only)
+        run: pnpm test:activity-actor-db
+        env:
+          REQUIRE_DB: '1'
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
+      - name: Relation action cycle guards (ephemeral Postgres only)
+        run: pnpm test:relation-cycle
+        env:
+          REQUIRE_DB: '1'
       - run: pnpm build
