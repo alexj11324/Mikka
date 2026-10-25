@@ -37,7 +37,7 @@ test('Issue threads open on the right as a conversation; comments are cards with
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
   const threads = page.getByRole('region', { name: /^线程/ })
   await expect(threads.getByRole('button', { name: /^打开线程 / })).toHaveCount(2)
-  await expect(threads.getByText('Codex · PR #95 merged', { exact: true })).toBeVisible()
+  await expect(threads.getByText('PR #95 merged', { exact: true })).toBeVisible()
   // Activity records each dispatch as a plain row.
   const activity = page.getByRole('region', { name: '任务活动', exact: true })
   await expect(activity.getByText('派出线程')).toHaveCount(2)

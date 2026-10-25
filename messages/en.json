@@ -2245,8 +2245,8 @@
     "loading": "Opening thread",
     "loadFailed": "Couldn't load the thread",
     "retry": "Retry",
-    "started": "{harness} · started {time}",
-    "steps": "{count, plural, one {Ran # step} other {Ran # steps}}",
+    "started": "started {time}",
+    "steps": "Handed to {harness} · {count, plural, one {# step} other {# steps}}",
     "composer": "Tell {agent} what to do next…",
     "send": "Send",
     "sendFailed": "Not sent. Your draft is still here"

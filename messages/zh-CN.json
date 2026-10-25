@@ -2245,8 +2245,8 @@
     "loading": "正在打开线程",
     "loadFailed": "线程没加载出来",
     "retry": "重试",
-    "started": "{harness} · 开始于 {time}",
-    "steps": "执行了 {count} 步",
+    "started": "开始于 {time}",
+    "steps": "交给 {harness} · 执行了 {count} 步",
     "composer": "告诉 {agent} 下一步做什么…",
     "send": "发送",
     "sendFailed": "没发出去，草稿还在"

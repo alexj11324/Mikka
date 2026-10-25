@@ -39,7 +39,8 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
     <ul className="flex flex-col rounded-xl bg-muted/50 p-1">
       {data.map(thread => {
         const name = thread.detail?.name ?? t('hidden')
-        const meta = thread.detail ? [harnessLabel(thread.detail.harness), thread.detail.summary].filter(Boolean).join(' · ') : null
+        // The bot runs the thread; the coding agent it hands work to is a step inside it, not the runner (R-05).
+        const meta = thread.detail?.summary ?? null
         const body = <>
           <LetterAvatar name={thread.detail?.agentName ?? t('agent')} size="pill" />
           <span className="flex min-w-0 flex-1 flex-col text-left">

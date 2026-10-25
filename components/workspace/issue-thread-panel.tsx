@@ -55,18 +55,22 @@ export function IssueThreadPanel({ issueId, runId, onClose }: { issueId: string;
         : <>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <ThreadStatus status={data.thread.status} />
-            {detail && <span>{t('started', { harness: harnessLabel(detail.harness), time: format.dateTime(new Date(data.thread.createdAt), { hour: '2-digit', minute: '2-digit' }) })}</span>}
+            <span>{t('started', { time: format.dateTime(new Date(data.thread.createdAt), { hour: '2-digit', minute: '2-digit' }) })}</span>
           </div>
-          {data.thread.prompt.trim() && <p className={cn(BUBBLE, 'self-end')}>{data.thread.prompt.trim()}</p>}
+          {data.thread.prompt.trim() && <p className={cn(BUBBLE, data.thread.ownedByCurrentUser ? 'self-end bg-sidebar-primary text-sidebar-primary-foreground' : 'self-start')}>{data.thread.prompt.trim()}</p>}
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
             {items.map(item => <li key={item.id} className="flex flex-col gap-1">
               {item.kind === 'agent' && <div className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>}
-              {item.kind === 'steps' && <span className="flex items-center gap-1 text-xs text-muted-foreground"><ChevronRight className="size-3.5" aria-hidden="true" />{t('steps', { count: item.count })}</span>}
+              {item.kind === 'steps' && <span className="flex items-center gap-1 text-xs text-muted-foreground"><ChevronRight className="size-3.5" aria-hidden="true" />{t('steps', { harness: harnessLabel(detail?.harness ?? ''), count: item.count })}</span>}
               {item.kind === 'error' && <p role="alert" className="text-xs text-destructive">{item.text}</p>}
-              {item.kind === 'person' && <>
-                {!item.mine && <span className="self-end text-xs text-muted-foreground">{item.author} · {format.dateTime(new Date(item.at), { hour: '2-digit', minute: '2-digit' })}</span>}
-                <p className={cn(BUBBLE, 'self-end')}>{item.text}</p>
-              </>}
+              {item.kind === 'person' && (item.mine
+                // R-14: your own words are the blue bubble on the right.
+                ? <p className={cn(BUBBLE, 'self-end bg-sidebar-primary text-sidebar-primary-foreground')}>{item.text}</p>
+                // A teammate speaks from the left under their name, as in a group chat (R-13).
+                : <>
+                  <span className="flex items-center gap-1.5 text-xs"><LetterAvatar name={item.author} size="pill" /><span className="font-medium">{item.author}</span><span className="text-muted-foreground">{format.dateTime(new Date(item.at), { hour: '2-digit', minute: '2-digit' })}</span></span>
+                  <p className={cn(BUBBLE, 'self-start')}>{item.text}</p>
+                </>)}
             </li>)}
           </ol>
         </>}
