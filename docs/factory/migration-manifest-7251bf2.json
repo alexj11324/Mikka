@@ -1,0 +1,41 @@
+{
+  "mainCommit": "7251bf2f703624a9c3c3f0fed7cb51b3a7bb93d5",
+  "mainLatestMigration": "20261025013400_run_checkpoints.sql",
+  "shared": [
+    {
+      "issue": 191,
+      "file": "20261025013401_run_dispatch_keys.sql",
+      "obsolete": [
+        "20261025004500_run_dispatch_keys.sql",
+        "20261025011101_run_dispatch_keys.sql",
+        "20261025011347_run_dispatch_keys.sql"
+      ],
+      "sha256": "ae4618bb7a9e9bfd9df1b52df5b36a6cead6b87edf5dd271eff4b4ca5b9ebf9d"
+    },
+    {
+      "issue": 192,
+      "file": "20261025013402_factory_192_stages.sql",
+      "obsolete": [
+        "20261025010001_factory_192_stages.sql"
+      ],
+      "sha256": "675eb386f3ef611885c145051806e2c5d3a9c07a37bde1eed9b0285cf48ef5ea"
+    }
+  ],
+  "downstream": [
+    {
+      "issue": 193,
+      "migration": null
+    },
+    {
+      "issue": 194,
+      "from": "20261025012001_factory_194_approvals.sql",
+      "migration": "20261025013403_factory_194_approvals.sql",
+      "action": "Coordinator supplies a filename-only compatibility commit; feature stays separate."
+    },
+    {
+      "issue": 195,
+      "migration": "20261025014500_factory_195_monitor.sql",
+      "action": "Keep existing filename."
+    }
+  ]
+}

@@ -93,7 +93,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
       ].filter(Boolean).join('\n')
     case 'run_retried':
       return [
-        `[Event] Run ${event.runId} lost its machine (the device went offline), so it was queued again as run ${payload.retryRunId}, attempt ${payload.attempt} of ${payload.maxAttempts}.`,
+        `[Event] Run ${event.runId} lost its machine (the device went offline), so it was ${payload.movedToDeviceId ? `handed to device ${payload.movedToDeviceId}` : 'queued again'} as run ${payload.retryRunId}, attempt ${payload.attempt} of ${payload.maxAttempts}.`,
         event.issueId ? `Issue: ${event.issueId}.` : null,
         'Nothing to do; follow the new run.',
         note,
