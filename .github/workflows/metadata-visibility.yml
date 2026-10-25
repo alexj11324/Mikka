@@ -78,17 +78,19 @@ jobs:
       - run: pnpm exec playwright test tests/e2e/device-revocation.spec.ts --output=browser-results
       - name: Actual MCP HTTP metadata sharing across separate databases
         run: |
-          pnpm exec next start --port 3100 --hostname 127.0.0.1 > /tmp/visibility-next.log 2>&1 &
+          pnpm exec next start --port 3100 --hostname localhost > /tmp/visibility-next.log 2>&1 &
           next_pid=$!
           trap 'kill "$next_pid"' EXIT
           for i in $(seq 1 60); do curl -fsS http://localhost:3100/mikka/sign-in > /dev/null && break; sleep 1; done
           E2E_BASE_URL=http://localhost:3100 node scripts/visibility/http-acceptance.mjs
+          E2E_BASE_URL=http://localhost:3100 node scripts/visibility/assignment-http.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: metadata-visibility-sanitized-evidence
           path: |
             test-results/visibility/http-evidence.json
+            test-results/visibility/assignment-evidence.json
             browser-results/**/device-revocation-evidence.json
             test-results/daemon-faults/device-revocation-fault-evidence.json
             test-results/daemon-faults/byos-revocation.log

@@ -33,3 +33,21 @@ regression. Only safe result metadata is written to artifacts, never tokens.
 #168 actor and #170 search remain separate candidates. Their writer/search changes
 are not bundled here. Production identities, frozen deployment, real-user
 acceptance and redacted PR video remain parent-coordinated and unverified.
+
+## Agent assignment options (P2 functional follow-up)
+
+`getIssuePropertyOptions` returns `capabilities.canAssignAgent`. Only the task
+owner receives their own Agent choices and may assign an Agent. Nonowners receive
+an empty Agent list and `false`; submitting a known private Agent ID is not a
+capability bypass. The existing `agents.userId === issue.userId` check remains.
+Other permitted metadata edits and clearing an assignment keep their existing
+contracts. No UI layout is changed; this addresses inconsistent choices, not a
+claim of a demonstrated security disclosure.
+
+`scripts/visibility/assignment-http.mjs` calls the actual built Next Server Actions
+using IDs from that build's server-reference manifest. Synthetic signed-in sessions
+read options and submit selections over HTTP; retained PG state verifies owner
+success, member/foreign Agent refusal, member label-edit success and refusal after
+workspace revocation or a personal-scope flip. This is real action/HTTP acceptance,
+not a browser interaction or production verification claim. Cookies/tokens and
+raw action responses are never written to the evidence artifact.

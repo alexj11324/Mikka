@@ -26,11 +26,12 @@ export async function getIssuePropertyOptions(id: string) {
   const { issue, user } = await requireIssueAccess(id)
   const [owner] = await db.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, issue.userId))
   const members = await db.select({ id: users.id, name: users.name, image: users.image }).from(issueMembers).innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId)))
-  const choices = await issuePropertyChoices(user.id)
+  const choices = await issuePropertyChoices(user.id, issue.userId)
   const projectRecords = await listProjects()
   return {
     members: owner ? [owner, ...members.filter(member => member.id !== owner.id)] : members,
     agents: choices.agents,
+    capabilities: { canAssignAgent: choices.canAssignAgent },
     projects: [...new Set(projectRecords.map(item => item.name))].sort(),
     projectRecords: projectRecords.map(item => ({ id: item.id, name: item.name })),
 
@@ -64,6 +65,8 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         } else if (patch.assignee === null) assignee = null
         else if (patch.assignee) {
           if (patch.assignee.kind === 'agent') {
+            // Personal agents are selectable only on their owner's tasks.
+            if (user.id !== issue.userId) return { error: 'agentNotFound' }
             const [agent] = await tx.select({ id: agents.id, name: agents.name }).from(agents).where(and(eq(agents.id, z.uuid().parse(patch.assignee.id)), eq(agents.userId, issue.userId)))
             if (!agent) return { error: 'agentNotFound' }
             assignee = { ...agent, kind: 'agent', image: null }
