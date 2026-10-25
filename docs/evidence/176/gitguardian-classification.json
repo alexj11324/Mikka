@@ -86,9 +86,10 @@
       "matching_run_tokens": 0
     }
   ],
-  "source": "CoordinatorInbox.claim uses randomUUID for a lease delivery fence; fixture logs staged receipts in loopback-only controlled transport. These are not provider or login credentials.",
+  "source": "Bounded diagnostic mapping: flagged fields match randomUUID delivery fences in the retained isolated PG fixture. This does not independently clear every secret category or resolve the scanner finding.",
   "services": "Diagnostic Next and controlled transport stopped; no production cron/Workflow/provider configured. Original fixture DB retained.",
   "actions": "All 13 delivery-token fields redacted from public diagnostic copy. Raw original retained locally. No history rewrite, rotation, check skip, configuration suppression or incident-state change performed.",
-  "remaining": "GitGuardian scans every PR commit. An authorized incident reviewer must classify only these confirmed synthetic incidents; no authenticated GitGuardian tool/session is available here.",
-  "officialDocs": "https://docs.gitguardian.com/internal-monitoring/prevent/detect-secrets-in-real-time-in-github"
+  "remaining": "Scanner failure retained as unresolved / not independently verified. User reports prior false positives and directs no further separate GitGuardian email/dashboard investigation. No safety gate or required-check setting changed; no email action attempted.",
+  "officialDocs": "https://docs.gitguardian.com/internal-monitoring/prevent/detect-secrets-in-real-time-in-github",
+  "independentSecretClearance": false
 }
