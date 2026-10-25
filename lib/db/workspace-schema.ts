@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, varchar, primaryKey, unique } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, uuid, varchar, primaryKey, unique, index } from 'drizzle-orm/pg-core'
 
 export const workspaces = pgTable('mikka_workspaces', {
   id: uuid('id').primaryKey(),
@@ -16,7 +16,7 @@ export const workspaceMembers = pgTable('mikka_workspace_members', {
   role: text('role').$type<'admin' | 'member'>().notNull(),
   status: text('status').$type<'active' | 'suspended'>().notNull().default('active'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [primaryKey({ columns: [table.workspaceId, table.userId] })])
+}, table => [primaryKey({ columns: [table.workspaceId, table.userId] }), index('mikka_workspace_members_user_idx').on(table.userId)])
 
 export const workspaceInvitations = pgTable('mikka_workspace_invitations', {
   id: uuid('id').primaryKey(),

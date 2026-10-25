@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { PanelLeft, Pin, Plus } from 'lucide-react'
+import { PanelLeft, Plus } from 'lucide-react'
 import { getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
 import { MikkaMark } from '@/components/brand/mikka-mark'
 import { Button } from '@/components/ui/button'
@@ -66,9 +66,15 @@ function coordinatorLine(text: string) {
   return sessionPreview(text.replace(/\[\[(?:issue|run):[0-9a-f-]{36}\]\]/gi, '').replace(/\[([^\]\n]+)\]\([^)]+\)/g, '$1'), null)
 }
 
-function Row({ name, preview, avatar, current, unread, onClick, label }: { name: string; preview: ReactNode; avatar: ReactNode; current: boolean; unread: boolean; onClick: () => void; label: string }) {
+/** Green while the conversation's bot is working, orange while it waits on you; otherwise no dot. */
+type RowStatus = 'working' | 'waiting'
+
+function Row({ name, preview, avatar, status, current, unread, onClick, label }: { name: string; preview: ReactNode; avatar: ReactNode; status?: RowStatus; current: boolean; unread: boolean; onClick: () => void; label: string }) {
   return <SidebarMenuItem><SidebarMenuButton size="lg" isActive={current} aria-current={current ? 'page' : undefined} aria-label={label} onClick={onClick} className="h-13 gap-2.5 rounded-xl px-2.5">
-    {avatar}
+    <span className="relative shrink-0">
+      {avatar}
+      {status && <span aria-hidden="true" className={cn('absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-sidebar', status === 'working' ? 'bg-success' : 'bg-attention')} />}
+    </span>
     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="truncate text-sm font-semibold">{name}</span>
       {preview && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">{preview}</span>}
@@ -78,8 +84,7 @@ function Row({ name, preview, avatar, current, unread, onClick, label }: { name:
 }
 
 /**
- * The conversation list beside the icon rail (Figma 48:3): Coordinator pinned
- * on top, then agent sessions by latest activity, each a name over a one-line
+ * The conversation list beside the icon rail (Figma 48:3): Coordinator first, then agent sessions by latest activity, each a name over a one-line
  * preview. It collapses off canvas; the rail stays.
  */
 export function ConversationList({ sessions, active, onOpen, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: ListProps) {
@@ -107,9 +112,10 @@ export function ConversationList({ sessions, active, onOpen, rail, onRail, user,
     </SidebarHeader>
     <SidebarContent>
       <SidebarGroup className="px-2 pt-1"><SidebarMenu aria-label={i18nText('Nav.conversations')} className="gap-0.5">
-        <Row name={i18nText('Nav.coordinator')} label={i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
+        <Row name={i18nText('Nav.coordinator')} label={coordinator?.working ? i18nText('Nav.coordinatorWorking') : i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
           avatar={<LetterAvatar name="Coordinator" tone="coordinator" />}
-          preview={<><span aria-hidden="true" className="flex shrink-0 [&_svg]:size-3"><Pin /></span><span className="shrink-0">{i18nText('Shell.pinned')}</span>{lastReply && <><span aria-hidden="true">·</span><span className="truncate">{coordinatorLine(lastReply.text)}</span></>}</>} />
+          status={coordinator?.working ? 'working' : undefined}
+          preview={lastReply ? <span className="truncate">{coordinatorLine(lastReply.text)}</span> : null} />
         {recent.map(session => {
           const name = session.title || untitled
           return <Row key={session.id} name={name} label={name} current={active?.kind === 'agent' && active.sessionId === session.id} unread={unread(session.id)} onClick={() => choose({ kind: 'agent', sessionId: session.id })}

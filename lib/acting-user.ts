@@ -1,11 +1,11 @@
 import 'server-only'
+import { cache } from 'react'
 import { noteLogUser } from '@/lib/request-log'
-import { headers } from 'next/headers'
 import { eq } from 'drizzle-orm'
-import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { actingContext, type ActivityActor } from '@/lib/activity-actor'
+import { getSession } from '@/lib/session'
 
 // Who a server action acts for. Normally the signed-in session; an MCP tool,
 // which has a verified OAuth token instead of a session cookie, runs the same
@@ -19,15 +19,20 @@ export function actAs<T>(userId: string, fn: () => Promise<T>, actor?: ActivityA
   return actingContext.run({ userId, actor }, fn)
 }
 
+// React cache is scoped to one server render, so the lookup is shared only within a request.
+const userById = cache(async (userId: string) => {
+  const [user] = await db.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(users).where(eq(users.id, userId)).limit(1)
+  return user ?? null
+})
+
 /** The user the current action acts for, or null when nobody is signed in. */
 export async function currentUser(): Promise<{ id: string; name: string; email: string; image?: string | null } | null> {
   const userId = actingContext.getStore()?.userId
   if (userId) {
     noteLogUser(userId)
-    const [user] = await db.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(users).where(eq(users.id, userId)).limit(1)
-    return user ?? null
+    return userById(userId)
   }
-  const session = await auth.api.getSession({ headers: await headers() })
-  noteLogUser(session?.user?.id)
-  return session?.user ?? null
+  const user = (await getSession())?.user ?? null
+  noteLogUser(user?.id)
+  return user
 }

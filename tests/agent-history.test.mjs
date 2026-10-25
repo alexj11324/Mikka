@@ -79,3 +79,15 @@ test('保存失败必须向客户端报告错误', async () => {
   assert.match(parts.at(-1).errorText, /保存连接中断/)
   assert.equal(parts.some(part => part.type === 'finish'), false)
 })
+
+test('瞬时状态 chunk 只下发给前端，不写入历史', async () => {
+  const saves = []
+  const status = { type: 'data-agent-status', data: { phase: 'thinking', step: 0 }, transient: true }
+  const parts = [status, { type: 'start' }, { ...status, data: { phase: 'searching', tool: 'web_search', step: 1 } }, text, { type: 'finish' }]
+  const returned = await collect(persistAgentStream(source(parts), async checkpoint => { saves.push(checkpoint) }))
+  assert.deepEqual(returned, parts)
+  assert.deepEqual(saves, [{ completion: '测试回复', status: 'complete', error: null }])
+  const reopened = JSON.stringify(saves)
+  assert.ok(!reopened.includes('data-agent-status'))
+  assert.ok(!reopened.includes('thinking'))
+})
