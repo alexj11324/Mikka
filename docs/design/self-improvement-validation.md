@@ -82,6 +82,37 @@ turn synthetic document comparison into a review/verify pass or publication
 approval. Evidence retention/erasure remains a #210 coordination item; this
 candidate performs no data deletion and does not add a delete API.
 
+## Full CI failure diagnosed before retry
+
+Initial complete run [40172412782](https://github.com/alexj11324/Mikka/actions/runs/40172412782)
+on `6c34caf8b012d79d7296f6ab2e71644058107a96` finished **failure**. Source/lint,
+typecheck, tracked-migration bootstrap and production build passed. Performance
+finished **4 passed / 1 failed**; regular browser regression finished **74 passed /
+1 skipped**. The existing skip is the development-preview acceptance entry,
+which is absent in this production build; it is not a passed OAuth acceptance.
+
+The sole failure is `agent-performance.spec.ts`'s initial history-request count,
+expected one and received two, not its elapsed-time assertion. We read the
+actual job log and its Playwright trace from
+[artifact 12590464956](https://github.com/alexj11324/Mikka/actions/runs/40172412782/artifacts/12590464956).
+Trace timing: reload begins at 10867.506 ms, the new main document commits at
+11205.623 ms, and reload completes at 11544.802 ms. The extra history fetch
+starts at 10901.711 ms before document commit and is cancelled (`status=-1`);
+the actual new-document fetch begins at 11647.595 ms and returns 200. Thus the
+observer included the previous fixture document's late startup fetch.
+
+Only after confirming this evidence, the three-file observer fix was reused
+from #170 `3113c3d07a543c189a82f8b9112c5158e46f5e64` (also present in #222).
+It observes the main frame's new document loaders. It does not discard failed
+or duplicate requests from measured documents, change a latency limit, add
+retries or alter the application. Its real-browser negative control induces
+a second request and verifies the unchanged one-read assertion rejects it.
+The three files must be deduplicated when #170/#222 are integrated.
+
+For #232 coordination, see the proposed
+[Skill source boundary](self-improvement-skill-source-contract.md). It adds no
+accepted input, trusted receipt implementation or claim of registry integration.
+
 No deployment was attempted by this thread. The parent owns integrated CI,
 fixed-version deployment, actual OAuth/Harness acceptance, production readback,
 and the sanitized acceptance video on the corresponding PR. An implementation
