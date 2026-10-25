@@ -83,3 +83,18 @@ export function runQuestionEvent(run: WorkerRun, question: { question: string; o
 export function runBlockedEvent(run: WorkerRun, reason: string): CoordinatorEventInput {
   return workerEvent('run_blocked', run, { reason })
 }
+
+/** An agent handed over a document or web page (MCP `submit_artifact`). One event per version. */
+export function artifactSubmittedEvent(
+  submitter: { userId: string; runId: string | null; issueId: string | null; authorName: string },
+  artifact: { artifactId: string; version: number; title: string; kind: string },
+): CoordinatorEventInput {
+  return {
+    userId: submitter.userId,
+    kind: 'artifact_submitted',
+    dedupeKey: `artifact_submitted:${artifact.artifactId}:${artifact.version}`,
+    issueId: submitter.issueId,
+    runId: submitter.runId,
+    payload: { artifactId: artifact.artifactId, version: artifact.version, title: artifact.title, artifactKind: artifact.kind, authorName: submitter.authorName },
+  }
+}

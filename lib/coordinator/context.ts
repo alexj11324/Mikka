@@ -1,5 +1,6 @@
 import { pruneMessages, type ModelMessage } from 'ai'
 import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema'
+import { splitQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 
 // What the Coordinator's model sees. Everything here depends only on the
 // stored conversation, never on time or on how long the person was away, so
@@ -110,6 +111,13 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         'The run keeps going. Ask the person, then pass their answer on with send_to_run.',
         note,
       ].filter(Boolean).join('\n')
+    case 'artifact_submitted':
+      return [
+        `[Event] ${payload.authorName}${event.runId ? ` (run ${event.runId})` : ''} handed over ${payload.artifactKind === 'html' ? 'a web page' : 'a document'} "${payload.title}", version ${payload.version}: [[artifact:${payload.artifactId}]]`,
+        event.issueId ? `Issue: ${event.issueId}.` : null,
+        'The person sees it as a card under your next reply. Say in a sentence what it is; do not repeat its content.',
+        note,
+      ].filter(Boolean).join('\n')
     case 'run_blocked':
       return [
         `[Event] The agent in run ${event.runId} is blocked: ${payload.reason}`,
@@ -151,32 +159,71 @@ export interface ChatItem {
   /** Tools the Coordinator used for this reply, in order. */
   tools: string[]
   createdAt: string
+  /** What the person quoted from an artifact, shown above their text. */
+  quote?: ArtifactQuote
+  /** Artifacts shown as cards under this entry, in order. */
+  artifacts: string[]
+}
+
+const ARTIFACT_CITATION = /\[\[artifact:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]\]/gi
+
+/** The artifact ids cited in `text`, and the text without those citations. */
+function takeArtifacts(text: string): { ids: string[]; text: string } {
+  const ids = [...text.matchAll(ARTIFACT_CITATION)].map(match => match[1].toLowerCase())
+  return { ids, text: ids.length ? text.replace(ARTIFACT_CITATION, '').replace(/[ \t]+\n/g, '\n').trim() : text }
 }
 
 /**
  * The conversation as the person sees it: their messages, Mikka's events, and
- * one entry per Coordinator reply, with the tools it called folded in.
+ * one entry per Coordinator reply, with the tools it called folded in. An
+ * artifact the Coordinator was told about shows as a card under its next
+ * reply (or on its own when no reply came yet) instead of as an event line;
+ * one the reply cites goes there too, once.
  */
 export function chatItems(rows: readonly (StoredMessage & { createdAt: Date })[]): ChatItem[] {
   const items: ChatItem[] = []
+  // Artifacts handed over since the last reply, waiting for one to sit under.
+  const waiting = { ids: [] as string[], position: 0, createdAt: new Date(0) }
+  const flush = () => {
+    if (!waiting.ids.length) return
+    items.push({ position: waiting.position, from: 'coordinator', text: '', tools: [], createdAt: waiting.createdAt.toISOString(), artifacts: [...new Set(waiting.ids)] })
+    waiting.ids = []
+  }
   for (const { position, message, createdAt } of rows) {
     if (message.role === 'user') {
-      const text = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
-      const event = text.startsWith('[Event]')
+      const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
+      const event = raw.startsWith('[Event]')
+      if (event) {
+        const cited = takeArtifacts(raw.split('\n')[0])
+        if (cited.ids.length) {
+          Object.assign(waiting, { ids: [...waiting.ids, ...cited.ids], position, createdAt })
+          continue
+        }
+      }
+      flush()
       // The triage line is for the Coordinator, not the person.
-      items.push({ position, from: event ? 'event' : 'person', text: event ? text.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') : text, tools: [], createdAt: createdAt.toISOString() })
+      if (event) items.push({ position, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n'), tools: [], createdAt: createdAt.toISOString(), artifacts: [] })
+      else {
+        const { quote, text } = splitQuote(raw)
+        items.push({ position, from: 'person', text, tools: [], createdAt: createdAt.toISOString(), artifacts: [], ...(quote ? { quote } : {}) })
+      }
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
-      const text = parts.flatMap(part => part.type === 'text' && part.text.trim() ? [part.text.trim()] : []).join('\n\n')
+      const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() ? [part.text.trim()] : []).join('\n\n'))
       const tools = parts.flatMap(part => part.type === 'tool-call' ? [part.toolName] : [])
       const last = items.at(-1)
-      if (last?.from === 'coordinator') {
-        last.text = [last.text, text].filter(Boolean).join('\n\n')
+      const pending = waiting.ids
+      const shown = [...pending, ...cited.ids]
+      if (last?.from === 'coordinator' && !pending.length) {
+        last.text = [last.text, cited.text].filter(Boolean).join('\n\n')
         last.tools.push(...tools)
-      } else if (text || tools.length) {
-        items.push({ position, from: 'coordinator', text, tools, createdAt: createdAt.toISOString() })
+        last.artifacts = [...new Set([...last.artifacts, ...cited.ids])]
+      } else if (cited.text || tools.length || shown.length) {
+        items.push({ position, from: 'coordinator', text: cited.text, tools, createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)] })
+        waiting.ids = []
       }
     }
   }
+  flush()
   return items
 }

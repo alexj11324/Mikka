@@ -218,8 +218,9 @@ export const runTokens = pgTable('run_tokens', {
 /**
  * `run_report`, `run_question` and `run_blocked` come from the agent inside a
  * run, through the worker tools of the MCP server (lib/mcp/worker.ts).
+ * `artifact_submitted` comes from `submit_artifact`, from a run or an OAuth agent.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'artifact_submitted'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth
@@ -395,3 +396,47 @@ export const conversationLinks = pgTable('conversation_links', {
   anchorPosition: bigint('anchorPosition', { mode: 'bigint' }).notNull(), firstPosition: bigint('firstPosition', { mode: 'bigint' }).notNull(),
   lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull(), messageCount: bigint('messageCount', { mode: 'bigint' }).notNull(),
 }, t => [index('conversation_links_source_idx').on(t.sourceConversationId, t.anchorPosition)])
+
+// --- Artifacts ---------------------------------------------------------------
+//
+// A document (Markdown) or web page (HTML) an agent hands over through the MCP
+// tool `submit_artifact` (lib/artifacts). Each version's file sits in R2 under
+// `storageKey`, immutable; this table keeps who, when and which version.
+
+export const ARTIFACT_KINDS = ['markdown', 'html'] as const
+export type ArtifactKind = (typeof ARTIFACT_KINDS)[number]
+
+export const artifacts = pgTable('artifacts', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  kind: text('kind').$type<ArtifactKind>().notNull(),
+  title: varchar('title', { length: 200 }).notNull(),
+  /** The run that made it; null when an agent outside a run (OAuth) sent it. */
+  runId: uuid('runId').references(() => agentRuns.id, { onDelete: 'set null' }),
+  issueId: uuid('issueId').references(() => issues.id, { onDelete: 'set null' }),
+  latestVersion: integer('latestVersion').notNull().default(1),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('artifacts_user_idx').on(table.userId, table.updatedAt), index('artifacts_run_idx').on(table.runId)])
+
+export const artifactVersions = pgTable('artifact_versions', {
+  id: uuid('id').primaryKey(),
+  artifactId: uuid('artifactId').notNull().references(() => artifacts.id, { onDelete: 'cascade' }),
+  version: integer('version').notNull(),
+  /** Object key in the artifacts bucket. */
+  storageKey: text('storageKey').notNull(),
+  /** The file itself, only where no bucket is configured (previews, tests); production always uses R2. */
+  inlineContent: text('inlineContent'),
+  sha256: text('sha256').notNull(), size: integer('size').notNull(),
+  /** Who made this version: the agent's name or the OAuth client's. */
+  authorName: text('authorName').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('artifact_versions_version_key').on(table.artifactId, table.version)])
+
+/** A link anyone can open at /a/<token>. Only the token's hash is stored; revoking ends it. */
+export const artifactShares = pgTable('artifact_shares', {
+  id: uuid('id').primaryKey(),
+  artifactId: uuid('artifactId').notNull().references(() => artifacts.id, { onDelete: 'cascade' }),
+  tokenHash: text('tokenHash').notNull(), createdBy: text('createdBy').notNull(),
+  revokedAt: timestamp('revokedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('artifact_shares_token_key').on(table.tokenHash), index('artifact_shares_artifact_idx').on(table.artifactId)])

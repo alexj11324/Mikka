@@ -870,6 +870,7 @@
     "repoNotFound": "仓库不存在。",
     "runInvalid": "运行参数不正确。",
     "runNotFound": "运行不存在。",
+    "artifactNotFound": "找不到这个成果。",
     "messageRequired": "消息不能为空。",
     "deviceSaveFailed": "保存失败，请重试。",
     "tokenCreateFailed": "生成 token 失败，请重试。",

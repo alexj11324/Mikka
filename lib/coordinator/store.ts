@@ -8,6 +8,7 @@ import { eventsForInbox } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
+import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -151,6 +152,8 @@ export interface ChatView {
   error: string | null
   /** The issues and runs the replies cite, by id, that this person can see. */
   sources: Record<string, CitationSource>
+  /** The artifacts shown as cards, by id. */
+  artifacts: Record<string, ArtifactSummary>
 }
 
 /** Looks up the issues and runs cited in `texts`, keeping only what `userId` may see. */
@@ -202,6 +205,7 @@ export async function chatView(userId: string, limit = 200): Promise<ChatView> {
     working: leased || waiting.some(event => event.tier !== 'background'),
     error: session?.lastError ?? null,
     sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text)),
+    artifacts: await artifactSummaries(userId, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
   }
 }
 

@@ -29,6 +29,7 @@ export const ACTION_ERROR_CODES = [
   'repoNotFound',
   'runInvalid',
   'runNotFound',
+  'artifactNotFound',
   'messageRequired',
   'deviceSaveFailed',
   'tokenCreateFailed',

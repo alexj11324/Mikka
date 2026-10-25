@@ -870,6 +870,7 @@
     "repoNotFound": "This repository does not exist.",
     "runInvalid": "The run parameters are invalid.",
     "runNotFound": "This run does not exist.",
+    "artifactNotFound": "This artifact does not exist.",
     "messageRequired": "A message cannot be empty.",
     "deviceSaveFailed": "The save failed. Please try again.",
     "tokenCreateFailed": "Could not create a token. Please try again.",
