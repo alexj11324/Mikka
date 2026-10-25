@@ -2,6 +2,7 @@
 // manifest; this candidate deliberately does not invent or publish these routes.
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { verifyOperationReadback } from './operation-readback-contract.mjs'
 
 if (process.argv.length !== 5 || process.argv[2] !== '--execute-readonly') {
   console.log('Usage: node scripts/verify-operation-acceptance.mjs --execute-readonly /private/manifest.json /private/browser-storage-state.json')
@@ -34,11 +35,10 @@ try {
   const version = await read(urls[0])
   if (version.sha !== manifest.expectedSha) throw new Error('deployment version mismatch')
   const operation = await read(urls[1])
-  if (operation.operationId !== manifest.operationId || operation.ownerId !== manifest.ownerId || operation.workspaceId !== manifest.workspaceId || operation.status !== 'succeeded' || operation.receipt?.providerObjectId !== manifest.providerObjectId) throw new Error('operation binding or result mismatch')
   // This route MUST perform independent remote lookup through the reviewed adapter,
   // not return the ledger receipt. Audit that implementation before using this driver.
   const remote = await read(urls[2])
-  if (remote.source !== 'provider' || remote.providerObjectId !== manifest.providerObjectId || remote.idempotencyKey !== operation.idempotencyKey) throw new Error('independent provider readback mismatch')
+  verifyOperationReadback(manifest, operation, remote)
   if ((await read(urls[0])).sha !== manifest.expectedSha) throw new Error('deployment changed during acceptance')
   // Never print session data, target/account IDs, URLs, provider responses or traces.
   console.log(JSON.stringify({ status: 'passed', check: 'read-only-operation-readback', sha: manifest.expectedSha, utc: new Date().toISOString() }))
