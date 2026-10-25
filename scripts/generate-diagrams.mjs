@@ -1,20 +1,12 @@
-// Draws the README architecture diagram as orthogonal SVG: English and Chinese,
-// light and dark. Solid boxes and lines are shipped; dashed ones are on the
-// roadmap. Run `node scripts/generate-architecture.mjs` after changing a box or
-// a flow, and commit the four files it writes to docs/assets.
-import fs from 'node:fs'
-import path from 'node:path'
+// Draws the README diagrams as orthogonal SVG in English and Chinese, light and
+// dark: the architecture and the way a task moves through Mikka. Run
+// `node scripts/generate-diagrams.mjs` after changing a box or a flow, and
+// commit the files it writes to docs/assets.
+import { chevron, diamond, legend, LEGEND_TEXT, line, rectBox, svg, tag, writeDiagram } from './diagram-svg.mjs'
 
 const ROOT = process.cwd()
-const OUT_DIR = path.join(ROOT, 'docs', 'assets')
-const W = 1220
-const H = 820
-const FONT = '-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, &quot;PingFang SC&quot;, &quot;Noto Sans CJK SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif'
 
-const PALETTES = {
-  light: { ink: '#111111', box: '#ffffff', blue: '#1a5cff', tag: '#ffffff', muted: '#59636e' },
-  dark: { ink: '#e6edf3', box: '#0d1117', blue: '#4d82ff', tag: '#ffffff', muted: '#9198a1' },
-}
+// ---- Architecture -------------------------------------------------------
 
 // Column x ranges and the two merge buses.
 const C1 = [20, 200]
@@ -25,7 +17,7 @@ const BUS1 = 370
 const BUS2 = 650
 
 // id: [column, y center, height, planned]
-const BOXES = {
+const ARCH_BOXES = {
   web: [C1, 170, 48, false],
   tg: [C1, 240, 48, false],
   notify: [C1, 320, 60, false],
@@ -46,7 +38,7 @@ const BOXES = {
   cu: [C4, 680, 60, true],
 }
 
-const TEXT = {
+const ARCH_TEXT = {
   en: {
     web: ['Web app'], tg: ['Telegram'], notify: ['GitHub, Gmail,', 'Notion, Slack'],
     sched: ['Scheduler', 'scheduled tasks'], mcpc: ['Claude Code, Codex', 'as MCP clients'],
@@ -58,9 +50,8 @@ const TEXT = {
     monitor: ['Monitoring', 'incidents to issues'], cloud: ['Cloud computer', 'E2B, a desktop per bot'],
     agents: ['Coding agent CLI', 'one worktree per run'], cu: ['Computer use', 'local cua-driver'],
     tWebhook: 'webhook', tNotify: 'webhooks, triggers', tMcp: 'MCP', tDb: 'reads, writes',
-    tEvents: 'events', tDispatch: 'dispatch run', tTools: 'worker tools', tLinear: 'webhooks, API',
+    tEvents: 'events', tDispatch: 'runs, answers', tTools: 'report, ask, blocked', tLinear: 'webhooks, API',
     pActions: 'actions after approval', pWake: 'wake', pSecure: 'secure input', pHandoff: 'handoff',
-    lShipped: 'Shipped', lPlanned: 'Planned', lFlow: 'Data flow', lPlannedFlow: 'Planned flow',
     title: 'Mikka architecture',
   },
   zh: {
@@ -74,78 +65,13 @@ const TEXT = {
     monitor: ['监控', '故障回流为 issue'], cloud: ['云端电脑', 'E2B，每个 bot 一个桌面'],
     agents: ['Coding agent CLI', '每次运行独立 worktree'], cu: ['Computer use', '本机 cua-driver'],
     tWebhook: 'webhook', tNotify: 'webhook、触发器', tMcp: 'MCP', tDb: '读写',
-    tEvents: '事件', tDispatch: '派发运行', tTools: 'worker 工具', tLinear: 'webhook、API',
+    tEvents: '事件', tDispatch: '派发运行、回答', tTools: '汇报、提问、阻塞', tLinear: 'webhook、API',
     pActions: '审批后执行操作', pWake: '唤醒', pSecure: '安全输入', pHandoff: '接续',
-    lShipped: '已上线', lPlanned: '规划中', lFlow: '数据流', lPlannedFlow: '规划中的数据流',
     title: 'Mikka 架构',
   },
 }
 
-const esc = s => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-
-// Rough rendered width at 14px: CJK glyphs are square, Latin glyphs about half as wide.
-const textWidth = s => [...s].reduce((sum, ch) => sum + (ch.codePointAt(0) > 0x2e80 ? 14 : 7.6), 0)
-
-function rectBox(x0, x1, yc, h, lines, p, planned) {
-  const dash = planned ? ' stroke-dasharray="7 5"' : ''
-  const first = yc - ((lines.length - 1) * 19) / 2 + 5
-  return [
-    `<rect x="${x0}" y="${yc - h / 2}" width="${x1 - x0}" height="${h}" fill="${p.box}" stroke="${p.ink}" stroke-width="2.5"${dash}/>`,
-    ...lines.map((line, i) => `<text x="${(x0 + x1) / 2}" y="${first + i * 19}" text-anchor="middle" font-size="15" fill="${p.ink}">${esc(line)}</text>`),
-  ]
-}
-
-function box(id, lines, p) {
-  const [[x0, x1], yc, h, planned] = BOXES[id]
-  return rectBox(x0, x1, yc, h, lines, p, planned)
-}
-
-function tag(cx, cy, label, p, planned = false) {
-  const w = Math.round(textWidth(label) + 18)
-  if (planned) {
-    return [
-      `<rect x="${cx - w / 2}" y="${cy - 13}" width="${w}" height="26" fill="${p.box}" stroke="${p.blue}" stroke-width="1.5" stroke-dasharray="4 3"/>`,
-      `<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="14" fill="${p.blue}">${esc(label)}</text>`,
-    ]
-  }
-  return [
-    `<rect x="${cx - w / 2}" y="${cy - 13}" width="${w}" height="26" fill="${p.blue}"/>`,
-    `<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="14" fill="${p.tag}">${esc(label)}</text>`,
-  ]
-}
-
-function line(points, p, planned = false) {
-  const dash = planned ? ' stroke-dasharray="7 5"' : ''
-  const d = 'M' + points.map(([x, y]) => `${x} ${y}`).join(' L')
-  return [`<path d="${d}" fill="none" stroke="${p.ink}" stroke-width="2.5"${dash}/>`]
-}
-
-function chevron(x, y, direction, p) {
-  const s = 8
-  const points = {
-    right: [[x - s, y - s], [x, y], [x - s, y + s]],
-    left: [[x + s, y - s], [x, y], [x + s, y + s]],
-    down: [[x - s, y - s], [x, y], [x + s, y - s]],
-    up: [[x - s, y + s], [x, y], [x + s, y + s]],
-  }[direction]
-  const d = 'M' + points.map(([a, b]) => `${a} ${b}`).join(' L')
-  return [`<path d="${d}" fill="none" stroke="${p.ink}" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>`]
-}
-
-function legend(t, p) {
-  const y = 776
-  const flowX = Math.round(352 + textWidth(t.lFlow) + 36)
-  return [
-    ...rectBox(20, 120, y, 36, [t.lShipped], p, false),
-    ...rectBox(140, 240, y, 36, [t.lPlanned], p, true),
-    ...line([[280, y], [340, y]], p), ...chevron(318, y, 'right', p),
-    `<text x="352" y="${y + 5}" font-size="14" fill="${p.muted}">${esc(t.lFlow)}</text>`,
-    ...line([[flowX, y], [flowX + 60, y]], p, true), ...chevron(flowX + 38, y, 'right', p),
-    `<text x="${flowX + 72}" y="${y + 5}" font-size="14" fill="${p.muted}">${esc(t.lPlannedFlow)}</text>`,
-  ]
-}
-
-function flows(t, p) {
+function archFlows(t, p) {
   return [
     // Entry points into the API, merged on BUS1.
     ...line([[C1[1], 170], [BUS1, 170], [BUS1, 240]], p), ...chevron(BUS1, 210, 'down', p),
@@ -176,7 +102,8 @@ function flows(t, p) {
     // Planned: Factory stages on top of the Coordinator, fed by monitoring.
     ...line([[830, 288], [830, 350]], p, true), ...chevron(830, 300, 'up', p), ...chevron(830, 340, 'down', p),
     ...line([[C4[0], 270], [C3[1], 270]], p, true), ...chevron(932, 270, 'left', p),
-    // Dispatch: your machine today, the cloud computer later.
+    // Dispatch: your machine today, the cloud computer later. Answers to a
+    // run's questions travel the same way; the agent reads them on its next poll.
     ...line([[C3[1], 380], [C4[0], 380]], p, true), ...chevron(988, 380, 'right', p),
     ...line([[830, 410], [830, 490]], p), ...chevron(830, 482, 'down', p), ...tag(830, 446, t.tDispatch, p),
     ...line([[C3[1], 520], [C4[0], 520]], p), ...chevron(988, 520, 'right', p),
@@ -185,32 +112,105 @@ function flows(t, p) {
     ...tag(1100, 450, t.pHandoff, p, true),
     // Planned: local computer use for the agent.
     ...line([[1150, 550], [1150, 650]], p, true), ...chevron(1150, 642, 'down', p),
-    // Agents report back through the MCP worker tools.
+    // Agents report, ask and say they are blocked through the MCP worker tools.
     ...line([[1050, 550], [1050, 600], [500, 600], [500, 550]], p),
     ...chevron(950, 600, 'left', p), ...chevron(500, 566, 'up', p), ...tag(800, 600, t.tTools, p),
   ]
 }
 
-export function drawArchitecture(lang, theme) {
-  const p = PALETTES[theme]
-  const t = TEXT[lang]
-  const elements = [
-    ...flows(t, p),
-    ...Object.keys(BOXES).flatMap(id => box(id, t[id], p)),
-    ...legend(t, p),
-  ]
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${FONT}" role="img" aria-label="${esc(t.title)}">
-  <title>${esc(t.title)}</title>
-  ${elements.join('\n  ')}
-</svg>
-`
+function drawArchitecture(lang, p) {
+  const t = ARCH_TEXT[lang]
+  return svg(1220, 820, t.title, [
+    ...archFlows(t, p),
+    ...Object.entries(ARCH_BOXES).flatMap(([id, [[x0, x1], yc, h, planned]]) => rectBox(x0, x1, yc, h, t[id], p, planned)),
+    ...legend(776, LEGEND_TEXT[lang], p),
+  ])
 }
 
-fs.mkdirSync(OUT_DIR, { recursive: true })
-for (const lang of Object.keys(TEXT)) {
-  for (const theme of Object.keys(PALETTES)) {
-    const file = path.join(OUT_DIR, `architecture${lang === 'en' ? '' : '-zh'}-${theme}.svg`)
-    fs.writeFileSync(file, drawArchitecture(lang, theme))
-    console.log(path.relative(ROOT, file))
-  }
+// ---- Task flow ----------------------------------------------------------
+
+// Columns of the main row; the two diamonds sit between them.
+const X1 = [20, 200]
+const X2 = [250, 430]
+const X3 = [680, 860]
+const X4 = [930, 1130]
+const RAIL = 1190
+
+// id: [x range, y center, height, planned]
+const FLOW_BOXES = {
+  request: [X1, 230, 48, false],
+  triage: [X2, 230, 48, false],
+  dispatch: [X3, 230, 48, false],
+  agent: [X4, 230, 60, false],
+  asks: [X4, 70, 60, false],
+  answer: [X3, 70, 60, false],
+  details: [[440, 620], 390, 48, false],
+  review: [X4, 520, 60, true],
+  approve: [[430, 610], 520, 60, true],
+  ship: [X1, 520, 60, true],
 }
+
+const FLOW_TEXT = {
+  en: {
+    request: ['New request', 'chat, Telegram, Linear'], triage: ['Coordinator triages'],
+    dispatch: ['Dispatch run'], agent: ['Coding agent runs'],
+    asks: ['Coordinator asks', 'for clarification'], answer: ['Human provides input'],
+    details: ['Human adds details'], review: ['Review and verification', 'agents run'],
+    approve: ['Human approves', 'the release'], ship: ['Ship and monitor'],
+    clear: ['Clear?'], passes: ['Ready', 'to ship?'],
+    tClear: 'Clear', tUnclear: 'Needs clarification', tAsks: 'Asks, blocked', tAnswer: 'Answer to the run',
+    pFinished: 'Finished', pFix: 'Needs a fix', pPasses: 'Ready', pIncident: 'New issue',
+    title: 'How a task moves through Mikka',
+  },
+  zh: {
+    request: ['新请求', '对话、Telegram、Linear'], triage: ['Coordinator 分诊'],
+    dispatch: ['派发运行'], agent: ['编码 agent 运行'],
+    asks: ['Coordinator', '请求澄清'], answer: ['人工提供输入'],
+    details: ['人工补充细节'], review: ['审查与验证', 'agent 运行'],
+    approve: ['人工批准发布'], ship: ['上线并监控'],
+    clear: ['是否清楚？'], passes: ['是否可以', '上线？'],
+    tClear: '清楚', tUnclear: '需要澄清', tAsks: '提问、阻塞', tAnswer: '答案送回运行',
+    pFinished: '完成', pFix: '需要修复', pPasses: '可以上线', pIncident: '新 issue',
+    title: '任务在 Mikka 中的流转',
+  },
+}
+
+function flowEdges(t, p) {
+  return [
+    // Main row: request, triage, the clarity check, dispatch, the agent.
+    ...line([[X1[1], 230], [X2[0], 230]], p), ...chevron(242, 230, 'right', p),
+    ...line([[X2[1], 230], [470, 230]], p), ...chevron(462, 230, 'right', p),
+    ...line([[590, 230], [X3[0], 230]], p), ...chevron(672, 230, 'right', p), ...tag(628, 230, t.tClear, p),
+    ...line([[X3[1], 230], [X4[0], 230]], p), ...chevron(922, 230, 'right', p),
+    // Clarification before dispatch: an unclear request goes back to the person.
+    ...line([[530, 290], [530, 366]], p), ...chevron(530, 358, 'down', p), ...tag(530, 328, t.tUnclear, p),
+    ...line([[440, 390], [340, 390], [340, 254]], p), ...chevron(340, 264, 'up', p),
+    // Clarification during a run: the agent asks, the person answers, the answer goes back.
+    ...line([[1060, 200], [1060, 100]], p), ...chevron(1060, 110, 'up', p), ...tag(1060, 150, t.tAsks, p),
+    ...line([[X4[0], 70], [X3[1], 70]], p), ...chevron(868, 70, 'left', p),
+    ...line([[770, 100], [770, 150], [970, 150], [970, 200]], p), ...chevron(970, 192, 'down', p),
+    ...tag(870, 150, t.tAnswer, p),
+    // Planned Factory loop: review, a fix when it fails, release approval, monitoring.
+    ...line([[X4[1], 230], [RAIL, 230], [RAIL, 520], [X4[1], 520]], p, true),
+    ...chevron(RAIL, 300, 'down', p), ...chevron(1140, 520, 'left', p), ...tag(RAIL, 375, t.pFinished, p, true),
+    ...line([[X4[0], 520], [826, 520]], p, true), ...chevron(834, 520, 'left', p),
+    ...line([[770, 464], [770, 254]], p, true), ...chevron(770, 262, 'up', p), ...tag(770, 360, t.pFix, p, true),
+    ...line([[714, 520], [610, 520]], p, true), ...chevron(618, 520, 'left', p), ...tag(662, 520, t.pPasses, p, true),
+    ...line([[430, 520], [X1[1], 520]], p, true), ...chevron(208, 520, 'left', p),
+    ...line([[110, 490], [110, 254]], p, true), ...chevron(110, 262, 'up', p), ...tag(110, 380, t.pIncident, p, true),
+  ]
+}
+
+function drawTaskFlow(lang, p) {
+  const t = FLOW_TEXT[lang]
+  return svg(1240, 670, t.title, [
+    ...flowEdges(t, p),
+    ...Object.entries(FLOW_BOXES).flatMap(([id, [[x0, x1], yc, h, planned]]) => rectBox(x0, x1, yc, h, t[id], p, planned)),
+    ...diamond(530, 230, 60, t.clear, p),
+    ...diamond(770, 520, 56, t.passes, p, true),
+    ...legend(630, LEGEND_TEXT[lang], p),
+  ])
+}
+
+writeDiagram(ROOT, 'architecture', drawArchitecture)
+writeDiagram(ROOT, 'task-flow', drawTaskFlow)

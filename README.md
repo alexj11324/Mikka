@@ -1,15 +1,25 @@
+<div align="center">
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="public/brand/mikka-icon-dark.svg">
-  <img src="public/brand/mikka-icon-light.svg" alt="Mikka" width="72">
+  <img src="public/brand/mikka-icon-light.svg" alt="Mikka" width="112">
 </picture>
-
-**English** · [简体中文](README.zh-CN.md)
 
 # Mikka
 
 ### The AI lead for ambitious work.
 
 Every agent, from laptop to cloud, working as one team.
+
+[![CI](https://github.com/alexj11324/Mikka/actions/workflows/ui-policy.yml/badge.svg?branch=main)](https://github.com/alexj11324/Mikka/actions/workflows/ui-policy.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![LINUX DO](https://img.shields.io/badge/LINUX%20DO-Community-FFB003)](https://linux.do)
+
+[Open Mikka](https://app.aspectlylabs.com/mikka) · [Docs](https://aspectlylabs.com/mikka/docs) · [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart)
+
+**English** · [简体中文](README.zh-CN.md)
+
+</div>
 
 Mikka coordinates the coding agents you already use as a single team. Describe
 what you need to a bot in natural language. The bot breaks the request into
@@ -18,10 +28,6 @@ own machines today; cloud computers are coming soon.
 
 You can follow each task in real time, step in when a decision is needed, and
 review the results.
-
-**Open Mikka:** [app.aspectlylabs.com/mikka](https://app.aspectlylabs.com/mikka)
-· **Docs:** [aspectlylabs.com/mikka/docs](https://aspectlylabs.com/mikka/docs)
-· **Quickstart:** [aspectlylabs.com/mikka/docs/quickstart](https://aspectlylabs.com/mikka/docs/quickstart)
 
 ## How Mikka works
 
@@ -39,6 +45,13 @@ review the results.
   - You can create dedicated bots for different kinds of work, or add several
     bots to a group chat to divide the work among them.
 
+- **Asks before it guesses.**
+  - When a request is unclear, the Coordinator asks you for the missing details
+    in chat before it dispatches a run.
+  - While a run works, its agent can ask a question or report that it is
+    blocked. The Coordinator puts the question to you with its options, never
+    answers for you, and sends your answer back to the run.
+
 - **Runs on your own machines.**
   - The Mikka daemon connects your Mac, Linux machine or server.
   - It runs agents through the CLIs you have already installed and signed in
@@ -51,6 +64,20 @@ review the results.
 - **Fits into your existing tools.**
   - Tasks sync both ways with Linear, other agents can operate Mikka through
     MCP, and a Telegram message can create a task.
+
+### How a task moves
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/task-flow-dark.svg">
+  <img src="docs/assets/task-flow-light.svg" alt="How a task moves through Mikka: a request is triaged, clarified with you in chat when unclear, and dispatched; the agent can ask you questions while it works; planned Factory stages add review, verification, release approval and monitoring.">
+</picture>
+
+The solid path ships today. A finished run reports its result in chat. The
+dashed loop is the planned Factory process: independent review and verification
+([#193](https://github.com/alexj11324/Mikka/issues/193)), a fix run when a check fails, release approval by a person
+([#194](https://github.com/alexj11324/Mikka/issues/194)), and monitoring that turns incidents into issues
+([#195](https://github.com/alexj11324/Mikka/issues/195)). Systematic routing of ambiguous requests is tracked in
+[#192](https://github.com/alexj11324/Mikka/issues/192).
 
 ## What Mikka does today
 
@@ -207,7 +234,7 @@ Start with these documents:
 ## Get access
 
 Mikka is in early access. Email
-[hello@aspectlylabs.com](mailto:hello@aspectlylabs.com) for an invite, then
+[mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com) for an invite, then
 follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart).
 
 ## License
@@ -218,3 +245,10 @@ their own licenses; see
 
 If you run a modified version of Mikka as a network service, the AGPL requires
 you to offer its users the source code of your version.
+
+## Contributing
+
+Contributions are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first.
+Before your first pull request merges, you sign the
+[Contributor License Agreement](CLA.md) by replying to a bot comment on the
+pull request.
