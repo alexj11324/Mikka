@@ -9,8 +9,9 @@ import * as store from '@/lib/coordinator/store'
 import { db } from '@/lib/db'
 import { agentRuns, agents, deviceRepos, devices, issueMembers, issues } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
-import { type ComposioActionName } from '@/lib/composio-actions'
+import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
+import { proposeAction } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
@@ -45,9 +46,9 @@ export async function failTurn(userId: string, holder: string, error: string) {
   await store.failTurn(userId, holder, error)
 }
 
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[]) {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null) {
   'use step'
-  await store.appendMessages(userId, holder, messages)
+  await store.appendMessages(userId, holder, messages, warning)
 }
 
 /**
@@ -92,6 +93,11 @@ export async function forget(userId: string, input: { text: string }) {
 export async function composioAction(userId: string, action: ComposioActionName, input: unknown) {
   'use step'
   return runComposioAction(userId, action, input)
+}
+
+export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown) {
+  'use step'
+  return proposeAction(userId, action, input)
 }
 
 export async function listIssues(userId: string, input: { status?: string }) {

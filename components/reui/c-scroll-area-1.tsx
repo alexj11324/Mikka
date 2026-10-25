@@ -9,7 +9,7 @@ export function Pattern() {
     <ScrollArea className="rounded-2xl h-72 w-48 border">
       <div className="p-4">
         <h4 className="mb-4 text-sm leading-none font-medium">Releases</h4>
-        <div className="flex flex-col divide-y">
+        <div className="flex flex-col gap-1">
           {tags.map((tag) => (
             <div key={tag} className="py-2 text-sm">
               {tag}

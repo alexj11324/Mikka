@@ -2,11 +2,11 @@
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import type { ActionEvent } from '@openuidev/react-lang'
-import { Bot } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { MessageBubble as Bubble, MessageBubbleContent as BubbleContent } from '@/components/agents/message-bubble'
-import { Message, MessageAvatar, MessageContent, MessageHeader } from '@/components/agents/message'
+import { Message, MessageContent, MessageHeader } from '@/components/agents/message'
+import { BotAvatar } from '@/components/nav/bot-avatar'
 import { ReasoningText } from '@/components/agents/loading-states/reasoning-text'
 import { StreamingResponse } from '@/components/agents/streaming-response'
 
@@ -22,7 +22,7 @@ export function AgentResponse({ completion, error, isLoading, stopped = false, s
   const showTrace = isLoading && !completion && statusSteps.length > 0
 
   return <Message from="assistant" aria-label={agentCopy.agentResponse} animateIn={isLoading}>
-    <MessageAvatar><Bot aria-hidden="true" /></MessageAvatar>
+    <BotAvatar size="search" mood={isLoading ? 'thinking' : 'idle'} />
     <MessageContent className="gap-3">
       <MessageHeader>Agent</MessageHeader>
       <Bubble variant="ghost" className="w-full min-w-0">

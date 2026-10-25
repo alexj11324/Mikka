@@ -78,7 +78,7 @@ test('普通聊天正文不加载公式引擎，含公式时复用完整 Markdow
   const math = await readFile(new URL('../components/workspace/agent-math-markdown.tsx', import.meta.url), 'utf8')
   assert.doesNotMatch(markdown, /from '(?:remark-math|rehype-katex)'|import 'katex\//)
   assert.match(markdown, /dynamic\(\(\) => import\('\.\/agent-math-markdown'\)/)
-  assert.match(markdown, /props\.text\.includes\('\$'\)/)
+  assert.match(markdown, /hasMathDelimiters\(props\.text\)/)
   assert.match(math, /<AgentMarkdownContent/)
   assert.match(math, /trust: false/)
   assert.match(math, /katex\/dist\/katex.min.css/)
@@ -356,7 +356,7 @@ test('功能分组完整且每个本地组件仅属于一个功能组', () => {
   const names = agentComponentGroups.flatMap(group => group.components)
   assert.deepEqual([...names].sort(), Object.keys(agentComponentCatalog).sort())
   assert.equal(new Set(names).size, names.length)
-  assert.equal(agentComponentGroups.length, 5)
+  assert.equal(agentComponentGroups.length, 6)
 })
 
 test('审批、问题、回复和任务计划均可解析', () => {
@@ -519,4 +519,28 @@ test('beUI 限制按钮语义、状态、数字和小数位', () => {
   for (const precision of [-1, 5, 1.5]) {
     assert.equal(BeStat.props.safeParse({ label: '用户输入', value: 12.5, precision }).success, false)
   }
+})
+
+test('\\( \\) 与 \\[ \\] 定界符转换为 KaTeX 公式，代码内容保持原样，中文使用 cjk_fallback', async () => {
+  const { normalizeMathDelimiters, hasMathDelimiters } = await import('../lib/math-delimiters.ts')
+  const source = String.raw`设 \(x^2 + y^2 = r^2\)，其中 \(\text{半径}\) 为 r。
+\[
+E = mc^2 \quad \text{（质能方程）}
+\]
+- 列表里：\(\alpha\) 与 \[\beta = 2\]
+
+代码：` + '`\\(x\\)`'
+  assert.ok(hasMathDelimiters(source))
+  assert.equal(normalizeMathDelimiters('无公式 $$a \\\\[2pt] b$$'), '无公式 $$a \\\\[2pt] b$$')
+  const markup = renderToStaticMarkup(Markdown({
+    remarkPlugins: [remarkMath],
+    rehypePlugins: [[rehypeKatex, { trust: false, strict: 'ignore', throwOnError: false, maxExpand: 1000, maxSize: 20 }]],
+    children: normalizeMathDelimiters(source),
+  }))
+  assert.equal([...markup.matchAll(/class="katex-display"/g)].length, 1)
+  assert.equal([...markup.matchAll(/class="katex"/g)].length, 5)
+  assert.match(markup, /<li>列表里：<span class="katex">/)
+  assert.match(markup, /class="mord cjk_fallback">半径</)
+  assert.match(markup, /<code>\\\(x\\\)<\/code>/)
+  assert.doesNotMatch(markup, /katex-error/)
 })

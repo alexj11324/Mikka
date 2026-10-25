@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, app } from './fixtures'
+import { test, expect, register, rail, app, seedTask, openIssueFromSearch } from './fixtures'
 
 test.use({ expectedConsoleErrors: [{ path: app('/api/auth/sign-out'), message: 'Failed to load resource: the server responded with a status of 400 (Bad Request)' }] })
 
@@ -20,6 +20,8 @@ for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
     const routePattern = '**/api/auth/sign-out'
     const hold = async () => {
       const gate = new Promise<boolean>(resolve => { release = resolve })
+      // Measure the reserved scrollbar gutter before any overlay locks scrolling (with html `scrollbar-gutter: stable`, documentElement.clientWidth here still equals innerWidth, while body.clientWidth excludes the reserved gutter, so measure on body).
+      const gutter = await page.evaluate(() => innerWidth - document.body.clientWidth)
       await page.route(routePattern, async route => {
         if (await gate) await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'SIGN_OUT_FAILED', message: 'Sign out failed' }) })
         else await route.continue()
@@ -47,7 +49,11 @@ for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
         await expect(pendingDialog).toBeFocused()
       }
       await expect(page.getByRole('dialog')).toHaveCount(1)
-      expect(await pendingDialog.boundingBox()).toEqual({ x: 0, y: 0, ...page.viewportSize()! })
+      // html reserves a stable scrollbar gutter, so the fixed overlay is exactly the measured gutter narrower than the viewport.
+      const box = (await pendingDialog.boundingBox())!
+      const viewport = page.viewportSize()!
+      expect({ x: box.x, y: box.y, height: box.height }).toEqual({ x: 0, y: 0, height: viewport.height })
+      expect(Math.abs(box.width - (viewport.width - gutter))).toBeLessThanOrEqual(1)
       await expect(accountMenu).toHaveCount(0)
       await expect(page.getByRole('heading').filter({ hasNotText: english ? 'Signing out…' : '正在退出…' })).toHaveCount(0)
       for (const name of await page.locator('[hidden][inert]').getByText('回归测试成员', { exact: true }).all()) await expect(name).not.toBeVisible()
@@ -78,15 +84,10 @@ for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
 test('sign-out waits for editor validation and preserves saved edits when revocation fails', async ({ page }) => {
   await register(page)
   const original = `退出保存 ${randomUUID()}`
-  await page.getByRole('button', { name: '新建任务', exact: true }).click()
-  const create = page.getByRole('dialog', { name: '新建任务', exact: true })
-  await create.getByLabel('任务标题', { exact: true }).fill(original)
-  await create.getByRole('button', { name: '创建任务', exact: true }).click()
-  await expect(create).not.toBeVisible()
-  await page.getByRole('button', { name: '打开全局搜索', exact: true }).click()
-  const search = page.getByRole('dialog', { name: '搜索任务', exact: true })
-  await search.getByRole('combobox', { name: '全局搜索任务', exact: true }).fill(original)
-  await search.getByRole('option').filter({ hasText: original }).click()
+  await seedTask(page, original)
+  await page.reload()
+  await rail(page, '看板').click()
+  await openIssueFromSearch(page, original)
   const title = page.getByLabel('任务标题', { exact: true })
   await expect(title).toHaveValue(original)
   await expect(page.getByRole('button', { name: '更多任务操作', exact: true })).toBeEnabled()
@@ -123,6 +124,7 @@ test('sign-out waits for editor validation and preserves saved edits when revoca
 
 test('failed sign-out preserves an invalid project draft and its validation error', async ({ page }) => {
   await register(page)
+  await page.goto(app('/?section=projects'))
   await page.getByRole('button', { name: '新建项目', exact: true }).first().click()
   const create = page.getByRole('dialog', { name: '新建项目', exact: true })
   await create.getByLabel('项目名称', { exact: true }).fill(`退出项目 ${randomUUID()}`)

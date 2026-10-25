@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { ReasoningText } from '@/components/agents/loading-states/reasoning-text'
-import { AGENT_DEMO_CODE, AGENT_DEMO_SECTIONS } from '@/lib/agent-demo'
+import { AGENT_DEMO_CITATIONS, AGENT_DEMO_CODE, AGENT_DEMO_SECTIONS } from '@/lib/agent-demo'
+import { AgentCitationsContext } from './agent-citations'
 import { AgentCodeBlock } from './agent-code-block'
 import { AgentGenerativeUI } from './agent-generative-ui'
 import { AgentInteractionContext } from './agent-interaction'
@@ -14,12 +15,14 @@ import { AgentImagePreviewContext } from './agent-image'
 import { AgentDemoTools } from './agent-demo-tools'
 import { withBasePath } from '@/lib/base-path'
 
+const demoCitations = { sources: AGENT_DEMO_CITATIONS, previews: {}, onOpenIssue: () => {} }
+
 const previewImage = { src: withBasePath('/placeholder.svg?height=360&width=640'), width: 640, height: 360, source: 'demo-placeholder', title: '本地演示占位图', author: '', license: '演示专用' }
 
 export function AgentDemo({ onClose }: { onClose: () => void }) {
   const [run, setRun] = useState(0)
   const [feedback, setFeedback] = useState('点击确认、提问或追问按钮，即可看到本地反馈。')
-  return <section aria-label="Agent 组件演示" className="orvilo-agent flex size-full min-h-0 flex-col">
+  return <section aria-label="Agent 组件演示" className="mikka-agent flex size-full min-h-0 flex-col">
     <header className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 px-4 py-2">
       <SidebarTrigger aria-label="展开或收起侧边栏" />
       <h1 className="text-sm font-medium">Agent 综合演示</h1>
@@ -52,7 +55,9 @@ export function AgentDemo({ onClose }: { onClose: () => void }) {
           <AgentInteractionContext value={{ busy: false, continueFromAnswer: async prompt => { setFeedback(`已收到演示交互：${prompt}（仅本地反馈，未发送到模型）`); return true } }}>
             {AGENT_DEMO_SECTIONS.map(section => <section key={section.id} id={`demo-${section.id}`} aria-label={section.title} className="flex min-w-0 scroll-mt-4 flex-col gap-4">
               <div className="flex flex-col gap-1"><h2 className="text-lg font-semibold">{section.title}</h2><p className="text-sm text-muted-foreground">{section.description}</p></div>
-              <AgentGenerativeUI response={section.response} isStreaming={false} onAction={event => setFeedback(`已收到演示动作：${event.humanFriendlyMessage || event.type}（未请求模型）`)} />
+              <AgentCitationsContext value={section.id === 'citations' ? demoCitations : null}>
+                <AgentGenerativeUI response={section.response} isStreaming={false} onAction={event => setFeedback(`已收到演示动作：${event.humanFriendlyMessage || event.type}（未请求模型）`)} />
+              </AgentCitationsContext>
             </section>)}
           </AgentInteractionContext>
         </AgentImagePreviewContext>

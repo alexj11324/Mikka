@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "private": true,
+  "license": "AGPL-3.0-only",
   "exports": {
     ".": "./src/index.ts",
     "./bridge": "./src/bridge.ts",

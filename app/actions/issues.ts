@@ -9,12 +9,13 @@ import { accessibleTeams } from '@/lib/team-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
-import { issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
+import { issues, issueVersions, issueMembers, linearIssueLinks, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { issueChecklist } from '@/lib/issue-checklist'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
-import { issueWithMetadata, readIssueMetadata } from '@/lib/issue-metadata'
+import { readIssueMetadata } from '@/lib/issue-metadata'
+import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
 import { ensureIssueNumbers } from '@/lib/issue-numbering'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
@@ -22,9 +23,11 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { issueDoneEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { after } from 'next/server'
+import { judgeIssueScope } from '@/lib/issue-scope-judge'
+import { TASK_SCOPES } from '@/lib/task-identifier'
 
 type IssueRow = typeof issues.$inferSelect
-type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata> }
+type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null }
 
 async function getUserId() {
   const user = await currentUser()
@@ -57,7 +60,7 @@ export async function listIssues() {
   const teams = await accessibleTeams(userId, context.workspace.id)
   const publicLinks = await issueTeamScope(userId)
   const publicIds = publicLinks.map(link => link.issueId)
-  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId), publicIds.length ? inArray(issues.id, publicIds) : undefined), sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
+  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId), publicIds.length ? inArray(issues.id, publicIds) : undefined), sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
   const links = await issueTeamScope(userId, rows.map(row => row.id))
   const visibleRows = rows.filter(row => { const link = links.find(item => item.issueId === row.id); return !link || teams.some(team => team.id === link.teamId) })
   const ownersWithoutNumbers = [...new Set(visibleRows.filter(row => !readIssueMetadata(row.content).number).map(row => row.ownerId))]
@@ -65,7 +68,9 @@ export async function listIssues() {
     for (const ownerId of ownersWithoutNumbers) await ensureIssueNumbers(ownerId)
     return listIssues()
   }
-  return visibleRows.filter(row => !readIssueMetadata(row.content).deletedAt).map(({ content, ...issue }) => ({ ...issue, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: issueChecklist(content) }))
+  const liveRows = visibleRows.filter(row => !readIssueMetadata(row.content).deletedAt)
+  const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
+  return liveRows.map(({ content, ...issue }) => ({ ...issue, identifier: identifiers.get(issue.id) ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: issueChecklist(content) }))
 }
 
 export async function getIssue(id: string) {
@@ -74,7 +79,7 @@ export async function getIssue(id: string) {
     await ensureIssueNumbers(issue.userId)
     issue = (await requireIssueAccess(id)).issue
   }
-  return issueWithMetadata(issue)
+  return issueView(issue)
 }
 
 export async function saveIssue(input: { id?: string; revision?: number; title: string; content: JSONContent; status: string; priority: string }): Promise<ActionResult<{ issue: IssueView }>> {
@@ -108,9 +113,10 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         }
         if (!issue) return { error: 'issueStale' }
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
-        return { issue: issueWithMetadata(issue) }
+        return { issue: await issueView(issue, tx) }
       })
       if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
+      if (!id && 'issue' in result && result.issue) { const created = result.issue.id; after(() => judgeIssueScope(created, 'the Mikka app')) }
       if (doneEvent && 'issue' in result) after(() => wakeCoordinator(ownerId))
       return result
     } catch (error) {
@@ -147,4 +153,31 @@ export async function listIssueVersions(id: string) {
   const { issue } = await requireIssueAccess(id)
   const userId = issue.userId
   return db.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
+}
+
+/**
+ * The one-click scope change (MIK-47). The person's choice wins over the
+ * agent's and becomes an example for its next judgment. A task already in
+ * Linear stays a workspace task: it cannot be taken back out.
+ */
+export async function setIssueScope(input: { id: string; revision: number; scope: string }): Promise<ActionResult<{ issue: IssueView }>> {
+  return runAction(async () => {
+    const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), scope: z.enum(TASK_SCOPES) }).safeParse(input)
+    if (!parsed.success) return { error: 'issueScopeInvalid' }
+    const userId = await getUserId()
+    const { issue } = await requireIssueAccess(parsed.data.id)
+    if (issue.userId !== userId) return { error: 'issueScopeOwnerOnly' }
+    if (parsed.data.scope === 'personal') {
+      const [link] = await db.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(eq(linearIssueLinks.issueId, issue.id)).limit(1)
+      if (link) return { error: 'issueScopeInLinear' }
+    }
+    const result = await db.transaction(async tx => {
+      const [saved] = await tx.update(issues).set({ scope: parsed.data.scope, scopeSetBy: 'user', scopeConfidence: null, revision: parsed.data.revision + 1, updatedAt: new Date() })
+        .where(and(eq(issues.id, issue.id), eq(issues.userId, userId), eq(issues.revision, parsed.data.revision))).returning()
+      if (!saved) return { error: 'issueStale' as const }
+      return { issue: await issueView(saved, tx) }
+    })
+    if ('issue' in result && parsed.data.scope === 'workspace') dispatchLinearIssueSync(issue.id)
+    return result
+  })
 }
