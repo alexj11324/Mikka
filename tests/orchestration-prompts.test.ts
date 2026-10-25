@@ -1,3 +1,4 @@
+import { SCHEDULE_INSTRUCTIONS } from '../lib/schedules/contract'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -112,10 +113,11 @@ test('Coordinator diagnoses transient failures without unsafe retries or termina
 
 test('proactive policy remains in the actual Coordinator instruction composition with memory and mailbox rules', () => {
   const steps = source('workflows/coordinator/steps.ts')
-  assert.ok(steps.includes('instructionsWithMemory(`${COORDINATOR_INSTRUCTIONS}\\n\\n${MAILBOX_INSTRUCTIONS}`, memory)'))
-  const composed = instructionsWithMemory(`${COORDINATOR_INSTRUCTIONS}\n\n${MAILBOX_INSTRUCTIONS}`, 'Do not publish this task.')
+  assert.match(steps, /instructionsWithMemory\(`\$\{COORDINATOR_INSTRUCTIONS\}[\s\S]*?\$\{MAILBOX_INSTRUCTIONS\}[\s\S]*?\$\{SCHEDULE_INSTRUCTIONS\}`, memory\)/)
+  const composed = instructionsWithMemory(`${COORDINATOR_INSTRUCTIONS}\n\n${MAILBOX_INSTRUCTIONS}\n\n${SCHEDULE_INSTRUCTIONS}`, 'Do not publish this task.')
   assert.ok(composed.includes(COORDINATOR_INSTRUCTIONS))
   assert.ok(composed.includes(MAILBOX_INSTRUCTIONS))
+  assert.ok(composed.includes(SCHEDULE_INSTRUCTIONS))
   assert.match(composed, /Advance authorized work proactively/)
   assert.match(composed, /Do not publish this task/)
   const workflow = source('workflows/coordinator/workflow.ts')
