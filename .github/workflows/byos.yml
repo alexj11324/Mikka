@@ -1,5 +1,7 @@
 name: BYOS backend integration
 on:
+  push:
+    branches: ['codex/byos-product-revocation']
   pull_request:
     paths:
       - 'lib/subscription*'
