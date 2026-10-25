@@ -9,7 +9,8 @@ export async function issueTeamScope(userId: string, ids: string[] = []) {
   const allowed = await accessibleTeams(userId)
   const teamIds = allowed.map(team => team.id)
   if (!ids.length && !teamIds.length) return []
-  return workspaceDb.select().from(teamIssues).where(or(ids.length ? inArray(teamIssues.issueId, ids) : undefined, teamIds.length ? inArray(teamIssues.teamId, teamIds) : undefined))
+  const links = await workspaceDb.select().from(teamIssues).where(or(ids.length ? inArray(teamIssues.issueId, ids) : undefined, teamIds.length ? inArray(teamIssues.teamId, teamIds) : undefined))
+  return links.filter(link => ids.includes(link.issueId) || allowed.some(team => team.id === link.teamId && team.workspaceId === link.workspaceId))
 }
 export async function issueTeamAccess(issueId: string, userId: string, executor: Pick<typeof workspaceDb, 'select'> = workspaceDb) {
   const [link] = await executor.select().from(teamIssues).where(eq(teamIssues.issueId, issueId)).limit(1)

@@ -1,7 +1,8 @@
+import { issueVisibility } from '@/lib/issue-visibility'
 import { generateText, type ModelMessage, type ToolExecutionOptions } from 'ai'
-import { and, asc, desc, eq, inArray, or } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
-import { addRunMessage, readRun, requestRunStop, runViewColumns } from '@/lib/agent-runs'
+import { addRunMessage, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { mailboxes } from '@/lib/mailbox-runtime'
 import { MailboxError } from '@/lib/session-mailbox'
@@ -10,7 +11,7 @@ import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db } from '@/lib/db'
-import { agentRuns, agents, coordinatorEvents, deviceRepos, devices, factoryAttempts, factoryTasks, issueMembers, issues } from '@/lib/db/schema'
+import { agents, coordinatorEvents, deviceRepos, devices, factoryAttempts, factoryTasks, issueMembers, issues } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
@@ -127,7 +128,7 @@ export async function listIssues(userId: string, input: { status?: string }) {
   'use step'
   const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)), input.status ? eq(issues.status, input.status) : undefined))
+    .where(and((await issueVisibility(userId)).predicate, input.status ? eq(issues.status, input.status) : undefined))
     .orderBy(desc(issues.updatedAt)).limit(100)
   return rows.filter(row => !readIssueMetadata(row.content).deletedAt).slice(0, 50).map(({ content, updatedAt, ...row }) => ({
     ...row, number: readIssueMetadata(content).number ?? null, updatedAt: updatedAt.toISOString(),
@@ -138,8 +139,7 @@ export async function getIssue(userId: string, input: { issueId: string }) {
   'use step'
   const issue = await issueForUser(userId, input.issueId)
   if (!issue) return { error: 'issueNotFound' }
-  const runs = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.issueId, issue.id), eq(agentRuns.userId, userId))).orderBy(desc(agentRuns.createdAt)).limit(5)
+  const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
   const {tasks: factory} = await factoryStore.listForIssue(userId,issue.id)
   return {
     id: issue.id, number: readIssueMetadata(issue.content).number ?? null, title: issue.title,
@@ -323,10 +323,7 @@ export async function stopFactoryTask(userId: string, input: { binding: FactoryB
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }) {
   'use step'
-  const active = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const
-  const rows = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.userId, userId), input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined, input.activeOnly ? inArray(agentRuns.status, [...active]) : undefined))
-    .orderBy(desc(agentRuns.createdAt)).limit(20)
+  const rows = await visibleRuns(userId, input)
   return rows.map(run => ({ id: run.id, issueId: run.issueId, agent: run.agentName, status: run.status, stopReason: run.stopReason, createdAt: run.createdAt.toISOString() }))
 }
 

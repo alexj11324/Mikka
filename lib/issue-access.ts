@@ -1,15 +1,14 @@
 import { appendAudit } from '@/lib/audit/store'
 import { pool } from '@/lib/db'
 import 'server-only'
-import { and, eq, or } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { currentUser } from '@/lib/acting-user'
 import { db } from '@/lib/db'
 import { workspaceDb } from '@/lib/workspace-db'
-import { issues, issueMembers } from '@/lib/db/schema'
+import { issues } from '@/lib/db/schema'
 import { issueTeamAccess } from '@/lib/issue-team-access'
-import { isIssueTeamAccessAllowed } from '@/lib/issue-team-access-policy'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 
 export async function requireUser() {
@@ -30,11 +29,18 @@ export async function requireIssueAccess(id: string, includeDeleted = false) {
 
 async function findIssueForUser(userId: string, id: string, includeDeleted: boolean, executor: Pick<typeof db, 'select'> = db, workspaceExecutor: Pick<typeof workspaceDb, 'select'> = workspaceDb) {
   if (!z.uuid().safeParse(id).success) return null
-  const access = await issueTeamAccess(id, userId, workspaceExecutor)
-  if (!isIssueTeamAccessAllowed(access)) return null
   const [row] = await executor.select({ issue: issues }).from(issues)
-    .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(eq(issues.id, id), access.allowed ? undefined : or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)))).limit(1)
+    .where(eq(issues.id, id)).limit(1)
+  if (!row) return null
+  // Personal scope never inherits invitations or stale team links.
+  if (row.issue.scope === 'personal') {
+    if (row.issue.userId !== userId) return null
+    if (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt) return null
+    return { issue: row.issue, teamId: null }
+  }
+  // Preserve current execution authority and supplied transaction connections.
+  const access = await issueTeamAccess(id, userId, workspaceExecutor)
+  if (access.linked ? !access.allowed : row.issue.userId !== userId) return null
   if (!row || (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt)) return null
   return { issue: row.issue, teamId: access.teamId }
 }

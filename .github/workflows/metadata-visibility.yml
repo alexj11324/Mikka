@@ -1,0 +1,96 @@
+name: Metadata visibility integration
+on:
+  push:
+    branches: ['fix/169-metadata-integration']
+permissions:
+  contents: read
+jobs:
+  isolated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mikka_e2e
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mikka_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      CI: 'true'
+      E2E_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/workspace_e2e
+      VISIBILITY_WORKSPACE_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/workspace_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Ephemeral isolated session key
+        run: |
+          node --input-type=module <<'JS'
+          import { randomBytes } from 'node:crypto'
+          import { appendFileSync } from 'node:fs'
+          const key = randomBytes(32).toString('hex')
+          console.log('::add-mask::' + key)
+          appendFileSync(process.env.GITHUB_ENV, 'BETTER_AUTH_SECRET=' + key + '\n')
+          JS
+      - name: Attest exact source
+        run: |
+          git rev-parse HEAD
+          git diff --exit-code HEAD
+      - run: psql postgresql://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE workspace_e2e'
+      - run: E2E_DATABASE_URL="$VISIBILITY_WORKSPACE_DATABASE_URL" pnpm test:e2e:setup
+      - run: pnpm test:e2e:setup
+      - run: REQUIRE_DB=1 pnpm test:visibility-db
+      - run: node --import tsx --test lib/run-visibility.test.ts lib/issue-owner-scope.test.ts
+      - name: Transaction-local revocation and audit fault regression
+        run: node --conditions=react-server --import ./scripts/daemon/server-only.mjs --import tsx scripts/daemon/revocation-faults.mjs
+      - run: node --import tsx --test lib/db/device-scope.test.ts
+      - run: pnpm typecheck
+      - run: pnpm --filter @mikka/daemon typecheck
+      - name: Installed isolated native runtime (pinned public image)
+        run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
+      - name: Combined daemon regressions including hosted budget and private stdin
+        run: |
+          umask 022
+          pnpm --filter @mikka/daemon test
+      - run: pnpm build
+      - name: Real Go broker observes actual application revoke
+        working-directory: packages/subscription-worker
+        env:
+          CGO_ENABLED: '0'
+          GOTOOLCHAIN: local
+          GOMODCACHE: ${{ github.workspace }}/packages/subscription-worker/.cache/build-toolchain/modules
+          GOCACHE: ${{ github.workspace }}/packages/subscription-worker/.cache/build-toolchain/objects
+          MIKKA_BYOS_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_e2e
+        run: .cache/build-toolchain/go/bin/go test -tags=application_integration -mod=readonly -run '^TestDaemonCredentialRevokeCancelsSilentNativeStream$' -count=1 -timeout=45s -v . > ../../test-results/daemon-faults/byos-revocation.log 2>&1
+      - run: pnpm exec playwright test tests/e2e/device-revocation.spec.ts --output=browser-results
+      - name: Actual MCP HTTP metadata sharing across separate databases
+        run: |
+          pnpm exec next start --port 3100 --hostname 127.0.0.1 > /tmp/visibility-next.log 2>&1 &
+          next_pid=$!
+          trap 'kill "$next_pid"' EXIT
+          for i in $(seq 1 60); do curl -fsS http://localhost:3100/mikka/sign-in > /dev/null && break; sleep 1; done
+          E2E_BASE_URL=http://localhost:3100 node scripts/visibility/http-acceptance.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: metadata-visibility-sanitized-evidence
+          path: |
+            test-results/visibility/http-evidence.json
+            browser-results/**/device-revocation-evidence.json
+            test-results/daemon-faults/device-revocation-fault-evidence.json
+            test-results/daemon-faults/byos-revocation.log
+          if-no-files-found: ignore
+          retention-days: 7

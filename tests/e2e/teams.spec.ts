@@ -27,6 +27,10 @@ async function createTask(page: Page, title: string, team?: string) {
   await save.click()
   await expect(save).toHaveCount(0)
   await expect(teamSelect).toContainText(team)
+  // Team assignment keeps personal scope; these collaboration fixtures explicitly publish.
+  await page.getByRole('button', { name: '归属：个人', exact: true }).click()
+  await page.getByRole('menuitem', { name: '工作区', exact: true }).click()
+  await expect(page.getByRole('button', { name: '归属：工作区', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
 }
 async function showAllTasks(page: Page) {
