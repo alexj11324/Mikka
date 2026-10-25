@@ -11,7 +11,9 @@ design changes, this document is updated, not forked.
 
 ## 1. What the user sees
 
-Every bot (agent) has "its own computer", the way Grok Bot does it:
+Every bot has "its own computer", the way Grok Bot does it. Bot and thread
+are defined in [glossary.md](glossary.md): the threads (runs) a bot starts
+use that bot's computer.
 
 - **Agent 详情页**: the bot's live screen ("Mikka Frontend 的屏幕") with a state
   badge. A centered 打开 button opens a full-window viewer.

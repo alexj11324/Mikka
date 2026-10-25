@@ -16,8 +16,8 @@ for (const [name, source] of [
   ['missing action', '<Button>保存</Button>'],
   ['native missing action', '<button type="button">保存</button>'],
   ['disabled is not implementation', '<Button disabled>保存</Button>'],
-  ['feature flag alone is not implementation', '<Button disabled data-feature-flag="orvilo-upcoming-example">保存</Button>'],
-  ['feature marked implemented still needs action', '<Button disabled data-feature-flag="orvilo-upcoming-example" data-feature-implemented={true} aria-describedby="reason" title="尚未开放">保存</Button>'],
+  ['feature flag alone is not implementation', '<Button disabled data-feature-flag="mikka-upcoming-example">保存</Button>'],
+  ['feature marked implemented still needs action', '<Button disabled data-feature-flag="mikka-upcoming-example" data-feature-implemented={true} aria-describedby="reason" title="尚未开放">保存</Button>'],
   ['empty callback', '<Button onClick={() => {}}>保存</Button>'],
   ['undefined callback', '<Button onClick={undefined}>保存</Button>'],
   ['returned undefined', '<Button onClick={() => undefined}>保存</Button>'],
@@ -50,7 +50,7 @@ for (const [name, source] of [
 ]) test(`rejects ${name}`, () => assert.ok(rules(source).length > 0, source))
 
 for (const [name, source] of [
-  ['explicit unimplemented feature presentation', '<Button disabled data-feature-flag="orvilo-upcoming-example" data-feature-implemented={false} aria-describedby="reason" title="尚未开放">保存</Button>'],
+  ['explicit unimplemented feature presentation', '<Button disabled data-feature-flag="mikka-upcoming-example" data-feature-implemented={false} aria-describedby="reason" title="尚未开放">保存</Button>'],
   ['real callback', '<Button onClick={() => setOpen(true)}>打开</Button>'],
   ['forwarded callback', 'function Save({ onSave }) { return <Button onClick={onSave}>保存</Button> }'],
   ['async mutation', '<Button onClick={async () => { await saveIssue(data); await mutate() }}>保存</Button>'],
