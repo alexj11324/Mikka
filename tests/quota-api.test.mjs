@@ -83,6 +83,11 @@ test('actual Next HTTP Agent, Coordinator, administrator and daemon quota gates'
       for(const response of responses){assert.equal(response.status,429);assert.ok(Number(response.headers.get('retry-after'))>0);assert.equal((await response.json()).error,'quotaBudgetExhausted')}
       assert.equal(Number((await pool.query("SELECT count(*) n FROM agent_turns WHERE \"userId\"=$1 AND status='pending'",[f.owner])).rows[0].n),0)
       assert.equal(Number((await pool.query('SELECT count(*) n FROM quota_reservations WHERE owner_id=$1',[f.owner])).rows[0].n),0)
+      const usagePath=`/api/workspaces/${f.workspace}/quota`
+      const usageResponse=await fetch(`${base}${usagePath}`,{headers:f.headers})
+      const usage=await usageResponse.json()
+      assert.equal(usageResponse.status,200);assert.equal(usage.unit,'admission_unit');assert.equal(usage.budget,'0');assert.equal(usage.allocation_budget,'100');assert.equal(usage.lifetime_used,'0')
+      evidence.requests.push({owner:f.owner,workspace:f.workspace,path:usagePath,method:'GET',status:usageResponse.status,utc:new Date().toISOString()})
     })
     await check('Coordinator HTTP admission rejects before enqueue',async()=>{
       const f=await fixture(),r=await f.request('/api/coordinator/messages',{text:'isolated quota test'})
@@ -105,6 +110,10 @@ test('actual Next HTTP Agent, Coordinator, administrator and daemon quota gates'
     })
     await check('expired override, suspended membership, foreign workspace and non-admin cannot enable execution',async()=>{
       const f=await fixture()
+      const oversized=await fetch(`${base}/api/workspaces/${f.workspace}/quota`,{method:'PUT',headers:f.headers,
+        body:new ReadableStream({start(controller){controller.enqueue(new TextEncoder().encode(' '.repeat(100001)));controller.close()}}),duplex:'half'})
+      assert.equal(oversized.status,413)
+      evidence.requests.push({owner:f.owner,workspace:f.workspace,path:`/api/workspaces/${f.workspace}/quota`,method:'PUT',status:oversized.status,case:'chunked body size cap',utc:new Date().toISOString()})
       assert.equal((await f.configure({override:{units:5,until:new Date(Date.now()-1000).toISOString(),reason:'expired test'}})).status,400)
       assert.equal((await f.configure({budgetUnits:101})).status,403)
       assert.equal((await f.configure({resources:{'unapproved.resource':{units:0,unknownCostApproved:true}}})).status,403)

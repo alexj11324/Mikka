@@ -70,10 +70,15 @@ export async function seedTask(page: Page, title: string, { status = 'todo', pri
 export async function seedCoordinatorAdmission(page: Page) {
   const target = new URL(process.env.E2E_DATABASE_URL!)
   if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || !target.pathname.endsWith('_e2e')) throw new Error('Quota fixture requires loopback E2E database')
+  // Registration reaches the Coordinator before the lazy workspace directory
+  // necessarily loads. Initialize through the authenticated product endpoint.
+  const contextResponse = await page.request.get(app('/api/workspace'))
+  expect(contextResponse.status()).toBe(200)
+  const context = await contextResponse.json()
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
   if (!cookie) throw new Error('Quota fixture requires authenticated synthetic session')
   const db = database()
-  const { rows: [row] } = await db.query(`SELECT s."userId" AS owner,w.id AS workspace FROM session s JOIN mikka_workspaces w ON w."userId"=s."userId" WHERE s.token=$1 LIMIT 1`, [decodeURIComponent(cookie.value).split('.')[0]])
+  const { rows: [row] } = await db.query(`SELECT s."userId" AS owner,w.id AS workspace FROM session s JOIN mikka_workspaces w ON w."userId"=s."userId" WHERE s.token=$1 AND w.id=$2 LIMIT 1`, [decodeURIComponent(cookie.value).split('.')[0], context.workspace.id])
   if (!row) throw new Error('Quota fixture requires an existing workspace')
   const resources = { 'coordinator.submit': { units: 0, unknownCostApproved: true } }
   await db.query(`INSERT INTO quota_allocations(workspace_id,max_budget_units,max_concurrency,max_rate_limit,rate_window_seconds,resources,expires_at,granted_by,reason)

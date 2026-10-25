@@ -11,15 +11,36 @@ import { QuotaError, quotaResponse } from '@/lib/quota/errors'
 export const dynamic = 'force-dynamic'
 type Context = { params: Promise<{ workspaceId: string }> }
 
+async function policyBody(request: Request): Promise<string | Response> {
+  if (Number(request.headers.get('content-length')) > 100000) return Response.json({ error: 'policyTooLarge' }, { status: 413 })
+  const reader = request.body?.getReader()
+  if (!reader) return ''
+  const decoder = new TextDecoder()
+  let size = 0, text = ''
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > 100000) {
+        await reader.cancel()
+        return Response.json({ error: 'policyTooLarge' }, { status: 413 })
+      }
+      text += decoder.decode(value, { stream: true })
+    }
+    return text + decoder.decode()
+  } catch { return Response.json({ error: 'invalidQuotaPolicy' }, { status: 400 }) }
+  finally { reader.releaseLock() }
+}
+
 export async function PUT(request: Request, { params }: Context) {
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) return Response.json({ error: 'authRequired' }, { status: 401 })
   if (request.headers.get('sec-fetch-site') === 'cross-site' || request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: 'originDenied' }, { status: 403 })
   const { workspaceId } = await params
   if (!z.uuid().safeParse(workspaceId).success) return Response.json({ error: 'invalidWorkspace' }, { status: 400 })
-  if (Number(request.headers.get('content-length')) > 100000) return Response.json({ error: 'policyTooLarge' }, { status: 413 })
-  const text = await request.text()
-  if (text.length > 100000) return Response.json({ error: 'policyTooLarge' }, { status: 413 })
+  const text = await policyBody(request)
+  if (text instanceof Response) return text
   const policy = quotaPolicySchema.safeParse((() => { try { return JSON.parse(text) } catch { return null } })())
   if (!policy.success) return Response.json({ error: 'invalidQuotaPolicy' }, { status: 400 })
   try {
