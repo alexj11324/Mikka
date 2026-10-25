@@ -41,7 +41,7 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
   await pool.query(`INSERT INTO agents(id,"userId",harness,name,"deviceId") VALUES($1,$2,'codex','synthetic-agent',$3)`, [agentId, owner, deviceId])
   await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,$3,'/synthetic/report')`, [repoId, deviceId, owner])
   let access = true
-  const authorizedIssues = new Set([issueId])
+  const authorizedIssues = new Set<string>([issueId])
   const authorize = async (userId: string, issue: string) => access && userId === owner && authorizedIssues.has(issue)
   let store = createImprovementStore(pool, authorize)
   const runs: string[] = []

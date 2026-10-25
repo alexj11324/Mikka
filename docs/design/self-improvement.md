@@ -1,7 +1,7 @@
 # Controlled Skill improvement
 
 - **Status:** draft implementation, 2026-10-25
-- **GitHub:** related #192–#195, #208, #230, #232; additive candidate
+- **GitHub / Linear:** #237 / MIK-103; related #192–#195, #208, #230, #232
 - **Owner thread:** Backend & Infra, controlled self-improvement
 
 ## What the user does

@@ -2,6 +2,8 @@
 
 This is an additive backend candidate based on main `c0f702f7e9f474e42d6217b7e2b0904ee02ca00d`.
 It does not replace #192–#195, #208, #230 or #232. See [the spec](self-improvement.md).
+Tracking: [GitHub #237](https://github.com/alexj11324/Mikka/issues/237),
+automatically synchronized and read back as [Linear MIK-103](https://linear.app/bdiverifier/issue/MIK-103).
 
 ## Evidence layers
 
