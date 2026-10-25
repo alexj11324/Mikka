@@ -11,7 +11,7 @@ const intent = identity.extend({
   proposalDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
 }).strict().refine(value => Boolean(value.candidateSha) !== Boolean(value.proposalDigest), 'exactly one candidate or proposal binding required')
-const receiptSchema = z.object({ providerObjectId: text, evidenceDigest: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
+const receiptSchema = z.object({ providerObjectId: z.string().min(1).max(1024), evidenceDigest: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
 export type OperationIdentity = z.infer<typeof identity>
 export type OperationIntent = z.infer<typeof intent>
 export type OperationReceipt = z.infer<typeof receiptSchema>
