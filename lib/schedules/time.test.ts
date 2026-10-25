@@ -17,6 +17,8 @@ test('DST fold selects explicit earlier/later or rejects; Lord Howe half-hour fo
 test('past once/interval starts and invalid zones reject, interval skips backlog', () => {
   assert.throws(() => timezone('Mars/Base'), /invalidIanaTimezone/)
   assert.throws(() => timezone('+08:00'), /invalidIanaTimezone/)
+  for (const abbreviation of ['PST', 'EST', 'CST']) assert.throws(() => timezone(abbreviation), /invalidIanaTimezone/)
+  assert.equal(timezone('UTC'), 'UTC')
   assert.throws(() => nextTime({ ...def, timing: { kind: 'once', at: '2026-01-01T00:00:00Z' } }, new Date('2026-01-02T00:00:00Z'), true), /scheduleTimeMustBeFuture/)
   assert.equal(nextTime({ ...def, timing: { kind: 'interval', start: '2026-01-01T00:00:00Z', minutes: 1 } }, new Date('2026-01-01T00:03:30Z'))?.toISOString(), '2026-01-01T00:04:00.000Z')
   assert.equal(nextTime({...def,timezone:'Asia/Shanghai'},new Date('2026-01-01T00:00:00Z'))?.toISOString(),'2026-01-01T18:30:00.000Z')
