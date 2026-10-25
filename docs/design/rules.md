@@ -178,6 +178,7 @@ place, not a licence to pick either.
 | `text/secondary` | `#737373` | `--muted-foreground` | `#606060` | yes (code darker on purpose, less grey) |
 | `text/tertiary` | `#a3a3a3` | `--ink-3` | mix | check |
 | `border/default` | `#00000014` | `--border` | `#e5e5e5` | close |
+| `border/rule` | `#e5e5e5` / dark `#383838` | `--rule` | `oklch(0.922 0 0)` / dark `oklch(0.269 0 0)` | |
 | `accent/default` | `#2f6bff` | `--sidebar-primary` | shadcn blue | yes |
 | `status/*` | StatusBadge set | `--success`, `--warning`, `--destructive` | Tailwind palette | check |
 
