@@ -584,7 +584,20 @@ export function createFactoryStore(
           await freshAttempt(tx, task, change.stage, change.reason);
         } else if (change.action === "retry" || change.action === "repair") {
           if (task.stage === "clarify") fail("factoryTransition");
-          if (!["failed", "blocked", "waiting"].includes(task.status))
+          // A completed monitor observation can open another observation of the
+          // same candidate. freshAttempt retains the candidate, never run evidence.
+          const nextMonitorCycle =
+            change.action === "retry" &&
+            task.stage === "monitor" &&
+            task.status === "passed" &&
+            task.candidateId !== null &&
+            attempt.stage === "monitor" &&
+            attempt.status === "passed" &&
+            attempt.candidateId === task.candidateId;
+          if (
+            !nextMonitorCycle &&
+            !["failed", "blocked", "waiting"].includes(task.status)
+          )
             fail("factoryTransition");
           if (
             change.action === "repair" &&
