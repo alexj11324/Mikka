@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { executeComposioAction } from './composio-actions'
+import { executeComposioAction, isApprovalAction, parseActionInput } from './composio-actions'
 import type { ComposioActionClient } from './composio-actions'
 
 const activeNotion = {
@@ -84,4 +84,43 @@ test('does not execute if no active connection exists or the toolkit has multipl
 test('rejects tool slugs outside Mikka’s fixed allowlist', async () => {
   const result = await executeComposioAction('user-1', 'NOTION_ARCHIVE_NOTION_PAGE' as never, {}, client([activeNotion]))
   assert.deepEqual(result, { error: 'integrationActionNotAllowed' })
+})
+
+function googleClient(toolkit: string, calls: Record<string, unknown>) {
+  return client([{ id: `${toolkit}-account`, toolkit: { slug: toolkit }, status: 'ACTIVE', isDisabled: false }], calls)
+}
+
+test('sends an email as plain text to the first recipient plus the rest', async () => {
+  const calls: Record<string, unknown> = {}
+  await executeComposioAction('user-1', 'send_email', { to: ['a@example.com', 'b@example.com'], cc: ['c@example.com'], subject: 'Hi', body: 'Hello' }, googleClient('gmail', calls))
+  assert.deepEqual((calls.execution as { slug: string; params: { arguments: unknown } }).slug, 'GMAIL_SEND_EMAIL')
+  assert.deepEqual((calls.execution as { params: { arguments: unknown } }).params.arguments, {
+    recipient_email: 'a@example.com', extra_recipients: ['b@example.com'], cc: ['c@example.com'], subject: 'Hi', body: 'Hello', is_html: false,
+  })
+})
+
+test('creates an event on the primary calendar without a Meet link, emailing guests unless told not to', async () => {
+  const calls: Record<string, unknown> = {}
+  await executeComposioAction('user-1', 'create_calendar_event', {
+    summary: 'Review', start: '2026-10-27T10:00:00-07:00', end: '2026-10-27T10:30:00-07:00', attendees: ['a@example.com'],
+  }, googleClient('googlecalendar', calls))
+  assert.deepEqual((calls.execution as { params: { arguments: unknown } }).params.arguments, {
+    calendar_id: 'primary', summary: 'Review', attendees: ['a@example.com'], start_datetime: '2026-10-27T10:00:00-07:00', end_datetime: '2026-10-27T10:30:00-07:00', send_updates: 'all', create_meeting_room: false,
+  })
+  const quiet = parseActionInput('create_calendar_event', { summary: 'Focus', start: '2026-10-27T10:00', end: '2026-10-27T11:00', timezone: 'America/Los_Angeles' })
+  assert.ok(quiet)
+})
+
+test('an event change must change something and cannot cancel the event', () => {
+  assert.equal(parseActionInput('update_calendar_event', { event_id: 'abc' }), null)
+  assert.equal(parseActionInput('update_calendar_event', { event_id: 'abc', status: 'cancelled' }), null)
+  assert.deepEqual(parseActionInput('update_calendar_event', { event_id: 'abc', start: '2026-10-27T11:00:00Z' }), { event_id: 'abc', start: '2026-10-27T11:00:00Z' })
+})
+
+test('only sending mail and writing the calendar need approval', () => {
+  assert.equal(isApprovalAction('send_email'), true)
+  assert.equal(isApprovalAction('create_calendar_event'), true)
+  assert.equal(isApprovalAction('update_calendar_event'), true)
+  assert.equal(isApprovalAction('list_calendar_events'), false)
+  assert.equal(isApprovalAction('fetch_recent_gmail'), false)
 })

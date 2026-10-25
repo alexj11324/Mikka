@@ -27,6 +27,7 @@ import {
   type RunPatch,
   type RunState,
   type StopReason,
+  type RunCheckpoint,
 } from "@mikka/protocol"
 
 import type { RunChunk } from "./chunks"
@@ -80,6 +81,12 @@ export interface ServerLink {
   /** Reports how the run ended, once, after its terminal `updateRun`. */
   completeRun(runId: string, completion: RunCompletion): Promise<void>
   /**
+   * Saves the run's work in progress; the server keeps the latest one so
+   * another machine can take the run over. Optional: links without it
+   * keep work on this machine only.
+   */
+  checkpointRun?(runId: string, checkpoint: RunCheckpoint): Promise<void>
+  /**
    * Messages people sent this device's runs and stops they asked for
    * (ADR 0018). Long-polls up to `waitSeconds` when nothing is pending;
    * `signal` ends the wait early (daemon stopping).
@@ -126,6 +133,8 @@ interface MemoryRun {
   patches: RunPatch[]
   leaseExpiresAt?: number
   completion?: RunCompletion
+  /** The latest checkpoint the daemon saved. */
+  checkpoint?: RunCheckpoint
 }
 
 type QueueRunInput = Omit<RunAssignment, "deviceId" | "runId"> & {
@@ -318,18 +327,20 @@ export class MemoryServer {
         if (device) device.lastHeartbeat = status
 
         const leases: Record<string, string> = {}
+        const revoked: string[] = []
         for (const { runId } of status.runs) {
           const run = this.runs.get(runId)
-          if (
-            !run ||
-            run.deviceId !== deviceId ||
-            isTerminalRunState(run.state)
-          )
+          if (!run) continue
+          // The real server also takes back runs it no longer knows; this one
+          // forgets every run on restart (`--server memory`), so it does not.
+          if (run.deviceId !== deviceId || isTerminalRunState(run.state)) {
+            revoked.push(runId)
             continue
+          }
           run.leaseExpiresAt = Date.now() + this.leaseMs
           leases[runId] = new Date(run.leaseExpiresAt).toISOString()
         }
-        return { leases }
+        return { leases, ...(revoked.length ? { revoked } : {}) }
       },
       listRepos: async (deviceId) => {
         this.check()
@@ -370,6 +381,11 @@ export class MemoryServer {
         if (!run) return
         run.state = patch.state
         run.patches.push(patch)
+      },
+      checkpointRun: async (runId, checkpoint) => {
+        this.check()
+        const run = this.runs.get(runId)
+        if (run && !isTerminalRunState(run.state)) run.checkpoint = checkpoint
       },
       completeRun: async (runId, completion) => {
         this.check()

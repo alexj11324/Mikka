@@ -22,7 +22,7 @@ export function SettingsShell({ user, defaultWorkspaceId, googleEnabled = false,
   const [error, setError] = useState('')
   const workspaceId = params.get('workspace') ?? defaultWorkspaceId
   const requested = params.get('section')
-  const section: SettingsSection = pathname === '/settings/teams' ? 'teams' : pathname === '/settings/members' ? 'members' : requested === 'profile' || requested === 'workspace' || requested === 'integrations' || requested === 'devices' ? requested : 'preferences'
+  const section: SettingsSection = pathname === '/settings/teams' ? 'teams' : pathname === '/settings/members' ? 'members' : requested === 'profile' || requested === 'account' || requested === 'workspace' || requested === 'integrations' || requested === 'devices' ? requested : 'preferences'
   async function signOut() {
     if (signingOut) return
     setSigningOut(true); setError('')

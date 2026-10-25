@@ -3,7 +3,7 @@ import { isStepCount, tool } from 'ai'
 import { getWorkflowMetadata } from 'workflow'
 import { z } from 'zod'
 import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
-import { createComposioAITools } from '@/lib/composio-actions'
+import { createComposioAITools, createGoogleAITools } from '@/lib/composio-actions'
 import * as steps from './steps'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
@@ -49,6 +49,7 @@ function coordinatorTools(userId: string) {
   const id = z.uuid()
   return {
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input)),
+    ...createGoogleAITools((action, input) => steps.composioAction(userId, action, input), (action, input) => steps.proposeAccountAction(userId, action, input)),
     list_issues: tool({
       description: 'List the person\'s issues, most recently updated first. Optionally only one status (todo, doing, review, done and so on).',
       inputSchema: z.object({ status: z.string().optional() }),

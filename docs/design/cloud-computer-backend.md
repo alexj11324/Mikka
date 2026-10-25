@@ -11,10 +11,13 @@ design changes, this document is updated, not forked.
 
 ## 1. What the user sees
 
-Every bot has "its own computer" (its own desktop on the workspace's one cloud machine), the way Grok Bot does it. The computer is keyed by `bots.id`, never `agents.id`:
+Every bot has "its own computer" (its own desktop on the workspace's one cloud
+machine), the way Grok Bot does it. Bot and thread are defined in
+[glossary.md](glossary.md): the threads (runs) a bot starts use that bot's
+computer. The computer is keyed by `bots.id`, never `agents.id`:
 
-- **Agent 详情页**: the bot's live screen ("Mikka Frontend 的屏幕") with a state
-  badge. A centered 打开 button opens a full-window viewer.
+- **Agent 详情页**: the bot's avatar and name, then its live screen captioned
+  "Mikka Frontend 的屏幕" (no state badge). A centered 打开 button opens a full-window viewer.
 - **Full-window viewer**: starts view-only (仅观看). 取得控制权 pauses the agent
   and gives the user mouse and keyboard (你在操作); 交还给 Agent hands control back.
 - **Chat**: one 电脑 card per computer task. It shows the task sentence, a state

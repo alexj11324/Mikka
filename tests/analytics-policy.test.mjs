@@ -39,7 +39,7 @@ test('unknown events, replay and raw exception events never pass the allowlist',
   }
   assert.equal(sanitizeAnalyticsEvent(null), null)
   assert.deepEqual(sanitizeAnalyticsEvent({ event: '$pageview', properties: { $current_url: 'not a url' } }).properties, {})
-  assert.deepEqual(sanitizeAnalyticsEvent({ event: 'orvilo_team_created', properties: { name: 'private' } }).properties, {})
+  assert.deepEqual(sanitizeAnalyticsEvent({ event: 'mikka_team_created', properties: { name: 'private' } }).properties, {})
 })
 
 test('all upcoming features fail closed, even if the remote switch is accidentally enabled', () => {
