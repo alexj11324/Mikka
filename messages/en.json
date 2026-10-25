@@ -233,6 +233,7 @@
     "requestProcessed": "Request processed. If the account qualifies, check your inbox. This does not confirm that an email was delivered.",
     "retryIn": "Try again in {seconds}s",
     "verifyDescription": "Enter the email you signed up with to get a new verification link. It works for 15 minutes.",
+    "verifyLinkInvalid": "This verification link is invalid, expired or already used. If your email is not verified yet, send a new link.",
     "verifyEmailLink": "Verify your email or resend the link"
   },
   "Metadata": {
