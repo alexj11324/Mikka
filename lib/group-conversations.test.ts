@@ -34,11 +34,11 @@ for (const [resource, method] of [['conversations','GET'],['conversations','POST
   })
 }
 
-// This test NEVER connects locally. The only authorized DB is the workflow's ephemeral service.
-const dbURL = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' ? process.env.E2E_DATABASE_URL : undefined
+// Disposable cloud Linux Postgres or the workflow's ephemeral service only.
+const dbURL = process.env.MIKKA_DISPOSABLE_POSTGRES_URL ?? (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' ? process.env.E2E_DATABASE_URL : undefined)
 if (dbURL) {
   const target = new URL(dbURL)
-  if (target.hostname !== '127.0.0.1' || target.pathname !== '/mikka_e2e') throw new Error('Group tests require CI temporary mikka_e2e')
+  if (target.hostname !== '127.0.0.1' || !['/mikka_review', '/mikka_e2e'].includes(target.pathname)) throw new Error('Group tests require CI temporary mikka_e2e')
 }
 test('Postgres17 migration, atomic history, pagination, unread counts, membership and privacy', { skip: !dbURL }, async () => {
   const pool = new Pool({ connectionString: dbURL, max: 16 })
@@ -47,9 +47,13 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
   await pool.query(`CREATE SCHEMA "${schema}"`)
   const scoped = new Pool({ connectionString: dbURL, max: 16, options: `-c search_path=${schema}` })
   try {
+    await scoped.query(await readFile(new URL('../drizzle/20261023221259_application_baseline.sql', import.meta.url), 'utf8'))
+    await scoped.query(await readFile(new URL('../drizzle/0001_agents_devices.sql', import.meta.url), 'utf8'))
     const migration = await readFile(new URL('../drizzle/20261023213851_group_conversations.sql', import.meta.url), 'utf8')
     await Promise.all([scoped.query(migration), scoped.query(migration)])
+    await scoped.query(await readFile(new URL('../drizzle/20261025052032_group_artifact_review.sql', import.meta.url), 'utf8'))
     await scoped.query(migration) // production retry / coexistence with #69
+    await scoped.query(await readFile(new URL('../drizzle/20261025082237_group_turn_mailbox_policy.sql', import.meta.url), 'utf8'))
     const reads = await readFile(new URL('../tests/fixtures/conversation-reads-69.sql', import.meta.url), 'utf8')
     await scoped.query(reads) // this migration first, then #69
     await scoped.query('DROP TABLE conversation_reads')
@@ -140,7 +144,7 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     assert.equal(((await run({})).body as typeof list).conversations[0].lastMessage.position, '9007199254740993')
   } finally {
     await scoped.end()
-    await pool.query(`DROP SCHEMA "${schema}" CASCADE`)
+    if(!process.env.KEEP_GROUP_TEST_FIXTURES)await pool.query(`DROP SCHEMA "${schema}" CASCADE`)
     await pool.end()
   }
 })

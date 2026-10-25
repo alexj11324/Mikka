@@ -283,7 +283,7 @@ export const runAssignmentSchema = z.object({
    * it stops working when the run ends. Absent: the server could not issue
    * one, and the run goes ahead without it.
    */
-  mcp: z.object({ url: z.url(), token: z.string().min(1).max(200) }).optional(),
+  mcp: z.object({ url: z.url(), token: z.string().min(1).max(200), mailboxUrl: z.url().optional() }).optional(),
   /** Question continuation must not silently open a different session. */
   requireSessionResume: z.boolean().optional(),
   questionId: z.uuid().optional(),

@@ -6,12 +6,11 @@ import { db, pool } from '@/lib/db'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { agentRuns, devices, issues, type RunStatus } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
-import { runFinishedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { factoryMonitor, factoryQuestions } from '@/lib/factory/server'
-import { factoryEventId } from '@/lib/factory/event-id'
 import { FactoryError } from '@/lib/factory/contract'
 import { revokeRunTokens } from '@/lib/mcp/worker'
+import { mailboxes } from '@/lib/mailbox-runtime'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     .where(and(eq(agentRuns.id, runId), eq(devices.ownerId, caller.userId)))
     .limit(1)
   if (!run) return NextResponse.json({ error: 'Unknown run.' }, { status: 404 })
+  if (run.kind === 'group_review') return NextResponse.json({ error: 'Use bound group-review completion.' }, { status: 409 })
   // A run ends once: a repeated completion is accepted and ignored.
   if (!(LIVE_STATUSES as readonly string[]).includes(run.status)) return new NextResponse(null, { status: 204 })
   const parsed = runCompleteRequest.safeParse(await request.json().catch(() => null),)
@@ -61,14 +61,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
       'SELECT t.id FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" WHERE a."runId"=$1 AND t."userId"=$2 FOR UPDATE OF t',
       [runId, run.userId],
     )
-    const updated = await tx.query(
-      'UPDATE agent_runs SET status=$2,"stopReason"=$3,report=$4,"finishedAt"=now(),"updatedAt"=now() WHERE id=$1 AND status=ANY($5::text[]) RETURNING id',
-      [
-        runId, status, stopReason,
-        JSON.stringify( report ?? null), [...LIVE_STATUSES],
-      ],)
-    ended = updated
-    .rows.length > 0
+    ended = await mailboxes.complete(run.userId, runId, status, stopReason, report ?? null, tx)
   if (ended) {
     await tx.query('SAVEPOINT question_settle')
       try {
@@ -88,19 +81,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
           if (!(error instanceof FactoryError)) throw error
         }
       }
-      const event = runFinishedEvent({ ...run, status, stopReason, report })
-      await tx.query(
-        'INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey","issueId","runId",payload) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT ("dedupeKey") DO NOTHING',
-        [
-          factoryEventId('run-finished', runId),
-          event.userId,
-          event.kind,
-          event.dedupeKey,
-          event.issueId,
-          event.runId,
-          JSON.stringify(event.payload),
-        ],
-      )
     }
     await tx.query('COMMIT')
   } catch (error) {
@@ -113,6 +93,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   if (ended) {
     await revokeRunTokens(runId)
     after(() => wakeCoordinator(run.userId))
+    await mailboxes.flush(run.userId)
   }
   if (run.issueId && reachesReview(stopReason, report)) {
     await db.update(issues).set({ status: 'review', updatedAt: new Date() }).where(eq(issues.id, run.issueId))

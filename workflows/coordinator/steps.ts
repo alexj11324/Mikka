@@ -3,6 +3,9 @@ import { and, asc, desc, eq, inArray, or } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, readRun, requestRunStop, runViewColumns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
+import { mailboxes } from '@/lib/mailbox-runtime'
+import { MailboxError } from '@/lib/session-mailbox'
+import { MAILBOX_INSTRUCTIONS } from '@/lib/mailbox-tools'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
@@ -25,12 +28,19 @@ import { dispatchFactoryRun, factoryMonitor, factoryStore, factoryQuestions, rec
 import type { QuestionReference, ContextQuestionAnswer } from '@/lib/factory/questions/contract'
 import { improvementStore, skillAssignments, improvementFactory } from '@/lib/self-improvement/server'
 import { ImprovementError, type Feedback, type ImprovementHandoff, type ImprovementRehearsal } from '@/lib/self-improvement/contract'
+import { executeSystemCredentialTool } from '@/lib/credentials/runtime'
+import type { CredentialToolName } from '@/lib/credentials/execution-tools'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
 // expected failures instead of throwing, so a bad id is not retried.
 
 type ToolResult<T> = T | { error: string }
+
+export async function credentialTool(userId: string, name: CredentialToolName, input: unknown) {
+  'use step'
+  return executeSystemCredentialTool({ userId }, name, input)
+}
 
 async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
@@ -83,7 +93,7 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
     summary = text
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(COORDINATOR_INSTRUCTIONS, memory), messages: promptMessages(summary, messages) }
+  return { instructions: instructionsWithMemory(`${COORDINATOR_INSTRUCTIONS}\n\n${MAILBOX_INSTRUCTIONS}`, memory), messages: promptMessages(summary, messages) }
 }
 
 export async function remember(userId: string, input: { note: string }) {
@@ -359,4 +369,18 @@ export async function stopRun(userId: string, input: { runId: string }) {
 export async function recoverAccountActions(userId: string, context: ActionContext) {
   'use step'
   return recoverCalendarBatch(userId, context)
+}
+
+export async function mailboxAction(userId: string, action: 'recipients' | 'inbox' | 'sent' | 'send' | 'ack', input: { to?: string; key?: string; text?: string; replyTo?: string; ids?: string[] } = {}) {
+  'use step'
+  try {
+    const actor = await mailboxes.conversation(userId, 'coordinator')
+    switch (action) {
+      case 'recipients': return await mailboxes.recipients(actor)
+      case 'inbox': return await mailboxes.inbox(actor)
+      case 'sent': return await mailboxes.sent(actor)
+      case 'send': return await mailboxes.send(actor, input as { to: string; key: string; text: string; replyTo?: string })
+      case 'ack': return await mailboxes.ack(actor, input.ids ?? [])
+    }
+  } catch (error) { if (error instanceof MailboxError) return { error: error.message }; throw error }
 }

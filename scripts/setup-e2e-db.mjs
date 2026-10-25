@@ -1,4 +1,5 @@
 import { Pool } from 'pg'
+import { execFileSync } from 'node:child_process'
 import { getMigrations } from 'better-auth/db/migration'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { postgresSchemaStatements } from '@chat-adapter/state-pg'
@@ -12,9 +13,17 @@ import * as teamSchema from '../lib/db/team-schema.ts'
 const connectionString = process.env.E2E_DATABASE_URL
 if (!connectionString) throw new Error('必须设置独立的 E2E_DATABASE_URL，禁止回退到业务数据库。')
 const target = new URL(connectionString)
-if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || !target.pathname.endsWith('_e2e')) {
-  throw new Error('测试初始化仅允许本机且名称以 _e2e 结尾的数据库。')
+if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || !target.pathname.endsWith('_e2e') || target.search || target.hash) {
+  throw new Error('测试初始化仅允许本机且名称以 _e2e 结尾、无查询参数或片段的数据库。')
 }
+
+// Bootstrap tracked constraints and SQL-owned group/review tables before the
+// schema fallback. The loopback disposable-target guard above applies to both
+// database targets; never inherit an external workspace database here.
+execFileSync(process.execPath, [new URL('./migrate.mjs', import.meta.url).pathname], {
+  env: { ...process.env, MIGRATE: '1', MIKKA_DATABASE_URL: connectionString, DATABASE_URL: connectionString },
+  stdio: 'inherit',
+})
 
 const authPool = new Pool({ connectionString, max: 1 })
 try {
@@ -41,6 +50,10 @@ function defaultValue(value, dataType) {
 }
 
 try {
+  // Shared ordering defaults need their sequence before schema-derived tables.
+  // Production creates this in the session-mailboxes migration. Never reset it
+  // when re-running the disposable database setup.
+  await pool.query('CREATE SEQUENCE IF NOT EXISTS mikka_mailbox_sequence')
   const tables = [...Object.values(issueSchema), ...Object.values(workspaceSchema), ...Object.values(projectSchema), ...Object.values(teamSchema)]
   for (const table of tables.filter(value => is(value, PgTable))) {
     const config = getTableConfig(table)

@@ -1,3 +1,5 @@
+import { mailboxes } from '@/lib/mailbox-runtime'
+import { MAILBOX_INSTRUCTIONS, mailboxTools } from '@/lib/mailbox-tools'
 import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createUIMessageStreamResponse, isStepCount, streamText, toUIMessageStream } from 'ai'
@@ -10,6 +12,8 @@ import systemPrompt from '@/lib/agent-system-prompt.json'
 import { validateAgentStream } from '@/lib/agent-fetch'
 import { persistAgentStream } from '@/lib/agent-history'
 import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
+import { createCredentialAITools } from '@/lib/credentials/ai-tools'
+import { executeSystemCredentialTool } from '@/lib/credentials/runtime'
 
 export const maxDuration = 300
 
@@ -95,6 +99,12 @@ export async function POST(request: Request) {
   }
   messages.push({ role: 'user', content: parsed.data.prompt })
 
+  // A transient mailbox failure must not strand a saved pending Bot turn.
+  // As with older worker assignments, advertise only available capabilities.
+  const mailboxActor = await mailboxes.conversation(session.user.id, 'bot', sessionId).catch(() => {
+    console.error('Could not prepare Bot mailbox; continuing without mailbox tools')
+    return null
+  })
   const opencode = createOpenAICompatible({
     name: 'opencode',
     apiKey,
@@ -104,9 +114,11 @@ export async function POST(request: Request) {
   const result = streamText({
     model: opencode('deepseek-v4.1-flash'),
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
-    system: `${systemPrompt}\n\n${agentWebInstructions()}`,
+    system: `${systemPrompt}\n\n${agentWebInstructions()}\n\n${mailboxActor ? MAILBOX_INSTRUCTIONS : ''}`,
     messages,
     tools: {
+      ...createCredentialAITools((name, input) => executeSystemCredentialTool({ userId: session.user.id }, name, input)),
+      ...(mailboxActor ? mailboxTools(mailboxes, mailboxActor) : {}),
       ...createAgentWebTools({ signal: request.signal }),
       ...createComposioAITools((action, input) => runComposioAction(session.user.id, action, input)),
     },

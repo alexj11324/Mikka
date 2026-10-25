@@ -246,6 +246,7 @@ export class CodexAdapter implements AgentAdapter {
     const ctx = new RunContext({
       harness: "codex",
       kind: options.kind,
+      mcp: options.mcp,
       worktree: options.cwd,
       networkAllow: options.networkAllow,
       accountActionReadback: options.accountActionReadback,

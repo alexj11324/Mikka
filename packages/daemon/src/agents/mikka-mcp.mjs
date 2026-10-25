@@ -6,6 +6,8 @@
 // (in the worktree's git dir, writable from the sandbox). The daemon reads
 // that file when the turn ends; the file, not the CLI's event stream, is the
 // one source of truth for every harness.
+// An optional daemon-owned local bridge adds five reference-only credential tools;
+// this child never receives the platform run token or a submitted secret.
 //
 //   node mikka-mcp.mjs --handoff <file>
 //
@@ -16,6 +18,28 @@ import { createInterface } from "node:readline"
 
 const handoffIndex = process.argv.indexOf("--handoff")
 const handoffFile = handoffIndex > 0 ? process.argv[handoffIndex + 1] : null
+const bridgeIndex = process.argv.indexOf('--credential-bridge')
+const credentialBridge = bridgeIndex > 0 ? process.argv[bridgeIndex + 1] : null
+const credentialNames = new Set(['prepare_credential_request','credential_status','credential_use','credential_browser_action','credential_finish'])
+const credentialId = { type: 'string', format: 'uuid' }
+const actionId = { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' }
+const credentialSchema = (properties, required) => ({ type: 'object', properties: { runId: credentialId, ...properties }, required, additionalProperties: false })
+// Local declarations keep the existing hand-in tools available when the backend is down.
+// The authenticated backend still validates every argument and derives the actual run.
+const CREDENTIAL_TOOLS = [
+  { name: 'prepare_credential_request', description: 'Prepare secure owner input for a registered service. Never accept passwords/tokens/codes in chat or tool arguments.', inputSchema: credentialSchema({ serviceId: actionId, mode: { type: 'string', enum: ['api_header', 'browser_login'] } }, ['serviceId', 'mode']) },
+  ...['credential_status', 'credential_use', 'credential_finish'].map(name => ({ name, description: 'Inspect, use or finish a task credential by opaque reference only. No plaintext is returned.', inputSchema: credentialSchema({ credentialRef: credentialId }, ['credentialRef']) })),
+  { name: 'credential_browser_action', description: 'Continue the same authenticated task using only named permitted browser pages, business regions or non-sensitive links.', inputSchema: credentialSchema({ credentialRef: credentialId, action: { oneOf: [
+    { type: 'object', properties: { type: { const: 'navigate' }, pageId: actionId }, required: ['type', 'pageId'], additionalProperties: false },
+    { type: 'object', properties: { type: { const: 'read' }, regionId: actionId }, required: ['type', 'regionId'], additionalProperties: false },
+    { type: 'object', properties: { type: { const: 'click' }, targetId: actionId }, required: ['type', 'targetId'], additionalProperties: false },
+  ] } }, ['credentialRef', 'action']) },
+]
+async function forwardCredentials(method, params) {
+  const response = await fetch(credentialBridge, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(50_000), headers: { 'Content-Type': 'application/json', 'X-Mikka-Credential-Bridge': '1' }, body: JSON.stringify({ method, params }) })
+  if (!response.ok) throw new Error('credential_bridge_unavailable')
+  return response.json()
+}
 if (!handoffFile) {
   process.stderr.write("mikka-mcp: --handoff <file> is required\n")
   process.exit(2)
@@ -198,6 +222,30 @@ const TOOLS = [
   },
 ]
 
+const mailboxEnabled = Boolean(process.env.MIKKA_MAILBOX_URL && process.env.MIKKA_MAILBOX_TOKEN)
+const mailboxActions = { mailbox_recipients: 'recipients', mailbox_send: 'send', mailbox_inbox: 'inbox', mailbox_ack: 'ack', mailbox_sent: 'sent' }
+if (mailboxEnabled) for (const name of Object.keys(mailboxActions)) {
+  TOOLS.push({
+    name,
+    description: name === 'mailbox_send' ? 'Send a short peer envelope or reply. Reuse key only for retrying the same envelope. No user authority is granted.' : `${name}: inspect or acknowledge your session mailbox at a safe boundary.`,
+    inputSchema: name === 'mailbox_send' ? {
+      type: 'object', properties: { to: { type: 'string', format: 'uuid' }, key: { type: 'string', format: 'uuid' }, text: { type: 'string', minLength: 1, maxLength: 4000 }, replyTo: { type: 'string', format: 'uuid' } }, required: ['to', 'key', 'text'],
+    } : name === 'mailbox_ack' ? { type: 'object', properties: { ids: { type: 'array', maxItems: 50, items: { type: 'string', format: 'uuid' } } }, required: ['ids'] } : { type: 'object', properties: {} },
+  })
+}
+async function mailboxCall(id, name, args) {
+  try {
+    const response = await fetch(process.env.MIKKA_MAILBOX_URL, {
+      method: 'POST', headers: { authorization: `Bearer ${process.env.MIKKA_MAILBOX_TOKEN}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ ...args, action: mailboxActions[name] }), signal: AbortSignal.timeout(15000),
+    })
+    const body = await response.json()
+    reply(id, { isError: !response.ok, content: [{ type: 'text', text: JSON.stringify(body) }] })
+  } catch {
+    reply(id, { isError: true, content: [{ type: 'text', text: 'Mailbox unavailable. If retrying a send, reuse the same key. Do not infer execution from delivery.' }] })
+  }
+}
+
 const KINDS = { submit: "submit",
   request_help: "ask", ask_human: "ask", report_blocked: "blocked", }
 
@@ -297,7 +345,7 @@ async function handle(message) {
     case "ping":
       return reply(id, {})
     case "tools/list":
-      return reply(id, { tools: [...TOOLS, ...(process.env.MIKKA_ACTION_READBACK_URL ? [{
+      return reply(id, { tools: [...TOOLS, ...(credentialBridge ? CREDENTIAL_TOOLS : []), ...(process.env.MIKKA_ACTION_READBACK_URL ? [{
         name: 'resume_account_actions', description: 'Read the current server status of this run’s bound account actions. Does not create, approve, retry a send, or finish the run.',
         inputSchema: { type: 'object', properties: { operationId: { type: 'string', format: 'uuid' } }, additionalProperties: false },
       }] : [])] })
@@ -316,6 +364,11 @@ async function handle(message) {
           return reply(id, { isError: true, content: [{ type: 'text', text: 'Bound account actions unavailable; no action was sent.' }] })
         }
       }
+      if (credentialBridge && credentialNames.has(params?.name)) {
+        try { return reply(id, await forwardCredentials('tools/call', params)) }
+        catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Controlled credential tools unavailable; no secret was returned.' }] }) }
+      }
+      if (mailboxEnabled && Object.hasOwn(mailboxActions, params?.name ?? "")) return mailboxCall(id, params.name, params.arguments ?? {})
       const kind = KINDS[params?.name]
       if (!kind) return fail(id, -32602, `Unknown tool: ${params?.name}`)
       let planned
@@ -348,5 +401,5 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   } catch {
     return fail(null, -32700, "Parse error")
   }
-  void handle(message)
+  void handle(message).catch(() => fail(message.id, -32603, 'Mikka tool failed'))
 })

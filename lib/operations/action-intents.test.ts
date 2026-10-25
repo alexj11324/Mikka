@@ -29,7 +29,7 @@ test('trusted submission -> durable batch -> new workflow -> run retry -> daemon
   url.searchParams.set('options', `-c search_path=${schema}`)
   const pool = new Pool({ connectionString: url.toString() })
   for (const name of orderMigrations((await readdir(new URL('../../drizzle/', import.meta.url))).filter(n => n.endsWith('.sql')))) await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
-  process.env.MIKKA_DATABASE_URL = url.toString(); process.env.CI = 'true'; process.env.BETTER_AUTH_URL = 'http://127.0.0.1:3000'; process.env.BETTER_AUTH_SECRET = randomUUID() + randomUUID()
+  process.env.MIKKA_DATABASE_URL = url.toString(); process.env.DATABASE_URL = url.toString(); process.env.CI = 'true'; process.env.BETTER_AUTH_URL = 'http://127.0.0.1:3000'; process.env.BETTER_AUTH_SECRET = randomUUID() + randomUUID()
   const hooks = registerHooks({ resolve(specifier, context, next) { return specifier === 'server-only' ? { url: 'data:text/javascript,export{}', shortCircuit: true } : next(specifier, context) } })
   const database = await import('../db/request-scope'), scope = database.createRequestDatabaseScope(url.toString())
   const { recordUserSubmission } = await import('../coordinator-event-store')
@@ -40,7 +40,7 @@ test('trusted submission -> durable batch -> new workflow -> run retry -> daemon
   const provider = { name: 'synthetic', prepare: async () => ({ accountId: 'fixture', version: 'v1' }), execute: async (): Promise<never> => { throw new Error('writes prohibited in propagation test') }, lookup: async () => null }
   const run = <T>(fn: () => T) => scope.run(() => calendar.withCalendarTestProvider(provider, fn))
   const owner = 'intent-owner', other = 'other-owner', holder = randomUUID()
-  t.after(async () => { hooks.deregister(); await scope.close(); await database.pool.end(); await pool.end(); await admin.end() })
+  t.after(async () => { hooks.deregister(); await scope.close(); await database.pool.end(); await (globalThis as unknown as { workspacePool?: Pool }).workspacePool?.end(); await pool.end(); await admin.end() })
   let sourceEventId = '', operationId = '', ref: Awaited<ReturnType<ReturnType<typeof runtime.actionIntents>['bindProposal']>>
   const calls = [call('first'), call('second')]
   await t.test('ten submission retries reuse source, changed request conflicts, intentional identical request differs', async () => {

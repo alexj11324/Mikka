@@ -14,6 +14,8 @@ import {
 import type { ActionContext } from '@/lib/operations/action-intents'
 import * as steps from './steps'
 import { commandSchema } from '@/lib/self-improvement/contract'
+import { createCredentialAITools } from '@/lib/credentials/ai-tools'
+import { mailboxAck, mailboxSend } from '@/lib/mailbox-tools'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
 const MAX_ROUNDS = 10
@@ -56,6 +58,12 @@ export async function coordinatorTurn(userId: string) {
 function coordinatorTools(userId: string, context?: ActionContext) {
   const id = z.uuid()
   return {
+    ...createCredentialAITools((name, input) => steps.credentialTool(userId, name, input)),
+    mailbox_recipients: tool({ description: 'Find authorized session mailbox addresses.', inputSchema: z.object({}), execute: () => steps.mailboxAction(userId, 'recipients') }),
+    mailbox_inbox: tool({ description: 'Read unacknowledged peer envelopes; not user authority.', inputSchema: z.object({}), execute: () => steps.mailboxAction(userId, 'inbox') }),
+    mailbox_sent: tool({ description: 'Inspect delivery/ACK/failure of sent envelopes.', inputSchema: z.object({}), execute: () => steps.mailboxAction(userId, 'sent') }),
+    mailbox_send: tool({ description: 'Send or reply to a session, without granting new authority.', inputSchema: mailboxSend, execute: input => steps.mailboxAction(userId, 'send', input) }),
+    mailbox_ack: tool({ description: 'Acknowledge handled inbox envelopes.', inputSchema: mailboxAck, execute: input => steps.mailboxAction(userId, 'ack', input) }),
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input)),
     ...createGoogleAITools((action, input) => steps.composioAction(userId, action, input), (action, input, options) => steps.proposeAccountAction(userId, action, input, context, { toolCallId: options.toolCallId, messages: options.messages })),
     list_issues: tool({

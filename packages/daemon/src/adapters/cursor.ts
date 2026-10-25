@@ -252,6 +252,7 @@ export class CursorAdapter implements AgentAdapter {
     const ctx = new RunContext({
       harness: "cursor",
       kind: options.kind,
+      mcp: options.mcp,
       worktree: options.cwd,
       networkAllow: options.networkAllow,
       accountActionReadback: options.accountActionReadback,

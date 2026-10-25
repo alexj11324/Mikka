@@ -31,7 +31,8 @@ export function createExecutionClaim(pool: Pool, authorize: FactoryAuthorize) {
       }
       const { rows } = await tx.query<{ id: string }>(
         `UPDATE agent_runs SET status='preparing',"startedAt"=now(),"leaseExpiresAt"=$4,"updatedAt"=now()
-         WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 AND status='queued' AND "stopRequestedAt" IS NULL RETURNING id`,
+         WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 AND status='queued' AND "stopRequestedAt" IS NULL
+           AND ("mailboxId" IS NULL OR EXISTS (SELECT 1 FROM session_mailboxes m WHERE m.id=agent_runs."mailboxId" AND NOT m.disabled)) RETURNING id`,
         [runId, userId, deviceId, leaseExpiresAt],
       );
       await tx.query("COMMIT");

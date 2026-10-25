@@ -12,7 +12,8 @@
 // (`ServerUnreachableError`, the outbox keeps the item); 409 on a claim is
 // `RunNotPinnedHereError`; any other 4xx is a refusal (`DaemonError`) that
 // retrying cannot fix.
-import type { z } from "zod"
+import { z } from "zod"
+import { groupReviewHttpLink } from "./runs/group-review-worker"
 import { SKILL_ARTIFACT_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
 
 import {
@@ -206,6 +207,10 @@ export class HttpServerLink implements ServerLink {
       { schema: deviceReposResponse }
     )
     return repos
+  }
+
+  groupReviews(deviceId: string, signal?: AbortSignal) {
+    return groupReviewHttpLink(body => this.call('POST', `/v1/devices/${encodeURIComponent(checkId(deviceId))}/group-reviews`, {body,schema:z.unknown(),signal}))
   }
 
   async pendingRuns(deviceId: string) {

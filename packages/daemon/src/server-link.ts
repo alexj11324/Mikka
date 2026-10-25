@@ -58,6 +58,9 @@ export interface ChunkBatch {
  * the daemon keeps running and retries (offline tolerance, R13).
  */
 export interface ServerLink {
+  /** Opt-in JSON-only group runtime; never the repository run supervisor. */
+  groupReviews?(deviceId: string, signal?: AbortSignal): import('./runs/group-review-worker').GroupReviewLink
+
   /**
    * `credential` is the session from `mikka daemon login` (Better Auth
    * device authorization, RFC 8628) or one the signed-in desktop handed

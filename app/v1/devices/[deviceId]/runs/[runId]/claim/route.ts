@@ -1,3 +1,4 @@
+import { mailboxes } from '@/lib/mailbox-runtime'
 import { NextResponse } from 'next/server'
 import { and, eq, isNull } from 'drizzle-orm'
 import { RUN_LEASE_MS } from '@mikka/protocol/device'
@@ -63,6 +64,7 @@ export async function POST(
       { error: 'Run is not queued for this device.' },
       { status: 409 },
     )
+  if (run.kind === 'group_review') return NextResponse.json({ error: 'Use the isolated group-review worker.' }, { status: 409 })
   if (
     run.retryOf &&
     run.issueId &&
@@ -100,6 +102,10 @@ export async function POST(
       { status: 409 },
     )
   }
+  // Prepare mailbox identity while the attempt is still queued. A transient
+  // failure here must remain retryable rather than strand a preparing run.
+  await mailboxes.conversation(run.userId, 'coordinator')
+  await mailboxes.run(run.userId, runId)
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
   try {
@@ -198,6 +204,7 @@ export async function POST(
   }
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
+  if (!claimed.length) return NextResponse.json({ error: 'Run already claimed.' }, { status: 409 })
   const mcp = claimed.length
     ? await issueRunToken(run)
         .then(({ token }) => ({
@@ -205,6 +212,7 @@ export async function POST(
             mcpResourceURL ??
             new URL(withBasePath('/api/mcp'), request.url).toString(),
           token,
+          mailboxUrl: new URL(withBasePath('/v1/mailbox'), request.url).toString(),
         }))
         .catch((error: unknown) => {
           console.error(
@@ -245,6 +253,9 @@ export async function POST(
     accountActionRefs: run.accountActionRefs,
     kind: run.kind,
     leaseExpiresAt,
+    ...(run.continuesRunId ? { continuesRunId: run.continuesRunId } : {}),
+    ...(run.resumeSessionId ? { resumeSessionId: run.resumeSessionId } : {}),
+    ...(run.followUp ? { followUp: run.followUp } : {}),
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
     ...retry,

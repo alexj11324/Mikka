@@ -1,6 +1,6 @@
 import 'server-only'
 import { after } from 'next/server'
-import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or } from 'drizzle-orm'
 import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, agents, deviceRepos, devices, runCheckpoints } from '@/lib/db/schema'
@@ -42,7 +42,7 @@ export async function renewRunLeases(deviceId: string, runIds: readonly string[]
  */
 export async function reclaimLostRuns(userId: string, now = new Date()): Promise<void> {
   const lost = await db.select().from(agentRuns)
-    .where(and(eq(agentRuns.userId, userId), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now)))
+    .where(and(eq(agentRuns.userId, userId), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), ne(agentRuns.kind, 'group_review'), lt(agentRuns.leaseExpiresAt, now)))
     .limit(20)
   for (const run of lost) await reclaimLostRun(run, now)
 
@@ -116,7 +116,7 @@ async function reclaimLostRun(run: Run, now: Date) {
   const retried = await db.transaction(async tx => {
     const [ended] = await tx.update(agentRuns)
       .set({ status: 'failed', stopReason: 'device_lost', error: `The device went offline; ${target ? 'handed to another device' : 'queued again'} as attempt ${outcome.attempt} of ${MAX_RUN_ATTEMPTS}.`, finishedAt: now, updatedAt: now })
-      .where(and(eq(agentRuns.id, run.id), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now)))
+      .where(and(eq(agentRuns.id, run.id), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), ne(agentRuns.kind, 'group_review'), lt(agentRuns.leaseExpiresAt, now)))
       .returning({ id: agentRuns.id })
     if (!ended) return false
     await tx.insert(agentRuns).values({

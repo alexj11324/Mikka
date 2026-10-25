@@ -3,6 +3,8 @@ import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db } from '@/lib/db'
+import { MailboxError } from '@/lib/session-mailbox'
+import { mailboxes } from '@/lib/mailbox-runtime'
 import { agents, agentRuns, deviceRepos, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
@@ -170,6 +172,6 @@ export async function addRunMessage(
 export async function requestRunStop(userId: string, runId: string): Promise<void> {
   const parsed = z.uuid().safeParse(runId)
   if (!parsed.success) throw new ActionFailureError('runNotFound')
-  await db.update(agentRuns).set({ stopRequestedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(agentRuns.id, parsed.data), eq(agentRuns.userId, userId)))
+  try { await mailboxes.stop(userId, runId) }
+  catch (error) { if (error instanceof MailboxError) throw new ActionFailureError('runNotFound'); throw error }
 }

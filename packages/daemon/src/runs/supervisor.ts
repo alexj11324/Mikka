@@ -1082,6 +1082,7 @@ export class RunSupervisor {
       skillReceipt: assignment.skillReceipt,
       fixture: assignment.fixture,
       model: assignment.model,
+      mcp: assignment.mcp,
     }
     const resuming =
       entry.sessionId !== null && adapter.capabilities.supportsResume
