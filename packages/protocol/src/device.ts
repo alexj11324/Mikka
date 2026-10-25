@@ -154,6 +154,12 @@ export type DeviceHeartbeat = z.input<typeof deviceHeartbeatSchema>
 export const heartbeatResultSchema = z.object({
   /** Renewed lease expiry per run id; a run missing here is not renewed. */
   leases: z.record(z.string(), isoTime),
+  /**
+   * Runs the device reported that it no longer holds: they ended on the
+   * server, or went to another attempt after the lease ran out. The daemon
+   * stops them now instead of when their lease runs out.
+   */
+  revoked: z.array(id).max(500).optional(),
 })
 export type HeartbeatResult = z.input<typeof heartbeatResultSchema>
 

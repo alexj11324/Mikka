@@ -653,6 +653,20 @@ describe("run stops", () => {
     expect(server.unownedRuns()).toEqual([])
   })
 
+  it("lease: a run the server took back stops at the next heartbeat", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const runId = queue(server, "stall")
+    await daemon.syncWithServer()
+    await waitFor(() => daemon.supervisor.get(runId).state === "running")
+    // The server gave up on this run (its lease ran out) and queued a retry.
+    const held = server.runs.get(runId)
+    if (held) held.state = "failed"
+    await daemon.syncWithServer()
+    await daemon.supervisor.idle()
+    expect(daemon.supervisor.get(runId).stopReason).toBe("device_lost")
+  })
+
   it("hands an issue to a human after the retry cap", async () => {
     const { server, dataDir } = await setup()
     const daemon = await boot(server, dataDir)

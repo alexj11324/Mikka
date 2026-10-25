@@ -25,7 +25,9 @@ test('Slack callback verifies signed challenges and rejects unauthorized events 
 
   const invalidBody = '{'
   const invalidSignature = 'v0=' + createHmac('sha256', 'ci-only-slack-signing-secret').update(`v0:${timestamp}:${invalidBody}`).digest('hex')
-  const invalid = await request.post(endpoint, { headers: { ...headers, 'x-slack-signature': invalidSignature }, data: invalidBody })
+  // A string with application/json is JSON-quoted by Playwright when invalid.
+  // Buffer preserves the exact signed malformed bytes that the server must reject.
+  const invalid = await request.post(endpoint, { headers: { ...headers, 'x-slack-signature': invalidSignature }, data: Buffer.from(invalidBody) })
   expect(invalid.status()).toBe(400)
 
   const unboundBody = JSON.stringify({ type: 'event_callback', api_app_id: 'A123', team_id: 'T123', event: { type: 'app_mention', user: 'U999', text: '<@U123> list agents' } })

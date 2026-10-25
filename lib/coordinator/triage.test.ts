@@ -8,6 +8,7 @@ const run = (payload: Record<string, unknown>) => ({ kind: 'run_finished' as con
 test('clear cases follow the rules', () => {
   assert.equal(ruleTier({ kind: 'user_message', payload: { text: 'hi' } }), 'attention')
   assert.equal(ruleTier({ kind: 'issue_done', payload: { title: 'x' } }), 'background')
+  assert.equal(ruleTier({ kind: 'run_retried', payload: { retryRunId: 'r2', attempt: 2, maxAttempts: 3 } }), 'background')
   assert.equal(ruleTier(run({ status: 'failed' })), 'attention')
   assert.equal(ruleTier(run({ status: 'cancelled' })), 'background')
   assert.equal(ruleTier(run({ status: 'stopped' })), 'background')
