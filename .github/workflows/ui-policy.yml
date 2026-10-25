@@ -6,11 +6,15 @@ name: CI
 # - postsubmit: every push to main runs CI again.
 # A PR from a branch in this repo is already covered by its push run, so the
 # pull_request run is kept only for PRs from forks (see the job conditions).
+# Browser tests (Playwright) are the slow part, so they run only on the way
+# into main: in the merge queue, on main itself, or when started by hand
+# (Actions → CI → Run workflow). Branch pushes still build and check the database.
 on:
   push:
     branches-ignore: ['gh-readonly-queue/**']
   pull_request:
   merge_group:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -155,7 +159,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Generate ephemeral test-only auth secret
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+      - name: Decide whether browser tests run
+        id: browser
+        run: echo "run=${{ github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' }}" >> "$GITHUB_OUTPUT"
       - run: pnpm exec playwright install --with-deps chromium
+        if: steps.browser.outputs.run == 'true'
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
@@ -168,11 +176,12 @@ jobs:
       - run: pnpm build
         id: build
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
+        if: steps.browser.outputs.run == 'true'
         run: pnpm test:performance --output=performance-results
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
       - name: Browser functionality regression
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browser.outputs.run == 'true' }}
         run: pnpm test:e2e --grep-invert @performance
       - name: Upload browser failure evidence
         if: always()
