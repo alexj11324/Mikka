@@ -58,7 +58,7 @@ try {
   await new Promise(resolve => reservation.close(resolve))
   const origin = `http://127.0.0.1:${port}`
   const env = {
-    HOME: '/tmp', XDG_CACHE_HOME: '/tmp/mikka-next-cache', NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1', BETTER_AUTH_URL: origin,
+    VERCEL_ENV: 'preview', MIKKA_BYOS_ACCEPTANCE_RETAIN_SOURCES: '1', HOME: '/tmp', XDG_CACHE_HOME: '/tmp/mikka-next-cache', NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1', BETTER_AUTH_URL: origin,
     BETTER_AUTH_SECRET: 'fixture-next-auth-secret-not-used-for-any-account',
     MIKKA_BYOS_ENROLLMENT_ENABLED: '1', MIKKA_BYOS_ENROLLMENT_OPERATOR_TOKEN: operator,
     MIKKA_BYOS_ENROLLMENT_BINARY: `/workspace/Mikka/${binary}`,

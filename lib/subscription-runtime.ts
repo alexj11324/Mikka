@@ -1,4 +1,5 @@
 import 'server-only'
+import { retainEnrollmentSourcesForAcceptance } from './subscription-enrollment-policy'
 import { SubscriptionRefusal, type SubscriptionRoute } from '@mikka/protocol/subscription'
 import { workspaceDb } from './workspace-db'
 import { requireWorkspace } from './workspace-access'
@@ -30,7 +31,7 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false): 
   // adapter uses CPA converters with Mikka's identity and no native metadata.
   const ready = new Set((process.env.MIKKA_BYOS_VALIDATED_NATIVE_ROUTES ?? '').split(',').filter(route => ['codex_cli', 'claude_code_cli'].includes(route)))
   const modelRoutes = new Set((process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES ?? '').split(',').filter(route => ['codex_cpa', 'claude_cpa'].includes(route)))
-  return new SubscriptionService(new SubscriptionRepository(database), scope => new SubscriptionWorkerClient({ binary }, { scope, databaseUrl, infisicalOrigin, project, environment, path, workloadToken, accessPath, accessToken: custodyOnly ? undefined : accessToken, retainEnrollmentSources: true, enrollmentAttemptPath: process.env.MIKKA_BYOS_ENROLLMENT_ATTEMPT_PATH, enrollmentClaimPath: process.env.MIKKA_BYOS_ENROLLMENT_CLAIM_PATH, enrollmentGrantPath: process.env.MIKKA_BYOS_ENROLLMENT_GRANT_PATH, enableRuntime: !custodyOnly, enablePlainModels: !custodyOnly && modelRoutes.has(scope.provider === 'codex' ? 'codex_cpa' : 'claude_cpa'), enableCodexOAuth: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', enableClaudeOAuth: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1' }), {
+  return new SubscriptionService(new SubscriptionRepository(database), scope => new SubscriptionWorkerClient({ binary }, { scope, databaseUrl, infisicalOrigin, project, environment, path, workloadToken, accessPath, accessToken: custodyOnly ? undefined : accessToken, retainEnrollmentSources: retainEnrollmentSourcesForAcceptance(), enrollmentAttemptPath: process.env.MIKKA_BYOS_ENROLLMENT_ATTEMPT_PATH, enrollmentClaimPath: process.env.MIKKA_BYOS_ENROLLMENT_CLAIM_PATH, enrollmentGrantPath: process.env.MIKKA_BYOS_ENROLLMENT_GRANT_PATH, enableRuntime: !custodyOnly, enablePlainModels: !custodyOnly && modelRoutes.has(scope.provider === 'codex' ? 'codex_cpa' : 'claude_cpa'), enableCodexOAuth: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', enableClaudeOAuth: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1' }), {
     ready: (route: SubscriptionRoute) => !custodyOnly && (ready.has(route) || modelRoutes.has(route)),
     oauth: { codex: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', claude: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1' },
     // Only a verified runner supplies native isolation; Vercel is not the runner.

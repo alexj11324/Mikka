@@ -99,9 +99,10 @@ Enrollment source copies have their own path-aware journal. Canonical publicatio
 records evidence atomically; before that point the sole recovery copy is protected
 unless explicit disconnect/reconnect advances the epoch. Fresh global claim and
 database identity checks prevent a losing preview from deleting the shared source.
-Source-only failures are eligible for the same bounded cron. Current Web
-configuration holds source deletion and reports `deletion_not_authorized` until
-a separate exact cleanup scope is approved; callback handoff never needs a global
+Source-only failures are eligible for the same bounded cron. The isolated Preview
+acceptance flag holds test-source deletion and reports `deletion_not_authorized`;
+production ignores that flag and normal owner-requested cleanup/retries remain.
+Separate approval applies to our real-vault test cleanup; callback handoff never needs a global
 operator/vault key in the browser or Mac. Token-free immutable
 claims remain for replay protection; unknown/uncertain creates stay pending after
 404 to catch late commits. Status exposes missing configuration, ownership proof

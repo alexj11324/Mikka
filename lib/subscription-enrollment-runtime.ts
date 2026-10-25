@@ -1,4 +1,5 @@
 import 'server-only'
+import { retainEnrollmentSourcesForAcceptance } from './subscription-enrollment-policy'
 import type { EnrollmentConfiguration } from './subscription-enrollment'
 
 // No DB/auth/reader dependency: first consent remains a custody-only operation.
@@ -14,6 +15,6 @@ export function enrollmentConfiguration(): EnrollmentConfiguration {
     grantPath: process.env.MIKKA_BYOS_ENROLLMENT_GRANT_PATH,
   }
   if (Object.values(config).some(value => !value)) throw new Error('subscription_enrollment_unavailable')
-  // Real-vault deletion needs a separately approved cleanup scope.
-  return { ...config, retainSources: true } as EnrollmentConfiguration
+  // The isolated acceptance deployment retains its test records pending approval.
+  return { ...config, retainSources: retainEnrollmentSourcesForAcceptance() } as EnrollmentConfiguration
 }
