@@ -93,3 +93,16 @@ complete account/calendar/payload validation and ambiguous/missing result handli
 The current adapter lookup remains unsupported (`null`), not a successful readback.
 No exactly-once claim is made. A concrete authorized test account/calendar, limits on
 real event creation and separately approved cleanup are still prerequisites.
+
+## CI follow-up checkpoint
+
+On 768acc0, dedicated ledger/propagation/PG regressions and dispatch CI passed;
+full CI strict/typecheck passed, but its parallel Factory suite returned PostgreSQL
+42P01 during the pre-existing synthetic Better Auth sign-in fixture. This code can
+mean missing relation or missing FROM-clause alias; the old log did not distinguish.
+The isolated approval suite passed 14/14 locally both with and without the browser
+CI environment variables. The suite now retains its schema/files under the explicit
+retention flag; sign-out expires retained synthetic sessions instead of deleting them.
+Factory test files run serially to avoid concurrent schema create/drop during auth
+schema introspection. This is a fixture-isolation fix candidate, not a proven root
+cause until exact-head full CI completes. No publication implementation is changed.
