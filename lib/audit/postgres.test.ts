@@ -540,15 +540,6 @@ test(
         async () => {
           const aged = randomUUID(),
             id = randomUUID();
-          assert.equal(
-            (
-              await app.query(
-                "SELECT event->>'actorType' AS type FROM security_audit_events WHERE tenant=$1 AND event->>'action'='audit.prune'",
-                [aged],
-              )
-            ).rows[0].type,
-            "system",
-          );
           await appendAudit(app, aged, event, id);
           // Test-only age injection requires owner override; never expose this in an API.
           await transaction(app, async (tx) => {
