@@ -89,7 +89,7 @@ jobs:
           WRANGLER_SEND_METRICS: 'false'
           WRANGLER_LOG: error
         run: |
-          pnpm exec wrangler deploy --dry-run --config cloudflare/linear-sync/wrangler.jsonc --outdir worker-build
+          pnpm exec wrangler deploy --dry-run --config cloudflare/linear-sync/wrangler.jsonc --outdir "$PWD/worker-build"
           node scripts/ci/worker-build-receipt.mjs
       - uses: actions/upload-artifact@v4
         with:
