@@ -1,0 +1,34 @@
+{
+  "sha": "fd688c6332a5781006f4528ba29ade4a2235c942",
+  "max": 5,
+  "connectionTimeoutMillis": 10000,
+  "before": {
+    "sourceWaiters": 4,
+    "appBorrowWaiters": 1,
+    "workspaceIdle": 0,
+    "workspaceTotal": 5
+  },
+  "workspaceBorrowWaiters": 1,
+  "elapsedMs": 10018,
+  "results": [
+    {
+      "status": 201
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "error": "timeout exceeded when trying to connect"
+    },
+    {
+      "status": 200
+    }
+  ],
+  "retained": true
+}

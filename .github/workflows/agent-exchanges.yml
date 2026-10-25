@@ -53,6 +53,10 @@ jobs:
         run: pnpm test:agent-exchanges > exchange-evidence/handlers.log
         env:
           EXCHANGE_EVIDENCE_PATH: exchange-evidence/handlers.json
+      - name: Real production-sized pools, one writer and five mixed readers (retained PG)
+        run: |
+          EXCHANGE_POOL_EVIDENCE_PATH=exchange-evidence/pools-readers.json pnpm test:agent-exchange-pools > exchange-evidence/pools-readers.log
+          EXCHANGE_POOL_MIXED_WORKERS=1 EXCHANGE_POOL_EVIDENCE_PATH=exchange-evidence/pools-mixed-workers.json pnpm test:agent-exchange-pools > exchange-evidence/pools-mixed-workers.log
       - run: pnpm typecheck
       - run: pnpm lint
       - name: Complete production build including pinned Linux workers
