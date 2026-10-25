@@ -81,8 +81,8 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
         [fixtureIssue, userId],
       );
       await pool.query(
-        `INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$2,'user_message',$1::text,'{}')`,
-        [event, userId],
+        `INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$2,'user_message',$3,'{}')`,
+        [event, userId, `execution-claim:${event}`],
       );
       const store = createFactoryStore(
         pool,
