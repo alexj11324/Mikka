@@ -626,6 +626,9 @@ export class Daemon {
       })
       this.supervisor.renewLeases(leases)
       if (revoked) this.supervisor.revokeLeases(revoked)
+      // Work in progress leaves the machine, so another can take over.
+      const checkpointRun = link.checkpointRun?.bind(link)
+      if (checkpointRun) await this.supervisor.saveCheckpoints(checkpointRun)
       this.saveDevice({ repos: await link.listRepos(deviceId) })
       this.server = "online"
       await this.outbox.flushAll()
