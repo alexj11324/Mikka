@@ -7,6 +7,7 @@ import {
   type FactoryEvidence,
 } from "./contract";
 import { factoryCheckAssignment, verifierCommandEvidence } from "./checks";
+import { factoryCheckIndependent } from "./check-independence";
 import { factoryEventId } from "./event-id";
 import type { FactoryTask, createFactoryStore } from "./store";
 
@@ -136,12 +137,8 @@ export async function reconcileFactoryCheck(
   if (status === "failed") {
     try {
       const assignment = await factoryCheckAssignment(tx, task.userId, run.id);
-      const { rows: reused } = await tx.query(
-        `SELECT 1 FROM factory_attempts WHERE "taskId"=$1 AND id<>$2 AND ("runId"=$3 OR "sessionId"=$4)`,
-        [task.id, task.attemptId, run.id, run.sessionId],
-      );
       if (
-        reused.length ||
+        !(await factoryCheckIndependent(tx, task, run.id)) ||
         run.report?.check?.sha !== assignment.baseBranch ||
         run.report.check.readOnly !== true ||
         run.report.verify.command !== assignment.verifyCommand ||
