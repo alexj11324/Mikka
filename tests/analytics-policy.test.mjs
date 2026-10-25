@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
-import { featureAvailability, upcomingFeatures } from '../lib/feature-flags.ts'
+import { featureAvailability, gatedFeatureEnabled, gatedFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
 
 test('pageviews strip query strings, hashes, document identifiers and unapproved properties', () => {
   const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: {
@@ -51,4 +51,10 @@ test('all upcoming features fail closed, even if the remote switch is accidental
     }
     assert.equal(featureAvailability(feature, true).reason, 'FeatureCopy.c_7a3f5896')
   }
+})
+
+test('gated features are on only when the remote flag is exactly true', () => {
+  assert.equal(gatedFeatures.cloudComputer, 'mikka-cloud-computer')
+  for (const remote of [undefined, false, 'control', 'true']) assert.equal(gatedFeatureEnabled(remote), false)
+  assert.equal(gatedFeatureEnabled(true), true)
 })
