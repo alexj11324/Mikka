@@ -46,7 +46,13 @@ const nextConfig = {
       { key: 'Strict-Transport-Security', value: 'max-age=63072000' },
       { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
       { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-    ] }]
+    ] }, ...['/api/auth/verify-email', '/api/auth/reset-password/:path*', '/reset-password/:path*'].map(source => ({
+      source,
+      headers: [
+        { key: 'Referrer-Policy', value: 'no-referrer' },
+        { key: 'Cache-Control', value: 'no-store' },
+      ],
+    }))]
   },
   experimental: {
     globalNotFound: true,
