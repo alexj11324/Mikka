@@ -35,4 +35,4 @@ jobs:
       - run: pnpm test:byos-worker
         env:
           MIKKA_BYOS_BACKEND_ONLY: '1'
-      - run: pnpm --filter @mikka/daemon exec vitest run test/subscription-worker-client.test.ts test/subscription-native-broker.test.ts test/claude-subscription.test.ts test/codex-subscription.test.ts
+      - run: pnpm --filter @mikka/daemon exec vitest run test/subscription-worker-client.test.ts test/subscription-native-broker.test.ts test/claude-subscription.test.ts test/codex-subscription.test.ts test/credential-input.test.ts test/subscription-request-budget.test.ts

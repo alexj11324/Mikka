@@ -107,8 +107,21 @@ automatic expiry. A leaked token can call device APIs for that user's devices.
 The hosted allowlist limits native subscription calls but is not a general
 restriction on this credential. `setDeviceEnabled(false)` stops hosted use for
 that device; it does not revoke the token. The authentication query respects
-`revokedAt`, but this audit found no ordinary token-revocation product endpoint.
-Do not promise a complete revocation UI or resort to direct SQL in acceptance.
+`revokedAt`. The endpoint is absent in this checkout, but is implemented in
+reviewed candidate #275 (`dfa82d38ace4befb62909a18feafc9daee2907c4`), including
+its #178 base. Reuse that integration; do not implement a competing revocation
+path or resort to direct SQL in acceptance.
+
+That candidate exposes owner-session `GET /api/device-tokens` (metadata only) and
+same-origin `POST /api/device-tokens/:tokenId/revoke`. Its transaction marks only
+the selected token revoked, expires attributed live leases, records stop requests
+and revokes related worker tokens with an audit receipt. Repetition preserves the
+original receipt, and sibling credentials remain valid. Database admission locks
+fence late application writes. Daemon session rejection stops active processing.
+Older unattributed attempts and already-admitted external effects are explicit
+limits; real native process termination has not been established by fixture tests.
+This does not add token expiry or workspace scope. Integration must preserve the
+reviewed audit/schema/claim wrappers rather than cherry-pick just the HTTP route.
 
 The CLI default device-code flow references `/api/auth/device/code` and
 `/api/auth/device/token`; `lib/auth.ts` does not register that plugin, and device

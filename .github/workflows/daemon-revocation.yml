@@ -1,7 +1,7 @@
 name: Daemon credential revocation
 on:
   push:
-    branches: ['fix/178-daemon-revocation', 'fix/178-transaction-fence']
+    branches: ['fix/178-daemon-revocation', 'fix/178-transaction-fence', 'codex/byos-product-revocation']
 permissions:
   contents: read
 jobs:
