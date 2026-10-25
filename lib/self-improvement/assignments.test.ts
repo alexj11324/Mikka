@@ -72,3 +72,19 @@ test('receipted journal resume cannot launch an adapter while online validation 
   const offline=new RunSupervisor({...deps,revalidateSkillAssignment:async()=>{throw new Error('offline')}})
   await offline.resumeAll();assert.equal(touched,0);assert.deepEqual(offline.activeRunIds(),[])
 })
+test('local cancellation while online revalidation waits cannot resurrect the run',async()=>{
+  const root=await mkdtemp(join(tmpdir(),'mikka-skill-cancel-')),receipt=fixtureReceipt()
+  const assignment={runId:receipt.runId,issueId:receipt.issueId,deviceId:receipt.deviceId,repoId:receipt.repoId,
+    baseBranch:'main',harness:'codex' as const,prompt:'fixture',leaseExpiresAt:receipt.leaseExpiresAt,skills:[BASELINE_SKILL],skillReceipt:receipt}
+  const journal=new RunJournal(join(root,'journal.json'))
+  journal.put({assignment,state:'running',sessionId:'synthetic',worktree:root,lastSeq:0,error:null,updatedAt:new Date().toISOString()})
+  let release!:()=>void, entered!:()=>void
+  const gate=new Promise<void>(resolve=>{release=resolve}),started=new Promise<void>(resolve=>{entered=resolve})
+  const deps={journal,outbox:{lastChunkSeq:()=>0,push:()=>{},compact:async()=>{}},repos:()=>[{repoId:receipt.repoId,name:'fixture',path:root}],
+    adapters:new Map(),worktrees:{},log:{},revalidateSkillAssignment:async()=>{entered();await gate;return {skillReceipt:receipt,leaseExpiresAt:receipt.leaseExpiresAt}}} as unknown as SupervisorDeps
+  const supervisor=new RunSupervisor(deps);let launches=0
+  Object.defineProperty(supervisor,'launch',{value:()=>{launches++}})
+  const pending=supervisor.resumeAll();await started
+  await supervisor.cancel(receipt.runId);release();await pending
+  assert.equal(journal.get(receipt.runId)!.state,'cancelled');assert.equal(launches,0)
+})

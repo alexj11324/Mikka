@@ -25,9 +25,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const parsed = deviceHeartbeatSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
   await db.update(devices).set({ harnesses: parsed.data.harnesses, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
-  const eligibility=await skillAssignments.heartbeatEligible(caller.userId,parsed.data.runs.map(run=>run.runId),request.headers.get(SKILL_ARTIFACT_HEADER)==='1')
-  const result = await renewRunLeases(deviceId, eligibility.eligible)
-  result.revoked=[...new Set([...(result.revoked??[]),...eligibility.revoked])]
+  const selected=await skillAssignments.renewHeartbeat(caller.userId,deviceId,parsed.data.runs.map(run=>run.runId),request.headers.get(SKILL_ARTIFACT_HEADER)==='1')
+  const result = await renewRunLeases(deviceId, selected.legacy)
+  result.leases={...result.leases,...selected.leases}
+  result.revoked=[...new Set([...(result.revoked??[]),...selected.revoked])]
   after(() => reclaimLostRuns(caller.userId).catch((error: unknown) => console.error('Could not reclaim lost runs', error instanceof Error ? error.message : error)))
   return NextResponse.json(result)
 }

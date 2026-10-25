@@ -58,7 +58,8 @@ legacy runs. Interrupted `finishing` stays blocked for explicit reconciliation
 and cannot automatically replay an uncertain publication.
 
 Heartbeats for receipted runs recheck the same source/access/capability boundary;
-rejected runs are returned in `revoked` and receive no renewed lease. Existing
+the check and lease update share the same transaction and locked run, with a
+stop/lease CAS. Rejected runs are returned in `revoked` and receive no renewed lease. Existing
 nonreceipted lease behavior is unchanged. A device capability header is a
 compatibility marker, **not** a cryptographic binary attestation. The server
 cannot prevent an arbitrary old binary from executing its cached journal while
@@ -120,7 +121,8 @@ actual immutable ledgers, actual #191 queue transactions, actual Factory
 dispatcher/store/gates and actual filesystem `RunContext` mounting. They cover
 ten-way replay, 25 assigned failures, missing sources, old-worker rejection,
 current stop/access and receipt checks, retry-source loss, no offline adapter
-launch, symlink/hardlink preservation and no model-supplied provenance. They
+launch, cancellation while online resume authorization is pending, concurrent
+heartbeat/stop fences, symlink/hardlink preservation and no model-supplied provenance. They
 do not invoke a paid model, a real CLI or a publication adapter.
 
 The added remote browser-CI test uses built **actual Next routes**, synthetic

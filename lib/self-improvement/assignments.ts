@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
+import { RUN_LEASE_MS } from '@mikka/protocol/device'
 import { skillAssignmentReceiptSchema } from '@mikka/protocol/skill'
 import { BASELINE_ARTIFACT, BASELINE_MARKDOWN, BASELINE_SKILL } from './builtin-skill'
 import { digest, ImprovementError } from './contract'
@@ -12,7 +13,7 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize) {
     try { await tx.query('BEGIN'); const result = await work(tx); await tx.query('COMMIT'); return result }
     catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
   }
-  async function owned(tx: PoolClient, userId: string, runId: string) {
+  async function owned(tx: PoolClient, userId: string, runId: string, lockRun=false) {
     if (!z.uuid().safeParse(runId).success) throw new ImprovementError('notFound')
     const { rows: [source] } = await tx.query('SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId, userId])
     if (!source?.issueId) throw new ImprovementError('notFound')
@@ -22,7 +23,7 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize) {
       JOIN agents a ON a.id=r."agentId" AND a."userId"=$2 AND a."deviceId"=r."deviceId"
       JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=$2 AND repo."deviceId"=r."deviceId"
       JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=$2 AND d.enabled=true
-      WHERE r.id=$1 AND r."userId"=$2 FOR SHARE OF r,a,repo,d`, [runId, userId])
+      WHERE r.id=$1 AND r."userId"=$2 ${lockRun?'FOR UPDATE OF r FOR SHARE OF a,repo,d':'FOR SHARE OF r,a,repo,d'}`, [runId, userId])
     if (!run?.issueId || run.issueId !== source.issueId) throw new ImprovementError('notFound')
     if (run.stopRequestedAt || run.status === 'cancelled') throw new ImprovementError('runUnavailable')
     return run
@@ -104,16 +105,33 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize) {
       return {skillReceipt:source.skillReceipt,leaseExpiresAt:run.leaseExpiresAt.toISOString()}
     })
   }
-  async function heartbeatEligible(userId:string,runIds:string[],supportsArtifacts:boolean) {
-    const {rows}=await pool.query('SELECT "runId",id FROM improvement_skill_receipts WHERE "userId"=$1 AND "runId"=ANY($2::uuid[])',[userId,runIds])
-    const revoked:string[]=[]
+  async function renewHeartbeat(userId:string,deviceId:string,runIds:string[],supportsArtifacts:boolean) {
+    const {rows}=await pool.query(`SELECT s."runId",r.id FROM improvement_skill_selections s
+      LEFT JOIN improvement_skill_receipts r ON r."runId"=s."runId" AND r."userId"=s."userId"
+      WHERE s."userId"=$1 AND s."runId"=ANY($2::uuid[])`,[userId,runIds])
+    const revoked:string[]=[],leases:Record<string,string>={}
     for(const row of rows) {
-      try {await revalidate(userId,row.runId,row.id,supportsArtifacts)}
+      try {
+        if(!supportsArtifacts||!row.id)throw new ImprovementError('workerCapabilityRequired')
+        leases[row.runId]=await transaction(async tx=>{
+          const run=await owned(tx,userId,row.runId,true)
+          if(run.deviceId!==deviceId||!['preparing','running','waiting_input','finishing'].includes(run.status)||!run.leaseExpiresAt||run.leaseExpiresAt.getTime()<=Date.now())
+            throw new ImprovementError('runUnavailable')
+          const source=await assignedSkillForRun(tx,userId,run)
+          if(source.skillUsage!=='assigned'||source.skillReceipt.id!==row.id||digest(source.skillArtifact)!==digest(BASELINE_ARTIFACT))throw new ImprovementError('sourceMismatch')
+          const expiry=new Date(Date.now()+RUN_LEASE_MS).toISOString()
+          const changed=await tx.query(`UPDATE agent_runs SET "leaseExpiresAt"=$4,"updatedAt"=now() WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3
+            AND "stopRequestedAt" IS NULL AND "leaseExpiresAt"=$5 AND "leaseExpiresAt">now() RETURNING id`,[run.id,userId,deviceId,expiry,run.leaseExpiresAt])
+          if(!changed.rowCount)throw new ImprovementError('runUnavailable')
+          return expiry
+        })
+      }
       catch(error) {if (!(error instanceof ImprovementError)) throw error;revoked.push(row.runId)}
     }
-    return {eligible:runIds.filter(id=>!revoked.includes(id)),revoked}
+    const protectedIds=new Set(rows.map(row=>row.runId))
+    return {legacy:runIds.filter(id=>!protectedIds.has(id)),leases,revoked}
   }
-  return { selectBaseline, preflight, recordClaim, revalidate, heartbeatEligible }
+  return { selectBaseline, preflight, recordClaim, revalidate, renewHeartbeat }
 }
 
 /** Trust only an immutable server ledger bound to this actual live source. */

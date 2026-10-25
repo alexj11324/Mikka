@@ -504,11 +504,20 @@ export class RunSupervisor {
           if (!this.deps.revalidateSkillAssignment) throw new Error('Current Skill source check unavailable')
           const current=await this.deps.revalidateSkillAssignment(entry.assignment)
           if (this.stopping) return
+          const latest=this.deps.journal.get(entry.assignment.runId)
+          if (!latest||isTerminalRunState(latest.state)||this.active.has(entry.assignment.runId)) {
+            this.blockedSkillResumes.delete(entry.assignment.runId)
+            continue
+          }
+          if (latest.state!==entry.state||latest.sessionId!==entry.sessionId||latest.worktree!==entry.worktree||latest.assignment.skillReceipt?.id!==entry.assignment.skillReceipt.id)
+            throw new Error('Local Skill resume fence changed')
           this.leases.set(entry.assignment.runId,Date.parse(verifySkillResume(entry.assignment,current)))
           this.deps.journal.update(entry.assignment.runId,{error:null})
           this.blockedSkillResumes.delete(entry.assignment.runId)
           this.launch(entry.assignment.runId,repo)
         } catch {
+          const latest=this.deps.journal.get(entry.assignment.runId)
+          if (!latest||isTerminalRunState(latest.state)) {this.blockedSkillResumes.delete(entry.assignment.runId);continue}
           this.leases.delete(entry.assignment.runId)
           this.blockedSkillResumes.add(entry.assignment.runId)
           this.deps.journal.update(entry.assignment.runId,{error:'Skill resume blocked: current online source, authorization and lease required.'})
