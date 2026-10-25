@@ -13,7 +13,7 @@ import {handleGroupWorkerRequest} from './group-worker-route'
 const url=process.env.MIKKA_DISPOSABLE_POSTGRES_URL
 const workspaceUrl=process.env.MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL??url
 for(const value of [url,workspaceUrl])if(value){const u=new URL(value);assert.equal(u.hostname,'127.0.0.1');assert.ok(['/mikka_review','/mikka_workspace_review'].includes(u.pathname))}
-test('trusted issue-less group HTTP assignment and commit-time authority on separate PG databases',{skip:!url},async t=>{
+test('trusted issue-less group HTTP assignment and commit-time workspace authority',{skip:!url},async t=>{
  const schema='authority_'+randomUUID().replaceAll('-',''),admin=new Pool({connectionString:url}),wa=new Pool({connectionString:workspaceUrl})
  await admin.query(`CREATE SCHEMA "${schema}"`);await wa.query(`CREATE SCHEMA "${schema}_ws"`)
  const pool=new Pool({connectionString:url,options:`-c search_path=${schema}`,max:8}),ws=new Pool({connectionString:workspaceUrl,options:`-c search_path=${schema}_ws`,max:4})
@@ -42,6 +42,9 @@ test('trusted issue-less group HTTP assignment and commit-time authority on sepa
  }
  const finish=(r:Awaited<ReturnType<typeof fresh>>,epoch:number)=>call({action:'complete',runId:r.work.runId,reply:{workId:r.work.id,triggerMessageId:r.work.triggerMessageId,claimEpoch:epoch,body:'Controlled trusted reply'}})
  try{
+  const appDatabase=(await admin.query('SELECT current_database() AS name')).rows[0].name
+  const workspaceDatabase=(await wa.query('SELECT current_database() AS name')).rows[0].name
+  console.log(JSON.stringify({layer:'actual PG topology',appDatabase,workspaceDatabase,splitDatabase:appDatabase!==workspaceDatabase}))
   for(const name of orderMigrations((await readdir(new URL('../drizzle/',import.meta.url))).filter(n=>n.endsWith('.sql')))){
    const sql=await readFile(new URL('../drizzle/'+name,import.meta.url),'utf8');await(/^--\s*target:\s*DATABASE_URL/m.test(sql)?ws:pool).query(sql)
   }
@@ -103,6 +106,18 @@ test('trusted issue-less group HTTP assignment and commit-time authority on sepa
      await pool.query('DROP TRIGGER authority_pause ON conversation_messages; DROP FUNCTION authority_pause()')
     }
    }
+  })
+  await t.test('application insert failure rolls back reply and permits one explicit same-epoch retry',async()=>{
+   const r=await fresh(),c=await call({action:'claim',runId:r.work.runId});assert.equal(c.status,200)
+   await pool.query(`CREATE FUNCTION authority_reject_insert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."authorType"='agent' THEN RAISE EXCEPTION 'synthetic application insert failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER authority_reject_insert BEFORE INSERT ON conversation_messages FOR EACH ROW EXECUTE FUNCTION authority_reject_insert()`)
+   try{
+    assert.equal((await finish(r,c.body.claimEpoch)).status,500)
+    assert.equal((await pool.query(`SELECT count(*) FROM conversation_messages WHERE "conversationId"=$1 AND "authorType"='agent'`,[r.conversationId])).rows[0].count,'0')
+    assert.equal((await pool.query('SELECT status FROM conversation_work WHERE id=$1',[r.work.id])).rows[0].status,'dispatched')
+   }finally{await pool.query('DROP TRIGGER authority_reject_insert ON conversation_messages; DROP FUNCTION authority_reject_insert()')}
+   assert.equal((await finish(r,c.body.claimEpoch)).body.status,'completed')
+   assert.equal((await finish(r,c.body.claimEpoch)).body.status,'completed')
+   assert.equal((await pool.query(`SELECT count(*) FROM conversation_messages WHERE "conversationId"=$1 AND "authorType"='agent'`,[r.conversationId])).rows[0].count,'1')
   })
  }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));await pool.end();await ws.end();if(!process.env.KEEP_GROUP_TEST_FIXTURES)await admin.query(`DROP SCHEMA "${schema}" CASCADE`);if(!process.env.KEEP_GROUP_TEST_FIXTURES)await wa.query(`DROP SCHEMA "${schema}_ws" CASCADE`);await admin.end();await wa.end()}
 })
