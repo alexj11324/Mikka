@@ -1,0 +1,22 @@
+▶ real PG schedule lifecycle, concurrency, fencing, recovery and original-chat result
+  ✔ ten repeated creates and ten concurrent due scans yield one occurrence/result (287.893425ms)
+  ✔ two recurring executions retain stable IDs across fresh process stores (67.458727ms)
+  ✔ claimed worker crash expires lease; stale claim cannot execute after restart (396.631619ms)
+  ✔ pause/cancel/update fence already claimed work, persistence and optimistic version (91.379076ms)
+  ✔ ten real cancellation-versus-execution races have one linearized outcome (484.347063ms)
+  ✔ late policy records skip; catch-up coalesces and records at most one backlog slot (35.244396ms)
+  ✔ cross owner/workspace/source denied and membership revoked before execution (47.46993ms)
+  ✔ read current issue state; revoked issue visibility produces a final error, not task data (98.378361ms)
+{"evidence":"retained PG schedule records","owner":"schedule-owner-2f3deaf8-292d-4c71-9b15-0f91be9b9be5","workspace":"946cb986-7e6e-4ebd-9f6d-19a7f2e0afae","session":"97f3e99d-07e3-436a-a65b-97bf59feb261","source":"a546b9d6-9508-4306-ab72-82ab8fc74758","at":"2030-01-01T00:32:02.001Z"}
+  ✔ real transaction failure retries three times and persists final error in chat (79.301576ms)
+✔ real PG schedule lifecycle, concurrency, fencing, recovery and original-chat result (1634.891833ms)
+{"evidence":"existing inbox compensation only; not Workflow SDK acceptance","owner":"wake179-431c724d-d5e6-47bf-9fed-ca2c1782bd8c","event":"75112cca-e5af-4e17-bdc1-bea882581cde","exhausted":"cb9864ab-dc1e-4f89-ab08-18d784c34c77"}
+✔ existing inbox persists delivery failures, compensation, concurrent claim and exhaustion (487.793169ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2228.859673

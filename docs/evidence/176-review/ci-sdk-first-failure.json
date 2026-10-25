@@ -1,0 +1,16 @@
+{
+  "run": 40238188319,
+  "head": "b664703f5cdce90269d18002626e587f720746e0",
+  "status": "completed",
+  "conclusion": "failure",
+  "step": "Real Workflow SDK duplicate delivery and Next worker SIGKILL",
+  "artifactId": 12615935715,
+  "artifactName": "actual-workflow-local-world",
+  "artifactExpired": false,
+  "artifactReadAction": "gh run download --name actual-workflow-local-world",
+  "artifactReadOutcome": "HTTP 403 Forbidden at redirected ZIP target; no local archive obtained",
+  "artifactReadAttempts": 1,
+  "retriedOrBypassed": false,
+  "rootCause": "unresolved: failing script output was redirected into inaccessible artifact; later SDK pass is not independent diagnosis",
+  "runtimeSource": "5a7197d0b51d514b38e8a57c14203c7c8da51583"
+}
