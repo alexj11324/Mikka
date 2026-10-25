@@ -1,5 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
+import { configureFactoryCheck, factoryRepairBrief } from "./checks";
+import { factoryEventId } from "./event-id";
 import { bindingSchema, FactoryError } from "./contract";
 import type { createFactoryStore } from "./store";
 import type { DispatchInput, DispatchResult } from "../run-dispatch";
@@ -59,6 +61,13 @@ export function createFactoryDispatch(
           ],
         );
       }
+      if (!run.replayed) {
+        if (task.stage === "review" || task.stage === "verify") {
+          await configureFactoryCheck(tx, task, run.runId);
+        } else if (task.stage === "execute") {
+          await factoryRepairBrief(tx, task, run.runId);
+        }
+      }
       const state = await store.apply(
         userId,
         binding,
@@ -70,6 +79,43 @@ export function createFactoryDispatch(
       return { ...run, ...state };
     } catch (error) {
       await tx.query("ROLLBACK");
+      // Missing authorized inputs become durable blocked state, with no orphan queue row.
+      const code =
+        error instanceof Error && "code" in error ? String(error.code) : null;
+      if (
+        [
+          "factoryCheckCommandRequired",
+          "factoryCheckHarnessUnavailable",
+          "factoryCheckUnchangedCandidate",
+          "agentNoDevice",
+          "agentRepoMissing",
+        ].includes(code ?? "")
+      ) {
+        try {
+          await tx.query("BEGIN");
+          await store.apply(
+            userId,
+            binding,
+            factoryEventId("dispatch-blocked", binding.attemptId),
+            {
+              action: "finish",
+              status: "blocked",
+              reason: `Dispatch blocked: ${code}; authorized Harness/repository/verify environment required`,
+              evidence: [],
+              output: { dispatchError: code },
+            },
+            tx,
+          );
+          await tx.query("COMMIT");
+        } catch (blockedError) {
+          await tx.query("ROLLBACK");
+          if (
+            !(blockedError instanceof FactoryError) ||
+            !["factoryStale", "factoryStopped"].includes(blockedError.code)
+          )
+            throw blockedError;
+        }
+      }
       throw error;
     } finally {
       tx.release();

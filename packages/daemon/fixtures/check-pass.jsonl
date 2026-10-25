@@ -1,0 +1,2 @@
+{"t":0,"submit":{"summary":"Fixture independent check; real command runs in the daemon.","criteria":[{"text":"Acceptance command succeeds","passed":true,"evidence":"Read the fixture acceptance command; daemon records the actual process outcome."}]}}
+{"t":0,"exit":{"outcome":"succeeded"}}

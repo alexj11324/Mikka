@@ -27,6 +27,7 @@
 // The handoff report's verify result is always the daemon's own: only the
 // agent's summary, open questions, next step and blocker are taken from the
 // agent. A submission is `succeeded` only when verify passed.
+import { fixedCheckSnapshot } from "./check"
 import { randomUUID } from "node:crypto"
 import { resolve } from "node:path"
 
@@ -414,7 +415,9 @@ export class RunSupervisor {
       // outbox one chunk ahead; continue after it so seqs neither repeat nor gap.
       const outboxSeq = this.deps.outbox.lastChunkSeq(entry.assignment.runId)
       if (outboxSeq > entry.lastSeq)
-        this.deps.journal.update(entry.assignment.runId, { lastSeq: outboxSeq })
+        this.deps.journal.update(entry.assignment.runId, {
+          lastSeq: outboxSeq,
+        })
       const repo = this.deps
         .repos()
         .find((r) => r.repoId === entry.assignment.repoId)
@@ -669,7 +672,10 @@ export class RunSupervisor {
     error: string | undefined,
     agent: AgentReport | undefined
   ): Promise<{ report: HandoffReport; verifyError?: string; tree?: string }> {
-    const report = { ...baseReport(error), ...pickAgentReport(agent) }
+    let report: HandoffReport = {
+      ...baseReport(error),
+      ...pickAgentReport(agent),
+    }
     const filesChanged = (
       await this.deps.worktrees.changedFiles(worktree).catch(() => [])
     ).slice(0, MAX_REPORTED_FILES)
@@ -680,11 +686,12 @@ export class RunSupervisor {
       return {
         report: { ...report, filesChanged, verify: { status: "not_run" } },
       }
+    let execution: Partial<HandoffReport["verify"]> = {}
     const failed = (output: string, verifyError: string) => ({
       report: {
         ...report,
         filesChanged,
-        verify: { status: "failed" as const, command, output },
+        verify: { status: "failed" as const, command, output, ...execution },
       },
       verifyError,
     })
@@ -693,7 +700,19 @@ export class RunSupervisor {
     const publisher = this.deps.publisher
     let before: string | undefined
     try {
-      before = await publisher?.snapshot({ worktree, repo })
+      if (assignment.kind === "check") {
+        if (runPolicy(assignment.policy).readOnly !== true)
+          throw new Error("Check assignment is missing its read-only policy")
+        const fixed = await fixedCheckSnapshot(
+          repo.path,
+          worktree,
+          assignment.baseBranch
+        )
+        report = { ...report, check: { sha: fixed.sha, readOnly: true } }
+        before = fixed.tree
+      } else {
+        before = await publisher?.snapshot({ worktree, repo })
+      }
     } catch (snapshotError) {
       return failed("", `Could not read the worktree: ${String(snapshotError)}`)
     }
@@ -706,12 +725,22 @@ export class RunSupervisor {
       signal: this.stopController.signal,
       readOnly: runPolicy(assignment.policy).readOnly === true,
     })
+    execution = {
+      exitCode: result.exitCode,
+      signal: result.signal,
+      timedOut: result.timedOut,
+    }
     const output = result.output.slice(-4000)
     if (result.exitCode !== 0 || result.timedOut)
       return failed(output, verifyFailure(command, result))
-    const after = publisher
-      ? await publisher.snapshot({ worktree, repo }).catch(() => null)
-      : undefined
+    const after =
+      assignment.kind === "check"
+        ? await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
+            .then((fixed) => fixed.tree)
+            .catch(() => null)
+        : publisher
+          ? await publisher.snapshot({ worktree, repo }).catch(() => null)
+          : undefined
     if (after !== before)
       return failed(
         output,
@@ -721,7 +750,7 @@ export class RunSupervisor {
       report: {
         ...report,
         filesChanged,
-        verify: { status: "passed", command, output },
+        verify: { status: "passed", command, output, ...execution },
       },
       tree: before,
     }
@@ -865,14 +894,26 @@ export class RunSupervisor {
       ))
     if (!entry.worktree) {
       // A continued worktree was bootstrapped by the run that made it.
-      const setup = continued
-        ? "continued"
-        : await this.deps.worktrees.bootstrap(worktree, repo.path, repo.setup)
+      const setup =
+        runPolicy(assignment.policy).readOnly === true
+          ? "read-only"
+          : continued
+            ? "continued"
+            : await this.deps.worktrees.bootstrap(
+                worktree,
+                repo.path,
+                repo.setup
+              )
       log.info({ worktree, setup }, "worktree ready")
       this.deps.journal.update(runId, { worktree })
     }
     if (this.stopping) return
 
+    if (assignment.kind === "check") {
+      if (runPolicy(assignment.policy).readOnly !== true)
+        throw new Error("Check assignment is missing its read-only policy")
+      await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
+    }
     const options = {
       runId,
       kind: assignment.kind,

@@ -17,11 +17,19 @@ import { factoryDispatchDatabase } from "./transaction";
 import { createFactoryReconciler } from "./reconcile";
 import { insertRunOnce } from "../run-dispatch";
 
+const localDB = process.env.FACTORY_TEST_DATABASE_URL;
+if (localDB) {
+  const url = new URL(localDB);
+  assert.equal(url.hostname, "127.0.0.1");
+  assert.equal(url.port, "55493");
+  assert.equal(url.pathname, "/factory193");
+}
 const dbURL =
-  process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true"
+  localDB ??
+  (process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true"
     ? process.env.E2E_DATABASE_URL
-    : undefined;
-if (dbURL) {
+    : undefined);
+if (dbURL && !localDB) {
   const url = new URL(dbURL);
   assert.equal(url.hostname, "127.0.0.1");
   assert.equal(url.pathname, "/mikka_e2e");
