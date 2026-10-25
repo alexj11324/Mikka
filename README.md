@@ -182,7 +182,7 @@ Dashed boxes and lines are on the roadmap: the Scheduler
 | Triage | Rules first, then a model call through Vercel AI Gateway with a monthly cost cap |
 | Data | Postgres on Neon, Drizzle migrations in [`drizzle/`](drizzle) |
 | Auth | Better Auth, with Google and GitHub sign-in and an OAuth 2.1 server for MCP |
-| Integrations | GitHub and Linear webhooks; Composio for Gmail, Notion and Slack; a Cloudflare Worker for Linear sync; Vercel Chat SDK for Telegram |
+| Integrations | GitHub and Linear webhooks; Composio for Gmail, Google Calendar, Notion and Slack; a Cloudflare Worker for Linear sync; Vercel Chat SDK for Telegram |
 | Agents | The Mikka daemon, with adapters for Claude Code, Codex and Cursor |
 
 ## Repository layout

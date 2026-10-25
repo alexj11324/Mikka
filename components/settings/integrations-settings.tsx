@@ -9,11 +9,11 @@ import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { Google } from '@/components/ui/svgs/google'
 
-type Toolkit = 'gmail' | 'notion' | 'slack'
+type Toolkit = 'gmail' | 'googlecalendar' | 'notion' | 'slack'
 type Account = { id: string; toolkit: Toolkit; status: string }
 type IntegrationState = { configured: boolean; callbackVerifierConfigured: boolean; webhookConfigured: boolean; accounts: Account[] }
 
-const TOOLKITS: Toolkit[] = ['gmail', 'notion', 'slack']
+const TOOLKITS: Toolkit[] = ['gmail', 'googlecalendar', 'notion', 'slack']
 const integrationPath = withBasePath('/api/integrations/composio')
 
 export function IntegrationsSettings({ googleEnabled, showWebhookDetails = true }: { googleEnabled: boolean; showWebhookDetails?: boolean }) {
