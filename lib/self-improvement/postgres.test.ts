@@ -230,6 +230,21 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
     assert.equal((await propose(moved)).pendingDistinctFailures, 0)
   })
 
+  await t.test('a legitimate scorer/baseline upgrade preserves prior score reads and exact event replay', async () => {
+    const input = feedback(await makeRun()), id = randomUUID(), oldScorer = digest({ id: SCORER.id, version: 0 })
+    const snapshot = { issueId, agentId, deviceRepoId: repoId, repository: '/synthetic/report' }
+    await pool.query(`INSERT INTO improvement_scorers(digest,id,version,definition) VALUES($1,$2,0,$3)`, [oldScorer, SCORER.id, JSON.stringify({ id: SCORER.id, version: 0 })])
+    await pool.query(`INSERT INTO improvement_feedback(id,"userId","eventId","runId","issueId",fingerprint,verdict,note)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, [id, owner, input.eventId, input.runId, issueId, digest(input), input.verdict, input.note])
+    await pool.query(`INSERT INTO improvement_scores(id,"userId","runId",bucket,"scorerDigest",outcome,reason,snapshot)
+      VALUES($1,$2,$3,'synthetic-previous-baseline',$4,'failure','synthetic-old-version',$5)`, [id, owner, input.runId, oldScorer, JSON.stringify(snapshot)])
+    const previous = (await store.read(owner, input.runId)).scores.find(row => row.id === id)
+    assert.equal(previous.scorerDigest, oldScorer)
+    const replay = await post(input)
+    assert.equal(replay.status, 200)
+    assert.equal((await replay.json()).id, id)
+  })
+
   console.log(JSON.stringify({ layer: 'actual-PG17-HTTP', fixtures: 'synthetic-run-report-and-identity', retainedSchema: schema,
     scorerDigest: SCORER_DIGEST, migrations: files.length, productionAcceptance: false }))
 })

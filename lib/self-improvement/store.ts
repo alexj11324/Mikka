@@ -11,6 +11,11 @@ interface Run {
   stopRequestedAt: Date | null; finishedAt: Date; attempt: number; retryOf: string | null
 }
 
+function sameSource(snapshot: Record<string, unknown>, run: Run) {
+  return snapshot.issueId === run.issueId && snapshot.agentId === run.agentId &&
+    snapshot.deviceRepoId === run.deviceRepoId && snapshot.repository === run.repository
+}
+
 export function createImprovementStore(pool: Pool, authorize: Authorize) {
   async function withRun<T>(userId: string, runId: string, work: (tx: PoolClient, run: Run, bucket: string) => Promise<T>) {
     if (!userId || !commandSchema.options[1].shape.runId.safeParse(runId).success) throw new ImprovementError('notFound')
@@ -58,8 +63,8 @@ export function createImprovementStore(pool: Pool, authorize: Authorize) {
       const { rows: [old] } = await tx.query('SELECT id,fingerprint FROM improvement_feedback WHERE "userId"=$1 AND "eventId"=$2', [userId, feedback.eventId])
       if (old) {
         if (old.fingerprint !== fingerprint) throw new ImprovementError('conflict')
-        const { rows: [previous] } = await tx.query('SELECT * FROM improvement_scores WHERE id=$1 AND "userId"=$2 AND bucket=$3', [old.id, userId, bucket])
-        if (!previous) throw new ImprovementError('conflict')
+        const { rows: [previous] } = await tx.query('SELECT * FROM improvement_scores WHERE id=$1 AND "userId"=$2', [old.id, userId])
+        if (!previous || !sameSource(previous.snapshot, run)) throw new ImprovementError('conflict')
         return previous
       }
       const id = randomUUID()
@@ -123,9 +128,17 @@ export function createImprovementStore(pool: Pool, authorize: Authorize) {
   }
 
   async function read(userId: string, runId: string) {
-    return withRun(userId, runId, async (tx, run, bucket) => {
-      const scores = (await tx.query('SELECT * FROM improvement_scores WHERE "userId"=$1 AND "runId"=$2 AND bucket=$3 ORDER BY "createdAt",id', [userId, run.id, bucket])).rows
-      const proposals = (await tx.query('SELECT * FROM improvement_proposals WHERE "userId"=$1 AND bucket=$2 ORDER BY "createdAt",id', [userId, bucket])).rows
+    return withRun(userId, runId, async (tx, run) => {
+      // Authorization follows current source identity, not current scorer or
+      // baseline version. Old immutable scores remain inspectable/replayable
+      // after legitimate version upgrades, without leaking a moved issue.
+      const scores = (await tx.query('SELECT * FROM improvement_scores WHERE "userId"=$1 AND "runId"=$2 ORDER BY "createdAt",id', [userId, run.id])).rows.filter(row => sameSource(row.snapshot, run))
+      const proposals = (await tx.query(`SELECT p.* FROM improvement_proposals p
+        WHERE p."userId"=$1 AND p."issueId"=$2 AND EXISTS (
+          SELECT 1 FROM improvement_proposal_sources src JOIN improvement_scores s ON s.id=src."scoreId"
+          WHERE src."proposalId"=p.id AND s.snapshot->>'issueId'=$2::text
+          AND s.snapshot->>'agentId'=$3 AND s.snapshot->>'deviceRepoId'=$4 AND s.snapshot->>'repository'=$5)
+        ORDER BY p."createdAt",p.id`, [userId, run.issueId, run.agentId, run.deviceRepoId, run.repository])).rows
       return { scores, proposals }
     })
   }
