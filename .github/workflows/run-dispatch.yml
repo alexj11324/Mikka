@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   dispatch-postgres:
-    if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository) && github.ref != 'refs/heads/fix/178-daemon-revocation' && github.ref != 'refs/heads/fix/178-transaction-fence' && github.head_ref != 'fix/178-daemon-revocation' && github.head_ref != 'fix/178-transaction-fence'
+    if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository) && github.ref != 'refs/heads/fix/178-daemon-revocation' && github.ref != 'refs/heads/fix/178-transaction-fence' && github.head_ref != 'fix/178-daemon-revocation' && github.head_ref != 'fix/178-transaction-fence' && github.ref != 'refs/heads/codex/110-agent-exchange-readonly' && github.head_ref != 'codex/110-agent-exchange-readonly'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:

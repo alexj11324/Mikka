@@ -59,7 +59,9 @@
     "test:mailboxes": "node --import tsx --test tests/session-mailbox.test.ts tests/orchestration-prompts.test.ts",
     "test:run-dispatch": "node --import tsx --test tests/run-dispatch.test.ts",
     "test:byos-claim": "node scripts/test-byos-claim.mjs",
-    "build:byos-workers": "node scripts/build-subscription-workers.mjs"
+    "build:byos-workers": "node scripts/build-subscription-workers.mjs",
+    "test:agent-exchanges": "node --import tsx scripts/test-agent-exchanges.ts",
+    "test:agent-exchange-pools": "node --import tsx scripts/test-agent-exchange-pools.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

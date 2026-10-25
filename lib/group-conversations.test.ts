@@ -54,6 +54,7 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     await scoped.query(await readFile(new URL('../drizzle/20261025052032_group_artifact_review.sql', import.meta.url), 'utf8'))
     await scoped.query(migration) // production retry / coexistence with #69
     await scoped.query(await readFile(new URL('../drizzle/20261025082237_group_turn_mailbox_policy.sql', import.meta.url), 'utf8'))
+    await scoped.query(await readFile(new URL('../drizzle/20261025202112_conversation_exchange_scopes.sql', import.meta.url), 'utf8'))
     const reads = await readFile(new URL('../tests/fixtures/conversation-reads-69.sql', import.meta.url), 'utf8')
     await scoped.query(reads) // this migration first, then #69
     await scoped.query('DROP TABLE conversation_reads')

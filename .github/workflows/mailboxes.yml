@@ -4,7 +4,7 @@ permissions:
   contents: read
 jobs:
   mailboxes:
-    if: github.ref != 'refs/heads/fix/178-daemon-revocation' && github.ref != 'refs/heads/fix/178-transaction-fence' && github.head_ref != 'fix/178-daemon-revocation' && github.head_ref != 'fix/178-transaction-fence'
+    if: github.ref != 'refs/heads/fix/178-daemon-revocation' && github.ref != 'refs/heads/fix/178-transaction-fence' && github.head_ref != 'fix/178-daemon-revocation' && github.head_ref != 'fix/178-transaction-fence' && github.ref != 'refs/heads/codex/110-agent-exchange-readonly' && github.head_ref != 'codex/110-agent-exchange-readonly'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:

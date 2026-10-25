@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { cancelWork, grantAgent, requireAgent, ReviewFailure } from './group-review-access'
 import { enqueueMailboxTurn } from './group-mailbox-turns'
+import { exchangeMarkers } from './conversation-exchanges'
 
 const member = z.object({ memberType: z.enum(['user', 'agent']), memberId: z.string().min(1).max(256) }).strict()
 const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]) }).strict()
@@ -93,10 +94,14 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const limit = Number(decimal(req.limit, '50'))
         if (limit > 100) return fail(422)
         const { rows } = await q('SELECT * FROM conversation_messages WHERE "conversationId"=$1 AND ($2::bigint IS NULL OR position < $2) ORDER BY position DESC LIMIT $3', [req.id, before, limit + 1])
-        const more = rows.length > limit
-        const messages = rows.slice(0, limit)
+        const markers = await exchangeMarkers(client, directory, req.id!, before, limit + 1)
+        const items = [...rows.map(row => ({ ...row, type: 'message' as const })), ...markers]
+          .sort((a, b) => BigInt(a.position) > BigInt(b.position) ? -1 : 1)
+        const more = items.length > limit
+        const page = items.slice(0, limit)
+        const messages = page.filter(item => item.type === 'message')
         const work=(await q(`SELECT id,"triggerMessageId","agentId",round,status,"uncertainAt","replyMessageId" FROM conversation_work WHERE "conversationId"=$1 ORDER BY "createdAt",id LIMIT 100`,[req.id])).rows
-        result = { messages, work, nextBefore: more ? messages.at(-1)?.position : null }
+        result = { messages, items: page, work, nextBefore: more ? page.at(-1)?.position : null }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)
         if (!await directory(group.workspaceId, userId, input.mentions.filter(m => m.memberType === 'user'), client)) return fail(422)
