@@ -187,4 +187,4 @@ Mikka 采用 [AGPL-3.0-only](LICENSE) 协议开源。第三方组件遵循各自
 
 ## 参与贡献
 
-欢迎参与贡献，请先阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)。首次提交的 pull request 合并前，需要签署 [贡献者许可协议（CLA）](CLA.md)：在 pull request 中回复机器人的评论即可完成签署。
+欢迎参与贡献，请先阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)。贡献的代码按照项目的 [AGPL-3.0-only](LICENSE) 协议授权，无需另行签署贡献者协议；贡献者保留其作品的版权。

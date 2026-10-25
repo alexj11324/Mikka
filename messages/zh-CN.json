@@ -176,15 +176,13 @@
     "createDescription": "从第一个任务开始，把想法变成可追踪的进展。",
     "welcomeDescription": "登录 Mikka，继续你的任务与文档。",
     "continueGoogle": "使用 Google 继续",
-    "googleScope": "仅请求登录所需的基本个人资料与邮箱。",
     "googleLinkHint": "如果此邮箱已注册 Mikka，请先用邮箱密码登录，再到「设置 → 账户」关联 Google。",
     "googleNotConfigured": "Google 登录暂未配置，请使用邮箱继续。",
     "viewGoogleCallback": "查看 Google OAuth 回调地址",
     "continueGithub": "使用 GitHub 继续",
-    "githubScope": "仅获取登录所需的身份与邮箱，不请求仓库读写权限。",
     "githubNotConfigured": "GitHub 登录暂未配置，请使用邮箱继续。",
     "viewCallback": "查看 GitHub App 回调地址",
-    "orEmail": "或使用邮箱",
+    "orEmail": "或",
     "name": "称呼",
     "namePlaceholder": "怎么称呼你",
     "email": "邮箱",
@@ -685,7 +683,35 @@
     "editorAria": "{label}编辑器"
   },
   "Devices": {
+    "otherDevices": "Remote control",
+    "menu": "{name} 的更多操作",
+    "add": {
+      "title": "添加设备",
+      "description": "能用 SSH 登录的机器，Mikka 会自己装好。",
+      "trigger": "添加设备",
+      "host": "主机",
+      "hostPlaceholder": "主机名或 IP",
+      "user": "用户",
+      "userPlaceholder": "你在那台机器上的用户名",
+      "tailnet": "Tailnet 上",
+      "sshConfig": "SSH 配置里",
+      "configured": "已设置",
+      "sshNew": "ssh · 未设置",
+      "tailnetNew": "tailnet · 未设置",
+      "shortcut": "快捷键",
+      "cancel": "取消",
+      "setUp": "设置",
+      "settingUp": "正在设置 {host}",
+      "settingUpDescription": "用 SSH 登录，装好 Mikka，启动服务，记下主机密钥。",
+      "progress": "设置进度",
+      "interrupted": "连接中断。",
+      "back": "返回",
+      "done": "完成",
+      "emptyDescription": "添加一台能用 SSH 登录的机器。"
+    },
     "neverOnline": "从未上线",
+    "lastOnline": "最后在线 {time}",
+    "reconnect": "重新连接",
     "lastHeartbeat": "最后心跳 {time}",
     "installedWithVersion": "已安装 · {version}",
     "installed": "已安装",
@@ -735,7 +761,7 @@
       "steps": {
         "login": "登录",
         "check": "检查主机",
-        "install": "安装 daemon",
+        "install": "安装 Mikka",
         "start": "启动服务",
         "connect": "连接"
       },
@@ -1448,6 +1474,10 @@
       "integrations": {
         "title": "集成",
         "description": "管理已连接的应用与消息平台。"
+      },
+      "devices": {
+        "title": "设备",
+        "description": "你自己接入的机器。"
       },
       "workspace": {
         "title": "工作区",
@@ -2251,6 +2281,50 @@
     "send": "发送",
     "sendFailed": "没发出去，草稿还在"
   },
+  "Computer": {
+    "status": {
+      "working": "Agent 操作中",
+      "approval": "等你审批",
+      "done": "完成",
+      "failed": "出错",
+      "sleeping": "休眠中",
+      "waking": "唤醒中",
+      "running": "运行中",
+      "user": "你在操作"
+    },
+    "screenOf": "{name} 的屏幕",
+    "computerOf": "{name} 的电脑",
+    "cloud": "Mikka Cloud",
+    "card": "电脑任务",
+    "cardTitle": "电脑",
+    "openScreen": "全屏查看 {name} 的屏幕",
+    "open": "打开",
+    "sleeping": "电脑正在休眠",
+    "wake": "唤醒",
+    "waking": "唤醒中",
+    "machineError": "电脑没能启动",
+    "retry": "重试",
+    "wakeFailed": "唤醒失败，请重试。",
+    "viewer": {
+      "title": "{name} 的屏幕",
+      "close": "退出全屏",
+      "controls": "控制",
+      "viewOnly": "仅观看",
+      "otherControls": "别人在操作",
+      "youControl": "你在操作",
+      "takeover": "取得控制权",
+      "handback": "交还给 Agent",
+      "takenByOther": "别人正在操作这台电脑。",
+      "takeoverFailed": "没能取得控制权，请重试。",
+      "handbackFailed": "没能交还，请重试。"
+    },
+    "approval": {
+      "allowRun": "本任务内都允许",
+      "deny": "拒绝",
+      "allow": "允许",
+      "failed": "没有送达，请重试。"
+    }
+  },
   "Shell": {
     "pinned": "置顶",
     "searchPlaceholder": "搜索对话、任务、Agent、知识库",
@@ -2338,12 +2412,7 @@
         "finishing": "收尾中",
         "failed": "失败",
         "succeeded": "已完成"
-      },
-      "command": "指挥这个任务…",
-      "commandLabel": "给 Coordinator 发指令",
-      "send": "发送",
-      "sent": "已发给 Coordinator。",
-      "sendFailed": "没发出去，再试一次。"
+      }
     },
     "empty": {
       "nothing": "这里是空的",
@@ -2361,6 +2430,8 @@
       "device": "运行的机器",
       "noDevice": "未连接机器",
       "offline": "离线",
+      "online": "在线",
+      "cloud": "Mikka Cloud",
       "contextProject": "项目：{project}",
       "contextSeparator": "，",
       "prompt": "帮我新建一个任务：{text}",
