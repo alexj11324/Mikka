@@ -85,7 +85,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
   const note = event.tier === 'attention' ? 'Triage: this needs the person; tell them.' : event.tier === 'background' ? 'Triage: background; mention it only if it matters to what you are doing.' : null
   switch (event.kind) {
     case 'user_message':
-      return String(payload.text ?? '')
+      return [event.issueId ? 'This chat is linked to issue ' + event.issueId + '.' : null, String(payload.text ?? '')].filter(Boolean).join('\n\n')
     case 'run_finished':
       return [
         `[Event] Run ${event.runId} ended with status ${payload.status} (${payload.stopReason}).`,
