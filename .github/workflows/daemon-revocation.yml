@@ -54,6 +54,12 @@ jobs:
       - run: node --import tsx --test lib/db/device-scope.test.ts
       - run: pnpm typecheck
       - run: pnpm --filter @mikka/daemon typecheck
+      - name: Installed isolated native runtime (pinned public image)
+        run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
+      - name: Combined daemon regressions including hosted budget and private stdin
+        run: |
+          umask 022
+          pnpm --filter @mikka/daemon test
       - run: pnpm build
       - name: Real Go broker observes actual application revoke
         working-directory: packages/subscription-worker
