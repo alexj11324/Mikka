@@ -49,8 +49,6 @@ export function AgentComposer({ ref, draft, onChange, onSubmit, isLoading, onSto
       placeholder={isEmpty ? agentCopy.askAgent2 : agentCopy.enterAMessage}
       minRows={isEmpty ? 2 : 1}
       maxRows={4}
-      models={[{ value: 'deepseek-v4.1-flash', label: 'DS 4.1 Flash' }]}
-      model="deepseek-v4.1-flash"
       // The + menu opens with 添加文件 (Grok-style), then the starters.
       actions={[{ value: ATTACH, label: tShell('attach'), icon: <Paperclip /> }, ...agentStarters.map(starter => ({ value: starter.title, label: starter.title, icon: <starter.icon /> }))]}
       onAction={value => {

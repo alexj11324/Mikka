@@ -12,6 +12,7 @@ import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db } from '@/lib/db'
 import { agents, coordinatorEvents, deviceRepos, devices, factoryAttempts, factoryTasks, issueMembers, issues } from '@/lib/db/schema'
+import { webSearch } from '@/lib/search'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
@@ -376,4 +377,10 @@ export async function mailboxAction(userId: string, action: 'recipients' | 'inbo
       case 'ack': return await mailboxes.ack(actor, input.ids ?? [])
     }
   } catch (error) { if (error instanceof MailboxError) return { error: error.message }; throw error }
+}
+
+/** Web search through the shared SearchProvider (MIK-5); degrades to searchUnavailable on 429/5xx/timeout. */
+export async function webSearchStep(userId: string, input: { query: string; limit?: number }) {
+  'use step'
+  return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
 }

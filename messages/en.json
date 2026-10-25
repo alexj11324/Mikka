@@ -320,6 +320,7 @@
       "searchAria": "Search related tasks",
       "loadFailed": "Could not load tasks",
       "noTasks": "No other tasks from this owner are available.",
+      "noMatch": "No matching tasks",
       "noTasksSameOwner": "Tasks owned by someone else cannot be linked here.",
       "loading": "Loading tasks…",
       "group": "Available tasks",
@@ -1275,8 +1276,7 @@
     "savingProperties": "Saving properties…",
     "noMatchTitle": "No matching projects",
     "noMatchDescription": "Try another name or status.",
-    "emptyTitle": "Organize work around goals",
-    "emptyDescription": "Create a project, link tasks, and track delivery progress.",
+    "emptyTitle": "No projects yet",
     "columns": {
       "name": "Name",
       "health": "Health",
@@ -1980,7 +1980,6 @@
   "Coordinator": {
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
-    "emptyTitle": "Talk to your Coordinator",
     "usedTools": "Used {tools}",
     "pendingActions": {
       "label": "Waiting for your approval",
@@ -2362,8 +2361,8 @@
       "briefing": "{count, plural, one {# new message is} other {# new messages are}} worth a look, starting with",
       "noneToday": "No new suggestions today.",
       "routine": "Routine",
-      "emptyTitle": "Nothing here",
-      "emptyDescription": "Check back later",
+      "empty": "Nothing to read right now",
+      "connect": "Connect apps",
       "refresh": "Refresh suggestions",
       "loadError": "Suggestions failed to load.",
       "action": {
@@ -2381,13 +2380,13 @@
       }
     },
     "tasks": {
-      "mine": "My tasks",
+      "mine": "Tasks",
       "waiting": "Waiting on you",
       "running": "Running",
       "failed": "Failed",
       "doneToday": "Done",
       "today": "today {count}",
-      "empty": "No tasks handed to an agent yet.",
+      "empty": "No tasks yet",
       "status": {
         "waiting_input": "needs your reply",
         "queued": "queued",
@@ -2399,7 +2398,9 @@
       }
     },
     "empty": {
-      "nothing": "Nothing here",
+      "browser": "No web pages opened yet",
+      "knowledge": "No documents yet",
+      "schedules": "No scheduled tasks yet",
       "arrange": "Let an agent set it up",
       "knowledgePrompt": "Help me put the documents I use often into the knowledge base: ",
       "schedulesPrompt": "Help me set up a scheduled task: "
