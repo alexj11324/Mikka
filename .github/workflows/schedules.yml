@@ -1,0 +1,44 @@
+name: Conversation schedules PostgreSQL
+on:
+  push:
+    branches: ['codex/179-conversation-schedules', 'codex/179-recovery-fixes']
+  pull_request:
+    paths: ['lib/schedules/**', 'app/api/schedules/**', 'app/api/cron/runtime/**', 'drizzle/*user_schedules.sql', '.github/workflows/schedules.yml']
+permissions:
+  contents: read
+jobs:
+  postgres:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mikka_179_recovery
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mikka_179_recovery"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      SCHEDULE_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+      MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: MIGRATE=1 node scripts/migrate.mjs
+      - run: pnpm test:schedules
+      - run: pnpm test:schedules:postgres
+      - run: pnpm test:schedules:recovery
+        env:
+          SCHEDULE_RECOVERY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+      - run: pnpm typecheck

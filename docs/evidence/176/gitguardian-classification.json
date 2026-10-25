@@ -1,0 +1,95 @@
+{
+  "at": "2026-10-25T20:22:01.809Z",
+  "checkRun": 121278999145,
+  "affectedCommit": "fb5697ebae1f23526ce7eacef0ccca0ad3133b2f",
+  "path": "docs/evidence/176/http-first-diagnostic.log",
+  "detector": "Generic High Entropy Secret",
+  "flaggedOccurrences": 8,
+  "distinctSyntheticFences": 6,
+  "incidentIds": [
+    "38997059",
+    "38997060",
+    "38997061",
+    "38997062",
+    "38997063",
+    "38997064"
+  ],
+  "flaggedLines": [
+    3,
+    8,
+    12,
+    15,
+    19,
+    24,
+    26,
+    32
+  ],
+  "proof": [
+    {
+      "id": "f5b92bf5-fd01-46aa-9620-4b352aea9dd5",
+      "wake_status": "failed",
+      "wake_generation_state": "uncertain",
+      "processed_at": null,
+      "lease_expired": true,
+      "matching_login_tokens": 0,
+      "matching_device_tokens": 0,
+      "matching_run_tokens": 0
+    },
+    {
+      "id": "7df3d0e2-3f8c-41f1-b950-5bfa8737098c",
+      "wake_status": "completed",
+      "wake_generation_state": "returned",
+      "processed_at": "2026-10-25T19:54:15.637Z",
+      "lease_expired": true,
+      "matching_login_tokens": 0,
+      "matching_device_tokens": 0,
+      "matching_run_tokens": 0
+    },
+    {
+      "id": "03b14ef6-29b1-4422-884d-ec9e7ad38309",
+      "wake_status": "completed",
+      "wake_generation_state": "returned",
+      "processed_at": "2026-10-25T19:54:15.783Z",
+      "lease_expired": true,
+      "matching_login_tokens": 0,
+      "matching_device_tokens": 0,
+      "matching_run_tokens": 0
+    },
+    {
+      "id": "57bfc355-5abc-42b8-96e3-7ef90c2d70a0",
+      "wake_status": "completed",
+      "wake_generation_state": "returned",
+      "processed_at": "2026-10-25T19:54:14.751Z",
+      "lease_expired": true,
+      "matching_login_tokens": 0,
+      "matching_device_tokens": 0,
+      "matching_run_tokens": 0
+    },
+    {
+      "id": "c927a87b-2512-4c8c-93c1-ea50aa836260",
+      "wake_status": "completed",
+      "wake_generation_state": "returned",
+      "processed_at": "2026-10-25T19:54:13.907Z",
+      "lease_expired": true,
+      "matching_login_tokens": 0,
+      "matching_device_tokens": 0,
+      "matching_run_tokens": 0
+    },
+    {
+      "id": "e28a746e-58d5-4502-a34f-2f8598c8bcc8",
+      "wake_status": "completed",
+      "wake_generation_state": "returned",
+      "processed_at": "2026-10-25T19:54:13.501Z",
+      "lease_expired": true,
+      "matching_login_tokens": 0,
+      "matching_device_tokens": 0,
+      "matching_run_tokens": 0
+    }
+  ],
+  "source": "Bounded diagnostic mapping: flagged fields match randomUUID delivery fences in the retained isolated PG fixture. This does not independently clear every secret category or resolve the scanner finding.",
+  "services": "Diagnostic Next and controlled transport stopped; no production cron/Workflow/provider configured. Original fixture DB retained.",
+  "actions": "All 13 delivery-token fields redacted from public diagnostic copy. Raw original retained locally. No history rewrite, rotation, check skip, configuration suppression or incident-state change performed.",
+  "remaining": "Scanner failure retained as unresolved / not independently verified. User reports prior false positives and directs no further separate GitGuardian email/dashboard investigation. No safety gate or required-check setting changed; no email action attempted.",
+  "officialDocs": "https://docs.gitguardian.com/internal-monitoring/prevent/detect-secrets-in-real-time-in-github",
+  "independentSecretClearance": false
+}

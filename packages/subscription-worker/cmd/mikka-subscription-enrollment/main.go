@@ -18,6 +18,10 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--version" {
+		fmt.Println("mikka-subscription-enrollment")
+		return
+	}
 	log.SetOutput(io.Discard)
 	if run() != nil {
 		fmt.Fprintln(os.Stderr, "subscription_enrollment_unavailable")

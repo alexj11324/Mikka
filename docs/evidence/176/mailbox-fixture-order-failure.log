@@ -1,0 +1,38 @@
+✖ isolated PostgreSQL mailbox vertical slice (2029.180742ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3070.250789
+
+✖ failing tests:
+
+test at tests/session-mailbox.test.ts:1:744
+✖ isolated PostgreSQL mailbox vertical slice (2029.180742ms)
+  error: column "sequence" does not exist
+      at /workspace/Mikka-176/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/tests/session-mailbox.test.ts:32:7)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    length: 98,
+    severity: 'ERROR',
+    code: '42703',
+    detail: undefined,
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'indexcmds.c',
+    line: '1904',
+    routine: 'ComputeIndexAttrs'
+  }

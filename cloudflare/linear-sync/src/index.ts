@@ -7,6 +7,8 @@ const CRON_PATH = '/mikka/api/cron/linear-sync'
 export interface Env {
   HYPERDRIVE?: { connectionString: string }
   CRON_SECRET?: string
+  MIKKA_RUNTIME_SWEEP_ENABLED?: string
+  MIKKA_RUNTIME_SWEEP_ORIGIN?: string
   CREDENTIAL_CLEANUP_ENABLED?: string
   LINEAR_CLIENT_ID?: string
   LINEAR_CLIENT_SECRET?: string
@@ -117,15 +119,29 @@ export async function handleRequest(request: Request, env: Env, ctx: WorkerConte
 export default {
   fetch: handleRequest,
   scheduled(controller: WorkerSchedule, env: Env, ctx: WorkerContext) {
+    if (controller.cron === '* * * * *' && env.MIKKA_RUNTIME_SWEEP_ENABLED === '1') {
+      ctx.waitUntil(runRuntimeSweep(env))
+    }
     if (controller.cron === '* * * * *' && env.CREDENTIAL_CLEANUP_ENABLED === '1') {
       // Rejections remain visible to the scheduler. Next tick retries durable
       // tombstones; never log provider responses or follow redirects with auth.
       ctx.waitUntil(runCredentialCleanup(env))
       return
     }
+    if (controller.cron === '* * * * *') return
     if (!env.CRON_SECRET || !syncConfigured(env)) return
     ctx.waitUntil(loadSyncRuntime(env).then(runtime => withRequestDatabase(runtime, env.HYPERDRIVE!.connectionString, () => runtime.processLinearSyncBatch())).catch(() => {
       console.error('Linear sync scheduled batch failed')
     }))
   },
+}
+
+/** Explicit destination enables a frozen authorized preview. Never defaults to
+ * production, follows redirects or logs the shared cron secret. */
+export async function runRuntimeSweep(env: Env) {
+  if (!env.CRON_SECRET || !env.MIKKA_RUNTIME_SWEEP_ORIGIN) throw new Error('runtimeSweepUnconfigured')
+  const url = new URL(env.MIKKA_RUNTIME_SWEEP_ORIGIN)
+  if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('runtimeSweepOriginInvalid')
+  const response = await fetch(new URL('/mikka/api/cron/runtime', url), { headers: { authorization: `Bearer ${env.CRON_SECRET}` }, redirect: 'error', signal: AbortSignal.timeout(55000) })
+  if (!response.ok) throw new Error('runtimeSweepUnavailable')
 }

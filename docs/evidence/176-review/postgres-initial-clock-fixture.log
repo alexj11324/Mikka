@@ -1,0 +1,209 @@
+▶ review: background terminal fairness, protocol scope, cached guard and quiet triage
+  ✖ 49 denied background rows cannot starve a later legal child across actual child SIGKILL (199.934251ms)
+  ✖ failed, cancelled and legacy_review background rows remain terminal (21.06794ms)
+  ✖ protocol mailbox partition is not a real tenant grant (53.831862ms)
+  ✖ cached successful guard cannot authorize a later stale remember effect (11.121308ms)
+  ✖ cached successful guard cannot authorize a later stale forget effect (12.500227ms)
+  ✖ cached successful guard cannot authorize a later stale mailboxAction effect (12.890574ms)
+  ✖ quiet run_report triages before any transport start (117.980406ms)
+  ✖ quiet run_retried triages before any transport start (47.932007ms)
+  ✖ late delivery whose tier became background never stages or starts generation (12.8792ms)
+✖ review: background terminal fairness, protocol scope, cached guard and quiet triage (9502.663942ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 0
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10140.122297
+
+✖ failing tests:
+
+test at lib/coordinator/review-postgres.test.ts:1:3258
+✖ 49 denied background rows cannot starve a later legal child across actual child SIGKILL (199.934251ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(c&&'delivery'in c)
+  
+      at claimed (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:23:89)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:35:56)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:31:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at lib/coordinator/review-postgres.test.ts:1:5627
+✖ failed, cancelled and legacy_review background rows remain terminal (21.06794ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(c&&'delivery'in c)
+  
+      at claimed (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:23:89)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:59:50)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:55:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at lib/coordinator/review-postgres.test.ts:1:6376
+✖ protocol mailbox partition is not a real tenant grant (53.831862ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '00000000-0000-4000-8000-000000000001'
+  - null
+  
+      at TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:72:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:65:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '00000000-0000-4000-8000-000000000001',
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/coordinator/review-postgres.test.ts:1:7885
+✖ cached successful guard cannot authorize a later stale remember effect (11.121308ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(c&&'delivery'in c)
+  
+      at claimed (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:23:89)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:76:38)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:75:68)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at lib/coordinator/review-postgres.test.ts:1:7885
+✖ cached successful guard cannot authorize a later stale forget effect (12.500227ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(c&&'delivery'in c)
+  
+      at claimed (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:23:89)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:76:38)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:75:68)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at lib/coordinator/review-postgres.test.ts:1:7885
+✖ cached successful guard cannot authorize a later stale mailboxAction effect (12.890574ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(c&&'delivery'in c)
+  
+      at claimed (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:23:89)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:76:38)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:75:68)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at lib/coordinator/review-postgres.test.ts:1:9626
+✖ quiet run_report triages before any transport start (117.980406ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:95:66)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:92:59)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/coordinator/review-postgres.test.ts:1:9626
+✖ quiet run_retried triages before any transport start (47.932007ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:95:66)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:92:59)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/coordinator/review-postgres.test.ts:1:10039
+✖ late delivery whose tier became background never stages or starts generation (12.8792ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(c&&'delivery'in c)
+  
+      at claimed (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:23:89)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:98:38)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/coordinator/review-postgres.test.ts:97:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

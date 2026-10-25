@@ -1,0 +1,33 @@
+▲ Next.js 16.1.6
+- Local:         http://127.0.0.1:3177
+- Network:       http://127.0.0.1:3177
+
+✓ Starting...
+✓ Ready in 595ms
+▲ Next.js 16.1.6
+- Local:         http://127.0.0.1:3177
+- Network:       http://127.0.0.1:3177
+
+✓ Starting...
+✓ Ready in 627ms
+[workflow-sdk] Re-executing inline steps owned by this queue message — a previous delivery crashed mid-body and this redelivery is recovering them
+  run    wrun_01M5TC41DS58M2P0S588B9R2QW
+  stepIds ["step_01M5TC41DSMBGS1KZEPP669SE6"]
+▲ Next.js 16.1.6
+- Local:         http://127.0.0.1:3177
+- Network:       http://127.0.0.1:3177
+
+✓ Starting...
+✓ Ready in 567ms
+[workflow-sdk] Re-executing inline steps owned by this queue message — a previous delivery crashed mid-body and this redelivery is recovering them
+  run    wrun_01M5TC7RX4XVNW3NE5TZSDXX4Y
+  stepIds ["step_01M5TC7RX420REP3NFJZ99GYWH"]
+▲ Next.js 16.1.6
+- Local:         http://127.0.0.1:3177
+- Network:       http://127.0.0.1:3177
+
+✓ Starting...
+✓ Ready in 612ms
+[workflow-sdk] Re-executing inline steps owned by this queue message — a previous delivery crashed mid-body and this redelivery is recovering them
+  run    wrun_01M5TCHWDNHBRT3N812PWF20YD
+  stepIds ["step_01M5TCHWDNQ2VKDPRZ4ADFNF09"]

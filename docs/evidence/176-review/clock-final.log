@@ -1,0 +1,11 @@
+adfe1cd59eb4fb97a0b10728fef5e9c9028c7d4b
+{"evidence":"existing inbox compensation only; not Workflow SDK acceptance","owner":"wake179-736ad912-b945-4b55-8c1c-fa68783f58eb","event":"4de49fb2-87b7-43a1-9bb6-8943d2a4d5f6","exhausted":"d68e9c79-763a-4f5b-817e-b3a851e62d51"}
+✔ existing inbox persists delivery failures, compensation, concurrent claim and exhaustion (359.815996ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 856.550305

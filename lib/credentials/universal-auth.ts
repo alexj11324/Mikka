@@ -44,9 +44,11 @@ export function universalAuthTokenProvider(options: {
           await response.body?.cancel(); throw failure()
         }
         const data = await response.json()
-        // Require bounded short-lived credentials; do not silently accept default 30-day tokens.
+        // Honor issuer lifetime, while requiring precise finite expiry arithmetic.
+        // Local eviction/renewal never revokes an already issued bearer.
         if (typeof data.accessToken !== 'string' || !data.accessToken || data.accessToken.length > 16384 || /[\s\0]/.test(data.accessToken) ||
-          data.tokenType !== 'Bearer' || !Number.isSafeInteger(data.expiresIn) || data.expiresIn < 30 || data.expiresIn > 3600 || data.expiresIn * 1000 <= minimumValidity) throw failure()
+          data.tokenType !== 'Bearer' || !Number.isSafeInteger(data.expiresIn) || data.expiresIn < 30 || data.expiresIn * 1000 <= minimumValidity) throw failure()
+        if (!Number.isSafeInteger(data.expiresIn * 1000) || !Number.isFinite(startedAt) || startedAt < 0 || startedAt + data.expiresIn * 1000 > Number.MAX_SAFE_INTEGER) throw failure()
         const refreshAt = startedAt + data.expiresIn * 1000 - Math.max(minimumValidity, Math.min(60000, data.expiresIn * 100))
         const current = options.credentials()
         if (epoch !== generation || denied || now() >= refreshAt || current?.clientId !== next.clientId || current?.clientSecret !== next.clientSecret) throw failure()

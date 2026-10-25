@@ -29,3 +29,20 @@ test('same identity, disabled auth, or rotated origin fail without static fallba
  env.MIKKA_BYOS_VAULT_AUTH='universal';env.MIKKA_BYOS_INFISICAL_ORIGIN='https://us.infisical.com'
  await assert.rejects(tokens.get('custody'));assert.equal(calls,0)
 })
+
+test('explicit shared identity uses separate logical caches and disabling it fences cached access',async()=>{
+ const env:NodeJS.ProcessEnv=config()
+ env.MIKKA_BYOS_SHARED_IDENTITY='1'
+ env.MIKKA_BYOS_ACCESS_CLIENT_ID=env.MIKKA_BYOS_CUSTODY_CLIENT_ID
+ env.MIKKA_BYOS_ACCESS_CLIENT_SECRET=env.MIKKA_BYOS_CUSTODY_CLIENT_SECRET
+ let calls=0
+ const tokens=createSubscriptionVaultTokens(()=>env,async()=>{calls++;return Response.json({accessToken:'same-synthetic-token',tokenType:'Bearer',expiresIn:600})})
+ const custody=await tokens.get('custody'),access=await tokens.get('access')
+ assert.equal(calls,2)
+ tokens.reject('access',access)
+ await assert.rejects(tokens.get('access'))
+ assert.equal(await tokens.get('custody'),custody)
+ env.MIKKA_BYOS_SHARED_IDENTITY='0'
+ await assert.rejects(tokens.get('access'))
+ assert.equal(await tokens.get('custody'),custody)
+})

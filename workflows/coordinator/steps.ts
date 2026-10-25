@@ -2,6 +2,14 @@ import { authorizeModel, authorizePolicyTool } from '@/lib/policy/runtime'
 import { coordinatorRoute } from '@/lib/policy/model'
 import { type ModelMessage, type ToolExecutionOptions } from 'ai'
 import { generatePolicyText } from '@/lib/policy/generate-text'
+import { coordinatorInbox } from '@/lib/coordinator/inbox-runtime'
+import {WakeError,type WakeDelivery,type WakeExecution} from '@/lib/coordinator/inbox-receipts'
+import {getStepMetadata} from 'workflow'
+import {intentDigest} from '@/lib/operations/action-intents'
+import { executeScheduleCommand } from '@/lib/schedules/runtime'
+import { ScheduleError, SCHEDULE_INSTRUCTIONS, type Command } from '@/lib/schedules/contract'
+import { workspaceDb } from '@/lib/workspace-db'
+import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, readRun, requestRunStop, runViewColumns } from '@/lib/agent-runs'
@@ -55,9 +63,9 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   }
 }
 
-export async function takeInbox(userId: string, holder: string) {
+export async function takeInbox(userId: string, holder: string, delivery?: WakeDelivery) {
   'use step'
-  return store.takeInbox(userId, holder)
+  return store.takeInbox(userId, holder, delivery)
 }
 
 export async function releaseLease(userId: string, holder: string) {
@@ -65,14 +73,14 @@ export async function releaseLease(userId: string, holder: string) {
   return store.releaseLease(userId, holder)
 }
 
-export async function failTurn(userId: string, holder: string, error: string) {
+export async function failTurn(userId: string, holder: string, error: string, delivery?: WakeDelivery) {
   'use step'
-  await store.failTurn(userId, holder, error)
+  await store.failTurn(userId, holder, error, delivery)
 }
 
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, actionContext?: ActionContext) {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, actionContext?: ActionContext, delivery?: WakeDelivery) {
   'use step'
-  await store.appendMessages(userId, holder, messages, warning, actionContext)
+  await store.appendMessages(userId, holder, messages, warning, actionContext, delivery)
 }
 
 /**
@@ -90,6 +98,8 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
     const folded = messages.filter(row => row.position <= cut)
     const { text } = await generatePolicyText(() => authorizeModel(userId, coordinatorRoute(COORDINATOR_MODEL)), {
       model: COORDINATOR_MODEL,
+      maxRetries:0,
+      timeout:{totalMs:45000},
       instructions: SUMMARY_INSTRUCTIONS,
       messages: [...promptMessages(summary, folded), { role: 'user', content: 'Write the summary now.' }],
     })
@@ -97,23 +107,28 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
     summary = text
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(`${COORDINATOR_INSTRUCTIONS}\n\n${MAILBOX_INSTRUCTIONS}`, memory), messages: promptMessages(summary, messages) }
+  return { instructions: instructionsWithMemory(`${COORDINATOR_INSTRUCTIONS}\n\n${MAILBOX_INSTRUCTIONS}\n\n${SCHEDULE_INSTRUCTIONS}`, memory), messages: promptMessages(summary, messages) }
 }
+// A request may already have been sent. The persisted inbox, rather than an
+// automatic step retry, records an uncertain outcome for reconciliation.
+preparePrompt.maxRetries=0
 
-export async function remember(userId: string, input: { note: string }) {
+export async function remember(userId: string, input: { note: string },execution?:WakeExecution) {
   'use step'
+  if(!execution)throw new WakeError('wakeReceiptRequired')
   return store.editMemory(userId, memory => {
     const next = rememberNote(memory, input.note)
     return next === null ? { error: 'memoryFull: forget something first' } : { memory: next, result: { remembered: true } }
-  })
+  },execution)
 }
 
-export async function forget(userId: string, input: { text: string }) {
+export async function forget(userId: string, input: { text: string },execution?:WakeExecution) {
   'use step'
+  if(!execution)throw new WakeError('wakeReceiptRequired')
   return store.editMemory(userId, memory => {
     const { memory: next, removed } = forgetNotes(memory, input.text)
     return { memory: next, result: { removed } }
-  })
+  },execution)
 }
 
 export async function composioAction(userId: string, action: ComposioActionName, input: unknown) {
@@ -125,6 +140,7 @@ export async function composioAction(userId: string, action: ComposioActionName,
 export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, context?: ActionContext, options?: Pick<ToolExecutionOptions<unknown>, 'messages' | 'toolCallId'>) {
   'use step'
   await authorizePolicyTool(userId)
+  if(context?.recovery && action!=='create_calendar_event')return {error:'accountActionRecoveryRequiresReconciliation'}
   if (action === 'create_calendar_event') {
     if (!context || !options) return { error: 'accountActionSourceRequired' }
     try { return await proposeCalendarBatch(userId, context, options) }
@@ -389,18 +405,21 @@ export async function recoverAccountActions(userId: string, context: ActionConte
   return recoverCalendarBatch(userId, context)
 }
 
-export async function mailboxAction(userId: string, action: 'recipients' | 'inbox' | 'sent' | 'send' | 'ack', input: { to?: string; key?: string; text?: string; replyTo?: string; ids?: string[] } = {}) {
+export async function mailboxAction(userId: string, action: 'recipients' | 'inbox' | 'sent' | 'send' | 'ack', input: { to?: string; key?: string; text?: string; replyTo?: string; ids?: string[] } = {},execution?:WakeExecution) {
   'use step'
   await authorizePolicyTool(userId)
+  if(!execution)throw new WakeError('wakeReceiptRequired')
   try {
-    const actor = await mailboxes.conversation(userId, 'coordinator')
+    return await coordinatorInbox().effect(userId,execution,async tx=>{
+    const actor = await mailboxes.conversation(userId, 'coordinator','coordinator',tx)
     switch (action) {
-      case 'recipients': return await mailboxes.recipients(actor)
-      case 'inbox': return await mailboxes.inbox(actor)
-      case 'sent': return await mailboxes.sent(actor)
-      case 'send': return await mailboxes.send(actor, input as { to: string; key: string; text: string; replyTo?: string })
-      case 'ack': return await mailboxes.ack(actor, input.ids ?? [])
+      case 'recipients': return await mailboxes.recipients(actor,tx)
+      case 'inbox': return await mailboxes.inbox(actor,tx)
+      case 'sent': return await mailboxes.sent(actor,tx)
+      case 'send': return await mailboxes.send(actor, input as { to: string; key: string; text: string; replyTo?: string },tx)
+      case 'ack': return await mailboxes.ack(actor, input.ids ?? [],tx)
     }
+    })
   } catch (error) { if (error instanceof MailboxError) return { error: error.message }; throw error }
 }
 
@@ -408,3 +427,56 @@ export async function authorizeCoordinator(userId: string, _round: number, _step
   'use step'
   await authorizeModel(userId, coordinatorRoute(COORDINATOR_MODEL))
 }
+/** Background events cannot supply human scheduling authority. */
+export async function scheduleCommand(userId: string, command: Command, context?: ActionContext) {
+  'use step'
+  if (!context && !['list','history'].includes(command.action)) return { error: 'scheduleUserSourceRequired' }
+  const source = context ? await coordinatorInbox().read(userId,context.sourceEventId) : null
+  if (source && source.kind !== 'user_message') return {error:'scheduleUserSourceRequired'}
+  let workspaceId=source?.wake_workspace_id
+  if(!workspaceId){
+    const choices = await workspaceDb.select({ id: workspaceMembers.workspaceId }).from(workspaceMembers).where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).limit(2)
+    if (choices.length !== 1) return { error: 'scheduleExplicitWorkspaceRequired' }
+    workspaceId=choices[0].id
+  }
+  try { return await executeScheduleCommand({ ownerId: userId, workspaceId, conversation: 'coordinator', sessionId: userId, sourceId: context?.sourceEventId ?? '' }, command) }
+  catch (error) { if (error instanceof ScheduleError) return { error: error.code }; throw error }
+}
+
+export async function assertWakeCurrent(userId: string, holder: string, delivery: WakeDelivery) {
+  'use step'
+  await coordinatorInbox().assertCurrent(userId,holder,delivery)
+}
+
+export async function continueInbox(userId: string) {
+  'use step'
+  const { wakeCoordinator } = await import('@/lib/coordinator/wake')
+  await wakeCoordinator(userId)
+}
+
+export async function beginWakeGeneration(userId: string,holder: string,delivery: WakeDelivery) {
+  'use step'
+  return coordinatorInbox().beginGeneration(userId,holder,delivery)
+}
+export async function wakeCheckpoint(userId: string,delivery: WakeDelivery) {
+  'use step'
+  return coordinatorInbox().cached(userId,delivery)
+}
+
+const wakeToolHandlers = { answerFactoryContext, answerFactoryQuestionFromUser, composioAction, credentialTool, dispatchBaselineRehearsal, dispatchRun, escalateFactoryQuestion, forget, getFactoryQuestion, getFactoryTask, getIssue, getRun, getSkillImprovementFactory, handoffSkillImprovement, listAgents, listFactoryQuestions, listFactoryRequests, listIssues, listRuns, mailboxAction, proposeAccountAction, proposeSkillImprovement, readRunImprovements, recordRunFeedback, remember, resolveFactoryTask, routeFactoryTask, scheduleCommand, selectBaselineSkill, sendToRun, stopFactoryTask, stopRun }
+/** One actual SDK step owns fresh fencing and the domain call. This must not
+ * be split into a cached assert step followed by an unfenced mutation step. */
+export async function executeWakeTool(userId:string,holder:string,delivery:WakeDelivery,name:string,args:unknown[]){
+  'use step'
+  if(!Object.hasOwn(wakeToolHandlers,name)||!Array.isArray(args))throw new WakeError('wakeToolUnavailable')
+  await coordinatorInbox().assertCurrent(userId,holder,delivery)
+  if(name==='remember'||name==='forget'||name==='mailboxAction'){
+    const execution:WakeExecution={holder,delivery,operationKey:getStepMetadata().stepId,binding:intentDigest([name,args])}
+    if(name==='remember')return remember(userId,args[0] as {note:string},execution)
+    if(name==='forget')return forget(userId,args[0] as {text:string},execution)
+    return mailboxAction(userId,args[0] as Parameters<typeof mailboxAction>[1],(args[1]??{}) as Parameters<typeof mailboxAction>[2],execution)
+  }
+  const handler=wakeToolHandlers[name as keyof typeof wakeToolHandlers] as unknown as (...args:unknown[])=>Promise<unknown>
+  return handler(userId,...args)
+}
+executeWakeTool.maxRetries=0

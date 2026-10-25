@@ -1,0 +1,8 @@
+{"version": 2, "width": 120, "height": 35, "timestamp": 1792966459, "title": "Mikka actual backend acceptance"}
+[0.004768, "o", "adfe1cd59eb4fb97a0b10728fef5e9c9028c7d4b\r\n"]
+[0.887811, "o", "{\"evidence\":\"existing inbox compensation only; not Workflow SDK acceptance\",\"owner\":\"wake179-736ad912-b945-4b55-8c1c-fa68783f58eb\",\"event\":\"4de49fb2-87b7-43a1-9bb6-8943d2a4d5f6\",\"exhausted\":\"d68e9c79-763a-4f5b-817e-b3a851e62d51\"}\r\n"]
+[0.888614, "o", "\u2714 existing inbox persists delivery failures, compensation, concurrent claim and exhaustion (359.815996ms)\r\n"]
+[0.910608, "o", "\u2139 tests 1\r\n"]
+[0.910654, "o", "\u2139 suites 0\r\n\u2139 pass 1\r\n\u2139 fail 0\r\n\u2139 cancelled 0\r\n\u2139 skipped 0\r\n"]
+[0.910693, "o", "\u2139 todo 0\r\n"]
+[0.910855, "o", "\u2139 duration_ms 856.550305\r\n"]

@@ -1,5 +1,10 @@
 # Integrated BYOS backend candidate
 
+> Current issuer-lifetime policy: the application accepts valid issuer TTLs,
+> including30days; earlier600s/short-token proposals below are historical, not
+> an application cap. See [shared identity policy](byos-shared-identity.md).
+> Local refresh or cache eviction does not revoke previously issued tokens.
+
 Base: PR254 c7a017a9 (including reviewed group/lease/Skill/credential integration), plus PR253 275fee68 mailbox-proof recovery. BYOS source: PR206 9e610781, excluding its obsolete auth changes and settings UI. This candidate does not activate a route, move a real grant, create IAM, run production migrations or replace a live deployment.
 
 Existing claim functions remain authoritative. BYOS binding insertion shares the ordinary execution and Factory check claim transaction; cancellation and stale connection revision refuse the claim. Question continuations requiring a prior session remain supported for existing local adapters, but hosted BYOS cross-run continuation is explicitly refused before any launch because its isolated runtime cannot yet prove the prior-session continuation. A new fresh session must never substitute silently.

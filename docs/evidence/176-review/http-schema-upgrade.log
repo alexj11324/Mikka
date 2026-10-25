@@ -1,0 +1,9 @@
+BEGIN
+ALTER TABLE
+NOTICE:  column "wake_tool_receipts" of relation "coordinator_events" already exists, skipping
+CREATE INDEX
+CREATE INDEX
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+COMMIT

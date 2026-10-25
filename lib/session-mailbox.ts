@@ -17,6 +17,7 @@ export class SessionMailbox {
     catch (error) { await client.query('rollback'); throw error }
     finally { client.release() }
   }
+  private withClient<T>(existing:PoolClient|undefined,work:(client:PoolClient)=>Promise<T>):Promise<T>{return existing?work(existing):this.transaction(work)}
   private async ensure(client: PoolClient, userId: string, kind: Mailbox['kind'], sessionKey: string): Promise<Mailbox> {
     const { rows } = await client.query<Mailbox>(`insert into session_mailboxes (id,"userId","workspaceId",kind,"sessionKey") values ($1,$2,$3,$4,$5)
       on conflict ("userId","workspaceId",kind,"sessionKey") do nothing returning *`, [randomUUID(), userId, this.workspaceId, kind, sessionKey])
@@ -38,8 +39,8 @@ export class SessionMailbox {
   }
 
   /** Only call for a verified server-side conversation identity. */
-  async conversation(userId: string, kind: 'coordinator' | 'bot', sessionKey = 'coordinator'): Promise<MailboxActor> {
-    return this.transaction(async client => {
+  async conversation(userId: string, kind: 'coordinator' | 'bot', sessionKey = 'coordinator', existingTransaction?:PoolClient): Promise<MailboxActor> {
+    return this.withClient(existingTransaction,async client => {
       if (kind === 'bot' && !(await client.query('select 1 from agent_sessions where id=$1 and "userId"=$2', [sessionKey, userId])).rowCount) throw new MailboxError('Unknown conversation')
       const box = await this.ensure(client, userId, kind, sessionKey)
       return { userId, workspaceId: this.workspaceId, mailboxId: box.id }
@@ -73,24 +74,24 @@ export class SessionMailbox {
     }
     return box
   }
-  async recipients(actor: MailboxActor) {
-    return this.transaction(async client => {
+  async recipients(actor: MailboxActor,existingTransaction?:PoolClient) {
+    return this.withClient(existingTransaction,async client => {
       await this.authorize(client, actor)
       // No transcripts, role configuration or repository paths are disclosed.
       const { rows } = await client.query(`select id,kind,"sessionKey","latestRunId",disabled,"wakeBudget" from session_mailboxes where "userId"=$1 and "workspaceId"=$2 and kind<>'group' order by "createdAt",id limit 100`, [actor.userId, this.workspaceId])
       return { self: actor.mailboxId, recipients: rows }
     })
   }
-  async send(actor: MailboxActor, input: { to: string; key: string; text: string; replyTo?: string }) {
-    return this.sendEnvelope(actor, input, false)
+  async send(actor: MailboxActor, input: { to: string; key: string; text: string; replyTo?: string },existingTransaction?:PoolClient) {
+    return this.sendEnvelope(actor, input, false,false,existingTransaction)
   }
   /** Explicit owner action, never available to a run or peer tool. */
   async ownerSend(userId: string, input: { to: string; key: string; text: string; resume: boolean }) {
     const actor = await this.conversation(userId, 'coordinator')
     return this.sendEnvelope(actor, input, true, input.resume)
   }
-  private async sendEnvelope(actor: MailboxActor, input: { to: string; key: string; text: string; replyTo?: string }, owner: boolean, resume = false): Promise<MailboxReceipt> {
-    return this.transaction<MailboxReceipt>(async client => {
+  private async sendEnvelope(actor: MailboxActor, input: { to: string; key: string; text: string; replyTo?: string }, owner: boolean, resume = false,existingTransaction?:PoolClient): Promise<MailboxReceipt> {
+    return this.withClient<MailboxReceipt>(existingTransaction,async client => {
       await this.authorize(client, actor)
       // Serialize this sender/key before selecting a recipient. The unique
       // index alone would turn cross-recipient races into an unhandled 23505.
@@ -137,23 +138,23 @@ export class SessionMailbox {
     await client.query('update session_mailboxes set "latestRunId"=$1,"wakeBudget"=greatest(0,"wakeBudget"-1) where id=$2', [id, box.id])
     return id
   }
-  async inbox(actor: MailboxActor) {
-    return this.transaction(async client => {
+  async inbox(actor: MailboxActor,existingTransaction?:PoolClient) {
+    return this.withClient(existingTransaction,async client => {
       await this.authorize(client, actor)
       const { rows } = await client.query(`update run_messages set "deliveredAt"=coalesce("deliveredAt",now()) where "mailboxId"=$1 and "acknowledgedAt" is null and id in (select id from run_messages where "mailboxId"=$1 and "acknowledgedAt" is null order by sequence limit 50) returning id,"senderMailboxId",text,"replyTo",origin,sequence,"deliveredAt","acknowledgedAt",failure`, [actor.mailboxId])
       rows.sort((a, b) => Number(a.sequence) - Number(b.sequence))
       return { self: actor.mailboxId, messages: rows, authority: 'Server-set origin distinguishes owner messages from peer data; neither bypasses run permissions' }
     })
   }
-  async ack(actor: MailboxActor, ids: string[]) {
-    return this.transaction(async client => {
+  async ack(actor: MailboxActor, ids: string[],existingTransaction?:PoolClient) {
+    return this.withClient(existingTransaction,async client => {
       await this.authorize(client, actor)
       const { rows } = await client.query('update run_messages set "acknowledgedAt"=coalesce("acknowledgedAt",now()) where "mailboxId"=$1 and id=any($2::uuid[]) and "deliveredAt" is not null returning id', [actor.mailboxId, ids])
       return { acknowledged: rows.map(row => row.id) }
     })
   }
-  async sent(actor: MailboxActor) {
-    return this.transaction(async client => {
+  async sent(actor: MailboxActor,existingTransaction?:PoolClient) {
+    return this.withClient(existingTransaction,async client => {
       await this.authorize(client, actor)
       const { rows } = await client.query('select id,"mailboxId","deliveredAt","acknowledgedAt",failure,sequence from run_messages where "senderMailboxId"=$1 order by sequence desc limit 50', [actor.mailboxId])
       return rows

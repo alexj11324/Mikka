@@ -1,0 +1,25 @@
+⚠ Serde warning for classes "Run", "ChannelImpl", "Message", "ThreadImpl", "GatewayEmbeddingModel", "GatewayImageModel", "GatewayLanguageModel": Workflow bundle contains Node.js built-in imports: crypto, fs, path. These will fail at runtime in the workflow sandbox. Add "use step" to methods that depend on Node.js APIs so they are stripped from the workflow bundle.
+✓ Compiled workflows in 8.0s (69 steps, 1 workflow)
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+▲ Next.js 16.1.6 (Turbopack)
+- Experiments (use with caution):
+  ✓ globalNotFound
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 110s
+  Running next.config.js provided runAfterProductionCompile ...
+✓ Completed runAfterProductionCompile in 2ms
+  Running TypeScript ...
+Failed to compile.
+
+./scripts/fixtures/wake-completion.ts:7:53
+Type error: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', 'node18', 'node20', 'nodenext', or 'preserve', and the 'target' option is set to 'es2017' or higher.
+
+[0m [90m  5 |[39m [36mif[39m ([33m![39murl [33m||[39m [36mnew[39m [33mURL[39m(url)[33m.[39mhostname [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33m![39m[36mnew[39m [33mURL[39m(url)[33m.[39mpathname[33m.[39mendsWith([32m'_176'[39m)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'isolated database required'[39m)
+ [90m  6 |[39m [36mconst[39m input [33m=[39m [33mJSON[39m[33m.[39mparse(process[33m.[39menv[33m.[39m[33mWAKE_COMPLETION_INPUT[39m[33m![39m) [36mas[39m {owner[33m:[39mstring[33m;[39mrunId[33m:[39mstring[33m;[39mworkspace[33m:[39mstring[33m;[39mphase[33m:[39mstring}
+[31m[1m>[22m[39m[90m  7 |[39m [36mconst[39m pool [33m=[39m [36mnew[39m [33mPool[39m({ connectionString[33m:[39murl })[33m,[39m tx[33m=[39m[36mawait[39m pool[33m.[39mconnect()
+ [90m    |[39m                                                     [31m[1m^[22m[39m
+ [90m  8 |[39m [36mawait[39m tx[33m.[39mquery([32m'BEGIN'[39m)
+ [90m  9 |[39m [36mawait[39m [36mnew[39m [33mSessionMailbox[39m(pool[33m,[39minput[33m.[39mworkspace)[33m.[39mcomplete(input[33m.[39mowner[33m,[39minput[33m.[39mrunId[33m,[39m[32m'succeeded'[39m[33m,[39m[32m'submitted'[39m[33m,[39m{summary[33m:[39m[32m'Actual isolated completion transaction; no harness or model invoked.'[39m}[33m,[39mtx)
+ [90m 10 |[39m [36mif[39m(input[33m.[39mphase[33m===[39m[32m'after_commit'[39m)[36mawait[39m tx[33m.[39mquery([32m'COMMIT'[39m)[0m
+Next.js build worker exited with code: 1 and signal: null

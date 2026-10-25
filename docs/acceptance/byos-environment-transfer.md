@@ -1,5 +1,10 @@
 # BYOS cross-environment custody transfer
 
+> Current issuer-lifetime policy: the application accepts valid issuer TTLs,
+> including30days; earlier600s/short-token proposals below are historical, not
+> an application cap. See [shared identity policy](byos-shared-identity.md).
+> Local refresh or cache eviction does not revoke previously issued tokens.
+
 This follow-up is stacked on frozen PR255 `ba4bf38`. It does not change that PR or
 activate production. Production account recovery/Google linking is separate and
 already verified; this document is not a claim of live BYOS execution.

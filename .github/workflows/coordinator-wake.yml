@@ -1,0 +1,112 @@
+name: Coordinator durable consumption
+on:
+  push:
+    branches: ['codex/176-durable-inbox-recovery']
+  pull_request:
+    paths: ['lib/coordinator/**', 'workflows/coordinator/**', 'app/api/coordinator/**', 'drizzle/*coordinator_consumption_receipts.sql', 'drizzle/*coordinator_effect_fences.sql', '.github/workflows/coordinator-wake.yml']
+permissions:
+  contents: read
+jobs:
+  postgres:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mikka_ci_176
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mikka_ci_176"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+      WAKE_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+      WAKE_REVIEW_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply tracked migrations to fresh disposable PostgreSQL
+        run: MIGRATE=1 node scripts/migrate.mjs
+      - run: pnpm test:wake
+      - run: pnpm test:wake:postgres
+      - run: pnpm test:wake:review
+      - name: Schedule integration and both recovery safety regressions
+        run: |
+          psql postgresql://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE mikka_179_recovery'
+          MIGRATE=1 node scripts/migrate.mjs
+          pnpm test:schedules:postgres
+          pnpm test:schedules:recovery
+        env:
+          MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+          DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+          SCHEDULE_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+          SCHEDULE_RECOVERY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+      - name: Preserve approved action slots and uncertain Calendar results
+        run: |
+          psql postgresql://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE mikka_208_test'
+          node --conditions=react-server --import tsx --test lib/operations/calendar-integration.test.ts lib/operations/action-intents.test.ts
+        env:
+          NODE_ENV: test
+          OPERATION_DB_TESTS: '1'
+          OPERATION_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_208_test
+      - run: pnpm typecheck
+      - name: Build the real Next workflow for isolated Local World acceptance
+        run: pnpm build
+        env:
+          CI: 'true'
+          BETTER_AUTH_URL: http://127.0.0.1:3177
+          BETTER_AUTH_SECRET: isolated-sdk-build-only-no-live-provider-access
+          NEXT_TELEMETRY_DISABLED: '1'
+      - name: Real Workflow SDK duplicate delivery and Next worker SIGKILL
+        shell: bash
+        env:
+          WORKFLOW_TARGET_WORLD: local
+          WORKFLOW_LOCAL_BASE_URL: http://127.0.0.1:3177/mikka
+          WORKFLOW_NODE_HTTP: '1'
+          # Fixed trusted replay harness in a keyless Local World only.
+          WORKFLOW_EXPERIMENTAL_DYNAMIC_WORKFLOWS: '1'
+        run: |
+          export WORKFLOW_LOCAL_DATA_DIR="/tmp/mikka-sdk-176-${GITHUB_RUN_ID}"
+          mkdir -p "$WORKFLOW_LOCAL_DATA_DIR"
+          docker run -d --name mikka176-sdk-next --network host --user "$(id -u):$(id -g)" \
+            -e CI=true -e NODE_ENV=production -e NEXT_TELEMETRY_DISABLED=1 \
+            -e BETTER_AUTH_SECRET=isolated-sdk-build-only-no-live-provider-access \
+            -e BETTER_AUTH_URL=http://127.0.0.1:3177 \
+            -e MIKKA_DATABASE_URL -e DATABASE_URL -e WORKFLOW_TARGET_WORLD \
+            -e WORKFLOW_LOCAL_BASE_URL -e WORKFLOW_LOCAL_DATA_DIR -e WORKFLOW_NODE_HTTP -e WORKFLOW_EXPERIMENTAL_DYNAMIC_WORKFLOWS \
+            -v "$PWD:$PWD" -v "$WORKFLOW_LOCAL_DATA_DIR:$WORKFLOW_LOCAL_DATA_DIR" -w "$PWD" \
+            node:24-bookworm-slim node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3177
+          # These keyless harnesses emit IDs, step states and counts only. Keep
+          # their diagnostics readable even when artifact download is denied;
+          # bash pipefail must still propagate a failing recorder/test status.
+          python3 scripts/record-terminal.py wake-sdk.cast node --import tsx scripts/verify-wake-sdk.mjs 2>&1 | tee wake-sdk.log
+          python3 scripts/record-terminal.py wake-effect-sdk.cast node --import tsx scripts/verify-wake-effect-sdk.mjs 2>&1 | tee wake-effect-sdk.log
+      - name: Preserve Workflow evidence and stop the isolated test container
+        if: always()
+        run: |
+          docker logs mikka176-sdk-next > wake-sdk-next.log 2>&1 || true
+          docker stop mikka176-sdk-next || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actual-workflow-local-world
+          path: |
+            wake-sdk.cast
+            wake-sdk.log
+            wake-sdk-next.log
+            wake-effect-sdk.cast
+            wake-effect-sdk.log
+          if-no-files-found: ignore

@@ -1,0 +1,19 @@
+{"evidence":"real report fault then fresh process-store retry","task":"reminder","occurrenceId":"cb1c1584-8ec8-4fd7-a20c-9917179d4cb4","operationId":"f24add01-f0a1-4c7e-9d15-f8d88abccfa4","status":"skipped","result":null,"effects":0}
+▶ recovery P2s use actual PG report faults, effects and permission rows
+  ✔ immutable skip after real report fault and restarted reminder (202.2343ms)
+{"evidence":"real report fault then fresh process-store retry","task":"issue_snapshot","occurrenceId":"d861595d-626e-4ccd-9f5e-f56b049cc072","operationId":"32268b78-52f0-4aa8-a12c-310debdea920","status":"skipped","result":null,"effects":0}
+  ✔ immutable skip after real report fault and restarted issue_snapshot (101.555948ms)
+{"evidence":"real report fault then fresh process-store retry","task":"agent_read","occurrenceId":"a84f9cc6-f204-4404-8b43-60fdef7f13fd","operationId":"d9a883ea-0630-4276-a90d-9f26e82f7914","status":"skipped","result":null,"effects":0}
+  ✔ immutable skip after real report fault and restarted agent_read (101.085188ms)
+  ✔ catch_up_once still executes after the same report fault without duplicate logical output (59.169786ms)
+{"evidence":"denied prefix before legal tenant","deniedCount":32,"queued":33,"scans":3,"limit":25,"healthyOccurrence":"4e8a212b-4580-4d28-86e7-f13403524aea","healthyReports":1,"deniedOwner":"recovery-208a64e8-35c2-44c3-a518-24cca60ac239","healthyOwner":"recovery-8c352c5c-73d7-456b-8305-0fe381fb956d"}
+  ✔ more than LIMIT denied reports cannot starve a later authorized tenant after restart (1293.426115ms)
+✔ recovery P2s use actual PG report faults, effects and permission rows (1811.305484ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2161.289876

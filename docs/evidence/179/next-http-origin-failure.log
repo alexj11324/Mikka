@@ -1,0 +1,21 @@
+51e1f2a522ec28327ced6f4931d4d2ebf2fb6dac
+{"at":"2026-10-25T18:15:01.602Z","phase":"authenticated real Next/PG","owner":"http179-374f40fe-3848-41b3-8844-ae8169edbd54","workspace":"298025a8-4937-48d5-bfef-03c50ac3bdc3","bot":"99c51b07-df1d-4ea2-b037-4a786bdafea2","source":"7232da57-1650-4610-980e-babb4d7dcabc"}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+403 !== 200
+
+    at file:///workspace/Mikka-179/scripts/verify-schedules-http.mjs:42:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 403,
+  expected: 200,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

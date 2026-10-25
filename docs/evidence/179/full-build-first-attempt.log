@@ -1,0 +1,45 @@
+$ pnpm build:byos-workers && pnpm generate:agent-ui && pnpm lint && pnpm migrate && next build && node scripts/verify-subscription-worker-artifacts.mjs
+$ node scripts/build-subscription-workers.mjs
+BYOS workers compiled and smoke-tested from pinned official Go and CPA sources
+$ node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs
+OpenUI 组件目录与提示词已生成：111 个组件定义。
+$ pnpm lint:code && pnpm lint:ui
+$ oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations
+$ node scripts/check-migrations.mjs
+migrations: 58 个迁移文件检查通过
+$ node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs tests/factory-migration-order.test.mjs
+✔ 历史重号在白名单内通过 (6.372829ms)
+✔ 新的 NNNN_ 文件被拒绝 (1.174708ms)
+✔ 修改旧迁移被拒绝 (0.733594ms)
+✔ 删除旧迁移被拒绝 (0.437797ms)
+✔ 非法时间戳被拒绝 (0.357619ms)
+✔ 不晚于 main 最新迁移被拒绝 (1.601221ms)
+✔ 晚于 main 最新迁移通过 (0.381063ms)
+✔ 时间戳重复被拒绝 (0.335077ms)
+✔ 拿不到 main 时只跳过顺序检查 (0.515035ms)
+✔ only the explicit baseline precedes legacy migrations, without changing their IDs (2.052337ms)
+✔ missing baseline fails before connecting to any database (0.704985ms)
+✔ one canonical Factory migration per component, after main and before consumers, with unchanged shared SQL (2.836071ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 140.513958
+$ node scripts/lint-ui.mjs
+
+UI policy: 673 business files, 0 errors; 254 component-library files excluded (no source verification).
+Interaction policy: 282 files, including downloaded business blocks; only UI/ReUI primitives excluded.
+{}
+$ node scripts/migrate.mjs
+migrate: skipped (not a Vercel production build; set MIGRATE=1 to force)
+⨯ Failed to load next.config.mjs, see more info here https://nextjs.org/docs/messages/next-config-error
+
+> Build error occurred
+Error: Failed to load native binding
+    at ignore-listed frames {
+  [cause]: [Array]
+}
+[ELIFECYCLE] Command failed with exit code 1.

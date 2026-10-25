@@ -1,0 +1,14 @@
+9c5c67c717618ee77126a82b6d7aea61e1e2ce0c
+{"at":"2026-10-25T18:25:35.530Z","phase":"authenticated real Next/PG","owner":"http179-b11d3f7c-731c-4c4e-8b32-592eb2cf32a4","workspace":"59940b37-acbe-4a1a-99bf-23e3efd537c0","bot":"25424c08-7be4-4281-8f40-fd73386c685f","source":"262d48a2-4bf1-460f-b74d-80ae9b919813"}
+{"at":"2026-10-25T18:25:35.665Z","phase":"created before service restart","scheduleId":"1709c617-5398-47fd-ac7a-381c702e463a","dueAt":"2026-10-25T18:25:38.089Z","slaMs":10000}
+{"at":"2026-10-25T18:25:40.092Z","phase":"once survived real Next restart and 10 concurrent HTTP sweeps","scheduleId":"1709c617-5398-47fd-ac7a-381c702e463a","occurrenceId":"1ddfb76d-15e3-493d-ad20-a1cff21da32f","operationId":"fa4f8719-878c-44fb-8721-b6666c1addce","resultVisibleInOriginalChat":true}
+{"at":"2026-10-25T18:25:41.186Z","phase":"first recurring occurrence finished; next due in 60 seconds","scheduleId":"19318036-968b-444d-bc15-336869421d40"}
+{"at":"2026-10-25T18:25:51.095Z","phase":"real-time wait heartbeat","elapsedSeconds":10}
+{"at":"2026-10-25T18:26:01.096Z","phase":"real-time wait heartbeat","elapsedSeconds":20}
+{"at":"2026-10-25T18:26:11.097Z","phase":"real-time wait heartbeat","elapsedSeconds":30}
+{"at":"2026-10-25T18:26:21.101Z","phase":"real-time wait heartbeat","elapsedSeconds":40}
+{"at":"2026-10-25T18:26:31.093Z","phase":"real-time wait heartbeat","elapsedSeconds":50}
+{"at":"2026-10-25T18:26:41.095Z","phase":"real-time wait heartbeat","elapsedSeconds":60}
+{"at":"2026-10-25T18:26:41.269Z","phase":"two real-time recurring results; persistent update/pause/resume/cancel","scheduleId":"19318036-968b-444d-bc15-336869421d40","occurrences":[{"occurrenceId":"921abab0-52e2-497a-95cd-0864138845d3","operationId":"ab508304-73ba-4833-8ad6-f3096c1fce53","status":"succeeded","dueAt":"2026-10-25T18:26:41.092Z","finishedAt":"2026-10-25T18:26:41.142Z"},{"occurrenceId":"a91ffb4f-bb16-4c74-97ed-fcd5d834b852","operationId":"8b8e2fd1-92af-4973-be6d-f15235abafd1","status":"succeeded","dueAt":"2026-10-25T18:25:41.092Z","finishedAt":"2026-10-25T18:25:41.172Z"}]}
+{"at":"2026-10-25T18:26:41.285Z","phase":"real model conversation acceptance blocked","httpStatus":503,"reason":"No provider credential/model resource enabled in this isolated environment; HTTP tool management success is not model-chat acceptance."}
+{"at":"2026-10-25T18:26:41.285Z","result":"PASS isolated Next/PG lifecycle; ISSUE REMAINS OPEN","retained":{"owner":"http179-b11d3f7c-731c-4c4e-8b32-592eb2cf32a4","workspace":"59940b37-acbe-4a1a-99bf-23e3efd537c0","bot":"25424c08-7be4-4281-8f40-fd73386c685f","source":"262d48a2-4bf1-460f-b74d-80ae9b919813"}}

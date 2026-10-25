@@ -1,0 +1,308 @@
+{
+  "events": [
+    {
+      "id": "1ddfb76d-15e3-493d-ad20-a1cff21da32f",
+      "kind": "schedule_result",
+      "tier": "background",
+      "runId": null,
+      "userId": "http179-b11d3f7c-731c-4c4e-8b32-592eb2cf32a4",
+      "issueId": null,
+      "payload": {
+        "error": null,
+        "status": "succeeded",
+        "scheduleId": "1709c617-5398-47fd-ac7a-381c702e463a",
+        "operationId": "fa4f8719-878c-44fb-8721-b6666c1addce",
+        "occurrenceId": "1ddfb76d-15e3-493d-ad20-a1cff21da32f"
+      },
+      "sequence": 156,
+      "createdAt": "2026-10-25T18:25:39.950752+00:00",
+      "dedupeKey": "schedule_result:1ddfb76d-15e3-493d-ad20-a1cff21da32f",
+      "wake_error": null,
+      "deliveredAt": null,
+      "wake_next_at": "2026-10-25T18:25:39.950752+00:00",
+      "wake_attempts": 0,
+      "wake_lease_until": null,
+      "accountActionBatch": null
+    },
+    {
+      "id": "a91ffb4f-bb16-4c74-97ed-fcd5d834b852",
+      "kind": "schedule_result",
+      "tier": "background",
+      "runId": null,
+      "userId": "http179-b11d3f7c-731c-4c4e-8b32-592eb2cf32a4",
+      "issueId": null,
+      "payload": {
+        "error": null,
+        "status": "succeeded",
+        "scheduleId": "19318036-968b-444d-bc15-336869421d40",
+        "operationId": "8b8e2fd1-92af-4973-be6d-f15235abafd1",
+        "occurrenceId": "a91ffb4f-bb16-4c74-97ed-fcd5d834b852"
+      },
+      "sequence": 157,
+      "createdAt": "2026-10-25T18:25:41.167309+00:00",
+      "dedupeKey": "schedule_result:a91ffb4f-bb16-4c74-97ed-fcd5d834b852",
+      "wake_error": null,
+      "deliveredAt": null,
+      "wake_next_at": "2026-10-25T18:25:41.167309+00:00",
+      "wake_attempts": 0,
+      "wake_lease_until": null,
+      "accountActionBatch": null
+    },
+    {
+      "id": "921abab0-52e2-497a-95cd-0864138845d3",
+      "kind": "schedule_result",
+      "tier": "background",
+      "runId": null,
+      "userId": "http179-b11d3f7c-731c-4c4e-8b32-592eb2cf32a4",
+      "issueId": null,
+      "payload": {
+        "error": null,
+        "status": "succeeded",
+        "scheduleId": "19318036-968b-444d-bc15-336869421d40",
+        "operationId": "ab508304-73ba-4833-8ad6-f3096c1fce53",
+        "occurrenceId": "921abab0-52e2-497a-95cd-0864138845d3"
+      },
+      "sequence": 158,
+      "createdAt": "2026-10-25T18:26:41.138729+00:00",
+      "dedupeKey": "schedule_result:921abab0-52e2-497a-95cd-0864138845d3",
+      "wake_error": null,
+      "deliveredAt": null,
+      "wake_next_at": "2026-10-25T18:26:41.138729+00:00",
+      "wake_attempts": 0,
+      "wake_lease_until": null,
+      "accountActionBatch": null
+    }
+  ],
+  "schedules": [
+    {
+      "id": "1709c617-5398-47fd-ac7a-381c702e463a",
+      "status": "completed",
+      "next_at": null,
+      "version": 1,
+      "owner_id": "http179-b11d3f7c-731c-4c4e-8b32-592eb2cf32a4",
+      "source_id": "262d48a2-4bf1-460f-b74d-80ae9b919813",
+      "created_at": "2026-10-25T18:25:35.618928+00:00",
+      "definition": {
+        "task": {
+          "kind": "reminder",
+          "text": "Controlled local result; no external message"
+        },
+        "title": "179 real Next controlled reminder",
+        "timing": {
+          "at": "2026-10-25T18:25:38.089Z",
+          "kind": "once"
+        },
+        "misfire": "catch_up_once",
+        "timezone": "UTC",
+        "maxLatenessMinutes": 5
+      },
+      "request_id": "236096cd-9b47-4f3e-9693-ff6dc7a22940",
+      "session_id": "25424c08-7be4-4281-8f40-fd73386c685f",
+      "updated_at": "2026-10-25T18:25:39.905+00:00",
+      "conversation": "bot",
+      "workspace_id": "59940b37-acbe-4a1a-99bf-23e3efd537c0",
+      "request_definition": {
+        "task": {
+          "kind": "reminder",
+          "text": "Controlled local result; no external message"
+        },
+        "title": "179 real Next controlled reminder",
+        "timing": {
+          "at": "2026-10-25T18:25:38.089Z",
+          "kind": "once"
+        },
+        "misfire": "catch_up_once",
+        "timezone": "UTC",
+        "maxLatenessMinutes": 5
+      }
+    },
+    {
+      "id": "19318036-968b-444d-bc15-336869421d40",
+      "status": "cancelled",
+      "next_at": null,
+      "version": 5,
+      "owner_id": "http179-b11d3f7c-731c-4c4e-8b32-592eb2cf32a4",
+      "source_id": "262d48a2-4bf1-460f-b74d-80ae9b919813",
+      "created_at": "2026-10-25T18:25:40.109734+00:00",
+      "definition": {
+        "task": {
+          "kind": "reminder",
+          "text": "Controlled local result; no external message"
+        },
+        "title": "179 real Next controlled reminder",
+        "timing": {
+          "kind": "interval",
+          "start": "2026-10-25T18:27:41.192Z",
+          "minutes": 1
+        },
+        "misfire": "catch_up_once",
+        "timezone": "Asia/Shanghai",
+        "maxLatenessMinutes": 5
+      },
+      "request_id": "7d6ae272-aa36-456d-b0d7-ddf91e3a84fa",
+      "session_id": "25424c08-7be4-4281-8f40-fd73386c685f",
+      "updated_at": "2026-10-25T18:26:41.252+00:00",
+      "conversation": "bot",
+      "workspace_id": "59940b37-acbe-4a1a-99bf-23e3efd537c0",
+      "request_definition": {
+        "task": {
+          "kind": "reminder",
+          "text": "Controlled local result; no external message"
+        },
+        "title": "179 real Next controlled reminder",
+        "timing": {
+          "kind": "interval",
+          "start": "2026-10-25T18:25:41.092Z",
+          "minutes": 1
+        },
+        "misfire": "catch_up_once",
+        "timezone": "UTC",
+        "maxLatenessMinutes": 5
+      }
+    }
+  ],
+  "chatResults": [
+    {
+      "id": "fa4f8719-878c-44fb-8721-b6666c1addce",
+      "error": null,
+      "prompt": "[Schedule] 179 real Next controlled reminder",
+      "status": "complete",
+      "userId": "http179-b11d3f7c-731c-4c4e-8b32-592eb2cf32a4",
+      "attemptId": "fa4f8719-878c-44fb-8721-b6666c1addce",
+      "createdAt": "2026-10-25T18:25:39.950752+00:00",
+      "sessionId": "25424c08-7be4-4281-8f40-fd73386c685f",
+      "updatedAt": "2026-10-25T18:25:39.950752+00:00",
+      "completion": "[Schedule 1709c617-5398-47fd-ac7a-381c702e463a; occurrence 1ddfb76d-15e3-493d-ad20-a1cff21da32f; operation fa4f8719-878c-44fb-8721-b6666c1addce] 179 real Next controlled reminder: succeeded\n{\"text\":\"Controlled local result; no external message\"}"
+    },
+    {
+      "id": "8b8e2fd1-92af-4973-be6d-f15235abafd1",
+      "error": null,
+      "prompt": "[Schedule] 179 real Next controlled reminder",
+      "status": "complete",
+      "userId": "http179-b11d3f7c-731c-4c4e-8b32-592eb2cf32a4",
+      "attemptId": "8b8e2fd1-92af-4973-be6d-f15235abafd1",
+      "createdAt": "2026-10-25T18:25:41.167309+00:00",
+      "sessionId": "25424c08-7be4-4281-8f40-fd73386c685f",
+      "updatedAt": "2026-10-25T18:25:41.167309+00:00",
+      "completion": "[Schedule 19318036-968b-444d-bc15-336869421d40; occurrence a91ffb4f-bb16-4c74-97ed-fcd5d834b852; operation 8b8e2fd1-92af-4973-be6d-f15235abafd1] 179 real Next controlled reminder: succeeded\n{\"text\":\"Controlled local result; no external message\"}"
+    },
+    {
+      "id": "ab508304-73ba-4833-8ad6-f3096c1fce53",
+      "error": null,
+      "prompt": "[Schedule] 179 real Next controlled reminder",
+      "status": "complete",
+      "userId": "http179-b11d3f7c-731c-4c4e-8b32-592eb2cf32a4",
+      "attemptId": "ab508304-73ba-4833-8ad6-f3096c1fce53",
+      "createdAt": "2026-10-25T18:26:41.138729+00:00",
+      "sessionId": "25424c08-7be4-4281-8f40-fd73386c685f",
+      "updatedAt": "2026-10-25T18:26:41.138729+00:00",
+      "completion": "[Schedule 19318036-968b-444d-bc15-336869421d40; occurrence 921abab0-52e2-497a-95cd-0864138845d3; operation ab508304-73ba-4833-8ad6-f3096c1fce53] 179 real Next controlled reminder: succeeded\n{\"text\":\"Controlled local result; no external message\"}"
+    }
+  ],
+  "occurrences": [
+    {
+      "id": "1ddfb76d-15e3-493d-ad20-a1cff21da32f",
+      "error": null,
+      "due_at": "2026-10-25T18:25:38.089+00:00",
+      "result": {
+        "text": "Controlled local result; no external message"
+      },
+      "status": "succeeded",
+      "version": 1,
+      "attempts": 1,
+      "created_at": "2026-10-25T18:25:39.899767+00:00",
+      "definition": {
+        "task": {
+          "kind": "reminder",
+          "text": "Controlled local result; no external message"
+        },
+        "title": "179 real Next controlled reminder",
+        "timing": {
+          "at": "2026-10-25T18:25:38.089Z",
+          "kind": "once"
+        },
+        "misfire": "catch_up_once",
+        "timezone": "UTC",
+        "maxLatenessMinutes": 5
+      },
+      "started_at": "2026-10-25T18:25:39.925+00:00",
+      "finished_at": "2026-10-25T18:25:39.984+00:00",
+      "lease_token": null,
+      "lease_until": null,
+      "reported_at": "2026-10-25T18:25:39.988+00:00",
+      "schedule_id": "1709c617-5398-47fd-ac7a-381c702e463a",
+      "operation_id": "fa4f8719-878c-44fb-8721-b6666c1addce",
+      "next_retry_at": "2026-10-25T18:25:39.905+00:00"
+    },
+    {
+      "id": "a91ffb4f-bb16-4c74-97ed-fcd5d834b852",
+      "error": null,
+      "due_at": "2026-10-25T18:25:41.092+00:00",
+      "result": {
+        "text": "Controlled local result; no external message"
+      },
+      "status": "succeeded",
+      "version": 1,
+      "attempts": 1,
+      "created_at": "2026-10-25T18:25:41.154718+00:00",
+      "definition": {
+        "task": {
+          "kind": "reminder",
+          "text": "Controlled local result; no external message"
+        },
+        "title": "179 real Next controlled reminder",
+        "timing": {
+          "kind": "interval",
+          "start": "2026-10-25T18:25:41.092Z",
+          "minutes": 1
+        },
+        "misfire": "catch_up_once",
+        "timezone": "UTC",
+        "maxLatenessMinutes": 5
+      },
+      "started_at": "2026-10-25T18:25:41.161+00:00",
+      "finished_at": "2026-10-25T18:25:41.172+00:00",
+      "lease_token": null,
+      "lease_until": null,
+      "reported_at": "2026-10-25T18:25:41.176+00:00",
+      "schedule_id": "19318036-968b-444d-bc15-336869421d40",
+      "operation_id": "8b8e2fd1-92af-4973-be6d-f15235abafd1",
+      "next_retry_at": "2026-10-25T18:25:41.155+00:00"
+    },
+    {
+      "id": "921abab0-52e2-497a-95cd-0864138845d3",
+      "error": null,
+      "due_at": "2026-10-25T18:26:41.092+00:00",
+      "result": {
+        "text": "Controlled local result; no external message"
+      },
+      "status": "succeeded",
+      "version": 1,
+      "attempts": 1,
+      "created_at": "2026-10-25T18:26:41.125531+00:00",
+      "definition": {
+        "task": {
+          "kind": "reminder",
+          "text": "Controlled local result; no external message"
+        },
+        "title": "179 real Next controlled reminder",
+        "timing": {
+          "kind": "interval",
+          "start": "2026-10-25T18:25:41.092Z",
+          "minutes": 1
+        },
+        "misfire": "catch_up_once",
+        "timezone": "UTC",
+        "maxLatenessMinutes": 5
+      },
+      "started_at": "2026-10-25T18:26:41.131+00:00",
+      "finished_at": "2026-10-25T18:26:41.142+00:00",
+      "lease_token": null,
+      "lease_until": null,
+      "reported_at": "2026-10-25T18:26:41.145+00:00",
+      "schedule_id": "19318036-968b-444d-bc15-336869421d40",
+      "operation_id": "ab508304-73ba-4833-8ad6-f3096c1fce53",
+      "next_retry_at": "2026-10-25T18:26:41.125+00:00"
+    }
+  ]
+}

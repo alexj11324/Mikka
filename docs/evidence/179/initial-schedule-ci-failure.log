@@ -1,0 +1,71 @@
+postgres	Initialize containers	﻿2026-10-25T18:01:52.8798446Z ##[group]Checking docker version
+postgres	Initialize containers	2026-10-25T18:01:52.8806839Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+postgres	Initialize containers	2026-10-25T18:01:52.9876847Z '1.48'
+postgres	Initialize containers	2026-10-25T18:01:52.9908821Z Docker daemon API version: '1.48'
+postgres	Initialize containers	2026-10-25T18:01:52.9909801Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+postgres	Initialize containers	2026-10-25T18:01:53.0048571Z '1.48'
+postgres	Initialize containers	2026-10-25T18:01:53.0054590Z Docker client API version: '1.48'
+postgres	Initialize containers	2026-10-25T18:01:53.0059745Z ##[endgroup]
+postgres	Initialize containers	2026-10-25T18:01:53.0061651Z ##[group]Clean up resources from previous jobs
+postgres	Initialize containers	2026-10-25T18:01:53.0066039Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=95d451"
+postgres	Initialize containers	2026-10-25T18:01:53.0176764Z ##[command]/usr/bin/docker network prune --force --filter "label=95d451"
+postgres	Initialize containers	2026-10-25T18:01:53.0271595Z ##[endgroup]
+postgres	Initialize containers	2026-10-25T18:01:53.0272195Z ##[group]Create local container network
+postgres	Initialize containers	2026-10-25T18:01:53.0279402Z ##[command]/usr/bin/docker network create --label 95d451 github_network_3bc4a6af807148bbb292d76b659e9364
+postgres	Initialize containers	2026-10-25T18:01:53.1973299Z 7b6c0133014e9d5f79247bbed1351ca90b665657e7108c3f64cd0c9347a9503a
+postgres	Initialize containers	2026-10-25T18:01:53.1987239Z ##[endgroup]
+postgres	Initialize containers	2026-10-25T18:01:53.2006590Z ##[group]Starting postgres service container
+postgres	Initialize containers	2026-10-25T18:01:53.2021826Z ##[command]/usr/bin/docker pull postgres:17-alpine
+postgres	Initialize containers	2026-10-25T18:01:53.7735269Z 17-alpine: Pulling from library/postgres
+postgres	Initialize containers	2026-10-25T18:01:53.9184859Z 7b229517ed22: Pulling fs layer
+postgres	Initialize containers	2026-10-25T18:01:53.9185620Z 9098654d3377: Pulling fs layer
+postgres	Initialize containers	2026-10-25T18:01:53.9186234Z dddde5442af4: Pulling fs layer
+postgres	Initialize containers	2026-10-25T18:01:53.9186846Z fa5e490e3893: Pulling fs layer
+postgres	Initialize containers	2026-10-25T18:01:53.9187715Z 694a01b64034: Pulling fs layer
+postgres	Initialize containers	2026-10-25T18:01:53.9188592Z 7a82a00c713d: Pulling fs layer
+postgres	Initialize containers	2026-10-25T18:01:53.9189489Z d6e09b1bfe5f: Pulling fs layer
+postgres	Initialize containers	2026-10-25T18:01:53.9190266Z e018eb860c5e: Pulling fs layer
+postgres	Initialize containers	2026-10-25T18:01:53.9190984Z f5e975d661d7: Pulling fs layer
+postgres	Initialize containers	2026-10-25T18:01:53.9191723Z d5bf1ad711f7: Pulling fs layer
+postgres	Initialize containers	2026-10-25T18:01:53.9192827Z fa5e490e3893: Waiting
+postgres	Initialize containers	2026-10-25T18:01:53.9193343Z 694a01b64034: Waiting
+postgres	Initialize containers	2026-10-25T18:01:53.9193869Z 7a82a00c713d: Waiting
+postgres	Initialize containers	2026-10-25T18:01:53.9194391Z d6e09b1bfe5f: Waiting
+postgres	Initialize containers	2026-10-25T18:01:53.9194916Z e018eb860c5e: Waiting
+postgres	Initialize containers	2026-10-25T18:01:53.9195432Z f5e975d661d7: Waiting
+postgres	Initialize containers	2026-10-25T18:01:54.0815783Z 9098654d3377: Download complete
+postgres	Initialize containers	2026-10-25T18:01:54.1557571Z dddde5442af4: Download complete
+postgres	Initialize containers	2026-10-25T18:01:54.1588718Z 7b229517ed22: Verifying Checksum
+postgres	Initialize containers	2026-10-25T18:01:54.1589645Z 7b229517ed22: Download complete
+postgres	Initialize containers	2026-10-25T18:01:54.2043585Z fa5e490e3893: Verifying Checksum
+postgres	Initialize containers	2026-10-25T18:01:54.2044615Z fa5e490e3893: Download complete
+postgres	Initialize containers	2026-10-25T18:01:54.2290053Z 7b229517ed22: Pull complete
+postgres	Initialize containers	2026-10-25T18:01:54.2981164Z 7a82a00c713d: Verifying Checksum
+postgres	Initialize containers	2026-10-25T18:01:54.2982317Z 7a82a00c713d: Download complete
+postgres	Initialize containers	2026-10-25T18:01:54.3768472Z d6e09b1bfe5f: Verifying Checksum
+postgres	Initialize containers	2026-10-25T18:01:54.3771596Z d6e09b1bfe5f: Download complete
+postgres	Initialize containers	2026-10-25T18:01:54.4218983Z e018eb860c5e: Verifying Checksum
+postgres	Initialize containers	2026-10-25T18:01:54.4219805Z e018eb860c5e: Download complete
+postgres	Initialize containers	2026-10-25T18:01:54.5205604Z f5e975d661d7: Verifying Checksum
+postgres	Initialize containers	2026-10-25T18:01:54.5206093Z f5e975d661d7: Download complete
+postgres	Initialize containers	2026-10-25T18:01:54.5474172Z d5bf1ad711f7: Verifying Checksum
+postgres	Initialize containers	2026-10-25T18:01:54.5474556Z d5bf1ad711f7: Download complete
+postgres	Initialize containers	2026-10-25T18:01:54.7175290Z 694a01b64034: Verifying Checksum
+postgres	Initialize containers	2026-10-25T18:01:54.7175857Z 694a01b64034: Download complete
+postgres	Initialize containers	2026-10-25T18:01:59.5477722Z 9098654d3377: Pull complete
+postgres	Initialize containers	2026-10-25T18:01:59.5777060Z dddde5442af4: Pull complete
+postgres	Initialize containers	2026-10-25T18:01:59.5875398Z fa5e490e3893: Pull complete
+postgres	Initialize containers	2026-10-25T18:02:02.5955043Z 694a01b64034: Pull complete
+postgres	Initialize containers	2026-10-25T18:02:02.6243020Z 7a82a00c713d: Pull complete
+postgres	Initialize containers	2026-10-25T18:02:02.6338888Z d6e09b1bfe5f: Pull complete
+postgres	Initialize containers	2026-10-25T18:02:02.6430528Z e018eb860c5e: Pull complete
+postgres	Initialize containers	2026-10-25T18:02:02.6515868Z f5e975d661d7: Pull complete
+postgres	Initialize containers	2026-10-25T18:02:02.6584471Z d5bf1ad711f7: Pull complete
+postgres	Initialize containers	2026-10-25T18:02:02.6613769Z Digest: sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
+postgres	Initialize containers	2026-10-25T18:02:02.6626482Z Status: Downloaded newer image for postgres:17-alpine
+postgres	Initialize containers	2026-10-25T18:02:02.6633033Z docker.io/library/postgres:17-alpine
+postgres	Initialize containers	2026-10-25T18:02:02.6682662Z ##[command]/usr/bin/docker create --name 4730183aceda4f1e9eb9d3c8342ba965_postgres17alpine_1bcf17 --label 95d451 --network github_network_3bc4a6af807148bbb292d76b659e9364 --network-alias postgres -p 5432:5432 --health-cmd 'pg_isready -U postgres -d mikka_179' --health-interval 5s --health-timeout 5s --health-retries 10 -e "POSTGRES_HOST_AUTH_METHOD=trust" -e "POSTGRES_DB=mikka_179" -e GITHUB_ACTIONS=true -e CI=true postgres:17-alpine
+postgres	Initialize containers	2026-10-25T18:02:02.8790823Z unknown shorthand flag: 'U' in -U
+postgres	Initialize containers	2026-10-25T18:02:02.8791622Z Usage:  docker create [OPTIONS] IMAGE [COMMAND] [ARG...]
+postgres	Initialize containers	2026-10-25T18:02:02.8791934Z Run 'docker create --help' for more information
+postgres	Initialize containers	2026-10-25T18:02:02.8883772Z ##[error]Exit code 125 returned from process: file name '/usr/bin/docker', arguments 'create --name 4730183aceda4f1e9eb9d3c8342ba965_postgres17alpine_1bcf17 --label 95d451 --network github_network_3bc4a6af807148bbb292d76b659e9364 --network-alias postgres -p 5432:5432 --health-cmd 'pg_isready -U postgres -d mikka_179' --health-interval 5s --health-timeout 5s --health-retries 10 -e "POSTGRES_HOST_AUTH_METHOD=trust" -e "POSTGRES_DB=mikka_179" -e GITHUB_ACTIONS=true -e CI=true postgres:17-alpine'.

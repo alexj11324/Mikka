@@ -1,0 +1,50 @@
+{"phase":"controlled transport ready","port":6176,"realWorkflow":false,"realModel":false}
+{"at":"2026-10-25T21:01:30.201Z","phase":"three transport failures persisted; no additional user message","eventId":"ba6a7f6f-77b2-4766-bfcb-16db1f3334ba","attempts":3,"nextRetryAt":"2026-10-25T21:01:30.584Z","slaMs":15000}
+{"phase":"staged","eventId":"ba6a7f6f-77b2-4766-bfcb-16db1f3334ba","recovery":true}
+{"phase":"effect_committed","eventId":"ba6a7f6f-77b2-4766-bfcb-16db1f3334ba"}
+{"phase":"checkpointed","eventId":"ba6a7f6f-77b2-4766-bfcb-16db1f3334ba"}
+{"phase":"result_committed","eventId":"ba6a7f6f-77b2-4766-bfcb-16db1f3334ba"}
+{"at":"2026-10-25T21:01:35.323Z","phase":"real Next restart and ten HTTP sweeps recovered original chat","eventId":"ba6a7f6f-77b2-4766-bfcb-16db1f3334ba","elapsedMs":5815}
+{"phase":"staged","eventId":"6fb1feba-a74d-4125-966c-e03b0f45e38e","recovery":false}
+{"phase":"effect_committed","eventId":"6fb1feba-a74d-4125-966c-e03b0f45e38e"}
+{"phase":"checkpointed","eventId":"6fb1feba-a74d-4125-966c-e03b0f45e38e"}
+{"phase":"result_committed","eventId":"6fb1feba-a74d-4125-966c-e03b0f45e38e"}
+{"phase":"staged","eventId":"b4573ad5-e82c-45a2-a450-6baec91a316d","recovery":false}
+{"at":"2026-10-25T21:01:35.638Z","phase":"actual transport consumer SIGKILL","atBoundary":"hold_staged","eventId":"b4573ad5-e82c-45a2-a450-6baec91a316d"}
+{"phase":"controlled transport ready","port":6176,"realWorkflow":false,"realModel":false}
+{"phase":"staged","eventId":"b4573ad5-e82c-45a2-a450-6baec91a316d","recovery":true}
+{"phase":"effect_committed","eventId":"b4573ad5-e82c-45a2-a450-6baec91a316d"}
+{"phase":"checkpointed","eventId":"b4573ad5-e82c-45a2-a450-6baec91a316d"}
+{"phase":"result_committed","eventId":"b4573ad5-e82c-45a2-a450-6baec91a316d"}
+{"phase":"staged","eventId":"9d06cc86-9254-4d7d-bb9a-c7d75580a6d6","recovery":false}
+{"phase":"effect_committed","eventId":"9d06cc86-9254-4d7d-bb9a-c7d75580a6d6"}
+{"phase":"checkpointed","eventId":"9d06cc86-9254-4d7d-bb9a-c7d75580a6d6"}
+{"at":"2026-10-25T21:01:36.927Z","phase":"actual transport consumer SIGKILL","atBoundary":"hold_checkpoint","eventId":"9d06cc86-9254-4d7d-bb9a-c7d75580a6d6"}
+{"phase":"controlled transport ready","port":6176,"realWorkflow":false,"realModel":false}
+{"phase":"staged","eventId":"9d06cc86-9254-4d7d-bb9a-c7d75580a6d6","recovery":true}
+{"phase":"result_committed","eventId":"9d06cc86-9254-4d7d-bb9a-c7d75580a6d6"}
+{"phase":"staged","eventId":"cc432f84-cc4e-42e1-b0b9-367e95f0aa8d","recovery":false}
+{"phase":"effect_committed","eventId":"cc432f84-cc4e-42e1-b0b9-367e95f0aa8d"}
+{"phase":"checkpointed","eventId":"cc432f84-cc4e-42e1-b0b9-367e95f0aa8d"}
+{"phase":"result_committed","eventId":"cc432f84-cc4e-42e1-b0b9-367e95f0aa8d"}
+{"at":"2026-10-25T21:01:38.305Z","phase":"actual transport consumer SIGKILL","atBoundary":"hold_result_ack","eventId":"cc432f84-cc4e-42e1-b0b9-367e95f0aa8d"}
+{"phase":"controlled transport ready","port":6176,"realWorkflow":false,"realModel":false}
+{"phase":"staged","eventId":"8edd0668-bc55-407e-a101-01cafe43ac31","recovery":false}
+{"phase":"effect_committed","eventId":"8edd0668-bc55-407e-a101-01cafe43ac31"}
+{"at":"2026-10-25T21:01:38.972Z","phase":"actual transport consumer SIGKILL","atBoundary":"hold_effect","eventId":"8edd0668-bc55-407e-a101-01cafe43ac31"}
+{"phase":"controlled transport ready","port":6176,"realWorkflow":false,"realModel":false}
+{"phase":"staged","eventId":"2293e62a-ce8e-4ee6-9411-7a67f067cb38","recovery":true}
+{"phase":"effect_committed","eventId":"2293e62a-ce8e-4ee6-9411-7a67f067cb38"}
+{"phase":"checkpointed","eventId":"2293e62a-ce8e-4ee6-9411-7a67f067cb38"}
+{"phase":"result_committed","eventId":"2293e62a-ce8e-4ee6-9411-7a67f067cb38"}
+{"at":"2026-10-25T21:01:42.246Z","phase":"real default workspace present; protocol sentinel has no fabricated membership","actualWorkspace":"c3089f84-1e6e-4958-876f-bad0e8a27714","protocolPartition":"00000000-0000-4000-8000-000000000001"}
+file:///workspace/Mikka-176/scripts/verify-wake-http.mjs:89
+  throw new Error(`timeout: ${label}`)
+        ^
+
+Error: timeout: 9fd493ed-2bfa-4fd3-a34b-828ba2a416a2 completed
+    at wait (file:///workspace/Mikka-176/scripts/verify-wake-http.mjs:89:9)
+    at async until (file:///workspace/Mikka-176/scripts/verify-wake-http.mjs:98:3)
+    at async file:///workspace/Mikka-176/scripts/verify-wake-http.mjs:323:7
+
+Node.js v24.19.0

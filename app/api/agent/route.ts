@@ -1,3 +1,7 @@
+import { scheduleTools } from '@/lib/schedules/tools'
+import { executeScheduleCommand, selectedScheduleWorkspace } from '@/lib/schedules/runtime'
+import { ScheduleError, SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/contract'
+import { cookies } from 'next/headers'
 import { pool } from '@/lib/db'
 import { subscriptionRepositoryIfInstalled } from '@/lib/subscription-binding-discovery'
 import { mailboxes } from '@/lib/mailbox-runtime'
@@ -140,17 +144,22 @@ export async function POST(request: Request) {
     console.error('Could not prepare Bot mailbox; continuing without mailbox tools')
     return null
   })
+  const scheduleWorkspace = await selectedScheduleWorkspace(session.user.id, (await cookies()).get('mikka-workspace')?.value).catch(() => null)
   const generationError = modelSource ? () => 'Subscription connection unavailable.' : agentErrorMessage
   const result = streamText({
     model,
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
-    system: `${systemPrompt}\n\n${agentWebInstructions()}\n\n${mailboxActor ? MAILBOX_INSTRUCTIONS : ''}`,
+    system: `${systemPrompt}\n\n${agentWebInstructions()}\n\n${mailboxActor ? MAILBOX_INSTRUCTIONS : ''}\n\n${SCHEDULE_INSTRUCTIONS}`,
     messages,
     tools: {
       ...createCredentialAITools(async (name, input) => { await authorizePolicyTool(session.user.id); return executeSystemCredentialTool({ userId: session.user.id }, name, input) }),
       ...(mailboxActor ? mailboxTools(mailboxes, mailboxActor, () => authorizePolicyTool(session.user.id)) : {}),
       ...createAgentWebTools({ signal: request.signal, authorize: async () => { await authorizeModel(session.user.id, coordinatorRoute('openai/gpt-5.4-mini')); await authorizePolicyTool(session.user.id) } }),
       ...createComposioAITools((action, input) => (async () => { await authorizePolicyTool(session.user.id); return runComposioAction(session.user.id, action, input) })()),
+      ...(scheduleWorkspace ? scheduleTools(async command => {
+        try { await authorizePolicyTool(session.user.id,scheduleWorkspace); return await executeScheduleCommand({ ownerId: session.user.id, workspaceId: scheduleWorkspace, conversation: 'bot', sessionId, sourceId: turnId }, command) }
+        catch (error) { if (error instanceof ScheduleError) return { error: error.code }; throw error }
+      }) : {}),
     },
     stopWhen: isStepCount(5),
     prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},

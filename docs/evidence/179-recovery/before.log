@@ -1,0 +1,107 @@
+{"evidence":"real report fault then fresh process-store retry","task":"reminder","occurrenceId":"35fc5022-cda0-4143-87c2-787f3bf32f59","operationId":"4f3a76bd-1997-4580-af9e-ded36be79d7d","status":"succeeded","result":{"text":"MUST NOT EXECUTE"},"effects":0}
+▶ recovery P2s use actual PG report faults, effects and permission rows
+  ✖ immutable skip after real report fault and restarted reminder (528.355525ms)
+{"evidence":"real report fault then fresh process-store retry","task":"issue_snapshot","occurrenceId":"631dc4e5-5f91-4334-ae08-01f263d40854","operationId":"af7f923b-04d3-471c-adba-be29d0d8d1ba","status":"succeeded","result":{"title":"real snapshot fixture","status":"todo","issueId":"670b06f4-59a8-4a56-a329-c620a53f8275","checkedAt":"2035-01-01T00:07:02.002Z"},"effects":0}
+  ✖ immutable skip after real report fault and restarted issue_snapshot (299.336193ms)
+{"evidence":"real report fault then fresh process-store retry","task":"agent_read","occurrenceId":"e67e9f86-dca8-4bf2-8869-0a13fd58bb59","operationId":"4debb01d-7b2c-4102-bf2a-8cc9faae0e3e","status":"succeeded","result":{"text":"CONTROLLED REAL PG EFFECT; NO MODEL OR PROVIDER"},"effects":1}
+  ✖ immutable skip after real report fault and restarted agent_read (272.742571ms)
+  ✔ catch_up_once still executes after the same report fault without duplicate logical output (138.594941ms)
+{"evidence":"denied prefix before legal tenant","deniedCount":30,"limit":25,"healthyOccurrence":"fbc9ece4-bedc-4fcc-a4b6-e05068970686","healthyReports":0,"deniedOwner":"recovery-707ac101-fcc4-4003-8f21-d4e2c748c254","healthyOwner":"recovery-f0459df3-5b34-4981-80ef-9e5d68ee712f"}
+  ✖ more than LIMIT denied reports cannot starve a later authorized tenant after restart (1037.496901ms)
+✖ recovery P2s use actual PG report faults, effects and permission rows (2362.275187ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 1
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3061.924628
+
+✖ failing tests:
+
+test at lib/schedules/recovery-postgres.test.ts:1:4182
+✖ immutable skip after real report fault and restarted reminder (528.355525ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'succeeded'
+  - 'skipped'
+  
+      at TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/recovery-postgres.test.ts:54:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/recovery-postgres.test.ts:44:4)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'succeeded',
+    expected: 'skipped',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/schedules/recovery-postgres.test.ts:1:4182
+✖ immutable skip after real report fault and restarted issue_snapshot (299.336193ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'succeeded'
+  - 'skipped'
+  
+      at TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/recovery-postgres.test.ts:54:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/recovery-postgres.test.ts:44:4)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'succeeded',
+    expected: 'skipped',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/schedules/recovery-postgres.test.ts:1:4182
+✖ immutable skip after real report fault and restarted agent_read (272.742571ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'succeeded'
+  - 'skipped'
+  
+      at TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/recovery-postgres.test.ts:54:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/recovery-postgres.test.ts:44:4)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'succeeded',
+    expected: 'skipped',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/schedules/recovery-postgres.test.ts:1:6116
+✖ more than LIMIT denied reports cannot starve a later authorized tenant after restart (1037.496901ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/recovery-postgres.test.ts:85:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176/lib/schedules/recovery-postgres.test.ts:66:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

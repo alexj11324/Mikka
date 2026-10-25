@@ -1,0 +1,124 @@
+postgres	Schedule integration and both recovery safety regressions	﻿2026-10-25T22:07:53.5983822Z ##[group]Run psql postgresql://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE mikka_179_recovery'
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.5985107Z [36;1mpsql postgresql://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE mikka_179_recovery'[0m
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.5985983Z [36;1mMIGRATE=1 node scripts/migrate.mjs[0m
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.5986491Z [36;1mpnpm test:schedules:postgres[0m
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.5986965Z [36;1mpnpm test:schedules:recovery[0m
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.6062579Z shell: /usr/bin/bash -e {0}
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.6062849Z env:
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.6063190Z   MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.6063717Z   DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.6064203Z   WAKE_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.6064741Z   WAKE_REVIEW_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.6065201Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.6065711Z   SCHEDULE_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.6066316Z   SCHEDULE_RECOVERY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_179_recovery
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.6066761Z ##[endgroup]
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.7479288Z CREATE DATABASE
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.8709703Z migrate: applied 20261023221259_application_baseline.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.9085080Z migrate: applied 0001_agents_devices.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.9104082Z migrate: applied 0002_device_enabled.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.9139943Z migrate: applied 0003_agents_columns.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.9537030Z migrate: applied 0004_linear_sync.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.9878031Z migrate: applied 0004_telegram_chat.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.9923123Z migrate: applied 0005_linear_sync_retry_and_comment_keys.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.9950200Z migrate: applied 0005_mikka_issue_metadata.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:53.9964613Z migrate: applied 0006_linear_comment_authorship.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.0042673Z migrate: applied 0007_coordinator_events.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.0055627Z migrate: applied 0007_linear_description_snapshot.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.0132422Z migrate: applied 0008_coordinator_sessions.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.0147495Z migrate: applied 0008_linear_mikka_issue_metadata.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.0637774Z migrate: applied 0009_oauth_provider.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.0656776Z migrate: applied 0010_coordinator_session_error.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.0670165Z migrate: applied 0011_coordinator_event_tier.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.0733982Z migrate: applied 0012_run_tokens.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.0782829Z migrate: applied 20261023143000_decision_calls.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.0868656Z migrate: applied 20261023150000_suggestions.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.0973863Z migrate: applied 20261023154800_issue_scope.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.1015421Z migrate: applied 20261023161128_issue_scope_source.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.1070684Z migrate: applied 20261023170500_drop_decision_calls.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.1100403Z migrate: applied 20261023171500_suggestion_trigger_checks.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.1370387Z migrate: applied 20261023213851_group_conversations.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.1396904Z migrate: applied 20261025000400_run_retries.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.1411536Z migrate: applied 20261025005600_mikka_linear_sync_setting.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.1460085Z migrate: applied 20261025013400_run_checkpoints.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.1507251Z migrate: applied 20261025043000_pending_actions.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.1533889Z migrate: applied 20261025051201_run_dispatch_keys.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.1845191Z migrate: applied 20261025051202_factory_192_stages.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.2082392Z migrate: applied 20261025051203_factory_194_approvals.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.2254997Z migrate: applied 20261025051204_factory_195_monitor.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.2487342Z migrate: applied 20261025051205_factory_192_questions.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.2559724Z migrate: applied 20261025052001_operation_ledger.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.2867687Z migrate: applied 20261025052031_session_mailboxes.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.3453905Z migrate: applied 20261025052032_group_artifact_review.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.3511802Z migrate: applied 20261025052033_group_review_mailboxes.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.3613983Z migrate: applied 20261025052200_credential_broker.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.3635931Z migrate: applied 20261025052201_credential_browser_binding.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.3658374Z migrate: applied 20261025052202_credential_handoff.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.3685449Z migrate: applied 20261025060001_calendar_operation_binding.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.3729660Z migrate: applied 20261025070001_account_action_intents.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.4002052Z migrate: applied 20261025070600_self_improvement.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.4152885Z migrate: applied 20261025082237_group_turn_mailbox_policy.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.4328095Z migrate: applied 20261025083303_improvement_skill_assignments.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.4408954Z migrate: applied 20261025141650_byos_credential_publications.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.4521765Z migrate: applied 20261025141651_byos_bindings_oauth.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.4556368Z migrate: applied 20261025141652_byos_device_authorization.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.4644485Z migrate: applied 20261025141653_byos_access_and_cleanup.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.4683974Z migrate: applied 20261025141654_byos_native_runs.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.4749630Z migrate: applied 20261025141655_byos_enrollment_transfers.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.4836633Z migrate: applied 20261025141656_byos_enrollment_cleanup.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.4889793Z migrate: applied 20261025160000_byos_environment_transfers.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.5055468Z migrate: applied 20261025180001_user_schedules.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.5111639Z migrate: applied 20261025185701_schedule_recovery_decisions.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.5230156Z migrate: applied 20261025191001_coordinator_consumption_receipts.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.5272561Z migrate: applied 20261025213501_coordinator_effect_fences.sql to MIKKA_DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.5378108Z migrate: applied 0004_mikka_workspace_tables.sql to DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.5588315Z migrate: applied 0006_workspace_tables.sql to DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.5788647Z migrate: applied 0014_workspace_teams.sql to DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.5856906Z migrate: applied 20261025005500_mikka_team_tables.sql to DATABASE_URL
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.9327463Z 
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.9328200Z > next-app@0.0.1 test:schedules:postgres /home/runner/work/Mikka/Mikka
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.9329029Z > node --import tsx --test lib/schedules/postgres.test.ts lib/schedules/wake-postgres.test.ts
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:54.9329748Z 
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:55.8405351Z ▶ real PG schedule lifecycle, concurrency, fencing, recovery and original-chat result
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:55.8406590Z   ✔ ten repeated creates and ten concurrent due scans yield one occurrence/result (306.353392ms)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:55.9057985Z   ✔ two recurring executions retain stable IDs across fresh process stores (67.260055ms)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.2588718Z   ✔ claimed worker crash expires lease; stale claim cannot execute after restart (353.126129ms)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.3142770Z   ✔ pause/cancel/update fence already claimed work, persistence and optimistic version (55.271265ms)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.6033091Z   ✔ ten real cancellation-versus-execution races have one linearized outcome (288.967672ms)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.6228238Z   ✔ late policy records skip; catch-up coalesces and records at most one backlog slot (19.174809ms)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.6513821Z   ✔ cross owner/workspace/source denied and membership revoked before execution (28.423591ms)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.7099387Z   ✔ read current issue state; revoked issue visibility produces a final error, not task data (58.118531ms)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.7595816Z {"evidence":"retained PG schedule records","owner":"schedule-owner-55579cfd-4e0d-402b-ad16-ca9cd8c136e1","workspace":"d5f23bd9-0928-4552-9e40-d74334c4d01c","session":"37d04767-9814-4409-a583-667c47c91d9d","source":"78cc3504-3ab8-4fb1-9111-1bd1bc959ef9","at":"2030-01-01T00:32:02.001Z"}
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.7661046Z   ✔ real transaction failure retries three times and persists final error in chat (49.919845ms)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.7669220Z ✔ real PG schedule lifecycle, concurrency, fencing, recovery and original-chat result (1267.92821ms)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8010251Z ✖ existing inbox persists delivery failures, compensation, concurrent claim and exhaustion (400.159902ms)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8013444Z ℹ tests 11
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8013903Z ℹ suites 0
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8014325Z ℹ pass 10
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8014760Z ℹ fail 1
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8015185Z ℹ cancelled 0
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8015595Z ℹ skipped 0
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8015989Z ℹ todo 0
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8016447Z ℹ duration_ms 1834.341118
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8025225Z 
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8025842Z ✖ failing tests:
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8026311Z 
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8026685Z test at lib/schedules/wake-postgres.test.ts:1:594
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8028025Z ✖ existing inbox persists delivery failures, compensation, concurrent claim and exhaustion (400.159902ms)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8028798Z   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8029223Z   
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8029699Z   4 !== 5
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8029920Z   
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8030499Z       at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/lib/schedules/wake-postgres.test.ts:38:10)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8031321Z       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8031928Z       at async Test.run (node:internal/test_runner/test:1409:7)
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8032526Z       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8033022Z     generatedMessage: true,
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8033307Z     code: 'ERR_ASSERTION',
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8033580Z     actual: 4,
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8033807Z     expected: 5,
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8034050Z     operator: 'strictEqual',
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8034319Z     diff: 'simple'
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8034537Z   }
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8212199Z  ELIFECYCLE  Command failed with exit code 1.
+postgres	Schedule integration and both recovery safety regressions	2026-10-25T22:07:56.8585132Z ##[error]Process completed with exit code 1.
