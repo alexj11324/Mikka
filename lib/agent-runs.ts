@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { agents, agentRuns, deviceRepos, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
+import { dispatchInput, insertRunOnce, type DispatchInput, type DispatchResult } from '@/lib/run-dispatch'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -44,8 +45,8 @@ export const runViewColumns = {
  * next poll, claims it, and reports back through `/v1/runs/:runId/complete`.
  * `note` is extra direction for this run only, after the issue.
  */
-export async function queueRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }): Promise<{ runId: string }> {
-  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), deviceRepoId: z.uuid(), note: z.string().trim().max(10_000).optional() }).safeParse(input)
+export async function queueRun(userId: string, input: DispatchInput): Promise<DispatchResult> {
+  const parsed = dispatchInput.safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
   const issue = await issueForUser(userId, parsed.data.issueId)
   if (!issue) throw new ActionFailureError('issueNotFound')
@@ -55,13 +56,10 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   const [repo] = await db.select().from(deviceRepos)
     .where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.deviceId, agent.deviceId), eq(deviceRepos.userId, userId))).limit(1)
   if (!repo) throw new ActionFailureError('agentRepoMissing')
-  const runId = crypto.randomUUID()
-  await db.insert(agentRuns).values({
-    id: runId, userId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
+  return insertRunOnce(db, userId, parsed.data, {
+    deviceId: agent.deviceId, baseBranch: repo.baseBranch,
     prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note),
   })
-  return { runId }
 }
 
 /** The brief the agent starts from: the issue, any note for this run, then the agent's own role. */

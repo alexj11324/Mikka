@@ -869,6 +869,8 @@
     "repoPathInvalid": "The repository path must be absolute.",
     "repoNotFound": "This repository does not exist.",
     "runInvalid": "The run parameters are invalid.",
+    "runAlreadyActive": "This task already has an active run.",
+    "runDispatchKeyConflict": "This request key was already used for different run parameters.",
     "runNotFound": "This run does not exist.",
     "messageRequired": "A message cannot be empty.",
     "deviceSaveFailed": "The save failed. Please try again.",

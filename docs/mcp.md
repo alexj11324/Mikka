@@ -37,6 +37,17 @@ The agent then acts as you.
 | `create_issue`, `update_issue` | Create an issue, or change its title, status, priority, project, labels or assigned agent. |
 | `link_issues` | Add or remove a parent, child, related, blocked-by, blocks or duplicate link. |
 | `dispatch_run`, `send_to_run`, `stop_run` | Queue a run for an agent, message a running agent, ask a run to stop. |
+
+`dispatch_run` accepts an optional `requestKey` (1–200 characters). Keep the
+same key when retrying one logical request after a timeout or lost response.
+The key belongs to the authenticated user and is bound to the issue, agent,
+repository and normalized note. Reusing it with changed parameters returns
+`runDispatchKeyConflict`. An exact replay returns the original `runId`, its
+current `status`, and `replayed: true`, even after that run ends. New requests
+return `replayed: false`. Current access is checked before every replay.
+Without a key, older callers still work, but cannot recover a lost response
+after the run ends. All callers receive `runAlreadyActive` if a new dispatch
+would overlap another active run by that user on the same issue.
 | `read_coordinator_memory`, `remember`, `forget` | Read and edit the notes your Coordinator keeps about you. |
 
 `get_issue` also returns the issue's project, labels, assignee and relations.

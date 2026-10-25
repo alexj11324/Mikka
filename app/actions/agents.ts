@@ -15,6 +15,7 @@ import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/
 import { listSshHosts } from '@/lib/ssh'
 import { addRunMessage, queueRun, readRun, requestRunStop, runViewColumns, type RunDetail, type RunView } from '@/lib/agent-runs'
 import type { HarnessInfo } from '@mikka/protocol/harness'
+import type { DispatchInput, DispatchResult } from '@/lib/run-dispatch'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -217,7 +218,7 @@ async function ownedDeviceWithHarness(deviceId: string, harness: SupportedHarnes
 }
 
 /** Queues one run of one agent against one issue. */
-export async function startRun(input: { issueId: string; agentId: string; deviceRepoId: string }): Promise<{ runId: string }> {
+export async function startRun(input: DispatchInput): Promise<DispatchResult> {
   return queueRun(await getUserId(), input)
 }
 

@@ -173,6 +173,10 @@ export const agentRuns = pgTable('agent_runs', {
   status: text('status').$type<RunStatus>().notNull().default('queued'),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),
+  /** Caller-supplied retry identity, scoped to userId. Null for older dispatchers. */
+  dispatchKey: text('dispatchKey'),
+  /** Hash of the original dispatch parameters; rejects reuse for different work. */
+  dispatchFingerprint: text('dispatchFingerprint'),
   baseBranch: text('baseBranch').notNull().default('main'),
   sessionId: text('sessionId'), worktreePath: text('worktreePath'),
   stopReason: text('stopReason'), error: text('error'),
@@ -187,7 +191,7 @@ export const agentRuns = pgTable('agent_runs', {
   finishedAt: timestamp('finishedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt)])
+}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`)])
 
 /** The run's event stream, one row per chunk; `seq` dedupes re-sent batches. */
 export const runChunks = pgTable('run_chunks', {

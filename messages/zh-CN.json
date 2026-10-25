@@ -869,6 +869,8 @@
     "repoPathInvalid": "仓库路径需要是绝对路径。",
     "repoNotFound": "仓库不存在。",
     "runInvalid": "运行参数不正确。",
+    "runAlreadyActive": "此任务已有正在执行的线程。",
+    "runDispatchKeyConflict": "此请求标识已用于不同的运行参数。",
     "runNotFound": "运行不存在。",
     "messageRequired": "消息不能为空。",
     "deviceSaveFailed": "保存失败，请重试。",

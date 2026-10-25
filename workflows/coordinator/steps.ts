@@ -14,6 +14,7 @@ import { runComposioAction } from '@/lib/composio'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
+import type { DispatchInput } from '@/lib/run-dispatch'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -131,9 +132,9 @@ export async function listAgents(userId: string) {
   }))
 }
 
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }) {
+export async function dispatchRun(userId: string, input: DispatchInput) {
   'use step'
-  return asToolResult(async () => ({ ...(await queueRun(userId, input)), status: 'queued' }))
+  return asToolResult(() => queueRun(userId, input))
 }
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }) {
