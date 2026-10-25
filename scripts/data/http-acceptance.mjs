@@ -11,7 +11,9 @@ const actionId=(name,file='app/actions/issue-metadata.ts')=>{const row=Object.en
 const app=new Pool({connectionString:appURL.toString()}),ws=new Pool({connectionString:wsURL.toString()}),id=()=>randomUUID()
 const evidence={sha:process.env.GITHUB_SHA??null,startedAt:new Date().toISOString(),environment:'built Next Server Actions HTTP + two isolated PG databases; no UI interaction claim',checks:[]}
 async function signup(){
- const response=await fetch(new URL('/mikka/api/auth/sign-up/email',origin),{method:'POST',headers:{origin:origin.origin,'content-type':'application/json'},body:JSON.stringify({name:'Synthetic assignment fixture',email:'assignment-'+id()+'@example.invalid',password:randomBytes(32).toString('hex')})})
+ const body=JSON.stringify({name:'Synthetic data fixture',email:'data-'+id()+'@example.invalid',password:randomBytes(32).toString('hex')})
+ const request=()=>fetch(new URL('/mikka/api/auth/sign-up/email',origin),{method:'POST',headers:{origin:origin.origin,'content-type':'application/json'},body})
+ const response=await request()
  assert.equal(response.status,200);const data=await response.json();const cookie=response.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');assert.ok(cookie);return {id:data.user.id,cookie}
 }
 function flight(text){
@@ -38,6 +40,9 @@ async function search(actor,workspace,params={}){
  const response=await fetch(url,{headers:{cookie:actor.cookie}})
  return {status:response.status,data:await response.json()}
 }
+// The installed auth library limits sign-up to 3 requests per 10 seconds.
+// Leave its window intact when this suite follows the 3-user assignment suite.
+await new Promise(resolve=>setTimeout(resolve,11000))
 try{
  const owner=await signup(),member=await signup(),outsider=await signup(),w1=id(),w2=id(),team=id(),issue=id(),privateIssue=id(),agent=id()
  for(const [w,u]of [[w1,owner.id],[w2,outsider.id]])await ws.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,'Retained data fixture')`,[w,u])
