@@ -46,10 +46,11 @@ source wins in a conflict is in [`README.md`](README.md).
   and an A–D choice card.
 - **R-13** One-to-one chats (a bot, the Coordinator, the board's Coordinator
   sidebar) show no avatar or name on messages; the header pill names the bot.
-  Group chats show a 24px avatar on the left at the top of each run, beside
-  the name, which appears once per run, 12px Medium in the bot's colour
-  (Figma `224:5023`). A group's 详情 lists its members, recent threads and
-  files under the group avatar.
+  Group chats show a 24px avatar on the left of the bubbles at the bottom of
+  each run and the name once per run, 12px Medium in the bot's colour (Figma
+  `224:5023`). A group's 详情 shows the group avatar and name, a switch
+  between its bots (the one at work selected, with a green dot), and that
+  bot's cloud computer screen with 「<Bot 名> 的屏幕」 under it (R-16, R-17).
 - **R-14** The user's messages sit in an accent-blue bubble with white text
   (`accent/default`); a bot's text sits in the light grey bubble. Charts, OpenUI cards
   and choice cards have no bubble. Bordered cards (document, computer) sit
