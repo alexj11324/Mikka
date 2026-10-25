@@ -263,7 +263,7 @@ function sameCommand(actual: unknown, expected: string): boolean {
   if (typeof actual !== "string") return false;
   if (actual.trim() === expected.trim()) return true;
   // Codex records the shell wrapper, Claude records its Bash input directly.
-  const wrapper = actual.match(/^(?:\/bin\/)?(?:bash|sh) -(?:lc|c) (.+)$/s);
+  const wrapper = actual.match(/^(?:\/bin\/)?(?:bash|sh) -(?:lc|c) ([\s\S]+)$/);
   if (!wrapper) return false;
   const quoted = wrapper[1];
   if (quoted.startsWith("'") && quoted.endsWith("'"))
