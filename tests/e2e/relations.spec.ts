@@ -1,20 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register } from './fixtures'
-
-async function createIssue(page: Page, title: string) {
-  await page.getByRole('button', { name: '新建任务', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
-  await dialog.getByLabel('任务标题', { exact: true }).fill(title)
-  await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
-  await expect(dialog).not.toBeVisible()
-}
+import { test, expect, register, rail, seedTask, openIssueFromSearch } from './fixtures'
 
 async function openIssue(page: Page, title: string) {
-  await page.getByRole('button', { name: '打开全局搜索', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '搜索任务', exact: true })
-  await dialog.getByRole('combobox', { name: '全局搜索任务', exact: true }).fill(title)
-  await dialog.getByRole('option').filter({ hasText: title }).click()
+  await openIssueFromSearch(page, title)
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
   await expect(page.getByRole('button', { name: '更多任务操作', exact: true })).toBeEnabled()
 }
@@ -43,9 +32,10 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     const parent = `关系父任务 ${suffix}`
     const child = `关系子任务 ${suffix}`
     const blocker = `前置阻塞任务 ${suffix}`
-    await createIssue(page, parent)
-    await createIssue(page, blocker)
-    await page.getByRole('button', { name: '任务', exact: true }).click()
+    await seedTask(page, parent)
+    await seedTask(page, blocker)
+    await page.reload()
+    await rail(page, '看板').click()
     await openIssue(page, parent)
     const parentUrl = page.url()
     await page.setViewportSize(viewport)

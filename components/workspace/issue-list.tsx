@@ -44,7 +44,7 @@ export function IssueList({ issues, searching, onOpen, onCreate }: {
             <Button type="button" variant="ghost" onClick={() => onOpen(issue.id)} className="h-auto min-h-13 w-full justify-start p-0">
               <span className="flex w-full items-center gap-3 px-4 py-3 text-left sm:px-6">
                 <status.icon className={cn('size-3.5 shrink-0', indicatorClassName)} />
-                <span className="hidden w-24 shrink-0 font-mono text-xs text-muted-foreground sm:block">{issueIdentifier(issue.metadata.number, tIssue('unassignedNumber'))}</span>
+                <span className="hidden w-24 shrink-0 font-mono text-xs text-muted-foreground sm:block">{issueIdentifier(issue, tIssue('unassignedNumber'))}</span>
                 <span className="min-w-0 flex-1 truncate font-medium">{issue.title}</span>
                 <span className="hidden w-24 shrink-0 text-xs text-muted-foreground sm:block">{priorityLabel(issue.priority)}</span>
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">v{issue.revision}</span>

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register, browserClientHeaders, watchRuntime, app, BASE_PATH } from './fixtures'
+import { test, expect, register, rail, browserClientHeaders, watchRuntime, app, BASE_PATH, seedTask, openIssueFromSearch } from './fixtures'
 
 async function createTeam(page: Page, name: string, identifier: string) {
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
@@ -14,39 +14,35 @@ async function createTeam(page: Page, name: string, identifier: string) {
   await expect(page.getByRole('row').filter({ hasText: name })).toBeVisible()
 }
 async function createTask(page: Page, title: string, team?: string) {
-  await page.getByRole('button', { name: '新建任务', exact: true }).first().click()
-  const dialog = page.getByRole('dialog', { name: '新建任务', exact: true })
-  await dialog.getByLabel('任务标题', { exact: true }).fill(title)
-  // Create-issue dialog renders a NativeSelect: drive it with selectOption.
-  await dialog.getByRole('combobox', { name: '团队', exact: true }).selectOption(team ? { label: team } : '')
-  await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
-  await expect(dialog).not.toBeVisible()
+  await seedTask(page, title)
+  await page.reload()
+  if (!team) return
+  await openIssueFromSearch(page, title)
+  const teamSelect = page.getByRole('combobox', { name: '团队', exact: true })
+  await teamSelect.click()
+  await page.getByRole('option', { name: team, exact: true }).click()
+  const save = page.getByRole('button', { name: '保存团队归属', exact: true })
+  // Moving a task between teams asks for confirmation first.
+  page.once('dialog', dialog => { void dialog.accept() })
+  await save.click()
+  await expect(save).toHaveCount(0)
+  await expect(teamSelect).toContainText(team)
+  await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
 }
 async function showAllTasks(page: Page) {
-  await page.getByRole('button', { name: '更多', exact: true }).click()
-  await page.getByRole('menuitem', { name: '全部任务', exact: true }).click()
-  await page.getByRole('button', { name: '列表视图', exact: true }).click()
+  await rail(page, '看板').click()
+  // The board mounts after the section switch settles; check its filters only once it is there.
+  await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
+  // The board opens filtered to 负责人 = 我; teammates' public tasks need it off.
+  const clear = page.getByRole('button', { name: '移除负责人筛选', exact: true })
+  await expect(async () => {
+    if (await clear.isVisible()) await clear.click({ timeout: 1000 })
+    await expect(clear).toHaveCount(0, { timeout: 1000 })
+  }).toPass()
 }
-
-test('团队主页、任务和项目菜单右侧空白区域均可点击导航', async ({ page }) => {
-  await register(page, '/settings/teams')
-  await createTeam(page, '导航团队', 'NAV')
-  await page.getByRole('link', { name: '返回工作台', exact: true }).click()
-  const submenu = page.locator('[data-sidebar="menu-sub"]').first()
-  const breadcrumb = page.getByRole('navigation', { name: '当前位置', exact: true })
-
-  for (const [title, heading] of [['主页', '团队主页'], ['任务', '团队任务'], ['项目', '团队项目']]) {
-    const button = submenu.getByRole('button', { name: title, exact: true })
-    const row = button.locator('..')
-    await expect(row).toBeVisible()
-    const bounds = await row.boundingBox()
-    if (!bounds) throw new Error('团队导航行不可见')
-    await row.click({ position: { x: bounds.width - 12, y: bounds.height / 2 } })
-    await expect(button).toHaveAttribute('data-active')
-    await expect(breadcrumb).toContainText('导航团队')
-    await expect(breadcrumb.getByText(heading, { exact: true })).toBeVisible()
-  }
-})
+function boardCard(page: Page, title: string) {
+  return page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })
+}
 
 test('公开团队创建、搜索、编辑、负责人保护、任务归属和项目多团队关联', async ({ page }) => {
   test.setTimeout(180000)
@@ -78,7 +74,7 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await createTask(page, privateTitle)
   await createTask(page, publicTitle, 'PRODUCT · 产品团队')
   await showAllTasks(page)
-  await page.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: publicTitle }).click()
+  await boardCard(page, publicTitle).click()
   // Detail page renders a Base UI Select: open the trigger and check the selected option.
   const teamSelect = page.getByRole('combobox', { name: '团队', exact: true })
   await expect(teamSelect).toContainText('PRODUCT · 产品团队')
@@ -88,7 +84,8 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await expect(page.getByRole('listbox')).toHaveCount(0)
   await expect(page.getByText('对该工作区启用成员公开，可协作编辑。', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
-  await page.getByRole('button', { name: '项目', exact: true }).first().click()
+  // Nav v3 keeps projects out of the left column; they stay reachable by link.
+  await page.goto(app('/?section=projects'))
   await page.getByRole('button', { name: '新建项目', exact: true }).first().click()
   const projectDialog = page.getByRole('dialog', { name: '新建项目', exact: true })
   await projectDialog.getByLabel('项目名称', { exact: true }).fill('跨团队交付项目')
@@ -160,7 +157,7 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
     await member.keyboard.press('Escape')
     await member.goto(app('/'))
     await showAllTasks(member)
-    await expect(member.locator('[aria-label="任务列表"]').getByText(publicTitle, { exact: true })).toBeVisible()
+    await expect(boardCard(member, publicTitle)).toBeVisible()
     await expect(member.getByText(privateTitle, { exact: true })).toHaveCount(0)
     await page.goto(app(`/settings/members?workspace=${workspaceId}`))
     const membership = page.getByRole('row').filter({ hasText: email })
@@ -209,7 +206,7 @@ test('非创建者成员在他人公开任务上改父子关系，关系区与�
     await page.goto(app('/'))
     await showAllTasks(page)
     for (const title of [parentTitle, childTitle]) {
-      await page.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: title }).click()
+      await boardCard(page, title).click()
       await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
       await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
       await page.getByRole('menuitem', { name: '管理协作成员…', exact: true }).click()
@@ -221,12 +218,16 @@ test('非创建者成员在他人公开任务上改父子关系，关系区与�
     }
     await member.goto(app('/'))
     await showAllTasks(member)
-    await member.locator('[aria-label="任务列表"]').getByRole('button').filter({ hasText: parentTitle }).click()
+    await boardCard(member, parentTitle).click()
     await expect(member.getByLabel('任务标题', { exact: true })).toHaveValue(parentTitle)
     // Non-owners cannot delete (owner-only menu item), so delete/undo is covered by the owner flow only.
     await member.getByRole('button', { name: '更多任务操作', exact: true }).click()
+    const actions = member.getByRole('menu')
+    await expect(actions).toBeVisible()
     await expect(member.getByRole('menuitem', { name: /^删除任务/ })).toHaveCount(0)
     await member.keyboard.press('Escape')
+    // The closing menu keeps an inert backdrop over the page until it is gone.
+    await expect(actions).toHaveCount(0)
     const children = member.getByRole('region', { name: '子任务', exact: true })
     const addExisting = async () => {
       await children.getByRole('button', { name: '添加现有任务', exact: true }).click()

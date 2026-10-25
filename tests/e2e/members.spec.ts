@@ -95,8 +95,8 @@ test("成员导航、邀请取消、角色选择、创建和撤销邀请、管�
   await expect(confirmation).not.toBeVisible();
   await page.getByRole("link", { name: "返回工作台", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "项目", exact: true }),
-  ).toBeVisible();
+    page.getByRole("button", { name: /^Coordinator/ }),
+  ).toHaveAttribute("aria-current", "page");
 });
 
 test("CSV 拖拽去重、导入错误保护、批量邀请和导出", async ({ page }) => {

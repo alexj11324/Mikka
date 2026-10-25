@@ -34,8 +34,8 @@ function DescriptionPreview({ content }: { content: JSONContent }) {
   return <EditorContent editor={editor} />
 }
 
-export function IssueDescriptionHistory({ open, onOpenChange, number, title, currentContent, versions, loadingError, onRetry, onRestore }: {
-  open: boolean; onOpenChange: (open: boolean) => void; number?: number; title: string; currentContent: JSONContent; versions?: Version[]; loadingError: boolean; onRetry: () => void; onRestore: (version: Version) => Promise<boolean>
+export function IssueDescriptionHistory({ open, onOpenChange, identifier, title, currentContent, versions, loadingError, onRetry, onRestore }: {
+  open: boolean; onOpenChange: (open: boolean) => void; identifier: string | null; title: string; currentContent: JSONContent; versions?: Version[]; loadingError: boolean; onRetry: () => void; onRestore: (version: Version) => Promise<boolean>
 }) {
   const t = useTranslations('IssueDetail.history')
   const tCommon = useTranslations('Common')
@@ -69,7 +69,7 @@ export function IssueDescriptionHistory({ open, onOpenChange, number, title, cur
   return <>
     <Dialog open={open} onOpenChange={value => { if (!pending) onOpenChange(value) }}>
       <DialogContent className="flex h-[92svh] max-h-[900px] min-w-0 flex-col gap-0 overflow-hidden p-0 sm:h-[85svh] sm:max-w-[min(90vw,1140px)]">
-        <DialogHeader className="shrink-0 px-5 py-4 pr-12"><DialogTitle className="truncate">{t('title', { id: issueIdentifier(number), title })}</DialogTitle><DialogDescription className="sr-only">{t('description')}</DialogDescription></DialogHeader>
+        <DialogHeader className="shrink-0 px-5 py-4 pr-12"><DialogTitle className="truncate">{t('title', { id: issueIdentifier({ identifier }), title })}</DialogTitle><DialogDescription className="sr-only">{t('description')}</DialogDescription></DialogHeader>
         {loadingError ? <div role="alert" className="flex flex-col items-start gap-4 p-6"><p>{t('readFailed')}</p><Button variant="outline" onClick={onRetry}>{t('reload')}</Button></div> : !versions ? <div role="status" aria-label={t('reading')} className="p-6"><Skeleton className="h-72 w-full" /></div> : <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 md:flex-row">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border">
             <div ref={viewport} className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-7">
