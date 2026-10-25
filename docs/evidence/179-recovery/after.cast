@@ -1,0 +1,12 @@
+{"version": 2, "width": 120, "height": 35, "timestamp": 1792955079, "title": "Mikka actual backend acceptance"}
+[0.5774, "o", "{\"evidence\":\"real report fault then fresh process-store retry\",\"task\":\"reminder\",\"occurrenceId\":\"b2177267-0b1c-40e9-acb6-4246edf1ad7a\",\"operationId\":\"f6840fb6-6e16-446f-a924-d044c0c8d4b1\",\"status\":\"skipped\",\"result\":null,\"effects\":0}\r\n"]
+[0.585985, "o", "\u25b6 recovery P2s use actual PG report faults, effects and permission rows\r\n  \u2714 immutable skip after real report fault and restarted reminder (161.28056ms)\r\n"]
+[0.670835, "o", "{\"evidence\":\"real report fault then fresh process-store retry\",\"task\":\"issue_snapshot\",\"occurrenceId\":\"a00bed4d-39fb-4859-b6bf-2f6634977429\",\"operationId\":\"29c0c3c8-873f-44f8-b570-20eb8fe56534\",\"status\":\"skipped\",\"result\":null,\"effects\":0}\r\n"]
+[0.676479, "o", "  \u2714 immutable skip after real report fault and restarted issue_snapshot (92.06346ms)\r\n"]
+[0.755877, "o", "{\"evidence\":\"real report fault then fresh process-store retry\",\"task\":\"agent_read\",\"occurrenceId\":\"fc26140a-5ec1-4802-bd41-20cbc0427688\",\"operationId\":\"b30ffcd0-3d29-40f4-b31b-e74ad85f329b\",\"status\":\"skipped\",\"result\":null,\"effects\":0}\r\n"]
+[0.762065, "o", "  \u2714 immutable skip after real report fault and restarted agent_read (84.840916ms)\r\n"]
+[0.816374, "o", "  \u2714 catch_up_once still executes after the same report fault without duplicate logical output (54.31219ms)\r\n"]
+[2.475668, "o", "{\"evidence\":\"denied prefix before legal tenant\",\"deniedCount\":32,\"queued\":185,\"scans\":9,\"limit\":25,\"healthyOccurrence\":\"58b7c74b-a13c-4615-952b-f71cc9d00a7b\",\"healthyReports\":1,\"deniedOwner\":\"recovery-2ab81b3a-3be9-4b00-88b8-993cf0a5bc95\",\"healthyOwner\":\"recovery-b79d7c4b-e65a-4da3-8315-cd62a13d3009\"}\r\n"]
+[4.083668, "o", "  \u2714 more than LIMIT denied reports cannot starve a later authorized tenant after restart (3262.306894ms)\r\n\u2714 recovery P2s use actual PG report faults, effects and permission rows (3707.546939ms)\r\n"]
+[4.12087, "o", "\u2139 tests 6\r\n\u2139 suites 0\r\n\u2139 pass 6\r\n\u2139 fail 0\r\n\u2139 cancelled 0\r\n"]
+[4.120961, "o", "\u2139 skipped 0\r\n\u2139 todo 0\r\n\u2139 duration_ms 4054.936982\r\n"]

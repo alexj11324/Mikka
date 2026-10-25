@@ -10,7 +10,7 @@ type Schedule = {
   id: string; owner_id: string; workspace_id: string; conversation: 'bot' | 'coordinator'; session_id: string; source_id: string;
   definition: Definition; status: string; version: number; next_at: Date | null; request_id: string; request_definition: Definition
 }
-type Occurrence = { id: string; schedule_id: string; operation_id: string; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string; error: string | null }
+type Occurrence = { id: string; schedule_id: string; operation_id: string; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string; error: string | null; execution_decision: 'execute' | 'skip' | 'review'; report_next_at: Date; report_attempts: number }
 
 /** Only transaction-local, read-only tasks are registered. Adding a provider
  * effect requires #208's stable operation ledger and domain approval checks. */
@@ -114,10 +114,7 @@ export class ScheduleStore {
         const late = now.getTime() - row.next_at!.getTime() > row.definition.maxLatenessMinutes * 60000
         const skipped = late && row.definition.misfire === 'skip'
         const next = nextTime(row.definition, now)
-        const { rows: created } = await tx.query<Occurrence>(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,operation_id,next_retry_at,finished_at,error) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(schedule_id,version,due_at) DO NOTHING RETURNING *`, [occurrence, row.id, row.version, row.next_at, row.definition, skipped ? 'skipped' : 'pending', randomUUID(), now, skipped ? now : null, skipped ? 'misfireSkipped' : null])
-        // Skipped history is persisted here. Delivery requires current permission
-        // and is performed in claim/execute, never by an unguarded scanner.
-        if (skipped && created.length) await tx.query(`UPDATE schedule_occurrences SET status='pending',error='misfireSkipped',finished_at=NULL WHERE id=$1`, [occurrence])
+        await tx.query(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,operation_id,next_retry_at,error,execution_decision) VALUES($1,$2,$3,$4,$5,'pending',$6,$7,$8,$9) ON CONFLICT(schedule_id,version,due_at) DO NOTHING`, [occurrence, row.id, row.version, row.next_at, row.definition, randomUUID(), now, skipped ? 'misfireSkipped' : null, skipped ? 'skip' : 'execute'])
         await tx.query('UPDATE user_schedules SET next_at=$2,status=$3,updated_at=$4 WHERE id=$1', [row.id, next, next ? 'active' : 'completed', now])
       }
       return rows.length
@@ -143,7 +140,7 @@ export class ScheduleStore {
     // Existing inbox is the durable event/audit entry. The deterministic result
     // is already in its original chat; background tier avoids paid duplicate narration.
     await tx.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,tier) VALUES($1,$2,'schedule_result',$3,$4,'background') ON CONFLICT("dedupeKey") DO NOTHING`, [occurrence.id, schedule.owner_id, `schedule_result:${occurrence.id}`, { scheduleId: schedule.id, occurrenceId: occurrence.id, operationId: occurrence.operation_id, status, error }])
-    await tx.query('UPDATE schedule_occurrences SET reported_at=$2 WHERE id=$1', [occurrence.id, this.clock()])
+    await tx.query('UPDATE schedule_occurrences SET reported_at=$2,report_attempts=report_attempts+1 WHERE id=$1', [occurrence.id, this.clock()])
   }
   async execute(claim: Occurrence) {
     const schedule = (await this.pool.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1', [claim.schedule_id])).rows[0]
@@ -158,45 +155,52 @@ export class ScheduleStore {
         }
         if (occurrence.attempts > 3) throw new Error('scheduleLeaseRecoveryExhausted')
         await this.conversation(tx, { ownerId: row.owner_id, conversation: row.conversation, sessionId: row.session_id })
+        if (occurrence.execution_decision === 'review') throw new ScheduleError('scheduleMisfireDecisionRequiresReview')
+        const skipped = occurrence.execution_decision === 'skip'
         const task = occurrence.definition.task
-        const issue = await this.taskPermission(tx, row.owner_id, occurrence.definition)
-        const skipped = occurrence.error === 'misfireSkipped'
+        const issue = skipped ? null : await this.taskPermission(tx, row.owner_id, occurrence.definition)
         const result = skipped ? null : task.kind === 'reminder' ? { text: task.text } : task.kind === 'agent_read' ? await this.agent!.read(row.owner_id, task, occurrence.operation_id) : { issueId: issue!.id, title: issue!.title, status: issue!.status, checkedAt: this.clock().toISOString() }
         const status = skipped ? 'skipped' : 'succeeded'
-        await tx.query(`UPDATE schedule_occurrences SET status=$2,result=$3,finished_at=$4,lease_token=NULL,lease_until=NULL WHERE id=$1`, [claim.id, status, result, this.clock()])
+        await tx.query(`UPDATE schedule_occurrences SET status=$2,result=$3,finished_at=$4,error=$5,lease_token=NULL,lease_until=NULL WHERE id=$1`, [claim.id, status, result, this.clock(), skipped ? 'misfireSkipped' : null])
         await this.report(tx, row, occurrence, status, result, skipped ? 'misfireSkipped' : null)
       }))
     } catch (error) {
       // Read-only transaction rolled back: retrying cannot duplicate an external
       // effect. Permission failures stop immediately, operational failures cap at 3.
       const denied = error instanceof ScheduleError && error.status === 403
-      const code = denied ? error.code : 'scheduleExecutionUnavailable'
+      const terminal = denied || (error instanceof ScheduleError && error.code === 'scheduleMisfireDecisionRequiresReview')
+      const code = error instanceof ScheduleError ? error.code : 'scheduleExecutionUnavailable'
       const failed = await this.transaction(async tx => {
         await tx.query('SELECT id FROM user_schedules WHERE id=$1 FOR UPDATE', [schedule.id])
-        const { rows } = await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status=CASE WHEN $3 OR attempts>=3 THEN 'failed' ELSE 'pending' END,error=$4,next_retry_at=$5,finished_at=CASE WHEN $3 OR attempts>=3 THEN $6::timestamptz ELSE NULL END,lease_token=NULL,lease_until=NULL WHERE id=$1 AND status='running' AND lease_token=$2 RETURNING *`, [claim.id, claim.lease_token, denied, code, new Date(this.clock().getTime() + 30000 * 2 ** Math.min(claim.attempts - 1, 4)), this.clock()])
+        const { rows } = await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status=CASE WHEN $3 OR attempts>=3 THEN 'failed' ELSE 'pending' END,error=$4,next_retry_at=$5,finished_at=CASE WHEN $3 OR attempts>=3 THEN $6::timestamptz ELSE NULL END,lease_token=NULL,lease_until=NULL,report_next_at=$6 WHERE id=$1 AND status='running' AND lease_token=$2 RETURNING *`, [claim.id, claim.lease_token, terminal, code, new Date(this.clock().getTime() + 30000 * 2 ** Math.min(claim.attempts - 1, 4)), this.clock()])
         return rows[0]?.status === 'failed' ? rows[0] : null
 
       })
-      if (failed) {
-        try { await this.workspace(schedule.owner_id, schedule.workspace_id, () => this.transaction(async tx => {
-          await this.conversation(tx, { ownerId: schedule.owner_id, conversation: schedule.conversation, sessionId: schedule.session_id })
-          await this.report(tx, schedule, failed, 'failed', null, code)
-        })) } catch { /* Persisted failure remains available after reauthorization. */ }
-      }
+      if (failed) await this.publishFailedReport(schedule, failed.id)
     }
   }
-  /** Recover the commit-before-error-report crash window without another outbox. */
+  /** A denied row advances durably so a full prefix cannot monopolize LIMIT.
+   * Permission checks remain outside and inside the publication transaction. */
+  private async publishFailedReport(schedule: Schedule, occurrenceId: string) {
+    const now = this.clock()
+    try { await this.workspace(schedule.owner_id, schedule.workspace_id, () => this.transaction(async tx => {
+      await tx.query('SELECT id FROM user_schedules WHERE id=$1 FOR UPDATE', [schedule.id])
+      const occurrence = (await tx.query<Occurrence>("SELECT * FROM schedule_occurrences WHERE id=$1 AND reported_at IS NULL AND status='failed' AND report_next_at<=$2 FOR UPDATE SKIP LOCKED", [occurrenceId, now])).rows[0]
+      if (!occurrence) return
+      await this.conversation(tx, { ownerId: schedule.owner_id, conversation: schedule.conversation, sessionId: schedule.session_id })
+      await this.report(tx, schedule, occurrence, 'failed', null, occurrence.error)
+    })) } catch {
+      // Only non-sensitive retry metadata changes after a revocation. Concurrent
+      // losers cannot multiply attempts or postpone a row already rescheduled.
+      await this.pool.query(`UPDATE schedule_occurrences SET report_next_at=$2::timestamptz+LEAST(21600,60*power(2,LEAST(report_attempts,9)))*interval '1 second',report_attempts=report_attempts+1 WHERE id=$1 AND status='failed' AND reported_at IS NULL AND report_next_at<=$2`, [occurrenceId, now])
+    }
+  }
+  /** Recover the commit-before-error-report window using the same occurrence. */
   async flushFailedReports(limit = 50) {
-    const { rows } = await this.pool.query<{ id: string; schedule_id: string }>("SELECT id,schedule_id FROM schedule_occurrences WHERE status='failed' AND reported_at IS NULL ORDER BY finished_at LIMIT $1", [limit])
+    const { rows } = await this.pool.query<{ id: string; schedule_id: string }>("SELECT id,schedule_id FROM schedule_occurrences WHERE status='failed' AND reported_at IS NULL AND report_next_at<=$2 ORDER BY report_next_at,finished_at,id LIMIT $1", [limit, this.clock()])
     for (const entry of rows) {
       const schedule = (await this.pool.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1', [entry.schedule_id])).rows[0]
-      try { await this.workspace(schedule.owner_id, schedule.workspace_id, () => this.transaction(async tx => {
-        await tx.query('SELECT id FROM user_schedules WHERE id=$1 FOR UPDATE', [schedule.id])
-        const occurrence = (await tx.query<Occurrence>("SELECT * FROM schedule_occurrences WHERE id=$1 AND reported_at IS NULL AND status='failed' FOR UPDATE", [entry.id])).rows[0]
-        if (!occurrence) return
-        await this.conversation(tx, { ownerId: schedule.owner_id, conversation: schedule.conversation, sessionId: schedule.session_id })
-        await this.report(tx, schedule, occurrence, 'failed', null, occurrence.error)
-      })) } catch { /* Current revocation keeps history private until reauthorization. */ }
+      await this.publishFailedReport(schedule, entry.id)
     }
   }
   async tick(limit = 50) {

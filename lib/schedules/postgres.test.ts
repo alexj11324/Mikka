@@ -122,6 +122,7 @@ test('real PG schedule lifecycle, concurrency, fencing, recovery and original-ch
       assert.equal(rows[0].status,'failed');assert.equal(rows[0].error,'scheduleWorkspaceAccessDenied')
       assert.equal((await pool.query('SELECT count(*)::int n FROM agent_turns WHERE id=$1',[rows[0].operation_id])).rows[0].n,0)
       await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspace,owner])
+      now=new Date(now.getTime()+61000)
       await store().flushFailedReports()
       assert.equal((await pool.query('SELECT count(*)::int n FROM agent_turns WHERE id=$1',[rows[0].operation_id])).rows[0].n,1)
     })

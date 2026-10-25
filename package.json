@@ -60,7 +60,8 @@
     "test:byos-claim": "node scripts/test-byos-claim.mjs",
     "build:byos-workers": "node scripts/build-subscription-workers.mjs",
     "test:schedules": "node --import tsx --test lib/schedules/time.test.ts lib/schedules/http.test.ts cloudflare/linear-sync/src/runtime-sweep.test.ts",
-    "test:schedules:postgres": "node --import tsx --test lib/schedules/postgres.test.ts lib/schedules/wake-postgres.test.ts"
+    "test:schedules:postgres": "node --import tsx --test lib/schedules/postgres.test.ts lib/schedules/wake-postgres.test.ts",
+    "test:schedules:recovery": "node --import tsx --test lib/schedules/recovery-postgres.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",
