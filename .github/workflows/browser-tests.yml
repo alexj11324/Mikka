@@ -1,0 +1,92 @@
+name: Browser tests
+
+# The full Playwright suite, the slowest layer of CI (CONTRIBUTING.md, "How
+# changes are tested"). Its own workflow, so a branch push does not report it
+# at all: a skipped check would count as passed for the required check.
+# Runs on a pull request once it is ready for review (not a draft) against the
+# PR merged with the latest main, on main after merging, every night on main,
+# and by hand (Actions → Browser tests → Run workflow).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  schedule:
+    # Nightly full regression on main, 03:17 Beijing time.
+    - cron: '17 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-tests-${{ github.event_name }}-${{ github.ref }}
+  # Superseded PR pushes are cancelled; every commit on main finishes.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  browser-e2e:
+    name: Browser tests (before merge)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate ephemeral test-only auth secret
+        run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Bootstrap empty database using tracked migrations only
+        run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
+        env:
+          MIGRATION_BOOTSTRAP_CI: '1'
+      - run: pnpm test:e2e:setup
+      - run: pnpm build
+        id: build
+      - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
+        run: pnpm test:performance --output=performance-results
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
+      - name: Browser functionality regression
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: pnpm test:e2e --grep-invert @performance
+      - name: Upload browser failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-report
+          path: |
+            playwright-report/
+            test-results/
+            playwright-performance-report/
+            performance-results/
+          if-no-files-found: ignore
+          retention-days: 7

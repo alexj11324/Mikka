@@ -46,7 +46,7 @@ cannot.
    it stays ready, against the PR merged with the latest main, so two changes
    that each pass but break together are caught. Keep a PR as a draft while it
    is in progress to skip it. To run it on a branch without a PR, start CI by
-   hand: Actions → CI → Run workflow.
+   hand: Actions → Browser tests → Run workflow.
 4. **After merging** (CI): the same suite on main, and again every night.
 
 ## Contributor License Agreement
