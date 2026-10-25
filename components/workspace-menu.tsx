@@ -28,7 +28,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 function WorkspaceAvatar({ name, large = false }: { name: string; large?: boolean }) {
-  return <span aria-hidden="true" className={cn('flex shrink-0 items-center justify-center rounded-md bg-sidebar-primary font-semibold text-sidebar-primary-foreground', large ? 'size-8 text-sm' : 'size-6 text-xs')}>{name.slice(0, 1)}</span>
+  return <span aria-hidden="true" className={cn('flex shrink-0 items-center justify-center rounded-full bg-sidebar-primary-soft font-semibold text-sidebar-primary-soft-foreground', large ? 'size-8 text-sm' : 'size-6 text-xs')}>{name.slice(0, 1)}</span>
 }
 
 export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBeforeChange, compact = false }: {

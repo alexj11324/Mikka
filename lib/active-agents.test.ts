@@ -3,10 +3,18 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { activeAgentsResponse, mergeAgentRuns, sortActiveAgents, type ActiveAgent } from './active-agents'
 import { coordinatorLeaseActive } from './coordinator/lease'
+import { WORKING_RUN_STATUSES, UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
+import { LEASED_RUN_STATUSES } from './run-retry'
 
 const copy = { pleaseSignIn: 'sign in', unavailable: 'unavailable', noParameters: 'no params' }
 const url = 'http://local/api/agent/sessions/active'
 const never = async (): Promise<ActiveAgent[]> => { throw new Error('should not be called') }
+
+test('active readers share main claimed-only lease states; queued is only in flight', () => {
+  assert.deepEqual(WORKING_RUN_STATUSES, LEASED_RUN_STATUSES)
+  assert.deepEqual(UNFINISHED_RUN_STATUSES, ['queued', ...LEASED_RUN_STATUSES])
+  assert.ok(!WORKING_RUN_STATUSES.some(status => String(status) === 'queued'))
+})
 
 test('401 without a session, private no-store', async () => {
   const response = await activeAgentsResponse(new Request(url), null, never, copy)
@@ -62,18 +70,37 @@ test('coordinator lease needs a holder and an unexpired lease', () => {
 
 // Database regressions execute only in CI against ephemeral Postgres 17.
 // Local pure tests skip them; REQUIRE_DB=1 makes a missing database fail.
-const databaseUrl = process.env.MIKKA_DATABASE_URL ?? process.env.ORVILO_DATABASE_URL
-if (!databaseUrl && process.env.REQUIRE_DB === '1') test('database required', () => assert.fail('REQUIRE_DB=1 but no MIKKA_DATABASE_URL'))
+let databaseUrl: string | undefined
+try {
+  const target = new URL(process.env.E2E_DATABASE_URL ?? '')
+  if (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true'
+    && ['postgres:', 'postgresql:'].includes(target.protocol)
+    && target.hostname === '127.0.0.1' && target.port === '5432' && target.pathname === '/mikka_e2e'
+    && !target.search && !target.hash && process.env.MIKKA_DATABASE_URL === target.href
+    && process.env.DATABASE_URL === target.href) databaseUrl = target.href
+} catch { /* no eligible disposable CI database */ }
+if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching Actions loopback mikka_e2e database')
 const dbTest = databaseUrl ? test : test.skip
 
 async function database() {
-  const [{ Pool }, { drizzle }, schema] = await Promise.all([import('pg'), import('drizzle-orm/node-postgres'), import('./db/schema')])
+  const [{ Pool }, { drizzle }, schema, { createRequestDatabaseScope }, { renewRunLeases }] = await Promise.all([
+    import('pg'), import('drizzle-orm/node-postgres'), import('./db/schema'), import('./db'), import('./run-leases'),
+  ])
   const pool = new Pool({ connectionString: databaseUrl, max: 2 })
-  return { pool, db: drizzle(pool, { schema }), schema }
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const db = drizzle(pool, { schema })
+  // Exercise the current server lease function, with its real request DB scope.
+  // The heartbeat route records device presence before renewing claimed runs.
+  const heartbeat = async (deviceId: string, runIds: readonly string[], now: Date) => {
+    const { eq } = await import('drizzle-orm')
+    await db.update(schema.devices).set({ harnesses: [], lastSeenAt: now, updatedAt: now }).where(eq(schema.devices.id, deviceId))
+    return scope.run(() => renewRunLeases(deviceId, runIds, now))
+  }
+  return { pool, db, schema, heartbeat, close: async () => { await scope.close(); await pool.end() } }
 }
 
 dbTest('active agents on the database', async t => {
-  const { db, schema, pool } = await database()
+  const { db, schema, heartbeat, close } = await database()
   const { listActiveAgents } = await import('./active-agents')
   const { agents, agentRuns, devices, coordinatorSessions } = schema
   const { eq, inArray } = await import('drizzle-orm')
@@ -109,7 +136,7 @@ dbTest('active agents on the database', async t => {
     try {
       await cleanup()
     } finally {
-      await pool.end()
+      await close()
     }
   })
   const cleanup = async () => {
@@ -141,7 +168,6 @@ dbTest('active agents on the database', async t => {
   })
 
   await t.test('heartbeats keep a claimed run active past the first 90s lease', async () => {
-    const { recordDeviceHeartbeat } = await import('./run-leases')
     const { isDeviceOnline, RUN_LEASE_MS } = await import('@mikka/protocol/device')
     const claimedAt = new Date(now.getTime() + 60 * 60_000) // future clock so other rows' leases do not matter
     const device = randomUUID()
@@ -154,7 +180,9 @@ dbTest('active agents on the database', async t => {
     let leases: Record<string, string> = {}
     for (let second = 15; second <= 120; second += 15) {
       const beatAt = new Date(claimedAt.getTime() + second * 1000)
-      leases = await recordDeviceHeartbeat(db, device, [], [claimed.id, finished.id], beatAt)
+      const result = await heartbeat(device, [claimed.id, finished.id], beatAt)
+      leases = result.leases
+      assert.deepEqual(result.revoked, [finished.id], 'terminal runs are revoked under main contract')
       assert.equal(leases[claimed.id], new Date(beatAt.getTime() + RUN_LEASE_MS).toISOString(), `renewed at +${second}s`)
       assert.ok((await listActiveAgents(db, me, beatAt)).some(x => x.runId === claimed.id), `still active at +${second}s`)
     }
@@ -169,8 +197,7 @@ dbTest('active agents on the database', async t => {
     await db.delete(devices).where(eq(devices.id, device))
   })
 
-  await t.test('heartbeat renews only reported, unfinished runs on this device', async () => {
-    const { recordDeviceHeartbeat } = await import('./run-leases')
+  await t.test('heartbeat renews only claimed runs; queued, foreign and invalid IDs are revoked', async () => {
     const { RUN_LEASE_MS } = await import('@mikka/protocol/device')
     const beatAt = new Date(now.getTime() + 2 * 60 * 60_000)
     const [device, otherDevice] = [randomUUID(), randomUUID()]
@@ -182,16 +209,19 @@ dbTest('active agents on the database', async t => {
     await db.insert(agents).values(worker)
     const old = new Date(beatAt.getTime() - 1_000)
     const queued = run(worker.id, 'queued', { deviceId: device, leaseExpiresAt: old })
+    const claimed = run(worker.id, 'preparing', { deviceId: device, leaseExpiresAt: old })
     const elsewhere = run(worker.id, 'running', { deviceId: otherDevice, leaseExpiresAt: old })
     const unreported = run(worker.id, 'running', { deviceId: device, leaseExpiresAt: old })
-    await db.insert(agentRuns).values([queued, elsewhere, unreported])
+    await db.insert(agentRuns).values([queued, claimed, elsewhere, unreported])
     try {
-      const leases = await recordDeviceHeartbeat(db, device, [], [queued.id, elsewhere.id, 'not-a-uuid'], beatAt)
+      const result = await heartbeat(device, [claimed.id, queued.id, elsewhere.id, 'not-a-uuid'], beatAt)
       const renewedTo = new Date(beatAt.getTime() + RUN_LEASE_MS)
-      assert.deepEqual(leases, { [queued.id]: renewedTo.toISOString() }, 'queued run renewed; other device and unreported runs not')
+      assert.deepEqual(result, { leases: { [claimed.id]: renewedTo.toISOString() }, revoked: [queued.id, elsewhere.id, 'not-a-uuid'] })
+      assert.deepEqual(await heartbeat(device, ['invalid-only'], beatAt), { leases: {}, revoked: ['invalid-only'] }, 'all-invalid reports avoid a UUID SQL error')
       const rows = await db.select({ id: agentRuns.id, leaseExpiresAt: agentRuns.leaseExpiresAt }).from(agentRuns).where(eq(agentRuns.agentId, worker.id))
       const lease = (id: string) => rows.find(row => row.id === id)!.leaseExpiresAt!.getTime()
-      assert.equal(lease(queued.id), renewedTo.getTime())
+      assert.equal(lease(claimed.id), renewedTo.getTime())
+      assert.equal(lease(queued.id), old.getTime(), 'queued runs are not held and must not be revived')
       assert.equal(lease(elsewhere.id), old.getTime(), 'a run on another device is not renewed even if reported')
       assert.equal(lease(unreported.id), old.getTime(), 'a run the daemon did not report is left to expire')
     } finally {
@@ -202,7 +232,6 @@ dbTest('active agents on the database', async t => {
   })
 
   await t.test('unauthorized access: each owner filter hides another user\'s rows on its own', async () => {
-    const { recordDeviceHeartbeat } = await import('./run-leases')
     const at = new Date(now.getTime() + 3 * 60 * 60_000)
     const [myDevice, theirDevice] = [randomUUID(), randomUUID()]
     await db.insert(devices).values([
@@ -230,7 +259,7 @@ dbTest('active agents on the database', async t => {
       // Heartbeat layer, run.deviceId: my device reporting a run that lives on their device renews nothing.
       const old = new Date(at.getTime() - 1_000)
       await db.update(agentRuns).set({ leaseExpiresAt: old }).where(eq(agentRuns.id, onTheirDevice.id))
-      assert.deepEqual(await recordDeviceHeartbeat(db, myDevice, [], [onTheirDevice.id], at), {}, 'a run on another user\'s device is not renewed')
+      assert.deepEqual(await heartbeat(myDevice, [onTheirDevice.id], at), { leases: {}, revoked: [onTheirDevice.id] }, 'a run on another user\'s device is revoked, not renewed')
       const [row] = await db.select({ leaseExpiresAt: agentRuns.leaseExpiresAt }).from(agentRuns).where(eq(agentRuns.id, onTheirDevice.id))
       assert.equal(row.leaseExpiresAt!.getTime(), old.getTime())
     } finally {

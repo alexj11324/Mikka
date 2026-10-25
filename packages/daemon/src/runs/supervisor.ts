@@ -212,6 +212,18 @@ export class RunSupervisor {
     }
   }
 
+  /**
+   * Stops the runs the server says this device no longer holds. Runs without
+   * a server lease (local dev runs) were never the server's to take back.
+   */
+  revokeLeases(runIds: readonly string[]) {
+    for (const runId of runIds) {
+      const run = this.active.get(runId)
+      if (run && !run.forcedStop && this.leases.has(runId))
+        this.forceStop(runId, run, "device_lost")
+    }
+  }
+
   /** Lease and watchdog pass; the daemon calls it on every tick. */
   check(now = Date.now()) {
     const stallMs = this.deps.stallMs ?? DEFAULT_STALL_MS
@@ -823,6 +835,14 @@ export class RunSupervisor {
       this.setState(runId, "preparing")
       entry = this.deps.journal.get(runId) as JournalEntry
     }
+
+    // A retry after a lost lease can arrive while the earlier attempt is
+    // still stopping here; let it stop before working on in its worktree.
+    const earlier = assignment.continuesRunId
+      ? this.active.get(assignment.continuesRunId)
+      : undefined
+    if (!entry.worktree && earlier) await earlier.done
+    if (this.stopping) return
 
     // A follow-up run continues the earlier run's worktree (ADR 0023);
     // otherwise one per run, reused when resuming after a restart.

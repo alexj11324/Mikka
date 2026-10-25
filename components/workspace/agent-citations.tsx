@@ -13,6 +13,7 @@ import { SourceAvatar, SourcesList, SourcesSummary, type StreamingSource } from 
 import { Claude } from '@/components/ui/svgs/claude'
 import { Mikka } from '@/components/ui/svgs/mikka'
 import { OpenAI } from '@/components/ui/svgs/openai'
+import { statusIconTints } from '@/lib/status-appearance'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from '@/components/workspace/issue-properties'
 
 const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destructive-light' | 'warning-light' | 'secondary'> = {
@@ -22,7 +23,6 @@ const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destructive-l
 
 /** A task chip is wider than a source chip: it carries the title too. */
 const TASK_CHIP = 'max-w-72 pl-1.5'
-const STATUS_DOT = 'size-1.5 shrink-0 rounded-full bg-current'
 
 export type LinkPreviews = Record<string, LinkPreview | null>
 
@@ -99,11 +99,10 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   const tIssue = useTranslations('Issue')
   const status = ISSUE_STATUSES.find(item => item.value === issue.status) ?? ISSUE_STATUSES[1]
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
-  const tone = status.value === 'doing' ? 'text-warning-foreground' : status.value === 'review' ? 'text-info-foreground' : status.value === 'done' ? 'text-success-foreground' : 'text-muted-foreground'
   const identifier = issue.identifier
   return <InlineCitation>
     <InlineCitationTrigger aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)} className={TASK_CHIP}>
-      <span aria-hidden="true" className={cn(STATUS_DOT, tone)} />
+      <status.icon aria-hidden="true" className={cn('size-3.5 shrink-0', statusIconTints[status.tone])} />
       {identifier && <span className="shrink-0">{identifier}</span>}
       <InlineCitationLabel className="font-sans">{issue.title}</InlineCitationLabel>
     </InlineCitationTrigger>
@@ -112,7 +111,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
         <InlineCitationSource><Mikka />{identifier ? `Mikka · ${identifier}` : 'Mikka'}</InlineCitationSource>
         <InlineCitationTitle>{issue.title}</InlineCitationTitle>
         <InlineCitationMeta>
-          <span><status.icon className={cn(tone)} />{tIssue(`status.${status.value}`)}</span>
+          <span><status.icon className={cn(statusIconTints[status.tone])} />{tIssue(`status.${status.value}`)}</span>
           {priority && <span><priority.icon {...priority.iconProps} />{tIssue(`priority.${priority.value}`)}</span>}
         </InlineCitationMeta>
       </InlineCitationBody>

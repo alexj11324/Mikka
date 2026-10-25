@@ -1,5 +1,5 @@
 import { test as apiTest } from '@playwright/test'
-import { test, expect, register, rail, app } from './fixtures'
+import { test, expect, register, rail, app, openSearch, conversationPill } from './fixtures'
 
 apiTest('开发预览验收入口不跳转到内部主机', async ({ request, baseURL }) => {
   const response = await request.get(app('/api/acceptance'), { maxRedirects: 0 })
@@ -91,7 +91,7 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(send).toBeDisabled()
   expect(externalRequests).toEqual([])
   await expect(panel.getByRole('article', { name: '你的问题', exact: true })).toContainText('原生组件交互测试')
-  await panel.getByRole('button', { name: '新任务', exact: true }).click()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   await expect(input).toHaveValue('')
   await expect(send).toBeDisabled()
   await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
@@ -103,7 +103,7 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.setViewportSize({ width: 1159, height: 851 })
   await rail(page, '看板').click()
-  await expect(page.getByRole('heading', { name: '全部任务', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '看板', exact: true })).toBeVisible()
   await expect(panel).toHaveCount(0)
 })
 
@@ -117,6 +117,8 @@ test('组件演示的 LaTeX 字体、复杂排版与窄屏滚动正确，返回�
   page.on('request', request => {
     if (new URL(request.url()).pathname === app('/api/agent') && request.method() === 'POST') modelRequests++
   })
+  // The demo entry lives in the phone header; desktop shows only the title pill.
+  await page.setViewportSize({ width: 402, height: 527 })
   await panel.getByRole('button', { name: '组件演示', exact: true }).click()
   const demo = page.locator('[data-agent-demo]')
   const formulas = demo.locator('#demo-rich-text .katex-display')
@@ -228,7 +230,7 @@ for (const stage of ['headers', 'body'] as const) {
     await panel.getByRole('button', { name: '停止生成' }).click()
     await expect(panel.getByRole('button', { name: '发送消息' })).toBeEnabled()
     expect(await page.evaluate(() => Reflect.get(window, 'agentCancellationTest').requests)).toBe(2)
-    await panel.getByRole('button', { name: '新任务', exact: true }).click()
+    await page.getByRole('button', { name: '新对话', exact: true }).click()
     await expect(input).toHaveValue('')
   })
 }
@@ -236,6 +238,7 @@ for (const stage of ['headers', 'body'] as const) {
 test('生成期间可新建和切换任务，独立保留草稿、回复与停止状态', async ({ page }) => {
   await register(page)
   await page.getByRole('button', { name: '新对话', exact: true }).click()
+  const conversations = page.getByRole('list', { name: '对话', exact: true })
   const panel = page.getByRole('region', { name: 'Agent 对话工作区', exact: true })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
   await expect(input).toBeEditable()
@@ -264,13 +267,10 @@ test('生成期间可新建和切换任务，独立保留草稿、回复与停�
   await input.fill('第一并发任务')
   await panel.getByRole('button', { name: '发送消息', exact: true }).click()
   await expect(panel.getByText('第一并发任务的独立回复', { exact: true })).toBeVisible()
-  await expect(panel.getByRole('button', { name: '新任务', exact: true })).toBeEnabled()
-  await panel.getByRole('button', { name: '新任务', exact: true }).click()
+  await expect(page.getByRole('button', { name: '新对话', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
   await expect(input).toHaveValue('')
-  await panel.getByRole('button', { name: /^切换会话：/ }).click()
-  await expect(page.getByRole('option', { name: /第一并发任务/ })).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(page.getByRole('option', { name: /第一并发任务/ })).toHaveCount(0)
+  await expect(conversations.getByRole('button', { name: '第一并发任务', exact: true })).toBeVisible()
   await input.fill('第二并发任务')
   await panel.getByRole('button', { name: '发送消息', exact: true }).click()
   await expect(panel.getByText('第二并发任务的独立回复', { exact: true })).toBeVisible()
@@ -279,9 +279,8 @@ test('生成期间可新建和切换任务，独立保留草稿、回复与停�
   ])
   expect(await page.evaluate(() => new Set(Reflect.get(window, 'concurrentAgentTest').requests.map((request: { sessionId: string }) => request.sessionId)).size)).toBe(2)
 
-  await panel.getByRole('button', { name: /^切换会话：/ }).click()
-  await page.getByRole('option', { name: /第一并发任务/ }).click()
-  await expect(page.getByRole('option', { name: /第一并发任务/ })).toHaveCount(0)
+  await conversations.getByRole('button', { name: '第一并发任务', exact: true }).click()
+  await expect(conversationPill(page)).toHaveText('第一并发任务')
   await expect(input).toHaveValue('第一并发任务')
   await expect(panel.getByText('第一并发任务的独立回复', { exact: true })).toBeVisible()
   await expect(panel.getByText('第二并发任务的独立回复', { exact: true })).toHaveCount(0)
@@ -291,34 +290,27 @@ test('生成期间可新建和切换任务，独立保留草稿、回复与停�
   expect(await page.evaluate(() => Reflect.get(window, 'concurrentAgentTest').requests.map((request: { aborted: boolean }) => request.aborted))).toEqual([true, false])
 
   await page.evaluate(() => Reflect.get(window, 'concurrentAgentTest').finish(1))
-  await panel.getByRole('button', { name: /^切换会话：/ }).click()
-  await page.getByRole('option', { name: /第二并发任务/ }).click()
-  await expect(page.getByRole('option', { name: /第二并发任务/ })).toHaveCount(0)
+  await conversations.getByRole('button', { name: '第二并发任务', exact: true }).click()
+  await expect(conversationPill(page)).toHaveText('第二并发任务')
   await expect(panel.getByText('第二并发任务的独立回复', { exact: true })).toBeVisible()
   await expect(input).toHaveValue('')
   await expect(panel.getByRole('button', { name: '停止生成', exact: true })).toHaveCount(0)
-  await panel.getByRole('button', { name: /^切换会话：/ }).click()
-  await page.getByRole('option', { name: /第一并发任务/ }).click()
-  await expect(page.getByRole('option', { name: /第一并发任务/ })).toHaveCount(0)
+  await conversations.getByRole('button', { name: '第一并发任务', exact: true }).click()
+  await expect(conversationPill(page)).toHaveText('第一并发任务')
   await expect(input).toHaveValue('第一任务保留的草稿')
   expect(await page.evaluate(() => Reflect.get(window, 'concurrentAgentTest').requests.length)).toBe(2)
   await expect(panel).toHaveCount(1)
   await expect(panel.getByRole('alert')).toHaveCount(0)
 })
 
-test('标题下拉切换历史，右侧图标搜索和新建，桌面与手机均不占侧栏空间', async ({ page }) => {
+test('左侧列表与 ⌘K 切换历史，标题胶囊跟随当前对话', async ({ page }) => {
   await register(page)
   await page.getByRole('button', { name: '新对话', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Agent 对话工作区', exact: true })
   const input = panel.getByRole('textbox', { name: '向 Agent 提问' })
-  const switcher = panel.getByRole('button', { name: /^切换会话：/ })
+  const conversations = page.getByRole('list', { name: '对话', exact: true })
   await expect(panel.getByText('Agent 工作区 · DS 4.1 Flash', { exact: true })).toHaveCount(0)
-  await expect(panel.getByRole('button', { name: '切换对话侧栏' })).toHaveCount(0)
   await expect(panel.getByRole('complementary', { name: '对话导航' })).toHaveCount(0)
-  await switcher.click()
-  await expect(page.getByText('暂无历史会话', { exact: true })).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(switcher).toBeFocused()
 
   await page.route('**/api/agent', route => route.fulfill({
     status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' },
@@ -328,43 +320,34 @@ test('标题下拉切换历史，右侧图标搜索和新建，桌面与手机�
     await input.fill(title)
     await panel.getByRole('button', { name: '发送消息' }).click()
     await expect(panel.getByText(`${title}的回复`, { exact: true })).toBeVisible()
-    await expect(switcher).toHaveText(title)
-    await panel.getByRole('button', { name: '新任务', exact: true }).click()
-  }
-  await input.fill('新任务的独立草稿')
-
-  for (const width of [1159, 390]) {
-    await page.setViewportSize({ width, height: 851 })
-    for (const name of ['新任务', '搜索']) {
-      const button = panel.locator('header').getByRole('button', { name, exact: true })
-      await expect(button).toBeVisible()
-      await expect(button).toHaveText('')
-    }
-    await panel.getByRole('button', { name: '搜索', exact: true }).click()
-    const search = page.getByRole('combobox', { name: '搜索历史会话', exact: true })
-    await expect(search).toBeFocused()
-    await search.fill('不存在的历史')
-    await expect(page.getByText('未找到相关会话', { exact: true })).toBeVisible()
-    await search.fill('香港')
-    await expect(page.getByRole('option', { name: /^香港景点/ })).toBeVisible()
-    await expect(page.getByRole('option', { name: /^项目计划/ })).toHaveCount(0)
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-    await search.press('Enter')
-    await expect(switcher).toHaveText('香港景点')
-    await expect(search).toHaveCount(0)
-    await expect(panel.getByText('香港景点的回复', { exact: true })).toBeVisible()
-    const followUp = `${width} 像素下的下一轮问题`
-    await input.fill(followUp)
-    await panel.getByRole('button', { name: '发送消息' }).click()
-    await expect(panel.getByText(`${followUp}的回复`, { exact: true })).toBeVisible()
-    await expect(switcher).toHaveText('香港景点')
-    await panel.getByRole('button', { name: '新任务', exact: true }).click()
+    await expect(conversationPill(page)).toHaveText(title)
+    await expect(conversations.getByRole('button', { name: title, exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '新对话', exact: true }).click()
     await expect(input).toHaveValue('')
   }
-  await switcher.click()
-  await expect(page.getByRole('group', { name: '今天', exact: true })).toBeVisible()
-  await expect(page.getByRole('option', { name: /^项目计划/ })).toContainText('今天')
-  await page.keyboard.press('Escape')
+
+  const search = await openSearch(page)
+  const query = search.getByRole('combobox', { name: '全局搜索', exact: true })
+  await query.fill('不存在的历史')
+  await expect(search.getByText('没有匹配的结果', { exact: true })).toBeVisible()
+  await query.fill('香港')
+  await expect(search.getByRole('option', { name: /香港景点/ })).toBeVisible()
+  await expect(search.getByRole('option', { name: /项目计划/ })).toHaveCount(0)
+  await query.press('Enter')
+  await expect(search).toHaveCount(0)
+  await expect(conversationPill(page)).toHaveText('香港景点')
+  await expect(panel.getByText('香港景点的回复', { exact: true })).toBeVisible()
+  await expect(conversations.getByRole('button', { name: '香港景点', exact: true })).toHaveAttribute('aria-current', 'page')
+  await input.fill('下一轮问题')
+  await panel.getByRole('button', { name: '发送消息' }).click()
+  await expect(panel.getByText('下一轮问题的回复', { exact: true })).toBeVisible()
+  await expect(conversationPill(page)).toHaveText('香港景点')
+
+  await conversations.getByRole('button', { name: '项目计划', exact: true }).click()
+  await expect(conversationPill(page)).toHaveText('项目计划')
+  await expect(panel.getByText('项目计划的回复', { exact: true })).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 851 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
 function openUIStream(response: string) {
@@ -425,8 +408,8 @@ test('beUI 功能组展示回复与计划，审批和多步回答直接继续且
     return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream(`root = Stack([response, tasks, approval, questions, icon])
 response = BeResponse([TextContent("按功能组合的回复内容")])
 tasks = BeTodoList("建议任务计划", [{ id: "one", title: "整理需求", status: "completed", progress: 100 }], "suggestion")
-approval = BeApproval("确认需求方案", "先整理需求再提供设计建议。", "项目是 Orvilo，当前正在讨论首版范围。")
-questions = BeQuestions("项目是 Orvilo，需要明确首版范围和检查要求。", [{ id: "scope", title: "首版范围？", options: [{ value: "small", label: "精简首版" }, { value: "large", label: "完整版本" }] }, { id: "checks", title: "需要哪些检查？", options: [{ value: "types", label: "类型检查" }, { value: "keyboard", label: "键盘交互" }], multiple: true, allowCustom: true }])
+approval = BeApproval("确认需求方案", "先整理需求再提供设计建议。", "项目是 Mikka，当前正在讨论首版范围。")
+questions = BeQuestions("项目是 Mikka，需要明确首版范围和检查要求。", [{ id: "scope", title: "首版范围？", options: [{ value: "small", label: "精简首版" }, { value: "large", label: "完整版本" }] }, { id: "checks", title: "需要哪些检查？", options: [{ value: "types", label: "类型检查" }, { value: "keyboard", label: "键盘交互" }], multiple: true, allowCustom: true }])
 icon = AgentIcon("question", "等待你的意见")`) })
   })
   await input.fill('请给出项目建议和澄清问题')
@@ -443,7 +426,7 @@ icon = AgentIcon("question", "等待你的意见")`) })
   await expect(input).toHaveValue('未发送的独立草稿')
   await expect(panel.getByText('同意这个建议方案，已提交给 Agent；未执行工作区操作。', { exact: true })).toBeVisible()
   expect(submissions).toHaveLength(2)
-  expect(submissions[1].prompt).toContain('项目是 Orvilo')
+  expect(submissions[1].prompt).toContain('项目是 Mikka')
   expect(submissions[1].prompt).toContain('同意这个建议方案')
   await expect(panel.getByRole('button', { name: '同意并继续', exact: true })).toHaveCount(0)
   await panel.getByRole('radio', { name: '精简首版' }).check()
@@ -479,7 +462,7 @@ test('beUI 内联回答失败与停止后���留选择，可在原卡片重
   await page.route('**/api/agent', route => {
     submissions.push(route.request().postDataJSON())
     const response = submissions.length === 1
-      ? openUIStream('root = BeQuestions("Orvilo 首版建议", [{ id: "scope", title: "选择验证范围？", options: [{ value: "types", label: "类型检查" }, { value: "keyboard", label: "键盘交互" }], multiple: true, allowCustom: true }])')
+      ? openUIStream('root = BeQuestions("Mikka 首版建议", [{ id: "scope", title: "选择验证范围？", options: [{ value: "types", label: "类型检查" }, { value: "keyboard", label: "键盘交互" }], multiple: true, allowCustom: true }])')
       : submissions.length === 2
         ? 'data: {"type":"error","errorText":"测试：请重试本次回答。"}\n\ndata: [DONE]\n\n'
         : openUIStream('root = TextContent("已按保留的答案继续。")')
@@ -541,8 +524,8 @@ test('旧按钮直接提问，纯文本在原卡片回答且失败可重试', as
     const body = submissions.length === 1
       ? openUIStream(`root = Stack([note, question, button])
 note = ShadcnAlert("需要更多信息", "在下方补充你的需求，直接提交即可。")
-question = BeQuestions("为 Orvilo 工作台提供任务建议，用户尚未说明具体需求。", [{ id: "goal", title: "你想完成什么任务？", allowCustom: true }])
-button = BeButton("填入提问", "为 Orvilo 本周任务建议一个计划结构，仅建议不执行。", "outline")`)
+question = BeQuestions("为 Mikka 工作台提供任务建议，用户尚未说明具体需求。", [{ id: "goal", title: "你想完成什么任务？", allowCustom: true }])
+button = BeButton("填入提问", "为 Mikka 本周任务建议一个计划结构，仅建议不执行。", "outline")`)
       : submissions.length === 2
         ? 'data: {"type":"error","errorText":"测试：提问失败，请在原卡片重试。"}\n\ndata: [DONE]\n\n'
         : openUIStream(`root = TextContent("第 ${submissions.length} 次请求直接继续成功。")`)
@@ -732,7 +715,7 @@ test('OpenUI 表格、Tabs 和表单直接提交，兼容按钮续问且会话�
   await expect(panel.getByText('以上为建议计划，尚未保存到工作区。', { exact: true })).toBeVisible()
   await panel.getByRole('tab', { name: '阶段计划' }).click()
   await input.fill('未发送的表单外草稿')
-  await panel.getByRole('textbox', { name: /^项目名称/ }).fill('Orvilo 发布')
+  await panel.getByRole('textbox', { name: /^项目名称/ }).fill('Mikka 发布')
   await panel.getByRole('button', { name: '提交回答并继续', exact: true }).click()
   await expect(panel.getByText('已根据项目名称继续提供建议。', { exact: true })).toBeVisible()
   await expect(input).toHaveValue('未发送的表单外草稿')

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { DAEMON_RPC_ERRORS } from "@mikka/protocol"
@@ -651,6 +651,54 @@ describe("run stops", () => {
       reason: "device_offline",
     })
     expect(server.unownedRuns()).toEqual([])
+  })
+
+  it("lease: a run the server took back stops at the next heartbeat", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const runId = queue(server, "stall")
+    await daemon.syncWithServer()
+    await waitFor(() => daemon.supervisor.get(runId).state === "running")
+    // The server gave up on this run (its lease ran out) and queued a retry.
+    const held = server.runs.get(runId)
+    if (held) held.state = "failed"
+    await daemon.syncWithServer()
+    await daemon.supervisor.idle()
+    expect(daemon.supervisor.get(runId).stopReason).toBe("device_lost")
+  })
+
+  it("lease: the retry works on in the lost attempt's worktree", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const first = queue(server, "stall")
+    await daemon.syncWithServer()
+    await waitFor(() => daemon.supervisor.get(first).state === "running")
+    const worktree = daemon.supervisor.get(first).worktree as string
+    // Work the agent had not committed when the machine went offline.
+    writeFileSync(join(worktree, "PARTIAL.md"), "half done\n")
+    const held = server.runs.get(first)
+    if (held) held.state = "failed"
+    const retry = server.queueRun(DEVICE, {
+      issueId: "issue-stall",
+      repoId: "repo-1",
+      baseBranch: "main",
+      harness: "mock",
+      prompt: "do it",
+      followUp: "Your machine went offline; continue.",
+      continuesRunId: first,
+      fixture: "success-edit",
+      verifyCommand: VERIFY,
+    })
+    await daemon.syncWithServer()
+    await waitFor(() => daemon.supervisor.list().find((r) => r.runId === retry))
+    await daemon.supervisor.idle()
+    expect(daemon.supervisor.get(first).stopReason).toBe("device_lost")
+    const run = daemon.supervisor.get(retry)
+    expect(run.state).toBe("succeeded")
+    expect(run.worktree).toBe(worktree)
+    expect(readFileSync(join(worktree, "PARTIAL.md"), "utf8")).toBe(
+      "half done\n"
+    )
   })
 
   it("hands an issue to a human after the retry cap", async () => {

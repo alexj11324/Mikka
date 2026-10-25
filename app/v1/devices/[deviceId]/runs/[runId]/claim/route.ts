@@ -7,6 +7,7 @@ import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 import { withBasePath } from '@/lib/base-path'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
+import { retryNote } from '@/lib/run-retry'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,11 +51,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       .then(({ token }) => ({ url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token }))
       .catch((error: unknown) => { console.error('Could not issue a run token', error instanceof Error ? error.message : error); return undefined })
     : undefined
+  // A retry after a lost lease works on in the lost attempt's worktree and,
+  // when the harness can, its session; the daemon falls back to `prompt`.
+  const [lost] = run.retryOf
+    ? await db.select({ sessionId: agentRuns.sessionId }).from(agentRuns).where(eq(agentRuns.id, run.retryOf)).limit(1)
+    : []
+  const retry = run.retryOf
+    ? { continuesRunId: run.retryOf, followUp: retryNote(run.attempt), ...(lost?.sessionId ? { resumeSessionId: lost.sessionId } : {}) }
+    : {}
   return NextResponse.json({
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
     baseBranch: repo.baseBranch, harness: agent.harness, prompt: run.prompt,
     kind: run.kind, leaseExpiresAt,
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
+    ...retry,
   })
 }
