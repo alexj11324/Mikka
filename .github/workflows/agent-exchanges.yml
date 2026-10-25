@@ -1,7 +1,7 @@
 name: Scoped Agent exchange acceptance
 on:
   push:
-    branches: ['codex/110-agent-exchange-readonly']
+    branches: ['codex/110-agent-exchange-readonly', 'integrate/280-mailbox-workspace']
   pull_request:
     paths: ['lib/conversation-exchange*', 'lib/conversation-links-route.ts', 'app/api/conversation-links/**', 'scripts/test-agent-exchanges.ts', '.github/workflows/agent-exchanges.yml']
 permissions:
