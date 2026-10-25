@@ -177,7 +177,7 @@
     "welcomeDescription": "登录 Mikka，继续你的任务与文档。",
     "continueGoogle": "使用 Google 继续",
     "googleScope": "仅请求登录所需的基本个人资料与邮箱。",
-    "googleLinkHint": "如果此邮箱已注册 Mikka，请先用邮箱密码登录，再到「设置 → 集成」关联 Google。",
+    "googleLinkHint": "如果此邮箱已注册 Mikka，请先用邮箱密码登录，再到「设置 → 账户」关联 Google。",
     "googleNotConfigured": "Google 登录暂未配置，请使用邮箱继续。",
     "viewGoogleCallback": "查看 Google OAuth 回调地址",
     "continueGithub": "使用 GitHub 继续",
@@ -193,7 +193,7 @@
     "submitCreate": "创建账号并进入",
     "submitSignIn": "登录工作台",
     "oauthFailed": "OAuth 登录未完成，可能已取消或授权已过期。请重新尝试。",
-    "googleAccountNotLinked": "此 Google 账号尚未关联 Mikka。请先用已有方式登录，再到“设置 → 集成”关联 Google。",
+    "googleAccountNotLinked": "此 Google 账号尚未关联 Mikka。请先用已有方式登录，再到「设置 → 账户」关联 Google。",
     "githubAccountNotLinked": "此 GitHub 账号尚未关联 Mikka。请使用已关联的方式登录，或先创建 Mikka 账号。",
     "continueNotice": "请点击下方对应的登录按钮，在此标签页完成授权。",
     "tabOpened": "请在新标签页完成登录；完成后可刷新此预览。",
@@ -210,7 +210,31 @@
     "testIssueLayoutTitle": "【测试】Issue 详情页布局与阅读体验",
     "testIssueLayoutDescription": "这是一条独立测试任务。可验证标题编辑、正文排版、属性修改与自动保存，不会影响其他账号的\u6570据。",
     "testIssueSwitchTitle": "【测试】任务切换与会话复用",
-    "testIssueSwitchDescription": "用于验证上一条／下一条任务切换。再次进入测试工作台时会复用账号和已有任务。"
+    "testIssueSwitchDescription": "用于验证上一条／下一条任务切换。再次进入测试工作台时会复用账号和已有任务。",
+    "forgotPassword": "忘记密码？",
+    "forgotTitle": "重置密码",
+    "forgotDescription": "输入注册邮箱，我们会发送重置链接。",
+    "sendResetLink": "发送重置链接",
+    "resendLink": "重新发送",
+    "backToSignIn": "返回登录",
+    "resetTitle": "设置新密码",
+    "resetDescription": "新密码至少 8 位字符。",
+    "newPassword": "新密码",
+    "confirmPassword": "确认新密码",
+    "submitReset": "保存新密码",
+    "passwordLength": "密码需为 8 到 128 位字符。",
+    "passwordMismatch": "两次输入的密码不一致。",
+    "resetDone": "密码已更新，其他已登录的设备也已退出。请使用新密码登录。",
+    "resetLinkInvalid": "重置链接无效或已过期，请重新获取。",
+    "requestNewLink": "重新获取链接",
+    "verifyTitle": "验证邮箱",
+    "sendVerification": "发送验证链接",
+    "recoveryUnavailable": "此功能暂不可用，请稍后再试。",
+    "requestProcessed": "请求已处理。如账号符合条件，请检查邮箱；此提示不代表邮件已送达。",
+    "retryIn": "{seconds} 秒后可重试",
+    "verifyDescription": "输入注册邮箱，我们会发送新的验证链接，链接 15 分钟内有效。",
+    "verifyLinkInvalid": "验证链接无效、已过期或已使用。如邮箱尚未验证，请重新发送。",
+    "verifyEmailLink": "验证邮箱或重新发送验证邮件"
   },
   "Metadata": {
     "title": "Mikka · 任务与文档工作台",
@@ -350,7 +374,13 @@
     "settingsPreviewTitle": "设置预览 · Mikka",
     "settingsPreviewDescription": "无需登录的设置界面预览，使用演示资料。",
     "oauthConsentTitle": "授权 Agent · Mikka",
-    "oauthConsentDescription": "允许外部 Agent 以你的身份使用 Mikka。"
+    "oauthConsentDescription": "允许外部 Agent 以你的身份使用 Mikka。",
+    "forgotPasswordTitle": "重置密码 · Mikka",
+    "forgotPasswordDescription": "通过邮箱重置 Mikka 账号密码。",
+    "resetPasswordTitle": "设置新密码 · Mikka",
+    "resetPasswordDescription": "为 Mikka 账号设置新密码。",
+    "verifyEmailTitle": "验证邮箱 · Mikka",
+    "verifyEmailDescription": "验证 Mikka 账号的邮箱。"
   },
   "NotFound": {
     "title": "页面不存在",
@@ -1405,6 +1435,10 @@
       "profile": {
         "title": "个人资料",
         "description": "查看你在工作区中的账户信息。"
+      },
+      "account": {
+        "title": "账户",
+        "description": "管理登录 Mikka 的方式。"
       },
       "integrations": {
         "title": "集成",

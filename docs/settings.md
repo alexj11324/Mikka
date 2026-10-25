@@ -21,6 +21,15 @@ supplies content.
 5. **Navigation and search stay in the sidebar.** Do not build a second list,
    selection region or scroll container inside the panel.
 
+## Sections
+
+- **Personal:** Preferences, Profile, Account (账户), Integrations.
+- **Administration:** Workspace, Teams, Members.
+
+Account holds how the person signs in: linking Google to the Mikka account.
+Integrations holds connected apps (Gmail, Calendar, Notion, Slack, Linear,
+Telegram), even when the app is a Google one.
+
 ## Why
 
 A screen with ten settings and ten cards has ten focal points, which means
