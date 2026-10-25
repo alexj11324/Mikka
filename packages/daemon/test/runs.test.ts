@@ -701,6 +701,55 @@ describe("run stops", () => {
     )
   })
 
+  it("checkpoint: another machine takes over from the saved work", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const first = queue(server, "stall")
+    await daemon.syncWithServer()
+    await waitFor(() => daemon.supervisor.get(first).state === "running")
+    const worktree = daemon.supervisor.get(first).worktree as string
+    writeFileSync(join(worktree, "PARTIAL.md"), "half done\n")
+    // Binary content must survive the trip.
+    writeFileSync(join(worktree, "blob.bin"), Buffer.from([0, 1, 2, 255, 0]))
+    const link = server.link()
+    await daemon.supervisor.saveCheckpoints(
+      (runId, checkpoint) => link.checkpointRun!(runId, checkpoint),
+      Date.now() + 10 * 60_000
+    )
+    const checkpoint = server.runs.get(first)?.checkpoint
+    expect(checkpoint?.files).toBe(2)
+    // Nothing changed since: no second upload.
+    const held = server.runs.get(first)
+    if (held) held.checkpoint = undefined
+    await daemon.supervisor.saveCheckpoints(
+      (runId, cp) => link.checkpointRun!(runId, cp),
+      Date.now() + 20 * 60_000
+    )
+    expect(server.runs.get(first)?.checkpoint).toBeUndefined()
+
+    // The machine is gone; the run goes on elsewhere with only the checkpoint.
+    if (held) held.state = "failed"
+    const takeover = server.queueRun(DEVICE, {
+      issueId: "issue-stall",
+      repoId: "repo-1",
+      baseBranch: "main",
+      harness: "mock",
+      prompt: "do it",
+      resumeFrom: checkpoint,
+      fixture: "success-edit",
+      verifyCommand: VERIFY,
+    })
+    await daemon.syncWithServer()
+    await waitFor(() => daemon.supervisor.list().find((r) => r.runId === takeover))
+    await daemon.supervisor.idle()
+    const run = daemon.supervisor.get(takeover)
+    expect(run.state).toBe("succeeded")
+    expect(run.worktree).not.toBe(worktree)
+    const moved = run.worktree as string
+    expect(readFileSync(join(moved, "PARTIAL.md"), "utf8")).toBe("half done\n")
+    expect([...readFileSync(join(moved, "blob.bin"))]).toEqual([0, 1, 2, 255, 0])
+  })
+
   it("hands an issue to a human after the retry cap", async () => {
     const { server, dataDir } = await setup()
     const daemon = await boot(server, dataDir)
