@@ -841,7 +841,7 @@
   "Errors": {
     "generic": "Something went wrong. Please try again.",
     "authRequired": "Please sign in first.",
-    "submissionConflict": "This message does not match the earlier submission and was not sent. Send it again.",
+    "submissionConflict": "This message does not match the earlier submission, so sending stopped and will not be retried. Edit it to send it as a new message.",
     "validationGeneric": "Please check the information you entered.",
     "validationTitleRequired": "Please enter a task title.",
     "validationNameRequired": "Please enter a name.",

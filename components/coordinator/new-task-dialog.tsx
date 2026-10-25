@@ -39,6 +39,9 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  // The message built for a draft, frozen so that sending the same draft again
+  // resends the same body even if the default device has changed meanwhile.
+  const composed = useRef<{ key: string; message: string } | null>(null)
   const fileId = useId()
 
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
@@ -61,9 +64,14 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
     if (!text || sending) return
     setSending(true)
     try {
-      const context = [device && t('contextDevice', { device: device.name }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
-      const outcome = await submitMessage(context ? t('promptWithContext', { context, text }) : t('prompt', { text }))
+      const key = JSON.stringify([text, picked, project ?? null])
+      if (composed.current?.key !== key) {
+        const context = [device && t('contextDevice', { device: device.name }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
+        composed.current = { key, message: context ? t('promptWithContext', { context, text }) : t('prompt', { text }) }
+      }
+      const outcome = await submitMessage(composed.current.message)
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
+      composed.current = null
       setDraft('')
       onOpenChange(false)
       onSent?.()

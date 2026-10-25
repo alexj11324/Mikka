@@ -5,19 +5,24 @@ import { useTranslations } from 'next-intl'
 import { authClient } from '@/lib/auth-client'
 import { createCoordinatorSubmitter, type SubmitOutcome } from '@/lib/coordinator-submission'
 
-// One composer's submissions to the Coordinator, scoped to the signed-in
-// account: a pending submission is resent only by the account that started it.
+// The account the next request's cookie belongs to, read fresh from the server
+// rather than from the cached session, which can lag behind a switch elsewhere.
+async function currentOwner() {
+  const { data, error } = await authClient.getSession({ query: { disableCookieCache: true } })
+  if (error) throw new Error(error.message ?? 'session')
+  return data?.user.id ?? null
+}
+
+/** One composer's submissions to the Coordinator; see lib/coordinator-submission.ts. */
 export function useCoordinatorSubmit() {
   const t = useTranslations('Coordinator')
   const tErrors = useTranslations('Errors')
-  const { data: session } = authClient.useSession()
-  const owner = session?.user.id ?? ''
   const submitter = useRef<ReturnType<typeof createCoordinatorSubmitter> | null>(null)
 
-  const submit = useCallback((text: string) => {
-    submitter.current ??= createCoordinatorSubmitter()
-    return submitter.current.submit(owner, text)
-  }, [owner])
+  const submit = useCallback((text: string, questionId?: string) => {
+    submitter.current ??= createCoordinatorSubmitter({ currentOwner })
+    return submitter.current.submit(text, questionId)
+  }, [])
 
   // What to tell the person when a send did not end in "accepted"; null when
   // there is nothing to say (accepted, or another send of this composer is out).

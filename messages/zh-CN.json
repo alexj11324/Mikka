@@ -841,7 +841,7 @@
   "Errors": {
     "generic": "操作未成功，请稍后重试。",
     "authRequired": "请先登录。",
-    "submissionConflict": "这条消息和之前的提交不一致，没有发出。请重新发送。",
+    "submissionConflict": "这条消息和之前的提交记录不一致，已停止发送，不会自动重试。修改内容后会作为新消息发出。",
     "validationGeneric": "请检查填写内容。",
     "validationTitleRequired": "请填写任务标题。",
     "validationNameRequired": "请填写名称。",
