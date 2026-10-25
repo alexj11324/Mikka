@@ -11,10 +11,9 @@ async function handlePOST(request:Request,{params}:{params:Promise<{deviceId:str
   const caller=await authenticateDevice(request)
   if(!caller)return Response.json({error:'unauthorized'},{status:401})
   const {deviceId}=await params
-  try{return await withGroupWorkerAuthority(workspaceDb.$client,caller,deviceId,directory=>
-    handleGroupWorkerRequest(request,deviceId,{pool,directory,authenticate:async()=>caller,onClaim:async(client,runId)=>{
+  try{return await handleGroupWorkerRequest(request,deviceId,{pool,directory:async()=>false,withDirectory:fn=>withGroupWorkerAuthority(workspaceDb.$client,caller,deviceId,fn),authenticate:async()=>caller,onClaim:async(client,runId)=>{
       await client.query('UPDATE agent_runs SET "deviceTokenId"=$2 WHERE id=$1 AND "userId"=$3',[runId,caller.tokenId,caller.userId])
-    }}))}
+    }})}
   catch(error){if(error instanceof ReviewFailure)return Response.json({error:error.code},{status:error.status});throw error}
 }
 

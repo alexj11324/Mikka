@@ -29,12 +29,17 @@ export function groupMailboxAdapter(pool: Pool) {
 }
 /** Owner/device comes only from authenticated route identity. A bounded poll
  * recovers pending intents; dispatch remains idempotent across polling workers. */
-export async function pollGroupReviews(pool:Pool,directory:Directory,userId:string,deviceId:string) {
+export async function pollGroupReviews(pool:Pool,directory:Directory,userId:string,deviceId:string,withDirectory?:<T>(fn:(directory:Directory)=>Promise<T>)=>Promise<T>) {
   const device=(await pool.query('SELECT 1 FROM devices WHERE id=$1 AND "ownerId"=$2 AND enabled',[deviceId,userId])).rowCount
   if (!device) return reject(404,'not_found')
   const pending=(await pool.query(`SELECT w.id FROM conversation_work w JOIN agents a ON a.id=w."agentId" WHERE a."userId"=$1 AND a."deviceId"=$2 AND w.status='pending' AND ${TURN_READY_SQL} ORDER BY w."createdAt",w.id LIMIT 20`,[userId,deviceId])).rows
   for (const work of pending) {
-    try { await dispatchReviewWork(pool,directory,groupMailboxAdapter(pool),work.id) }
+    try {
+      const dispatch=(scoped:Directory)=>dispatchReviewWork(pool,scoped,groupMailboxAdapter(pool),work.id)
+      // Each dispatch commits before its workspace membership locks are released.
+      // Never retain a workspace connection while borrowing the next app client.
+      await (withDirectory ? withDirectory(dispatch) : dispatch(directory))
+    }
     catch(error) { if (!(error instanceof ReviewFailure) || error.code!=='group_device_unavailable') throw error }
   }
   return {runIds:(await pool.query(`SELECT r.id FROM agent_runs r JOIN conversation_work w ON w."runId"=r.id JOIN session_mailboxes m ON m.id=r."mailboxId" WHERE r."userId"=$1 AND r."deviceId"=$2 AND r.kind='group_review' AND w.status='dispatched' AND w."uncertainAt" IS NULL AND r."stopRequestedAt" IS NULL AND NOT m.disabled AND (r.status='queued' OR (r.status='running' AND r."leaseExpiresAt"<now())) ORDER BY w."createdAt" LIMIT 20`,[userId,deviceId])).rows.map(row=>row.id as string)}

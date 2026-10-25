@@ -12,7 +12,7 @@ const command=z.discriminatedUnion('action',[
   z.object({action:z.literal('fail'),runId:z.uuid(),claimEpoch:z.number().int().positive(),code:z.literal('processor_failed')}).strict(),
   z.object({action:z.literal('complete'),runId:z.uuid(),reply:z.unknown()}).strict(),
 ])
-export async function handleGroupWorkerRequest(request:Request,deviceId:string,deps:{pool:Pool;directory:Directory;onClaim?:(client:PoolClient,runId:string)=>Promise<void>;authenticate:(request:Request)=>Promise<{userId:string}|null>}) {
+export async function handleGroupWorkerRequest(request:Request,deviceId:string,deps:{pool:Pool;directory:Directory;withDirectory?:<T>(fn:(directory:Directory)=>Promise<T>)=>Promise<T>;onClaim?:(client:PoolClient,runId:string)=>Promise<void>;authenticate:(request:Request)=>Promise<{userId:string}|null>}) {
   const caller=await deps.authenticate(request)
   const json=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store'}})
   if (!caller) return json({error:'unauthorized'},401)
@@ -20,7 +20,8 @@ export async function handleGroupWorkerRequest(request:Request,deviceId:string,d
   if (!z.uuid().safeParse(deviceId).success || !parsed.success) return json({error:'invalid_input'},422)
   const input=parsed.data
   try {
-    const result=input.action==='exchange'?await appendAgentExchange(deps.pool,deps.directory,caller.userId,deviceId,input.runId,input.exchange):input.action==='poll'?await pollGroupReviews(deps.pool,deps.directory,caller.userId,deviceId):input.action==='claim'?await claimGroupReview(deps.pool,deps.directory,caller.userId,deviceId,input.runId,client=>deps.onClaim?.(client,input.runId)??Promise.resolve()):input.action==='check'?await checkGroupReview(deps.pool,deps.directory,caller.userId,deviceId,input.runId,input.claimEpoch):input.action==='fail'?await failGroupReview(deps.pool,deps.directory,caller.userId,deviceId,input.runId,input.claimEpoch):await finishGroupReview(deps.pool,deps.directory,caller.userId,deviceId,input.runId,input.reply)
+    const execute=async(directory:Directory)=>input.action==='exchange'?await appendAgentExchange(deps.pool,directory,caller.userId,deviceId,input.runId,input.exchange):input.action==='poll'?await pollGroupReviews(deps.pool,directory,caller.userId,deviceId,deps.withDirectory):input.action==='claim'?await claimGroupReview(deps.pool,directory,caller.userId,deviceId,input.runId,client=>deps.onClaim?.(client,input.runId)??Promise.resolve()):input.action==='check'?await checkGroupReview(deps.pool,directory,caller.userId,deviceId,input.runId,input.claimEpoch):input.action==='fail'?await failGroupReview(deps.pool,directory,caller.userId,deviceId,input.runId,input.claimEpoch):await finishGroupReview(deps.pool,directory,caller.userId,deviceId,input.runId,input.reply)
+    const result=input.action==='poll'||!deps.withDirectory?await execute(deps.directory):await deps.withDirectory(execute)
     return json(result)
   } catch(error) {if(error instanceof ReviewFailure)return json({error:error.code},error.status);throw error}
 }
