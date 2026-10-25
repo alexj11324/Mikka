@@ -402,6 +402,10 @@
         "signature": "SourceChip(url: string, label?: string)",
         "description": "内联网页来源，例如 pull request 或文档。url 为 http(s) 地址，label 为简短名称，可选；悬停显示网页预览。放在 InlineText 的 parts 里。"
       },
+      "ComputerCard": {
+        "signature": "ComputerCard(botId: string, runId: string, task: string, state?: \"working\" | \"approval\" | \"done\" | \"failed\", botName?: string, thread?: string)",
+        "description": "电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。botId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working；thread 可选，是这次运行（线程）的名字，例如「#66 预览部署检查」，不是 bot 名。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。"
+      },
       "ShadcnCard": {
         "signature": "ShadcnCard(title: string, children: any[], description?: string)",
         "description": "本地 shadcn 卡片。用于有标题的建议、说明或内容分组，可嵌套已注册组件。"
@@ -496,10 +500,12 @@
           "InlineText",
           "TaskChip",
           "RunChip",
-          "SourceChip"
+          "SourceChip",
+          "ComputerCard"
         ],
         "notes": [
-          "引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。"
+          "引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。",
+          "Agent 用自己的电脑做事时放一张 ComputerCard，画面、状态和审批都在卡片里，正文不再复述操作过程。"
         ]
       },
       {
@@ -831,6 +837,9 @@
         "SourceChip": {
           "$ref": "#/$defs/SourceChip"
         },
+        "ComputerCard": {
+          "$ref": "#/$defs/ComputerCard"
+        },
         "ShadcnCard": {
           "$ref": "#/$defs/ShadcnCard"
         },
@@ -966,6 +975,7 @@
         "TaskChip",
         "RunChip",
         "SourceChip",
+        "ComputerCard",
         "ShadcnCard",
         "ShadcnBadge",
         "ShadcnAlert",
@@ -5099,6 +5109,52 @@
           "additionalProperties": false,
           "description": "内联网页来源，例如 pull request 或文档。url 为 http(s) 地址，label 为简短名称，可选；悬停显示网页预览。放在 InlineText 的 parts 里。"
         },
+        "ComputerCard": {
+          "type": "object",
+          "properties": {
+            "botId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "runId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "task": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "working",
+                "approval",
+                "done",
+                "failed"
+              ]
+            },
+            "botName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "thread": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "required": [
+            "botId",
+            "runId",
+            "task"
+          ],
+          "additionalProperties": false,
+          "description": "电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。botId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working；thread 可选，是这次运行（线程）的名字，例如「#66 预览部署检查」，不是 bot 名。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。"
+        },
         "ShadcnCard": {
           "type": "object",
           "properties": {
@@ -5460,6 +5516,7 @@
     "TaskChip",
     "RunChip",
     "SourceChip",
+    "ComputerCard",
     "ShadcnCard",
     "ShadcnBadge",
     "ShadcnAlert",

@@ -249,6 +249,5 @@ you to offer its users the source code of your version.
 ## Contributing
 
 Contributions are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first.
-Before your first pull request merges, you sign the
-[Contributor License Agreement](CLA.md) by replying to a bot comment on the
-pull request.
+Contributions are made under the project's [AGPL-3.0-only](LICENSE) license;
+no separate contributor agreement is required.
