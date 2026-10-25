@@ -69,10 +69,10 @@ allocation accordingly. This is an execution safety limit, not a commercial tier
 Models have zero SDK retries and bounded generation time below the quota lease.
 Ordinary Agent output retains its existing provider-controlled token limit. Daemon quota leases match existing run leases; expired/revoked
 claims cannot be renewed and must be retried through normal fenced run recovery.
-Claim activation and the queued-to-preparing run CAS share one PostgreSQL
-transaction and one persisted deadline. A SQL error or process death inside that
-transaction leaves a reserved allowance and queued run, permitting one safe
-retry. Once committed, the bound run prevents reissuing an ambiguous payload.
+Claim reservation creation, activation and the queued-to-preparing run CAS
+share one PostgreSQL transaction and one persisted deadline. A SQL error or
+process death inside that transaction leaves no reservation and a queued run,
+permitting one safe retry even after a long restart delay. Once committed, the bound run prevents reissuing an ambiguous payload.
 
 Composio has a 270-second whole-operation deadline within its 300-second lease.
 The AbortSignal reaches actual account, schema and execution HTTP requests;
@@ -189,8 +189,11 @@ pre-send gaps. New isolated regressions first reproduced both before correction:
 - A real `agent_runs` BEFORE UPDATE trigger forced the claim CAS to fail after
   separately committed quota activation. HTTP returned 500 and left a queued run
   with no reservation binding; same-key retries returned 409 even after expiry.
-  The corrected actual handler returns 503 with queued/reserved state, then one
-  retry binds the preparing run and quota atomically. A separate worker killed
+  The first correction returned 503 with queued/reserved state and allowed an
+  immediate retry, but a new actual HTTP regression showed late retry still
+  failed after reservation expiry. The final handler rolls reservation creation
+  back too, returning 503 with queued/no-reservation state; retry binds the
+  preparing run and quota atomically. A separate worker killed
   by SIGKILL inside the combined transaction verifies rollback and recovery.
 - The real Composio SDK used controlled loopback HTTP for accounts, schema and
   execution, with actual PG allowance/HTTP-effect records. Delayed preflight
@@ -235,3 +238,27 @@ new quota work does not change auth or weaken that condition. The broader check
 remains red for these three verified baseline assertions; the other 18 remaining
 script groups pass, including types/lint. This differs from the repository CI
 workflow, which does not run those two source-test files.
+
+Legacy claim compatibility preserves terminal history: an expired reserved
+record becomes refunded once; a trusted same-transaction run read must prove
+queued status and null quota binding, startedAt and leaseExpiresAt before a
+new `quota-unsent:<old reservation id>` attempt can be admitted. The old refund
+is never reopened or charged again. New admission still checks current budget,
+concurrency, rate, membership and allocation. A child attempt is unique and
+immutable, so uncertain/settled/executing work cannot replay. Actual HTTP tests
+also prove that an ambiguous non-null startedAt refuses this recovery. A
+separate worker is SIGKILLed after legacy reservation commit, its lease is
+advanced past expiry in the isolated PG, and a restarted store binds exactly
+one new charge while retaining the zero-unit old refund.
+
+The locked Composio client `2.0.0-rc.19` removed its manual caller-signal bridge
+after HTTP headers, leaving body decoding outside cancellation. A new real SDK
+HTTP test first failed when the server flushed headers/partial JSON and stalled
+the body. The checked-in pnpm patch composes the caller signal directly with
+the attempt signal sent to fetch, keeping the caller's whole-operation deadline
+connected through response-body I/O. It changes no dependency versions and
+introduces no global fetch hook or abandoned Promise race. Frozen-lockfile
+installation and exact-head CI verify patch application. The regression checks
+actual socket closure before the delayed body, no execution POST and a safe
+pre-send refund. SDK per-attempt header timeout is not treated as a substitute
+for this caller deadline.

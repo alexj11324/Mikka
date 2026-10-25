@@ -16,3 +16,6 @@ allowBuilds:
   '@swc/core': true
   esbuild: true
   sharp: true
+
+patchedDependencies:
+  '@composio/client@2.0.0-rc.19': patches/@composio__client@2.0.0-rc.19.patch

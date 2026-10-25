@@ -4,6 +4,8 @@ import { QuotaError } from './errors'
 
 export type QuotaAuthorization = (ownerId: string, workspaceId: string) => Promise<boolean>
 export type Reservation = { id: string; owner_id: string; workspace_id: string; resource: string; state: string; units: string; expires_at: Date; fingerprint: string }
+type UnsentProof = (client: PoolClient, reservation: Reservation) => Promise<boolean>
+type QuotaBinding = (client: PoolClient, reservation: Reservation) => Promise<void>
 export type QuotaRequest = { ownerId: string; key: string; resource: string; binding: unknown; leaseMs?: number }
 const MAX_LEASE_MS = 300_000
 
@@ -68,6 +70,16 @@ export class QuotaStore {
   }
 
   async reserve(input: QuotaRequest): Promise<Reservation> {
+    return this.reserveInternal(input)
+  }
+
+  /** Admission, activation and domain CAS have no intermediate committed state.
+   * Only database writes may run in bind; payload delivery follows commit. */
+  async reserveBound(input: QuotaRequest, bind: QuotaBinding, proveUnsent?: UnsentProof): Promise<Reservation> {
+    return this.reserveInternal(input, bind, proveUnsent)
+  }
+
+  private async reserveInternal(input: QuotaRequest, bind?: QuotaBinding, proveUnsent?: UnsentProof): Promise<Reservation> {
     if (!input.ownerId || !input.key || input.key.length > 256 || !input.resource || input.resource.length > 128) throw new QuotaError('quotaInvalidRequest', 400)
     const leaseMs = input.leaseMs ?? MAX_LEASE_MS
     if (!Number.isInteger(leaseMs) || leaseMs < 100 || leaseMs > MAX_LEASE_MS) throw new QuotaError('quotaInvalidLease', 400)
@@ -75,10 +87,23 @@ export class QuotaStore {
     return this.transaction(input.ownerId, async (client, tenant, now) => {
       const units = this.checkPolicy(tenant, input.resource, now)
       await this.expire(client, tenant.workspace_id, now)
-      const { rows: [existing] } = await client.query('SELECT * FROM quota_reservations WHERE owner_id=$1 AND request_key=$2', [input.ownerId, input.key])
+      let requestKey = input.key
+      const { rows: [existing] } = await client.query('SELECT * FROM quota_reservations WHERE owner_id=$1 AND request_key=$2', [input.ownerId, requestKey])
       if (existing) {
         if (existing.workspace_id !== tenant.workspace_id || existing.fingerprint !== fingerprint) throw new QuotaError('quotaKeyConflict', 409)
-        return existing
+        if (bind && proveUnsent && existing.state === 'refunded' && BigInt(existing.settled_units) === BigInt(0)) {
+          // Compatibility for an old pre-send crash. Preserve the immutable old
+          // refund; charge one new linked attempt only after a locked domain
+          // read proves no payload was ever issued. Never reopen an uncertain,
+          // settled or executing operation. New bound admission has no orphan.
+          if (!await proveUnsent(client, existing)) throw new QuotaError('quotaUnsentProofFailed', 409)
+          requestKey = `quota-unsent:${existing.id}`
+          const { rows: [retry] } = await client.query('SELECT * FROM quota_reservations WHERE owner_id=$1 AND request_key=$2', [input.ownerId, requestKey])
+          if (retry) {
+            if (retry.workspace_id !== tenant.workspace_id || retry.fingerprint !== fingerprint) throw new QuotaError('quotaKeyConflict', 409)
+            return this.activateInTransaction(client, tenant, now, input.ownerId, retry.id, bind)
+          }
+        } else return bind ? this.activateInTransaction(client, tenant, now, input.ownerId, existing.id, bind) : existing
       }
       const { rows: [backoff] } = await client.query('SELECT retry_at FROM quota_backoffs WHERE workspace_id=$1 AND resource=$2 AND retry_at > $3', [tenant.workspace_id, input.resource, now])
       if (backoff) throw new QuotaError('providerBackoff', 429, (backoff.retry_at.getTime() - now.getTime()) / 1000)
@@ -95,8 +120,8 @@ export class QuotaStore {
       if (Number(totals.rate) >= Math.min(tenant.rate_limit, tenant.allocation.max_rate_limit)) throw new QuotaError('quotaRateExceeded', 429, (totals.oldest.getTime() + tenant.rate_window_seconds * 1000 - now.getTime()) / 1000)
       const { rows: [reservation] } = await client.query(`INSERT INTO quota_reservations
         (id,owner_id,workspace_id,request_key,resource,fingerprint,units,state,expires_at) VALUES ($1,$2,$3,$4,$5,$6,$7,'reserved',$8) RETURNING *`,
-      [randomUUID(), input.ownerId, tenant.workspace_id, input.key, input.resource, fingerprint, units, new Date(now.getTime() + leaseMs)])
-      return reservation
+      [randomUUID(), input.ownerId, tenant.workspace_id, requestKey, input.resource, fingerprint, units, new Date(now.getTime() + leaseMs)])
+      return bind ? this.activateInTransaction(client, tenant, now, input.ownerId, reservation.id, bind) : reservation
     })
   }
 
@@ -106,20 +131,22 @@ export class QuotaStore {
 
   /** Only database writes belong in bind: activation and domain CAS commit
    * together, before any execution payload or external effect can be issued. */
-  async activateBound(ownerId: string, id: string, bind: (client: PoolClient, reservation: Reservation) => Promise<void>): Promise<Reservation> {
-    return this.transaction(ownerId, async (client, tenant, now) => {
-      await this.expire(client, tenant.workspace_id, now)
-      const { rows: [row] } = await client.query('SELECT * FROM quota_reservations WHERE id=$1 AND owner_id=$2 AND workspace_id=$3', [id, ownerId, tenant.workspace_id])
-      if (!row) throw new QuotaError('quotaReservationNotFound', 404)
-      this.checkPolicy(tenant, row.resource, now)
-      await this.checkHeldBudget(client, tenant, now)
-      const { rows: [backoff] } = await client.query('SELECT retry_at FROM quota_backoffs WHERE workspace_id=$1 AND resource=$2 AND retry_at > $3', [tenant.workspace_id, row.resource, now])
-      if (backoff) throw new QuotaError('providerBackoff', 429, (backoff.retry_at - now.getTime()) / 1000)
-      if (row.state !== 'reserved') throw new QuotaError(row.state === 'uncertain' ? 'quotaOutcomeUncertain' : 'quotaAlreadyDispatched', 409)
-      const { rows: [active] } = await client.query(`UPDATE quota_reservations SET state='executing' WHERE id=$1 RETURNING *`, [id])
-      await bind(client, active)
-      return active
-    })
+  async activateBound(ownerId: string, id: string, bind: QuotaBinding): Promise<Reservation> {
+    return this.transaction(ownerId, (client, tenant, now) => this.activateInTransaction(client, tenant, now, ownerId, id, bind))
+  }
+
+  private async activateInTransaction(client: PoolClient, tenant: Record<string, any>, now: Date, ownerId: string, id: string, bind: QuotaBinding): Promise<Reservation> {
+    await this.expire(client, tenant.workspace_id, now)
+    const { rows: [row] } = await client.query('SELECT * FROM quota_reservations WHERE id=$1 AND owner_id=$2 AND workspace_id=$3', [id, ownerId, tenant.workspace_id])
+    if (!row) throw new QuotaError('quotaReservationNotFound', 404)
+    this.checkPolicy(tenant, row.resource, now)
+    await this.checkHeldBudget(client, tenant, now)
+    const { rows: [backoff] } = await client.query('SELECT retry_at FROM quota_backoffs WHERE workspace_id=$1 AND resource=$2 AND retry_at > $3', [tenant.workspace_id, row.resource, now])
+    if (backoff) throw new QuotaError('providerBackoff', 429, (backoff.retry_at.getTime() - now.getTime()) / 1000)
+    if (row.state !== 'reserved') throw new QuotaError(row.state === 'uncertain' ? 'quotaOutcomeUncertain' : 'quotaAlreadyDispatched', 409)
+    const { rows: [active] } = await client.query(`UPDATE quota_reservations SET state='executing' WHERE id=$1 RETURNING *`, [id])
+    await bind(client, active)
+    return active
   }
 
   /** Final pre-send fence. Rechecks the original executing lease without

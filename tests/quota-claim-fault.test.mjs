@@ -9,6 +9,7 @@ import {join} from 'node:path'
 import {setTimeout as delay} from 'node:timers/promises'
 import test from 'node:test'
 import {Pool} from 'pg'
+import {QuotaStore} from '../lib/quota/store.ts'
 const target=process.env.QUOTA_TEST_DATABASE_URL
 if(target){const u=new URL(target);assert.ok(['localhost','127.0.0.1','[::1]'].includes(u.hostname));assert.match(u.pathname,/(?:_e2e|_quota215)$/)}
 test('actual HTTP claim SQL fault rolls back activation and permits one safe retry',{skip:!target,timeout:180000},async t=>{
@@ -44,15 +45,34 @@ test('actual HTTP claim SQL fault rolls back activation and permits one safe ret
   const suffix=randomUUID().replaceAll('-',''),functionName=`quota_claim_fault_${suffix}`
   await pool.query(`CREATE FUNCTION ${functionName}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.status='preparing' AND EXISTS(SELECT 1 FROM quota_claim_test_faults WHERE run_id=NEW.id AND enabled) THEN RAISE EXCEPTION 'synthetic claim CAS fault'; END IF; RETURN NEW; END $$`)
   await pool.query(`CREATE TRIGGER ${functionName} BEFORE UPDATE ON agent_runs FOR EACH ROW EXECUTE FUNCTION ${functionName}()`)
-  const snapshot=async()=>({run:(await pool.query('SELECT status,"quotaReservationId" FROM agent_runs WHERE id=$1',[run])).rows[0],quota:(await pool.query('SELECT id,state,units,settled_units,expires_at FROM quota_reservations WHERE owner_id=$1 AND request_key=$2',[owner,`daemon:${run}`])).rows[0]})
+  const snapshot=async()=>({reservations:(await pool.query('SELECT id,state,request_key,units,settled_units,expires_at FROM quota_reservations WHERE owner_id=$1 ORDER BY created_at',[owner])).rows,run:(await pool.query('SELECT status,"quotaReservationId","startedAt","leaseExpiresAt" FROM agent_runs WHERE id=$1',[run])).rows[0],quota:(await pool.query('SELECT id,state,units,settled_units,expires_at FROM quota_reservations WHERE owner_id=$1 AND request_key=$2',[owner,`daemon:${run}`])).rows[0]})
   const claim=async()=>{const response=await fetch(`http://localhost:3216/mikka/v1/devices/${device}/runs/${run}/claim`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:'{}',signal:AbortSignal.timeout(30000)});let body;try{body=await response.json()}catch{body={error:'non-JSON server failure'}}const result={status:response.status,hasPayload:typeof body.prompt==='string',error:body.error};evidence.responses.push(result);return result}
   const failed=await claim();evidence.afterFault=await snapshot()
   await pool.query('UPDATE quota_claim_test_faults SET enabled=false WHERE run_id=$1',[run])
+  // Model the persisted orphan from the older two-transaction claim version.
+  // New claims roll the reservation back too; legacy state must also recover.
+  const oldStore=new QuotaStore(pool,async(user,ws)=>Boolean((await pool.query(`SELECT 1 FROM mikka_workspace_members WHERE "userId"=$1 AND "workspaceId"=$2 AND status='active'`,[user,ws])).rowCount))
+  const legacy=await oldStore.reserve({ownerId:owner,key:`daemon:${run}`,resource:'daemon.run',binding:{runId:run,issueId:issue,agentId:agent,repoId:repo}})
+  evidence.legacyReservation=legacy.id
+  await pool.query("UPDATE quota_reservations SET expires_at=clock_timestamp()-interval '1 second' WHERE owner_id=$1",[owner])
+  evidence.beforeDelayedRetry=await snapshot()
+  await pool.query('UPDATE agent_runs SET "startedAt"=clock_timestamp() WHERE id=$1',[run])
+  const ambiguous=await claim();evidence.afterUnsafeHistory=await snapshot()
+  assert.equal(ambiguous.status,409);assert.equal(ambiguous.error,'quotaUnsentProofFailed')
+  assert.equal(evidence.afterUnsafeHistory.reservations.length,1)
+  // Restore only the synthetic fixture after proving ambiguous history fails.
+  await pool.query('UPDATE agent_runs SET "startedAt"=NULL WHERE id=$1',[run])
   const retried=await claim();evidence.afterRetry=await snapshot()
   if(retried.status!==200){await pool.query("UPDATE quota_reservations SET expires_at=clock_timestamp()-interval '1 second' WHERE owner_id=$1",[owner]);await claim();evidence.afterExpiredRetry=await snapshot()}
   assert.equal(failed.status,503);assert.equal(failed.hasPayload,false)
-  assert.equal(evidence.afterFault.run.status,'queued');assert.equal(evidence.afterFault.run.quotaReservationId,null);assert.equal(evidence.afterFault.quota.state,'reserved')
-  assert.equal(retried.status,200);assert.equal(retried.hasPayload,true);assert.equal(evidence.afterRetry.run.quotaReservationId,evidence.afterRetry.quota.id)
+  assert.equal(evidence.afterFault.run.status,'queued');assert.equal(evidence.afterFault.run.quotaReservationId,null);assert.equal(evidence.afterFault.quota,undefined);assert.equal(evidence.afterFault.reservations.length,0)
+  assert.equal(evidence.afterFault.run.startedAt,null);assert.equal(evidence.afterFault.run.leaseExpiresAt,null)
+  assert.equal(retried.status,200);assert.equal(retried.hasPayload,true);assert.notEqual(evidence.afterRetry.run.quotaReservationId,legacy.id)
+  assert.equal(evidence.afterRetry.quota.state,'refunded');assert.equal(evidence.afterRetry.quota.settled_units,'0')
+  assert.equal(evidence.afterRetry.reservations.length,2)
+  const bound=evidence.afterRetry.reservations.find(r=>r.id===evidence.afterRetry.run.quotaReservationId)
+  assert.equal(bound.state,'executing');assert.equal(bound.request_key,`quota-unsent:${legacy.id}`)
+  assert.equal(bound.expires_at.getTime(),evidence.afterRetry.run.leaseExpiresAt.getTime())
   assert.equal((await claim()).status,409)
  }finally{await cleanup()}
 })

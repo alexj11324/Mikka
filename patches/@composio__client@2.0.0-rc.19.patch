@@ -1,0 +1,16 @@
+diff --git a/dist/generated-operations-Dv7pAKDT.mjs b/dist/generated-operations-Dv7pAKDT.mjs
+index af39b4595098605e337471936885788bf4364932..b4051c841eeacd634e5fe1dedce0db61077343cc 100644
+--- a/dist/generated-operations-Dv7pAKDT.mjs
++++ b/dist/generated-operations-Dv7pAKDT.mjs
+@@ -1706,7 +1706,10 @@ async function makeRequest(config, options) {
+ 		const timer = setTimeout(abort, timeout);
+ 		let result;
+ 		try {
+-			result = await dispatchWithRedirects(config, options, url, body, bodyHeaders, controller.signal, call);
++			// Keep the caller deadline connected to fetch body I/O after headers,
++			// when the attempt's manual abort listener has been removed.
++			const signal = userSignal ? AbortSignal.any([controller.signal, userSignal]) : controller.signal;
++			result = await dispatchWithRedirects(config, options, url, body, bodyHeaders, signal, call);
+ 		} catch (cause) {
+ 			if (cause instanceof ComposioError) {
+ 				if (attemptLog !== void 0) emitLog(config, "info", "Request failed", {

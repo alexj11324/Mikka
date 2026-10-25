@@ -45,13 +45,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   }
   let quota: Reservation
   try {
-    const reserved = await tenantQuotas.reserve({ ownerId: run.userId, key: `daemon:${run.id}`, resource: 'daemon.run', binding: { runId, issueId: run.issueId, agentId: run.agentId, repoId: repo.id }, leaseMs: RUN_LEASE_MS })
-    quota = await tenantQuotas.activateBound(run.userId, reserved.id, async (client, active) => {
+    quota = await tenantQuotas.reserveBound({ ownerId: run.userId, key: `daemon:${run.id}`, resource: 'daemon.run', binding: { runId, issueId: run.issueId, agentId: run.agentId, repoId: repo.id }, leaseMs: RUN_LEASE_MS }, async (client, active) => {
       const { rows } = await client.query(`UPDATE agent_runs SET status='preparing',"startedAt"=clock_timestamp(),
         "leaseExpiresAt"=$4,"quotaReservationId"=$5,"updatedAt"=clock_timestamp()
-        WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 AND status='queued' RETURNING id`,
+        WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 AND status='queued' AND "quotaReservationId" IS NULL AND "startedAt" IS NULL AND "leaseExpiresAt" IS NULL RETURNING id`,
       [runId, run.userId, deviceId, active.expires_at, active.id])
       if (!rows.length) throw new QuotaError('quotaRunClaimLost', 409)
+    }, async client => {
+      // Only a never-claimed queued run can recover a legacy refunded orphan.
+      // Claim delivery always persists preparing/startedAt/quota binding first.
+      const proof = await client.query(`SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3
+        AND status='queued' AND "quotaReservationId" IS NULL AND "startedAt" IS NULL AND "leaseExpiresAt" IS NULL FOR UPDATE`, [runId, run.userId, deviceId])
+      return proof.rowCount === 1
     })
   } catch (error) {
     if (error instanceof QuotaError) return quotaResponse(error)

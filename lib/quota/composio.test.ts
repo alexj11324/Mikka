@@ -5,6 +5,8 @@ import {createServer,type ServerResponse} from 'node:http'
 import {once} from 'node:events'
 import {setTimeout as delay} from 'node:timers/promises'
 import {execFileSync} from 'node:child_process'
+import {join} from 'node:path'
+import {tmpdir} from 'node:os'
 import test from 'node:test'
 import {Pool} from 'pg'
 import {Composio} from '@composio/core'
@@ -19,12 +21,14 @@ function deferred(){let resolve!:()=>void;const promise=new Promise<void>(r=>{re
 function json(res:ServerResponse,body:unknown){if(!res.destroyed){res.setHeader('content-type','application/json');res.end(JSON.stringify(body))}}
 
 test('real Composio SDK HTTP preflight, lease fencing and transport cancellation',{skip:!target,timeout:30000},async t=>{
+ const network=join(tmpdir(),`quota-sdk-network-${randomUUID()}.jsonl`);await writeFile(network,'');process.env.QUOTA_NETWORK_EVIDENCE=network
+ await import('../../tests/fixtures/quota-network-guard.mjs')
  const admin=new Pool({connectionString:target,max:1}),schema=`composio_quota_${randomUUID().replaceAll('-','')}`
  await admin.query(`CREATE SCHEMA "${schema}"`)
  const url=new URL(target!);url.searchParams.set('options',`-c search_path=${schema}`)
  const pool=new Pool({connectionString:url.toString(),max:8})
  const store=new QuotaStore(pool,async(owner,workspace)=>Boolean((await pool.query('SELECT 1 FROM quota_test_members WHERE owner_id=$1 AND workspace_id=$2',[owner,workspace])).rowCount))
- const evidence:{sha:string;utc:string;schema:string;cases:Record<string,unknown>[]}={sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),utc:new Date().toISOString(),schema,cases:[]}
+ const evidence:{sha:string;utc:string;schema:string;cases:Record<string,unknown>[];blockedNetworkAttempts?:unknown[]}={sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),utc:new Date().toISOString(),schema,cases:[]}
  try{
   await pool.query('CREATE TABLE agent_runs(id uuid PRIMARY KEY)')
   await pool.query(await readFile(new URL('../../drizzle/20261025165100_tenant_quotas.sql',import.meta.url),'utf8'))
@@ -42,7 +46,7 @@ test('real Composio SDK HTTP preflight, lease fencing and transport cancellation
     if(req.method==='GET'&&req.url?.includes('tools')){await beforeSchema?.(++schemaRequests);json(res,tool);return}
     res.statusCode=404;json(res,{error:'unknown synthetic endpoint'})
    });server.listen(0,'127.0.0.1');await once(server,'listening')
-   const client=new Composio({apiKey:'synthetic-no-provider-access',userApiKey:null,orgApiKey:null,baseURL:`http://127.0.0.1:${(server.address() as {port:number}).port}`,allowTracking:false})
+   const client=new Composio({apiKey:'synthetic-no-provider-access',userApiKey:null,orgApiKey:null,baseURL:`http://127.0.0.1:${(server.address() as {port:number}).port}`,allowTracking:false,disableVersionCheck:true})
    return{id,client,requests,effects,async close(){server.closeAllConnections();const closed=once(server,'close');server.close();await closed}}}
   await t.test('positive control uses the real SDK and one loopback execution',async()=>{
    const f=await fixture(),s=await service()
@@ -89,6 +93,25 @@ test('real Composio SDK HTTP preflight, lease fencing and transport cancellation
     assert.ok('error'in result);assert.equal(state.state,'refunded');assert.equal(state.settled_units,'0')
    }finally{await s.close()}
   })
+  await t.test('deadline cancels a response body stalled after actual HTTP headers',async()=>{
+   const f=await fixture(),lateResponse=deferred();let closedBeforeResponse=false
+   const s=await service(async res=>{
+    res.setHeader('content-type','application/json');res.writeHead(200);res.write('{"items":')
+    res.on('close',()=>{if(!res.writableEnded)closedBeforeResponse=true})
+    await delay(1500);lateResponse.resolve()
+   })
+   try{
+    const started=Date.now()
+    const result=await budgetedComposioAction(store,f.owner,'search_notion_pages',{query:'synthetic stalled body'},()=>s.client,f.key,{leaseMs:5000,timeoutMs:1000})
+    const duration=Date.now()-started
+    await lateResponse.promise;await delay(30)
+    const state=(await pool.query('SELECT state,settled_units FROM quota_reservations WHERE owner_id=$1 AND request_key=$2',[f.owner,f.key])).rows[0]
+    evidence.cases.push({name:'headers then stalled body',result,duration,closedBeforeResponse,state,requests:s.requests,effects:s.effects})
+    assert.equal(closedBeforeResponse,true,'whole-operation deadline must cancel body I/O after headers')
+    assert.equal(s.effects.length,0);assert.equal(s.requests.some(r=>r.startsWith('POST')),false)
+    assert.deepEqual(result,{error:'integrationTimedOut'});assert.deepEqual(state,{state:'refunded',settled_units:'0'})
+   }finally{await s.close()}
+  })
   await t.test('actual SDK-wrapped HTTP 429 refunds and persists shared Retry-After without retry',async()=>{
    const f=await fixture(),s=await service(undefined,undefined,undefined,429)
    try{
@@ -121,5 +144,5 @@ test('real Composio SDK HTTP preflight, lease fencing and transport cancellation
    }finally{controller.abort();release.resolve();await pending;await s.close()}
 
   })
- }finally{await writeFile('quota-composio-evidence.json',JSON.stringify(evidence,null,2));await pool.end();await admin.end()}
+ }finally{evidence.blockedNetworkAttempts=(await readFile(network,'utf8')).trim().split('\n').filter(Boolean).map(line=>JSON.parse(line));await writeFile('quota-composio-evidence.json',JSON.stringify(evidence,null,2));await pool.end();await admin.end();assert.deepEqual(evidence.blockedNetworkAttempts,[])}
 })

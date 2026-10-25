@@ -159,24 +159,48 @@ test('real PostgreSQL quota contention, restart, retries and authorization', { s
       assert.equal(Number((await pool.query('SELECT count(*) n FROM quota_reservations WHERE owner_id=$1',[owner])).rows[0].n),0)
       await store.reserve(request(owner))
     })
-    await t.test('SIGKILL inside activation/domain CAS rolls both back and allows one bounded retry',async()=>{
+    await t.test('SIGKILL inside admission/activation/domain CAS leaves no orphan and allows one bounded retry',async()=>{
       const {owner}=await fixture(),key=randomUUID()
       await pool.query("INSERT INTO quota_test_claims(id,status) VALUES($1,'queued')",[key])
       const child=spawn(process.execPath,['--import','tsx',new URL('./restart-worker.ts',import.meta.url).pathname],{cwd:new URL('../..',import.meta.url),env:{...process.env,QUOTA_TEST_DATABASE_URL:target.toString(),QUOTA_TEST_OWNER:owner,QUOTA_TEST_KEY:key,QUOTA_TEST_PHASE:'claim-cas'},stdio:['ignore','pipe','pipe']})
       let stderr='';child.stderr.on('data',chunk=>stderr+=chunk)
       await new Promise<void>((resolve,reject)=>{child.stdout.on('data',chunk=>{if(String(chunk).includes('READY'))resolve()});child.once('exit',code=>reject(new Error(`claim worker exited ${code}: ${stderr}`)))})
       const exited=once(child,'exit');child.kill('SIGKILL');assert.equal((await exited)[1],'SIGKILL')
-      const reservation=await store.reserve(request(owner,key))
-      assert.equal(reservation.state,'reserved')
+      assert.equal(Number((await pool.query('SELECT count(*) n FROM quota_reservations WHERE owner_id=$1',[owner])).rows[0].n),0)
       const before=(await pool.query('SELECT status,quota_id FROM quota_test_claims WHERE id=$1',[key])).rows[0]
       assert.deepEqual(before,{status:'queued',quota_id:null})
-      await store.activateBound(owner,reservation.id,async client=>{
-        const result=await client.query("UPDATE quota_test_claims SET status='preparing',quota_id=$2 WHERE id=$1 AND status='queued' RETURNING id",[key,reservation.id])
+      const reservation=await store.reserveBound(request(owner,key),async (client, active)=>{
+        const result=await client.query("UPDATE quota_test_claims SET status='preparing',quota_id=$2 WHERE id=$1 AND status='queued' RETURNING id",[key,active.id])
         assert.equal(result.rowCount,1)
       })
       const after=(await pool.query('SELECT status,quota_id FROM quota_test_claims WHERE id=$1',[key])).rows[0]
       assert.deepEqual(after,{status:'preparing',quota_id:reservation.id})
-      await assert.rejects(store.activateBound(owner,reservation.id,async()=>{throw new Error('must not bind twice')}),{code:'quotaAlreadyDispatched'})
+      await assert.rejects(store.reserveBound(request(owner,key),async()=>{throw new Error('must not bind twice')}),{code:'quotaAlreadyDispatched'})
+    })
+    await t.test('legacy reserved crash survives expiry and restart with one linked charge; unsafe states cannot recover',async()=>{
+      const {owner}=await fixture(),key=randomUUID(),input=request(owner,key)
+      await pool.query("INSERT INTO quota_test_claims(id,status) VALUES($1,'queued')",[key])
+      const child=spawn(process.execPath,['--import','tsx',new URL('./restart-worker.ts',import.meta.url).pathname],{cwd:new URL('../..',import.meta.url),env:{...process.env,QUOTA_TEST_DATABASE_URL:target.toString(),QUOTA_TEST_OWNER:owner,QUOTA_TEST_KEY:key,QUOTA_TEST_PHASE:'legacy-claim-reserved'},stdio:['ignore','pipe','pipe']})
+      let stderr='';child.stderr.on('data',chunk=>stderr+=chunk)
+      await new Promise<void>((resolve,reject)=>{child.stdout.on('data',chunk=>{if(String(chunk).includes('READY'))resolve()});child.once('exit',code=>reject(new Error(`legacy claim worker exited ${code}: ${stderr}`)))})
+      const exited=once(child,'exit');child.kill('SIGKILL');assert.equal((await exited)[1],'SIGKILL')
+      const original=(await pool.query('SELECT id,state FROM quota_reservations WHERE owner_id=$1 AND request_key=$2',[owner,key])).rows[0]
+      assert.equal(original.state,'reserved')
+      await pool.query("UPDATE quota_reservations SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1",[original.id])
+      const restarted=new QuotaStore(pool,authorize)
+      const recovered=await restarted.reserveBound(input,async(client,active)=>{
+        const result=await client.query("UPDATE quota_test_claims SET status='preparing',quota_id=$2 WHERE id=$1 AND status='queued' AND quota_id IS NULL RETURNING id",[key,active.id]);assert.equal(result.rowCount,1)
+      },async client=>Boolean((await client.query("SELECT id FROM quota_test_claims WHERE id=$1 AND status='queued' AND quota_id IS NULL FOR UPDATE",[key])).rowCount))
+      assert.notEqual(recovered.id,original.id);assert.equal(recovered.state,'executing')
+      assert.deepEqual((await pool.query('SELECT state,settled_units FROM quota_reservations WHERE id=$1',[original.id])).rows[0],{state:'refunded',settled_units:'0'})
+      assert.equal(Number((await pool.query('SELECT sum(coalesce(settled_units,units)) n FROM quota_reservations WHERE owner_id=$1',[owner])).rows[0].n),1)
+      await restarted.finish(owner,recovered.id,'uncertain')
+      await assert.rejects(restarted.reserveBound(input,async()=>{throw new Error('cannot bind twice')},async()=>true),{code:'quotaOutcomeUncertain'})
+      assert.equal(Number((await pool.query('SELECT count(*) n FROM quota_reservations WHERE owner_id=$1',[owner])).rows[0].n),2)
+      const denied=await fixture(),deniedInput=request(denied.owner)
+      const r=await restarted.reserve(deniedInput);await restarted.finish(denied.owner,r.id,'refunded')
+      await assert.rejects(restarted.reserveBound(deniedInput,async()=>{throw new Error('cannot bind without domain proof')},async()=>false),{code:'quotaUnsentProofFailed'})
+      assert.equal(Number((await pool.query('SELECT count(*) n FROM quota_reservations WHERE owner_id=$1',[denied.owner])).rows[0].n),1)
     })
     await t.test('unknown configuration/cost, suspension, workspace mismatch and expired override fail closed',async()=>{
       await assert.rejects(store.reserve(request(randomUUID())),{code:'quotaNotConfigured'})
