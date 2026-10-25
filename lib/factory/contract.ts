@@ -86,6 +86,9 @@ export const evidenceSchema = z
 export type FactoryEvidence = z.infer<typeof evidenceSchema>;
 export const changeSchema = z.discriminatedUnion("action", [
   z
+    .object({ action: z.literal("adopt_retry"), runId: z.uuid(), reason })
+    .strict(),
+  z
     .object({
       action: z.literal("resolve"),
       sourceEventId: z.uuid(),

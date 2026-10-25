@@ -375,6 +375,37 @@ export function createFactoryStore(
               ],
             );
           }
+        } else if (change.action === "adopt_retry") {
+          if (
+            !["spec", "execute"].includes(task.stage) ||
+            !attempt.runId ||
+            !["running", "failed"].includes(task.status)
+          )
+            fail("factoryTransition");
+          const prior = await runFor(tx, task, attempt.runId);
+          const retry = await runFor(tx, task, change.runId);
+          if (
+            prior.stopReason !== "device_lost" ||
+            prior.status !== "failed" ||
+            retry.retryOf !== prior.id
+          )
+            fail("factoryRunMismatch");
+          await tx.query(
+            'UPDATE factory_attempts SET status=\'failed\',reason=$2,"sessionId"=$3,"finishedAt"=now() WHERE id=$1',
+            [
+              attempt.id,
+              String(prior.error ?? "Device lost").slice(0, 4000),
+              prior.sessionId,
+            ],
+          );
+          task.reason = change.reason;
+          if (task.stage === "execute") task.candidateId = null;
+          await freshAttempt(tx, task, task.stage, change.reason);
+          await tx.query(
+            'UPDATE factory_attempts SET status=\'running\',"runId"=$2,"sessionId"=$3 WHERE id=$1',
+            [task.attemptId, retry.id, retry.sessionId],
+          );
+          task.status = "running";
         } else if (change.action === "bind_run") {
           if (task.status !== "pending" || attempt.runId)
             fail("factoryTransition");
@@ -431,6 +462,19 @@ export function createFactoryStore(
         } else if (change.action === "finish") {
           if (!["pending", "running", "waiting"].includes(task.status))
             fail("factoryTransition");
+          if (attempt.runId) {
+            const {
+              rows: [provenance],
+            } = await tx.query(
+              'SELECT "sessionId" FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "issueId"=$3',
+              [attempt.runId, userId, task.issueId],
+            );
+            if (!provenance) fail("factoryRunMismatch");
+            await tx.query(
+              'UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1',
+              [attempt.id, provenance.sessionId],
+            );
+          }
           if (change.status === "passed") {
             const consumerStage = [
               "review",

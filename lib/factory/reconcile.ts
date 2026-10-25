@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import { FactoryError, type FactoryBinding } from "./contract";
 import { factoryEventId } from "./event-id";
 import type { FactoryTask, createFactoryStore } from "./store";
+import { MAX_RUN_ATTEMPTS } from "../run-retry";
 const binding = (task: FactoryTask): FactoryBinding => ({
   taskId: task.id,
   issueId: task.issueId,
@@ -17,7 +18,7 @@ export function createFactoryReconciler(
 ) {
   return async (userId: string) => {
     const { rows: pending } = await pool.query(
-      "SELECT id FROM factory_tasks WHERE \"userId\"=$1 AND status='running' AND stage IN ('spec','execute') ORDER BY \"updatedAt\" LIMIT 50",
+      `SELECT t.id FROM factory_tasks t WHERE t."userId"=$1 AND t.stage IN ('spec','execute') AND (t.status='running' OR (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId"))) ORDER BY t."updatedAt" LIMIT 50`,
       [userId],
     );
     let recovered = 0;
@@ -25,22 +26,55 @@ export function createFactoryReconciler(
       const tx = await pool.connect();
       try {
         await tx.query("BEGIN");
-        const {
+        let {
           rows: [task],
         } = await tx.query<FactoryTask>(
-          "SELECT * FROM factory_tasks WHERE id=$1 AND \"userId\"=$2 AND status='running' FOR UPDATE",
+          "SELECT * FROM factory_tasks WHERE id=$1 AND \"userId\"=$2 AND status IN ('running','failed') FOR UPDATE",
           [item.id, userId],
         );
         if (!task) {
           await tx.query("COMMIT");
           continue;
         }
-        const {
+        let {
           rows: [run],
         } = await tx.query(
           `SELECT r.*, repo."remoteUrl", repo."repoPath" FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId" WHERE a.id=$1 AND r."userId"=$2 AND r."issueId"=$3 FOR UPDATE OF r`,
           [task.attemptId, userId, task.issueId],
         );
+        // Consume the existing bounded run-retry chain; never create a retry here.
+        for (
+          let retry = 1;
+          run?.stopReason === "device_lost" &&
+          !run.stopRequestedAt &&
+          retry < MAX_RUN_ATTEMPTS;
+          retry++
+        ) {
+          const {
+            rows: [child],
+          } = await tx.query(
+            `SELECT r.*,repo."remoteUrl",repo."repoPath" FROM agent_runs r LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId" WHERE r."retryOf"=$1 AND r."userId"=$2 AND r."issueId"=$3 ORDER BY r."createdAt" LIMIT 1 FOR UPDATE OF r`,
+            [run.id, userId, task.issueId],
+          );
+          if (!child) break;
+          const adopted = await store.apply(
+            userId,
+            binding(task),
+            factoryEventId("adopt-retry", child.id),
+            {
+              action: "adopt_retry",
+              runId: child.id,
+              reason: "Resumed the existing device-loss retry; no new dispatch",
+            },
+            tx,
+          );
+          task = adopted.task;
+          run = child;
+        }
+        if (task.status === "failed") {
+          await tx.query("COMMIT");
+          continue;
+        }
         if (
           !run ||
           !["succeeded", "failed", "stopped", "cancelled"].includes(run.status)

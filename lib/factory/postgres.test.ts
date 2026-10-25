@@ -288,6 +288,48 @@ test(
         ).runId,
         dispatchedRetry.runId,
       );
+      const lost = await route();
+      const lostRun = await dispatcher("owner", {
+        ...dispatchInput,
+        binding: binding(lost.task),
+      });
+      const childId = randomUUID(),
+        childSession = `retry-${randomUUID()}`;
+      await pool.query(
+        "UPDATE agent_runs SET status='failed',\"stopReason\"='device_lost',error='fixture lost device',\"sessionId\"=$2 WHERE id=$1",
+        [lostRun.runId, `lost-${randomUUID()}`],
+      );
+      await pool.query(
+        `INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"stopReason","sessionId",report,"retryOf",attempt,"finishedAt") VALUES ($1,'owner',$2,$3,$4,$5,'succeeded','submitted',$6,$7,$8,2,now())`,
+        [
+          childId,
+          issueId,
+          agentId,
+          deviceId,
+          repoId,
+          childSession,
+          JSON.stringify({
+            summary: "existing retry fixture",
+            verify: { status: "passed" },
+            publish: { commit: completionSha },
+          }),
+          lostRun.runId,
+        ],
+      );
+      const runCountBeforeRecovery = (
+        await pool.query("SELECT count(*) FROM agent_runs")
+      ).rows[0].count;
+      await reconcile("owner");
+      const retried = await store.read("owner", lost.task.id);
+      assert.equal(retried.task.stage, "review");
+      assert.equal(retried.attempts[0].runId, lostRun.runId);
+      assert.equal(retried.attempts[0].status, "failed");
+      assert.equal(retried.attempts[1].runId, childId);
+      assert.equal(retried.attempts[1].sessionId, childSession);
+      assert.equal(
+        (await pool.query("SELECT count(*) FROM agent_runs")).rows[0].count,
+        runCountBeforeRecovery,
+      );
       const external = await route(),
         externalRun = randomUUID();
       const tx = await pool.connect();
