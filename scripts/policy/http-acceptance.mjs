@@ -100,6 +100,7 @@ try {
   await app.query(`UPDATE agent_runs SET status='running' WHERE id=$1`,[runId])
   await app.query(`INSERT INTO run_tokens(id,"runId","userId","tokenHash","expiresAt") VALUES($1,$2,$3,$4,now()+interval '1 hour')`,[randomUUID(),runId,userId,hash(workerToken)])
   assert.equal((await anonymous.call('/v1/mailbox','POST',{action:'inbox'},{authorization:`Bearer ${workerToken}`})).status,401)
+  assert.equal((await anonymous.call(`/v1/runs/${runId}/skill-receipt?receiptId=${randomUUID()}`,'GET',undefined,deviceHeaders)).body.error,'workerEnforcementUnavailable')
   const heartbeat=await anonymous.call(`/v1/devices/${deviceId}/heartbeat`,'POST',{harnesses:[],runs:[{runId,lastProgressAt:new Date().toISOString()}],worktreeDiskBytes:0},deviceHeaders)
   assert.equal(heartbeat.status,200);assert.ok(heartbeat.body.revoked.includes(runId));assert.deepEqual(heartbeat.body.leases,{})
   // Actual daemon + actual compiled HTTP: restarting the same journal twice cannot mint local lease grace.
