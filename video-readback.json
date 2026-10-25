@@ -1,0 +1,14 @@
+{
+  "sourceSha": "80f3cab2b15ad967d1a27e45e6f833435d4de72e",
+  "evidenceCommitRead": "4f2f449bd2b3242c88f454d01e0cac522d48f376",
+  "gitBlob": "840d096e0d6b3d1d55a5907a316ff9f3d111c6dc",
+  "sha256": "e8c41073fcbe555c537b67ffec25c133ed033a882483dbb55481560a1bcf6a9c",
+  "originalPlaywrightBytesMatch": true,
+  "githubBytesMatch": true,
+  "fullVideoDecode": "ffmpeg exit 0",
+  "format": "VP9 WebM 1280x800",
+  "durationSeconds": 4.96,
+  "sizeBytes": 533150,
+  "inspected": "actual JSON API with public key/hash and synthetic IDs; no cookies or secrets",
+  "utc": "2026-10-25T18:33:03.836Z"
+}

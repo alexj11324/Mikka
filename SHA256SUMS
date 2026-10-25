@@ -1,8 +1,8 @@
-504f430c606312a4fa432e8eda8fa528d7549c1e7c5c831b303daf9f301bb40b  ./README.md
+2e09fc338c060f8fda7a4115befaa09ca588dddeaf882bb5d8302b7794aa389b  ./README.md
 4992c9cffbb4ba71b58d579958ea29a0f65609f8f244fc9f625f0682937117b8  ./acceptance.json
-baf50acff80ccb1a6a92f72faf9e482b1cba93901eb58cc60b0156cfa74a1be9  ./ci-status.json
+486f9fd3ee216d5ab440cf2406c478fa7cf86bac6f94073d285ef26934cb7bdb  ./ci-status.json
 6e430db4c4202f6146cc6e06e02005c69e982d6447cb6249d7fc9923c05e46a0  ./database-readback.json
-d920ce1cc91d7ec1568fc0d9109ddcd666b9f00e47b28dcf4ffb62defa67cda6  ./environment.json
+c5a3bafd60fed8a75fa724ccecbc2f9e9da1ea161cc493ecfd0ca867c174099f  ./environment.json
 dd245225f2f6af5a5bd6e67a42da3285609a8122d105e97a7abb8ed81047ef2f  ./history/710da20/acceptance.json
 b9a00bcdf56f009de43c3bf9c1b460581e8ef21b63d828bb1a3f9e3b6079b33e  ./history/710da20/browser-failure.log
 fad870e7aa2ed16f72e08762e24e59a680dad2e60063e2cf2d670f9c8a4526ad  ./history/710da20/ci-status.json
@@ -15,12 +15,14 @@ d09c2e779bd54ccaf7b152a717a1f7fa575cf9f0d2501dca8183c16755e5f461  ./history/710d
 fd3af5814fac60387969b1d66bb4d3b305635de5a02335d4301821b9bee5fa65  ./history/policy-230-check.log
 fd0de75e8f47d016f4b33cbb7220ca5c103e7bd94a7e6700c4d46899ac35f501  ./history/policy-230-lint-final.log
 965a0283fc83aec27c73ff13f85e02e5626599a2b7eaf3e3d3628241c5ada3c7  ./history/policy-230-postgres-final.log
+2d747d8bb08b51232d6b06b0fe11503d3bc3e765a64fa3590907630c2c732db1  ./main-ci.json
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./policy-230-migrations-repeat.log
 91fb0811a3ee974ccd8fecdda613a7d33e7b318005af024d9258f337611f8bb9  ./policy-230-migrations.log
 41c0fbcbf6720f81d2b6f446b2d79f5e0cd6e68dfa0555f070dd5823574452c0  ./policy-ci.log
 e8c41073fcbe555c537b67ffec25c133ed033a882483dbb55481560a1bcf6a9c  ./policy-http-raw.webm
 f10a3a80e014b9a1bed5e48fc3d0577f93c75de8344bcc4cf9b1d434bfaa20c9  ./restart-acceptance.json
 6def06d3dd17e7349a1ec612db3d76875b49feee1ff8d36a7063b6ae6251edbb  ./restart-probe.mjs
+1c6dd197a44e6a27471fd6f22da0acd8c4d3df49ee9903bf6cb052bc6218f8d2  ./video-readback.json
 cedf1e74753b53a010f7feb9283320007d216d503fce9db45b9ba947b81e3f7e  ./worker-base-comparison.json
 3aea5506bb4ab8f0baf59a2cadbccffba92987acaa249c9e5f803404f44e2474  ./worker-base.log
 fa85f6bc4819518b65f39a8ccaaf7d2b673ec33d72862331e00dab7b56993862  ./worker-repaired.log

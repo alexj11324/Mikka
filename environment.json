@@ -64,5 +64,14 @@
     "headResult": "passed in 5.2s",
     "headMigrations": 60,
     "boundary": "request-correlated committed worker.authenticated audit event; existing current-role/token/stop/expiry/lock-wait/six-concurrent assertions retained"
+  },
+  "finalCI": {
+    "sourceSha": "80f3cab2b15ad967d1a27e45e6f833435d4de72e",
+    "main": "https://github.com/alexj11324/Mikka/actions/runs/40219786532",
+    "mainConclusion": "success",
+    "all17ChecksCompleted": true,
+    "browserPassed": 86,
+    "performancePassed": 5,
+    "verifiedUtc": "2026-10-25T18:33:03.836Z"
   }
 }
