@@ -274,8 +274,9 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
       assert.equal((await store.policy(owner,recipient.mailboxId,2,false)).continuationRunId,null)
       assert.equal((await store.ownerSend(owner,{to:recipient.mailboxId,key:randomUUID(),text:'Resume through Factory',resume:true})).continuationRunId,undefined)
       assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "continuesRunId"=$1',[next])).rowCount,0)
-      // A pre-existing/unadopted child also fails the actual claim implementation.
-      await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"continuesRunId") VALUES($1,$2,$3,$4,$5,$6,'queued',$7)`,[child,owner,issue,role,device,repo,next])
+      // A scope-valid but unadopted child still fails the actual Factory claim;
+      // bind the parent mailbox to reach that gate under the audit lineage invariant.
+      await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"continuesRunId","mailboxId") VALUES($1,$2,$3,$4,$5,$6,'queued',$7,$8)`,[child,owner,issue,role,device,repo,next,recipient.mailboxId])
       await assert.rejects(createExecutionClaim(pool,async()=>true)(owner,device,child,new Date(Date.now()+60000).toISOString()),/factoryRunMismatch/)
       await pool.query(`UPDATE factory_tasks SET status='cancelled' WHERE id=$1`,[task.id])
       await assert.rejects(createExecutionClaim(pool,async()=>true)(owner,device,child,new Date(Date.now()+60000).toISOString()),/factoryStopped/)

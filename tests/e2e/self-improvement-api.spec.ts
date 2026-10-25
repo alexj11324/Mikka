@@ -31,8 +31,8 @@ test('Skill baseline selection, actual claim receipt and feedback provenance use
     await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash") VALUES($1,$2,$3)`,[randomUUID(),userId,createHash('sha256').update(deviceToken).digest('hex')])
     await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,'Synthetic Skill HTTP agent','codex',$3)`,[agentId,userId,deviceId])
     await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,$3,'/ci/skill-http')`,[repoId,deviceId,userId])
-    async function queue(id:string) {
-      await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status) VALUES($1,$2,$3,$4,$5,$6,'queued')`,[id,userId,issueId,agentId,deviceId,repoId])
+    async function queue(id:string,retryOf:string|null=null) {
+      await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"retryOf") VALUES($1,$2,$3,$4,$5,$6,'queued',$7)`,[id,userId,issueId,agentId,deviceId,repoId,retryOf])
     }
     await queue(runId)
     const api=app('/api/self-improvement'),claim=app(`/v1/devices/${deviceId}/runs/${runId}/claim`)
@@ -97,8 +97,9 @@ test('Skill baseline selection, actual claim receipt and feedback provenance use
       }
       if(phase==='retry') {
         await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='device_lost' WHERE id=$1`,[original])
-        current=randomUUID();await queue(current)
-        await pool.query('UPDATE agent_runs SET "retryOf"=$2 WHERE id=$1',[current,original])
+        // The lineage is part of creation; post-insert reparenting is correctly
+        // rejected by the audit guard. This still exercises an unadopted retry.
+        current=randomUUID();await queue(current,original)
         if(selected) expect((await page.request.post(api,{headers:{origin},data:{action:'select_baseline',runId:current}})).status()).toBe(200)
         expect((await supported.post(app(`/v1/devices/${deviceId}/runs/${current}/claim`))).status()).toBe(409)
       }
