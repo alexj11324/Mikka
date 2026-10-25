@@ -51,7 +51,11 @@ const directory = groupDirectory({
 const groupReq = { userId: owner, method: 'GET' as const, resource: 'conversations' as const, origin: null, host: 'localhost:3110' }
 const group = (changes: Record<string, unknown>) => {
   const req = { ...groupReq, ...changes } as any
-  if (httpOrigin) return http(`/api/conversations${req.id ? `/${req.id}/${req.resource}` : ''}`, req.userId, req.method, req.body, req.origin)
+  if (httpOrigin) {
+    const params = new URLSearchParams()
+    for (const key of ['before', 'limit', 'workspaceId']) if (req[key] != null) params.set(key, req[key])
+    return http(`/api/conversations${req.id ? `/${req.id}/${req.resource}` : ''}?${params}`, req.userId, req.method, req.body, req.origin)
+  }
   return handleGroup(pool, directory, req)
 }
 const link = (id: string, changes: Record<string, unknown> = {}) => {
