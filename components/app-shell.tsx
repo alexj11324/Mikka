@@ -82,7 +82,7 @@ export function SignOutBoundary({ pending, children }: { pending: boolean; child
 export function AppShellContent({ parent, title, actions, children, variant = 'workspace', hideHeader = false, listToggle = true }: { parent: string; title: string; actions?: ReactNode; children: ReactNode; variant?: 'workspace' | 'settings'; hideHeader?: boolean; listToggle?: boolean }) {
   const i18nText = useTranslations();
   const { isMobile, openMobile, open, toggleSidebar } = useSidebar()
-  return <SidebarInset className={cn('min-h-0 min-w-0', variant === 'workspace' && 'overflow-y-auto overscroll-contain', variant === 'settings' && 'overflow-y-auto overscroll-contain md:my-2 md:mr-2 md:rounded-xl md:border md:shadow-sm')}>
+  return <SidebarInset className={cn('min-h-0 min-w-0', variant === 'workspace' && 'overflow-y-auto overscroll-contain', variant === 'settings' && 'overflow-y-auto overscroll-contain md:my-2 md:mr-2 md:rounded-xl md:shadow-sm')}>
     {/* Desktop has no title bar (MIK-40): the top bar searches and the pill names the conversation. Phones keep it, having no rail. */}
     {!hideHeader && <header className={cn('flex h-12 shrink-0 items-center justify-between gap-3 px-4 md:hidden')}>
       <div className="flex min-w-0 items-center gap-2">
