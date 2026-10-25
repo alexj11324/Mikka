@@ -25,6 +25,8 @@ import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { after } from 'next/server'
 import { judgeIssueScope } from '@/lib/issue-scope-judge'
 import { TASK_SCOPES } from '@/lib/task-identifier'
+import { enrichActivityActors } from '@/lib/activity-actor-server'
+import { activityActor } from '@/lib/activity-actor'
 
 type IssueRow = typeof issues.$inferSelect
 type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null }
@@ -99,7 +101,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
     try {
       const result = await db.transaction(async tx => {
         if (!id) {
-          const issue = await createIssueForUserInTransaction(tx, userId, parsed.data)
+          const issue = await createIssueForUserInTransaction(tx, userId, parsed.data, activityActor(userId))
           return issue ? { issue } : { error: 'issueCreateFailed' }
         }
         let issue
@@ -112,7 +114,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
           doneEvent = true
         }
         if (!issue) return { error: 'issueStale' }
-        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
+        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
         return { issue: await issueView(issue, tx) }
       })
       if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
@@ -152,7 +154,8 @@ export async function changeIssuePriority(input: { id: string; priority: string;
 export async function listIssueVersions(id: string) {
   const { issue } = await requireIssueAccess(id)
   const userId = issue.userId
-  return db.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
+  const versions = await db.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
+  return enrichActivityActors(versions, userId)
 }
 
 /**
@@ -175,6 +178,7 @@ export async function setIssueScope(input: { id: string; revision: number; scope
       const [saved] = await tx.update(issues).set({ scope: parsed.data.scope, scopeSetBy: 'user', scopeConfidence: null, revision: parsed.data.revision + 1, updatedAt: new Date() })
         .where(and(eq(issues.id, issue.id), eq(issues.userId, userId), eq(issues.revision, parsed.data.revision))).returning()
       if (!saved) return { error: 'issueStale' as const }
+      await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(userId) })
       return { issue: await issueView(saved, tx) }
     })
     if ('issue' in result && parsed.data.scope === 'workspace') dispatchLinearIssueSync(issue.id)

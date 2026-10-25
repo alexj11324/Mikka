@@ -11,7 +11,6 @@ import {
   Building2,
   ChevronRight,
   Download,
-  Info,
   MoreHorizontal,
   Search,
   Shield,
@@ -663,12 +662,6 @@ export function MembersSettings({
                 </EmptyHeader>
               </Empty>
             )}
-            <div className="mt-6 flex max-w-2xl items-start gap-2 text-xs leading-relaxed text-muted-foreground">
-              <Info className="mt-0.5 size-3.5 shrink-0" />
-              <p>
-                {canManage ? t("footer.admin") : t("footer.member")}
-              </p>
-            </div>
           </div>
         </div>
       </MainContent>
