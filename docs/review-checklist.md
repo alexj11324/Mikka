@@ -41,7 +41,7 @@ more than once.
       mismatch is resolved by `docs/design/README.md` § When sources
       disagree, and the losing side is fixed or reported.
 - [ ] Groupings and order read exactly as the frame shows (machine picker:
-      R-23). When a frame can be read two ways, ask the design thread before
+      R-23). When a frame can be read two ways, ask Alex before
       building.
 
 ### Copy
