@@ -129,6 +129,17 @@ test('frozen client against real HTTP/session/PG: concurrent retry, conflict, ow
     const continued = await questions.answer({ source: 'human_event', userId: ownerA }, request)
     expect((await questions.answer({ source: 'human_event', userId: ownerA }, request)).continuationRunId).toBe(continued.continuationRunId)
     expect((await db.query(`SELECT id FROM agent_runs WHERE "issueId"=$1 AND status='queued'`, [issueId])).rowCount).toBe(1)
+    const queued = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [continued.continuationRunId])).rows[0]
+    expect(queued.userId).toBe(ownerA)
+    expect(queued.deviceId).toBe(deviceId)
+    expect(queued.questionContinuation).toMatchObject({ questionId, originRunId: runId, originSessionId: `synthetic:${runId}`, requireSessionResume: true })
+    expect(queued.questionContinuation.followUp).toContain(answerText)
+    const persistedAnswer = (await db.query('SELECT * FROM factory_questions WHERE id=$1', [questionId])).rows[0]
+    expect(persistedAnswer.answerSourceEventId).toBe(answer.sourceEventId)
+    expect(persistedAnswer.answer.input).toEqual(request)
+    expect(persistedAnswer.continuationRunId).toBe(continued.continuationRunId)
+    expect((await db.query('SELECT text FROM run_messages WHERE id=$1 AND "runId"=$2', [request.answerId, runId])).rows[0].text).toBe(answerText)
+
     // Better Auth deletes expired sessions on read. Retain this synthetic owner's
     // records with a narrow rule; no unrelated session is affected.
     await db.query(`CREATE RULE retain_submission_${randomUUID().replaceAll('-', '')} AS ON DELETE TO session WHERE OLD."userId"='${ownerA.replaceAll("'", "''")}' DO INSTEAD NOTHING`)
