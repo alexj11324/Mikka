@@ -132,3 +132,21 @@ test('Cache is scoped by owner/workspace, immutable, case preserving; scrape sha
   for (let i = 0; i < 7; i++) assert.equal((await web.scrape(url, ctx)).ok, true)
   assert.equal((await web.search('fresh query', ctx)).ok, false)
 })
+
+
+test('Unchanged scrape metadata reuses the preflight DNS check within the same bounded call', async () => {
+  let resolutions = 0
+  const provider = createFirecrawlProvider(async () => Response.json(validPage()), { resolve: async () => { resolutions++; return publicHost() } })
+  await provider.scrape!(url)
+  assert.equal(resolutions, 1)
+})
+
+test('Authorization is rechecked before serving cached results', async () => {
+  let allowed = true
+  let calls = 0
+  const web = createWebService({ authorize: () => allowed, provider: { name: 'fixture', search: async () => { calls++; return [] } } })
+  assert.equal((await web.search('public query', ctx)).ok, true)
+  allowed = false
+  assert.equal((await web.search('public query', ctx)).ok, false)
+  assert.equal(calls, 1)
+})

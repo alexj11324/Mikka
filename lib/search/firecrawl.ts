@@ -87,7 +87,7 @@ export function createFirecrawlProvider(fetchImpl: typeof fetch = fetch, options
         // Fail closed on changed targets, including public redirects. Firecrawl owns remote egress enforcement.
         for (const target of [body.data.metadata.sourceURL, body.data.metadata.url].filter((value): value is string => value !== undefined)) {
           if (new URL(target).href !== new URL(url).href) throw new Error('Changed scrape target')
-          await assertPublicWebUrl(target, combined, options.resolve)
+          webUrlSchema.parse(target)
         }
         return { url, markdown: body.data.markdown.slice(0, 24000) }
       })
