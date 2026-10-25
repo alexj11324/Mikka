@@ -1,0 +1,28 @@
+# Exact incremental migration and compatibility boundary
+
+No production SQL is authorized or executed by this lane. `migration-manifest.json` hashes only the two **new, never-deployed** #210 SQL files. The frozen prerequisite is #257 `20e2f2e4ed14a9b08b3ef02fb56199809e29558e` (57 earlier migrations); this PR does not rewrite any of those files. Production approval must identify both actual database targets, the final reviewed source SHA, these hashes and the writer-maintenance/recovery owner.
+
+## Increment and dependencies
+
+- Application target `MIKKA_DATABASE_URL`: seven new audit tables, an index on the new events table, three functions and source triggers on `agent_runs`, Factory approvals/attempts/publications, credential requests, BYOS connections, operation ledger, pending actions and auth sessions. No business-row backfill or old audit rewriting. The mailbox/Factory/credential/BYOS prerequisite tables and run lineage columns must already exist.
+- Workspace target `DATABASE_URL`: six corresponding audit-core tables plus membership/invitation trigger functions/triggers. The source member/invitation tables must exist.
+- Shared physical target: the common core is idempotent and preserves its persistent `storeId`, head, events and policies; do not sum two logical source labels as independent event sets. Split databases are independently committed and have independent snapshots.
+
+The review fix changes only the new application SQL: both `retryOf` and `continuesRunId` can inherit a captured scope; parent owner/issue, continuation mailbox, explicit workspace and non-private child mailbox scope must agree. Unknown/foreign/forged lineage fails the business transaction rather than recording a guessed tenant. Previously created synthetic 9532817 audit rows are retained as historical failure evidence; they are not rewritten to conceal the bug. There is no deployed #210 history to backfill.
+
+## Controlled application order
+
+1. Verify the actual runtime DB selector and both existing migration ledgers against the approved environment. In this repository a `VERCEL_ENV=preview` app selects `DATABASE_URL`, while the migration runner's application target is named `MIKKA_DATABASE_URL`. For a shared Preview, both migration targets must deliberately identify that same approved Preview database. Never let a preview runner inherit a production application URL.
+2. Confirm source tables/columns and existing deployment-role DDL/function privileges; no new IAM, role or credential is provisioned. Pause the affected writers for the activation window, or establish an explicitly reviewed compatible rolling-deployment plan. Mixed old/new mailbox code with the audit trigger is not accepted: old stop/complete ordering can deadlock, and old continuation capture is incomplete.
+3. Apply only the approved increment through the existing migration runner, which sets session lock/statement timeouts (5s/60s). The first block also sets local timeouts. Trigger DDL briefly locks existing source tables; the index is on a newly created table, not a large business-table rebuild. On timeout/error the runner stops and does not mark the file applied. Do not disable audit or mark the ledger by hand to make a deploy green.
+4. Deploy the same reviewed application SHA, run source-write/readback, current-admin/worker/foreign-member checks, continuation query/export, retention hold and storage-failure checks on the fixed environment, then reopen writers. A build alone is not activation acceptance.
+
+The files contain multiple transactions and the two targets are not a distributed transaction. A crash after a committed block but before the migration ledger write can leave part of the new core installed; re-running the exact file is idempotent and preserves history. Review the ledger **and** actual functions/triggers before declaring readiness. Do not run only one target then silently enable the complete feature.
+
+## Backward compatibility and rollback
+
+The producer tables and protocol retain their prior business columns. Existing events, policies and heads are not reset. Historical rows do not acquire invented actors. New lineage checks intentionally reject insertion/reparenting that would misattribute an owner/issue/workspace; valid ordinary continuations and retries retain their original audit scope. The mailbox fix avoids a no-op upsert UPDATE lock and locks coordinator/target mailboxes in ID order before audited run mutations; it does not skip or swallow audit errors.
+
+An application rollback does **not** remove the DB source triggers. Rolling back to 9532817/older mailbox code while leaving these triggers active reintroduces the reviewed lock-order risk, so do not treat old-app redeploy as a complete rollback. Prefer a forward repair while writers remain paused. Any separately approved feature rollback must preserve all audit tables, heads, keys and checkpoints; do not drop or truncate history. Disabling only the source producer triggers is a possible operator-controlled emergency step, but creates an audit gap and is not equivalent to the enterprise audited behavior: keep affected critical writers closed until the coordinator explicitly resolves that boundary. No rollback SQL or production trigger disable has been executed here.
+
+Per-tenant event payload retention defaults to configurable 90 days, not a legal requirement. Pruning is a separate explicit admin/operator action, blocked by legal hold and active snapshot pins. It leaves prefix checkpoints and non-secret export/dedupe/resource metadata. No automatic cleanup scheduler, external WORM store or independently controlled checkpoint service is activated; database-owner whole-chain rewrite remains outside this local integrity guarantee.

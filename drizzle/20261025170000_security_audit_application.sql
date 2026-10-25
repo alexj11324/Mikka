@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS security_audit_resource_scopes (
  PRIMARY KEY(source,resource)
 );
 CREATE OR REPLACE FUNCTION security_audit_transition() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE r jsonb; before_row jsonb; tenant_id text; actor text; actor_kind text; owner_id text; resource_ref text; action_name text; result_name text; reason_code text; run_id text; operation_id text; captured_tenant text;
+DECLARE r jsonb; before_row jsonb; tenant_id text; actor text; actor_kind text; owner_id text; resource_ref text; action_name text; result_name text; reason_code text; run_id text; operation_id text; captured_tenant text; parent_id uuid; parent_run record; inherited_tenant text; parent_tenant text; child_mailbox record;
 BEGIN
  r:=CASE WHEN TG_OP='DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
  before_row:=CASE WHEN TG_OP='UPDATE' THEN to_jsonb(OLD) ELSE '{}'::jsonb END;
@@ -72,10 +72,42 @@ BEGIN
  resource_ref:=coalesce(r->>'id',r->>'operationId'); run_id:=coalesce(r->>'run_id',r->>'runId'); operation_id:=coalesce(r->>'operationId',r->>'eventId');
  result_name:='success'; reason_code:=lower(TG_OP); action_name:=TG_TABLE_NAME||'.'||lower(TG_OP);
  IF TG_TABLE_NAME='agent_runs' THEN
+   IF TG_OP='UPDATE' AND ((NEW."retryOf" IS NOT NULL AND NEW."retryOf" IS DISTINCT FROM OLD."retryOf") OR (NEW."continuesRunId" IS NOT NULL AND NEW."continuesRunId" IS DISTINCT FROM OLD."continuesRunId")) THEN
+     RAISE EXCEPTION 'security_audit_lineage_invalid';
+   END IF;
+   IF TG_OP='INSERT' THEN
+     FOREACH parent_id IN ARRAY ARRAY[(r->>'retryOf')::uuid,(r->>'continuesRunId')::uuid] LOOP
+       CONTINUE WHEN parent_id IS NULL;
+       IF parent_id=(r->>'id')::uuid THEN RAISE EXCEPTION 'security_audit_lineage_invalid'; END IF;
+       SELECT p."userId",p."issueId",p."mailboxId",s.tenant INTO parent_run FROM agent_runs p
+         LEFT JOIN security_audit_resource_scopes s ON s.source='agent_runs' AND s.resource=p.id::text WHERE p.id=parent_id;
+       IF NOT FOUND OR parent_run."userId" IS DISTINCT FROM owner_id OR parent_run."issueId" IS DISTINCT FROM (r->>'issueId')::uuid THEN
+         RAISE EXCEPTION 'security_audit_lineage_invalid';
+       END IF;
+       IF parent_id=(r->>'continuesRunId')::uuid AND (parent_run."mailboxId" IS NULL OR parent_run."mailboxId" IS DISTINCT FROM (r->>'mailboxId')::uuid) THEN
+         RAISE EXCEPTION 'security_audit_lineage_invalid';
+       END IF;
+       parent_tenant:=parent_run.tenant;
+       IF parent_tenant IS NULL AND parent_run."mailboxId" IS NOT NULL THEN
+         SELECT CASE WHEN "workspaceId"='00000000-0000-4000-8000-000000000001' THEN 'personal:'||owner_id ELSE "workspaceId" END INTO parent_tenant FROM session_mailboxes WHERE id=parent_run."mailboxId";
+       END IF;
+       IF parent_tenant IS NOT NULL AND inherited_tenant IS NOT NULL AND parent_tenant<>inherited_tenant THEN RAISE EXCEPTION 'security_audit_lineage_invalid'; END IF;
+       inherited_tenant:=coalesce(parent_tenant,inherited_tenant);
+     END LOOP;
+     IF inherited_tenant IS NOT NULL AND (r->>'mailboxId') IS NOT NULL THEN
+       SELECT "userId","workspaceId" INTO child_mailbox FROM session_mailboxes WHERE id=(r->>'mailboxId')::uuid;
+       IF NOT FOUND OR child_mailbox."userId" IS DISTINCT FROM owner_id OR (child_mailbox."workspaceId"<>'00000000-0000-4000-8000-000000000001' AND child_mailbox."workspaceId"<>inherited_tenant) THEN
+         RAISE EXCEPTION 'security_audit_lineage_invalid';
+       END IF;
+     END IF;
+     IF inherited_tenant IS NOT NULL AND nullif(current_setting('mikka.audit_workspace',true),'') IS NOT NULL AND inherited_tenant<>current_setting('mikka.audit_workspace') THEN
+       RAISE EXCEPTION 'security_audit_lineage_invalid';
+     END IF;
+   END IF;
    IF TG_OP='UPDATE' AND r->>'status'=before_row->>'status' AND r->>'stopRequestedAt' IS NOT DISTINCT FROM before_row->>'stopRequestedAt' THEN RETURN NEW; END IF;
    SELECT CASE WHEN "workspaceId"='00000000-0000-4000-8000-000000000001' THEN 'personal:'||owner_id ELSE "workspaceId" END INTO tenant_id FROM session_mailboxes WHERE id=(r->>'mailboxId')::uuid;
-   SELECT s.tenant INTO captured_tenant FROM security_audit_resource_scopes s WHERE s.source='agent_runs' AND s.resource=coalesce(r->>'retryOf',r->>'id');
-   tenant_id:=coalesce(captured_tenant,nullif(current_setting('mikka.audit_workspace',true),''),tenant_id,'personal:'||owner_id); run_id:=resource_ref;
+   SELECT s.tenant INTO captured_tenant FROM security_audit_resource_scopes s WHERE s.source='agent_runs' AND s.resource=r->>'id';
+   tenant_id:=coalesce(captured_tenant,inherited_tenant,nullif(current_setting('mikka.audit_workspace',true),''),tenant_id,'personal:'||owner_id); run_id:=resource_ref;
    reason_code:=r->>'status';
  ELSIF TG_TABLE_NAME='factory_approvals' THEN
    actor:=owner_id; actor_kind:='human';

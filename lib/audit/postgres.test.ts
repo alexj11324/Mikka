@@ -1,3 +1,4 @@
+import { SessionMailbox } from "../session-mailbox";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -475,6 +476,154 @@ test(
               )
             ).rows[0].tenant,
             tenant,
+          );
+          await transaction(app, (tx) => verifyAudit(tx, tenant));
+        },
+      );
+      await t.test(
+        "ordinary mailbox continuation inherits workspace; forged parent chains are rejected",
+        async () => {
+          const device = randomUUID(),
+            agent = randomUUID(),
+            repo = randomUUID(),
+            issue = randomUUID(),
+            otherIssue = randomUUID(),
+            parent = randomUUID(),
+            box = randomUUID(),
+            wrongBox = randomUUID();
+          await app.query(
+            `INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,'continuation fixture')`,
+            [device, owner],
+          );
+          await app.query(
+            `INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,$3,'codex',$4)`,
+            [agent, owner, agent, device],
+          );
+          await app.query(
+            `INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,$3,'/synthetic/audit-continuation')`,
+            [repo, device, owner],
+          );
+          for (const id of [issue, otherIssue])
+            await app.query(
+              `INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,'synthetic','{}','todo','normal','workspace')`,
+              [id, owner],
+            );
+          for (const id of [box, wrongBox])
+            await app.query(
+              `INSERT INTO session_mailboxes(id,"userId","workspaceId",kind,"sessionKey",harness) VALUES($1::uuid,$2,'00000000-0000-4000-8000-000000000001','run',$1::text,'codex')`,
+              [id, owner],
+            );
+          await transaction(app, async (tx) => {
+            await tx.query(
+              "SELECT set_config('mikka.audit_workspace',$1,true)",
+              [tenant],
+            );
+            await tx.query(
+              `INSERT INTO agent_runs(id,"userId","agentId","deviceId","deviceRepoId","issueId","mailboxId",status,"stopReason","sessionId","worktreePath") VALUES($1,$2,$3,$4,$5,$6,$7,'succeeded','submitted','synthetic-session','/synthetic/worktree')`,
+              [parent, owner, agent, device, repo, issue, box],
+            );
+          });
+          await app.query(
+            'UPDATE session_mailboxes SET "latestRunId"=$2 WHERE id=$1',
+            [box, parent],
+          );
+          await app.query(
+            `INSERT INTO run_messages(id,"userId","mailboxId",text,origin) VALUES($1,$2,$3,'synthetic pending follow-up','peer')`,
+            [randomUUID(), owner, box],
+          );
+          const service = new SessionMailbox(
+            app,
+            "00000000-0000-4000-8000-000000000001",
+          );
+          const created = await service.policy(owner, box, 1, false);
+          assert.ok(created.continuationRunId);
+          const child = (
+            await app.query("SELECT * FROM agent_runs WHERE id=$1", [
+              created.continuationRunId,
+            ])
+          ).rows[0];
+          assert.equal(child.continuesRunId, parent);
+          assert.equal(child.retryOf, null);
+          assert.equal(
+            (
+              await app.query(
+                "SELECT tenant FROM security_audit_resource_scopes WHERE source='agent_runs' AND resource=$1",
+                [child.id],
+              )
+            ).rows[0].tenant,
+            tenant,
+          );
+          assert.ok(
+            (
+              await app.query(
+                "SELECT 1 FROM security_audit_events WHERE tenant=$1 AND event->>'runId'=$2",
+                [tenant, child.id],
+              )
+            ).rowCount,
+          );
+          assert.equal(
+            (
+              await app.query(
+                "SELECT count(*) FROM security_audit_events WHERE tenant=$1 AND event->>'runId'=$2",
+                [`personal:${owner}`, child.id],
+              )
+            ).rows[0].count,
+            "0",
+          );
+          const insert = async (options: {
+            user?: string;
+            mailbox?: string;
+            issue?: string;
+            parent?: string;
+            workspace?: string;
+          }) =>
+            transaction(app, async (tx) => {
+              if (options.workspace)
+                await tx.query(
+                  "SELECT set_config('mikka.audit_workspace',$1,true)",
+                  [options.workspace],
+                );
+              await tx.query(
+                'INSERT INTO agent_runs(id,"userId","agentId","issueId","mailboxId","continuesRunId") VALUES($1,$2,$3,$4,$5,$6)',
+                [
+                  randomUUID(),
+                  options.user ?? owner,
+                  agent,
+                  options.issue ?? issue,
+                  options.mailbox ?? box,
+                  options.parent ?? parent,
+                ],
+              );
+            });
+          for (const options of [
+            { user: member },
+            { mailbox: wrongBox },
+            { issue: otherIssue },
+            { workspace: other },
+            { parent: randomUUID() },
+          ])
+            await assert.rejects(
+              insert(options),
+              /security_audit_lineage_invalid|foreign key constraint/,
+            );
+          await assert.rejects(
+            app.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [
+              child.id,
+              randomUUID(),
+            ]),
+            /security_audit_lineage_invalid|foreign key constraint/,
+          );
+          const foreignBox = randomUUID();
+          await app.query(
+            `INSERT INTO session_mailboxes(id,"userId","workspaceId",kind,"sessionKey") VALUES($1::uuid,$2,$3,'run',$1::text)`,
+            [foreignBox, owner, other],
+          );
+          await assert.rejects(
+            app.query(
+              'INSERT INTO agent_runs(id,"userId","agentId","issueId","mailboxId","retryOf") VALUES($1,$2,$3,$4,$5,$6)',
+              [randomUUID(), owner, agent, issue, foreignBox, parent],
+            ),
+            /security_audit_lineage_invalid/,
           );
           await transaction(app, (tx) => verifyAudit(tx, tenant));
         },
