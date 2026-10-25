@@ -410,6 +410,7 @@ export async function validatedMonitorProof(
   );
   if (
     !row ||
+    new Date(row.createdAt).getTime() > new Date(run.finishedAt).getTime() ||
     row.chunk?.type !== "factory-monitor-probe" ||
     !monitorAuditSchema.safeParse(row.chunk.audit).success ||
     !bindingSchema.safeParse(row.chunk.binding).success ||

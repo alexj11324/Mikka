@@ -390,7 +390,8 @@ export function createFactoryMonitor(
           ...evidence[0],
           artifact: proof.artifact,
           kind: "log",
-          recordedAt: proof.audit.finishedAt,
+          // The persisted reference is recorded after the raw chunk was inserted.
+          recordedAt: source.finishedAt.toISOString(),
         });
       await tx.query(
         `INSERT INTO factory_monitor_observations (id,"userId","workspaceKey","sourceEventId","runId","sessionId","taskId","candidateId","incidentId","checkKey",request,evidence,outcome)

@@ -16,6 +16,7 @@ import { approvalGate, publishGate, createFactoryApprovals } from "./approval";
 import { createLocalPublicationAdapter } from "./local-publication";
 import { createLocalMonitorProbe } from "./monitor-probe";
 import { readFactoryPublicationReceipt } from "./publication-receipt";
+import { readFactoryArtifact } from "./evidence";
 import { registerHooks } from "node:module";
 import test from "node:test";
 import { Pool, type PoolClient } from "pg";
@@ -961,6 +962,22 @@ test(
             (await store.read("owner", recovered.task.id)).task.status,
             "passed",
           );
+          const artifactReader = await pool.connect();
+          try {
+            const result = await store.read("owner", recovered.task.id);
+            const refs = result.attempts.find(
+              (a) => a.id === result.task.attemptId,
+            )!.evidence;
+            for (const ref of refs)
+              await readFactoryArtifact(
+                artifactReader,
+                result.task,
+                evidenceSchema.parse(ref),
+              );
+          } finally {
+            artifactReader.release();
+          }
+
           assert.equal(
             (
               await pool.query(
