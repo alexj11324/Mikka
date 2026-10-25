@@ -1,5 +1,5 @@
 import { coordinatorInbox } from './inbox-runtime'
-import type { WakeDelivery } from './inbox-receipts'
+import type { WakeDelivery, WakeExecution } from './inbox-receipts'
 import 'server-only'
 import { and, asc, desc, eq, gt, inArray, isNull, ne, or } from 'drizzle-orm'
 import type { ActionContext } from '../operations/action-intents'
@@ -20,7 +20,7 @@ const INBOX_BATCH = 50
 
 /** Undelivered events that should start a turn; issue_done is background even before triage. */
 function waking(userId: string) {
-  return and(eq(coordinatorEvents.userId, userId), and(isNull(coordinatorEvents.processedAt), inArray(coordinatorEvents.wakeStatus, ['pending','running'])), ne(coordinatorEvents.kind, 'issue_done'), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background')))
+  return and(eq(coordinatorEvents.userId, userId), and(isNull(coordinatorEvents.processedAt), inArray(coordinatorEvents.wakeStatus, ['pending','running'])), ne(coordinatorEvents.kind, 'issue_done'), inArray(coordinatorEvents.tier, ['attention','result']))
 }
 
 /** Whether any undelivered event should start a turn. */
@@ -97,7 +97,14 @@ export async function saveSummary(userId: string, summary: string, through: numb
 }
 
 /** Rewrites the memory with `edit`, under a row lock so two edits do not lose each other. */
-export async function editMemory<T>(userId: string, edit: (memory: string) => { memory: string; result: T } | { error: string }): Promise<T | { error: string }> {
+export async function editMemory<T>(userId: string, edit: (memory: string) => { memory: string; result: T } | { error: string }, execution?:WakeExecution): Promise<T | { error: string }> {
+  if(execution)return coordinatorInbox().effect(userId,execution,async tx=>{
+    const session=(await tx.query('SELECT memory FROM coordinator_sessions WHERE "userId"=$1',[userId])).rows[0]
+    const outcome=edit(session?.memory??'')
+    if('error'in outcome)return outcome
+    await tx.query('UPDATE coordinator_sessions SET memory=$2,"updatedAt"=clock_timestamp() WHERE "userId"=$1',[userId,outcome.memory])
+    return outcome.result
+  })
   return db.transaction(async tx => {
     await tx.insert(coordinatorSessions).values({ userId }).onConflictDoNothing()
     const [session] = await tx.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions)

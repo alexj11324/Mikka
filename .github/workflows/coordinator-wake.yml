@@ -25,6 +25,7 @@ jobs:
       MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
       DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
       WAKE_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+      WAKE_REVIEW_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -39,6 +40,7 @@ jobs:
         run: MIGRATE=1 node scripts/migrate.mjs
       - run: pnpm test:wake
       - run: pnpm test:wake:postgres
+      - run: pnpm test:wake:review
       - name: Schedule integration and both recovery safety regressions
         run: |
           psql postgresql://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE mikka_179_recovery'
@@ -71,6 +73,8 @@ jobs:
           WORKFLOW_TARGET_WORLD: local
           WORKFLOW_LOCAL_BASE_URL: http://127.0.0.1:3177/mikka
           WORKFLOW_NODE_HTTP: '1'
+          # Fixed trusted replay harness in a keyless Local World only.
+          WORKFLOW_EXPERIMENTAL_DYNAMIC_WORKFLOWS: '1'
         run: |
           export WORKFLOW_LOCAL_DATA_DIR="/tmp/mikka-sdk-176-${GITHUB_RUN_ID}"
           mkdir -p "$WORKFLOW_LOCAL_DATA_DIR"
@@ -79,10 +83,11 @@ jobs:
             -e BETTER_AUTH_SECRET=isolated-sdk-build-only-no-live-provider-access \
             -e BETTER_AUTH_URL=http://127.0.0.1:3177 \
             -e MIKKA_DATABASE_URL -e DATABASE_URL -e WORKFLOW_TARGET_WORLD \
-            -e WORKFLOW_LOCAL_BASE_URL -e WORKFLOW_LOCAL_DATA_DIR -e WORKFLOW_NODE_HTTP \
+            -e WORKFLOW_LOCAL_BASE_URL -e WORKFLOW_LOCAL_DATA_DIR -e WORKFLOW_NODE_HTTP -e WORKFLOW_EXPERIMENTAL_DYNAMIC_WORKFLOWS \
             -v "$PWD:$PWD" -v "$WORKFLOW_LOCAL_DATA_DIR:$WORKFLOW_LOCAL_DATA_DIR" -w "$PWD" \
             node:24-bookworm-slim node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3177
           python3 scripts/record-terminal.py wake-sdk.cast node --import tsx scripts/verify-wake-sdk.mjs > wake-sdk.log 2>&1
+          python3 scripts/record-terminal.py wake-effect-sdk.cast node --import tsx scripts/verify-wake-effect-sdk.mjs > wake-effect-sdk.log 2>&1
       - name: Preserve Workflow evidence and stop the isolated test container
         if: always()
         run: |
@@ -96,4 +101,6 @@ jobs:
             wake-sdk.cast
             wake-sdk.log
             wake-sdk-next.log
+            wake-effect-sdk.cast
+            wake-effect-sdk.log
           if-no-files-found: ignore

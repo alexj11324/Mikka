@@ -7,6 +7,7 @@ import { intentDigest, type ActionContext } from '../operations/action-intents'
 import type { CoordinatorEventKind, CoordinatorEventTier } from '../db/schema'
 
 export type WakeDelivery = { eventId: string; token: string }
+export type WakeExecution = { holder: string; delivery: WakeDelivery; operationKey: string; binding: string }
 export type WakeEvent = {
   id: string
   userId: string
@@ -27,6 +28,7 @@ export type WakeEvent = {
   wake_generation_holder: string | null
   wake_checkpoint: { messages: ModelMessage[]; warning: string | null } | null
   wake_checkpoint_digest: string | null
+  wake_tool_receipts: Record<string, { binding: string; value: unknown }>
   wake_error: string | null
   accountActionBatch: { holder: string; closed: boolean; batches: unknown[] } | null
 }
@@ -71,6 +73,8 @@ const fallbackAuthorization: WakeAuthorization = async (tx, event) => {
   if (event.wake_workspace_id) throw new WakeError('wakeWorkspaceAuthorityRequired', 403)
   return 'normal'
 }
+const foreground = (event: WakeEvent) =>
+  event.kind !== 'issue_done' && (event.tier === 'attention' || event.tier === 'result')
 export type InboxReceipt = {
   held: boolean
   added: number
@@ -170,18 +174,18 @@ export class CoordinatorInbox {
     const reservation = await this.tx<WakeClaim | null>(async (tx) => {
       const now = this.clock()
       await tx.query(
-        `INSERT INTO coordinator_sessions("userId") SELECT DISTINCT "userId" FROM coordinator_events WHERE processed_at IS NULL AND wake_status IN ('pending','running') AND kind<>'issue_done' AND (tier IS NULL OR tier<>'background') AND ($1::text IS NULL OR "userId"=$1) ON CONFLICT DO NOTHING`,
+        `INSERT INTO coordinator_sessions("userId") SELECT DISTINCT "userId" FROM coordinator_events WHERE processed_at IS NULL AND wake_status IN ('pending','running') AND kind<>'issue_done' AND tier IN ('attention','result') AND ($1::text IS NULL OR "userId"=$1) ON CONFLICT DO NOTHING`,
         [onlyOwner ?? null],
       )
       const { rows: owners } = await tx.query(
-        `SELECT s.* FROM coordinator_sessions s WHERE ($2::text IS NULL OR s."userId"=$2) AND (s."leaseUntil" IS NULL OR s."leaseUntil"<=$1) AND NOT EXISTS(SELECT 1 FROM coordinator_events a WHERE a."userId"=s."userId" AND a.processed_at IS NULL AND a.wake_lease_until>$1) AND EXISTS(SELECT 1 FROM coordinator_events e WHERE e."userId"=s."userId" AND e.processed_at IS NULL AND e.wake_status IN ('pending','running') AND e.kind<>'issue_done' AND (e.tier IS NULL OR e.tier<>'background') AND e.wake_next_at<=$1) ORDER BY s."updatedAt" LIMIT 1 FOR UPDATE OF s SKIP LOCKED`,
+        `SELECT s.* FROM coordinator_sessions s WHERE ($2::text IS NULL OR s."userId"=$2) AND (s."leaseUntil" IS NULL OR s."leaseUntil"<=$1) AND NOT EXISTS(SELECT 1 FROM coordinator_events a WHERE a."userId"=s."userId" AND a.processed_at IS NULL AND a.wake_lease_until>$1) AND EXISTS(SELECT 1 FROM coordinator_events e WHERE e."userId"=s."userId" AND e.processed_at IS NULL AND e.wake_status IN ('pending','running') AND e.kind<>'issue_done' AND e.tier IN ('attention','result') AND e.wake_next_at<=$1) ORDER BY s."updatedAt" LIMIT 1 FOR UPDATE OF s SKIP LOCKED`,
         [now, onlyOwner ?? null],
       )
       if (!owners.length) return null
       const owner = owners[0].userId as string
       const event = (
         await tx.query<WakeEvent>(
-          `SELECT * FROM coordinator_events WHERE "userId"=$1 AND processed_at IS NULL AND wake_status IN ('pending','running') AND kind<>'issue_done' AND (tier IS NULL OR tier<>'background') AND wake_next_at<=$2 ORDER BY sequence LIMIT 1 FOR UPDATE`,
+          `SELECT * FROM coordinator_events WHERE "userId"=$1 AND processed_at IS NULL AND wake_status IN ('pending','running') AND kind<>'issue_done' AND tier IN ('attention','result') AND wake_next_at<=$2 ORDER BY sequence LIMIT 1 FOR UPDATE`,
           [owner, now],
         )
       ).rows[0]
@@ -268,6 +272,27 @@ export class CoordinatorInbox {
     })
   }
 
+  async deferTriage(owner: string, id: string, retryAt: Date) {
+    return this.tx(async (tx) => {
+      await this.session(tx, owner)
+      await tx.query(
+        `UPDATE coordinator_events SET wake_next_at=$3,wake_error='wakeAdmissionDeferred' WHERE id=$1 AND "userId"=$2 AND tier IS NULL AND "deliveredAt" IS NULL AND processed_at IS NULL AND wake_status IN ('pending','running')`,
+        [id, owner, retryAt],
+      )
+    })
+  }
+  async denyTriage(owner: string, id: string, code: string) {
+    return this.tx(async (tx) => {
+      await this.session(tx, owner)
+      const event = (
+        await tx.query<WakeEvent>(
+          `SELECT * FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND tier IS NULL AND "deliveredAt" IS NULL AND processed_at IS NULL AND wake_status IN ('pending','running') FOR UPDATE`,
+          [id, owner],
+        )
+      ).rows[0]
+      if (event) await this.noteFailure(tx, event, code, true)
+    })
+  }
   async delivered(owner: string, delivery: WakeDelivery, runId?: string) {
     await this.pool.query(
       `UPDATE coordinator_events SET wake_transport_run_id=COALESCE($4,wake_transport_run_id),wake_error=CASE WHEN wake_error='wakeAdmissionDeferred' THEN wake_error ELSE NULL END,wake_next_at=GREATEST(wake_next_at,$5::timestamptz) WHERE id=$1 AND "userId"=$2 AND wake_delivery_token=$3 AND processed_at IS NULL`,
@@ -330,6 +355,18 @@ export class CoordinatorInbox {
         ).rows[0]
       if (!event || event.processed_at || !['pending', 'running'].includes(event.wake_status))
         return { held: false, added: 0 }
+      if (delivery && !foreground(event)) {
+        await tx.query(
+          'UPDATE coordinator_events SET wake_lease_until=NULL,wake_delivery_token=NULL,processing_holder=NULL WHERE id=$1',
+          [event.id],
+        )
+        if (session.active_event_id === event.id)
+          await tx.query(
+            'UPDATE coordinator_sessions SET "leaseHolder"=NULL,"leaseUntil"=NULL,active_event_id=NULL WHERE "userId"=$1',
+            [owner],
+          )
+        return { held: false, added: 0 }
+      }
       let mode: 'normal' | 'notify_only'
       try {
         mode = await this.authorize(tx, event, 'consume')
@@ -349,7 +386,7 @@ export class CoordinatorInbox {
       // children already staged with this event so its ACK cannot orphan them.
       const background = (
         await tx.query<WakeEvent>(
-          `SELECT * FROM coordinator_events WHERE "userId"=$1 AND id<>$2 AND processed_at IS NULL AND wake_workspace_id IS NOT DISTINCT FROM $3::uuid AND (wake_parent_id=$2 OR ($4::boolean AND "deliveredAt" IS NULL AND (tier='background' OR kind='issue_done'))) ORDER BY sequence LIMIT 49 FOR UPDATE`,
+          `SELECT * FROM coordinator_events WHERE "userId"=$1 AND id<>$2 AND processed_at IS NULL AND wake_status IN ('pending','running') AND wake_workspace_id IS NOT DISTINCT FROM $3::uuid AND (wake_parent_id=$2 OR ($4::boolean AND wake_parent_id IS NULL AND "deliveredAt" IS NULL AND (tier='background' OR kind='issue_done'))) ORDER BY sequence LIMIT 49 FOR UPDATE`,
           [owner, event.id, event.wake_workspace_id, mode !== 'notify_only'],
         )
       ).rows
@@ -424,8 +461,50 @@ export class CoordinatorInbox {
         session.leaseUntil <= this.clock()
       )
         throw new WakeError('wakeLeaseLost')
+      if (!foreground(event)) throw new WakeError('wakeNotForeground')
       if ((await this.authorize(tx, event, 'commit')) === 'notify_only') throw new WakeError('wakeRunStopped')
       return event
+    })
+  }
+  /** The effect and its receipt share the fresh session/event fence transaction.
+   * This runs inside the actual effect step, never as a cached preflight step. */
+  async effect<T>(owner: string, execution: WakeExecution, work: (tx: PoolClient) => Promise<T>): Promise<T> {
+    if (!/^step_[A-Za-z0-9_-]{1,160}$/.test(execution.operationKey) || !/^[a-f0-9]{64}$/.test(execution.binding))
+      throw new WakeError('wakeEffectBindingInvalid')
+    return this.scoped(owner, execution.delivery.eventId, 'commit', async (tx) => {
+      const session = await this.session(tx, owner)
+      const event = (
+        await tx.query<WakeEvent>('SELECT * FROM coordinator_events WHERE id=$1 AND "userId"=$2 FOR UPDATE', [
+          execution.delivery.eventId,
+          owner,
+        ])
+      ).rows[0]
+      if (
+        !event ||
+        event.processed_at ||
+        !['pending', 'running'].includes(event.wake_status) ||
+        event.wake_delivery_token !== execution.delivery.token ||
+        event.processing_holder !== execution.holder ||
+        session.leaseHolder !== execution.holder ||
+        !session.leaseUntil ||
+        session.leaseUntil <= this.clock()
+      )
+        throw new WakeError('wakeLeaseLost')
+      if (!foreground(event)) throw new WakeError('wakeNotForeground')
+      if ((await this.authorize(tx, event, 'commit')) === 'notify_only') throw new WakeError('wakeRunStopped')
+      const receipts = event.wake_tool_receipts ?? {},
+        prior = receipts[execution.operationKey]
+      if (prior) {
+        if (prior.binding !== execution.binding) throw new WakeError('wakeEffectBindingConflict')
+        return prior.value as T
+      }
+      if (Object.keys(receipts).length >= 128) throw new WakeError('wakeEffectLimit')
+      const value = await work(tx)
+      await tx.query('UPDATE coordinator_events SET wake_tool_receipts=$2 WHERE id=$1', [
+        event.id,
+        { ...receipts, [execution.operationKey]: { binding: execution.binding, value } },
+      ])
+      return value
     })
   }
   async beginGeneration(owner: string, holder: string, delivery: WakeDelivery) {
@@ -454,6 +533,7 @@ export class CoordinatorInbox {
         session.leaseUntil <= this.clock()
       )
         throw new WakeError('wakeLeaseLost')
+      if (!foreground(event)) throw new WakeError('wakeNotForeground')
       if ((await this.authorize(tx, event, 'commit')) === 'notify_only') throw new WakeError('wakeRunStopped')
       if (event.wake_checkpoint) return { generate: false }
       if (event.wake_generation_state !== 'not_started') throw new WakeError('wakeGenerationUncertain')

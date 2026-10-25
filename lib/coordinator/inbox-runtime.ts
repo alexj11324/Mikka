@@ -18,6 +18,7 @@ import {
   type WakeScopeGuard,
 } from './inbox-receipts'
 import { controlledWakeConfiguration } from './wake-controlled'
+import { WORKSPACE_ID } from '@/lib/device-link'
 
 const workspaceScope = new AsyncLocalStorage<WorkspaceTransaction>()
 const authorize: WakeAuthorization = async (tx, event) => {
@@ -59,7 +60,12 @@ const authorize: WakeAuthorization = async (tx, event) => {
     ).rows[0]
     if (!run || run.userId !== event.userId || run.ownerId !== event.userId)
       throw new WakeError('wakeRunAccessDenied', 403)
-    if (run.workspaceId && event.wake_workspace_id && run.workspaceId !== event.wake_workspace_id)
+    if (
+      run.workspaceId &&
+      run.workspaceId !== WORKSPACE_ID &&
+      event.wake_workspace_id &&
+      run.workspaceId !== event.wake_workspace_id
+    )
       throw new WakeError('wakeWorkspaceMismatch', 403)
     if (run.stopRequestedAt || ['cancelled', 'stopped'].includes(run.status)) return 'notify_only'
   }

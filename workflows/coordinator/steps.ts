@@ -1,5 +1,7 @@
 import { coordinatorInbox } from '@/lib/coordinator/inbox-runtime'
-import type { WakeDelivery } from '@/lib/coordinator/inbox-receipts'
+import {WakeError,type WakeDelivery,type WakeExecution} from '@/lib/coordinator/inbox-receipts'
+import {getStepMetadata} from 'workflow'
+import {intentDigest} from '@/lib/operations/action-intents'
 import { executeScheduleCommand } from '@/lib/schedules/runtime'
 import { ScheduleError, SCHEDULE_INSTRUCTIONS, type Command } from '@/lib/schedules/contract'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -107,20 +109,22 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
 // automatic step retry, records an uncertain outcome for reconciliation.
 preparePrompt.maxRetries=0
 
-export async function remember(userId: string, input: { note: string }) {
+export async function remember(userId: string, input: { note: string },execution?:WakeExecution) {
   'use step'
+  if(!execution)throw new WakeError('wakeReceiptRequired')
   return store.editMemory(userId, memory => {
     const next = rememberNote(memory, input.note)
     return next === null ? { error: 'memoryFull: forget something first' } : { memory: next, result: { remembered: true } }
-  })
+  },execution)
 }
 
-export async function forget(userId: string, input: { text: string }) {
+export async function forget(userId: string, input: { text: string },execution?:WakeExecution) {
   'use step'
+  if(!execution)throw new WakeError('wakeReceiptRequired')
   return store.editMemory(userId, memory => {
     const { memory: next, removed } = forgetNotes(memory, input.text)
     return { memory: next, result: { removed } }
-  })
+  },execution)
 }
 
 export async function composioAction(userId: string, action: ComposioActionName, input: unknown) {
@@ -383,17 +387,20 @@ export async function recoverAccountActions(userId: string, context: ActionConte
   return recoverCalendarBatch(userId, context)
 }
 
-export async function mailboxAction(userId: string, action: 'recipients' | 'inbox' | 'sent' | 'send' | 'ack', input: { to?: string; key?: string; text?: string; replyTo?: string; ids?: string[] } = {}) {
+export async function mailboxAction(userId: string, action: 'recipients' | 'inbox' | 'sent' | 'send' | 'ack', input: { to?: string; key?: string; text?: string; replyTo?: string; ids?: string[] } = {},execution?:WakeExecution) {
   'use step'
+  if(!execution)throw new WakeError('wakeReceiptRequired')
   try {
-    const actor = await mailboxes.conversation(userId, 'coordinator')
+    return await coordinatorInbox().effect(userId,execution,async tx=>{
+    const actor = await mailboxes.conversation(userId, 'coordinator','coordinator',tx)
     switch (action) {
-      case 'recipients': return await mailboxes.recipients(actor)
-      case 'inbox': return await mailboxes.inbox(actor)
-      case 'sent': return await mailboxes.sent(actor)
-      case 'send': return await mailboxes.send(actor, input as { to: string; key: string; text: string; replyTo?: string })
-      case 'ack': return await mailboxes.ack(actor, input.ids ?? [])
+      case 'recipients': return await mailboxes.recipients(actor,tx)
+      case 'inbox': return await mailboxes.inbox(actor,tx)
+      case 'sent': return await mailboxes.sent(actor,tx)
+      case 'send': return await mailboxes.send(actor, input as { to: string; key: string; text: string; replyTo?: string },tx)
+      case 'ack': return await mailboxes.ack(actor, input.ids ?? [],tx)
     }
+    })
   } catch (error) { if (error instanceof MailboxError) return { error: error.message }; throw error }
 }
 
@@ -432,3 +439,21 @@ export async function wakeCheckpoint(userId: string,delivery: WakeDelivery) {
   'use step'
   return coordinatorInbox().cached(userId,delivery)
 }
+
+const wakeToolHandlers = { answerFactoryContext, answerFactoryQuestionFromUser, composioAction, credentialTool, dispatchBaselineRehearsal, dispatchRun, escalateFactoryQuestion, forget, getFactoryQuestion, getFactoryTask, getIssue, getRun, getSkillImprovementFactory, handoffSkillImprovement, listAgents, listFactoryQuestions, listFactoryRequests, listIssues, listRuns, mailboxAction, proposeAccountAction, proposeSkillImprovement, readRunImprovements, recordRunFeedback, remember, resolveFactoryTask, routeFactoryTask, scheduleCommand, selectBaselineSkill, sendToRun, stopFactoryTask, stopRun }
+/** One actual SDK step owns fresh fencing and the domain call. This must not
+ * be split into a cached assert step followed by an unfenced mutation step. */
+export async function executeWakeTool(userId:string,holder:string,delivery:WakeDelivery,name:string,args:unknown[]){
+  'use step'
+  if(!Object.hasOwn(wakeToolHandlers,name)||!Array.isArray(args))throw new WakeError('wakeToolUnavailable')
+  await coordinatorInbox().assertCurrent(userId,holder,delivery)
+  if(name==='remember'||name==='forget'||name==='mailboxAction'){
+    const execution:WakeExecution={holder,delivery,operationKey:getStepMetadata().stepId,binding:intentDigest([name,args])}
+    if(name==='remember')return remember(userId,args[0] as {note:string},execution)
+    if(name==='forget')return forget(userId,args[0] as {text:string},execution)
+    return mailboxAction(userId,args[0] as Parameters<typeof mailboxAction>[1],(args[1]??{}) as Parameters<typeof mailboxAction>[2],execution)
+  }
+  const handler=wakeToolHandlers[name as keyof typeof wakeToolHandlers] as unknown as (...args:unknown[])=>Promise<unknown>
+  return handler(userId,...args)
+}
+executeWakeTool.maxRetries=0

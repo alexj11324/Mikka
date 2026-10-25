@@ -63,7 +63,8 @@
     "test:schedules:postgres": "node --import tsx --test lib/schedules/postgres.test.ts lib/schedules/wake-postgres.test.ts",
     "test:schedules:recovery": "node --import tsx --test lib/schedules/recovery-postgres.test.ts",
     "test:wake:postgres": "node --conditions=react-server --import tsx --test lib/coordinator/inbox-postgres.test.ts lib/coordinator/schedules-postgres.test.ts",
-    "test:wake": "node --conditions=react-server --import tsx --test lib/coordinator/wake-contract.test.ts"
+    "test:wake": "node --conditions=react-server --import tsx --test lib/coordinator/wake-contract.test.ts",
+    "test:wake:review": "node --conditions=react-server --import tsx --test lib/coordinator/review-postgres.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

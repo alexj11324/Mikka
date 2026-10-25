@@ -255,14 +255,30 @@ try {
     agent = randomUUID(),
     workspace = '00000000-0000-4000-8000-000000000001',
     deviceToken = randomUUID()
+  const hash = createHash('sha256').update(`orvilo-default:${actor.owner}`).digest('hex')
+  const actualWorkspace = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
+  await pool.query('INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,\'actual default workspace\')', [
+    actualWorkspace,
+    actor.owner,
+  ])
   await pool.query(
-    'INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,\'isolated completion\') ON CONFLICT DO NOTHING',
-    [workspace, actor.owner],
+    'INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,$2,$3,\'admin\')',
+    [actualWorkspace, actor.owner, `${actor.owner}@example.invalid`],
   )
-  await pool.query(
-    'INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,$2,$3,\'admin\') ON CONFLICT DO NOTHING',
-    [workspace, actor.owner, `${actor.owner}@example.invalid`],
+  assert.equal(
+    (
+      await pool.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [
+        workspace,
+        actor.owner,
+      ])
+    ).rowCount,
+    0,
   )
+  log({
+    phase: 'real default workspace present; protocol sentinel has no fabricated membership',
+    actualWorkspace,
+    protocolPartition: workspace,
+  })
   await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash") VALUES($1,$2,$3)', [
     randomUUID(),
     actor.owner,
@@ -333,7 +349,7 @@ try {
       await until(report.id, 'completed')
       await assertResult(report.id)
       for (const e of events) {
-        assert.equal((await row(e.id)).wake_workspace_id, workspace)
+        assert.equal((await row(e.id)).wake_workspace_id, null)
         assert.equal((await row(e.id)).wake_status, 'completed')
       }
       assert.equal(
