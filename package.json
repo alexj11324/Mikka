@@ -34,6 +34,7 @@
     "test:settings": "node --experimental-strip-types --test tests/settings-navigation.test.mjs tests/team-identifier.test.mjs",
     "test:auth-return": "node --import tsx --test lib/auth-return.test.ts",
     "test:agent": "node --import tsx --test tests/agent-fetch.test.mjs tests/agent-ui.test.mjs tests/agent-history.test.mjs tests/agent-web-tools.test.mjs",
+    "test:relation-cycle": "NODE_ENV=test node --import ./tests/support/server-only.mjs --import tsx --test lib/issue-relation-cycle.db.test.ts",
     "test:acceptance": "node --import tsx --test tests/acceptance.test.mjs",
     "test:auth-composio": "node --import tsx --test lib/auth-error.test.ts lib/auth-config.test.ts lib/db/config.test.ts lib/auth-return.test.ts lib/auth-recovery.test.ts lib/composio-config.test.ts lib/composio-webhook.test.ts lib/google-link.test.ts",
     "check": "pnpm check:agent-ui && pnpm test:preview && pnpm test:agent && pnpm test:acceptance && pnpm test:auth-composio && pnpm test:ui-policy && pnpm test:motion && pnpm test:i18n && pnpm i18n:check && pnpm test:ssh-target && pnpm test:linear-sync && pnpm test:coordinator-events && pnpm test:groups && pnpm test:integrations && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm test:issues && pnpm test:telegram && pnpm test:suggestions && pnpm lint && pnpm typecheck",
