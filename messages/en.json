@@ -833,7 +833,8 @@
       "addedSubtask": "Added subtask {title}",
       "addedLabel": "Added label {name}",
       "removedLabel": "Removed label {name}",
-      "unknownAssignee": "someone"
+      "unknownAssignee": "someone",
+      "separator": ", "
     },
     "detail": {
       "readFailed": "Could not load this task. Please try again.",

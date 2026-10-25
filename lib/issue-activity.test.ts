@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { JSONContent } from '@tiptap/core'
-import { deriveIssueActivity } from './issue-activity'
+import { deriveIssueActivity, groupActivityByMinute } from './issue-activity'
 
 function content(assignee: { id: string; name: string } | null): JSONContent {
   return {
@@ -61,4 +61,14 @@ test('records clearing an assignee and ignores subtasks created before the paren
     { id: 'old', title: 'Older', createdAt: '2026-10-22T09:00:00.000Z' },
   ])
   assert.deepEqual(events.map(event => event.kind), ['created', 'unassigned'])
+})
+
+test('joins events in the same minute into one row', () => {
+  const groups = groupActivityByMinute([
+    { id: 'a', at: '2026-10-22T10:00:05.000Z', kind: 'created' },
+    { id: 'b', at: '2026-10-22T10:00:40.000Z', kind: 'assigned', assigneeName: 'Ada' },
+    { id: 'c', at: '2026-10-22T10:01:02.000Z', kind: 'status', status: 'doing' },
+    { id: 'd', at: '2026-10-22T11:01:02.000Z', kind: 'priority', priority: 'high' },
+  ])
+  assert.deepEqual(groups.map(group => group.map(event => event.id)), [['a', 'b'], ['c'], ['d']])
 })

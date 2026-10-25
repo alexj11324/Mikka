@@ -833,7 +833,8 @@
       "addedSubtask": "添加了子任务 {title}",
       "addedLabel": "添加了标签 {name}",
       "removedLabel": "移除了标签 {name}",
-      "unknownAssignee": "某人"
+      "unknownAssignee": "某人",
+      "separator": "，"
     },
     "detail": {
       "readFailed": "任务读取失败，请重试。",

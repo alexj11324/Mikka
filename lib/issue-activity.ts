@@ -77,3 +77,18 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
   const rest = events.filter(event => event.kind !== 'created').sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id)).slice(0, limit)
   return [...(createdEvent ? [createdEvent] : []), ...rest].sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
 }
+
+/**
+ * R-63: events in the same minute read as one row (「创建了任务，指派给 Ada」).
+ * Versions carry no actor yet, so every event is the issue owner's and the
+ * minute alone decides; events must already be in time order.
+ */
+export function groupActivityByMinute(events: IssueActivityEvent[]): IssueActivityEvent[][] {
+  const groups: IssueActivityEvent[][] = []
+  for (const event of events) {
+    const last = groups.at(-1)
+    if (last && last[0].at.slice(0, 16) === event.at.slice(0, 16)) last.push(event)
+    else groups.push([event])
+  }
+  return groups
+}
