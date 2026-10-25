@@ -1,5 +1,6 @@
 // Real compiled Next HTTP acceptance on disposable cloud Linux databases only.
 import assert from 'node:assert/strict'
+import { oauthMcpAcceptance } from './oauth-mcp-acceptance.mjs'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -67,6 +68,7 @@ try {
     const result=await c.call('/api/auth/sign-up/email','POST',{name:'Synthetic policy acceptance',email:`policy-${randomUUID()}@example.invalid`,password:randomBytes(32).toString('base64url')})
     assert.equal(result.status,200);return result.body.user.id
   }
+  const oauthMcp = await oauthMcpAcceptance({app,workspace,origin,client,signup,receipts,route})
   const userId=await signup(owner), memberId=await signup(member)
   await workspace.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,'Synthetic policy acceptance'),($3,$2,'Synthetic second workspace')`,[w,userId,other])
   await workspace.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,'Synthetic','policy@example.invalid','admin'),($3,$2,'Synthetic','policy@example.invalid','admin'),($1,$4,'Synthetic','member@example.invalid','member')`,[w,userId,other,memberId])
@@ -159,7 +161,7 @@ try {
   }
   const versions=(await workspace.query('SELECT workspace_id,version,actor_id,rollback_of,published_at FROM organization_policy_versions WHERE workspace_id=ANY($1::uuid[]) ORDER BY workspace_id,version',[[w,other]])).rows
   const events=(await workspace.query(`SELECT tenant,seq,event,hash FROM security_audit_events WHERE tenant=ANY($1::text[]) AND event->>'action' LIKE 'policy.%' ORDER BY tenant,seq`,[[w,other]])).rows
-  await writeFile(`${evidence}/acceptance.json`,JSON.stringify({sha,results:"passed",utc:new Date().toISOString(),environment:'dedicated cloud Linux; compiled Next; separate loopback PG17 databases; synthetic sessions; no external provider keys',requests:receipts,versions,events,limitations:['not deployed Preview or production acceptance','no real OAuth/provider/CLI allowed path','#215 reservation and verified managed worker transport remain unavailable']},null,2))
+  await writeFile(`${evidence}/acceptance.json`,JSON.stringify({sha,results:"passed",utc:new Date().toISOString(),environment:'dedicated cloud Linux; compiled Next; separate loopback PG17 databases; synthetic sessions; no external provider keys',requests:receipts,oauthMcp,versions,events,limitations:['not deployed Preview or production acceptance','no real OAuth/provider/CLI allowed path','#215 reservation and verified managed worker transport remain unavailable']},null,2))
   console.log(JSON.stringify({sha,requests:receipts.length,results:'passed',video:process.env.POLICY_RECORD_VIDEO==='1',evidence}))
 } catch (error) {
   await writeFile(`${evidence}/failed-attempt.json`,JSON.stringify({sha,utc:new Date().toISOString(),error:error instanceof Error?error.message:"acceptanceFailed",requests:receipts},null,2));

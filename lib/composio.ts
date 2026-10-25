@@ -1,4 +1,5 @@
 import 'server-only'
+import { withPolicyTool } from '@/lib/policy/runtime'
 import { Composio } from '@composio/core'
 import { executeComposioAction, type ComposioActionName, type ComposioActionResult } from '@/lib/composio-actions'
 
@@ -11,7 +12,7 @@ export function getComposio() {
 }
 
 export function runComposioAction(userId: string, action: ComposioActionName, input: unknown): Promise<ComposioActionResult> {
-  return executeComposioAction(userId, action, input, getComposio())
+  return withPolicyTool(userId, () => executeComposioAction(userId, action, input, getComposio()))
 }
 
 export function isComposioToolkit(value: string): value is ComposioToolkit {

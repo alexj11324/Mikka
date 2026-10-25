@@ -1,6 +1,7 @@
 import { authorizeModel, authorizePolicyTool } from '@/lib/policy/runtime'
 import { coordinatorRoute } from '@/lib/policy/model'
-import { generateText, type ModelMessage, type ToolExecutionOptions } from 'ai'
+import { type ModelMessage, type ToolExecutionOptions } from 'ai'
+import { generatePolicyText } from '@/lib/policy/generate-text'
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, readRun, requestRunStop, runViewColumns } from '@/lib/agent-runs'
@@ -87,8 +88,7 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
   const cut = compactionCut(summary, messages)
   if (cut !== null) {
     const folded = messages.filter(row => row.position <= cut)
-    await authorizeModel(userId, coordinatorRoute(COORDINATOR_MODEL))
-    const { text } = await generateText({
+    const { text } = await generatePolicyText(() => authorizeModel(userId, coordinatorRoute(COORDINATOR_MODEL)), {
       model: COORDINATOR_MODEL,
       instructions: SUMMARY_INSTRUCTIONS,
       messages: [...promptMessages(summary, folded), { role: 'user', content: 'Write the summary now.' }],

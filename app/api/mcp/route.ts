@@ -3,7 +3,7 @@ import { pool as auditPool } from '@/lib/db'
 import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import { z } from 'zod'
 import { withBasePath } from '@/lib/base-path'
-import { mcpUserId, verifyMcpToken } from '@/lib/mcp/auth'
+import { mcpUserId, verifyMcpToken, withMcpTool } from '@/lib/mcp/auth'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { MCP_SCOPE } from '@/lib/mcp/resource'
 import { COMPOSIO_ACTIONS } from '@/lib/composio-actions'
@@ -46,6 +46,12 @@ const id = z.uuid()
  * writes go through the same server actions as the UI (lib/mcp/actions.ts).
  */
 const handler = createMcpHandler(server => {
+  const register = server.registerTool.bind(server)
+  server.registerTool = ((...args: Parameters<typeof server.registerTool>) => {
+    const [name, config, callback] = args
+    return register(name, config, async (input, ctx) => withMcpTool(ctx.http?.authInfo, name, async () => callback(input, ctx)))
+  }) as typeof server.registerTool
+
   for (const [name, definition] of Object.entries(credentialToolDefinitions)) {
     server.registerTool(name, { description: definition.description, inputSchema: definition.inputSchema }, async (input: unknown, ctx: { http?: { authInfo?: AuthInfo } }) =>
       outcome(await executeSystemCredentialTool({ userId: mcpUserId(ctx.http?.authInfo) }, name as CredentialToolName, input)))

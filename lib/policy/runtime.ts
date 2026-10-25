@@ -1,4 +1,5 @@
 import "server-only";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { workspacePool } from "@/lib/workspace-db";
@@ -92,5 +93,20 @@ export async function workerPolicyInTransaction(
     runId,
     issueId,
     workspaceId,
+  );
+}
+
+const toolAdmission = new AsyncLocalStorage<string>();
+/** Nested integration calls reuse the outer admission and its held locks. */
+export async function withPolicyTool<T>(
+  userId: string,
+  work: () => Promise<T>,
+  capturedWorkspaces: string[] = [],
+): Promise<T> {
+  if (toolAdmission.getStore() === userId) return work();
+  return policyStore().withTool(
+    userId,
+    () => toolAdmission.run(userId, work),
+    capturedWorkspaces,
   );
 }

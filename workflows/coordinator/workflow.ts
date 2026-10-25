@@ -38,7 +38,7 @@ export async function coordinatorTurn(userId: string) {
     }
     try {
       const recovered = inbox.actionContext ? await steps.recoverAccountActions(userId, inbox.actionContext) : []
-      const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, tools: coordinatorTools(userId, inbox.actionContext) })
+      const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, maxRetries: 0, tools: coordinatorTools(userId, inbox.actionContext) })
       const { instructions, messages } = await steps.preparePrompt(userId)
       messages.push(...recovered)
       const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: async info => { await steps.authorizeCoordinator(userId, round, info.stepNumber); return coordinatorStep(info) }, })

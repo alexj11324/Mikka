@@ -395,6 +395,94 @@ test(
         },
       );
       await t.test(
+        "tool admission fences publication and denies without invoking side effects",
+        async () => {
+          const id = randomUUID(),
+            actor = `tool_${randomUUID()}`;
+          await pool.query(
+            `INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,'Synthetic tool fence')`,
+            [id, actor],
+          );
+          await pool.query(
+            `INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,'Synthetic','tool@example.invalid','admin')`,
+            [id, actor],
+          );
+          let entered!: () => void,
+            finish!: () => void,
+            sends = 0;
+          const admitted = new Promise<void>((resolve) => {
+            entered = resolve;
+          });
+          const released = new Promise<void>((resolve) => {
+            finish = resolve;
+          });
+          const running = store.withTool(actor, async () => {
+            entered();
+            await released;
+            sends++;
+            return "ok";
+          }, [id]);
+          await admitted;
+          let published = false;
+          const publication = store
+            .publish(id, actor, 0, document(id))
+            .then((value) => {
+              published = true;
+              return value;
+            });
+          // Observe the blocked exclusive policy lock in PG, not a timer guess.
+          try {
+            const deadline = Date.now() + 3000;
+            while (
+              !(
+                await pool.query(
+                  `SELECT 1 FROM pg_locks WHERE locktype='advisory' AND NOT granted`,
+                )
+              ).rowCount
+            ) {
+              assert.ok(
+                Date.now() < deadline,
+                "publication must wait for admitted tool",
+              );
+              await new Promise((resolve) => setTimeout(resolve, 10));
+            }
+            assert.equal(published, false);
+          } finally {
+            finish();
+          }
+          assert.equal(await running, "ok");
+          await publication;
+          await assert.rejects(
+            store.withTool(actor, async () => {
+              sends++;
+            }, [id]),
+            /toolEnforcementUnavailable/,
+          );
+          assert.equal(sends, 1);
+          await store.publish(id, actor, 1, {
+            ...document(id),
+            state: "revoked",
+          });
+          await assert.rejects(
+            store.withTool(actor, async () => {
+              sends++;
+            }, [id]),
+            /policyRevoked/,
+          );
+          await pool.query(
+            `UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`,
+            [id, actor],
+          );
+          await assert.rejects(
+            store.withTool(actor, async () => {
+              sends++;
+            }, [id]),
+            /policyAccessDenied/,
+          );
+          assert.equal(sends, 1);
+        },
+      );
+      await t.test(
         "database unavailable returns 503 with no implicit unmanaged fallback",
         async () => {
           const unavailable = new Pool({

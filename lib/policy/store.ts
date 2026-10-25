@@ -303,6 +303,30 @@ export class PolicyStore {
   ) {
     return this.denyExecution(userId, runId, issueId, workspaceId);
   }
+  /** Keep admission locks through the side effect. Publication waits for admitted
+   * calls; a call waiting behind publication sees the new version. */
+  async withTool<T>(
+    userId: string,
+    work: () => Promise<T>,
+    capturedWorkspaces: string[] = [],
+  ): Promise<T> {
+    const result = await transaction(this.pool, async (tx) => {
+      for (const id of [...new Set(capturedWorkspaces)].sort())
+        await this.member(tx, id, userId);
+      const denied = await this.workerDenial(
+        tx,
+        userId,
+        "unscoped-tool",
+        undefined,
+        undefined,
+        true,
+      );
+      if (denied) return { denied };
+      return { value: await work() };
+    });
+    if (result.denied) throw result.denied;
+    return result.value as T;
+  }
   async denyTool(userId: string, workspaceId?: string) {
     return this.denyExecution(
       userId,
