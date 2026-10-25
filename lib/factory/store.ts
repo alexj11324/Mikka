@@ -57,6 +57,17 @@ export interface FactorySnapshot {
   attempts: FactoryAttempt[];
   candidates: FactoryCandidate[];
 }
+export type FactoryTaskSummary = Pick<
+  FactoryTask,
+  | "id"
+  | "issueId"
+  | "stage"
+  | "status"
+  | "revision"
+  | "attemptId"
+  | "candidateId"
+  | "reason"
+>;
 export type FactoryAuthorize = (
   userId: string,
   issueId: string,
@@ -256,6 +267,18 @@ export function createFactoryStore(
       return transaction(async (tx) =>
         snapshot(tx, await owned(tx, userId, taskId)),
       );
+    },
+    /** Rediscover persisted bindings from an issue after history compaction/restart. */
+    async listForIssue(userId: string, issueId: string) {
+      uuid(issueId);
+      return transaction(async (tx) => {
+        if (!(await authorize(userId, issueId, tx))) fail("factoryNotFound");
+        const { rows: tasks } = await tx.query<FactoryTaskSummary>(
+          'SELECT id,"issueId",stage,status,revision,"attemptId","candidateId",reason FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2 ORDER BY "updatedAt" DESC,id DESC LIMIT 50',
+          [userId, issueId],
+        );
+        return { contractVersion: 1 as const, issueId, tasks };
+      });
     },
     /** Hold the task fence before #191 takes its dispatch-key then issue locks. */
     async lockForDispatch(
