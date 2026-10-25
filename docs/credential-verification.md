@@ -74,3 +74,12 @@ do not disable SWC ownership checks or expand sandbox privileges to make tests p
 The API contract is in [credential-backend.md](credential-backend.md). Public delivery
 contains source, synthetic tests and technical summaries only. No issue should be closed
 on the strength of local tests or a draft PR.
+
+## Updated completion gate
+
+Production deployment and a real production user workflow, with a sanitized acceptance
+video attached to PR #223, are now required. Parent coordinates a single integrated
+version and release; passing CI is not release authorization or completion. See
+[production acceptance checklist](credential-production-acceptance.md) for the real
+preproduction/production matrix, explicit lifecycle-deletion gate, executable GET probes
+and safe recording steps. No new remote environment or account has been exercised.
