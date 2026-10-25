@@ -1,7 +1,8 @@
 // Applies pending drizzle/*.sql files in order and records each one, so a
 // file runs once per database. Runs as part of `pnpm build`, but only for
 // Vercel production builds unless MIGRATE=1 is set; preview and local builds
-// skip it.
+// skip it. Explicit MIGRATE=0 also skips production migration; deployment
+// alone must not override an operator-managed migration plan.
 //
 // A file targets MIKKA_DATABASE_URL unless its first lines contain
 // `-- target: DATABASE_URL` (the workspace database).
@@ -10,9 +11,9 @@ import { Pool } from 'pg'
 import { orderMigrations } from './migration-order.mjs'
 import { configureMigrationSession } from './migration-session.mjs'
 
-const shouldRun = process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production'
+const shouldRun = process.env.MIGRATE !== '0' && (process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production')
 if (!shouldRun) {
-  console.log('migrate: skipped (not a Vercel production build; set MIGRATE=1 to force)')
+  console.log('migrate: skipped (explicit MIGRATE=0 or non-production; set MIGRATE=1 to apply)')
   process.exit(0)
 }
 
