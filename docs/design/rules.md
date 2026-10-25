@@ -113,6 +113,15 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   in; it may dispatch a thread. You never @ a thread: open the thread and
   talk there.
 
+- **R-65** Every page that is not a conversation (board, issue, project…)
+  has the same AI sidebar button at the top right (⌘J; tooltip 「AI 助手」,
+  never "Coordinator", R-07). It opens a conversation with the Coordinator
+  by default; its name in the sidebar header switches to another bot, and
+  the choice is remembered. The page's subject (the open issue) comes along
+  as a removable context chip above the composer. On the issue page it takes
+  the right column, as an open thread does; closing it brings the properties
+  back. The home page is already that conversation and has no button.
+  Figma: page 「AI 侧栏 · 全局」.
 ## Look
 
 - **R-30** Greys are pure neutral: `rgba(0,0,0,a)` and `#737373 / #A3A3A3 /
