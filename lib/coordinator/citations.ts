@@ -16,6 +16,8 @@ export interface IssueSource {
   kind: 'issue'
   id: string
   number: number | null
+  /** `MIK-12` or `ALEX-12`, from `taskIdentifier`. */
+  identifier: string | null
   title: string
   status: string
   priority: string
@@ -27,7 +29,7 @@ export interface RunSource {
   agentName: string
   harness: string
   status: string
-  issue: { id: string; number: number | null; title: string } | null
+  issue: { id: string; number: number | null; identifier: string | null; title: string } | null
   createdAt: string
   finishedAt: string | null
 }
@@ -71,4 +73,38 @@ export function citedIds(texts: readonly string[]): { issueIds: string[]; runIds
     }
   }
   return { issueIds: [...issueIds], runIds: [...runIds] }
+}
+
+/** Where a citation link points, as `#cite/<kind|any>/<id>`; relative, so Markdown keeps it. */
+export const CITATION_HREF = '#cite/'
+
+type MdastNode = { type: string; value?: string; url?: string; children?: MdastNode[] }
+
+/**
+ * Remark plugin: turns [[issue:<id>]], [[run:<id>]] and bare ids in text into
+ * links the citation anchor renders as chips, and keeps single line breaks,
+ * since replies are written as plain text. Code is left alone.
+ */
+export function remarkCitations() {
+  // GFM ends a bare URL only at ASCII space or punctuation, so a URL glued to Chinese text swallows it; cut it as splitCitations does.
+  const autolink = (link: MdastNode): MdastNode[] => {
+    const [first, ...rest] = splitCitations(link.url ?? '')
+    if (first?.type !== 'link' || !rest.length) return [link]
+    return [{ type: 'link', url: first.url, children: [{ type: 'text', value: first.url }] }, { type: 'text', value: rest.map(part => part.type === 'text' ? part.text : part.raw).join('') }]
+  }
+  return (tree: MdastNode) => {
+    const walk = (node: MdastNode) => {
+      if (!node.children || node.type === 'link' || node.type === 'linkReference') return
+      node.children = node.children.flatMap(child => {
+        if (child.type === 'link' && child.children?.length === 1 && child.children[0].value === child.url) return autolink(child)
+        if (child.type !== 'text' || !child.value) { walk(child); return [child] }
+        return splitCitations(child.value).flatMap<MdastNode>(part => {
+          if (part.type === 'citation') return [{ type: 'link', url: `${CITATION_HREF}${part.kind ?? 'any'}/${part.id}`, children: [{ type: 'text', value: part.raw }] }]
+          if (part.type === 'link') return [{ type: 'link', url: part.url, children: [{ type: 'text', value: part.label ?? part.url }] }]
+          return part.text.split('\n').flatMap((line, index) => [...(index ? [{ type: 'break' }] : []), ...(line ? [{ type: 'text', value: line }] : [])])
+        })
+      })
+    }
+    walk(tree)
+  }
 }

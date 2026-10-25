@@ -12,6 +12,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
 import { migrationGate } from './migrate-gate.mjs'
 import { applyMigration, planMigration } from './migration-steps.mjs'
+import { orderMigrations } from './migration-order.mjs'
 
 const gate = migrationGate(process.env)
 for (const warning of gate.warnings) console.warn(`migrate: warning: ${warning}`)
@@ -33,7 +34,7 @@ const dir = new URL('../drizzle/', import.meta.url)
 const sqlFiles = readdirSync(dir).filter((name) => name.endsWith('.sql'))
 const unknown = sqlFiles.filter((name) => !/^(\d{4}|\d{14})_.+\.sql$/.test(name))
 if (unknown.length) throw new Error(`migrate: 无法识别的迁移文件名：${unknown.join(', ')}`)
-const files = sqlFiles.sort()
+const files = orderMigrations(sqlFiles)
 
 const byTarget = new Map()
 for (const name of files) {

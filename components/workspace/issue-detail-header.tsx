@@ -12,8 +12,8 @@ import { issueIdentifier } from './issue-properties'
 
 export type IssueDetailNavigation = { index: number; total: number; onOpen: (offset: -1 | 1) => void }
 
-export function IssueDetailHeader({ workspaceName, number, title, saveLabel, saved, pending, navigation, actions, onClose }: {
-  workspaceName: string; number: number | undefined; title: string; saveLabel: string; saved: boolean; pending: boolean
+export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel, saved, pending, navigation, actions, onClose }: {
+  workspaceName: string; identifier: string | null; title: string; saveLabel: string; saved: boolean; pending: boolean
   navigation: IssueDetailNavigation; actions: ReactNode
   onClose: () => void
 }) {
@@ -29,7 +29,7 @@ export function IssueDetailHeader({ workspaceName, number, title, saveLabel, sav
         <BreadcrumbSeparator className="hidden md:block" />
         <BreadcrumbItem className="hidden shrink-0 sm:inline-flex"><Button variant="ghost" size="xs" disabled={pending} onClick={onClose}>{tDetail('breadcrumbTask')}</Button></BreadcrumbItem>
         <BreadcrumbSeparator className="hidden sm:block" />
-        <BreadcrumbItem className="min-w-0"><BreadcrumbPage className="flex min-w-0 items-center gap-2"><span className="shrink-0">{issueIdentifier(number)}</span><span className="hidden truncate text-muted-foreground lg:inline" title={title}>{title}</span></BreadcrumbPage></BreadcrumbItem>
+        <BreadcrumbItem className="min-w-0"><BreadcrumbPage className="flex min-w-0 items-center gap-2"><span className="shrink-0">{issueIdentifier({ identifier })}</span><span className="hidden truncate text-muted-foreground lg:inline" title={title}>{title}</span></BreadcrumbPage></BreadcrumbItem>
       </BreadcrumbList></Breadcrumb>
     </div>
     <div className="flex shrink-0 items-center gap-1">
