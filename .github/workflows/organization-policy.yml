@@ -10,7 +10,7 @@ jobs:
   policy:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17
@@ -26,6 +26,11 @@ jobs:
       DATABASE_URL: postgresql://postgres@127.0.0.1:5432/policy_workspace_e2e
       POLICY_WORKSPACE_TEST_URL: postgresql://postgres@127.0.0.1:5432/policy_workspace_e2e
       REQUIRE_POLICY_DB: '1'
+      BETTER_AUTH_URL: http://127.0.0.1:3130
+      NEXT_TELEMETRY_DISABLED: '1'
+      POLICY_HTTP_ORIGIN: http://127.0.0.1:3130
+      POLICY_EVIDENCE_DIR: policy-http-evidence
+      POLICY_EXTERNAL_SERVER: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -46,10 +51,21 @@ jobs:
       - run: pnpm --filter @mikka/protocol typecheck
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/protocol test
+      - name: Install pinned hosted-runner test image
+        run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
       - run: pnpm --filter @mikka/daemon test
+      - name: Generate isolated auth secret
+        run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+      - run: pnpm exec next build --webpack
+      - name: Compiled Next policy API regression
+        run: |
+          pnpm exec next start --hostname 127.0.0.1 --port 3130 > policy-next.log 2>&1 &
+          node scripts/policy/http-acceptance.mjs | tee policy-http.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: policy-postgres-evidence
-          path: policy-*.log
+          path: |
+            policy-*.log
+            policy-http-evidence/
           retention-days: 14
