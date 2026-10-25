@@ -89,6 +89,7 @@ jobs:
       - run: pnpm test:linear-sync
       - run: pnpm test:coordinator-events
       - run: pnpm test:auth-composio
+      - run: pnpm test:groups
       - run: pnpm test:integrations
       - run: pnpm test:csv
       - run: pnpm test:settings
@@ -163,6 +164,12 @@ jobs:
           echo "::add-mask::$secret"
           echo "BETTER_AUTH_SECRET=$secret" >> "$GITHUB_ENV"
       - run: pnpm exec playwright install --with-deps chromium
+      - name: Bootstrap empty database using tracked migrations only
+        run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
+        env:
+          MIGRATION_BOOTSTRAP_CI: '1'
+      - name: Group conversation API and migrations (temporary Postgres 17 only)
+        run: pnpm test:groups
       - run: pnpm test:e2e:setup
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs

@@ -45,9 +45,9 @@ export async function failTurn(userId: string, holder: string, error: string) {
   await store.failTurn(userId, holder, error)
 }
 
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[]) {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null) {
   'use step'
-  await store.appendMessages(userId, holder, messages)
+  await store.appendMessages(userId, holder, messages, warning)
 }
 
 /**

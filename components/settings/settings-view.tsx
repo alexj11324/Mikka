@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { WorkspaceSettings } from '@/components/settings/workspace-settings'
 import { MembersPanel } from '@/components/settings/members-panel'
 import { LinearSettings } from '@/components/settings/linear-settings'
+import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings'
 import { IntegrationsSettings } from '@/components/settings/integrations-settings'
 import { TelegramSettings } from '@/components/settings/telegram-settings'
 import { SettingRow, SettingsSection as SettingsSectionComponent } from '@/components/settings/primitives'
@@ -36,7 +37,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onBack, onS
         <div className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">{title}</h1><p className="text-sm text-muted-foreground">{description}</p></div>
         {section === 'preferences' && <SettingsSectionComponent id="appearance-heading" title={t('appearance.title')}><SettingRow title={t('appearance.theme')} description={t('appearance.themeDescription')}><ToggleGroup aria-label={t('appearance.themeLabel')} variant="outline" spacing={0} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}><ToggleGroupItem value="light" aria-label={t('appearance.light')}><Sun />{t('appearance.light')}</ToggleGroupItem><ToggleGroupItem value="dark" aria-label={t('appearance.dark')}><Moon />{t('appearance.dark')}</ToggleGroupItem><ToggleGroupItem value="system" aria-label={t('appearance.systemLabel')}><Monitor />{t('appearance.system')}</ToggleGroupItem></ToggleGroup></SettingRow><SettingRow title={t('appearance.language')} description={t('appearance.languageDescription')}><span className="text-muted-foreground">{t('appearance.languageName')}</span></SettingRow></SettingsSectionComponent>}
         {section === 'profile' && <div className="flex flex-col gap-3"><SettingsSectionComponent id="profile-heading" title={t('profile.heading')}><SettingRow title={t('profile.avatar')} description={t('profile.avatarDescription')}><Avatar className="size-10"><AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></SettingRow><SettingRow title={t('profile.name')}><span>{user.name || t('profile.notSet')}</span></SettingRow><SettingRow title={t('profile.email')}><span className="break-all">{user.email}</span></SettingRow></SettingsSectionComponent><p className="text-xs text-muted-foreground">{t('profile.readOnly')}</p></div>}
-        {section === 'integrations' && <><IntegrationsSettings googleEnabled={googleEnabled} /><LinearSettings notice={linearNotice} /><TelegramSettings preview={preview} /></>}
+        {section === 'integrations' && <><IntegrationsSettings googleEnabled={googleEnabled} /><LinearSettings notice={linearNotice} /><IssuePrefixSettings /><TelegramSettings preview={preview} /></>}
         {section === 'workspace' && <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />}
       </SettingsContent>}
     </AppShellContent>
