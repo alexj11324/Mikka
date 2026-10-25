@@ -10,7 +10,10 @@ import { createFactoryQuestions, questionReference } from '../../lib/factory/que
 import { app, browserClientHeaders, openCreateIssue } from './fixtures'
 
 // Synthetic accounts only. Keep rows for inspection; never run against Preview/production.
-test.beforeEach(() => {
+test.beforeEach(({ baseURL }) => {
+  const origin = new URL(baseURL!)
+  expect(['localhost', '127.0.0.1']).toContain(origin.hostname)
+  expect(origin.protocol).toBe('http:')
   expect(process.env.CI).toBe('true')
   const url = new URL(process.env.E2E_DATABASE_URL!)
   expect(url.hostname).toBe('127.0.0.1')
@@ -126,8 +129,13 @@ test('frozen client against real HTTP/session/PG: concurrent retry, conflict, ow
     const continued = await questions.answer({ source: 'human_event', userId: ownerA }, request)
     expect((await questions.answer({ source: 'human_event', userId: ownerA }, request)).continuationRunId).toBe(continued.continuationRunId)
     expect((await db.query(`SELECT id FROM agent_runs WHERE "issueId"=$1 AND status='queued'`, [issueId])).rowCount).toBe(1)
+    // Better Auth deletes expired sessions on read. Retain this synthetic owner's
+    // records with a narrow rule; no unrelated session is affected.
+    await db.query(`CREATE RULE retain_submission_${randomUUID().replaceAll('-', '')} AS ON DELETE TO session WHERE OLD."userId"='${ownerA.replaceAll("'", "''")}' DO INSTEAD NOTHING`)
+    const sessionsBefore = (await db.query('SELECT id FROM session WHERE "userId"=$1', [ownerA])).rows
     await db.query('UPDATE session SET "expiresAt"=now()-interval \'1 second\' WHERE "userId"=$1', [ownerA])
     expect((await a.post(app('/api/coordinator/messages'), { headers: { origin }, data })).status()).toBe(401)
+    expect((await db.query('SELECT id FROM session WHERE "userId"=$1', [ownerA])).rows).toEqual(sessionsBefore)
   } finally { await Promise.all([a.dispose(), b.dispose(), anonymous.dispose(), db.end()]) }
 })
 
