@@ -10,6 +10,8 @@ import systemPrompt from '@/lib/agent-system-prompt.json'
 import { validateAgentStream } from '@/lib/agent-fetch'
 import { persistAgentStream } from '@/lib/agent-history'
 import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
+import { createCredentialAITools } from '@/lib/credentials/ai-tools'
+import { executeSystemCredentialTool } from '@/lib/credentials/runtime'
 
 export const maxDuration = 300
 
@@ -107,6 +109,7 @@ export async function POST(request: Request) {
     system: `${systemPrompt}\n\n${agentWebInstructions()}`,
     messages,
     tools: {
+      ...createCredentialAITools((name, input) => executeSystemCredentialTool({ userId: session.user.id }, name, input)),
       ...createAgentWebTools({ signal: request.signal }),
       ...createComposioAITools((action, input) => runComposioAction(session.user.id, action, input)),
     },

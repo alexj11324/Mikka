@@ -44,6 +44,7 @@ import { MockAdapter } from "./adapters/mock"
 import type { AgentAdapter } from "./adapters/types"
 import { publishRun, snapshotTree } from "./agents/publish"
 import { runPaths } from "./agents/run-context"
+import { registerCredentialBridge, closeCredentialBridges } from "./agents/credential-bridge"
 import { runVerify } from "./agents/verify"
 import { SandboxRuntime, type AgentSandbox } from "./agents/sandbox"
 import { buildChildEnv } from "./env"
@@ -287,6 +288,7 @@ export class Daemon {
     const detected = this.options.harnesses ?? (await detectHarnesses())
     this.harnesses = detected.filter((info) => this.adapters.has(info.harness))
     // Runs survive restarts: pick up what the journal says was active.
+    for (const entry of this.journal.active()) await this.credentialBridge(entry.assignment)
     this.supervisor.resumeAll()
     if (this.options.quotaSource !== null) {
       this.quota = new QuotaPoller(
@@ -669,7 +671,14 @@ export class Daemon {
     if (existing) return this.supervisor.summary(existing)
     const assignment = await this.options.link.claimRun(deviceId, runId)
     if (assignment.runId !== runId) return this.refuseRun(runId)
+    await this.credentialBridge(assignment)
     return this.supervisor.start(assignment)
+  }
+
+  private credentialBridge(assignment: import('./server-link').RunAssignment) {
+    const deviceCredential = this.device.credential
+    return registerCredentialBridge({ privateDir: runPaths(this.paths.adapterState, assignment.runId).privateDir, runId: assignment.runId, mcp: assignment.mcp,
+      isLive: () => Boolean(!this.stopped && deviceCredential && this.device.credential === deviceCredential && this.device.deviceId === assignment.deviceId && this.journal.get(assignment.runId) && !isTerminalRunState(this.journal.get(assignment.runId)!.state)) })
   }
 
   /**
@@ -883,6 +892,7 @@ export class Daemon {
     await this.fsLoop.catch(() => undefined)
     await this.tick
     await this.rpc?.close()
+    await closeCredentialBridges(runPaths(this.paths.adapterState, 'credential-shutdown').privateDir)
     await this.supervisor?.stop()
     await this.outbox?.close()
     const release = this.releaseLock

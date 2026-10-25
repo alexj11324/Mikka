@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs"
 import { homedir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 
 import type { Harness, RunKind } from "@mikka/protocol"
 import { planHandoff, planSplitProblem } from "@mikka/protocol/plan"
@@ -36,6 +36,7 @@ import {
 } from "../permissions"
 import { ownDir } from "./harness-home"
 import type { SandboxPolicy } from "./sandbox"
+import { credentialBridgeFor } from "./credential-bridge"
 
 /**
  * Model API and login domains per harness: always reachable from that
@@ -263,6 +264,7 @@ export class RunContext {
         ...daemonSecrets(this.options.privateDir),
       ],
       allowDomains: [
+        ...(() => { const bridge = credentialBridgeFor(this.options.privateDir, basename(this.runDir)); return bridge ? [new URL(bridge).host] : [] })(),
         ...HARNESS_DOMAINS[this.options.harness],
         ...runDomains(
           runPolicy(this.options.policy),
@@ -294,11 +296,12 @@ export class RunContext {
 
   mcpServer(): McpServerSpec {
     const command = this.options.nodeBinary ?? process.execPath
+    const bridge = credentialBridgeFor(this.options.privateDir, basename(this.runDir))
     return {
       command,
-      args: [MCP_SERVER_SCRIPT, "--handoff", this.handoffFile],
+      args: [...(bridge ? ['--use-env-proxy'] : []), MCP_SERVER_SCRIPT, "--handoff", this.handoffFile, ...(bridge ? ['--credential-bridge', bridge] : [])],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.
-      env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},
+      env: { ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}), ...(bridge ? { NO_PROXY: '', no_proxy: '' } : {}) },
     }
   }
 
