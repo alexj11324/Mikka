@@ -23,14 +23,25 @@ credentials of an account when one daemon credential is revoked.
 
 ## Admission and integration boundary
 
-`withDeviceAuthorization` wraps ordinary daemon HTTP handlers. Body receipt occurs
-before admission. A dedicated pool holds a shared credential row lock while the
-handler completes; revoke takes the exclusive lock before mutating its state.
-This avoids consuming all application pool connections with waiting admissions.
-Long polling holds the lock only for each read and rechecks approximately every
-second. Operations already admitted may complete before revoke commits; operations
-admitted after that commit fail. A 5-second lock timeout can make a revoke fail;
-readback, not an optimistic client response, establishes the outcome.
+`withDeviceAuthorization` scopes application database access to the authenticated
+credential. Each SQL statement or explicit transaction acquires a shared token
+lock on the SAME connection performing the work. Revocation takes the exclusive
+lock. A lost connection rolls back its protected writes; no independent admission
+connection or reconnect retry can permit a late commit. Events insert/status/tail
+read share one transaction. A 5-second lock timeout fails the operation; readback
+establishes an uncertain revoke outcome.
+
+This is application-database fencing, not distributed atomicity across workspace
+databases or external providers. The subscription route carries this scope into
+its application queries. Existing Go run/lease checks cancel silent native streams
+on their one-second polling interval and check before forwarding chunks. An
+external request admitted before revoke may already have reached its provider;
+unknown external effects are not automatically replayed.
+
+First revoke appends `device.credential.revoked` through #259's existing audit
+store in the same transaction as token, run and worker-token updates. Audit failure
+rolls back all of them; repeated revoke returns the original receipt without an
+additional event. Dependency: reviewed audit commit `1b39b709ce361b9643524aea983860e6de818ff6`.
 
 For parent integration with #259/#264/#265, preserve the existing claim/heartbeat
 business code and add the exported route wrapper. Compose the claim `onClaim`
@@ -51,21 +62,10 @@ This candidate is NOT sufficient to close #178 or authorize production rollout:
    receipt reports `unattributedActiveRuns`; it does not guess their owner-token
    association or terminate other credentials' work. A production migration/drain
    plan is required before claiming complete in-flight revocation.
-2. The protected BYOS subscription route is deliberately not rewritten. Its
-   initial authentication refuses revoked credentials, but its already admitted
-   refresh/external-operation race needs coordination with its owner.
-3. The admission connection and handler transactions are separate connections.
-   Loss of the admission connection releases its row lock; rejecting the HTTP
-   response does NOT roll back independent handler commits. Do not claim atomic
-   revocation under connection-loss faults. Closing this boundary requires
-   transaction-local credential checks in the affected write services.
-4. `revokedAt`/`revokedBy` provide authoritative idempotent operation state, but
-   integration into #259's tenant audit export is outstanding; no duplicate audit
-   framework is introduced here.
-5. The isolated daemon test uses the actual runtime/HTTP transport with quota
+2. The isolated daemon test uses the actual runtime/HTTP transport with quota
    access disabled and no provider or harness execution. It cannot prove that an
    actual running Codex/Claude process terminates within an SLA.
-6. Production identity, frozen release, controlled fixture, redacted recording
+3. Production identity, frozen release, controlled fixture, redacted recording
    and PR video remain parent-coordinated; no production verification is claimed.
 
 ## Reproducible isolated checks
@@ -76,6 +76,7 @@ credentials or inherited provider variables. Build the exact checkout, start its
 Next server on loopback, then execute:
 
 ```
+node --conditions=react-server --import ./scripts/daemon/server-only.mjs --import tsx scripts/daemon/revocation-faults.mjs
 pnpm exec playwright test tests/e2e/device-revocation.spec.ts
 pnpm --filter @mikka/daemon typecheck
 ```
@@ -87,3 +88,11 @@ restart. It retains database rows and daemon state. No DELETE/TRUNCATE/DROP or
 fixture removal occurs. Test traces/screenshots are disabled to avoid publishing
 cookies or tokens; the attached JSON contains only checks, environment and SHA.
 A green test establishes only its listed checks, not the gaps above.
+
+Additional retained-PG regression kills the protected writer while its INSERT is
+blocked, commits revoke, and verifies zero chunks. An audit-failure trigger proves
+full rollback, then successful/repeated revoke proves one verified chain event.
+The targeted Go test `TestDaemonCredentialRevokeCancelsSilentNativeStream` uses
+the actual broker, actual application revoke helper and a loopback TLS provider
+fixture; it verifies cancellation and denied context/prepare after reinstantiation.
+It is not a production provider or native CLI acceptance video.

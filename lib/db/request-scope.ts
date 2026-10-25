@@ -3,6 +3,7 @@ import { Pool } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import * as schema from './schema'
 import { mikkaDatabaseURL } from './config'
+import { deviceScopedPool } from './device-scope'
 
 function createPool(connectionString = mikkaDatabaseURL(process.env)) {
   return new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10000, idleTimeoutMillis: 20000 })
@@ -20,15 +21,25 @@ const requestDatabase = new AsyncLocalStorage<{ pool: Pool; db: typeof defaultDa
 
 export const pool = new Proxy(defaultPool, {
   get(target, property) {
-    const current = requestDatabase.getStore()?.pool ?? target
+    const current = deviceScopedPool(requestDatabase.getStore()?.pool ?? target)
     const value = Reflect.get(current, property, current)
     return typeof value === 'function' ? value.bind(current) : value
   },
 })
 
+const scopedDatabases = new WeakMap<Pool, typeof defaultDatabase>()
+
 export const db = new Proxy(defaultDatabase, {
   get(target, property) {
-    const current = requestDatabase.getStore()?.db ?? target
+    const currentScope = requestDatabase.getStore()
+    const base = currentScope?.pool ?? defaultPool
+    const guarded = deviceScopedPool(base)
+    let current = currentScope?.db ?? target
+    if (guarded !== base) {
+      let database = scopedDatabases.get(guarded)
+      if (!database) { database = createDatabase(guarded); scopedDatabases.set(guarded, database) }
+      current = database
+    }
     const value = Reflect.get(current, property, current)
     return typeof value === 'function' ? value.bind(current) : value
   },

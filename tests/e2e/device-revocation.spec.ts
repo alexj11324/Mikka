@@ -129,6 +129,39 @@ test('owner revokes credential durably; old daemon API calls and attributed work
     expect(text).not.toContain(bearer)
     expect(text).not.toContain('tokenHash')
     checks.push('re-enable and re-registration cannot revive token; sibling token works; worker token revoked and lease expired')
+    const audit = await owner.get('/mikka/api/audit?action=device.credential.revoked')
+    expect(audit.status()).toBe(200)
+    const auditEvents = (await audit.json()).events.filter((row: {event:{resourceId:string}}) => row.event.resourceId===tokenId)
+    expect(auditEvents).toHaveLength(1)
+    expect(auditEvents[0].event.actorId).toBe(userId)
+    checks.push('owner audit HTTP lists exactly one correctly attributed credential revocation after retry')
+
+    // Actual Next transport: terminate only the fixture's blocked SQL writer.
+    const faultId=randomUUID(),faultRun=randomUUID(),faultBearer='orv_'+randomBytes(32).toString('hex'),faultGate='httpfault_'+randomUUID().replaceAll('-','')
+    await pg.query('INSERT INTO device_tokens(id,"userId","tokenHash","lastUsedAt") VALUES($1,$2,$3,now())',[faultId,userId,createHash('sha256').update(faultBearer).digest('hex')])
+    await pg.query('INSERT INTO agent_runs(id,"userId","agentId","issueId","deviceId","deviceRepoId","deviceTokenId",status,"leaseExpiresAt") VALUES($1,$2,$3,$4,$5,$6,$7,$8,now()+interval \'90 seconds\')',[faultRun,userId,agentId,issueId,deviceId,repoId,faultId,'preparing'])
+    await pg.query(`CREATE FUNCTION ${faultGate}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock(hashtextextended('${faultGate}',0)); RETURN NEW; END $$`)
+    await pg.query(`CREATE TRIGGER ${faultGate} BEFORE INSERT ON run_chunks FOR EACH ROW WHEN (NEW."runId"='${faultRun}'::uuid) EXECUTE FUNCTION ${faultGate}()`)
+    const faultLocker=await pg.connect()
+    let faultRequest: ReturnType<typeof daemon.post> | undefined
+    try {
+      await faultLocker.query('SELECT pg_advisory_lock(hashtextextended($1,0))',[faultGate])
+      const lockerPid=(await faultLocker.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+      faultRequest=daemon.post(`/mikka/v1/runs/${faultRun}/events`,{headers:{authorization:'Bearer '+faultBearer},data:{fromSeq:1,chunks:[{type:'text-delta',delta:'must roll back'}]}})
+      let writers: {pid:number}[]=[]
+      await expect.poll(async()=>{writers=(await pg.query('SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))',[lockerPid])).rows;return writers.length}).toBe(1)
+      await pg.query('SELECT pg_terminate_backend($1)',[writers[0].pid])
+      expect((await owner.post(`/mikka/api/device-tokens/${faultId}/revoke`,{headers:{origin}})).status()).toBe(200)
+      await faultLocker.query('SELECT pg_advisory_unlock(hashtextextended($1,0))',[faultGate])
+      expect((await faultRequest).status()).toBeGreaterThanOrEqual(400)
+      expect(Number((await pg.query('SELECT count(*) FROM run_chunks WHERE "runId"=$1',[faultRun])).rows[0].count)).toBe(0)
+      checks.push('real Next HTTP writer connection failure rolls back chunk; subsequent owner revoke commits')
+    } finally {
+      await faultLocker.query('SELECT pg_advisory_unlock(hashtextextended($1,0))',[faultGate])
+      faultLocker.release()
+      if(faultRequest)await faultRequest.catch(()=>undefined)
+    }
+
     const evidencePath = info.outputPath('device-revocation-evidence.json')
     writeFileSync(evidencePath,JSON.stringify({sha:process.env.GITHUB_SHA,base:'a3294781eae74d824087c9c80bfc3f6093f196d7',migration:'20261025185500_daemon_revocation.sql',startedAt,finishedAt:new Date().toISOString(),environment:'isolated PG + actual Next HTTP',fixture:{deviceId,runId,tokenId},revocation:{revokedAt:receipt.revokedAt,stopRequestedAt:state.stopRequestedAt,leaseExpiresAt:state.leaseExpiresAt},endpointResults,checks},null,2))
     await info.attach('device-revocation-evidence',{path:evidencePath,contentType:'application/json'})

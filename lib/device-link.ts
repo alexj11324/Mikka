@@ -53,7 +53,7 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
   // A daemon polls every few seconds; one write a minute is enough to show
   // that a token is still in use.
   if (!row.lastUsedAt || Date.now() - row.lastUsedAt.getTime() > 60_000) {
-    await db.update(deviceTokens).set({ lastUsedAt: new Date() }).where(eq(deviceTokens.id, row.id))
+    await db.update(deviceTokens).set({ lastUsedAt: new Date() }).where(and(eq(deviceTokens.id, row.id), isNull(deviceTokens.revokedAt)))
   }
   return { userId: row.userId, tokenId: row.id }
 }
@@ -126,11 +126,6 @@ export function withDeviceAuthorization<Args extends unknown[]>(handler: (reques
   return async (request: Request, ...args: Args): Promise<Response> => {
     const caller = await authenticateDevice(request)
     if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // Drain before locking. The original Request remains the handler's input.
-    if (request.body) {
-      const bytes = await request.arrayBuffer()
-      request = new Request(request.url, { method: request.method, headers: request.headers, body: bytes, signal: request.signal })
-    }
     return await withDeviceAdmission(caller, () => handler(request, ...args))
       ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

@@ -1,7 +1,7 @@
 name: Daemon credential revocation
 on:
   push:
-    branches: ['fix/178-daemon-revocation']
+    branches: ['fix/178-daemon-revocation', 'fix/178-transaction-fence']
 permissions:
   contents: read
 jobs:
@@ -49,14 +49,28 @@ jobs:
           git rev-parse HEAD
           git diff --exit-code HEAD
       - run: pnpm test:e2e:setup
+      - name: Transaction-local revocation and audit fault regression
+        run: node --conditions=react-server --import ./scripts/daemon/server-only.mjs --import tsx scripts/daemon/revocation-faults.mjs
       - run: pnpm typecheck
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm build
-      - run: pnpm exec playwright test tests/e2e/device-revocation.spec.ts
+      - name: Real Go broker observes actual application revoke
+        working-directory: packages/subscription-worker
+        env:
+          CGO_ENABLED: '0'
+          GOTOOLCHAIN: local
+          GOMODCACHE: ${{ github.workspace }}/packages/subscription-worker/.cache/build-toolchain/modules
+          GOCACHE: ${{ github.workspace }}/packages/subscription-worker/.cache/build-toolchain/objects
+          MIKKA_BYOS_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_e2e
+        run: .cache/build-toolchain/go/bin/go test -mod=readonly -run '^TestDaemonCredentialRevokeCancelsSilentNativeStream$' -count=1 -timeout=45s -v . > ../../test-results/daemon-faults/byos-revocation.log 2>&1
+      - run: pnpm exec playwright test tests/e2e/device-revocation.spec.ts --output=browser-results
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: daemon-revocation-sanitized-evidence
-          path: test-results/**/device-revocation-evidence.json
+          path: |
+            browser-results/**/device-revocation-evidence.json
+            test-results/daemon-faults/device-revocation-fault-evidence.json
+            test-results/daemon-faults/byos-revocation.log
           if-no-files-found: ignore
           retention-days: 7
