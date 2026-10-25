@@ -2,26 +2,31 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
 import { changeIssuePriority, moveIssue, type listIssues } from '@/app/actions/issues'
+import { setIssueDeleted } from '@/app/actions/issue-operations'
 import { useActionError } from '@/lib/use-action-error'
 import { type KanbanCommitMeta } from '@/components/reui/kanban'
-import { KanbanBoard } from '@/components/blocks/kanban-board-1/components/kanban-board'
-import { ISSUE_STATUSES, type IssueStatus } from './issue-properties'
+import { KanbanBoard, type CardContext } from '@/components/blocks/kanban-board-1/components/kanban-board'
+import { BOARD_COLUMNS, boardColumnOf } from '@/components/blocks/kanban-board-1/components/data'
+import type { IssueStatus } from './issue-properties'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Columns = Record<string, Issue[]>
 
 function groupIssues(issues: Issue[]): Columns {
-  return Object.fromEntries(ISSUE_STATUSES.map(status => [status.value, issues.filter(issue => issue.status === status.value)]))
+  return Object.fromEntries(BOARD_COLUMNS.map(column => [column.value, issues.filter(issue => boardColumnOf(issue.status) === column.value)]))
 }
 
-export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }: {
+export function IssueBoard({ issues, columns: visibleColumns, hidden, context, onOpen, onDiscuss, onHideColumn, onShowColumn, onUpdated, onBusyChange }: {
   issues: Issue[]
+  columns: IssueStatus[]
+  hidden: { status: IssueStatus; count: number }[]
+  context: CardContext
   onOpen: (id: string) => void
-  onCreate: (status: IssueStatus) => void
+  onDiscuss: (issue: Issue) => void
+  onHideColumn: (status: IssueStatus) => void
+  onShowColumn: (status: IssueStatus) => void
   onUpdated: () => Promise<unknown>
   onBusyChange: (busy: boolean) => void
 }) {
@@ -43,7 +48,7 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
   const viewportRef = useRef<HTMLDivElement>(null)
   const viewportId = useId()
   const instructionsId = useId()
-  const [canScroll, setCanScroll] = useState({ left: false, right: false })
+  const [, setCanScroll] = useState({ left: false, right: false })
   useEffect(() => {
     const viewport = viewportRef.current
     if (!viewport) return
@@ -98,6 +103,34 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
     }
   }
 
+  function changeStatus(issue: Issue, status: IssueStatus) {
+    if (saving.current || dragging || issue.status === status) return
+    const target = boardColumnOf(status)
+    const next = Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, key === target ? [{ ...issue, status }, ...items.filter(item => item.id !== issue.id)] : items.filter(item => item.id !== issue.id)]))
+    setColumns(next)
+    void persist(issue, { status }, columns)
+  }
+
+  function changePriority(issue: Issue, priority: string) {
+    if (saving.current || dragging || issue.priority === priority) return
+    setColumns(Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, items.map(item => item.id === issue.id ? { ...item, priority } : item)])))
+    void persist(issue, { priority }, columns)
+  }
+
+  async function remove(issue: Issue) {
+    if (saving.current) return
+    const previous = columns
+    setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.filter(item => item.id !== issue.id)])))
+    const result = await setIssueDeleted({ id: issue.id, revision: issue.revision }).catch(() => null)
+    if (!result || !('issue' in result)) {
+      setColumns(previous)
+      toast.error(result ? translateError(result.error) : t('deleteFailed'))
+      return
+    }
+    toast(t('deleted', { title: issue.title }), { action: { label: t('undo'), onClick: () => { void setIssueDeleted({ id: issue.id, restore: true }).then(() => onUpdated()) } } })
+    void onUpdated().catch(() => {})
+  }
+
   function commit(next: Columns, meta: KanbanCommitMeta<Issue>) {
     if (meta.kind !== 'item' || meta.activeContainer === meta.overContainer) {
       setColumns(meta.previousValue)
@@ -109,30 +142,10 @@ export function IssueBoard({ issues, onOpen, onCreate, onUpdated, onBusyChange }
     void persist(issue, { status: meta.overContainer }, meta.previousValue)
   }
 
-  function changeStatus(issue: Issue, status: IssueStatus) {
-    if (saving.current || dragging || issue.status === status) return
-    const next = Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, key === status ? [{ ...issue, status }, ...items.filter(item => item.id !== issue.id)] : items.filter(item => item.id !== issue.id)]))
-    setColumns(next)
-    void persist(issue, { status }, columns)
-  }
-
-  function changePriority(issue: Issue, priority: string) {
-    if (saving.current || dragging || issue.priority === priority) return
-    const next = Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, items.map(item => item.id === issue.id ? { ...item, priority } : item)]))
-    setColumns(next)
-    void persist(issue, { priority }, columns)
-  }
-
-  return <section aria-label={t('label')} className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 px-4 pb-2 sm:px-6">
-    <div className="flex shrink-0 items-center justify-between gap-3">
-      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message || t('instructions')}</p>
-      <div className="flex shrink-0 items-center gap-1">
-        <Button type="button" variant="ghost" size="icon-sm" aria-label={t('scrollLeft')} aria-controls={viewportId} disabled={!canScroll.left} onClick={() => scrollBoard(-1)}><ChevronLeft data-icon="inline-start" /></Button>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label={t('scrollRight')} aria-controls={viewportId} disabled={!canScroll.right} onClick={() => scrollBoard(1)}><ChevronRight data-icon="inline-start" /></Button>
-      </div>
-    </div>
+  return <section aria-label={t('label')} className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <p role="status" aria-live="polite" className="sr-only">{message}</p>
     <p id={instructionsId} className="sr-only">{t('keyboardHint')}</p>
-    <KanbanBoard value={columns} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onCreate={onCreate} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
+    <KanbanBoard value={columns} columns={visibleColumns} hiddenColumns={hidden} context={context} onDelete={issue => { void remove(issue) }} onDiscuss={onDiscuss} onHideColumn={onHideColumn} onShowColumn={onShowColumn} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
       setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
       setMessage(t('propertiesSaved'))
       void onUpdated().catch(() => {})

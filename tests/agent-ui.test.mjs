@@ -433,14 +433,18 @@ test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 
   assert.doesNotMatch(starters, /<Button|function AgentStarters/)
 })
 
-test('Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单', async () => {
+test('Agent 保留应用外壳、居中输入与当前导航标题', async () => {
   const source = await readFile(new URL('../components/workspace/agent-chat.tsx', import.meta.url), 'utf8')
-  for (const name of ['SidebarTrigger', 'AgentWelcome', 'Popover', 'PopoverTrigger', 'Command', 'CommandItem']) {
+  for (const name of ['SidebarTrigger', 'AgentWelcome', 'ConversationPill']) {
     assert.match(source, new RegExp(`<${name}[\\s>]`))
   }
   assert.doesNotMatch(source, /<AnimatedSidebar[\s>]|<AnimatedSidebarTrigger|<AISidebar/)
-  assert.match(source, /aria-label=\{\(agentCopy\.switchConversation\s*\+\s*\(title\)\)\}/)
-  for (const key of ['newTask', 'search']) assert.ok(source.includes(`size="icon" aria-label={agentCopy.${key}}`))
+  assert.match(source, /<ConversationPill name=\{title\}/)
+  assert.ok(source.includes('size="icon" aria-label={agentCopy.newTask}'))
+  assert.match(source, /onClick=\{onReset\}/)
+  const navigation = await readFile(new URL('../components/nav/conversation-list.tsx', import.meta.url), 'utf8')
+  assert.match(navigation, /onOpen\(conversation\)/)
+  assert.match(navigation, /sessionId: session\.id/)
   assert.doesNotMatch(source, /ChatApp|AnimatedSidebarInset/)
   assert.match(source, /turns\.length === 0 \? <AgentWelcome/)
   const welcome = await readFile(new URL('../components/workspace/agent-welcome.tsx', import.meta.url), 'utf8')
