@@ -1,0 +1,528 @@
+
+> next-app@0.0.1 check /workspace/mikka-policy-230
+> pnpm check:agent-ui && pnpm test:preview && pnpm test:agent && pnpm test:byos && pnpm test:acceptance && pnpm test:auth-composio && pnpm test:ui-policy && pnpm test:motion && pnpm test:i18n && pnpm i18n:check && pnpm test:ssh-target && pnpm test:linear-sync && pnpm test:coordinator-events && pnpm test:factory && pnpm test:groups && pnpm test:integrations && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm test:issues && pnpm test:telegram && pnpm test:suggestions && pnpm lint && pnpm typecheck
+
+
+> next-app@0.0.1 check:agent-ui /workspace/mikka-policy-230
+> node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check
+
+OpenUI 组件目录与提示词已校验：111 个组件定义。
+
+> next-app@0.0.1 test:preview /workspace/mikka-policy-230
+> node --test tests/preview-ready.test.mjs
+
+✔ background precompilation is enabled by default and only explicit zero disables it (1.926753ms)
+✔ startup compiles chat, images, history and workspace with read-only HEAD requests (69.213555ms)
+✔ startup begins every warmup without waiting for other routes (1.047409ms)
+✔ startup supports deployments without a base path (1.653042ms)
+✔ page warmup accepts the sign-in redirect but API redirects remain failures (0.493112ms)
+✔ compile failures cannot report preview ready (4.789768ms)
+✔ optional warmup aborts a stalled request instead of hanging startup work (28.317204ms)
+✔ page requests never wait for unrelated AI routes or readiness marker files (4.423111ms)
+✔ preview bootstrap script is inside head to avoid hydration failure (2.913074ms)
+✔ startup preserves readiness output and starts default warmup without awaiting it (2.824492ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 311.865785
+
+> next-app@0.0.1 test:agent /workspace/mikka-policy-230
+> node --import tsx --test tests/agent-fetch.test.mjs tests/agent-ui.test.mjs tests/agent-history.test.mjs tests/agent-web-tools.test.mjs
+
+✔ 配图关键词闭合即预加载，不等待卡片介绍、标签或回复完成 (17.321928ms)
+✔ 图片观察不预加载推理，不吞正文，并限制为最多六张不同配图 (11.491162ms)
+✔ 正常结束保留全部正文，不人为截断长回复 (1.863096ms)
+✔ 思考耗尽预算和空回复不会显示为成功 (10.950578ms)
+✔ 流提前断开保留正文并通知重试，已有错误不重复追加 (1.092433ms)
+✔ 主动停止不生成空回复或连接中断错误 (29.017585ms)
+✔ 请求头尚未返回时，即使预览传输忽略取消，也能结束等待 (3.06977ms)
+✔ 响应头已返回时，停止会中断流读取并取消上游 (99.578521ms)
+✔ 正常 SSE 响应保持内容、状态和响应头 (11.498007ms)
+✔ 完成前保存完整回复，不保存推理片段 (39.817323ms)
+✔ 失败回复保留正文和错误，不误标为完成 (3.487762ms)
+✔ 断流保存为失败，不静默当作成功 (3.791751ms)
+✔ 取消请求保存已生成片段且取消上游 (3.13182ms)
+✔ 数据库检查点缓慢时正文继续返回，完成前仍等待保存 (14.406104ms)
+✔ 保存失败必须向客户端报告错误 (5.470703ms)
+✔ KaTeX 样式字体与 rehype 渲染引擎使用同一版本 (56.306746ms)
+✔ 演示公式覆盖行内、对齐、矩阵及长公式，且不输出解析错误 (255.33054ms)
+✖ Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀 (136.822544ms)
+✔ 综合演示每个分组都可解析，覆盖全部本地回复组件 (194.625312ms)
+✔ beUI 代码块在 OpenUI 和 Markdown 中真正接入，等待状态使用 ReasoningText (53.8752ms)
+✔ 普通聊天正文不加载公式引擎，含公式时复用完整 Markdown 渲染 (2.151235ms)
+✔ 图片解析保留真实来源和许可，拒绝不安全资源 (18.003214ms)
+✔ 配图检索通过固定来源查询，并正确处理无结果及上游错误 (78.489775ms)
+✔ 图片复用正文入口并共享 SWR 预加载，回复缩略图不懒加载 (8.165299ms)
+✔ 资料配图和详细回答规则进入模型规范 (16.559032ms)
+✔ TextContent 统一支持 Markdown、LaTeX 和 Mermaid，保留旧字号契约 (19.605862ms)
+✔ Beautiful Mermaid 实际渲染六类图表，主题自适应且样式不污染其他回复 (561.105223ms)
+✔ 精致图表优先，复杂语法保留严格 Mermaid 回退和 SVG 清洗 (29.004246ms)
+✔ 混合真实换行与 JSON 转义的回复仍正确渲染标题、列表和自注意力公式 (64.54697ms)
+✔ 修复仅处理 OpenUI 字符串语法，保留代码、矩阵换行、转义引号与流式前缀 (22.495674ms)
+✔ 相关追问支持具体问题、上下文及内联继续，不再被提示词压制 (32.781221ms)
+✔ 完整正文和可自动补齐的括号不会误报失败 (10.836529ms)
+✔ 真实缺少段落与组件格式错误分别说明原因 (33.346308ms)
+✔ 紧凑推荐卡片可解析且模型规范优先小卡片 (46.950932ms)
+✔ beUI 组件包含在运行时和可序列化规范中 (43.214229ms)
+✔ beUI OpenUI Lang 输出可解析且保留旧组件兼容 (13.230493ms)
+✔ 功能分组完整且每个本地组件仅属于一个功能组 (0.270431ms)
+✔ 审批、问题、回复和任务计划均可解析 (18.364945ms)
+✔ 问题、任务与图标严格限制输入，不能��造审批结果 (14.154273ms)
+✔ 49 项 AI Elements 对照不遗漏且 beUI 对应源码可导入 (76.110232ms)
+✔ 会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 会话组件 (16.849636ms)
+✖ Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单 (7.572964ms)
+✔ 服务端和 beUI 界面均使用 DS 4.1 Flash (7.917497ms)
+✔ 停止按钮先取消表单默认行为，避免同步恢复后误发草稿 (7.276536ms)
+✔ 回复动作统一直接请求，澄清使用内联问题卡片 (29.560618ms)
+✔ beUI 限制按钮语义、状态、数字和小数位 (2.136756ms)
+✔ \( \) 与 \[ \] 定界符转换为 KaTeX 公式，代码内容保持原样，中文使用 cjk_fallback (45.991539ms)
+✖ 联网工具只暴露搜索和网页读取，保留 DS 聊天及认证 (59.090497ms)
+✔ 拒绝非 HTTPS、凭据、内网地址、IP 及自定义端口 (14.041021ms)
+✔ 搜索保留原始来源、日期和检索时间，裁剪内容 (7.373117ms)
+✔ 网页先检查 DNS，拒绝混合公共和私网解析 (1.063436ms)
+✔ 网页只返回有效正文，不把重定向或上游错误当成资料 (1.859565ms)
+✔ 计费验证未完成时说明具体原因且不重复调用上游 (0.840259ms)
+✔ 上游失败不泄漏错误详情，限制每轮费用，取消传播 (2.819488ms)
+ℹ tests 54
+ℹ suites 0
+ℹ pass 51
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15601.064175
+
+✖ failing tests:
+
+test at tests/agent-ui.test.mjs:39:1
+✖ Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀 (136.822544ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /if \(typeof window !== 'undefined'\) void import\('\.\/agent-panel'\)/. Input:
+  
+  "'use client'\n" +
+    "import { useTranslations } from 'next-intl'\n" +
+    '\n' +
+    "import { useCallback, useEffect, useRef, useState } from 'react'\n" +
+    "import useSWR, { useSWRConfig } from 'swr'\n" +
+    "import { toast } from 'sonner'\n" +
+    "import { useSearchParams } from 'next/navigation'\n" +
+    "import { usePathname, useRouter } from '@/i18n/navigation'\n" +
+    "import dynamic from 'next/dynamic'\n" +
+    "import { Skeleton } from '@/components/ui/skeleton'\n" +
+    "import { Columns3, List, Plus, Search } from 'lucide-react'\n" +
+    "import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'\n" +
+    "import { IconRail, type RailDestination } from '@/components/nav/icon-rail'\n" +
+    "import { ConversationList, type Conversation } from '@/components/nav/conversation-list'\n" +
+    "import type { AgentSessionRequest } from './agent-panel'\n" +
+    "import { TeamHome } from '@/components/teams/team-home'\n" +
+    "import { AppFrame, AppShell, AppShellContent, SignOutBoundary, WindowBar } from '@/components/app-shell'\n" +
+    "import { IssueList } from './issue-list'\n" +
+    "import { BoardPage } from './board-page'\n" +
+    "import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'\n" +
+    "import { GlobalSearch, SearchPill } from '@/components/nav/global-search'\n" +
+    "import { ContextPanel } from '@/components/nav/context-panel'\n" +
+    "import { listTaskRuns } from '@/app/actions/task-runs'\n" +
+    "import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'\n" +
+    "import { sessionPreview } from '@/lib/agent-history'\n" +
+    "import { PanelRight } from 'lucide-react'\n" +
+    "import { ISSUE_STATUSES, issueIdentifier, type IssueStatus, type IssueView } from './issue-properties'\n" +
+    "import { listIssues } from '@/app/actions/issues'\n" +
+    "import { authClient } from '@/lib/auth-client'\n" +
+    "import { Button } from '@/components/ui/button'\n" +
+    "import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'\n" +
+    "import { ShortcutKeys } from '@/components/shortcut-keys'\n" +
+    "import { Badge } from '@/components/ui/badge'\n" +
+    "import { Input } from '@/components/ui/input'\n" +
+    "import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'\n" +
+    "import { listProjects } from '@/app/actions/projects'\n" +
+    "import { listTeams } from '@/app/actions/teams'\n" +
+    "import { listProjectTeams } from '@/app/actions/team-relations'\n" +
+    "import { WorkspaceOverview } from './workspace-overview'\n" +
+    "import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'\n" +
+    "import { PluginsSkillsView } from '@/components/plugins/plugins-skills-view'\n" +
+    "import type { WorkspaceSection } from './workspace-navigation'\n" +
+    "import { pushSettingsHistory } from '@/lib/settings-navigation'\n" +
+    "import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'\n" +
+    "import { fetchSettingsData } from '@/lib/settings-data'\n" +
+    "import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'\n" +
+    "import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'\n" +
+    "import { useAgentHistory } from '@/hooks/use-agent-history'\n" +
+    "import { useWorkspace } from '@/hooks/use-workspace'\n" +
+    '\n' +
+    '// Start the chunk download during module evaluation, before hydration and its effects.\n' +
+    "if (typeof window !== 'undefined') {\n" +
+    "  void import('./agent-panel').catch(() => {})\n" +
+    "  void import('./create-issue-dialog').catch(() => {})\n" +
+    '}\n' +
+    '\n' +
+    'function DetailLoading() {\n' +
+    "  const t = useTranslations('Workspace')\n" +
+    `  return <div role="status" aria-label={t('loadingEditor')} className="flex flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>\n` +
+    '}\n' +
+    "const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })\n" +
+    "const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module => module.ProjectWorkspace), { loading: DetailLoading })\n" +
+    '// Settings open through history.pushState; without their own fallback a first chunk load suspends\n' +
+    "// up to the route's loading boundary, which can stay stuck on the skeleton.\n" +
+    "const SettingsShell = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsShell), { loading: WorkspaceLoading })\n" +
+    "const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })\n" +
+    '\n' +
+    "export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'account'; googleEnabled?: boolean }) {\n" +
+    '  const i18nText = useTranslations()\n' +
+    '  const { data: workspaceData } = useWorkspace(user.email)\n' +
+    '  const { data: agentHistory } = useAgentHistory(user.id, initialAgentHistory)\n' +
+    "  const t = useTranslations('Workspace')\n" +
+    "  const tIssue = useTranslations('Issue')\n" +
+    "  const tPlugins = useTranslations('Plugins')\n" +
+    '  const params = useSearchParams()\n' +
+    '  const pathname = usePathname()\n' +
+    '  const router = useRouter()\n' +
+    "  const { data: workspaceContext } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })\n" +
+    '  const { mutate: clearCache } = useSWRConfig()\n' +
+    '  const sectionTitles: Record<WorkspaceSection, string> = {\n' +
+    "    inbox: i18nText('Overview.sections.inbox'),\n" +
+    "    'my-issues': i18nText('Overview.sections.myIssues'),\n" +
+    "    agent: i18nText('Overview.sections.agent'),\n" +
+    "    coordinator: i18nText('Overview.sections.coordinator'),\n" +
+    "    projects: i18nText('Overview.sections.projects'),\n" +
+    "    views: i18nText('Overview.sections.views'),\n" +
+    "    'team-home': i18nText('Overview.sections.teamHome'),\n" +
+    "    'team-issues': i18nText('Overview.sections.teamIssues'),\n" +
+    "    'team-projects': i18nText('Overview.sections.teamProjects'),\n" +
+    "    'all-issues': i18nText('Overview.sections.allIssues'),\n" +
+    "    plugins: tPlugins('title'),\n" +
+    '  }\n' +
+    '  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value\n' +
+    '  const [settingsOpen, setSettingsOpen] = useState(Boolean(initialSettingsSection))\n' +
+    "  const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members' | 'integrations' | 'account'; invite: boolean }>({ section: initialSettingsSection ?? 'preferences', invite: false })\n" +
+    "  const [linearNotice, setLinearNotice] = useState<'connected' | 'error' | null>(null)\n" +
+    '  useEffect(() => {\n' +
+    '    const url = new URL(window.location.href)\n' +
+    "    const result = url.searchParams.get('linear')\n" +
+    "    if (result !== 'connected' && result !== 'error') return\n" +
+    '    setSettingsOpen(true)\n' +
+    "    setSettingsTarget({ section: 'integrations', invite: false })\n" +
+    '    setLinearNotice(result)\n' +
+    "    url.searchParams.delete('linear')\n" +
+    "    window.history.replaceState(null, '', url)\n" +
+    '  }, [])\n' +
+    '  const [boardBusy, setBoardBusy] = useState(false)\n' +
+    "  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], listIssues, { fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })\n" +
+    '  // Keep failed refreshes out of document flow so the board/list never jumps.\n' +
+    "  const listErrorMessage = t('listError')\n" +
+    '  useEffect(() => {\n' +
+    '    const id = `issue-list-error-${user.id}`\n' +
+    '    if (error) toast.error(listErrorMessage, { id, duration: Infinity })\n' +
+    '    else toast.dismiss(id)\n' +
+    '    return () => { toast.dismiss(id) }\n' +
+    '  }, [error, listErrorMessage, user.id])\n' +
+    "  const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)\n" +
+    "  const { data: teams = [] } = useSWR('teams', listTeams)\n" +
+    "  const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams)\n" +
+    "  const { data: taskRuns = [] } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: boardBusy ? 0 : 15000, revalidateOnFocus: false })\n" +
+    "  const { data: coordinatorChat } = useSWR<CoordinatorChatView>('coordinator-chat', () => getCoordinatorChat(), { revalidateOnFocus: false })\n" +
+    '  const [panelOpen, setPanelOpen] = useState(true)\n' +
+    "  useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])\n" +
+    "  function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem('mikka:context-panel', next ? '1' : '0') } catch { /* storage unavailable */ } }\n" +
+    '  const [coordinatorPrefill, setCoordinatorPrefill] = useState<{ text: string; nonce: number }>()\n' +
+    "  const [teamId, setTeamId] = useState<string | null>(params.get('team'))\n" +
+    '  const activeTeam = teams.find(team => team.id === teamId)\n' +
+    "  const [section, setSection] = useState<WorkspaceSection>(params.get('team') ? 'team-home' : initialSection)\n" +
+    '  function changeSection(next: WorkspaceSection) {\n' +
+    '    setSection(next)\n' +
+    '    const url = new URL(window.location.href)\n' +
+    "    if (next === 'agent' || next === 'coordinator') url.searchParams.set('section', next)\n" +
+    "    else url.searchParams.delete('section')\n" +
+    "    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)\n" +
+    '  }\n' +
+    '  const [agentRequest, setAgentRequest] = useState<AgentSessionRequest>()\n' +
+    '  const [activeAgentId, setActiveAgentId] = useState<string | null>(null)\n' +
+    '  // Sessions the open Agent panel knows about, including ones still streaming and not saved yet.\n' +
+    '  const [liveSessions, setLiveSessions] = useState<SavedAgentSession[]>([])\n' +
+    "  const lastConversation = useRef<Conversation>(initialSection === 'agent' ? { kind: 'agent', sessionId: null } : { kind: 'coordinator' })\n" +
+    '  const [projectId, setProjectId] = useState<string | null>(null)\n' +
+    '  const [creationProject, setCreationProject] = useState<string | null>(null)\n' +
+    "  const [layout, setLayout] = useState<'board' | 'list'>('board')\n" +
+    '  const [selected, setSelected] = useState<string | null>(initialSelected)\n' +
+    '  const [pendingSelection, setPendingSelection] = useState<string | null | undefined>(und'... 19032 more characters
+  
+      at TestContext.<anonymous> (/workspace/mikka-policy-230/tests/agent-ui.test.mjs:43:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '\'use client\'\nimport { useTranslations } from \'next-intl\'\n\nimport { useCallback, useEffect, useRef, useState } from \'react\'\nimport useSWR, { useSWRConfig } from \'swr\'\nimport { toast } from \'sonner\'\nimport { useSearchParams } from \'next/navigation\'\nimport { usePathname, useRouter } from \'@/i18n/navigation\'\nimport dynamic from \'next/dynamic\'\nimport { Skeleton } from \'@/components/ui/skeleton\'\nimport { Columns3, List, Plus, Search } from \'lucide-react\'\nimport { ToggleGroup, ToggleGroupItem } from \'@/components/ui/toggle-group\'\nimport { IconRail, type RailDestination } from \'@/components/nav/icon-rail\'\nimport { ConversationList, type Conversation } from \'@/components/nav/conversation-list\'\nimport type { AgentSessionRequest } from \'./agent-panel\'\nimport { TeamHome } from \'@/components/teams/team-home\'\nimport { AppFrame, AppShell, AppShellContent, SignOutBoundary, WindowBar } from \'@/components/app-shell\'\nimport { IssueList } from \'./issue-list\'\nimport { BoardPage } from \'./board-page\'\nimport { NewTaskDialog } from \'@/components/coordinator/new-task-dialog\'\nimport { GlobalSearch, SearchPill } from \'@/components/nav/global-search\'\nimport { ContextPanel } from \'@/components/nav/context-panel\'\nimport { listTaskRuns } from \'@/app/actions/task-runs\'\nimport { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from \'@/app/actions/coordinator\'\nimport { sessionPreview } from \'@/lib/agent-history\'\nimport { PanelRight } from \'lucide-react\'\nimport { ISSUE_STATUSES, issueIdentifier, type IssueStatus, type IssueView } from \'./issue-properties\'\nimport { listIssues } from \'@/app/actions/issues\'\nimport { authClient } from \'@/lib/auth-client\'\nimport { Button } from \'@/components/ui/button\'\nimport { Tooltip, TooltipContent, TooltipTrigger } from \'@/components/ui/tooltip\'\nimport { ShortcutKeys } from \'@/components/shortcut-keys\'\nimport { Badge } from \'@/components/ui/badge\'\nimport { Input } from \'@/components/ui/input\'\nimport { NativeSelect, NativeSelectOption } from \'@/components/ui/native-select\'\nimport { listProjects } from \'@/app/actions/projects\'\nimport { listTeams } from \'@/app/actions/teams\'\nimport { listProjectTeams } from \'@/app/actions/team-relations\'\nimport { WorkspaceOverview } from \'./workspace-overview\'\nimport { WorkspaceContentLoading, WorkspaceLoading } from \'./workspace-loading\'\nimport { PluginsSkillsView } from \'@/components/plugins/plugins-skills-view\'\nimport type { WorkspaceSection } from \'./workspace-navigation\'\nimport { pushSettingsHistory } from \'@/lib/settings-navigation\'\nimport { bufferTypeAhead, typingOrDialog } from \'@/lib/shortcut-guard\'\nimport { fetchSettingsData } from \'@/lib/settings-data\'\nimport type { WorkspaceSwitcher } from \'@/lib/workspace-switcher\'\nimport type { AgentHistory, SavedAgentSession } from \'@/lib/agent-history\'\nimport { useAgentHistory } from \'@/hooks/use-agent-history\'\nimport { useWorkspace } from \'@/hooks/use-workspace\'\n\n// Start the chunk download during module evaluation, before hydration and its effects.\nif (typeof window !== \'undefined\') {\n  void import(\'./agent-panel\').catch(() => {})\n  void import(\'./create-issue-dialog\').catch(() => {})\n}\n\nfunction DetailLoading() {\n  const t = useTranslations(\'Workspace\')\n  return <div role="status" aria-label={t(\'loadingEditor\')} className="flex flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>\n}\nconst TaskDetail = dynamic(() => import(\'./task-detail\').then(module => module.TaskDetail), { loading: DetailLoading })\nconst ProjectWorkspace = dynamic(() => import(\'./project-workspace\').then(module => module.ProjectWorkspace), { loading: DetailLoading })\n// Settings open through history.pushState; without their own fallback a first chunk load suspends\n// up to the route\'s loading boundary, which can stay stuck on the skeleton.\nconst SettingsShell = dynamic(() => import(\'@/components/settings/settings-shell\').then(module => module.SettingsShell), { loading: WorkspaceLoading })\nconst SettingsView = dynamic(() => import(\'@/components/settings/settings-view\').then(module => module.SettingsView), { loading: WorkspaceContentLoading })\n\nexport function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = \'coordinator\', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: \'integrations\' | \'account\'; googleEnabled?: boolean }) {\n  const i18nText = useTranslations()\n  const { data: workspaceData } = useWorkspace(user.email)\n  const { data: agentHistory } = useAgentHistory(user.id, initialAgentHistory)\n  const t = useTranslations(\'Workspace\')\n  const tIssue = useTranslations(\'Issue\')\n  const tPlugins = useTranslations(\'Plugins\')\n  const params = useSearchParams()\n  const pathname = usePathname()\n  const router = useRouter()\n  const { data: workspaceContext } = useSWR(\'/api/workspace/switcher\', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })\n  const { mutate: clearCache } = useSWRConfig()\n  const sectionTitles: Record<WorkspaceSection, string> = {\n    inbox: i18nText(\'Overview.sections.inbox\'),\n    \'my-issues\': i18nText(\'Overview.sections.myIssues\'),\n    agent: i18nText(\'Overview.sections.agent\'),\n    coordinator: i18nText(\'Overview.sections.coordinator\'),\n    projects: i18nText(\'Overview.sections.projects\'),\n    views: i18nText(\'Overview.sections.views\'),\n    \'team-home\': i18nText(\'Overview.sections.teamHome\'),\n    \'team-issues\': i18nText(\'Overview.sections.teamIssues\'),\n    \'team-projects\': i18nText(\'Overview.sections.teamProjects\'),\n    \'all-issues\': i18nText(\'Overview.sections.allIssues\'),\n    plugins: tPlugins(\'title\'),\n  }\n  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value\n  const [settingsOpen, setSettingsOpen] = useState(Boolean(initialSettingsSection))\n  const [settingsTarget, setSettingsTarget] = useState<{ section: \'preferences\' | \'members\' | \'integrations\' | \'account\'; invite: boolean }>({ section: initialSettingsSection ?? \'preferences\', invite: false })\n  const [linearNotice, setLinearNotice] = useState<\'connected\' | \'error\' | null>(null)\n  useEffect(() => {\n    const url = new URL(window.location.href)\n    const result = url.searchParams.get(\'linear\')\n    if (result !== \'connected\' && result !== \'error\') return\n    setSettingsOpen(true)\n    setSettingsTarget({ section: \'integrations\', invite: false })\n    setLinearNotice(result)\n    url.searchParams.delete(\'linear\')\n    window.history.replaceState(null, \'\', url)\n  }, [])\n  const [boardBusy, setBoardBusy] = useState(false)\n  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR([\'issues\', user.id], listIssues, { fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })\n  // Keep failed refreshes out of document flow so the board/list never jumps.\n  const listErrorMessage = t(\'listError\')\n  useEffect(() => {\n    const id = `issue-list-error-${user.id}`\n    if (error) toast.error(listErrorMessage, { id, duration: Infinity })\n    else toast.dismiss(id)\n    return () => { toast.dismiss(id) }\n  }, [error, listErrorMessage, user.id])\n  const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR([\'projects\', user.id], listProjects)\n  const { data: teams = [] } = useSWR(\'teams\', listTeams)\n  const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR(\'project-teams\', listProjectTeams)\n  const { data: taskRuns = [] } = useSWR(\'task-runs\', () => listTaskRuns(), { refreshInterval: boardBusy ? 0 : 15000, revalidateOnFocus: false })\n  const { data: coordinatorChat } = useSWR<CoordinatorChatView>(\'coordinator-chat\', () => getCoordinatorChat(), { revalidateOnFocus: false })\n  const [panelOpen, setPanelOpen] = useState(true)\n  useEffect(() => { try { if (window.localStorage.getItem(\'mikka:context-panel\') === \'0\') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])\n  function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem(\'mikka:context-panel\', next ? \'1\' : \'0\') } catch { /* storage unavailable */ } }\n  const [coordinatorPrefill, setCoordinatorPrefill] = useState<{ text: string; nonce: number }>()\n  const [teamId, setTeamId] = useState<string | null>(params.get(\'team\'))\n  const activeTeam = teams.find(team => team.id === teamId)\n  const [section, setSection] = useState<WorkspaceSection>(params.get(\'team\') ? \'team-home\' : initialSection)\n  function changeSection(next: WorkspaceSection) {\n    setSection(next)\n    const url = new URL(window.location.href)\n    if (next === \'agent\' || next === \'coordinator\') url.searchParams.set(\'section\', next)\n    else url.searchParams.delete(\'section\')\n    window.history.replaceState(window.history.state, \'\', `${url.pathname}${url.search}${url.hash}`)\n  }\n  const [agentRequest, setAgentRequest] = useState<AgentSessionRequest>()\n  const [activeAgentId, setActiveAgentId] = useState<string | null>(null)\n  // Sessions the open Agent panel knows about, including ones still streaming and not saved yet.\n  const [liveSessions, setLiveSessions] = useState<SavedAgentSession[]>([])\n  const lastConversation = useRef<Conversation>(initialSection === \'agent\' ? { kind: \'agent\', sessionId: null } : { kind: \'coordinator\' })\n  const [projectId, setProjectId] = useState<string | null>(null)\n  const [creationProject, setCreationProject] = useState<string | null>(null)\n  const [layout, setLayout] = useState<\'board\' | \'list\'>(\'board\')\n  const [selected, setSelected] = useState<string | null>(initialSelected)\n  const [pendingSelection, setPendingSelection] = useState<string | null | undefined>(und'... 19032 more characters,
+    expected: /if \(typeof window !== 'undefined'\) void import\('\.\/agent-panel'\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/agent-ui.test.mjs:433:1
+✖ Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单 (7.572964ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /<Popover[\s>]/. Input:
+  
+  "'use client'\n" +
+    '\n' +
+    "import { useAgentCopy } from '@/hooks/use-agent-copy'\n" +
+    "import type { ReactNode } from 'react'\n" +
+    "import { MessageSquarePlus } from 'lucide-react'\n" +
+    "import { SidebarTrigger } from '@/components/ui/sidebar'\n" +
+    "import { AgentWelcome } from './agent-welcome'\n" +
+    "import { Button } from '@/components/ui/button'\n" +
+    "import { ConversationPill } from '@/components/nav/conversation-pill'\n" +
+    "import { AgentConversation, type AgentTurn } from './agent-conversation'\n" +
+    "import type { SavedAgentSession } from '@/lib/agent-history'\n" +
+    '\n' +
+    'export type AgentChatSession = SavedAgentSession & { running?: boolean }\n' +
+    '\n' +
+    'type AgentChatNavigation = {\n' +
+    '  sessions: AgentChatSession[]\n' +
+    '  sessionId: string | null\n' +
+    '  onSelect: (id: string) => void\n' +
+    '  onReset: () => void\n' +
+    '  onDemo?: () => void\n' +
+    '}\n' +
+    '\n' +
+    'export function AgentChat({ turns, composer, streaming, sessions, sessionId, onSelect, onReset, onDemo, onSuggestion }: AgentChatNavigation & {\n' +
+    '  turns: AgentTurn[]\n' +
+    '  composer: ReactNode\n' +
+    '  streaming: boolean\n' +
+    '  onSuggestion: (prompt: string) => void\n' +
+    '}) {\n' +
+    '  const agentCopy = useAgentCopy()\n' +
+    '\n' +
+    '  const title = sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || agentCopy.newConversation\n' +
+    '\n' +
+    '  return <section aria-label={agentCopy.agentConversationWorkspace} className="mikka-agent relative flex size-full min-h-0 flex-col">\n' +
+    '    <AgentChatHeader title={title} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} onDemo={onDemo} />\n' +
+    '    <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />\n' +
+    '    {turns.length === 0 ? <AgentWelcome composer={composer} sessions={sessions} onSelect={onSelect} onSuggestion={onSuggestion} /> : <>\n' +
+    '      <AgentConversation turns={turns} streaming={streaming} />\n' +
+    '      <footer className="shrink-0 px-4 pb-4 pt-2 sm:px-8 sm:pb-6">\n' +
+    '        <div className="mx-auto w-full max-w-3xl">{composer}</div>\n' +
+    '      </footer>\n' +
+    '    </>}\n' +
+    '  </section>\n' +
+    '}\n' +
+    '\n' +
+    'function AgentChatHeader({ title, streaming, onReset, onDemo }: AgentChatNavigation & { title: string; streaming: boolean }) {\n' +
+    '  const agentCopy = useAgentCopy()\n' +
+    '\n' +
+    '  // Desktop shows the conversation as the centered pill (MIK-40) and switches conversations in the left list or ⌘K.\n' +
+    '  return <>\n' +
+    '    <ConversationPill name={title} />\n' +
+    '    {streaming && <span role="status" className="sr-only">{agentCopy.responding}</span>}\n' +
+    '    <header className="flex h-12 shrink-0 items-center gap-2 px-4 md:hidden">\n' +
+    '      <SidebarTrigger aria-label={agentCopy.toggleSidebar} />\n' +
+    '      <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{title}</h1>\n' +
+    '      {onDemo && <Button variant="ghost" size="sm" onClick={onDemo}>{agentCopy.componentDemo}</Button>}\n' +
+    '      <Button variant="ghost" size="icon" aria-label={agentCopy.newTask} title={agentCopy.newTask} onClick={onReset}><MessageSquarePlus aria-hidden="true" data-icon="inline-start" /></Button>\n' +
+    '    </header>\n' +
+    '  </>\n' +
+    '}\n'
+  
+      at TestContext.<anonymous> (/workspace/mikka-policy-230/tests/agent-ui.test.mjs:436:12)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `'use client'\n\nimport { useAgentCopy } from '@/hooks/use-agent-copy'\nimport type { ReactNode } from 'react'\nimport { MessageSquarePlus } from 'lucide-react'\nimport { SidebarTrigger } from '@/components/ui/sidebar'\nimport { AgentWelcome } from './agent-welcome'\nimport { Button } from '@/components/ui/button'\nimport { ConversationPill } from '@/components/nav/conversation-pill'\nimport { AgentConversation, type AgentTurn } from './agent-conversation'\nimport type { SavedAgentSession } from '@/lib/agent-history'\n\nexport type AgentChatSession = SavedAgentSession & { running?: boolean }\n\ntype AgentChatNavigation = {\n  sessions: AgentChatSession[]\n  sessionId: string | null\n  onSelect: (id: string) => void\n  onReset: () => void\n  onDemo?: () => void\n}\n\nexport function AgentChat({ turns, composer, streaming, sessions, sessionId, onSelect, onReset, onDemo, onSuggestion }: AgentChatNavigation & {\n  turns: AgentTurn[]\n  composer: ReactNode\n  streaming: boolean\n  onSuggestion: (prompt: string) => void\n}) {\n  const agentCopy = useAgentCopy()\n\n  const title = sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || agentCopy.newConversation\n\n  return <section aria-label={agentCopy.agentConversationWorkspace} className="mikka-agent relative flex size-full min-h-0 flex-col">\n    <AgentChatHeader title={title} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} onDemo={onDemo} />\n    <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />\n    {turns.length === 0 ? <AgentWelcome composer={composer} sessions={sessions} onSelect={onSelect} onSuggestion={onSuggestion} /> : <>\n      <AgentConversation turns={turns} streaming={streaming} />\n      <footer className="shrink-0 px-4 pb-4 pt-2 sm:px-8 sm:pb-6">\n        <div className="mx-auto w-full max-w-3xl">{composer}</div>\n      </footer>\n    </>}\n  </section>\n}\n\nfunction AgentChatHeader({ title, streaming, onReset, onDemo }: AgentChatNavigation & { title: string; streaming: boolean }) {\n  const agentCopy = useAgentCopy()\n\n  // Desktop shows the conversation as the centered pill (MIK-40) and switches conversations in the left list or ⌘K.\n  return <>\n    <ConversationPill name={title} />\n    {streaming && <span role="status" className="sr-only">{agentCopy.responding}</span>}\n    <header className="flex h-12 shrink-0 items-center gap-2 px-4 md:hidden">\n      <SidebarTrigger aria-label={agentCopy.toggleSidebar} />\n      <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{title}</h1>\n      {onDemo && <Button variant="ghost" size="sm" onClick={onDemo}>{agentCopy.componentDemo}</Button>}\n      <Button variant="ghost" size="icon" aria-label={agentCopy.newTask} title={agentCopy.newTask} onClick={onReset}><MessageSquarePlus aria-hidden="true" data-icon="inline-start" /></Button>\n    </header>\n  </>\n}\n`,
+    expected: /<Popover[\s>]/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/agent-web-tools.test.mjs:9:1
+✖ 联网工具只暴露搜索和网页读取，保留 DS 聊天及认证 (59.090497ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /tools:\s*\{\s*\.\.\.createAgentWebTools\(\{ signal: request\.signal \}\),/. Input:
+  
+  "import { pool } from '@/lib/db'\n" +
+    "import { subscriptionRepositoryIfInstalled } from '@/lib/subscription-binding-discovery'\n" +
+    "import { mailboxes } from '@/lib/mailbox-runtime'\n" +
+    "import { MAILBOX_INSTRUCTIONS, mailboxTools } from '@/lib/mailbox-tools'\n" +
+    "import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'\n" +
+    "import { authorizeModel, authorizePolicyTool } from '@/lib/policy/runtime'\n" +
+    "import { PolicyError } from '@/lib/policy/contract'\n" +
+    "import { AGENT_ROUTE, modelFetch, coordinatorRoute } from '@/lib/policy/model'\n" +
+    "import { createOpenAICompatible } from '@ai-sdk/openai-compatible'\n" +
+    "import { createUIMessageStreamResponse, isStepCount, streamText, toUIMessageStream } from 'ai'\n" +
+    "import { agentWebInstructions, createAgentWebTools } from '@/lib/agent-web-tools'\n" +
+    "import { createComposioAITools } from '@/lib/composio-actions'\n" +
+    "import { runComposioAction } from '@/lib/composio'\n" +
+    "import { z } from 'zod'\n" +
+    "import { auth } from '@/lib/auth'\n" +
+    "import systemPrompt from '@/lib/agent-system-prompt.json'\n" +
+    "import { validateAgentStream } from '@/lib/agent-fetch'\n" +
+    "import { persistAgentStream } from '@/lib/agent-history'\n" +
+    "import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'\n" +
+    "import { createCredentialAITools } from '@/lib/credentials/ai-tools'\n" +
+    "import { executeSystemCredentialTool } from '@/lib/credentials/runtime'\n" +
+    "import { agentModelSourceSchema, resolveAgentModel } from '@/lib/agent-model'\n" +
+    "import { SubscriptionRefusal } from '@mikka/protocol/subscription'\n" +
+    "import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'\n" +
+    "import { resolveAgentSubscription } from '@/lib/agent-subscription'\n" +
+    '\n' +
+    'export const maxDuration = 300\n' +
+    '\n' +
+    '// Reuse the POST bundle: image lookup must not trigger a second cold route compilation.\n' +
+    "export { GET } from './images/route'\n" +
+    '\n' +
+    'const promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional(), turnId: z.uuid().optional(), retry: z.boolean().optional(), modelSource: agentModelSourceSchema.optional() }).strict()\n' +
+    "const errorHeaders = { 'Cache-Control': 'private, no-store', 'Content-Type': 'text/plain; charset=utf-8' }\n" +
+    '\n' +
+    'function agentErrorMessage(error: unknown) {\n' +
+    "  const status = typeof error === 'object' && error !== null && 'statusCode' in error ? error.statusCode : undefined\n" +
+    '  if (status === 401 || status === 403) return agentCopy.opencodeGoAuthenticationOrModelAccessFailed\n' +
+    '  if (status === 429 || status === 402) return agentCopy.opencodeGoIsRateLimitedOrOut\n' +
+    '  if (error instanceof Error && /timeout|abort/i.test(error.name)) return agentCopy.theModelTimedOutReceivedContentIs\n' +
+    '  return agentCopy.opencodeGoConnectionFailedReceivedContentIs\n' +
+    '}\n' +
+    '\n' +
+    'export async function HEAD(request: Request) {\n' +
+    '  const session = await auth.api.getSession({ headers: request.headers })\n' +
+    "  return new Response(null, { status: session?.user ? 204 : 401, headers: { 'Cache-Control': 'private, no-store' } })\n" +
+    '}\n' +
+    '\n' +
+    'export async function POST(request: Request) {\n' +
+    "  if (request.headers.get('sec-fetch-site') === 'cross-site') {\n" +
+    '    return new Response(agentCopy.crosssiteRequestsAreNotAllowed, { status: 403, headers: errorHeaders })\n' +
+    '  }\n' +
+    '  const startedAt = performance.now()\n' +
+    '  const session = await auth.api.getSession({ headers: request.headers })\n' +
+    '  const authenticatedAt = performance.now()\n' +
+    '  if (!session?.user) return new Response(agentCopy.signInBeforeUsingAgent, { status: 401, headers: errorHeaders })\n' +
+    "  if (!request.headers.get('content-type')?.startsWith('application/json')) {\n" +
+    '    return new Response(agentCopy.sendAJSONRequest, { status: 415, headers: errorHeaders })\n' +
+    '  }\n' +
+    "  if (Number(request.headers.get('content-length')) > 40000) {\n" +
+    '    return new Response(agentCopy.theRequestIsTooLong, { status: 413, headers: errorHeaders })\n' +
+    '  }\n' +
+    '  const reader = request.body?.getReader()\n' +
+    '  if (!reader) return new Response(agentCopy.enterAQuestion, { status: 400, headers: errorHeaders })\n' +
+    '  let size = 0\n' +
+    '  const decoder = new TextDecoder()\n' +
+    "  let body = ''\n" +
+    '  try {\n' +
+    '    while (true) {\n' +
+    '      const { value, done } = await reader.read()\n' +
+    '      if (done) break\n' +
+    '      size += value.byteLength\n' +
+    '      if (size > 40000) {\n' +
+    '        await reader.cancel()\n' +
+    '        return new Response(agentCopy.theRequestIsTooLong, { status: 413, headers: errorHeaders })\n' +
+    '      }\n' +
+    '      body += decoder.decode(value, { stream: true })\n' +
+    '    }\n' +
+    '    body += decoder.decode()\n' +
+    '  } catch {\n' +
+    '    return new Response(agentCopy.unableToReadTheRequestPleaseRetry, { status: 400, headers: errorHeaders })\n' +
+    '  } finally {\n' +
+    '    reader.releaseLock()\n' +
+    '  }\n' +
+    '  const parsed = promptSchema.safeParse((() => {\n' +
+    '    try { return JSON.parse(body) } catch { return null }\n' +
+    '  })())\n' +
+    '  if (!parsed.success) return new Response(agentCopy.enterAQuestionBetween1And8000, { status: 400, headers: errorHeaders })\n' +
+    '\n' +
+    '  const sessionId = parsed.data.sessionId ?? crypto.randomUUID()\n' +
+    '  const turnId = parsed.data.turnId ?? crypto.randomUUID()\n' +
+    '  let model: Awaited<ReturnType<typeof resolveAgentModel>>\n' +
+    '  let modelSource = parsed.data.modelSource\n' +
+    '  try {\n' +
+    '    if (!modelSource) {\n' +
+    '      const saved = await (await subscriptionRepositoryIfInstalled(pool))?.defaultModelBinding(session.user.id, sessionId)\n' +
+    "      if (saved) modelSource = { type: 'subscription', bindingId: saved }\n" +
+    '    }\n' +
+    '    if (!modelSource) await authorizeModel(session.user.id, AGENT_ROUTE)\n' +
+    '    model = await resolveAgentModel(modelSource, {\n' +
+    '      subscriptionModel: async bindingId => {\n' +
+    '        await authorizePolicyTool(session.user.id)\n' +
+    '        return resolveAgentSubscription(session.user.id, sessionId, bindingId, subscriptionRuntime(), authorizeSubscriptionWorkspace, request.signal)\n' +
+    '      },\n' +
+    '      defaultModel: () => {\n' +
+    '        const apiKey = process.env.OPENCODE_API_KEY\n' +
+    "        if (!apiKey) throw new Error('default_model_unavailable')\n" +
+    '        const opencode = createOpenAICompatible({\n' +
+    "          name: 'opencode', apiKey, fetch: modelFetch(() => authorizeModel(session.user.id, AGENT_ROUTE), AGENT_ROUTE), baseURL: 'https://opencode.ai/zen/go/v1',\n" +
+    "          headers: { 'User-Agent': 'Mikka-UI-Agent/1.0', 'x-opencode-session': sessionId },\n" +
+    '        })\n' +
+    "        return opencode('deepseek-v4.1-flash')\n" +
+    '      },\n' +
+    '    })\n' +
+    '  } catch (error) {\n' +
+    '    if (error instanceof PolicyError) return Response.json({ error: error.code }, { status: error.status, headers: errorHeaders })\n' +
+    "    if (error instanceof SubscriptionRefusal) return Response.json({ error: error.code }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } })\n" +
+    "    if (modelSource) return Response.json({ error: 'backend_unavailable' }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } })\n" +
+    '    return new Response(agentCopy.opencodeapikeyIsNotConfiguredOnTheServer, { status: 503, headers: errorHeaders })\n' +
+    '  }\n' +
+    '  let turn: Awaited<ReturnType<typeof beginAgentTurn>>\n' +
+    '  try {\n' +
+    '    turn = await beginAgentTurn(session.user.id, sessionId, turnId, parsed.data.prompt, parsed.data.retry)\n' +
+    '  } catch (error) {\n' +
+    '    return new Response(error instanceof AgentStoreError ? error.message : agentCopy.unableToSaveThisQuestionPleaseTry, {\n' +
+    '      status: error instanceof AgentStoreError ? error.status : 503, headers: errorHeaders,\n' +
+    '    })\n' +
+    '  }\n' +
+    "  const messages: { role: 'user' | 'assistant'; content: string }[] = []\n" +
+    '  let historySize = 0\n' +
+    '  for (const previous of [...turn.history].reverse()) {\n' +
+    '    historySize += previous.prompt.length + previous.completion.length\n' +
+    '    if (historySize > 80000) break\n' +
+    "    messages.unshift({ role: 'user', content: previous.prompt }, { role: 'assistant', content: previous.completion })\n" +
+    '  }\n' +
+    "  messages.push({ role: 'user', content: parsed.data.prompt })\n" +
+    '\n' +
+    '  // A transient mailbox failure must not strand a saved pending Bot turn.\n' +
+    '  // As with older worker assignments, advertise only available capabilities.\n' +
+    "  const mailboxActor = await mailboxes.conversation(session.user.id, 'bot', sessionId).catch(() => {\n" +
+    "    console.error('Could not prepare Bot mailbox; continuing without mailbox tools')\n" +
+    '    return null\n' +
+    '  })\n' +
+    "  const generationError = modelSource ? () => 'Subscription connection unavailable.' : agentErrorMessage\n" +
+    '  const result = streamText({\n' +
+    '    model,\n' +
+    "    providerOptions: { opencode: { reasoningEffort: 'medium' } },\n" +
+    "    system: `${systemPrompt}\\n\\n${agentWebInstructions()}\\n\\n${mailboxActor ? MAILBOX_INSTRUCTIONS : ''}`,\n" +
+    '    messages,\n' +
+    '    tools: {\n' +
+    '      ...createCredentialAITools(async (name, input) => { await authorizePolicyTool(session.user.id); return executeSystemCredentialTool({ userId: session.user.id }, name, input) }),\n' +
+    '      ...(mailboxActor ? mailboxTools(mailboxes, mailboxActor, () => authorizePolicyTool(session.user.id)) : {}),\n' +
+    "      ...createAgentWebTools({ signal: request.signal, authorize: async () => { await authorizeModel(session.user.id, coordinatorRoute('openai/gpt-5.4-mini')); await authorizePolicyTool(session.user.id) } }),\n" +
+    '      ...createComposioAITools((action, input) => (async () => { await authorizePolicyTool(session.user.id); return runComposioAction(session.user.id, action, input) })()),\n' +
+    '    },\n' +
+    '    stopWhen: isStepCount(5),\n' +
+    "    prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},\n" +
+    '    maxRetries: modelSource ? 0 : 1,\n' +
+    '    timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },\n' +
+    '    abortSignal: request.signal,\n' +
+    '    onError: ({ error }) => {\n' +
+    "      if (!request.signal.aborted) console.error('Agent generation failed:', generationError(error))\n" +
+    '    },\n' +
+    '  })\n' +
+    '  return createUIMessageStreamResponse({\n' +
+    '    headers: {\n' +
+    "      'Cache-Control': 'private, no-store', 'X-Accel-Buffering': 'no', 'X-Agent-Session-Id': sessionId, 'X-Agent-Turn-Id': turnId,\n" +
+    "      'Server-Timing': `auth;dur=${(authenticatedAt - startedAt).toFixed(1)}, prepare;dur=${(performance.now() - authenticatedAt).toFixed(1)}`,\n" +
+    '    },\n' +
+    '    stream: persistAgentStream(toUIMessageStream({\n' +
+    '      stream: result.stream,\n' +
+    '      sendReasoning: false,\n' +
+    '      onError: generationError,\n' +
+    '    }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),\n' +
+    '  })\n' +
+    '}\n'
+  
+      at TestContext.<anonymous> (file:///workspace/mikka-policy-230/tests/agent-web-tools.test.mjs:15:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "import { pool } from '@/lib/db'\nimport { subscriptionRepositoryIfInstalled } from '@/lib/subscription-binding-discovery'\nimport { mailboxes } from '@/lib/mailbox-runtime'\nimport { MAILBOX_INSTRUCTIONS, mailboxTools } from '@/lib/mailbox-tools'\nimport { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'\nimport { authorizeModel, authorizePolicyTool } from '@/lib/policy/runtime'\nimport { PolicyError } from '@/lib/policy/contract'\nimport { AGENT_ROUTE, modelFetch, coordinatorRoute } from '@/lib/policy/model'\nimport { createOpenAICompatible } from '@ai-sdk/openai-compatible'\nimport { createUIMessageStreamResponse, isStepCount, streamText, toUIMessageStream } from 'ai'\nimport { agentWebInstructions, createAgentWebTools } from '@/lib/agent-web-tools'\nimport { createComposioAITools } from '@/lib/composio-actions'\nimport { runComposioAction } from '@/lib/composio'\nimport { z } from 'zod'\nimport { auth } from '@/lib/auth'\nimport systemPrompt from '@/lib/agent-system-prompt.json'\nimport { validateAgentStream } from '@/lib/agent-fetch'\nimport { persistAgentStream } from '@/lib/agent-history'\nimport { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'\nimport { createCredentialAITools } from '@/lib/credentials/ai-tools'\nimport { executeSystemCredentialTool } from '@/lib/credentials/runtime'\nimport { agentModelSourceSchema, resolveAgentModel } from '@/lib/agent-model'\nimport { SubscriptionRefusal } from '@mikka/protocol/subscription'\nimport { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'\nimport { resolveAgentSubscription } from '@/lib/agent-subscription'\n\nexport const maxDuration = 300\n\n// Reuse the POST bundle: image lookup must not trigger a second cold route compilation.\nexport { GET } from './images/route'\n\nconst promptSchema = z.object({ prompt: z.string().trim().min(1).max(8000), sessionId: z.uuid().optional(), turnId: z.uuid().optional(), retry: z.boolean().optional(), modelSource: agentModelSourceSchema.optional() }).strict()\nconst errorHeaders = { 'Cache-Control': 'private, no-store', 'Content-Type': 'text/plain; charset=utf-8' }\n\nfunction agentErrorMessage(error: unknown) {\n  const status = typeof error === 'object' && error !== null && 'statusCode' in error ? error.statusCode : undefined\n  if (status === 401 || status === 403) return agentCopy.opencodeGoAuthenticationOrModelAccessFailed\n  if (status === 429 || status === 402) return agentCopy.opencodeGoIsRateLimitedOrOut\n  if (error instanceof Error && /timeout|abort/i.test(error.name)) return agentCopy.theModelTimedOutReceivedContentIs\n  return agentCopy.opencodeGoConnectionFailedReceivedContentIs\n}\n\nexport async function HEAD(request: Request) {\n  const session = await auth.api.getSession({ headers: request.headers })\n  return new Response(null, { status: session?.user ? 204 : 401, headers: { 'Cache-Control': 'private, no-store' } })\n}\n\nexport async function POST(request: Request) {\n  if (request.headers.get('sec-fetch-site') === 'cross-site') {\n    return new Response(agentCopy.crosssiteRequestsAreNotAllowed, { status: 403, headers: errorHeaders })\n  }\n  const startedAt = performance.now()\n  const session = await auth.api.getSession({ headers: request.headers })\n  const authenticatedAt = performance.now()\n  if (!session?.user) return new Response(agentCopy.signInBeforeUsingAgent, { status: 401, headers: errorHeaders })\n  if (!request.headers.get('content-type')?.startsWith('application/json')) {\n    return new Response(agentCopy.sendAJSONRequest, { status: 415, headers: errorHeaders })\n  }\n  if (Number(request.headers.get('content-length')) > 40000) {\n    return new Response(agentCopy.theRequestIsTooLong, { status: 413, headers: errorHeaders })\n  }\n  const reader = request.body?.getReader()\n  if (!reader) return new Response(agentCopy.enterAQuestion, { status: 400, headers: errorHeaders })\n  let size = 0\n  const decoder = new TextDecoder()\n  let body = ''\n  try {\n    while (true) {\n      const { value, done } = await reader.read()\n      if (done) break\n      size += value.byteLength\n      if (size > 40000) {\n        await reader.cancel()\n        return new Response(agentCopy.theRequestIsTooLong, { status: 413, headers: errorHeaders })\n      }\n      body += decoder.decode(value, { stream: true })\n    }\n    body += decoder.decode()\n  } catch {\n    return new Response(agentCopy.unableToReadTheRequestPleaseRetry, { status: 400, headers: errorHeaders })\n  } finally {\n    reader.releaseLock()\n  }\n  const parsed = promptSchema.safeParse((() => {\n    try { return JSON.parse(body) } catch { return null }\n  })())\n  if (!parsed.success) return new Response(agentCopy.enterAQuestionBetween1And8000, { status: 400, headers: errorHeaders })\n\n  const sessionId = parsed.data.sessionId ?? crypto.randomUUID()\n  const turnId = parsed.data.turnId ?? crypto.randomUUID()\n  let model: Awaited<ReturnType<typeof resolveAgentModel>>\n  let modelSource = parsed.data.modelSource\n  try {\n    if (!modelSource) {\n      const saved = await (await subscriptionRepositoryIfInstalled(pool))?.defaultModelBinding(session.user.id, sessionId)\n      if (saved) modelSource = { type: 'subscription', bindingId: saved }\n    }\n    if (!modelSource) await authorizeModel(session.user.id, AGENT_ROUTE)\n    model = await resolveAgentModel(modelSource, {\n      subscriptionModel: async bindingId => {\n        await authorizePolicyTool(session.user.id)\n        return resolveAgentSubscription(session.user.id, sessionId, bindingId, subscriptionRuntime(), authorizeSubscriptionWorkspace, request.signal)\n      },\n      defaultModel: () => {\n        const apiKey = process.env.OPENCODE_API_KEY\n        if (!apiKey) throw new Error('default_model_unavailable')\n        const opencode = createOpenAICompatible({\n          name: 'opencode', apiKey, fetch: modelFetch(() => authorizeModel(session.user.id, AGENT_ROUTE), AGENT_ROUTE), baseURL: 'https://opencode.ai/zen/go/v1',\n          headers: { 'User-Agent': 'Mikka-UI-Agent/1.0', 'x-opencode-session': sessionId },\n        })\n        return opencode('deepseek-v4.1-flash')\n      },\n    })\n  } catch (error) {\n    if (error instanceof PolicyError) return Response.json({ error: error.code }, { status: error.status, headers: errorHeaders })\n    if (error instanceof SubscriptionRefusal) return Response.json({ error: error.code }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } })\n    if (modelSource) return Response.json({ error: 'backend_unavailable' }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } })\n    return new Response(agentCopy.opencodeapikeyIsNotConfiguredOnTheServer, { status: 503, headers: errorHeaders })\n  }\n  let turn: Awaited<ReturnType<typeof beginAgentTurn>>\n  try {\n    turn = await beginAgentTurn(session.user.id, sessionId, turnId, parsed.data.prompt, parsed.data.retry)\n  } catch (error) {\n    return new Response(error instanceof AgentStoreError ? error.message : agentCopy.unableToSaveThisQuestionPleaseTry, {\n      status: error instanceof AgentStoreError ? error.status : 503, headers: errorHeaders,\n    })\n  }\n  const messages: { role: 'user' | 'assistant'; content: string }[] = []\n  let historySize = 0\n  for (const previous of [...turn.history].reverse()) {\n    historySize += previous.prompt.length + previous.completion.length\n    if (historySize > 80000) break\n    messages.unshift({ role: 'user', content: previous.prompt }, { role: 'assistant', content: previous.completion })\n  }\n  messages.push({ role: 'user', content: parsed.data.prompt })\n\n  // A transient mailbox failure must not strand a saved pending Bot turn.\n  // As with older worker assignments, advertise only available capabilities.\n  const mailboxActor = await mailboxes.conversation(session.user.id, 'bot', sessionId).catch(() => {\n    console.error('Could not prepare Bot mailbox; continuing without mailbox tools')\n    return null\n  })\n  const generationError = modelSource ? () => 'Subscription connection unavailable.' : agentErrorMessage\n  const result = streamText({\n    model,\n    providerOptions: { opencode: { reasoningEffort: 'medium' } },\n    system: `${systemPrompt}\\n\\n${agentWebInstructions()}\\n\\n${mailboxActor ? MAILBOX_INSTRUCTIONS : ''}`,\n    messages,\n    tools: {\n      ...createCredentialAITools(async (name, input) => { await authorizePolicyTool(session.user.id); return executeSystemCredentialTool({ userId: session.user.id }, name, input) }),\n      ...(mailboxActor ? mailboxTools(mailboxes, mailboxActor, () => authorizePolicyTool(session.user.id)) : {}),\n      ...createAgentWebTools({ signal: request.signal, authorize: async () => { await authorizeModel(session.user.id, coordinatorRoute('openai/gpt-5.4-mini')); await authorizePolicyTool(session.user.id) } }),\n      ...createComposioAITools((action, input) => (async () => { await authorizePolicyTool(session.user.id); return runComposioAction(session.user.id, action, input) })()),\n    },\n    stopWhen: isStepCount(5),\n    prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},\n    maxRetries: modelSource ? 0 : 1,\n    timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },\n    abortSignal: request.signal,\n    onError: ({ error }) => {\n      if (!request.signal.aborted) console.error('Agent generation failed:', generationError(error))\n    },\n  })\n  return createUIMessageStreamResponse({\n    headers: {\n      'Cache-Control': 'private, no-store', 'X-Accel-Buffering': 'no', 'X-Agent-Session-Id': sessionId, 'X-Agent-Turn-Id': turnId,\n      'Server-Timing': `auth;dur=${(authenticatedAt - startedAt).toFixed(1)}, prepare;dur=${(performance.now() - authenticatedAt).toFixed(1)}`,\n    },\n    stream: persistAgentStream(toUIMessageStream({\n      stream: result.stream,\n      sendReasoning: false,\n      onError: generationError,\n    }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),\n  })\n}\n",
+    expected: /tools:\s*\{\s*\.\.\.createAgentWebTools\(\{ signal: request\.signal \}\),/,
+    operator: 'match',
+    diff: 'simple'
+  }
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.

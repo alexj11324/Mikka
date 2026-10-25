@@ -1,0 +1,45 @@
+
+> next-app@0.0.1 lint /workspace/mikka-policy-230
+> pnpm lint:code && pnpm lint:ui
+
+
+> next-app@0.0.1 lint:code /workspace/mikka-policy-230
+> oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations
+
+
+> next-app@0.0.1 check:migrations /workspace/mikka-policy-230
+> node scripts/check-migrations.mjs
+
+migrations: 60 个迁移文件检查通过
+
+> next-app@0.0.1 test:migrations /workspace/mikka-policy-230
+> node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs tests/factory-migration-order.test.mjs
+
+✔ 历史重号在白名单内通过 (3.487921ms)
+✔ 新的 NNNN_ 文件被拒绝 (0.569261ms)
+✔ 修改旧迁移被拒绝 (0.849241ms)
+✔ 删除旧迁移被拒绝 (0.49756ms)
+✔ 非法时间戳被拒绝 (0.433211ms)
+✔ 不晚于 main 最新迁移被拒绝 (2.082926ms)
+✔ 晚于 main 最新迁移通过 (0.391802ms)
+✔ 时间戳重复被拒绝 (0.30517ms)
+✔ 拿不到 main 时只跳过顺序检查 (0.399209ms)
+✔ only the explicit baseline precedes legacy migrations, without changing their IDs (1.397862ms)
+✔ missing baseline fails before connecting to any database (0.439277ms)
+✔ one canonical Factory migration per component, after main and before consumers, with unchanged shared SQL (4.357895ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 147.564283
+
+> next-app@0.0.1 lint:ui /workspace/mikka-policy-230
+> node scripts/lint-ui.mjs
+
+
+UI policy: 677 business files, 0 errors; 254 component-library files excluded (no source verification).
+Interaction policy: 282 files, including downloaded business blocks; only UI/ReUI primitives excluded.
+{}

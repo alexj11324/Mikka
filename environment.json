@@ -1,0 +1,58 @@
+{
+  "sourceSha": "710da20f2f2f9767a989ceb7ab105efa9baafda9",
+  "baseSha": "9532817f3456ae0ed4decc9cd5d7e0e5bac95feb",
+  "utc": "2026-10-25T17:50:59.772Z",
+  "environment": {
+    "os": "Linux 6.18.55 x86_64",
+    "node": "v24.19.0",
+    "postgresImage": "sha256:82903352d6faf8f8a318bc4353d1cb1db67d4a5ff968d2799b2718e2cb00afa2",
+    "nodeImage": "sha256:dc1f22974dab4be31a8b56d58cb1f8fc218e83de83ccd831d885b3d7ac1223fb"
+  },
+  "runtime": {
+    "mode": "Next development server, on-demand compilation, isolated cloud Linux; production build/API acceptance verified separately in exact-SHA CI",
+    "trackedSource": "clean detached worktree at same SHA; dependencies linked to the same frozen source worktree",
+    "httpRequests": 37,
+    "browserRequests": 3,
+    "daemonRestarts": 2,
+    "nextProcessRestarts": 1
+  },
+  "ci": {
+    "policy": "https://github.com/alexj11324/Mikka/actions/runs/40217397265",
+    "sourceSha": "710da20f2f2f9767a989ceb7ab105efa9baafda9",
+    "postgres": 13,
+    "protocol": 224,
+    "daemonPassed": 247,
+    "daemonExplicitSkips": 9,
+    "httpRequests": 37
+  },
+  "history": [
+    {
+      "command": "REQUIRE_POLICY_DB=1 pnpm test:policy",
+      "result": "13 passed; zero skipped; dedicated loopback PG17",
+      "log": "history/policy-230-postgres-final.log",
+      "capturedUtc": "2026-10-25T17:17:57.324Z",
+      "sourceSha": "3a4794b0b63c30d64c7e371cfc94385908e994c3",
+      "note": "Historical check; final frozen source verified by CI."
+    },
+    {
+      "command": "pnpm lint",
+      "result": "passed; zero UI policy errors",
+      "log": "history/policy-230-lint-final.log",
+      "capturedUtc": "2026-10-25T17:18:02.776Z",
+      "sourceSha": "3a4794b0b63c30d64c7e371cfc94385908e994c3",
+      "note": "Historical check; final frozen source verified by CI."
+    },
+    {
+      "command": "pnpm check",
+      "result": "stops at three known baseline Agent frontend/static assertions; not claimed green",
+      "log": "history/policy-230-check.log",
+      "capturedUtc": "2026-10-25T17:09:41.484Z",
+      "sourceSha": "c3333c0b10dcdcaa86ed3c7ae4b4aa543107fe43",
+      "note": "Historical check; final frozen source verified by CI."
+    }
+  ],
+  "redaction": {
+    "ephemeralAuthEnvironmentLines": 4,
+    "rawVideoUnchanged": true
+  }
+}

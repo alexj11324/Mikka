@@ -1,0 +1,26 @@
+
+> next-app@0.0.1 test:policy /workspace/mikka-policy-230
+> node --import tsx --test lib/policy/*.test.ts
+
+✔ lower defaults never erase ceilings, explicit empty network and model lists deny (10.844805ms)
+✔ strict fields, schema version, scope, TTL and canonical HTTPS endpoint (1.488227ms)
+✔ signature, unknown fields, tampering and key rotation fail closed (8.122883ms)
+✔ every HTTP attempt rechecks policy, endpoint, model aliases, redirect and cancellation (34.334267ms)
+✔ signatures survive JSON persistence with optional undefined values (2.725065ms)
+▶ real PostgreSQL policy transactions, HTTP contract, tenant isolation, revocation and failure
+  ✔ no policy is explicitly unmanaged; missing origin, bearer and member writes refused (68.31134ms)
+  ✔ twelve concurrent publishers produce one winner, one version and one audit event (111.162195ms)
+  ✔ tenant rules differ; route aliases, endpoints, region and unmanaged-scope omission cannot bypass (82.701796ms)
+  ✔ revoke then rollback creates monotonic version, new instances see it and old signed bytes cannot supersede head (49.729124ms)
+  ✔ audit failure rolls back publication; suspended users lose current reads and writes (35.469579ms)
+  ✔ missing current version and replayed signed payload cannot become unmanaged or current (22.61507ms)
+  ✔ database unavailable returns 503 with no implicit unmanaged fallback (2.468097ms)
+✔ real PostgreSQL policy transactions, HTTP contract, tenant isolation, revocation and failure (427.633414ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 955.912096
