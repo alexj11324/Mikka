@@ -41,6 +41,21 @@ export interface FactoryAttempt {
   output: Record<string, unknown>;
   evidence: unknown[];
 }
+export interface FactoryCandidate {
+  id: string;
+  taskId: string;
+  sha: string;
+  repository: string;
+  environment: string;
+  scope: string;
+  runId: string;
+}
+export interface FactorySnapshot {
+  contractVersion: 1;
+  task: FactoryTask;
+  attempts: FactoryAttempt[];
+  candidates: FactoryCandidate[];
+}
 export type FactoryAuthorize = (
   userId: string,
   issueId: string,
@@ -98,12 +113,15 @@ export function createFactoryStore(
       fail("factoryNotFound");
     return task;
   }
-  async function snapshot(tx: PoolClient, task: FactoryTask) {
+  async function snapshot(
+    tx: PoolClient,
+    task: FactoryTask,
+  ): Promise<FactorySnapshot> {
     const { rows: attempts } = await tx.query<FactoryAttempt>(
       'SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY "createdAt", ordinal',
       [task.id],
     );
-    const { rows: candidates } = await tx.query(
+    const { rows: candidates } = await tx.query<FactoryCandidate>(
       'SELECT * FROM factory_candidates WHERE "taskId"=$1 ORDER BY "createdAt"',
       [task.id],
     );
@@ -117,7 +135,7 @@ export function createFactoryStore(
   ) {
     const {
       rows: [event],
-    } = await tx.query(
+    } = await tx.query<{ result: FactorySnapshot; same: boolean }>(
       'SELECT result, request=$3::jsonb AS same FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2',
       [taskId, eventId, JSON.stringify(request)],
     );

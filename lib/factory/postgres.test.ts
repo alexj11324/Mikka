@@ -5,6 +5,7 @@ import test from "node:test";
 import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import {
+  FACTORY_STAGES,
   FactoryError,
   type FactoryBinding,
   type FactoryChange,
@@ -91,8 +92,8 @@ test(
       const source = async (owner = "owner") => {
         const id = randomUUID();
         await pool.query(
-          'INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$2,\'user_message\',$1,\'{"text":"fixture request"}\')',
-          [id, owner],
+          'INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$2,\'user_message\',$3,\'{"text":"fixture request"}\')',
+          [id, owner, `factory-fixture:${id}`],
         );
         return id;
       };
@@ -454,6 +455,80 @@ test(
           store.apply("owner", binding(revoked.task), randomUUID(), blocked),
         "factoryStopped",
       );
+      // Seed each stage, not a successful gate. Inject a real PG precommit
+      // error and reconnect to read/replay its committed wait checkpoint.
+      const phaseEvidence = [];
+      for (const stage of FACTORY_STAGES) {
+        let phase = await route();
+        await pool.query("UPDATE factory_tasks SET stage=$2 WHERE id=$1", [
+          phase.task.id,
+          stage,
+        ]);
+        await pool.query("UPDATE factory_attempts SET stage=$2 WHERE id=$1", [
+          phase.task.attemptId,
+          stage,
+        ]);
+        phase = await store.read("owner", phase.task.id);
+        const phaseRun = randomUUID(),
+          phaseSession = `phase-${randomUUID()}`;
+        await pool.query(
+          `INSERT INTO agent_runs (id,"userId","issueId","agentId",status,"sessionId") VALUES ($1,'owner',$2,$3,'running',$4)`,
+          [phaseRun, issueId, agentId, phaseSession],
+        );
+        phase = await store.apply("owner", binding(phase.task), randomUUID(), {
+          action: "bind_run",
+          runId: phaseRun,
+        });
+        const phaseBinding = binding(phase.task),
+          phaseEvent = randomUUID();
+        const wait: FactoryChange = {
+          action: "finish",
+          status: "waiting",
+          reason: `${stage}: waiting for actual consumer`,
+          evidence: [],
+          output: { checkpoint: stage },
+        };
+        await pool.query(
+          "CREATE TRIGGER factory_inject BEFORE INSERT ON factory_events FOR EACH ROW EXECUTE FUNCTION factory_fail_event()",
+        );
+        const beforePhase = await store.read("owner", phase.task.id);
+        await assert.rejects(
+          () => store.apply("owner", phaseBinding, phaseEvent, wait),
+          /injected precommit/,
+        );
+        await pool.query("DROP TRIGGER factory_inject ON factory_events");
+        assert.deepEqual(await store.read("owner", phase.task.id), beforePhase);
+        phase = await store.apply("owner", phaseBinding, phaseEvent, wait);
+        const reconnect = new Pool({
+          connectionString: dbURL,
+          max: 1,
+          options: `-c search_path=${schema}`,
+        });
+        try {
+          const recovered = createFactoryStore(reconnect, authorize);
+          const again = await recovered.apply(
+            "owner",
+            phaseBinding,
+            phaseEvent,
+            wait,
+          );
+          assert.equal(again.task.stage, stage);
+          assert.equal(again.task.attemptId, phaseBinding.attemptId);
+          assert.equal(again.attempts[0].runId, phaseRun);
+          assert.equal(again.attempts[0].sessionId, phaseSession);
+          assert.deepEqual(again.attempts[0].output, { checkpoint: stage });
+          assert.equal(again.task.revision, phase.task.revision);
+        } finally {
+          await reconnect.end();
+        }
+        phaseEvidence.push({
+          stage,
+          taskId: phase.task.id,
+          attemptId: phase.task.attemptId,
+          runId: phaseRun,
+          eventId: phaseEvent,
+        });
+      }
       const removed = await route();
       await pool.query("UPDATE issues SET status='deleted' WHERE id=$1", [
         issueId,
@@ -478,6 +553,7 @@ test(
           eventId: eid,
           rollbackEventId,
           candidateIds: state.candidates.map((c: { id: string }) => c.id),
+          phaseEvidence,
           note: "isolated CI fixture evidence; not real Mikka/Harness acceptance",
         }),
       );
