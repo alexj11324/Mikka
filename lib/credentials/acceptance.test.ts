@@ -172,6 +172,14 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
   await workspace.query('INSERT INTO mikka_workspace_members ("workspaceId","userId") VALUES ($1,$2)', [workspaceId, alice.id])
   await workspace.query('INSERT INTO mikka_team_issues VALUES ($1,$2)', [taskId, workspaceId])
   const binding: Binding & { serviceId: string } = { ownerId: alice.id, authSessionId: alice.sessionId, workspaceId, taskId, runId, executionSession, serviceId: 'fixture' }
+  // Independent browser scenarios share a synthetic worker but have no daemon
+  // sending heartbeats. Renew only its liveness between scenarios: slow Chromium
+  // cleanup must not expire the next scenario's device/lease. Expiry and
+  // revocation assertions inside each scenario still use the real guards.
+  t.beforeEach(async () => {
+    await app.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
+    await app.query('UPDATE agent_runs SET "leaseExpiresAt"=now()+interval \'90 seconds\' WHERE id=$1', [runId])
+  })
   async function call(path: string, body?: unknown, cookie = alice.cookie, extra: Record<string, string> = {}) {
     return fetch(`${origin}/api/credential-requests${path}`, {
       method: body === undefined ? 'GET' : 'POST',
@@ -386,6 +394,9 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
       assert.equal(await page.locator('#password').inputValue(), '')
       assert.equal(vault.puts, puts)
     } finally { await browser.close() }
+    // Reproduce a slow prior teardown without sleeping: the next independent
+    // browser scenario must start with a fresh synthetic worker heartbeat.
+    await app.query("UPDATE devices SET \"lastSeenAt\"=now()-interval '61 seconds' WHERE id=$1", [deviceId])
   })
   await t.test('owned Chromium: real HTTP secret submission, exclusive isolation, real fill/submit/site verification, destroy and restore', async () => {
     const executor = new OwnedChromiumExecutor({ executablePath: '/usr/bin/chromium', loopbackFixture: true, policies: ['fixture-browser', 'fixture-browser-other'].map(id => ({
