@@ -104,7 +104,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   name, one line on what it is doing, status, time. Clicking one opens it on
   the right as a conversation that ends in the composer (R-10); people and
   the agent talk there. Teammates on a workspace issue see the same thread
-  (R-26).
+  (R-26). The bot runs the thread (R-05); a coding agent it hands work
+  to (Codex, Claude Code) shows as a step 「交给 Codex · …」, never as the
+  runner in the list or the header.
 - **R-63** Activity: events (created, handed to, dispatched a thread,
   status changes) are plain one-line rows. A comment is a card with a 1px
   border; its replies sit inside the same card above a 「留下回复…」 row. The
