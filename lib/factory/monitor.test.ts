@@ -5,7 +5,8 @@ import { registerHooks } from "node:module";
 import test from "node:test";
 import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
-import { FactoryError, type FactoryBinding } from "./contract";
+import { evidenceSchema, FactoryError, type FactoryBinding } from "./contract";
+import { handleFactory } from "./http";
 import {
   createFactoryStore,
   type FactoryTask,
@@ -704,6 +705,105 @@ test(
             ).rows[0].status,
             "todo",
           );
+        },
+      );
+      await t.test(
+        "passed monitor opens a clean fenced cycle and actual monitorGate rejects old evidence before a fresh failure/repair",
+        async () => {
+          const before = await store.read("owner", first.task.id);
+          assert.equal(before.task.status, "passed");
+          const previous = before.attempts.find(
+            (a) => a.id === before.task.attemptId,
+          )!;
+          const eventId = randomUUID();
+          const responses = await Promise.all(
+            Array.from({ length: 10 }, () =>
+              handleFactory(store, {
+                userId: "owner",
+                method: "POST",
+                taskId: before.task.id,
+                origin: "http://isolated.invalid",
+                url: `http://isolated.invalid/api/factory/tasks/${before.task.id}`,
+                body: {
+                  binding: binding(before.task),
+                  eventId,
+                  action: "retry",
+                  reason: "Next authorized monitor observation",
+                },
+              }),
+            ),
+          );
+          assert.ok(responses.every((r) => r.status === 200));
+          assert.equal(
+            new Set(
+              responses.map((r) => (r.body as FactorySnapshot).task.attemptId),
+            ).size,
+            1,
+          );
+          const cycle = await store.read("owner", first.task.id);
+          assert.equal(cycle.task.stage, "monitor");
+          assert.equal(cycle.task.status, "pending");
+          assert.equal(cycle.task.candidateId, before.task.candidateId);
+          assert.equal(cycle.task.revision, before.task.revision + 1);
+          assert.notEqual(cycle.task.attemptId, before.task.attemptId);
+          const fresh = cycle.attempts.find(
+            (a) => a.id === cycle.task.attemptId,
+          )!;
+          assert.equal(fresh.runId, null);
+          assert.equal(fresh.sessionId, null);
+          assert.deepEqual(fresh.output, {});
+          assert.deepEqual(fresh.evidence, []);
+          assert.deepEqual(
+            JSON.parse(
+              JSON.stringify(cycle.attempts.find((a) => a.id === previous.id)),
+            ),
+            JSON.parse(JSON.stringify(previous)),
+          );
+          await rejects(
+            () =>
+              store.apply("owner", binding(cycle.task), randomUUID(), {
+                action: "finish",
+                status: "passed",
+                reason: "Old evidence must not pass",
+                evidence: previous.evidence.map((e) => evidenceSchema.parse(e)),
+                output: previous.output,
+              }),
+            "factoryConsumerGateRequired",
+          );
+          await rejects(
+            () =>
+              store.apply("owner", binding(cycle.task), randomUUID(), {
+                action: "bind_run",
+                runId: previous.runId!,
+              }),
+            "factoryRunMismatch",
+          );
+          const live = await run("owner", issueId);
+          const bound = await store.apply(
+            "owner",
+            binding(cycle.task),
+            randomUUID(),
+            { action: "bind_run", runId: live },
+          );
+          await complete(live, "HTTP 503 request 999 token=fixture-secret");
+          const observed = await monitor.consume("owner", {
+            binding: binding(bound.task),
+            sourceEventId: await source("owner", issueId, live, "run_finished"),
+          });
+          assert.equal(observed.outcome, "failed");
+          const failed = await store.read("owner", first.task.id);
+          assert.equal(failed.task.status, "failed");
+          const repaired = await store.apply(
+            "owner",
+            binding(failed.task),
+            randomUUID(),
+            {
+              action: "repair",
+              reason: "Repair after fresh monitor regression",
+            },
+          );
+          assert.equal(repaired.task.stage, "execute");
+          assert.equal(repaired.task.candidateId, null);
         },
       );
       await t.test(
