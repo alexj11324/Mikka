@@ -88,3 +88,6 @@ export const reconcileFactoryRuns = createFactoryReconciler(
   factoryStore,
   factoryQuestions,
 );
+
+import { createExecutionClaim } from "./execution-claim";
+export const claimExecutionRun = createExecutionClaim(pool, authorize);

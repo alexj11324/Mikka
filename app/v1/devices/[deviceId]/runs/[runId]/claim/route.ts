@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { RUN_LEASE_MS } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
@@ -11,8 +11,14 @@ import { latestCheckpoint } from '@/lib/run-leases'
 import { retryNote } from '@/lib/run-retry'
 import { pool } from '@/lib/db'
 import { isFactoryCheckRun } from '@/lib/factory/checks'
-import { claimFactoryCheckRun, factoryQuestions } from '@/lib/factory/server'
+import {
+  claimFactoryCheckRun,
+  claimExecutionRun,
+  factoryQuestions,
+} from '@/lib/factory/server'
 import { blockQuestionRetry } from '@/lib/factory/questions/retry'
+
+import { FactoryError } from '@/lib/factory/contract'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +51,7 @@ export async function POST(
         eq(agentRuns.id, runId),
         eq(agentRuns.deviceId, deviceId),
         eq(agentRuns.status, 'queued'),
+        isNull(agentRuns.stopRequestedAt),
       ),
     )
     .limit(1)
@@ -53,7 +60,11 @@ export async function POST(
       { error: 'Run is not queued for this device.' },
       { status: 409 },
     )
-  if (run.retryOf && run.issueId && await blockQuestionRetry(pool, caller.userId, run.issueId, runId))
+  if (
+    run.retryOf &&
+    run.issueId &&
+    (await blockQuestionRetry(pool, caller.userId, run.issueId, runId))
+  )
     return NextResponse.json(
       { error: 'Generic retry cannot resume a question continuation.' },
       { status: 409 },
@@ -145,16 +156,20 @@ export async function POST(
       )
     }
   } else {
-    claimed = await db
-      .update(agentRuns)
-      .set({
-        status: 'preparing',
-        startedAt: new Date(),
-        leaseExpiresAt: new Date(leaseExpiresAt),
-        updatedAt: new Date(),
-      })
-      .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
-      .returning({ id: agentRuns.id })
+    try {
+      claimed = await claimExecutionRun(
+        caller.userId,
+        deviceId,
+        runId,
+        leaseExpiresAt,
+      )
+    } catch (error) {
+      if (!(error instanceof FactoryError)) throw error
+      return NextResponse.json(
+        { error: 'Execution binding is unavailable or stale.' },
+        { status: 409 },
+      )
+    }
   }
   if (!claimed.length)
     return NextResponse.json(

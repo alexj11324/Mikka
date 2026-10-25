@@ -66,6 +66,20 @@ test('trusted submission -> durable batch -> new workflow -> run retry -> daemon
     await pool.query(`INSERT INTO coordinator_sessions ("userId","leaseHolder","leaseUntil") VALUES ($1,$2,now()+interval '1 minute')`, [other, holder])
     await assert.rejects(createActionIntents(pool).slots(other, context), /accountActionSourceUnavailable/)
   })
+  await t.test('migration replay after SQL commit preserves persisted source slots and operation identity', async () => {
+    const snapshot = async () => ({
+      batch: (await pool.query('SELECT "accountActionBatch" FROM coordinator_events WHERE id=$1', [sourceEventId])).rows,
+      proposals: (await pool.query('SELECT * FROM pending_actions WHERE "sourceEventId"=$1 ORDER BY id', [sourceEventId])).rows,
+    })
+    const before = await snapshot()
+    assert.equal(before.proposals.length, 2)
+    const sql = await readFile(new URL('../../drizzle/20261025070001_account_action_intents.sql', import.meta.url), 'utf8')
+    await pool.query(sql)
+    await pool.query(sql)
+    assert.deepEqual(await snapshot(), before)
+    assert.equal((await createActionIntents(pool).slots(owner, { sourceEventId, holder })).length, 2)
+  })
+
   await t.test('new workflow replays persisted calls before model; regenerated call cannot create another intent', async () => {
     await run(() => store.failTurn(owner, holder, 'synthetic lost response'))
     const nextHolder = randomUUID(), inbox = await run(() => store.takeInbox(owner, nextHolder)); assert.ok(inbox.actionContext)
