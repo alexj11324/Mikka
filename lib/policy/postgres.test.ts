@@ -1,3 +1,5 @@
+import { drizzle } from "drizzle-orm/node-postgres";
+import { policySqlClient } from "./sql-client";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -353,6 +355,42 @@ test(
               "UPDATE organization_policy_heads SET version=3 WHERE workspace_id=$1",
               [workspaceId],
             );
+          }
+        },
+      );
+      await t.test(
+        "policy decisions reuse one held transaction connection and commit denial audit",
+        { timeout: 5000 },
+        async () => {
+          const one = new Pool({
+            connectionString: guarded(),
+            max: 1,
+            connectionTimeoutMillis: 500,
+          });
+          try {
+            const scoped = new PolicyStore(one, store.signer),
+              resource = randomUUID();
+            const denied = await drizzle(one).transaction((tx) =>
+              scoped.workerDenial(
+                policySqlClient((statement) => tx.execute(statement)),
+                userId,
+                resource,
+                undefined,
+                workspaceId,
+              ),
+            );
+            assert.equal(denied?.code, "workerEnforcementUnavailable");
+            assert.equal(
+              (
+                await pool.query(
+                  "SELECT count(*) FROM security_audit_events WHERE tenant=$1 AND event->>'resourceId'=$2",
+                  [workspaceId, resource],
+                )
+              ).rows[0].count,
+              "1",
+            );
+          } finally {
+            await one.end();
           }
         },
       );

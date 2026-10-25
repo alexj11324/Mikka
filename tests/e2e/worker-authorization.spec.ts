@@ -94,17 +94,18 @@ test('worker MCP rechecks current issue authority after queueing and revocation'
     expect(await events(secondAdmin.run)).toBe(2)
 
     // Real HTTP authentication completes while the request body is withheld.
-    // Observe the final auth query in PG, revoke, then permit tool execution.
+    // Observe the committed request-correlated auth audit point, revoke, then
+    // permit tool execution. Query order/idle pool contents are not a contract.
     const origin = new URL(process.env.E2E_BASE_URL ?? 'http://localhost:3100')
     expect(['localhost','127.0.0.1','[::1]']).toContain(origin.hostname)
     for (const status of ['queued','running']) {
       await pool.query('update mikka_workspace_members set status=$1 where "workspaceId"=$2 and "userId"=$3',['active',workspaceA,member])
       const delayed = await runFor(member,issueA,status)
       const body = JSON.stringify({jsonrpc:'2.0',id:++sequence,method:'tools/call',params:{name:'report',arguments:{text:'Delayed body fixture'}}})
-      const marker = (await pool.query('select clock_timestamp()::text as at')).rows[0].at
+      const requestId = randomUUID()
       let send!: ReturnType<typeof httpRequest>
       const response = new Promise<{status:number;body:string}>((resolve,reject) => {
-        send = httpRequest(new URL('/mikka/api/mcp',origin),{method:'POST',headers:{authorization:`Bearer ${delayed.token}`,accept:'application/json, text/event-stream','content-type':'application/json','content-length':Buffer.byteLength(body)}},res => {
+        send = httpRequest(new URL('/mikka/api/mcp',origin),{method:'POST',headers:{authorization:`Bearer ${delayed.token}`,accept:'application/json, text/event-stream','content-type':'application/json','content-length':Buffer.byteLength(body),'x-request-id':requestId}},res => {
           let text = ''; res.on('data',chunk => { text += chunk }); res.on('end',() => resolve({status:res.statusCode!,body:text}))
         })
         send.on('error',reject); send.setTimeout(15000,() => send.destroy(new Error('Delayed authorization test timed out')))
@@ -112,7 +113,7 @@ test('worker MCP rechecks current issue authority after queueing and revocation'
       void response.catch(() => {})
       try {
         send.write(body.slice(0,1)); send.flushHeaders()
-        await expect.poll(async () => Number((await pool.query(`select count(*) from pg_stat_activity where pid <> pg_backend_pid() and query_start > $1::timestamptz and state='idle' and query like 'select %"issues"%' and query like '%left join "issue_members"%'`,[marker])).rows[0].count),{timeout:10000}).toBeGreaterThan(0)
+        await expect.poll(async () => Number((await pool.query(`select count(*) from security_audit_events where event->>'action'='worker.authenticated' and event->>'requestId'=$1 and event->>'runId'=$2`,[requestId,delayed.run])).rows[0].count),{timeout:10000}).toBe(1)
         await pool.query('update mikka_workspace_members set status=$1 where "workspaceId"=$2 and "userId"=$3',['suspended',workspaceA,member])
         send.end(body.slice(1))
         const result = await response

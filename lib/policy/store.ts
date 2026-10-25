@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Pool, PoolClient } from "pg";
+import type { Pool } from "pg";
 import { appendAudit, transaction } from "../audit/store";
 import {
   admitModel,
@@ -10,6 +10,7 @@ import {
   type ModelRoute,
   type PolicyContext,
 } from "./contract";
+import type { PolicyClient } from "./sql-client";
 import type { PolicySigner, SignedPolicy } from "./signing";
 
 export type PolicyBinding = {
@@ -23,7 +24,7 @@ export class PolicyStore {
     readonly signer: PolicySigner,
   ) {}
   async member(
-    tx: PoolClient,
+    tx: PolicyClient,
     workspaceId: string,
     userId: string,
     admin = false,
@@ -139,7 +140,7 @@ export class PolicyStore {
     });
   }
   async contexts(
-    tx: PoolClient,
+    tx: PolicyClient,
     userId: string,
     workspaceId?: string,
     issueId?: string,
@@ -195,7 +196,7 @@ export class PolicyStore {
     return contexts.sort((a, b) => a.workspaceId.localeCompare(b.workspaceId));
   }
   async bindings(
-    tx: PoolClient,
+    tx: PolicyClient,
     userId: string,
     workspaceId?: string,
     issueId?: string,
@@ -248,6 +249,40 @@ export class PolicyStore {
       return bindings;
     });
   }
+  async workerDenial(
+    tx: PolicyClient,
+    userId: string,
+    runId: string,
+    issueId?: string,
+    workspaceId?: string,
+    tool = false,
+  ): Promise<PolicyError | null> {
+    const bindings = await this.bindings(
+      tx,
+      userId,
+      workspaceId,
+      issueId,
+      true,
+    );
+    if (!bindings.length) return null;
+    const reason = bindings.some((b) => b.revoked)
+      ? "policyRevoked"
+      : tool
+        ? "toolEnforcementUnavailable"
+        : "workerEnforcementUnavailable";
+    for (const b of bindings)
+      await appendAudit(tx, b.signed.payload.workspaceId, {
+        actorId: userId,
+        actorType: tool ? "system" : "worker",
+        resourceId: runId,
+        ...(tool ? {} : { runId }),
+        action: tool ? "policy.tool" : "policy.worker",
+        outcome: "denied",
+        reason,
+        requestId: randomUUID(),
+      });
+    return new PolicyError(reason, reason === "policyRevoked" ? 403 : 409);
+  }
   private async denyExecution(
     userId: string,
     runId: string,
@@ -255,35 +290,10 @@ export class PolicyStore {
     workspaceId?: string,
     tool = false,
   ) {
-    const result = await transaction(this.pool, async (tx) => {
-      const bindings = await this.bindings(
-        tx,
-        userId,
-        workspaceId,
-        issueId,
-        true,
-      );
-      if (!bindings.length) return null;
-      const reason = bindings.some((b) => b.revoked)
-        ? "policyRevoked"
-        : tool
-          ? "toolEnforcementUnavailable"
-          : "workerEnforcementUnavailable";
-      for (const b of bindings)
-        await appendAudit(tx, b.signed.payload.workspaceId, {
-          actorId: userId,
-          actorType: tool ? "system" : "worker",
-          resourceId: runId,
-          ...(tool ? {} : { runId }),
-          action: tool ? "policy.tool" : "policy.worker",
-          outcome: "denied",
-          reason,
-          requestId: randomUUID(),
-        });
-      return reason;
-    });
-    if (result)
-      throw new PolicyError(result, result === "policyRevoked" ? 403 : 409);
+    const denied = await transaction(this.pool, (tx) =>
+      this.workerDenial(tx, userId, runId, issueId, workspaceId, tool),
+    );
+    if (denied) throw denied;
   }
   async denyWorker(
     userId: string,

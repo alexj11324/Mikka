@@ -1,10 +1,14 @@
-import { authorizePolicyWorker } from '@/lib/policy/runtime'
+import { policySqlClient } from '@/lib/policy/sql-client'
+import type { PolicyError } from '@/lib/policy/contract'
+import { authorizePolicyWorker, workerPolicyInTransaction } from '@/lib/policy/runtime'
 import 'server-only'
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { after } from 'next/server'
 import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import type { AuthInfo } from '@modelcontextprotocol/server'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { appendAudit } from '@/lib/audit/store'
+import { z } from 'zod'
 import { agentRuns, runTokens, issues, issueMembers } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runBlockedEvent, runQuestionEvent, runReportEvent, type CoordinatorEventInput } from '@/lib/coordinator-events'
@@ -63,14 +67,23 @@ async function currentRun(bearerToken?: string, executor: Pick<typeof db, 'selec
     .limit(1)
   const [row] = await (lock ? query.for('share') : query)
   if (!row?.issueId || row.kind === 'group_review' || !await issueForUser(row.userId, row.issueId, false, executor, workspaceExecutor) || row.expiresAt.getTime() <= Date.now()) return undefined
-  try { await authorizePolicyWorker(row.userId, row.runId, row.issueId) } catch { return undefined }
+  // Locked calls are checked by deliver on its existing connections below.
+  if (!lock) { try { await authorizePolicyWorker(row.userId, row.runId, row.issueId) } catch { return undefined } }
   return row
 }
 
 /** Authenticate every HTTP request against the current run and issue policy. */
-export async function verifyRunToken(_request: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
+export async function verifyRunToken(request: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
   const row = await currentRun(bearerToken)
   if (!row || !bearerToken) return undefined
+  // A durable request correlation point, after HTTP authentication and before
+  // the MCP handler consumes the body. No bearer or request body is recorded.
+  const supplied = request.headers.get('x-request-id')
+  const requestId = z.uuid().safeParse(supplied).success ? supplied! : randomUUID()
+  const captured = (await pool.query("SELECT tenant FROM security_audit_resource_scopes WHERE source='agent_runs' AND resource=$1 AND owner_id=$2", [row.runId, row.userId])).rows[0]
+  try {
+    await appendAudit(pool, captured?.tenant ?? `personal:${row.userId}`, { actorId: row.userId, actorType: 'worker', resourceId: row.runId, runId: row.runId, requestId, action: 'worker.authenticated', outcome: 'success', reason: 'http' })
+  } catch { return undefined }
   return {
     token: bearerToken, clientId: `run:${row.runId}`, scopes: [],
     expiresAt: Math.floor(row.expiresAt.getTime() / 1000),
@@ -92,6 +105,7 @@ async function deliver(event: CoordinatorEventInput, token: string): Promise<voi
   // (the same order as issue deletion/member removal). Never borrow another
   // pool connection inside these scopes: both pools are bounded.
   if (!event.issueId) throw new Error('MCP run authorization is no longer valid')
+  let policyDenied: PolicyError | null = null
   await workspaceDb.transaction(async workspaceTx => {
     await workspaceTx.execute(sql`set local lock_timeout = '5s'`)
     await workspaceTx.execute(sql`set local statement_timeout = '10s'`)
@@ -111,9 +125,16 @@ async function deliver(event: CoordinatorEventInput, token: string): Promise<voi
       if (!run || run.runId !== event.runId || run.userId !== event.userId || run.issueId !== event.issueId) {
         throw new Error('MCP run authorization is no longer valid')
       }
+      policyDenied = await workerPolicyInTransaction(
+        policySqlClient(statement => tx.execute(statement)),
+        policySqlClient(statement => workspaceTx.execute(statement)),
+        run.userId, run.runId, run.issueId!,
+      )
+      if (policyDenied) return
       await recordCoordinatorEvent(tx, event)
     })
   })
+  if (policyDenied) throw new Error('MCP run authorization is no longer valid')
   after(() => wakeCoordinator(event.userId))
 }
 

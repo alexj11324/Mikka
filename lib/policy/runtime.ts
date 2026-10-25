@@ -7,6 +7,7 @@ import { policySigner } from "./signing";
 import { PolicyStore } from "./store";
 import { policyHttp } from "./http";
 import { authorizeModelRequest } from "./model";
+import type { PolicyClient } from "./sql-client";
 import { PolicyError, type ModelRoute } from "./contract";
 
 export function policyStore() {
@@ -64,4 +65,32 @@ export async function authorizePolicyTool(
   workspaceId?: string,
 ) {
   return policyStore().denyTool(userId, workspaceId);
+}
+
+/** Called inside the existing MCP transaction scopes: uses exactly their two
+ * connections and commits a policy denial before returning it to the caller. */
+export async function workerPolicyInTransaction(
+  app: PolicyClient,
+  workspace: PolicyClient,
+  userId: string,
+  runId: string,
+  issueId: string,
+) {
+  const captured = (
+    await app.query(
+      "SELECT tenant FROM security_audit_resource_scopes WHERE source='agent_runs' AND resource=$1 AND owner_id=$2",
+      [runId, userId],
+    )
+  ).rows[0];
+  const workspaceId =
+    captured?.tenant && !captured.tenant.startsWith("personal:")
+      ? captured.tenant
+      : undefined;
+  return policyStore().workerDenial(
+    workspace,
+    userId,
+    runId,
+    issueId,
+    workspaceId,
+  );
 }
