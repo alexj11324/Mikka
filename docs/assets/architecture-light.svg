@@ -55,8 +55,8 @@
   <path d="M980 372 L988 380 L980 388" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M830 410 L830 490" fill="none" stroke="#111111" stroke-width="2.5"/>
   <path d="M822 474 L830 482 L838 474" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <rect x="775.5" y="433" width="109" height="26" fill="#1a5cff"/>
-  <text x="830" y="451" text-anchor="middle" font-size="14" fill="#ffffff">dispatch run</text>
+  <rect x="771.5" y="433" width="117" height="26" fill="#1a5cff"/>
+  <text x="830" y="451" text-anchor="middle" font-size="14" fill="#ffffff">runs, answers</text>
   <path d="M920 520 L1000 520" fill="none" stroke="#111111" stroke-width="2.5"/>
   <path d="M980 512 L988 520 L980 528" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M1100 410 L1100 490" fill="none" stroke="#111111" stroke-width="2.5" stroke-dasharray="7 5"/>
@@ -69,8 +69,8 @@
   <path d="M1050 550 L1050 600 L500 600 L500 550" fill="none" stroke="#111111" stroke-width="2.5"/>
   <path d="M958 592 L950 600 L958 608" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M492 574 L500 566 L508 574" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <rect x="745.5" y="587" width="109" height="26" fill="#1a5cff"/>
-  <text x="800" y="605" text-anchor="middle" font-size="14" fill="#ffffff">worker tools</text>
+  <rect x="715" y="587" width="170" height="26" fill="#1a5cff"/>
+  <text x="800" y="605" text-anchor="middle" font-size="14" fill="#ffffff">report, ask, blocked</text>
   <rect x="20" y="146" width="180" height="48" fill="#ffffff" stroke="#111111" stroke-width="2.5"/>
   <text x="110" y="175" text-anchor="middle" font-size="15" fill="#111111">Web app</text>
   <rect x="20" y="216" width="180" height="48" fill="#ffffff" stroke="#111111" stroke-width="2.5"/>

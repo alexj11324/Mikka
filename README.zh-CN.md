@@ -1,9 +1,9 @@
+<div align="center">
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="public/brand/mikka-icon-dark.svg">
-  <img src="public/brand/mikka-icon-light.svg" alt="Mikka" width="72">
+  <img src="public/brand/mikka-icon-light.svg" alt="Mikka" width="112">
 </picture>
-
-[English](README.md) · **简体中文**
 
 # Mikka
 
@@ -11,11 +11,19 @@
 
 从本地到云端，所有 Agent 协作如一。
 
+[![CI](https://github.com/alexj11324/Mikka/actions/workflows/ui-policy.yml/badge.svg?branch=main)](https://github.com/alexj11324/Mikka/actions/workflows/ui-policy.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![LINUX DO](https://img.shields.io/badge/LINUX%20DO-Community-FFB003)](https://linux.do)
+
+[访问 Mikka](https://app.aspectlylabs.com/mikka) · [文档](https://aspectlylabs.com/mikka/docs) · [快速入门](https://aspectlylabs.com/mikka/docs/quickstart)
+
+[English](README.md) · **简体中文**
+
+</div>
+
 Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只需用自然语言向 bot 描述需求，它会将需求拆解为任务，并分派给 Claude Code、Codex 或 Cursor 执行。目前任务运行在你自己的设备上，云端电脑即将上线。
 
 你可以实时跟进每项工作的进展，在需要决策时介入，并在完成后审阅结果。
-
-**访问 Mikka：** [app.aspectlylabs.com/mikka](https://app.aspectlylabs.com/mikka) · **文档：** [aspectlylabs.com/mikka/docs](https://aspectlylabs.com/mikka/docs) · **快速入门：** [aspectlylabs.com/mikka/docs/quickstart](https://aspectlylabs.com/mikka/docs/quickstart)
 
 ## 工作方式
 
@@ -28,6 +36,10 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
   - Coordinator 是常驻运行的 bot。当运行结束、任务状态变更或 worker 提出问题时，它会被唤醒并决定下一步操作，仅在需要你决策时发出通知。
   - 你可以为不同类型的工作创建专门的 bot，也可以将多个 bot 加入群聊，由它们分工协作。
 
+- **先确认，再执行。**
+  - 需求不明确时，Coordinator 会在派发运行前，先在对话中向你确认缺少的信息。
+  - 运行过程中，agent 可以提出问题或报告阻塞。Coordinator 会连同可选项一起向你提问，不会代你作答，并将你的回答送回该运行。
+
 - **运行在你自己的设备上。**
   - Mikka daemon 可连接你的 Mac、Linux 主机或服务器。
   - Daemon 通过你已安装并登录的 CLI 运行 agent，因此沿用你现有的订阅与配置。
@@ -37,6 +49,15 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 
 - **融入现有工具。**
   - 任务与 Linear 双向同步；其他 agent 可通过 MCP 操作 Mikka；在 Telegram 中发送消息即可创建任务。
+
+### 任务流转
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/task-flow-zh-dark.svg">
+  <img src="docs/assets/task-flow-zh-light.svg" alt="任务在 Mikka 中的流转：请求经过分诊，需求不明确时在对话中向你澄清后再派发；agent 执行过程中可以向你提问；规划中的 Factory 阶段增加审查、验证、发布审批和监控。">
+</picture>
+
+实线路径已经上线，运行完成后会在对话中汇报结果。虚线部分是规划中的 Factory 流程：独立的审查与验证（[#193](https://github.com/alexj11324/Mikka/issues/193)）、检查未通过时派发修复运行、由人工批准发布（[#194](https://github.com/alexj11324/Mikka/issues/194)），以及将故障转为 issue 的监控（[#195](https://github.com/alexj11324/Mikka/issues/195)）。按需求歧义程度进行系统分流在 [#192](https://github.com/alexj11324/Mikka/issues/192) 中跟踪。
 
 ## 当前功能
 
@@ -156,10 +177,14 @@ pnpm check
 
 ## 获取访问权限
 
-Mikka 目前处于早期体验阶段。请发送邮件至 [hello@aspectlylabs.com](mailto:hello@aspectlylabs.com) 申请邀请，然后参照 [快速入门](https://aspectlylabs.com/mikka/docs/quickstart) 开始使用。
+Mikka 目前处于早期体验阶段。请发送邮件至 [mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com) 申请邀请，然后参照 [快速入门](https://aspectlylabs.com/mikka/docs/quickstart) 开始使用。
 
 ## 许可证
 
 Mikka 采用 [AGPL-3.0-only](LICENSE) 协议开源。第三方组件遵循各自的许可证，详见 [`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md)。
 
 如果你将修改后的 Mikka 作为网络服务提供给他人使用，AGPL 要求你向这些用户提供所部署版本的源代码。
+
+## 参与贡献
+
+欢迎参与贡献，请先阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)。首次提交的 pull request 合并前，需要签署 [贡献者许可协议（CLA）](CLA.md)：在 pull request 中回复机器人的评论即可完成签署。
