@@ -1,48 +1,67 @@
-// Front-end seam for email verification and password recovery.
+// Email verification and password recovery requests, per
+// docs/handoff/auth-email-frontend.md (Better Auth 1.7.12).
 //
-// The backend owns the endpoints, error codes and the parameters its emails
-// link back with. Until that contract is handed over, every request here fails
-// with 'contract_pending', so no screen can report a success that did not
-// happen. Wiring the contract means filling in the request functions and the
-// CONTRACT constants below; the screens only depend on this module's types.
+// The email requests answer 202 whether or not an account exists or a message
+// was delivered, so a success here only means "request processed". Callback
+// and redirect targets are left to the backend, which fixes them to
+// /mikka/sign-in and /mikka/reset-password.
 
-export type AuthRecoveryError = 'contract_pending' | 'invalid_token' | 'rate_limited' | 'failed'
-export type AuthRecoveryResult = { ok: true } | { ok: false; error: AuthRecoveryError }
+import { withBasePath } from '@/lib/base-path'
 
-const CONTRACT = {
-  // Query parameters the reset and verification links land with.
-  resetToken: 'token',
-  linkError: 'error',
-  verifiedFlag: 'verified',
-  // Error codes the sign-in endpoint returns for an unverified email.
-  emailNotVerifiedCodes: [] as readonly string[],
-} as const
+export type AuthRecoveryError = 'invalid_token' | 'password_length' | 'rate_limited' | 'unavailable' | 'invalid_request' | 'failed'
+export type AuthRecoveryResult = { ok: true } | { ok: false; error: AuthRecoveryError; retryAfter?: number }
 
-const pending: AuthRecoveryResult = { ok: false, error: 'contract_pending' }
+// The page's own cooldown after a processed email request. The backend limits
+// sending on its own; this only stops repeated clicks.
+export const EMAIL_RESEND_COOLDOWN_SECONDS = 60
 
-export async function sendVerificationEmail(_input: { email: string; callbackURL: string }): Promise<AuthRecoveryResult> {
-  return pending
+export function classifyFailure(status: number, code: string | undefined, retryAfter: string | null): Extract<AuthRecoveryResult, { ok: false }> {
+  if (status === 429) {
+    const seconds = Number.parseInt(retryAfter ?? '', 10)
+    return { ok: false, error: 'rate_limited', retryAfter: Number.isFinite(seconds) && seconds > 0 ? seconds : EMAIL_RESEND_COOLDOWN_SECONDS }
+  }
+  if (code === 'INVALID_TOKEN') return { ok: false, error: 'invalid_token' }
+  if (code === 'PASSWORD_TOO_SHORT' || code === 'PASSWORD_TOO_LONG') return { ok: false, error: 'password_length' }
+  if (status === 503 || code === 'AUTH_EMAIL_DELIVERY_UNAVAILABLE') return { ok: false, error: 'unavailable' }
+  if (status === 400 || status === 403) return { ok: false, error: 'invalid_request' }
+  return { ok: false, error: 'failed' }
 }
 
-export async function requestPasswordReset(_input: { email: string; redirectTo: string }): Promise<AuthRecoveryResult> {
-  return pending
+async function post(path: string, body: Record<string, string>): Promise<AuthRecoveryResult> {
+  const response = await fetch(withBasePath(`/api/auth/${path}`), {
+    method: 'POST',
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (response.ok) return { ok: true }
+  const payload: unknown = await response.json().catch(() => null)
+  const code = payload && typeof payload === 'object' && 'code' in payload && typeof payload.code === 'string' ? payload.code : undefined
+  return classifyFailure(response.status, code, response.headers.get('X-Retry-After'))
 }
 
-export async function resetPassword(_input: { token: string; newPassword: string }): Promise<AuthRecoveryResult> {
-  return pending
+export function sendVerificationEmail(email: string) {
+  return post('send-verification-email', { email })
 }
 
-export function isEmailNotVerified(error: { code?: string } | null | undefined) {
-  return Boolean(error?.code && CONTRACT.emailNotVerifiedCodes.includes(error.code))
+export function requestPasswordReset(email: string) {
+  return post('request-password-reset', { email })
 }
 
-export type RecoveryMessageKey = 'recoveryUnavailable' | 'resetLinkInvalid' | 'tooManyRequests' | 'submitFailed'
+export function resetPassword(token: string, newPassword: string) {
+  return post('reset-password', { token, newPassword })
+}
 
-export function recoveryMessageKey(error: AuthRecoveryError): RecoveryMessageKey {
-  if (error === 'contract_pending') return 'recoveryUnavailable'
+export type RecoveryMessageKey = 'resetLinkInvalid' | 'passwordLength' | 'recoveryUnavailable' | 'submitFailed' | 'connectionFailed'
+
+// Rate limits are shown as a countdown instead (see useCooldown).
+export function recoveryMessageKey(error: Exclude<AuthRecoveryError, 'rate_limited'>): RecoveryMessageKey {
   if (error === 'invalid_token') return 'resetLinkInvalid'
-  if (error === 'rate_limited') return 'tooManyRequests'
-  return 'submitFailed'
+  if (error === 'password_length') return 'passwordLength'
+  if (error === 'unavailable') return 'recoveryUnavailable'
+  if (error === 'invalid_request') return 'submitFailed'
+  return 'connectionFailed'
 }
 
 export const PASSWORD_MIN_LENGTH = 8
@@ -50,30 +69,21 @@ export const PASSWORD_MAX_LENGTH = 128
 
 export type PasswordProblem = 'length' | 'mismatch'
 
+// Length counts JavaScript string units, as the server does.
 export function newPasswordProblem(password: string, confirmation: string): PasswordProblem | null {
   if (password.length < PASSWORD_MIN_LENGTH || password.length > PASSWORD_MAX_LENGTH) return 'length'
   if (password !== confirmation) return 'mismatch'
   return null
 }
 
-type Query = Record<string, string | string[] | undefined>
-
-function single(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value
-}
-
-export type ResetPageState = { kind: 'form'; token: string } | { kind: 'invalid' }
-
-export function resetPageState(query: Query): ResetPageState {
-  const token = single(query[CONTRACT.resetToken])?.trim()
-  if (single(query[CONTRACT.linkError]) || !token) return { kind: 'invalid' }
-  return { kind: 'form', token }
-}
-
-export type VerifyPageState = 'pending' | 'verified' | 'invalid'
-
-export function verifyPageState(query: Query): VerifyPageState {
-  if (single(query[CONTRACT.linkError])) return 'invalid'
-  if (single(query[CONTRACT.verifiedFlag]) === '1') return 'verified'
-  return 'pending'
+// Reads the reset link the backend redirects to (/reset-password?token=… or
+// ?error=INVALID_TOKEN) and returns the address without either parameter, so
+// the caller can drop the token from the URL before anything else runs.
+export function readResetLink(href: string): { token: string | null; cleaned: string } {
+  const url = new URL(href)
+  const token = url.searchParams.get('token')?.trim() || null
+  const invalid = url.searchParams.has('error')
+  url.searchParams.delete('token')
+  url.searchParams.delete('error')
+  return { token: invalid ? null : token, cleaned: `${url.pathname}${url.search}${url.hash}` }
 }

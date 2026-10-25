@@ -1,8 +1,7 @@
 import type { Metadata } from 'next'
 import { getLocale, getTranslations } from 'next-intl/server'
 
-import { VerifyEmailNotice } from '@/components/auth/verify-email-notice'
-import { verifyPageState } from '@/lib/auth-recovery'
+import { VerifyEmailForm } from '@/components/auth/verify-email-form'
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale()
@@ -10,6 +9,6 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t('verifyEmailTitle'), description: t('verifyEmailDescription') }
 }
 
-export default async function VerifyEmailPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  return <VerifyEmailNotice state={verifyPageState(await searchParams)} />
+export default function VerifyEmailPage() {
+  return <VerifyEmailForm />
 }

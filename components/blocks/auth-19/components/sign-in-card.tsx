@@ -28,10 +28,9 @@ type SignInCardProps = {
   onSubmit: FormEventHandler<HTMLFormElement>
   onGoogleSignIn: () => Promise<void>
   onGitHubSignIn: () => Promise<void>
-  onResendVerification?: () => void
 }
 
-export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, showGoogleLinkHint, error, notice, googleCallbackURL, githubCallbackURL, next = '/', onSubmit, onGoogleSignIn, onGitHubSignIn, onResendVerification }: SignInCardProps) {
+export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, showGoogleLinkHint, error, notice, googleCallbackURL, githubCallbackURL, next = '/', onSubmit, onGoogleSignIn, onGitHubSignIn }: SignInCardProps) {
   const t = useTranslations('Auth')
   function authHref(path: string) {
     const params = new URLSearchParams()
@@ -78,7 +77,9 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
           <Separator className="flex-1" />
         </div>
         {error && <p id="auth-error" role="alert" className="text-destructive text-sm">{error}</p>}
-        {onResendVerification && <Button type="button" variant="outline" className="w-full" disabled={pending} onClick={onResendVerification}>{t('sendVerification')}</Button>}
+        {error && <p className="text-muted-foreground text-xs">
+          <Link href="/verify-email" className="text-foreground underline underline-offset-4">{t('verifyEmailLink')}</Link>
+        </p>}
         <form className="flex flex-col gap-5" onSubmit={onSubmit} aria-busy={pending} aria-describedby={error ? 'auth-error' : undefined}>
           <FieldGroup>
             {registering && <Field data-disabled={pending} className="gap-2">

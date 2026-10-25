@@ -7,7 +7,7 @@ import { redirect as localeRedirect } from '@/i18n/navigation'
 import { isAcceptanceEnabled } from '@/lib/acceptance'
 import { auth, googleEnabled } from '@/lib/auth'
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ acceptance?: string; issue?: string; section?: string; settings?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ acceptance?: string; issue?: string; section?: string; settings?: string; google?: string }> }) {
   const query = await searchParams
   const initialSelected = query.issue && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(query.issue) ? query.issue : null
   const session = await auth.api.getSession({ headers: await headers() })
