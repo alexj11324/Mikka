@@ -3,7 +3,8 @@ import 'server-only'
 import { createHash } from 'node:crypto'
 import { cookies } from 'next/headers'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { appendAudit } from '@/lib/audit/store'
 import { users } from '@/lib/db/schema'
 import { z } from 'zod'
 import { requireUser } from '@/lib/issue-access'
@@ -31,7 +32,11 @@ export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: st
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
     .where(and(eq(workspaces.id, workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
     .for('update').limit(1)
-  if (!row || (admin && row.membership.role !== 'admin')) throw new WorkspaceError('workspaceAccessDenied')
+  if (!row || (admin && row.membership.role !== 'admin')) {
+    await appendAudit(pool, `personal:${userId}`, { actorId: userId, actorType: 'human', resourceId: 'workspace', action: 'authorization.denied', outcome: 'denied', reason: 'workspace_access_denied' })
+    throw new WorkspaceError('workspaceAccessDenied')
+  }
+  await tx.execute(sql`select set_config('mikka.audit_actor', ${userId}, true)`)
   return row
 }
 
@@ -46,6 +51,7 @@ export async function loadWorkspaceContext(requestedId?: string, authenticatedUs
   let choices = await readChoices()
   if (!choices.length) {
     await workspaceDb.transaction(async tx => {
+      await tx.execute(sql`select set_config('mikka.audit_actor', ${user.id}, true)`)
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`workspace-owner:${user.id}`}, 0))`)
       const [own] = await tx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.userId, user.id)).limit(1)
       if (own) return

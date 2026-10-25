@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import { appendAudit } from '@/lib/audit/store'
 import { mailboxes } from '@/lib/mailbox-runtime'
 import { MailboxError } from '@/lib/session-mailbox'
 import { NextResponse } from 'next/server'
@@ -129,7 +131,13 @@ export async function POST(
   if (subscription && !device.harnesses.some(harness => harness.harness === agent.harness && harness.subscriptionBroker)) {
     return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   }
-  const onClaim = subscription ? (tx: import('pg').PoolClient) => bindSubscriptionClaim(tx, runId, subscription) : undefined
+  const onClaim = async (tx: import('pg').PoolClient) => {
+    if (subscription) await bindSubscriptionClaim(tx, runId, subscription)
+    const mailbox = (await tx.query('SELECT m."workspaceId" FROM agent_runs r JOIN session_mailboxes m ON m.id=r."mailboxId" WHERE r.id=$1',[runId])).rows[0]
+    const captured = (await tx.query("SELECT tenant FROM security_audit_resource_scopes WHERE source='agent_runs' AND resource=$1",[runId])).rows[0]
+    const tenant = captured?.tenant ?? (mailbox && mailbox.workspaceId !== '00000000-0000-4000-8000-000000000001' ? mailbox.workspaceId : `personal:${caller.userId}`)
+    await appendAudit(tx, tenant, { actorId: caller.tokenId, actorType: 'worker', subjectId: caller.userId, resourceId: runId, action: 'worker.claim', outcome: 'success', reason: 'claimed', runId, requestId: randomUUID() })
+  }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
   try {

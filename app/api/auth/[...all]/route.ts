@@ -1,3 +1,5 @@
+import { pool } from '@/lib/db'
+import { appendAudit } from '@/lib/audit/store'
 import { auth, authBaseURL } from '@/lib/auth'
 import { BASE_PATH } from '@/lib/base-path'
 import { verificationNavigationResponse } from '@/lib/auth-verification-response'
@@ -19,4 +21,12 @@ function withBasePathURL(route: (request: Request) => Promise<Response>) {
 export const GET = withBasePathURL(async request => verificationNavigationResponse(
   request, await handler.GET(request), authBaseURL ?? 'http://localhost:3000',
 ))
-export const POST = withBasePathURL(handler.POST)
+export const POST = withBasePathURL(async request => {
+  const response = await handler.POST(request)
+  if (response.status >= 400) {
+    try {
+      await appendAudit(pool, 'system:auth', { actorId: 'anonymous', actorType: 'anonymous', resourceId: 'auth', action: 'auth.denied', outcome: 'denied', reason: `http_${response.status}` })
+    } catch { return Response.json({ error: 'auditUnavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } }) }
+  }
+  return response
+})

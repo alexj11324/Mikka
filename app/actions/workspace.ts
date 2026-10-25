@@ -2,7 +2,7 @@
 
 import { getTranslations } from 'next-intl/server'
 import { createHash, randomBytes } from 'node:crypto'
-import { and, eq, gt, ne } from 'drizzle-orm'
+import { and, eq, gt, ne, sql } from 'drizzle-orm'
 import { cookies, headers } from 'next/headers'
 import { auth, type DeviceSessionSummary } from '@/lib/auth'
 import { z } from 'zod'
@@ -50,6 +50,7 @@ export async function createWorkspace(input: string | { name: string; slug: stri
     const { name, slug } = z.object({ name: z.string().trim().min(1).max(120), slug: workspaceSlug }).parse(value)
     const workspaceId = crypto.randomUUID()
     await workspaceDb.transaction(async tx => {
+      await tx.execute(sql`select set_config('mikka.audit_actor', ${user.id}, true)`)
       const [created] = await tx.insert(workspaces).values({ id: workspaceId, userId: user.id, name, slug }).onConflictDoNothing({ target: workspaces.slug }).returning({ id: workspaces.id })
       if (!created) throw new WorkspaceError(i18nText('FeatureCopy.c_a56de3c3'))
       await tx.insert(workspaceMembers).values({ workspaceId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: 'admin' })
@@ -88,6 +89,7 @@ export async function createWorkspaceInvitation(input: { workspaceId: string; em
     const role = roleSchema.parse(input.role)
     const emails = [...new Set(z.array(z.email().max(254)).min(1).max(20).parse(input.emails.map(email => email.trim().toLowerCase())))]
     return workspaceDb.transaction(async tx => {
+      await tx.execute(sql`select set_config('mikka.audit_actor', ${user.id}, true)`)
       await requireWorkspace(tx, input.workspaceId, user.id, true)
       const members = await tx.select({ email: workspaceMembers.email }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, input.workspaceId))
       if (emails.some(email => members.some(member => member.email.toLowerCase() === email))) throw new WorkspaceError('workspaceMemberExists')
@@ -140,6 +142,7 @@ export async function acceptWorkspaceInvitation(token: string) {
     const user = await requireUser()
     tokenSchema.parse(token)
     const workspaceId = await workspaceDb.transaction(async tx => {
+      await tx.execute(sql`select set_config('mikka.audit_actor', ${user.id}, true)`)
       const [candidate] = await tx.select({ workspaceId: workspaceInvitations.workspaceId }).from(workspaceInvitations).where(and(eq(workspaceInvitations.tokenHash, hashToken(token)), eq(workspaceInvitations.email, user.email.toLowerCase()), eq(workspaceInvitations.status, 'pending'), gt(workspaceInvitations.expiresAt, new Date()))).limit(1)
       if (!candidate) throw new WorkspaceError('inviteInvalid')
       await tx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, candidate.workspaceId)).for('update')
