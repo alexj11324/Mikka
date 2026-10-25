@@ -5,7 +5,7 @@ import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { ArrowUp, Plus, Send } from 'lucide-react'
 import { toast } from 'sonner'
-import { getCoordinatorChat, sendCoordinatorMessage, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { getCoordinatorChat, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import { listTaskRuns } from '@/app/actions/task-runs'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { cn } from '@/lib/utils'
@@ -24,6 +24,7 @@ import { useLinkPreviews, type AgentCitations } from '@/components/workspace/age
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
 import { AgentThemeProvider } from '@/components/workspace/agent-theme'
 import { CoordinatorReply } from './coordinator-reply'
+import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { PendingActions } from './pending-actions'
 
 /** The person's conversation with their Coordinator, which dispatches agents to issues. */
@@ -42,6 +43,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const { submit, failureMessage } = useCoordinatorSubmit()
   // 「让 Agent 安排」 puts its sentence here for the person to finish (MIK-39).
   useEffect(() => {
     if (!prefill) return
@@ -60,8 +62,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     setSending(true)
     setSendError(null)
     try {
-      const result = await sendCoordinatorMessage(text)
-      if (result.error) { setSendError(actionError(result.error)); return false }
+      const outcome = await submit(text)
+      if (outcome.kind !== 'accepted') { setSendError(failureMessage(outcome)); return false }
       await mutate()
       return true
     } catch { setSendError(actionError()); return false } finally { setSending(false) }

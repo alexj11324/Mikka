@@ -7,7 +7,6 @@ import { ArrowUp, BookOpen, ChevronRight, CircleCheck, Clock, Globe, Info, Maxim
 import { toast } from 'sonner'
 import type { listIssues } from '@/app/actions/issues'
 import type { TaskRun } from '@/app/actions/task-runs'
-import { sendCoordinatorMessage } from '@/app/actions/coordinator'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
@@ -18,6 +17,7 @@ import { issueIdentifier } from '@/components/workspace/issue-properties'
 import { withBasePath } from '@/lib/base-path'
 import type { SuggestionAction, SuggestionSource } from '@/lib/db/schema'
 import { cn } from '@/lib/utils'
+import { useCoordinatorSubmit } from '@/components/coordinator/use-coordinator-submit'
 import { LetterAvatar } from './letter-avatar'
 import { StatusDot } from './status-dot'
 
@@ -141,14 +141,15 @@ function CommandComposer() {
   const t = useTranslations('Shell.tasks')
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const { submit, failureMessage } = useCoordinatorSubmit()
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
     if (!text || sending) return
     setSending(true)
     try {
-      const result = await sendCoordinatorMessage(text)
-      if (result.error) throw new Error(result.error)
+      const outcome = await submit(text)
+      if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
       setDraft('')
       toast.success(t('sent'))
     } catch { toast.error(t('sendFailed')) } finally { setSending(false) }
