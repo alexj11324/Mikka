@@ -10,6 +10,13 @@ test('deployment probes use only fixed GETs, discard sensitive bodies and redact
     return new Response('synthetic-sensitive-body', { status: [401, 200, 404][calls.length - 1], headers: { 'cache-control': 'private, no-store' } })
   })
   assert.equal(report.result, 'GET_PROBES_PASS')
+  assert.equal(report.basePath, '/mikka')
+  assert.equal(report.targetOrigin, base.origin)
+  assert.deepEqual(calls.map(call => call.url.pathname), [
+    '/mikka/api/credential-requests/00000000-0000-4000-8000-000000000000',
+    `/mikka/api/credential-requests/${config.requestId}`,
+    `/mikka/api/credential-requests/${config.requestId}`,
+  ])
   assert.equal(report.productionAcceptanceComplete, false)
   assert.equal(report.deploymentShaVerified, false)
   assert.equal(JSON.stringify(report).includes('synthetic'), false)

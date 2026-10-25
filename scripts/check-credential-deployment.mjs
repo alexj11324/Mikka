@@ -1,6 +1,7 @@
 // GET-only deployment probes. Status reads can trigger lifecycle cleanup.
 // Explicit cleanup authorization is required; never print HTTP bodies.
 import { pathToFileURL } from 'node:url'
+import { basePath } from '../lib/base-path-config.mjs'
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 export async function checkDeployment(config, fetcher = fetch) {
@@ -12,7 +13,7 @@ export async function checkDeployment(config, fetcher = fetch) {
   const checks = []
   const probe = async (name, path, cookie, expected) => {
     try {
-      const response = await fetcher(new URL(path, origin), {
+      const response = await fetcher(new URL(`${basePath}${path}`, origin), {
         method: 'GET', redirect: 'error', signal: AbortSignal.timeout(10_000),
         headers: cookie ? { Cookie: cookie } : {},
       })
@@ -28,7 +29,7 @@ export async function checkDeployment(config, fetcher = fetch) {
     if (config.otherOwnerCookie) await probe('other_owner_denied', `/api/credential-requests/${config.requestId}`, config.otherOwnerCookie, 404)
   }
   return {
-    checkedAt: new Date().toISOString(), declaredSourceSha: config.sha,
+    checkedAt: new Date().toISOString(), targetOrigin: origin.origin, basePath, declaredSourceSha: config.sha,
     // The operator must independently prove deployment -> SHA; HTTP probes cannot attest it.
     deploymentShaVerified: false, checks,
     result: checks.every(check => check.passed) && checks.length === 3 ? 'GET_PROBES_PASS' : 'INCOMPLETE_OR_FAILED',

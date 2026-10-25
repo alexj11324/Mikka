@@ -39,7 +39,7 @@ browser profiles; do not rerun them under a no-deletion rule.
 
 ## Executable status probes
 
-`scripts/check-credential-deployment.mjs` performs three fixed-origin GET checks:
+`scripts/check-credential-deployment.mjs` performs three fixed-origin GET checks under the repository-configured `/mikka` base path:
 unauthenticated refusal, owner access to an already approved request, and another
 approved owner's refusal. It follows no redirects, sends no secrets in URLs, discards
 all bodies and outputs only numeric status/header results and declared SHA. It does
