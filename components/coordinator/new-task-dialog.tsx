@@ -6,8 +6,6 @@ import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
 import { ChevronRight, Laptop, Paperclip } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
-import { sendCoordinatorMessage } from '@/app/actions/coordinator'
-import { useActionError } from '@/lib/use-action-error'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -15,6 +13,7 @@ import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { useCoordinatorSubmit } from './use-coordinator-submit'
 
 const MAX_LENGTH = 8000
 
@@ -35,11 +34,14 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const t = useTranslations('Shell.newTaskDialog')
   const tShell = useTranslations('Shell')
   const tCommon = useTranslations('Common')
-  const actionError = useActionError()
+  const { submit: submitMessage, failureMessage } = useCoordinatorSubmit()
   const { mutate } = useSWRConfig()
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  // The message built for a draft, frozen so that sending the same draft again
+  // resends the same body even if the default device has changed meanwhile.
+  const composed = useRef<{ key: string; message: string } | null>(null)
   const fileId = useId()
 
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
@@ -62,9 +64,14 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
     if (!text || sending) return
     setSending(true)
     try {
-      const context = [device && t('contextDevice', { device: device.name }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
-      const result = await sendCoordinatorMessage(context ? t('promptWithContext', { context, text }) : t('prompt', { text }))
-      if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+      const key = JSON.stringify([text, picked, project ?? null])
+      if (composed.current?.key !== key) {
+        const context = [device && t('contextDevice', { device: device.name }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
+        composed.current = { key, message: context ? t('promptWithContext', { context, text }) : t('prompt', { text }) }
+      }
+      const outcome = await submitMessage(composed.current.message)
+      if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
+      composed.current = null
       setDraft('')
       onOpenChange(false)
       onSent?.()

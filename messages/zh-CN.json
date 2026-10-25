@@ -871,6 +871,7 @@
   "Errors": {
     "generic": "操作未成功，请稍后重试。",
     "authRequired": "请先登录。",
+    "submissionConflict": "这条消息和之前的提交记录不一致，已停止发送，不会自动重试。修改内容后会作为新消息发出。",
     "validationGeneric": "请检查填写内容。",
     "validationTitleRequired": "请填写任务标题。",
     "validationNameRequired": "请填写名称。",
@@ -1981,6 +1982,7 @@
     "input": "给 Coordinator 发消息",
     "placeholder": "让 Coordinator 开始处理一个 issue…",
     "send": "发送",
+    "sendUncertain": "未能确认消息是否送达。在这个输入框里原样重发不会产生重复；关闭或切换输入框、刷新页面或更换账号后再发，则可能重复。",
     "citation": {
       "issue": "Issue",
       "run": "运行",
