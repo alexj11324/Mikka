@@ -39,7 +39,7 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
       assert.match(detail.threads[0].comments.at(-1).body,target===ccAgentId?/CC controlled/:/Codex controlled/)
       assert.equal(detail.versions[1].content,'# Controlled revision 中文 🌍')
       const work=(await pool.query('SELECT * FROM conversation_work WHERE id=$1',[r.work.workId])).rows[0]
-      await worker({action:'complete',runId:work.runId,reply:{workId:work.id,triggerMessageId:work.triggerMessageId,claimEpoch:work.claimEpoch,body:'duplicate native completion'}})
+      await assert.rejects(worker({action:'complete',runId:work.runId,reply:{workId:work.id,triggerMessageId:work.triggerMessageId,claimEpoch:work.claimEpoch,body:'duplicate native completion'}}),/result_mismatch/)
       assert.equal((await post(r.path,{action:'read',artifactId:r.base.artifactId})).versions.length,2)
       await worker({action:'fail',runId:work.runId,claimEpoch:work.claimEpoch,code:'processor_failed'})
       assert.equal((await pool.query('SELECT error FROM agent_runs WHERE id=$1',[work.runId])).rows[0].error,null)
@@ -75,9 +75,11 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
      const stale=await newRequest(agentId,'fixture:delay')
      const first=await awaitWork(stale.work.workId,w=>w.claimEpoch===1)
      await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=now()-interval \'1 second\' WHERE id=$1',[stale.work.workId])
-     await awaitWork(stale.work.workId,w=>w.claimEpoch===2)
-     await assert.rejects(worker({action:'complete',runId:stale.work.workId,reply:{workId:stale.work.workId,triggerMessageId:first.triggerMessageId,claimEpoch:1,body:'old native output'}}),/claim_epoch_mismatch/)
-     await awaitWork(stale.work.workId,w=>w.status==='completed')
+     await command(stale.group.id,'owner',{action:'work',workId:stale.work.workId})
+     await awaitWork(stale.work.workId,w=>Boolean(w.uncertainAt))
+     await assert.rejects(worker({action:'complete',runId:stale.work.workId,reply:{workId:stale.work.workId,triggerMessageId:first.triggerMessageId,claimEpoch:1,body:'old native output'}}),/execution_uncertain/)
+     assert.equal((await pool.query('SELECT "claimEpoch" FROM conversation_work WHERE id=$1',[stale.work.workId])).rows[0].claimEpoch,1)
+     await command(stale.group.id,'owner',{action:'reconcile',workId:stale.work.workId,decision:'abandon'})
      const tool=await newRequest(agentId,'fixture:tool');await awaitWork(tool.work.workId,w=>w.status==='cancelled')
      assert.equal((await post(tool.path,{action:'read',artifactId:tool.base.artifactId})).versions.length,1)
      const r=await newRequest(agentId,'fixture:wait')
@@ -89,7 +91,7 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
      await daemon.stop()
      const limit=await newRequest();await worker({action:'poll'})
      await pool.query('UPDATE conversation_work SET "claimEpoch"=3 WHERE id=$1',[limit.work.workId])
-     assert.equal((await worker({action:'claim',runId:limit.work.workId})).reason,'claim_attempt_limit')
+     assert.equal((await worker({action:'claim',runId:limit.work.workId})).status,'uncertain')
     }finally{await daemon.stop();await rm(dataDir,{recursive:true,force:true})}
     // Missing compatibility/isolation capability fails closed before execution.
     await assert.rejects(createNativeGroupProcessor({codex:'latest'}))

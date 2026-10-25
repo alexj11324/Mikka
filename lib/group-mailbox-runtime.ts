@@ -50,7 +50,7 @@ export async function claimGroupReview(pool:Pool,directory:Directory,userId:stri
     if (work.status!=='dispatched' || !run.enabled || run.stopRequestedAt) return reject(409,'work_not_live')
     try { await authorizedWork(client,directory,work) }
     catch(error) { if (!(error instanceof ReviewFailure)) throw error; await cancelWork(client,work.conversationId,{workId:work.id});return {status:'cancelled' as const} }
-    if(work.uncertainAt || (run.status==='running' && run.leaseExpiresAt && new Date(run.leaseExpiresAt).getTime()<Date.now())) {
+    if(work.uncertainAt || (run.status==='queued'&&work.claimEpoch>0) || (run.status==='running' && run.leaseExpiresAt && new Date(run.leaseExpiresAt).getTime()<Date.now())) {
       await client.query('UPDATE conversation_work SET "uncertainAt"=coalesce("uncertainAt",now()) WHERE id=$1',[work.id])
       return {status:'uncertain' as const}
     }
