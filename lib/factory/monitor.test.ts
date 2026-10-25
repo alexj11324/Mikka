@@ -695,6 +695,48 @@ test(
           );
         },
       );
+      await t.test(
+        "reuse across issues preserves the original mapping and existing issue deletion cascade",
+        async () => {
+          const originalIssue = await issue(
+            "owner",
+            "workspace:deletion-fixture",
+          );
+          const anotherIssue = await issue(
+            "owner",
+            "workspace:deletion-fixture",
+          );
+          const original = await toMonitor("owner", originalIssue);
+          const another = await toMonitor("owner", anotherIssue);
+          const a = await monitor.consume("owner", original.input);
+          const b = await monitor.consume("owner", another.input);
+          assert.equal(a.incidentId, b.incidentId);
+          assert.equal(b.issueId, originalIssue);
+          assert.equal(
+            (
+              await pool.query(
+                'SELECT count(*)::int AS n FROM issue_documents WHERE "issueId"=$1',
+                [anotherIssue],
+              )
+            ).rows[0].n,
+            0,
+          );
+          await pool.query("DELETE FROM issues WHERE id=$1", [originalIssue]);
+          assert.equal(
+            (
+              await pool.query(
+                'SELECT "incidentId" FROM factory_monitor_observations WHERE id=$1',
+                [b.observationId],
+              )
+            ).rows[0].incidentId,
+            null,
+          );
+          assert.equal(
+            (await store.read("owner", another.task.id)).task.status,
+            "failed",
+          );
+        },
+      );
       t.diagnostic(
         JSON.stringify({
           environment: "isolated local Docker postgres:17",

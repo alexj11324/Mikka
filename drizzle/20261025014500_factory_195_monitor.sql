@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS factory_monitor_observations (
   "sourceEventId" uuid NOT NULL, "runId" uuid NOT NULL, "sessionId" text NOT NULL,
   "taskId" uuid NOT NULL REFERENCES factory_tasks(id) ON DELETE CASCADE,
   "candidateId" uuid NOT NULL REFERENCES factory_candidates(id),
-  "incidentId" uuid REFERENCES factory_monitor_incidents(id),
+  "incidentId" uuid REFERENCES factory_monitor_incidents(id) ON DELETE SET NULL,
   "checkKey" text NOT NULL, request jsonb NOT NULL, evidence jsonb NOT NULL, result jsonb NOT NULL DEFAULT '{}',
   outcome text NOT NULL CHECK (outcome IN ('failed','passed','blocked')),
   deliveries integer NOT NULL DEFAULT 1 CHECK (deliveries > 0),
