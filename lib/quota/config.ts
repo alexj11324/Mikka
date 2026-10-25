@@ -24,7 +24,7 @@ export async function configureQuota(pool: Pool, workspaceId: string, actor: str
     const { rows: [allocation] } = await c.query('SELECT * FROM quota_allocations WHERE workspace_id=$1 FOR SHARE', [workspaceId])
     if (!allocation || allocation.revoked_at || allocation.expires_at <= now || Date.parse(policy.windowEnd) > allocation.expires_at.getTime()
       || BigInt(policy.override?.units ?? policy.budgetUnits) > BigInt(allocation.max_budget_units)
-      || BigInt(policy.budgetUnits) > BigInt(allocation.max_budget_units) || policy.concurrencyLimit > allocation.max_concurrency || policy.rateLimit > allocation.max_rate_limit
+      || BigInt(policy.budgetUnits) > BigInt(allocation.max_budget_units) || policy.concurrencyLimit > allocation.max_concurrency || policy.rateLimit > allocation.max_rate_limit || policy.rateWindowSeconds !== allocation.rate_window_seconds
       || Object.entries(policy.resources).some(([name,rule]) => !Object.hasOwn(allocation.resources,name) || allocation.resources[name].unknownCostApproved !== true || allocation.resources[name].units !== rule.units)) {
       throw new QuotaError('quotaAllocationExceeded', 403)
     }

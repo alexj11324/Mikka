@@ -31,7 +31,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     .select({ id: agentRuns.id, userId: agentRuns.userId, issueId: agentRuns.issueId, status: agentRuns.status, kind: agentRuns.kind, quotaReservationId: agentRuns.quotaReservationId })
     .from(agentRuns)
     .innerJoin(devices, eq(devices.id, agentRuns.deviceId))
-    .where(and(eq(agentRuns.id, runId), eq(devices.ownerId, caller.userId)))
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(devices.ownerId, caller.userId)))
     .limit(1)
   if (!run) return NextResponse.json({ error: 'Unknown run.' }, { status: 404 })
   // A run ends once: a repeated completion is accepted and ignored.

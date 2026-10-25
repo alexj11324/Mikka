@@ -24,7 +24,7 @@ import { tenantQuotas } from '@/lib/quota/runtime'
  */
 export async function renewRunLeases(deviceId: string, runIds: readonly string[], now = new Date()): Promise<{ leases: Record<string, string>; revoked?: string[] }> {
   if (!runIds.length) return { leases: {} }
-  const candidates = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, quotaId: agentRuns.quotaReservationId }).from(agentRuns)
+  const candidates = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, quotaId: agentRuns.quotaReservationId }).from(agentRuns).innerJoin(devices, and(eq(devices.id, agentRuns.deviceId), eq(devices.ownerId, agentRuns.userId)))
     .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, [...runIds]), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), gt(agentRuns.leaseExpiresAt, now)))
   const allowed: string[] = []
   for (const run of candidates) {

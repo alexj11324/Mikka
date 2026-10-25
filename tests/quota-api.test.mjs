@@ -57,8 +57,8 @@ test('actual Next HTTP Agent, Coordinator, administrator and daemon quota gates'
       }
       const policy={windowStart:new Date(Date.now()-60000).toISOString(),windowEnd:new Date(Date.now()+3600000).toISOString(),budgetUnits:0,concurrencyLimit:1,rateLimit:100,rateWindowSeconds:60,
         resources:{'agent.turn':{units:1,unknownCostApproved:true},'coordinator.submit':{units:1,unknownCostApproved:true},'coordinator.model':{units:1,unknownCostApproved:true},'daemon.run':{units:1,unknownCostApproved:true}},paused:false,owners:[owner],override:null}
-      await pool.query(`INSERT INTO quota_allocations(workspace_id,max_budget_units,max_concurrency,max_rate_limit,resources,expires_at,granted_by,reason)
-        VALUES ($1,100,100,1000,$2,now()+interval '2 hours','test-operator','isolated synthetic allocation')`,[workspace,policy.resources])
+      await pool.query(`INSERT INTO quota_allocations(workspace_id,max_budget_units,max_concurrency,max_rate_limit,rate_window_seconds,resources,expires_at,granted_by,reason)
+        VALUES ($1,100,100,1000,60,$2,now()+interval '2 hours','test-operator','isolated synthetic allocation')`,[workspace,policy.resources])
       const configure=changes=>request(`/api/workspaces/${workspace}/quota`,{...policy,...changes},'PUT')
       const configured=await configure({});assert.equal(configured.status,200,await configured.text())
       return{owner,workspace,request,configure,policy,headers}
@@ -135,6 +135,13 @@ test('actual Next HTTP Agent, Coordinator, administrator and daemon quota gates'
       assert.equal((await pool.query('SELECT settled_units FROM quota_reservations WHERE id=$1',[quotaId])).rows[0].settled_units,'1')
       const next=runs.find(id=>id!==winner.runId)
       assert.equal((await daemon(`/v1/devices/${device}/runs/${next}/claim`)).status,200)
+      const leaseBefore=(await pool.query('SELECT "leaseExpiresAt" FROM agent_runs WHERE id=$1',[next])).rows[0].leaseExpiresAt.toISOString()
+      await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`,[f.workspace,f.owner])
+      const heartbeat=await daemon(`/v1/devices/${device}/heartbeat`,{harnesses:[],runs:[{runId:next,lastProgressAt:new Date().toISOString()}],worktreeDiskBytes:0})
+      assert.equal(heartbeat.status,200)
+      const heartbeatBody=await heartbeat.json();assert.deepEqual(heartbeatBody.leases,{});assert.ok(heartbeatBody.revoked.includes(next))
+      assert.equal((await pool.query('SELECT "leaseExpiresAt" FROM agent_runs WHERE id=$1',[next])).rows[0].leaseExpiresAt.toISOString(),leaseBefore)
+
     })
     const external=await readFile(network,'utf8')
     assert.equal(external,'',`External provider calls were attempted: ${external}`)

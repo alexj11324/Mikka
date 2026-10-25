@@ -48,13 +48,15 @@ export async function GET(request: Request, { params }: Context) {
     return await workspaceDb.transaction(async tx => {
       await requireWorkspace(tx, workspaceId, session.user.id)
       const { rows: [usage] } = await pool.query(`SELECT t.window_start,t.window_end,t.paused,
-        CASE WHEN t.override_until > clock_timestamp() THEN t.override_units ELSE t.budget_units END AS budget,
+        LEAST(CASE WHEN t.override_until > clock_timestamp() THEN t.override_units ELSE t.budget_units END,a.max_budget_units) AS budget,
+        a.max_budget_units AS allocation_budget,a.expires_at AS allocation_expires_at,(a.revoked_at IS NULL AND a.expires_at > clock_timestamp()) AS allocation_active,
+        COALESCE(sum(CASE WHEN r.state='reserved' AND r.expires_at <= clock_timestamp() THEN 0 ELSE COALESCE(r.settled_units,r.units) END),0) AS lifetime_used,
         COALESCE(sum(CASE WHEN r.state='reserved' AND r.expires_at <= clock_timestamp() THEN 0 ELSE COALESCE(r.settled_units,r.units) END)
           FILTER (WHERE r.created_at >= t.window_start AND r.created_at < t.window_end),0) AS used,
         count(r.id) FILTER (WHERE r.state IN ('reserved','executing') AND r.expires_at > clock_timestamp()) AS active,
         t.concurrency_limit,t.rate_limit,t.rate_window_seconds
-        FROM quota_tenants t LEFT JOIN quota_reservations r ON r.workspace_id=t.workspace_id
-        WHERE t.workspace_id=$1 GROUP BY t.workspace_id`, [workspaceId])
+        FROM quota_tenants t LEFT JOIN quota_allocations a ON a.workspace_id=t.workspace_id LEFT JOIN quota_reservations r ON r.workspace_id=t.workspace_id
+        WHERE t.workspace_id=$1 GROUP BY t.workspace_id,a.workspace_id`, [workspaceId])
       if (!usage) throw new QuotaError('quotaNotConfigured', 503, 60)
       return Response.json({ unit: 'admission_unit', ...usage }, { headers: { 'Cache-Control': 'private, no-store' } })
     })

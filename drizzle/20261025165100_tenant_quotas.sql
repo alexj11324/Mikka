@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS quota_allocations (
   max_budget_units bigint NOT NULL CHECK (max_budget_units >= 0 AND max_budget_units <= 9007199254740991),
   max_concurrency integer NOT NULL CHECK (max_concurrency > 0),
   max_rate_limit integer NOT NULL CHECK (max_rate_limit > 0),
+  rate_window_seconds integer NOT NULL CHECK (rate_window_seconds BETWEEN 1 AND 86400),
   resources jsonb NOT NULL CHECK (jsonb_typeof(resources)='object'),
   expires_at timestamptz NOT NULL,
   granted_by text NOT NULL,

@@ -44,8 +44,8 @@ test('real PostgreSQL quota contention, restart, retries and authorization', { s
       const owner = randomUUID(), workspace = randomUUID()
       const policy = quotaPolicySchema.parse({ windowStart:new Date(Date.now()-60000).toISOString(),windowEnd:new Date(Date.now()+3600000).toISOString(),budgetUnits:100,
         concurrencyLimit:3,rateLimit:100,rateWindowSeconds:60, resources:{ 'agent.turn':{units:1,unknownCostApproved:true},'coordinator.model':{units:1,unknownCostApproved:true},'daemon.run':{units:1,unknownCostApproved:true} },paused:false,owners:[owner],override:null,...changes })
-      await pool.query(`INSERT INTO quota_allocations(workspace_id,max_budget_units,max_concurrency,max_rate_limit,resources,expires_at,granted_by,reason)
-        VALUES ($1,100,100,1000,$2,now()+interval '2 hours','test-operator','isolated synthetic allocation')`,[workspace,policy.resources])
+      await pool.query(`INSERT INTO quota_allocations(workspace_id,max_budget_units,max_concurrency,max_rate_limit,rate_window_seconds,resources,expires_at,granted_by,reason)
+        VALUES ($1,100,100,1000,60,$2,now()+interval '2 hours','test-operator','isolated synthetic allocation')`,[workspace,policy.resources])
       await configureQuota(pool,workspace,owner,policy)
       await pool.query('INSERT INTO quota_test_members(owner_id,workspace_id) VALUES ($1,$2)',[owner,workspace])
       return { owner,workspace,policy }
@@ -120,6 +120,7 @@ test('real PostgreSQL quota contention, restart, retries and authorization', { s
     })
     await t.test('operator allocation and override are rechecked at activation/renewal; tenant admins cannot raise caps',async()=>{
       const f=await fixture({budgetUnits:0})
+      await assert.rejects(configureQuota(pool,f.workspace,f.owner,{...f.policy,rateWindowSeconds:1}),{code:'quotaAllocationExceeded'})
       await assert.rejects(configureQuota(pool,f.workspace,f.owner,{...f.policy,budgetUnits:101}),{code:'quotaAllocationExceeded'})
       await assert.rejects(configureQuota(pool,f.workspace,f.owner,{...f.policy,resources:{'agent.turn':{units:0,unknownCostApproved:true}}}),{code:'quotaAllocationExceeded'})
       await configureQuota(pool,f.workspace,f.owner,{...f.policy,override:{units:1,until:new Date(Date.now()+60000).toISOString(),reason:'synthetic authorized override'}})
@@ -133,6 +134,16 @@ test('real PostgreSQL quota contention, restart, retries and authorization', { s
       await assert.rejects(store.renew(f.owner,active.id,90000),{code:'quotaAllocationUnavailable'})
       await store.finish(f.owner,active.id,'uncertain')
       assert.equal((await state(active.id)).settled_units,'1')
+    })
+    await t.test('rolling tenant windows cannot reset the platform allocation lifetime cap',async()=>{
+      const f=await fixture({budgetUnits:1})
+      await pool.query('UPDATE quota_allocations SET max_budget_units=2 WHERE workspace_id=$1',[f.workspace])
+      for(let i=0;i<2;i++) {
+        const r=await store.reserve(request(f.owner));await store.activate(f.owner,r.id);await store.finish(f.owner,r.id,'settled')
+        await pool.query("UPDATE quota_tenants SET window_start=clock_timestamp()-interval '2 seconds',window_end=clock_timestamp()-interval '1 second' WHERE workspace_id=$1",[f.workspace])
+        await configureQuota(pool,f.workspace,f.owner,{...f.policy,windowStart:new Date().toISOString()})
+      }
+      await assert.rejects(store.reserve(request(f.owner)),{code:'quotaBudgetExhausted'})
     })
     await t.test('SQL write fault rolls back reservation and releases the tenant lock',async()=>{
       const {owner}=await fixture()

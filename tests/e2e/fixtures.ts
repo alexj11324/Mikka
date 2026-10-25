@@ -76,8 +76,8 @@ export async function seedCoordinatorAdmission(page: Page) {
   const { rows: [row] } = await db.query(`SELECT s."userId" AS owner,w.id AS workspace FROM session s JOIN mikka_workspaces w ON w."userId"=s."userId" WHERE s.token=$1 LIMIT 1`, [decodeURIComponent(cookie.value).split('.')[0]])
   if (!row) throw new Error('Quota fixture requires an existing workspace')
   const resources = { 'coordinator.submit': { units: 0, unknownCostApproved: true } }
-  await db.query(`INSERT INTO quota_allocations(workspace_id,max_budget_units,max_concurrency,max_rate_limit,resources,expires_at,granted_by,reason)
-    VALUES ($1,0,1,100,$2,now()+interval '1 hour','e2e-operator','synthetic enqueue-only fixture') ON CONFLICT DO NOTHING`, [row.workspace, resources])
+  await db.query(`INSERT INTO quota_allocations(workspace_id,max_budget_units,max_concurrency,max_rate_limit,rate_window_seconds,resources,expires_at,granted_by,reason)
+    VALUES ($1,0,1,100,60,$2,now()+interval '1 hour','e2e-operator','synthetic enqueue-only fixture') ON CONFLICT DO NOTHING`, [row.workspace, resources])
   await db.query(`INSERT INTO quota_tenants(workspace_id,window_start,window_end,budget_units,concurrency_limit,rate_limit,rate_window_seconds,resources)
     VALUES ($1,now()-interval '1 minute',now()+interval '30 minutes',0,1,100,60,$2) ON CONFLICT DO NOTHING`, [row.workspace, resources])
   await db.query('INSERT INTO quota_owners(owner_id,workspace_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [row.owner, row.workspace])

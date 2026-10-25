@@ -41,6 +41,7 @@ export class QuotaStore {
   private checkPolicy(tenant: Record<string, any>, resource: string, now: Date) {
     const allocation = tenant.allocation
     if (!allocation || allocation.revoked_at || allocation.expires_at <= now) throw new QuotaError('quotaAllocationUnavailable', 403, 60)
+    if (tenant.rate_window_seconds !== allocation.rate_window_seconds) throw new QuotaError('quotaAllocationExceeded', 403)
     if (tenant.paused) throw new QuotaError('quotaPaused', 403, 60)
     if (now < tenant.window_start || now >= tenant.window_end) throw new QuotaError('quotaWindowUnavailable', 503, 60)
     const rule = Object.hasOwn(tenant.resources, resource) ? tenant.resources[resource] : undefined
@@ -60,10 +61,10 @@ export class QuotaStore {
   }
 
   private async checkHeldBudget(client: PoolClient, tenant: Record<string, any>, now: Date) {
-    const { rows: [total] } = await client.query(`SELECT COALESCE(sum(COALESCE(settled_units,units)),0) AS used FROM quota_reservations
-      WHERE workspace_id=$1 AND created_at >= $2 AND created_at < $3`, [tenant.workspace_id, tenant.window_start, tenant.window_end])
+    const { rows: [total] } = await client.query(`SELECT COALESCE(sum(COALESCE(settled_units,units)) FILTER (WHERE created_at >= $2 AND created_at < $3),0) AS used,
+      COALESCE(sum(COALESCE(settled_units,units)),0) AS lifetime_used FROM quota_reservations WHERE workspace_id=$1`, [tenant.workspace_id, tenant.window_start, tenant.window_end])
     const budget = BigInt(tenant.override_until > now ? tenant.override_units : tenant.budget_units) < BigInt(tenant.allocation.max_budget_units) ? (tenant.override_until > now ? tenant.override_units : tenant.budget_units) : tenant.allocation.max_budget_units
-    if (BigInt(total.used) > BigInt(budget)) throw new QuotaError('quotaBudgetExhausted', 429, (tenant.window_end.getTime() - now.getTime()) / 1000)
+    if (BigInt(total.used) > BigInt(budget) || BigInt(total.lifetime_used) > BigInt(tenant.allocation.max_budget_units)) throw new QuotaError('quotaBudgetExhausted', 429, (tenant.window_end.getTime() - now.getTime()) / 1000)
   }
 
   async reserve(input: QuotaRequest): Promise<Reservation> {
@@ -82,13 +83,14 @@ export class QuotaStore {
       const { rows: [backoff] } = await client.query('SELECT retry_at FROM quota_backoffs WHERE workspace_id=$1 AND resource=$2 AND retry_at > $3', [tenant.workspace_id, input.resource, now])
       if (backoff) throw new QuotaError('providerBackoff', 429, (backoff.retry_at.getTime() - now.getTime()) / 1000)
       const { rows: [totals] } = await client.query(`SELECT
+        COALESCE(sum(COALESCE(settled_units,units)),0) AS lifetime_used,
         COALESCE(sum(COALESCE(settled_units,units)) FILTER (WHERE created_at >= $2 AND created_at < $3),0) AS used,
         count(*) FILTER (WHERE state IN ('reserved','executing')) AS active,
         count(*) FILTER (WHERE created_at > $4) AS rate,
         min(created_at) FILTER (WHERE created_at > $4) AS oldest
         FROM quota_reservations WHERE workspace_id=$1`, [tenant.workspace_id, tenant.window_start, tenant.window_end, new Date(now.getTime() - tenant.rate_window_seconds * 1000)])
       const budget = BigInt(tenant.override_until > now ? tenant.override_units : tenant.budget_units) < BigInt(tenant.allocation.max_budget_units) ? (tenant.override_until > now ? tenant.override_units : tenant.budget_units) : tenant.allocation.max_budget_units
-      if (BigInt(totals.used) + BigInt(units) > BigInt(budget)) throw new QuotaError('quotaBudgetExhausted', 429, (tenant.window_end.getTime() - now.getTime()) / 1000)
+      if (BigInt(totals.used) + BigInt(units) > BigInt(budget) || BigInt(totals.lifetime_used) + BigInt(units) > BigInt(tenant.allocation.max_budget_units)) throw new QuotaError('quotaBudgetExhausted', 429, (tenant.window_end.getTime() - now.getTime()) / 1000)
       if (Number(totals.active) >= Math.min(tenant.concurrency_limit, tenant.allocation.max_concurrency)) throw new QuotaError('quotaConcurrencyExceeded', 429)
       if (Number(totals.rate) >= Math.min(tenant.rate_limit, tenant.allocation.max_rate_limit)) throw new QuotaError('quotaRateExceeded', 429, (totals.oldest.getTime() + tenant.rate_window_seconds * 1000 - now.getTime()) / 1000)
       const { rows: [reservation] } = await client.query(`INSERT INTO quota_reservations

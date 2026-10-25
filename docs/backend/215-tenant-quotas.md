@@ -14,8 +14,9 @@ model, are stored as usage observations independently from the allowance.
 
 No allowance is seeded. Missing configuration fails closed. A platform operator
 must first authorize a finite `quota_allocations` grant in the application DB,
-with workspace, fixed per-resource units, maximum window budget, concurrency,
-rate, expiry, grantor and reason. There is deliberately no public grant endpoint.
+with workspace, fixed per-resource units, maximum lifetime budget, concurrency,
+rate and fixed rate window, expiry, grantor and reason. Tenant window rollover
+cannot reset this platform lifetime cap; only an operator can increase it. There is deliberately no public grant endpoint.
 A workspace administrator may set a policy or temporary override only within
 that existing allocation. They cannot approve unknown resources, lower resource
 weights to zero, expand an allocation, or move an owner's existing tenant binding.
@@ -46,7 +47,9 @@ that tenant. The rate count includes refunded attempts, preventing refund loops.
 terminal. A key is owner-scoped and bound to a canonical payload fingerprint.
 Ten identical callers can obtain one reservation, but only one activates it.
 Changed parameters conflict. Settled or uncertain operations cannot resend just
-because the HTTP response was lost. Reconciliation or a new explicit logical
+because the HTTP response was lost. The existing explicit Agent retry/regenerate
+action creates a new server attempt and is charged separately; transport replays
+retain the original turn key. Reconciliation or a new explicit logical
 operation is needed; the quota ledger does not pretend to cache a model reply.
 
 Before-send failure or expiry refunds the allowance. An explicit initial
@@ -115,6 +118,12 @@ The initial PG suite passed 13/13 with zero skips at
 `2026-10-25T17:01:04Z`; the later operator-allocation test exposed a fixture that
 expected an owner-binding error before the live-window check. The fixture was
 corrected to keep the same target window; failures remain in the evidence logs.
+Expanded local PG regression passed 16/16 with zero skips at
+`2026-10-25T17:23:43Z`, including allocation lifetime/window-reset and rate-window
+evasion, expired overrides at activation, operator revocation at renewal, and a
+real SQL trigger write fault. Initial clean-CI actual Next HTTP regression passed
+6/6 at `88787cd` with zero external network attempts:
+https://github.com/alexj11324/Mikka/actions/runs/40215373894 .
 Source regression passed 29/29, migration checks 11/11 and all 33 migration names
 passed. Exact candidate SHA, final HTTP results and CI links are recorded in the
 PR after execution. Earlier build failures are retained: native SWC cache

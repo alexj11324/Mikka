@@ -90,7 +90,10 @@ export async function POST(request: Request) {
   }
   let quota: Awaited<ReturnType<typeof beginQuota>>
   try {
-    quota = await beginQuota({ ownerId: session.user.id, key: `agent:${turnId}`, resource: 'agent.turn', binding: { sessionId, turnId, prompt: parsed.data.prompt } })
+    // The existing explicit retry/regenerate action is a new charged attempt.
+    // Ordinary transport replays retain the original logical turn key.
+    const quotaKey = parsed.data.retry ? `agent-retry:${turnId}:${turn.attemptId}` : `agent:${turnId}`
+    quota = await beginQuota({ ownerId: session.user.id, key: quotaKey, resource: 'agent.turn', binding: { sessionId, turnId, prompt: parsed.data.prompt } })
   } catch (error) {
     await saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, { status: 'failed', completion: '', error: error instanceof QuotaError ? error.code : 'quotaUnavailable' })
     return error instanceof QuotaError ? quotaResponse(error) : Response.json({ error: 'quotaUnavailable' }, { status: 503, headers: errorHeaders })
