@@ -26,7 +26,8 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
     const dir = new URL('../drizzle/', import.meta.url)
     const names = orderMigrations((await readdir(dir)).filter(name => name.endsWith('.sql')))
     for (const name of names) {
-      if (['20261025052031_session_mailboxes.sql','20261025052033_group_review_mailboxes.sql'].includes(name)) continue
+      // Audit is a mailbox consumer, so legacy fixtures must install it after the mailbox migration.
+      if (['20261025052031_session_mailboxes.sql','20261025052033_group_review_mailboxes.sql','20261025170000_security_audit_application.sql'].includes(name)) continue
       const sql = await readFile(new URL(name, dir), 'utf8')
       if (/^--\s*target:\s*DATABASE_URL/m.test(sql)) continue
       await pool.query(sql)
@@ -45,6 +46,7 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
     const migration = await readFile(new URL('20261025052031_session_mailboxes.sql', dir), 'utf8')
     await pool.query(migration)
     await pool.query(await readFile(new URL('20261025052033_group_review_mailboxes.sql', dir), 'utf8'))
+    await pool.query(await readFile(new URL('20261025170000_security_audit_application.sql', dir), 'utf8'))
     const firstIdentities = (await pool.query('select id,kind,"sessionKey","latestRunId",harness from session_mailboxes order by id')).rows
     await pool.query(migration)
     assert.deepEqual((await pool.query('select id,kind,"sessionKey","latestRunId",harness from session_mailboxes order by id')).rows, firstIdentities, 'migration replay must preserve every address and continuation pointer')
@@ -272,8 +274,9 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
       assert.equal((await store.policy(owner,recipient.mailboxId,2,false)).continuationRunId,null)
       assert.equal((await store.ownerSend(owner,{to:recipient.mailboxId,key:randomUUID(),text:'Resume through Factory',resume:true})).continuationRunId,undefined)
       assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "continuesRunId"=$1',[next])).rowCount,0)
-      // A pre-existing/unadopted child also fails the actual claim implementation.
-      await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"continuesRunId") VALUES($1,$2,$3,$4,$5,$6,'queued',$7)`,[child,owner,issue,role,device,repo,next])
+      // A scope-valid but unadopted child still fails the actual Factory claim;
+      // bind the parent mailbox to reach that gate under the audit lineage invariant.
+      await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"continuesRunId","mailboxId") VALUES($1,$2,$3,$4,$5,$6,'queued',$7,$8)`,[child,owner,issue,role,device,repo,next,recipient.mailboxId])
       await assert.rejects(createExecutionClaim(pool,async()=>true)(owner,device,child,new Date(Date.now()+60000).toISOString()),/factoryRunMismatch/)
       await pool.query(`UPDATE factory_tasks SET status='cancelled' WHERE id=$1`,[task.id])
       await assert.rejects(createExecutionClaim(pool,async()=>true)(owner,device,child,new Date(Date.now()+60000).toISOString()),/factoryStopped/)

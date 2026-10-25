@@ -1,3 +1,5 @@
+import { appendAudit } from '@/lib/audit/store'
+import { pool as auditPool } from '@/lib/db'
 import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import { z } from 'zod'
 import { withBasePath } from '@/lib/base-path'
@@ -289,9 +291,14 @@ const workerHandler = createMcpHandler(server => {
 
 const workerAuthed = withMcpAuth(workerHandler, worker.verifyRunToken, { required: true, resourceMetadataPath: withBasePath('/.well-known/oauth-protected-resource') })
 
-function route(request: Request) {
+async function route(request: Request) {
   const bearer = request.headers.get('authorization')?.match(/^Bearer\s+(\S+)/i)?.[1]
-  return bearer?.startsWith(worker.RUN_TOKEN_PREFIX) ? workerAuthed(request) : authed(request)
+  const response = await (bearer?.startsWith(worker.RUN_TOKEN_PREFIX) ? workerAuthed(request) : authed(request))
+  if (response && response.status >= 400) {
+    try { await appendAudit(auditPool, 'system:auth', { actorId: 'anonymous', actorType: 'anonymous', resourceId: 'mcp', action: 'authorization.denied', outcome: 'denied', reason: `mcp_http_${response.status}` }) }
+    catch { return Response.json({ error: 'auditUnavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } }) }
+  }
+  return response
 }
 
 export { route as GET, route as POST, route as DELETE }

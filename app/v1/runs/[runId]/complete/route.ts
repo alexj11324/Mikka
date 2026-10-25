@@ -1,4 +1,6 @@
 import { withDeviceAuthorization } from '@/lib/device-link'
+import { randomUUID } from 'node:crypto'
+import { auditActor } from '@/lib/audit/store'
 import { after, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { runStateForStop } from '@mikka/protocol/daemon'
@@ -56,6 +58,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   const tx = await pool.connect()
   let ended = false
   try { await tx.query('BEGIN')
+    await auditActor(tx, caller.tokenId, 'worker', randomUUID())
     // Match Factory cancellation/answer lock order before touching the run row.
     await tx
     .query(
