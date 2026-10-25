@@ -7,6 +7,7 @@ import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db } from '@/lib/db'
+import { webSearch } from '@/lib/search'
 import { agentRuns, agents, deviceRepos, devices, issueMembers, issues } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
@@ -173,4 +174,10 @@ export async function sendToRun(userId: string, input: { runId: string; text: st
 export async function stopRun(userId: string, input: { runId: string }) {
   'use step'
   return asToolResult(async () => { await requestRunStop(userId, input.runId); return { stopRequested: true } })
+}
+
+/** Web search through the shared SearchProvider (MIK-5); degrades to searchUnavailable on 429/5xx/timeout. */
+export async function webSearchStep(userId: string, input: { query: string; limit?: number }) {
+  'use step'
+  return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
 }
