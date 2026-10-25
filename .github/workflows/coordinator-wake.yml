@@ -71,6 +71,7 @@ jobs:
           BETTER_AUTH_SECRET: isolated-sdk-build-only-no-live-provider-access
           NEXT_TELEMETRY_DISABLED: '1'
       - name: Real Workflow SDK duplicate delivery and Next worker SIGKILL
+        shell: bash
         env:
           WORKFLOW_TARGET_WORLD: local
           WORKFLOW_LOCAL_BASE_URL: http://127.0.0.1:3177/mikka
@@ -88,8 +89,11 @@ jobs:
             -e WORKFLOW_LOCAL_BASE_URL -e WORKFLOW_LOCAL_DATA_DIR -e WORKFLOW_NODE_HTTP -e WORKFLOW_EXPERIMENTAL_DYNAMIC_WORKFLOWS \
             -v "$PWD:$PWD" -v "$WORKFLOW_LOCAL_DATA_DIR:$WORKFLOW_LOCAL_DATA_DIR" -w "$PWD" \
             node:24-bookworm-slim node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3177
-          python3 scripts/record-terminal.py wake-sdk.cast node --import tsx scripts/verify-wake-sdk.mjs > wake-sdk.log 2>&1
-          python3 scripts/record-terminal.py wake-effect-sdk.cast node --import tsx scripts/verify-wake-effect-sdk.mjs > wake-effect-sdk.log 2>&1
+          # These keyless harnesses emit IDs, step states and counts only. Keep
+          # their diagnostics readable even when artifact download is denied;
+          # bash pipefail must still propagate a failing recorder/test status.
+          python3 scripts/record-terminal.py wake-sdk.cast node --import tsx scripts/verify-wake-sdk.mjs 2>&1 | tee wake-sdk.log
+          python3 scripts/record-terminal.py wake-effect-sdk.cast node --import tsx scripts/verify-wake-effect-sdk.mjs 2>&1 | tee wake-effect-sdk.log
       - name: Preserve Workflow evidence and stop the isolated test container
         if: always()
         run: |
