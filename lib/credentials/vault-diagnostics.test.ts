@@ -29,3 +29,16 @@ test('successful deletion and absent object produce no failure; throwing diagnos
   const vault = new InfisicalCredentialVault({ ...base, fetch: async () => new Response(null, { status: 500 }), onFailure: () => { throw new Error('callback failed') } })
   await assert.rejects(vault.remove(ref), { code: 'vault_unavailable' })
 })
+
+
+test('auth diagnostics preserve numeric denial and discard private response/error details', async () => {
+  const { universalAuthTokenProvider } = await import('./universal-auth')
+  const observations: unknown[] = []
+  const provider = universalAuthTokenProvider({ origin: base.origin, credentials: () => ({ clientId: 'synthetic-id', clientSecret: 'synthetic-secret' }),
+    fetch: async () => new Response('synthetic-private-body', { status: 403 }),
+    onFailure: failure => { observations.push(failure); throw new Error('diagnostic failed') },
+  })
+  await assert.rejects(provider.getAccessToken(), { code: 'vault_auth_unavailable' })
+  await assert.rejects(provider.getAccessToken(), { code: 'vault_auth_unavailable' })
+  assert.deepEqual(observations, [{ kind: 'http', status: 403 }])
+})
