@@ -28,9 +28,10 @@ type SignInCardProps = {
   onSubmit: FormEventHandler<HTMLFormElement>
   onGoogleSignIn: () => Promise<void>
   onGitHubSignIn: () => Promise<void>
+  onResendVerification?: () => void
 }
 
-export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, showGoogleLinkHint, error, notice, googleCallbackURL, githubCallbackURL, next = '/', onSubmit, onGoogleSignIn, onGitHubSignIn }: SignInCardProps) {
+export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, showGoogleLinkHint, error, notice, googleCallbackURL, githubCallbackURL, next = '/', onSubmit, onGoogleSignIn, onGitHubSignIn, onResendVerification }: SignInCardProps) {
   const t = useTranslations('Auth')
   function authHref(path: string) {
     const params = new URLSearchParams()
@@ -77,6 +78,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
           <Separator className="flex-1" />
         </div>
         {error && <p id="auth-error" role="alert" className="text-destructive text-sm">{error}</p>}
+        {onResendVerification && <Button type="button" variant="outline" className="w-full" disabled={pending} onClick={onResendVerification}>{t('sendVerification')}</Button>}
         <form className="flex flex-col gap-5" onSubmit={onSubmit} aria-busy={pending} aria-describedby={error ? 'auth-error' : undefined}>
           <FieldGroup>
             {registering && <Field data-disabled={pending} className="gap-2">
@@ -94,7 +96,10 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
               </InputGroup>
             </Field>
             <Field data-disabled={pending} className="gap-2">
-              <FieldLabel htmlFor="password">{t('password')}</FieldLabel>
+              <div className="flex items-center justify-between gap-3">
+                <FieldLabel htmlFor="password">{t('password')}</FieldLabel>
+                {!registering && <Link href="/forgot-password" className="text-muted-foreground text-xs underline-offset-4 hover:underline">{t('forgotPassword')}</Link>}
+              </div>
               <InputGroup>
                 <InputGroupAddon><LockKeyholeIcon aria-hidden="true" /></InputGroupAddon>
                 <InputGroupInput id="password" name="password" type="password" autoComplete={registering ? 'new-password' : 'current-password'} placeholder={t('passwordPlaceholder')} minLength={8} maxLength={128} required disabled={pending} />

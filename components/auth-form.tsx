@@ -7,6 +7,7 @@ import { getPathname } from '@/i18n/navigation'
 import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { SignInCard } from '@/components/blocks/auth-19/components/sign-in-card'
 import { safeAuthReturn } from '@/lib/auth-return'
+import { isEmailNotVerified, recoveryMessageKey, sendVerificationEmail } from '@/lib/auth-recovery'
 import { withBasePath } from '@/lib/base-path'
 import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
@@ -33,6 +34,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
   }
   const pendingRef = useRef(false)
   const [pending, setPending] = useState(false)
+  const [unverifiedEmail, setUnverifiedEmail] = useState('')
   function beginSubmit() {
     if (pendingRef.current) return false
     pendingRef.current = true
@@ -89,12 +91,27 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     try {
       const credentials = { email: String(data.get('email')).trim(), password: String(data.get('password')) }
       const result = registering ? await authClient.signUp.email({ ...credentials, name: String(data.get('name')).trim() }) : await authClient.signIn.email(credentials)
+      setUnverifiedEmail('')
+      if (!registering && isEmailNotVerified(result.error)) { setUnverifiedEmail(credentials.email); setError(t('emailNotVerified')); return }
       if (result.error) { setError(t('submitFailed')); return }
       const session = await authClient.getSession({ query: { disableCookieCache: true } })
       if (!session.data?.user) { setError(t('sessionNotKept')); return }
       window.location.replace(home)
     } catch { setError(t('connectionFailed')) }
     finally { endSubmit() }
+  }
+  async function resendVerification() {
+    if (!beginSubmit()) return
+    try {
+      const callbackURL = new URL(withBasePath(getPathname({ locale, href: '/verify-email' })), window.location.origin).href
+      const result = await sendVerificationEmail({ email: unverifiedEmail, callbackURL })
+      if (result.ok) setNotice(t('verificationSent'))
+      else setError(t(recoveryMessageKey(result.error)))
+    } catch {
+      setError(t('connectionFailed'))
+    } finally {
+      endSubmit()
+    }
   }
   async function enterTestWorkspace() {
     if (!beginSubmit()) return
@@ -124,7 +141,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }
   }
   return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
-    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} notice={notice} googleCallbackURL={googleCallbackURL} githubCallbackURL={githubCallbackURL} next={returnPath} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} />
+    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} notice={notice} googleCallbackURL={googleCallbackURL} githubCallbackURL={githubCallbackURL} next={returnPath} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} onResendVerification={unverifiedEmail ? () => void resendVerification() : undefined} />
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
       <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>{t('testWorkspaceCta')}</Button>
       <p className="text-muted-foreground text-xs">{t('testWorkspaceHint')}</p>

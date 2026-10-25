@@ -1,13 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useLocale, useTranslations } from 'next-intl'
-import { authClient } from '@/lib/auth-client'
-import { getPathname } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
-import { Google } from '@/components/ui/svgs/google'
 
 type Toolkit = 'gmail' | 'googlecalendar' | 'notion' | 'slack'
 type Account = { id: string; toolkit: Toolkit; status: string }
@@ -16,38 +13,13 @@ type IntegrationState = { configured: boolean; callbackVerifierConfigured: boole
 const TOOLKITS: Toolkit[] = ['gmail', 'googlecalendar', 'notion', 'slack']
 const integrationPath = withBasePath('/api/integrations/composio')
 
-export function IntegrationsSettings({ googleEnabled, showWebhookDetails = true }: { googleEnabled: boolean; showWebhookDetails?: boolean }) {
-  const locale = useLocale()
+export function IntegrationsSettings({ showWebhookDetails = true }: { showWebhookDetails?: boolean }) {
   const t = useTranslations('Settings.integrations')
   const [state, setState] = useState<IntegrationState | null>(null)
   const [pending, setPending] = useState<Toolkit | ''>('')
   const [error, setError] = useState('')
-  const [googleLinked, setGoogleLinked] = useState<boolean | null>(null)
-  const [googlePending, setGooglePending] = useState(false)
-  const [googleError, setGoogleError] = useState('')
   const [callbackError, setCallbackError] = useState('')
   const [callbackSuccess, setCallbackSuccess] = useState('')
-  const [googleSuccess, setGoogleSuccess] = useState('')
-
-  useEffect(() => {
-    if (!googleEnabled) { setGoogleLinked(false); return }
-    let current = true
-    void authClient.listAccounts().then(({ data, error: resultError }) => {
-      if (!current) return
-      if (resultError) {
-        setGoogleError(t('googleStatusFailed'))
-        setGoogleLinked(false)
-      } else {
-        setGoogleError('')
-        setGoogleLinked(data?.some(account => account.providerId === 'google') ?? false)
-      }
-    }).catch(() => {
-      if (!current) return
-      setGoogleError(t('googleStatusFailed'))
-      setGoogleLinked(false)
-    })
-    return () => { current = false }
-  }, [googleEnabled, t])
 
   const refresh = useCallback(async () => {
     setError('')
@@ -64,39 +36,13 @@ export function IntegrationsSettings({ googleEnabled, showWebhookDetails = true 
 
   useEffect(() => {
     const url = new URL(window.location.href)
-    const googleResult = url.searchParams.get('google')
-    if (googleResult === 'linked') {
-      setGoogleLinked(true)
-      setGoogleError('')
-      setGoogleSuccess(t('googleLinkSuccess'))
-    }
-    if (googleResult === 'failed') setGoogleError(t('googleLinkFailed'))
-    url.searchParams.delete('google')
     const result = url.searchParams.get('composio')
-    if (!result) {
-      if (googleResult) window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
-      return
-    }
+    if (!result) return
     if (result === 'connected') setCallbackSuccess(t('connectionCompleted'))
     if (result === 'callback-failed') setCallbackError(t('callbackVerificationFailed'))
     url.searchParams.delete('composio')
     window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
   }, [t])
-
-  async function linkGoogle() {
-    setGooglePending(true); setGoogleError(''); setGoogleSuccess('')
-    try {
-      const callbackURL = new URL(withBasePath('/api/integrations/google/callback'), window.location.origin)
-      callbackURL.searchParams.set('locale', locale)
-      const settingsURL = new URL(withBasePath(`${getPathname({ locale, href: '/' })}?settings=integrations&google=failed`), window.location.origin)
-      const result = await authClient.linkSocial({ provider: 'google', callbackURL: callbackURL.href, errorCallbackURL: settingsURL.href })
-      if (result.error) throw new Error()
-      if (result.data?.url) window.location.assign(result.data.url)
-    } catch {
-      setGoogleError(t('googleLinkFailed'))
-      setGooglePending(false)
-    }
-  }
 
   async function connect(toolkit: Toolkit) {
     setPending(toolkit); setError('')
@@ -128,19 +74,6 @@ export function IntegrationsSettings({ googleEnabled, showWebhookDetails = true 
   }
 
   return <div className="flex flex-col gap-8">
-    <SettingsSection id="google-sign-in-heading" title={t('googleSignInTitle')} description={t('googleSignInDescription')}>
-      <SettingRow title={t('googleSignIn')} description={googleLinked ? t('googleLinkedDescription') : t('googleLinkDescription')}>
-        <div className="flex items-center gap-3">
-          {googleLinked && <span className="text-xs text-muted-foreground">{t('googleLinked')}</span>}
-          {!googleLinked && <Button type="button" variant="outline" size="sm" disabled={!googleEnabled || googleLinked === null || googlePending} onClick={() => void linkGoogle()}>
-            <Google className="size-4" />{googlePending ? t('googleLinking') : t('linkGoogle')}
-          </Button>}
-        </div>
-      </SettingRow>
-      {!googleEnabled && <p role="status" className="text-sm text-muted-foreground">{t('googleNotConfigured')}</p>}
-      {googleSuccess && <p role="status" className="text-sm text-muted-foreground">{googleSuccess}</p>}
-      {googleError && <p role="alert" className="text-sm text-destructive">{googleError}</p>}
-    </SettingsSection>
     <SettingsSection id="connected-apps-heading" title={t('heading')} description={t('description')}>
       {TOOLKITS.map(toolkit => {
         const accounts = state?.accounts.filter(item => item.toolkit === toolkit) ?? []

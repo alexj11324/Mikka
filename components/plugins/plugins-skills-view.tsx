@@ -9,6 +9,7 @@ import { Link } from '@/i18n/navigation'
 import { withBasePath } from '@/lib/base-path'
 import type { SkillsSearchResult } from '@/lib/skills-search'
 import { IntegrationsSettings } from '@/components/settings/integrations-settings'
+import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { Frame, FramePanel } from '@/components/reui/frame'
 import { IconTile } from '@/components/reui/icon-tile'
 import { Button } from '@/components/ui/button'
@@ -78,7 +79,8 @@ export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean })
                 </FramePanel>
               </Frame>
             </section>
-            <IntegrationsSettings googleEnabled={googleEnabled} showWebhookDetails={false} />
+            <GoogleSignInSettings googleEnabled={googleEnabled} />
+            <IntegrationsSettings showWebhookDetails={false} />
           </TabsContent>
           <TabsContent value="skills" className="flex flex-col gap-5 pt-4">
             <div className="flex flex-col gap-3">
