@@ -163,6 +163,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
       const syncRemote = existingLink
         ? !existingLink.linearUpdatedAt || remote.updatedAt > existingLink.linearUpdatedAt.toISOString()
         : remote.updatedAt > sameId.updatedAt.toISOString()
+      if (sameId.scope !== 'workspace') await tx.update(issues).set({ scope: 'workspace' }).where(eq(issues.id, sameId.id))
       if (!existingLink) await tx.insert(linearIssueLinks).values({
         id: crypto.randomUUID(), issueId: sameId.id, ownerId: team.ownerId, teamSyncId: team.id,
         linearIssueId: remote.id, linearIdentifier: remote.identifier, linearDescriptionHash: syncRemote ? null : hashValue(remote.description ?? ''), syncStatus: 'synced',
@@ -184,7 +185,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
     const issueContent = withIssueMetadata(content, metadata)
     const now = new Date()
     const [issue] = await tx.insert(issues).values({
-      id, userId: team.ownerId, title: remote.title, content: issueContent,
+      id, userId: team.ownerId, scope: 'workspace', title: remote.title, content: issueContent,
       status: issueStatusForLinearType(remote.state?.type ?? '', 'todo', remote.state?.name), priority: issuePriorityForLinear(remote.priority),
       revision: 1, createdAt: now, updatedAt: now,
     }).returning()
@@ -211,7 +212,8 @@ export async function syncAppIssueToLinear(issueId: string) {
   if (!row) return
   const issue = row.issue
   const metadata = readIssueMetadata(issue.content)
-  if (metadata.deletedAt) return
+  // Personal issues never leave Mikka (MIK-46).
+  if (metadata.deletedAt || issue.scope !== 'workspace') return
   const [savedLink] = await db.select({ link: linearIssueLinks, team: linearTeamSyncs }).from(linearIssueLinks)
     .innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId)).where(eq(linearIssueLinks.issueId, issue.id)).limit(1)
   const link = savedLink?.link ?? null

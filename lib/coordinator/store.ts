@@ -7,6 +7,7 @@ import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib
 import { eventsForInbox } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { taskIdentifiers } from '@/lib/task-identifier-server'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -88,8 +89,11 @@ export async function setEventTier(id: string, tier: CoordinatorEventTier): Prom
   await db.update(coordinatorEvents).set({ tier }).where(and(eq(coordinatorEvents.id, id), isNull(coordinatorEvents.tier)))
 }
 
-/** Appends the turn's new messages and renews the lease. */
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[]): Promise<void> {
+/**
+ * Appends the turn's new messages and renews the lease. `warning` says why the
+ * reply may be cut short; it shows in the chat until a turn ends cleanly.
+ */
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null): Promise<void> {
   await db.transaction(async tx => {
     if (messages.length) {
       const first = await nextPosition(tx, userId)
@@ -97,7 +101,8 @@ export async function appendMessages(userId: string, holder: string, messages: M
         id: crypto.randomUUID(), userId, position: first + index, message: message as unknown as Record<string, unknown>,
       })))
     }
-    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(Date.now() + LEASE_MS), lastError: null, lastErrorAt: null, updatedAt: new Date() })
+    const now = new Date()
+    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning, lastErrorAt: warning ? now : null, updatedAt: now })
       .where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.leaseHolder, holder)))
   })
 }
@@ -153,21 +158,23 @@ export async function citationSources(userId: string, texts: readonly string[]):
   const { issueIds, runIds } = citedIds(texts)
   const sources: Record<string, CitationSource> = {}
   if (issueIds.length) {
-    const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content })
+    const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content })
       .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
       .where(and(inArray(issues.id, issueIds), or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))))
-    for (const { content, ...row } of rows) {
+    const identifiers = await taskIdentifiers(rows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
+    for (const { content, ownerId: _owner, scope: _scope, ...row } of rows) {
       const metadata = readIssueMetadata(content)
-      if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null }
+      if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null }
     }
   }
   if (runIds.length) {
-    const rows = await db.select({ id: agentRuns.id, agentName: agents.name, harness: agents.harness, status: agentRuns.status, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, issueId: issues.id, issueTitle: issues.title, issueContent: issues.content })
+    const rows = await db.select({ id: agentRuns.id, agentName: agents.name, harness: agents.harness, status: agentRuns.status, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, issueId: issues.id, issueOwnerId: issues.userId, issueScope: issues.scope, issueTitle: issues.title, issueContent: issues.content })
       .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
       .where(and(inArray(agentRuns.id, runIds), eq(agentRuns.userId, userId)))
+    const identifiers = await taskIdentifiers(rows.flatMap(row => row.issueId && row.issueOwnerId && row.issueScope && row.issueContent ? [{ id: row.issueId, ownerId: row.issueOwnerId, scope: row.issueScope, number: readIssueMetadata(row.issueContent).number }] : []))
     for (const row of rows) {
       const issue = row.issueId && row.issueTitle && row.issueContent && !readIssueMetadata(row.issueContent).deletedAt
-        ? { id: row.issueId, title: row.issueTitle, number: readIssueMetadata(row.issueContent).number ?? null } : null
+        ? { id: row.issueId, title: row.issueTitle, number: readIssueMetadata(row.issueContent).number ?? null, identifier: identifiers.get(row.issueId) ?? null } : null
       sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
     }
   }

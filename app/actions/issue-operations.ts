@@ -8,7 +8,8 @@ import { db } from '@/lib/db'
 import { issues, issueMembers, issueVersions } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { issueOwnerScope } from '@/lib/issue-owner-scope'
-import { issueWithMetadata, readIssueMetadata, withIssueMetadata, type IssueMetadata } from '@/lib/issue-metadata'
+import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
+import { readIssueMetadata, withIssueMetadata, type IssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers } from '@/lib/issue-numbering'
 import { createsIssueCycle } from '@/lib/issue-relations'
 import { dispatchLinearIssueSync, dispatchLinearWork } from '@/lib/linear-sync/dispatch'
@@ -17,10 +18,12 @@ const relationSchema = z.object({ id: z.uuid(), revision: z.number().int().posit
 
 export async function listIssueConnections(id: string) {
   const { issue, user } = await requireIssueAccess(id)
-  const rows = await db.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, content: issues.content }).from(issues)
+  const rows = await db.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, content: issues.content, createdAt: issues.createdAt }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, user.id)))
     .where(issueOwnerScope(user.id, issue.userId)).orderBy(desc(issues.updatedAt))
-  return rows.filter(row => !readIssueMetadata(row.content).deletedAt).map(({ content, ...row }) => ({ ...row, metadata: readIssueMetadata(content) }))
+  const live = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
+  const identifiers = await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
+  return live.map(({ content, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))
 }
 
 export async function updateIssueRelation(input: z.input<typeof relationSchema>) {
@@ -83,7 +86,7 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
           await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: issue.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
           if (id === current.id) savedCurrent = saved
         }
-        return { issue: issueWithMetadata(savedCurrent) }
+        return { issue: await issueView(savedCurrent, tx) }
       })
       if ('issue' in result) dispatchLinearWork()
       return result
@@ -137,7 +140,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
             }
           }
         }
-        return { issue: issueWithMetadata(created) }
+        return { issue: await issueView(created, tx) }
       })
       if ('issue' in result) dispatchLinearWork()
       return result
@@ -163,7 +166,7 @@ export async function toggleIssuePreference(input: { id: string; kind: 'favorite
         metadata[key] = ids.includes(user.id) ? ids.filter(id => id !== user.id) : [...ids, user.id]
         if (metadata[key].length > 200) return { error: 'issuePreferenceLimit' }
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, metadata), revision: latest.revision + 1 }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).returning()
-        return { issue: issueWithMetadata(saved) }
+        return { issue: await issueView(saved, tx) }
       })
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
@@ -193,7 +196,7 @@ export async function setIssueDeleted(input: { id: string; revision?: number; re
         const metadata = readIssueMetadata(latest.content)
         if (input.restore && metadata.deletedAt && Date.now() - new Date(metadata.deletedAt).getTime() > 30 * 86400000) return { error: 'issueRestoreWindow' }
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, deletedAt: input.restore ? null : new Date().toISOString() }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, user.id))).returning()
-        return { issue: issueWithMetadata(saved) }
+        return { issue: await issueView(saved, tx) }
       })
       if (input.restore && 'issue' in result) dispatchLinearIssueSync(issue.id)
       return result

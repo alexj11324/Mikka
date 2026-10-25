@@ -1,13 +1,14 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
+import { and, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { agents, issues, issueMembers, issueVersions, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { listProjects } from '@/app/actions/projects'
-import { assigneeSchema, issueWithMetadata, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { issueView } from '@/lib/task-identifier-server'
+import { assigneeSchema, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 
 const patchSchema = z.object({
@@ -25,7 +26,7 @@ export async function getIssuePropertyOptions(id: string) {
   const [owner] = await db.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, issue.userId))
   const members = await db.select({ id: users.id, name: users.name, image: users.image }).from(issueMembers).innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId)))
   const availableAgents = await db.select({ id: agents.id, name: agents.name, harness: agents.harness }).from(agents).where(eq(agents.userId, issue.userId))
-  const ownedIssues = await db.select({ content: issues.content }).from(issues).where(eq(issues.userId, user.id))
+  const ownedIssues = await db.select({ content: issues.content }).from(issues).where(user.id === issue.userId ? eq(issues.userId, issue.userId) : or(eq(issues.userId, user.id), eq(issues.userId, issue.userId)))
   const metadata = ownedIssues.map(row => readIssueMetadata(row.content))
   const projectRecords = await listProjects()
   return {
@@ -83,7 +84,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, next), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId), eq(issues.revision, latest.revision))).returning()
         if (!saved) return { error: 'issueOutdated' }
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
-        return { issue: issueWithMetadata(saved) }
+        return { issue: await issueView(saved, tx) }
       })
       if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
       return result

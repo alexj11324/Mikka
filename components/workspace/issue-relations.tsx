@@ -1,12 +1,12 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, ChevronRight, Circle, Flag, GitBranch, Link2, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { listIssueConnections, updateIssueRelation } from '@/app/actions/issue-operations'
-import { moveIssue, type getIssue } from '@/app/actions/issues'
+import { listIssues, moveIssue, type getIssue } from '@/app/actions/issues'
 import { useActionError } from '@/lib/use-action-error'
 import { Button } from '@/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
@@ -18,22 +18,36 @@ import { cn } from '@/lib/utils'
 
 type Issue = Awaited<ReturnType<typeof getIssue>>
 export type RelationKind = 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'
+// Picker-only cache key, keyed by the signed-in viewer like the board's ['issues', viewerId] (listIssues returns the viewer's visible issues); mutate it after any relation change.
+export const relationPickerKey = (userId: string) => ['issues', 'relation-picker', userId] as const
 const closed = (status: string) => ['done', 'canceled', 'duplicate'].includes(status)
 
-export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, onSelect, validationError }: { kind: RelationKind; task: Issue; open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; onSelect: (id: string) => void; validationError?: string }) {
+export function IssueRelationPicker({ viewerId, kind, task, open, onOpenChange, pending, onSelect, validationError }: { viewerId: string; kind: RelationKind; task: Issue; open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; onSelect: (id: string) => void; validationError?: string }) {
   const t = useTranslations('Metadata.relations')
   const relationTitle = (value: RelationKind) => t.has(`title.${value}` as never) ? t(`title.${value}` as never) : value
-  const { data, error, mutate } = useSWR(open ? ['issue-connections', task.id] : null, () => listIssueConnections(task.id))
-  return <Dialog open={open} onOpenChange={value => { if (!pending) onOpenChange(value) }}><DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg"><DialogHeader className="p-4 pr-10"><DialogTitle>{relationTitle(kind)}</DialogTitle><DialogDescription>{t('dialogDescription')}</DialogDescription></DialogHeader>{validationError && <p role="alert" className="px-4 pb-3 text-sm text-destructive">{validationError}</p>}<Command className="[&_[cmdk-item]]:min-h-11 lg:[&_[cmdk-item]]:min-h-0"><CommandInput placeholder={t('searchPlaceholder')} aria-label={t('searchAria')} disabled={pending} /><CommandList><CommandEmpty>{error ? t('loadFailed') : data ? t('noTasks') : t('loading')}</CommandEmpty><CommandGroup heading={t('group')}>{data?.filter(row => row.id !== task.id && (kind !== 'child' || row.metadata.parentId !== task.id)).map(row => { const Icon = ISSUE_STATUSES.find(status => status.value === row.status)?.icon ?? Circle; return <CommandItem key={row.id} value={`${row.id} ${issueIdentifier(row.metadata.number)} ${row.title}`} disabled={pending} onSelect={() => onSelect(row.id)}><Icon /><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row.metadata.number)}</span><span className="truncate">{row.title}</span></CommandItem> })}{error && <CommandItem onSelect={() => { void mutate() }}>{t('reload')}</CommandItem>}</CommandGroup></CommandList></Command></DialogContent></Dialog>
+  const [query, setQuery] = useState('')
+  // Relations change between openings; never filter against a stale board snapshot.
+  const { data: connections, error, mutate } = useSWR(open ? ['issue-connections', task.id] : null, () => listIssueConnections(task.id))
+  const { data: latestBoard, isValidating } = useSWR(open ? relationPickerKey(viewerId) : null, listIssues)
+  // While revalidating, the cached board may predate the last relation change; wait for fresh data instead of filtering against it.
+  const board = isValidating ? undefined : latestBoard
+  const source = board ?? (isValidating ? undefined : connections)
+  const needle = query.trim().toLowerCase()
+  const sameOwner = (source ?? []).filter(row => row.id !== task.id && row.ownerId === task.userId && (kind !== 'child' || row.metadata.parentId !== task.id))
+  const otherOwner = (board ?? []).some(row => row.id !== task.id && row.ownerId !== task.userId)
+  const rows = sameOwner.filter(row => !needle || `${issueIdentifier(row)} ${row.title}`.toLowerCase().includes(needle))
+  const empty = error && !board ? t('loadFailed') : !source ? t('loading') : rows.length === 0 && !needle && otherOwner && sameOwner.length === 0 ? t('noTasksSameOwner') : rows.length === 0 ? t('noTasks') : ''
+  return <Dialog open={open} onOpenChange={value => { if (!pending) onOpenChange(value) }}><DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg"><DialogHeader className="p-4 pr-10"><DialogTitle>{relationTitle(kind)}</DialogTitle><DialogDescription>{t('dialogDescription')}</DialogDescription></DialogHeader>{validationError && <p role="alert" className="px-4 pb-3 text-sm text-destructive">{validationError}</p>}<Command shouldFilter={false} className="[&_[cmdk-item]]:min-h-11 lg:[&_[cmdk-item]]:min-h-0"><CommandInput value={query} onValueChange={setQuery} placeholder={t('searchPlaceholder')} aria-label={t('searchAria')} disabled={pending} /><CommandList>{empty ? <CommandEmpty>{empty}</CommandEmpty> : null}<CommandGroup heading={t('group')}>{rows.map(row => { const Icon = ISSUE_STATUSES.find(status => status.value === row.status)?.icon ?? Circle; return <CommandItem key={row.id} value={`${row.id} ${issueIdentifier(row)} ${row.title}`} disabled={pending} onSelect={() => onSelect(row.id)}><Icon /><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row)}</span><span className="truncate">{row.title}</span></CommandItem> })}{error && <CommandItem onSelect={() => { void mutate() }}>{t('reload')}</CommandItem>}</CommandGroup></CommandList></Command></DialogContent></Dialog>
 }
 
-export function IssueRelations({ task, mode, onOpen, onCreate, onPick, getCurrent, onSaved, disabled }: { task: Issue; mode: 'subissues' | 'sidebar'; onOpen: (id: string) => void; onCreate: () => void; onPick: (kind: RelationKind) => void; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; disabled: boolean }) {
+export function IssueRelations({ viewerId, task, mode, onOpen, onCreate, onPick, getCurrent, onSaved, disabled }: { viewerId: string; task: Issue; mode: 'subissues' | 'sidebar'; onOpen: (id: string) => void; onCreate: () => void; onPick: (kind: RelationKind) => void; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; disabled: boolean }) {
   const t = useTranslations('Metadata.relations')
   const tIssue = useTranslations('Issue')
   const actionError = useActionError()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const groupLabel = (value: RelationKind) => t.has(`groupLabel.${value}` as never) ? t(`groupLabel.${value}` as never) : value
   const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
+  const { mutate: refresh } = useSWRConfig()
   const { data: rows, error, mutate } = useSWR(['issue-connections', task.id], () => listIssueConnections(task.id), { refreshInterval: 10000 })
   const [expanded, setExpanded] = useState(true)
   const [pending, setPending] = useState(false)
@@ -48,7 +62,7 @@ export function IssueRelations({ task, mode, onOpen, onCreate, onPick, getCurren
       if (!latest) return
       const result = await updateIssueRelation({ id: task.id, revision: latest.revision, kind, targetId, remove: true })
       if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error))
-      onSaved(result.issue); await mutate(); toast.success(t('removed'))
+      onSaved(result.issue); await Promise.all([mutate(), refresh(relationPickerKey(viewerId)), refresh(['issues', viewerId])]); toast.success(t('removed'))
     } catch (error) { toast.error(error instanceof Error ? error.message : t('removeFailed')) }
     finally { busy.current = false; setPending(false) }
   }
@@ -62,10 +76,10 @@ export function IssueRelations({ task, mode, onOpen, onCreate, onPick, getCurren
   if (error) return <Button variant="ghost" size="sm" onClick={() => { void mutate() }}>{t('readFailedRetry')}</Button>
   if (mode === 'subissues') {
     const done = children.filter(row => closed(row.status)).length
-    return <section aria-label={t('subissuesAria')} className="flex flex-col gap-3 py-3 [&_button]:min-h-11 [&_button[aria-label]]:min-w-11 lg:[&_button]:min-h-0 lg:[&_button[aria-label]]:min-w-0">
+    return <section aria-label={t('subissuesAria')} className="mt-2 flex flex-col gap-3 rounded-lg bg-muted/30 px-3 py-4 [&_button]:min-h-11 [&_button[aria-label]]:min-w-11 lg:[&_button]:min-h-0 lg:[&_button[aria-label]]:min-w-0">
       <div className="flex items-center justify-between gap-2"><Button variant="ghost" size="xs" onClick={() => setExpanded(value => !value)} aria-expanded={expanded}>{expanded ? <ChevronDown data-icon="inline-start" /> : <ChevronRight data-icon="inline-start" />}{t('subissues')}<span className="text-muted-foreground">{done} / {children.length}</span></Button><div className="flex items-center gap-1"><Button variant="ghost" size="xs" disabled={disabled || pending} onClick={() => onPick('child')}>{t('addExisting')}</Button><Button variant="ghost" size="icon-xs" disabled={disabled || pending} aria-label={t('createChildAria')} onClick={onCreate}><Plus data-icon="inline-start" /></Button></div></div>
       {children.length > 0 && <Progress value={done / children.length * 100} aria-label={t('progressAria', { done, total: children.length })} className="h-1" />}
-      {expanded && children.map(row => <div key={row.id} className="group flex min-w-0 items-center gap-2"><IssuePropertyMenu label={t('statusOf', { title: row.title })} value={row.status} options={statusOptions} icon={Circle} compact disabled={disabled || pending} onChange={value => { void status(row.id, row.revision, value) }} /><Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start" onClick={() => onOpen(row.id)}><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row.metadata.number)}</span><span className="truncate">{row.title}</span></Button><Button variant="ghost" size="icon-xs" disabled={disabled || pending} aria-label={t('removeChildAria', { title: row.title })} onClick={() => { void remove('child', row.id) }}><X data-icon="inline-start" /></Button></div>)}
+      {expanded && children.map(row => <div key={row.id} className="group flex min-w-0 items-center gap-2"><IssuePropertyMenu label={t('statusOf', { title: row.title })} value={row.status} options={statusOptions} icon={Circle} compact disabled={disabled || pending} onChange={value => { void status(row.id, row.revision, value) }} /><Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start" onClick={() => onOpen(row.id)}><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row)}</span><span className="truncate">{row.title}</span></Button><Button variant="ghost" size="icon-xs" disabled={disabled || pending} aria-label={t('removeChildAria', { title: row.title })} onClick={() => { void remove('child', row.id) }}><X data-icon="inline-start" /></Button></div>)}
       {expanded && children.length === 0 && <Button variant="ghost" size="sm" className="justify-start" disabled={disabled || pending} onClick={onCreate}><Plus data-icon="inline-start" />{t('addChild')}</Button>}
     </section>
   }
@@ -76,5 +90,5 @@ export function IssueRelations({ task, mode, onOpen, onCreate, onPick, getCurren
     { kind: 'duplicate', label: groupLabel('duplicate'), items: rows?.filter(row => row.id === current.duplicateOfId) ?? [], icon: Link2 },
     { kind: 'related', label: groupLabel('related'), items: rows?.filter(row => current.relatedIds.includes(row.id) || row.metadata.relatedIds.includes(task.id) || (current.blockedByIds.includes(row.id) && closed(row.status)) || (row.metadata.blockedByIds.includes(task.id) && closed(task.status))) ?? [], icon: Link2 },
   ]
-  return <>{groups.filter(group => group.items.length).map(group => <section key={group.kind} aria-label={group.label} className="flex min-w-0 flex-col gap-2 [&_button]:min-h-11 [&_button[aria-label]]:min-w-11 lg:[&_button]:min-h-0 lg:[&_button[aria-label]]:min-w-0"><h3 className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><group.icon className={cn('size-3.5', group.warning && 'text-warning-foreground')} />{group.label}</h3>{group.items.map(row => <div key={row.id} className="flex min-w-0 items-center gap-1"><Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start" title={row.title} onClick={() => onOpen(row.id)}><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row.metadata.number)}</span><span className="truncate">{row.title}</span></Button><Button variant="ghost" size="icon-xs" disabled={disabled || pending} aria-label={t('removeAria', { label: group.label, title: row.title })} onClick={() => { void remove(group.kind === 'related' && current.blockedByIds.includes(row.id) ? 'blockedBy' : group.kind === 'related' && row.metadata.blockedByIds.includes(task.id) ? 'blocks' : group.kind, row.id) }}><X data-icon="inline-start" /></Button></div>)}</section>)}</>
+  return <>{groups.filter(group => group.items.length).map(group => <section key={group.kind} aria-label={group.label} className="flex min-w-0 flex-col gap-2 [&_button]:min-h-11 [&_button[aria-label]]:min-w-11 lg:[&_button]:min-h-0 lg:[&_button[aria-label]]:min-w-0"><h3 className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><group.icon className={cn('size-3.5', group.warning && 'text-warning-foreground')} />{group.label}</h3>{group.items.map(row => <div key={row.id} className="flex min-w-0 items-center gap-1"><Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start" title={row.title} onClick={() => onOpen(row.id)}><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row)}</span><span className="truncate">{row.title}</span></Button><Button variant="ghost" size="icon-xs" disabled={disabled || pending} aria-label={t('removeAria', { label: group.label, title: row.title })} onClick={() => { void remove(group.kind === 'related' && current.blockedByIds.includes(row.id) ? 'blockedBy' : group.kind === 'related' && row.metadata.blockedByIds.includes(task.id) ? 'blocks' : group.kind, row.id) }}><X data-icon="inline-start" /></Button></div>)}</section>)}</>
 }

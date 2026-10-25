@@ -1,10 +1,17 @@
 import createMiddleware from 'next-intl/middleware'
 import { NextResponse, type NextRequest } from 'next/server'
 import { routing } from './i18n/routing'
+import { localeAliasPath } from './lib/locale-alias'
 
 const localize = createMiddleware(routing)
 
 export default function proxy(request: NextRequest) {
+  const alias = localeAliasPath(request.nextUrl.pathname)
+  if (alias) {
+    const destination = request.nextUrl.clone()
+    destination.pathname = alias
+    return NextResponse.redirect(destination)
+  }
   if (request.nextUrl.pathname.startsWith('/w/')) return NextResponse.next()
   if (process.env.NODE_ENV === 'production') {
     const localePrefix = request.nextUrl.pathname.match(/^\/(en|zh-CN)(?=\/)/)?.[0] ?? ''

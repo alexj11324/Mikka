@@ -1,12 +1,12 @@
-import { test, expect, register, watchRuntime, browserClientHeaders, app } from './fixtures'
+import { test, expect, register, rail, watchRuntime, browserClientHeaders, app, openCreateIssue } from './fixtures'
 import { controlsSelector, clickWithEffect, inspectControl } from './control-audit'
 import type { Page } from '@playwright/test'
 
 const surfaces: { name: string; scope?: 'dialog' | 'menu'; prepare: (page: Page) => Promise<void> }[] = [
   { name: '工作台', prepare: async page => {
     await page.goto(app('/'))
-    await page.getByRole('button', { name: '我的任务', exact: true }).click()
-    await expect(page.getByRole('heading', { name: '我创建的任务', exact: true })).toBeVisible()
+    await rail(page, '看板').click()
+    await expect(page.getByRole('heading', { name: '看板', exact: true })).toBeVisible()
   } },
   { name: '成员管理', prepare: async page => {
     await page.goto(app('/settings/members'))
@@ -19,13 +19,14 @@ const surfaces: { name: string; scope?: 'dialog' | 'menu'; prepare: (page: Page)
   } },
   { name: '新建任务', scope: 'dialog', prepare: async page => {
     await page.goto(app('/'))
-    await page.getByRole('button', { name: '新建任务', exact: true }).click()
-    await expect(page.getByLabel('任务标题', { exact: true })).toBeVisible()
+    await rail(page, '看板').click()
+    await openCreateIssue(page)
+    await expect(page.getByLabel('任务描述', { exact: true })).toBeVisible()
   } },
-  { name: '任务状态菜单', scope: 'menu', prepare: async page => {
+  { name: '看板筛选菜单', scope: 'menu', prepare: async page => {
     await page.goto(app('/'))
-    await page.getByRole('button', { name: '新建任务', exact: true }).click()
-    await page.getByRole('button', { name: /^任务状态：/ }).click()
+    await rail(page, '看板').click()
+    await page.getByRole('toolbar', { name: '看板工具栏', exact: true }).getByRole('button', { name: '筛选', exact: true }).click()
     await expect(page.getByRole('menu')).toBeVisible()
   } },
   { name: '工作区菜单', scope: 'menu', prepare: async page => {

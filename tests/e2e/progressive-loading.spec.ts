@@ -1,4 +1,4 @@
-import { test, expect, register, app } from './fixtures'
+import { test, expect, register, rail, app } from './fixtures'
 
 test('聊天历史未返回时壳子已可导航，恢复后显示真实会话', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
@@ -15,11 +15,11 @@ test('聊天历史未返回时壳子已可导航，恢复后显示真实会话',
     await expect.poll(() => requested).toBe(true)
     await expect(page).not.toHaveURL(/section=agent/)
     await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeVisible()
-    await page.getByRole('button', { name: 'Agent', exact: true }).click()
+    await page.getByRole('button', { name: '新对话', exact: true }).click()
     await expect(page.getByRole('region', { name: 'Agent 对话工作区', exact: true })).toHaveAttribute('aria-busy', 'true')
-    await page.getByRole('button', { name: '我的任务', exact: true }).click()
+    await rail(page, '看板').click()
     await expect(page).not.toHaveURL(/section=agent/)
-    await page.getByRole('button', { name: 'Agent', exact: true }).click()
+    await rail(page, '主页').click()
     release()
     await expect(page.getByRole('textbox', { name: '向 Agent 提问', exact: true })).toBeVisible()
   } finally {
