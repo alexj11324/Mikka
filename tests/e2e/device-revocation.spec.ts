@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test'
 import { Pool } from 'pg'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { createInterface } from 'node:readline'
+import { writeFileSync } from 'node:fs'
 import { browserClientHeaders } from './fixtures'
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
@@ -125,6 +126,8 @@ test('owner revokes credential durably; old daemon API calls and attributed work
     expect(text).not.toContain(bearer)
     expect(text).not.toContain('tokenHash')
     checks.push('re-enable and re-registration cannot revive token; sibling token works; worker token revoked and lease expired')
-    await info.attach('device-revocation-evidence',{body:JSON.stringify({sha:process.env.GITHUB_SHA,environment:'isolated PG + actual Next HTTP',checks}),contentType:'application/json'})
+    const evidencePath = info.outputPath('device-revocation-evidence.json')
+    writeFileSync(evidencePath,JSON.stringify({sha:process.env.GITHUB_SHA,environment:'isolated PG + actual Next HTTP',checks},null,2))
+    await info.attach('device-revocation-evidence',{path:evidencePath,contentType:'application/json'})
   } finally { if(runtime){runtime.stdin.write(JSON.stringify({action:'stop'})+'\n');await new Promise<void>(resolve=>{if(runtime!.exitCode!==null)resolve();else runtime!.once('exit',()=>resolve())})}await owner.dispose();await outsider.dispose();await daemon.dispose();await pg.end() }
 })

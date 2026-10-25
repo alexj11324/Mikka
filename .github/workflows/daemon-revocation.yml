@@ -57,6 +57,6 @@ jobs:
         if: always()
         with:
           name: daemon-revocation-sanitized-evidence
-          path: test-results/**/attachments/device-revocation-evidence*
+          path: test-results/**/device-revocation-evidence.json
           if-no-files-found: ignore
           retention-days: 7
