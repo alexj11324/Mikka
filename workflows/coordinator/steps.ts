@@ -396,9 +396,15 @@ export async function mailboxAction(userId: string, action: 'recipients' | 'inbo
 export async function scheduleCommand(userId: string, command: Command, context?: ActionContext) {
   'use step'
   if (!context && !['list','history'].includes(command.action)) return { error: 'scheduleUserSourceRequired' }
-  const choices = await workspaceDb.select({ id: workspaceMembers.workspaceId }).from(workspaceMembers).where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).limit(2)
-  if (choices.length !== 1) return { error: 'scheduleExplicitWorkspaceRequired' }
-  try { return await executeScheduleCommand({ ownerId: userId, workspaceId: choices[0].id, conversation: 'coordinator', sessionId: userId, sourceId: context?.sourceEventId ?? '' }, command) }
+  const source = context ? await coordinatorInbox().read(userId,context.sourceEventId) : null
+  if (source && source.kind !== 'user_message') return {error:'scheduleUserSourceRequired'}
+  let workspaceId=source?.wake_workspace_id
+  if(!workspaceId){
+    const choices = await workspaceDb.select({ id: workspaceMembers.workspaceId }).from(workspaceMembers).where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).limit(2)
+    if (choices.length !== 1) return { error: 'scheduleExplicitWorkspaceRequired' }
+    workspaceId=choices[0].id
+  }
+  try { return await executeScheduleCommand({ ownerId: userId, workspaceId, conversation: 'coordinator', sessionId: userId, sourceId: context?.sourceEventId ?? '' }, command) }
   catch (error) { if (error instanceof ScheduleError) return { error: error.code }; throw error }
 }
 
