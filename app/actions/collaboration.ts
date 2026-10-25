@@ -13,6 +13,7 @@ import { requireIssueAccess } from '@/lib/issue-access'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { bindCommentAuthorship, snapshotCommentAuthorship } from '@/lib/linear-sync/comment-authorship'
+import { activityActor } from '@/lib/activity-actor'
 
 const encodedState = z.string().max(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/)
 const syncSchema = z.object({ id: z.uuid(), vector: encodedState.optional(), update: encodedState.optional(), seed: encodedState.optional() })
@@ -81,7 +82,7 @@ export async function removeMember(id: string, memberId: string): Promise<Action
       const metadata = readIssueMetadata(latest.content)
       if (metadata.assignee?.kind === 'member' && metadata.assignee.id === parsed.data) {
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, assignee: null }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, user.id))).returning()
-        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: user.id, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
+        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: user.id, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
         return true
       }
       return false
