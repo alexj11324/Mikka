@@ -36,7 +36,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Ephemeral isolated session key
-        run: node -e "console.log('BETTER_AUTH_SECRET='+require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+        run: |
+          node --input-type=module <<'JS'
+          import { randomBytes } from 'node:crypto'
+          import { appendFileSync } from 'node:fs'
+          const key = randomBytes(32).toString('hex')
+          console.log('::add-mask::' + key)
+          appendFileSync(process.env.GITHUB_ENV, 'BETTER_AUTH_SECRET=' + key + '\n')
+          JS
       - name: Attest exact source
         run: |
           git rev-parse HEAD

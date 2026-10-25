@@ -105,7 +105,7 @@ test('owner revokes credential durably; old daemon API calls and attributed work
       ['POST','/v1/devices/register'],['POST',`/v1/devices/${deviceId}/heartbeat`],['GET',`/v1/devices/${deviceId}/repos`],['GET',`/v1/devices/${deviceId}/runs`],
       ['GET',`/v1/devices/${deviceId}/commands`],['POST',`/v1/devices/${deviceId}/commands/ack`],['GET',`/v1/devices/${deviceId}/fs/requests`],['POST',`/v1/devices/${deviceId}/fs/requests/${randomUUID()}`],
       ['POST',`/v1/devices/${deviceId}/group-reviews`],['POST',`/v1/devices/${deviceId}/runs/${runId}/claim`],['POST',`/v1/devices/${deviceId}/runs/${runId}/subscription`],
-      ['PATCH',`/v1/runs/${runId}`],['POST',`/v1/runs/${runId}/events`],['POST',`/v1/runs/${runId}/checkpoint`],['POST',`/v1/runs/${runId}/complete`],['POST',`/v1/runs/${runId}/skill-receipt`],['POST',`/v1/runs/${runId}/group-reply`],
+      ['PATCH',`/v1/runs/${runId}`],['POST',`/v1/runs/${runId}/events`],['POST',`/v1/runs/${runId}/checkpoint`],['POST',`/v1/runs/${runId}/complete`],['GET',`/v1/runs/${runId}/skill-receipt`],['POST',`/v1/runs/${runId}/group-reply`],
     ]
     for(const [method,path] of endpoints) {
       const response=await daemon.fetch('/mikka'+path,{method,headers,...(method==='GET'?{}:{data:{}})})
