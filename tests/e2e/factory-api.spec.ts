@@ -146,6 +146,57 @@ test("Factory HTTP API isolates owners, requires sessions/origins and atomically
     expect(recoveryState.attempts[0].reason).toBe(
       "Fixture environment unavailable",
     );
+    const query = app(`/api/factory/tasks?issueId=${issueId}`);
+    expect((await anonymous.get(query)).status()).toBe(401);
+    expect((await other.get(query)).status()).toBe(404);
+    expect(
+      (
+        await owner.get(app(`/api/factory/tasks?issueId=${randomUUID()}`))
+      ).status(),
+    ).toBe(404);
+    expect(
+      (await owner.get(app("/api/factory/tasks?issueId=invalid"))).status(),
+    ).toBe(422);
+    const discovered = await owner.get(query);
+    expect(discovered.status()).toBe(200);
+    expect(discovered.headers()["cache-control"]).toContain("no-store");
+    const tasks = (await discovered.json()).tasks as {
+      id: string;
+      status: string;
+    }[];
+    expect(tasks.map((task) => task.id).sort()).toEqual(
+      [taskId, recovery.task.id].sort(),
+    );
+    expect(
+      (
+        await owner.post(app(`/api/factory/tasks/${recovery.task.id}`), {
+          headers: { origin },
+          data: {
+            binding: bind(recoveryState.task),
+            eventId: randomUUID(),
+            action: "revoke",
+            reason: "Owner withdraws fixture permission",
+          },
+        })
+      ).status(),
+    ).toBe(200);
+    const revoked = (await (await owner.get(query)).json()).tasks.find(
+      (task: { id: string }) => task.id === recovery.task.id,
+    );
+    expect(revoked.status).toBe("revoked");
+    expect(
+      (
+        await owner.post(app(`/api/factory/tasks/${recovery.task.id}`), {
+          headers: { origin },
+          data: {
+            binding: bind(revoked),
+            eventId: randomUUID(),
+            action: "retry",
+            reason: "Must not reopen revoked task",
+          },
+        })
+      ).status(),
+    ).toBe(409);
     const command = {
       binding: bind(state.task),
       eventId: randomUUID(),
@@ -188,6 +239,13 @@ test("Factory HTTP API isolates owners, requires sessions/origins and atomically
         })
       ).status(),
     ).toBe(422);
+    await pool.query("UPDATE issues SET content=$2 WHERE id=$1", [
+      issueId,
+      JSON.stringify({
+        attrs: { mikka: { deletedAt: new Date().toISOString() } },
+      }),
+    ]);
+    expect((await owner.get(query)).status()).toBe(404);
     expect(
       (
         await owner.post(app("/api/auth/sign-out"), {
@@ -207,6 +265,11 @@ test("Factory HTTP API isolates owners, requires sessions/origins and atomically
           taskId,
           runId,
           checks: [
+            "issueDiscoveryMultipleTasks200",
+            "queryForeignOwner404",
+            "queryNonexistent404",
+            "queryRevokedVisibleAndRetry409",
+            "queryDeletedIssue404",
             "ownerRecovery200WithHistory",
             "session401",
             "worker401",

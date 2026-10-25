@@ -1,6 +1,6 @@
 # Factory monitor consumer (#195)
 
-Initially branched from PR #197 `605bf086d4371e19f2df2e2857a487f1decd649d`, then merged the explicitly coordinated unified #191/#192 baseline `4cd3a1b5fa05773094722bab7774e15a8d49d018` (`codex/factory-unified-192-191-20261025`) without conflicts or force push. Shared runtime/contract code is unchanged; the inherited baseline also adjusts performance-test request accounting. Its CI must be reported separately, never assumed green.
+Initially branched from PR #197 `605bf086d4371e19f2df2e2857a487f1decd649d`, then merged the explicitly coordinated unified #191/#192 baseline `4cd3a1b5fa05773094722bab7774e15a8d49d018`. Subsequently merged the parent common baseline `87696d6344f65a6369117e8145759462f0e59ef7`, including migration synchronization `7e93b86277fbfeb1a5f19d41bcc0c03596484491` and additive issue discovery. The package.json conflict was resolved by preserving both query and monitor test commands. No force push or unilateral shared migration rename. Consumer validators remain separate; #194 feature/compatibility commit is not imported into this #195-only branch.
 Read the full [issue](https://github.com/alexj11324/Mikka/issues/195) (zero comments at implementation), `AGENTS.md`, `192-contract-v1.md` and `contract.ts`. Neither the checkout nor the frozen tree contains `.agents/skills`. No state contract, other consumer validators, review/approval implementation, dispatch, frontend, Linear worker or wake implementation is changed.
 
 ## Integration
@@ -37,7 +37,7 @@ docker stop mikka-monitor-195-pg
 
 The loopback database opt-in never reads app/production environment URLs or CLI credentials. Tests bootstrap all tracked SQL in a fresh schema, reapply this migration, and exercise real PG17 transactions/concurrency, rollback before commit, pool replacement after commit, replay, authorization, owner/workspace/candidate isolation, echo rejection, original-issue association, repair, failed recovery and same-candidate recovery. The #193/#194 gates and Harness run records in this layer are explicitly fixtures. They are **not** proof of human approval, real Harness execution, deployed runtime recovery or final acceptance. CI also runs these tests on its temporary PG17 service; type checks/builds remain in remote CI.
 
-Migration: `20261025014500_factory_195_monitor.sql`. #192 remains `20261025010001_factory_192_stages.sql`; unified #191 uses only `20261025011347_run_dispatch_keys.sql`, with neither old `20261025004500` nor candidate-only `20261025011101` file present.
+Migration: `20261025014500_factory_195_monitor.sql` remains unchanged. Parent manifest fixes #191 to `20261025013401_run_dispatch_keys.sql` and #192 to `20261025013402_factory_192_stages.sql`; all superseded names are absent and SQL hashes are unchanged. #194's separately integrated compatible feature must use only `20261025013403_factory_194_approvals.sql` (compatibility commit `4d6f83c43639a26380e4cdc1587ce52ac0a5f4d9`). Naming is owned by the common-baseline maintainer; this consumer does not select replacement names.
 
 ## Remaining real acceptance
 

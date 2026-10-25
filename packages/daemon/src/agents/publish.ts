@@ -120,24 +120,28 @@ function safeRealpath(path: string) {
   }
 }
 
-type Git = (
+export type Git = (
   args: string[],
-  env?: Record<string, string>
+  env?: Record<string, string>,
+  options?: { buffer?: boolean }
 ) => ReturnType<typeof execa>
 
-async function pinnedGit(
+export async function pinnedGit(
   repoPath: string,
   worktree: string,
   env: NodeJS.ProcessEnv = process.env
 ): Promise<Git> {
   const gitDir = await worktreeGitDir(repoPath, worktree)
   const workTree = realpathSync(worktree)
-  return (args, extra) =>
+  return (args, extra, options) =>
     execa("git", [...SAFE_GIT, ...args], {
       cwd: workTree,
       env: { ...env, ...extra, GIT_DIR: gitDir, GIT_WORK_TREE: workTree },
       extendEnv: false,
       stdin: "ignore",
+      ...(options?.buffer
+        ? { encoding: "buffer" as const, stripFinalNewline: false }
+        : {}),
     })
 }
 
