@@ -25,7 +25,7 @@ import { ImprovementError } from '@/lib/self-improvement/contract'
 
 import { FactoryError } from '@/lib/factory/contract'
 import { bindSubscriptionClaim } from '@/lib/subscription-claim'
-import { subscriptionRuntime } from '@/lib/subscription-runtime'
+import { subscriptionRepositoryIfInstalled } from '@/lib/subscription-binding-discovery'
 
 export const dynamic = 'force-dynamic'
 
@@ -117,8 +117,8 @@ export async function POST(
     if (!(error instanceof MailboxError)) throw error
     return NextResponse.json({ error: 'Run mailbox is unavailable or stale.' }, { status: 409 })
   }
-  const subscription = process.env.MIKKA_BYOS_ENABLED === '1'
-    ? await subscriptionRuntime().repository.nativeBinding(caller.userId, agent.id, agent.harness) : null
+  const subscription = await (await subscriptionRepositoryIfInstalled(pool))?.nativeBinding(caller.userId, agent.id, agent.harness)
+  if (subscription && process.env.MIKKA_BYOS_ENABLED !== '1') return NextResponse.json({error:'Subscription runtime is disabled.'},{status:409})
   if (subscription && run.questionContinuation) return NextResponse.json({error:'Hosted subscription question continuation is not yet supported.'},{status:409})
   if(subscription && (run.userId!==caller.userId || agent.userId!==caller.userId || repo.userId!==caller.userId)) return NextResponse.json({error:'Run owner mismatch.'},{status:409})
   if (subscription && !device.harnesses.some(harness => harness.harness === agent.harness && harness.subscriptionBroker)) {

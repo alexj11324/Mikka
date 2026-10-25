@@ -1,3 +1,5 @@
+import { pool } from '@/lib/db'
+import { subscriptionRepositoryIfInstalled } from '@/lib/subscription-binding-discovery'
 import { mailboxes } from '@/lib/mailbox-runtime'
 import { MAILBOX_INSTRUCTIONS, mailboxTools } from '@/lib/mailbox-tools'
 import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
@@ -86,8 +88,8 @@ export async function POST(request: Request) {
   let model: Awaited<ReturnType<typeof resolveAgentModel>>
   let modelSource = parsed.data.modelSource
   try {
-    if (!modelSource && process.env.MIKKA_BYOS_ENABLED === '1') {
-      const saved = await subscriptionRuntime().repository.defaultModelBinding(session.user.id, sessionId)
+    if (!modelSource) {
+      const saved = await (await subscriptionRepositoryIfInstalled(pool))?.defaultModelBinding(session.user.id, sessionId)
       if (saved) modelSource = { type: 'subscription', bindingId: saved }
     }
     model = await resolveAgentModel(modelSource, {
