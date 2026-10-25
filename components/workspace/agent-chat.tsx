@@ -30,7 +30,7 @@ export function AgentChat({ turns, composer, streaming, sessions, sessionId, onS
 
   const title = sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || agentCopy.newConversation
 
-  return <section aria-label={agentCopy.agentConversationWorkspace} className="orvilo-agent relative flex size-full min-h-0 flex-col">
+  return <section aria-label={agentCopy.agentConversationWorkspace} className="mikka-agent relative flex size-full min-h-0 flex-col">
     <AgentChatHeader title={title} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} onDemo={onDemo} />
     <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
     {turns.length === 0 ? <AgentWelcome composer={composer} sessions={sessions} onSelect={onSelect} onSuggestion={onSuggestion} /> : <>

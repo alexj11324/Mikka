@@ -16,6 +16,8 @@ const nextConfig = {
   },
   webpack(config) {
     config.resolve.alias['react-syntax-highlighter$'] = new URL('./components/workspace/agent-syntax-highlighter.tsx', import.meta.url).pathname
+    // noVNC ships ES modules with top-level await but no "type": "module".
+    config.module.rules.push({ test: /[\\/]@novnc[\\/]novnc[\\/]lib[\\/].*\.js$/, type: 'javascript/esm' })
     return config
   },
   onDemandEntries: {
@@ -46,7 +48,14 @@ const nextConfig = {
       { key: 'Strict-Transport-Security', value: 'max-age=63072000' },
       { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
       { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-    ] }]
+    ] }, // next-intl can land the reset link on a locale-prefixed page; it carries the token too.
+      ...['/api/auth/verify-email', '/verify-email', '/:locale(en|zh-CN)/verify-email', '/api/auth/reset-password/:path*', '/reset-password/:path*', '/:locale(en|zh-CN)/reset-password/:path*'].map(source => ({
+      source,
+      headers: [
+        { key: 'Referrer-Policy', value: 'no-referrer' },
+        { key: 'Cache-Control', value: 'no-store' },
+      ],
+    }))]
   },
   experimental: {
     globalNotFound: true,

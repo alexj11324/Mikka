@@ -4,7 +4,7 @@ export const workspaces = pgTable('mikka_workspaces', {
   id: uuid('id').primaryKey(),
   userId: text('userId').notNull(),
   name: varchar('name', { length: 120 }).notNull(),
-  slug: varchar('slug', { length: 64 }).unique('orvilo_workspaces_slug_unique'),
+  slug: varchar('slug', { length: 64 }).unique('mikka_workspaces_slug_unique'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
