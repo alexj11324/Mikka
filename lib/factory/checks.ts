@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 import { DEVICE_ONLINE_WINDOW_MS } from "@mikka/protocol/device";
 import { FactoryError } from "./contract";
+import { factoryMonitorDispatchAssignment } from "./monitor-dispatch";
 import type { FactoryAuthorize, FactoryGate, FactoryTask } from "./store";
 
 // Internal dispatch metadata on the existing attempt, never a second stage source.
@@ -91,6 +92,9 @@ export async function factoryCheckAssignment(
     [runId, userId],
   );
   const check = row?.output?.check;
+  // The receipt reader uses query only; production claim supplies the held PoolClient.
+  if (row?.stage === "monitor")
+    return factoryMonitorDispatchAssignment(tx as PoolClient, userId, runId);
   if (
     !row ||
     !["review", "verify"].includes(row.stage) ||
@@ -219,7 +223,7 @@ export async function isFactoryCheckRun(
     `WITH RECURSIVE lineage AS (
     SELECT id,"retryOf","issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2
     UNION SELECT r.id,r."retryOf",r."issueId" FROM agent_runs r JOIN lineage l ON r.id=l."retryOf" AND r."issueId"=l."issueId" WHERE r."userId"=$2
-  ) SELECT EXISTS(SELECT 1 FROM lineage l JOIN factory_attempts a ON a."runId"=l.id JOIN factory_tasks t ON t.id=a."taskId" WHERE t."userId"=$2 AND t."issueId"=l."issueId" AND a.stage IN ('review','verify')) AS bound`,
+  ) SELECT EXISTS(SELECT 1 FROM lineage l JOIN factory_attempts a ON a."runId"=l.id JOIN factory_tasks t ON t.id=a."taskId" WHERE t."userId"=$2 AND t."issueId"=l."issueId" AND a.stage IN ('review','verify','monitor')) AS bound`,
     [runId, userId],
   );
   return row.bound as boolean;

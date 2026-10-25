@@ -313,7 +313,7 @@ export function createFactoryStore(
         fail("factoryStale");
       if (
         task.status !== "pending" ||
-        !["spec", "execute", "review", "verify"].includes(task.stage)
+        !["spec", "execute", "review", "verify", "monitor"].includes(task.stage)
       )
         fail("factoryTransition");
       return task;
