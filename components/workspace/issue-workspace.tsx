@@ -20,6 +20,7 @@ import { BoardPage } from './board-page'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { GlobalSearch, SearchPill } from '@/components/nav/global-search'
 import { ContextPanel } from '@/components/nav/context-panel'
+import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
 import { listTaskRuns } from '@/app/actions/task-runs'
 import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'
 import { sessionPreview } from '@/lib/agent-history'
@@ -65,7 +66,7 @@ const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module
 const SettingsShell = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsShell), { loading: WorkspaceLoading })
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })
 
-export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations'; googleEnabled?: boolean }) {
+export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'account'; googleEnabled?: boolean }) {
   const i18nText = useTranslations()
   const { data: workspaceData } = useWorkspace(user.email)
   const { data: agentHistory } = useAgentHistory(user.id, initialAgentHistory)
@@ -91,8 +92,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     plugins: tPlugins('title'),
   }
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
-  const [settingsOpen, setSettingsOpen] = useState(initialSettingsSection === 'integrations')
-  const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members' | 'integrations'; invite: boolean }>({ section: initialSettingsSection ?? 'preferences', invite: false })
+  const [settingsOpen, setSettingsOpen] = useState(Boolean(initialSettingsSection))
+  const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members' | 'integrations' | 'account'; invite: boolean }>({ section: initialSettingsSection ?? 'preferences', invite: false })
   const [linearNotice, setLinearNotice] = useState<'connected' | 'error' | null>(null)
   useEffect(() => {
     const url = new URL(window.location.href)
@@ -330,7 +331,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} googleEnabled={googleEnabled} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
     {dialogs}
   </AppShell></SignOutBoundary>
-  return <SignOutBoundary pending={signingOut}><AppFrame
+  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><AppFrame
     bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={isConversation && !panelOpen && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="hidden text-muted-foreground xl:inline-flex" aria-label={i18nText('Shell.panel.open')} onClick={() => showPanel(true)} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>} />}
     rail={<IconRail active={rail} onNavigate={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}>
     {/* The board keeps only the rail on its left (MIK-45). */}
@@ -346,7 +347,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       </>}
     </AppShellContent>
     {isConversation && panelOpen && <ContextPanel userName={user.name || user.email} issues={tasks} runs={taskRuns} onOpenIssue={id => { open(id) }} onArrange={arrange} onConnect={() => openRail('plugins')} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
-      conversation={section === 'coordinator' ? { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt } : { name: activeSession?.title || i18nText('Nav.untitledConversation'), kind: 'agent', updatedAt: activeSession?.updatedAt }} />}
+      conversation={section === 'coordinator' ? { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt } : { id: activeAgentId, name: activeSession?.title || i18nText('Nav.untitledConversation'), kind: 'agent', updatedAt: activeSession?.updatedAt }} />}
     {dialogs}
-  </AppFrame></SignOutBoundary>
+  </AppFrame></ComputerAgentsProvider></SignOutBoundary>
 }
