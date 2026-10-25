@@ -20,7 +20,7 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
   const t = useTranslations('Workspace')
   const tDetail = useTranslations('IssueDetail')
   const tWorkspaceDetail = useTranslations('Workspace.detail')
-  return <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 bg-background px-3 sm:px-4">
+  return <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-rule bg-background px-3 sm:px-4">
     <div className="flex min-w-0 flex-1 items-center gap-2">
       <SidebarTrigger className="-ml-1" aria-label={t('toggleSidebar')} />
       <Separator orientation="vertical" className="mr-1 data-vertical:h-4 data-vertical:self-auto" />

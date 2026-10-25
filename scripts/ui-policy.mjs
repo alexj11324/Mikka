@@ -85,8 +85,11 @@ function checkUtility(token, policy, report, options = {}) {
   if (/(?:^|:)dark:/.test(token) && /^(?:bg|text|border|ring|fill|stroke|outline)-/.test(base) && !base.endsWith('-transparent')) report('style/no-dark-color-override', `用语义 token 处理明暗主题，不单独覆盖 ${token}。`)
 }
 
+const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx']
+
 export function auditSource(file, text, policy) {
-  const allowHorizontalRule = file.startsWith('components/settings/')
+  // R-61/R-63 (Alex 2026-10-25): the issue page's header line and the lines inside a comment card.
+  const allowHorizontalRule = file.startsWith('components/settings/') || ISSUE_PAGE_RULES.includes(file)
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), variables = new Map(), seen = new Set()
   const add = (node, rule, message) => {

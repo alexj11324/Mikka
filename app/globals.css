@@ -40,6 +40,7 @@
 --color-destructive: var(--destructive);
 --color-destructive-foreground: var(--destructive-foreground);
 --color-border: var(--border);
+--color-rule: var(--rule);
 --color-input: var(--input);
 --color-ring: var(--ring);
 --color-chart-1: var(--chart-1);
@@ -157,6 +158,8 @@
 --accent-foreground: oklch(0.205 0 0);
 --destructive: oklch(0.577 0.245 27.325);
 --border: oklch(0.922 0 0);
+/* R-61/R-63 lines on the issue page; dark is a solid grey, never white at low opacity (R-31). */
+--rule: oklch(0.922 0 0);
 --input: oklch(0.922 0 0);
 --ring: oklch(0.708 0 0);
 --chart-1: oklch(0.87 0 0);
@@ -223,6 +226,7 @@
 --accent-foreground: oklch(0.985 0 0);
 --destructive: oklch(0.704 0.191 22.216);
 --border: oklch(1 0 0 / 10%);
+--rule: oklch(0.269 0 0);
 --input: oklch(1 0 0 / 15%);
 --ring: oklch(0.556 0 0);
 --chart-1: oklch(0.87 0 0);

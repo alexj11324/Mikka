@@ -18,7 +18,8 @@ import { DocumentSync } from '@/lib/document-sync'
 import { useActionError } from '@/lib/use-action-error'
 import { IssueMembers } from './issue-members'
 import { IssueDetailProperties } from './issue-detail-properties'
-import { IssueRuns } from './issue-runs'
+import { IssueThreads, ThreadEvents } from './issue-threads'
+import { IssueThreadPanel } from './issue-thread-panel'
 import { IssueActivityFeed } from './issue-activity-feed'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -37,6 +38,13 @@ function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () =>
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   return <div className="flex flex-col items-start gap-4 p-8"><h1 className="text-lg font-semibold">{data ? t('deletedTitle') : t('unavailableTitle')}</h1><p role="status" className="text-sm text-muted-foreground">{data ? t('deletedDescription', { title: data.title }) : t('unavailableDescription')}</p>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<div className="flex gap-2">{data && <Button disabled={pending} onClick={async () => { setPending(true); try { const result = await setIssueDeleted({ id, restore: true }); if (result.error) setError(actionError(result.error)); else { toast.success(t('taskRestored')); onRetry() } } catch { setError(t('restoreFailed')) } finally { setPending(false) } }}>{t('restoreTask')}</Button>}<Button size="sm" variant="outline" onClick={onRetry}>{t('reload')}</Button><Button size="sm" variant="ghost" onClick={onClose}>{t('backToWorkspace')}</Button></div></div>
+}
+
+const WIDE = '(min-width: 1024px)'
+function subscribeWide(onChange: () => void) {
+  const query = window.matchMedia(WIDE)
+  query.addEventListener('change', onChange)
+  return () => query.removeEventListener('change', onChange)
 }
 
 export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
@@ -94,6 +102,8 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
   const composing = useRef(false)
   const [editSequence, setEditSequence] = useState(0)
   const [metadataSaving, setMetadataSaving] = useState(false)
+  const [openThread, setOpenThread] = useState<string | null>(null)
+  const wide = useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => false)
   const [error, setError] = useState('')
   const [history, setHistory] = useState(false)
   const [members, setMembers] = useState(false)
@@ -197,22 +207,32 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
     ? <Button variant="ghost" size="sm" type="button" onClick={() => { void refreshVersions() }}>{t('activityFailed')}</Button>
     : <IssueActivityFeed versions={versions ?? []} children={subtasks} />
 
-  return <div className="flex min-w-0 flex-1 flex-col">
+  const properties = <IssueDetailProperties task={saved} onMetadataSaved={adopt} metadataDisabled={false} onMetadataBusy={setMetadataSaving} status={status} priority={priority} pending={false} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} request={propertyRequest} onDate={() => requestAction('dueDate')} onEstimate={() => requestAction('estimate')} relations={<IssueRelations viewerId={user.id} mode="sidebar" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} />} />
+  const threadPanel = openThread && <IssueThreadPanel key={openThread} issueId={saved.id} runId={openThread} onClose={() => setOpenThread(null)} />
+
+  // R-61: one line under the header, one before the properties or an open thread; the page scrolls, the right column stays.
+  return <div className="flex min-w-0 flex-1">
+    <div className="flex min-w-0 flex-1 flex-col">
     <IssueDetailHeader workspaceName={workspaceName} identifier={saved.identifier} title={title} saveLabel={error ? t('saveFailed') : syncState.error ? t('syncFailed') : pending || metadataSaving ? t('saving') : t('autosaved')} saved={!error && !syncState.error && !pending && !metadataSaving} pending={false} navigation={navigation} onClose={onClose} actions={<IssueDetailActions task={saved} userId={user.id} disabled={false} documentTools={documentTools} request={actionRequest} getCurrent={getCurrent} onSaved={adopt} onOpen={onOpen} onDeleted={onDeleted} onHistory={() => { void save().then(success => { if (success) { void refreshVersions(); setHistory(true) } }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)} onProperty={requestProperty} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} />} />
-    <div className="mx-auto grid w-full min-w-0 max-w-6xl flex-1 grid-cols-1 gap-6 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,24rem)] lg:items-start lg:gap-8 lg:px-8 lg:py-10">
-      <div className="order-2 min-w-0 lg:order-1">
+    <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-1 flex-col gap-6 px-5 py-6 sm:px-8 lg:py-10">
+      {!wide && <SectionBoundary onClose={onClose}>{properties}</SectionBoundary>}
+      <div className="min-w-0">
         <div className="flex w-full flex-col gap-8">
           {error && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="text-sm text-destructive">{error}</p><Button variant="outline" size="sm" disabled={pending} onClick={() => { void save() }}>{t('retryAutosave')}</Button></div>}
           <div className="flex min-w-0 flex-col gap-7">
             <FieldGroup><Field><FieldLabel htmlFor="task-title" className="sr-only">{t('titleLabel')}</FieldLabel><Textarea id="task-title" aria-label={t('titleLabel')} rows={1} placeholder={t('titleLabel')} value={title} onChange={event => changed({ title: event.target.value })} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; setEditSequence(value => value + 1) }} onBlur={() => { if (title.trim() && title !== saved.title) void save() }} maxLength={200} className="field-sizing-content min-h-10 w-full resize-none rounded-sm border-none bg-transparent px-0 py-0 text-2xl leading-snug font-semibold tracking-tight shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring md:text-3xl dark:bg-transparent" onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }} /></Field></FieldGroup>
             {documentTools && <div><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />{t('backToSimple')}</Button></div>}
-    <SectionBoundary onClose={onClose}>{syncState.ready ? <IssueEditor persisted content={content} layout={documentTools ? 'document' : 'issue'} activity={activity} runRecords={<IssueRuns issueId={saved.id} doc={sync.doc} author={user.name || user.email} authorId={user.id} />} afterDescription={<IssueRelations viewerId={user.id} mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} />} sharedDoc={sync.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
+    <SectionBoundary onClose={onClose}>{syncState.ready ? <IssueEditor persisted content={content} layout={documentTools ? 'document' : 'issue'} activity={activity} threadEvents={<ThreadEvents issueId={saved.id} onOpen={setOpenThread} />} afterDescription={<><IssueRelations viewerId={user.id} mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} /><IssueThreads issueId={saved.id} openId={openThread} onOpen={setOpenThread} /></>} sharedDoc={sync.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
           </div>
           {syncState.error && <p role="alert" className="text-xs text-destructive">{t('syncRetryNotice')}</p>}
         </div>
       </div>
-      <SectionBoundary onClose={onClose}><IssueDetailProperties task={saved} onMetadataSaved={adopt} metadataDisabled={false} onMetadataBusy={setMetadataSaving} status={status} priority={priority} pending={false} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} request={propertyRequest} onDate={() => requestAction('dueDate')} onEstimate={() => requestAction('estimate')} relations={<IssueRelations viewerId={user.id} mode="sidebar" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} />} /></SectionBoundary>
     </div>
+    </div>
+    {wide && <div className="sticky top-0 flex h-[calc(100svh-3.25rem)] shrink-0 flex-col self-start border-l border-rule">
+      {threadPanel ? <div className="flex h-full w-108 flex-col">{threadPanel}</div> : <div className="w-80 overflow-y-auto px-6 py-10"><SectionBoundary onClose={onClose}>{properties}</SectionBoundary></div>}
+    </div>}
+    {!wide && threadPanel && <div className="fixed inset-0 z-30 flex flex-col bg-background">{threadPanel}</div>}
     <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{t('membersTitle')}</DialogTitle><DialogDescription>{tDetail('membersDialogDescription')}</DialogDescription></DialogHeader><IssueMembers id={saved.id} onChanged={async () => { adopt(await getIssue(saved.id)) }} /></DialogContent></Dialog>
     <IssueDescriptionHistory open={history} onOpenChange={setHistory} identifier={saved.identifier} title={title} currentContent={content} versions={versions} loadingError={!!historyError} onRetry={() => { void refreshVersions() }} onRestore={restore} />
   </div>

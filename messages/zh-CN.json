@@ -782,6 +782,7 @@
       "newTask": "新建任务"
     },
     "activity": {
+      "comment": "{author} 的评论",
       "label": "任务活动",
       "title": "活动",
       "subtitle": "更新与讨论",
@@ -792,7 +793,7 @@
       "reopen": "重新打开",
       "resolve": "解决讨论",
       "replyLabel": "回复内容",
-      "replyPlaceholder": "写下回复…",
+      "replyPlaceholder": "留下回复…",
       "sendReply": "发送回复",
       "commentLabel": "评论内容",
       "commentPlaceholder": "留下评论…",
@@ -2233,12 +2234,22 @@
     "creating": "正在创建…",
     "createWorkspace": "创建工作区"
   },
-  "IssueRuns": {
+  "IssueThreads": {
+    "title": "线程",
     "agent": "Agent",
-    "row": "{agent} 的运行",
-    "replyLabel": "回复 {agent} 的运行",
-    "loadFailed": "Agent 运行没加载出来",
-    "retry": "重试"
+    "hidden": "Agent 的线程",
+    "open": "打开线程 {name}",
+    "dispatched": "派出线程",
+    "close": "关闭线程",
+    "conversation": "线程对话",
+    "loading": "正在打开线程",
+    "loadFailed": "线程没加载出来",
+    "retry": "重试",
+    "started": "{harness} · 开始于 {time}",
+    "steps": "执行了 {count} 步",
+    "composer": "告诉 {agent} 下一步做什么…",
+    "send": "发送",
+    "sendFailed": "没发出去，草稿还在"
   },
   "Shell": {
     "pinned": "置顶",
