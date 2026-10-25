@@ -290,6 +290,7 @@ test(
           target,
           targetEnvironment: environment,
         });
+      assert.ok(published, "Actual publisher must return a verified receipt");
         const current = await store.read("owner", state.task.id);
         const ready = await store.apply(
           "owner",
