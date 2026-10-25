@@ -1214,8 +1214,7 @@
     "savingProperties": "Saving properties…",
     "noMatchTitle": "No matching projects",
     "noMatchDescription": "Try another name or status.",
-    "emptyTitle": "Organize work around goals",
-    "emptyDescription": "Create a project, link tasks, and track delivery progress.",
+    "emptyTitle": "No projects yet",
     "columns": {
       "name": "Name",
       "health": "Health",

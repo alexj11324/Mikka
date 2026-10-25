@@ -1214,8 +1214,7 @@
     "savingProperties": "正在保存属性…",
     "noMatchTitle": "没有匹配的项目",
     "noMatchDescription": "试试其他名称或状态。",
-    "emptyTitle": "围绕目标组织工作",
-    "emptyDescription": "创建项目，关联任务并追踪交付进度。",
+    "emptyTitle": "还没有项目",
     "columns": {
       "name": "名称",
       "health": "健康度",
