@@ -48,9 +48,9 @@ source wins in a conflict is in [`README.md`](README.md).
   sidebar) show no avatar or name on messages; the header pill names the bot.
   Group chats show a 24px avatar on the left of the bubbles at the bottom of
   each run and the name once per run, 12px Medium in the bot's colour (Figma
-  `224:5023`). A group's 详情 shows the group avatar and name, a switch
-  between its bots (the one at work selected, with a green dot), and that
-  bot's cloud computer screen with 「<Bot 名> 的屏幕」 under it (R-16, R-17).
+  `224:5023`). A group's 详情 is about people, not computers: the group
+  avatar and name, then its members (people and bots), recent threads and
+  files. No cloud computer in a group; open a bot's own chat to see its.
 - **R-14** The user's messages sit in an accent-blue bubble with white text
   (`accent/default`); a bot's text sits in the light grey bubble. Charts, OpenUI cards
   and choice cards have no bubble. Bordered cards (document, computer) sit
