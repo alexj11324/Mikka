@@ -1,0 +1,36 @@
+name: Controlled Skill improvement
+on:
+  push:
+    branches: ['codex/controlled-skill-improvement-*']
+  pull_request:
+    paths: ['lib/self-improvement/**', 'app/api/self-improvement/**', 'drizzle/*self_improvement.sql', '.github/workflows/self-improvement.yml']
+permissions:
+  contents: read
+jobs:
+  postgres-http:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: improvement
+          POSTGRES_PASSWORD: disposable-local-only
+          POSTGRES_DB: mikka_improvement
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U improvement -d mikka_improvement"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node --import tsx --test lib/self-improvement/scorer.test.ts lib/self-improvement/postgres.test.ts
+        env:
+          IMPROVEMENT_TEST_URL: postgresql://improvement:disposable-local-only@127.0.0.1:5432/mikka_improvement
