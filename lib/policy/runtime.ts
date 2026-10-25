@@ -1,42 +1,20 @@
 import "server-only";
+import { transaction } from "../audit/store";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { workspacePool } from "@/lib/workspace-db";
-import { appOrigin } from "@/lib/mcp/resource";
 import { policySigner } from "./signing";
 import { PolicyStore } from "./store";
-import { policyHttp } from "./http";
 import { authorizeModelRequest } from "./model";
 import type { PolicyClient } from "./sql-client";
 import { workerPolicyScope } from "./run-scope";
-import { type ModelRoute } from "./contract";
+import { PolicyError, type ModelRoute } from "./contract";
 
 export function policyStore() {
   return new PolicyStore(
     workspacePool,
     policySigner(process.env.BETTER_AUTH_SECRET ?? ""),
   );
-}
-export async function handlePolicy(request: Request) {
-  try {
-    return await policyHttp({
-      store: policyStore(),
-      origin: appOrigin ?? "",
-      authenticate: async (req) => {
-        const session = await auth.api.getSession({
-          headers: req.headers,
-          query: { disableCookieCache: true },
-        });
-        return session ? { userId: session.user.id } : null;
-      },
-    })(request);
-  } catch {
-    return Response.json(
-      { error: "policyUnavailable" },
-      { status: 503, headers: { "Cache-Control": "private, no-store" } },
-    );
-  }
 }
 export async function authorizeModel(userId: string, route: ModelRoute) {
   return authorizeModelRequest(policyStore(), userId, route);
@@ -68,8 +46,9 @@ export async function workerPolicyInTransaction(
   userId: string,
   runId: string,
   issueId: string,
+  suppliedWorkspace?: string,
 ) {
-  const scope = await workerPolicyScope(app, userId, runId);
+  const scope = await workerPolicyScope(app, userId, runId, suppliedWorkspace);
   if (!scope.verified) {
     const denied = await policyStore().workerDenial(workspace, userId, runId);
     if (denied) return denied;
@@ -97,4 +76,24 @@ export async function withPolicyTool<T>(
     () => toolAdmission.run(userId, work),
     capturedWorkspaces,
   );
+}
+
+/** Claim hooks already hold the app transaction. Never borrow another app
+ * connection; workspace denial audits commit independently before app rollback. */
+export async function authorizeWorkerClaim(
+  app: PolicyClient,
+  userId: string,
+  runId: string,
+  issueId: string,
+  workspaceId?: string,
+) {
+  try {
+    const denied = await transaction(workspacePool, (tx) =>
+      workerPolicyInTransaction(app, tx, userId, runId, issueId, workspaceId),
+    );
+    if (denied) throw denied;
+  } catch (error) {
+    if (error instanceof PolicyError) throw error;
+    throw new PolicyError("policyUnavailable", 503);
+  }
 }

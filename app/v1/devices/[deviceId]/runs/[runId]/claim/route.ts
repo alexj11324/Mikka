@@ -1,4 +1,4 @@
-import { authorizePolicyWorker } from '@/lib/policy/runtime'
+import { authorizePolicyWorker, authorizeWorkerClaim } from '@/lib/policy/runtime'
 import { PolicyError } from '@/lib/policy/contract'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { randomUUID } from 'node:crypto'
@@ -136,10 +136,15 @@ export async function POST(
   }
   try { await authorizePolicyWorker(caller.userId, runId, run.issueId ?? undefined, subscription?.workspaceId) }
   catch (error) {
-    if (!(error instanceof PolicyError)) return NextResponse.json({ error: 'policyUnavailable' }, { status: 503 })
-    return NextResponse.json({ error: error.code }, { status: error.status })
+    // Existing rejected Factory retries must still reach their locked domain
+    // validation. An otherwise admissible retry is checked again in onClaim.
+    if (!(error instanceof PolicyError && error.code === 'policyScopeUnverified' && run.retryOf && !run.questionContinuation)) {
+      if (!(error instanceof PolicyError)) return NextResponse.json({ error: 'policyUnavailable' }, { status: 503 })
+      return NextResponse.json({ error: error.code }, { status: error.status })
+    }
   }
   const onClaim = async (tx: import('pg').PoolClient) => {
+    await authorizeWorkerClaim(tx, caller.userId, runId, run.issueId!, subscription?.workspaceId)
     if (subscription) await bindSubscriptionClaim(tx, runId, subscription)
     const mailbox = (await tx.query('SELECT m."workspaceId" FROM agent_runs r JOIN session_mailboxes m ON m.id=r."mailboxId" WHERE r.id=$1',[runId])).rows[0]
     const captured = (await tx.query("SELECT tenant FROM security_audit_resource_scopes WHERE source='agent_runs' AND resource=$1",[runId])).rows[0]
@@ -166,7 +171,8 @@ export async function POST(
         onClaim,
       )
       claimed = [{ id: runId }]
-    } catch {
+    } catch (error) {
+      if (error instanceof PolicyError) return NextResponse.json({ error: error.code }, { status: error.status })
       await db
         .update(agentRuns)
         .set({
@@ -197,7 +203,8 @@ export async function POST(
         onClaim,
       )
       claimed = [{ id: runId }]
-    } catch {
+    } catch (error) {
+      if (error instanceof PolicyError) return NextResponse.json({ error: error.code }, { status: error.status })
       await db
         .update(agentRuns)
         .set({
@@ -223,6 +230,7 @@ export async function POST(
         onClaim,
       )
     } catch (error) {
+      if (error instanceof PolicyError) return NextResponse.json({ error: error.code }, { status: error.status })
       if (!(error instanceof FactoryError)) throw error
       return NextResponse.json(
         { error: 'Execution binding is unavailable or stale.' },

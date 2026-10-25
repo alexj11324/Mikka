@@ -11,9 +11,8 @@ import { Pool } from "pg";
 import { transaction, verifyAudit } from "../audit/store";
 import { PolicyStore } from "./store";
 import { policySigner } from "./signing";
-import { policyHttp } from "./http";
 import { AGENT_ROUTE, authorizeModelRequest } from "./model";
-import type { PolicyDocument } from "./contract";
+import { PolicyError, type PolicyDocument } from "./contract";
 const target = process.env.POLICY_WORKSPACE_TEST_URL;
 const guarded = () => {
   const url = new URL(target ?? "");
@@ -25,7 +24,7 @@ const guarded = () => {
   return url.toString();
 };
 test(
-  "real PostgreSQL policy transactions, HTTP contract, tenant isolation, revocation and failure",
+  "real PostgreSQL core policy transactions, tenant isolation, revocation and failure",
   { skip: !target && process.env.REQUIRE_POLICY_DB !== "1" },
   async (t) => {
     const pool = new Pool({ connectionString: guarded(), max: 16 });
@@ -50,25 +49,6 @@ test(
         },
       ],
     });
-    const request = (
-      method = "GET",
-      input?: unknown,
-      cookie = "admin",
-      origin = "http://policy.invalid",
-      id = workspaceId,
-    ) =>
-      new Request(`http://policy.invalid/api/policy?workspaceId=${id}`, {
-        method,
-        headers: { cookie, origin, "content-type": "application/json" },
-        ...(input !== undefined ? { body: JSON.stringify(input) } : {}),
-      });
-    const http = policyHttp({
-      store,
-      origin: "http://policy.invalid",
-      authenticate: async (req) => ({
-        userId: req.headers.get("cookie") === "member" ? member : userId,
-      }),
-    });
     try {
       const migration = readFileSync(
         "drizzle/20261025180000_organization_policy.sql",
@@ -84,52 +64,24 @@ test(
         `INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,'Synthetic','policy@example.invalid','admin'),($3,$2,'Synthetic','policy@example.invalid','admin'),($1,$4,'Synthetic','member@example.invalid','member')`,
         [workspaceId, userId, other, member],
       );
-      await t.test(
-        "no policy is explicitly unmanaged; missing origin, bearer and member writes refused",
-        async () => {
-          assert.equal((await store.current(userId)).length, 0);
-          assert.equal(
-            (
-              await http(
-                request(
-                  "POST",
-                  { expectedVersion: 0, document: document() },
-                  "admin",
-                  "http://evil.invalid",
-                ),
-              )
-            ).status,
-            403,
-          );
-          assert.equal(
-            (
-              await http(
-                request(
-                  "POST",
-                  { expectedVersion: 0, document: document() },
-                  "member",
-                ),
-              )
-            ).status,
-            403,
-          );
-          const bearer = request();
-          bearer.headers.set("authorization", "Bearer synthetic");
-          assert.equal((await http(bearer)).status, 401);
-        },
-      );
+      await t.test("no policy is explicitly unmanaged; member publication refused", async () => {
+        assert.equal((await store.current(userId)).length,0);
+        await assert.rejects(store.publish(workspaceId,member,0,document()), /policyAccessDenied/);
+      });
       await t.test(
         "twelve concurrent publishers produce one winner, one version and one audit event",
         async () => {
-          const replies = await Promise.all(
-            Array.from({ length: 12 }, () =>
-              http(
-                request("POST", { expectedVersion: 0, document: document() }),
-              ),
-            ),
+          const replies = await Promise.allSettled(
+            Array.from({length:12},()=>store.publish(workspaceId,userId,0,document())),
           );
-          assert.equal(replies.filter((r) => r.status === 201).length, 1);
-          assert.equal(replies.filter((r) => r.status === 409).length, 11);
+          assert.equal(replies.filter(r=>r.status==='fulfilled').length,1);
+          const rejected=replies.filter(r=>r.status==='rejected');
+          assert.equal(rejected.length,11);
+          for (const result of rejected) {
+            assert.ok(result.reason instanceof PolicyError);
+            assert.equal(result.reason.code,'policyVersionConflict');
+            assert.equal(result.reason.status,409);
+          }
           assert.equal(
             (
               await pool.query(
@@ -148,7 +100,7 @@ test(
             ).rows[0].count,
             "1",
           );
-          assert.equal((await http(request())).status, 200);
+          assert.ok(await store.read(workspaceId,userId));
           await assert.rejects(
             authorizeModelRequest(store, userId, AGENT_ROUTE),
             /policyBudgetUnavailable/,
@@ -274,14 +226,7 @@ test(
             `CREATE FUNCTION policy_test_audit_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.event->>'action'='policy.published' THEN RAISE EXCEPTION 'synthetic audit unavailable'; END IF; RETURN NEW; END $$; CREATE TRIGGER policy_test_audit_fail BEFORE INSERT ON security_audit_events FOR EACH ROW EXECUTE FUNCTION policy_test_audit_fail()`,
           );
           try {
-            assert.equal(
-              (
-                await http(
-                  request("POST", { expectedVersion: 3, document: document() }),
-                )
-              ).status,
-              503,
-            );
+            await assert.rejects(store.publish(workspaceId,userId,3,document()), /synthetic audit unavailable/);
             assert.equal(
               (await store.read(workspaceId, userId))?.payload.version,
               3,
@@ -299,18 +244,7 @@ test(
             store.read(workspaceId, member),
             /policyAccessDenied/,
           );
-          assert.equal(
-            (
-              await http(
-                request(
-                  "POST",
-                  { expectedVersion: 3, document: document() },
-                  "member",
-                ),
-              )
-            ).status,
-            403,
-          );
+          await assert.rejects(store.publish(workspaceId,member,3,document()), /policyAccessDenied/);
           const verified = await transaction(pool, (tx) =>
             verifyAudit(tx, workspaceId),
           );
@@ -542,7 +476,7 @@ test(
         },
       );
       await t.test(
-        "database unavailable returns 503 with no implicit unmanaged fallback",
+        "database unavailable rejects with no implicit unmanaged fallback",
         async () => {
           const unavailable = new Pool({
             connectionString:
@@ -550,12 +484,9 @@ test(
             connectionTimeoutMillis: 200,
           });
           try {
-            const handle = policyHttp({
-              store: new PolicyStore(unavailable, store.signer),
-              origin: "http://policy.invalid",
-              authenticate: async () => ({ userId }),
-            });
-            assert.equal((await handle(request())).status, 503);
+            const unavailableStore=new PolicyStore(unavailable,store.signer);
+            await assert.rejects(unavailableStore.read(workspaceId,userId));
+            await assert.rejects(unavailableStore.current(userId,workspaceId));
           } finally {
             await unavailable.end();
           }

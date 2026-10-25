@@ -30,17 +30,18 @@ export async function continuationPolicyAcceptance({app,workspace,owner,userId,d
   assert.equal((await app.query(`SELECT status FROM agent_runs WHERE id=$1`,[child])).rows[0].status,'queued')
   assert.equal((await app.query(`SELECT count(*)::int count FROM run_tokens WHERE "runId"=$1`,[child])).rows[0].count,0)
   Object.assign(receipts.at(-1),{probe:'ordinary continuation moved A to unmanaged B cannot bypass captured A policy',expected:'policyScopeMismatch'})
-  const historical=randomUUID(), retry=randomUUID(), question=randomUUID()
+  const historical=randomUUID(), retry=randomUUID(), question=randomUUID(), genericRetry=randomUUID()
   // Old ordinary runs without a trusted organization capture can legitimately
   // have personal projections. Neither resume representation proves that past.
   await app.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status) VALUES($1,$2,$3,$4,$5,$6,'done')`,[historical,userId,issue,agentId,deviceId,repoId])
   await app.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"continuesRunId") VALUES($1,$2,$3,$4,$5,$6,'queued',$7)`,[retry,userId,issue,agentId,deviceId,repoId,historical])
   await app.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"questionContinuation") VALUES($1,$2,$3,$4,$5,$6,'queued',$7)`,[question,userId,issue,agentId,deviceId,repoId,{originRunId:historical}])
-  for(const candidate of [retry,question]) {
+  await app.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"retryOf") VALUES($1,$2,$3,$4,$5,$6,'queued',$7)`,[genericRetry,userId,issue,agentId,deviceId,repoId,historical])
+  for(const candidate of [retry,question,genericRetry]) {
     const denied=await anonymous.call(`/v1/devices/${deviceId}/runs/${candidate}/claim`,'POST',{},deviceHeaders)
     assert.equal(denied.status,403);assert.equal(denied.body.error,'policyScopeUnverified')
     assert.equal((await app.query(`SELECT status FROM agent_runs WHERE id=$1`,[candidate])).rows[0].status,'queued')
     assert.equal((await app.query(`SELECT count(*)::int count FROM run_tokens WHERE "runId"=$1`,[candidate])).rows[0].count,0)
   }
-  return {auditRepairSha,captured,childStatus:'queued',issuedRunTokens:0,unverifiedHistory:['ordinary continuation: denied','questionContinuation without continuesRunId: denied'],policyResult:'policyScopeMismatch',isolation:'test overlay only; not final combined source/production acceptance'}
+  return {auditRepairSha,captured,childStatus:'queued',issuedRunTokens:0,unverifiedHistory:['ordinary continuation: denied','questionContinuation without continuesRunId: denied','generic retryOf reaching locked claim hook: denied'],policyResult:'policyScopeMismatch',isolation:'test overlay only; not final combined source/production acceptance'}
 }

@@ -91,6 +91,15 @@ export async function verifyRunToken(request: Request, bearerToken?: string): Pr
   }
 }
 
+/** Credential callbacks also execute after request body parsing. Revalidate the
+ * opaque token, run/issue owner, live state and policy before using its actor. */
+export async function authorizeToolRun(authInfo: AuthInfo | undefined) {
+  const original = workerRun(authInfo)
+  const current = await currentRun(original.token)
+  if (!current || current.runId !== original.id || current.userId !== original.userId) throw new Error('MCP run authorization is no longer valid')
+  return { ...original, issueId: current.issueId }
+}
+
 /** The run a worker request comes from. */
 export function workerRun(authInfo: AuthInfo | undefined): { id: string; userId: string; issueId: string | null; token: string } {
   const extra = authInfo?.extra

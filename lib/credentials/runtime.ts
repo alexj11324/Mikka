@@ -1,3 +1,6 @@
+import { withPolicyTool, authorizePolicyWorker } from '@/lib/policy/runtime'
+import { workerPolicyScope } from '@/lib/policy/run-scope'
+import { PolicyError } from '@/lib/policy/contract'
 import { appendAudit } from '@/lib/audit/store'
 import 'server-only'
 import { Pool } from 'pg'
@@ -12,7 +15,7 @@ import { universalAuthTokenProvider } from './universal-auth'
 import { credentialServices } from './services'
 import { credentialHttp } from './http'
 import { OwnedChromiumExecutor, type OwnedBrowserPolicy } from './owned-chromium'
-import { CredentialExecutionTools, type CredentialToolActor, type CredentialToolName } from './execution-tools'
+import { CredentialExecutionTools, credentialToolDefinitions, type CredentialToolActor, type CredentialToolName } from './execution-tools'
 
 const globalRuntime = globalThis as unknown as { mikkaCredentials?: {
   broker?: CredentialBroker; cleanupBroker?: CredentialBroker; workspace?: Pool;
@@ -89,11 +92,21 @@ export function getCredentialCleanupBroker() { return state.cleanupBroker ??= bu
 
 export async function executeSystemCredentialTool(actor: CredentialToolActor, name: CredentialToolName, input: unknown) {
   try {
-    state.tools ??= new CredentialExecutionTools({ app: pool, workspace: workspacePool(), broker: getCredentialBroker(), basePath: process.env.MIKKA_BASE_PATH ?? '/mikka' })
-    // Check enable flags on every call, including an already initialized executor.
-    getCredentialBroker()
-    return await state.tools.execute(actor, name, input)
-  } catch (error) { return { error: error instanceof CredentialError ? error.code : 'credential_unavailable' } }
+    const parsed = credentialToolDefinitions[name].inputSchema.safeParse(input)
+    if (!parsed.success) throw new CredentialError('credential_tool_input_invalid', 400)
+    const runId = actor.runId ?? parsed.data.runId
+    const scope = runId ? await workerPolicyScope(pool, actor.userId, runId) : undefined
+    if (runId) {
+      const row = (await pool.query('SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId, actor.userId])).rows[0]
+      await authorizePolicyWorker(actor.userId, runId, actor.taskId ?? row?.issueId ?? undefined)
+    }
+    return await withPolicyTool(actor.userId, async () => {
+      state.tools ??= new CredentialExecutionTools({ app: pool, workspace: workspacePool(), broker: getCredentialBroker(), basePath: process.env.MIKKA_BASE_PATH ?? '/mikka' })
+      // Check enable flags on every call, including an already initialized executor.
+      getCredentialBroker()
+      return state.tools.execute(actor, name, input)
+    }, scope?.workspaceId ? [scope.workspaceId] : [])
+  } catch (error) { return { error: error instanceof CredentialError ? error.code : error instanceof PolicyError ? error.code : 'credential_unavailable' } }
 }
 
 export async function handleCredentialRequest(request: Request, action: 'create' | 'get' | 'submit' | 'cancel' | 'events', id?: string) {

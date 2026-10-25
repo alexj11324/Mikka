@@ -268,7 +268,7 @@ const workerHandler = createMcpHandler(server => {
 
   for (const [name, definition] of Object.entries(credentialToolDefinitions)) {
     server.registerTool(name, { description: definition.description, inputSchema: definition.inputSchema }, async (input: unknown, ctx: { http?: { authInfo?: AuthInfo } }) => {
-      const run = worker.workerRun(ctx.http?.authInfo)
+      const run = await worker.authorizeToolRun(ctx.http?.authInfo)
       return outcome(await executeSystemCredentialTool({ userId: run.userId, runId: run.id, taskId: run.issueId }, name as CredentialToolName, input))
     })
   }
