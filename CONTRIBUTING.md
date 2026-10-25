@@ -49,23 +49,14 @@ cannot.
    hand: Actions → Browser tests → Run workflow.
 4. **After merging** (CI): the same suite on main, and again every night.
 
-## Contributor License Agreement
-
-Before your first pull request can merge, you sign the
-[Contributor License Agreement](CLA.md). A bot comments on the pull request
-with instructions; you sign by replying with one sentence, and the signature
-covers all your later contributions.
-
-The agreement lets the project maintainer, and any company later formed to
-develop Mikka, distribute your contribution under the project's license or
-other terms. You keep the copyright in your work.
-
 ## License
 
-Mikka is licensed under [AGPL-3.0-only](LICENSE). By contributing, you agree
-that your contributions are also licensed under the AGPL-3.0-only, in addition
-to the rights granted in the CLA. Send questions about the license or the CLA
-to [legal@aspectlylabs.com](mailto:legal@aspectlylabs.com).
+Mikka is licensed under [AGPL-3.0-only](LICENSE). Contributions are submitted
+under the same license; contributors retain copyright in their work. No separate
+contributor agreement or copyright assignment is required. Please only submit
+work you are authorized to license under AGPL-3.0-only, and identify any
+third-party material and its license in your pull request. Send licensing
+questions to [legal@aspectlylabs.com](mailto:legal@aspectlylabs.com).
 
 ## Security
 
