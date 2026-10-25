@@ -2,12 +2,14 @@ import 'server-only'
 import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
-import { agentRuns, agents, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, type CoordinatorEventTier } from '@/lib/db/schema'
+import { agentRuns, agents, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
+import { runSummaryText } from '@/lib/issue-run-conversation'
+import { threadName } from '@/lib/issue-threads'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -153,9 +155,11 @@ export interface ChatView {
   sources: Record<string, CitationSource>
 }
 
-/** Looks up the issues and runs cited in `texts`, keeping only what `userId` may see. */
-export async function citationSources(userId: string, texts: readonly string[]): Promise<Record<string, CitationSource>> {
-  const { issueIds, runIds } = citedIds(texts)
+/** Looks up the issues and runs cited in `texts`, and the `threads` dispatched, keeping only what `userId` may see. */
+export async function citationSources(userId: string, texts: readonly string[], threads: readonly string[] = []): Promise<Record<string, CitationSource>> {
+  const cited = citedIds(texts)
+  const issueIds = cited.issueIds
+  const runIds = [...new Set([...cited.runIds, ...threads])]
   const sources: Record<string, CitationSource> = {}
   if (issueIds.length) {
     const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content })
@@ -168,14 +172,19 @@ export async function citationSources(userId: string, texts: readonly string[]):
     }
   }
   if (runIds.length) {
-    const rows = await db.select({ id: agentRuns.id, agentName: agents.name, harness: agents.harness, status: agentRuns.status, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, issueId: issues.id, issueOwnerId: issues.userId, issueScope: issues.scope, issueTitle: issues.title, issueContent: issues.content })
+    const rows = await db.select({ id: agentRuns.id, agentName: agents.name, harness: agents.harness, status: agentRuns.status, prompt: agentRuns.prompt, report: agentRuns.report, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, issueId: issues.id, issueOwnerId: issues.userId, issueScope: issues.scope, issueTitle: issues.title, issueContent: issues.content })
       .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
       .where(and(inArray(agentRuns.id, runIds), eq(agentRuns.userId, userId)))
+    const steps = new Map((rows.length ? await db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
+      .where(and(inArray(runChunks.runId, rows.map(row => row.id)), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId) : [])
+      .map(row => [row.runId, Number(row.count)]))
     const identifiers = await taskIdentifiers(rows.flatMap(row => row.issueId && row.issueOwnerId && row.issueScope && row.issueContent ? [{ id: row.issueId, ownerId: row.issueOwnerId, scope: row.issueScope, number: readIssueMetadata(row.issueContent).number }] : []))
     for (const row of rows) {
       const issue = row.issueId && row.issueTitle && row.issueContent && !readIssueMetadata(row.issueContent).deletedAt
         ? { id: row.issueId, title: row.issueTitle, number: readIssueMetadata(row.issueContent).number ?? null, identifier: identifiers.get(row.issueId) ?? null } : null
-      sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
+      sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue,
+        name: threadName(row.prompt, row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
+        createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
     }
   }
   return sources
@@ -201,7 +210,7 @@ export async function chatView(userId: string, limit = 200): Promise<ChatView> {
     items,
     working: leased || waiting.some(event => event.tier !== 'background'),
     error: session?.lastError ?? null,
-    sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text)),
+    sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text), items.flatMap(item => item.threads)),
   }
 }
 

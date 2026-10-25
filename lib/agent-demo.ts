@@ -53,7 +53,7 @@ const DEMO_RUN = '00000000-0000-4000-8000-0000000000a1'
 export const AGENT_DEMO_CITATIONS: Record<string, CitationSource> = {
   [DEMO_TASK]: { kind: 'issue', id: DEMO_TASK, number: 43, identifier: 'MIK-43', title: '演示任务：Coordinator 聊天迁到 OpenUI', status: 'doing', priority: 'high' },
   [DEMO_TASK_2]: { kind: 'issue', id: DEMO_TASK_2, number: 44, identifier: 'MIK-44', title: '演示任务：任务与来源 chip 注册为 OpenUI 组件', status: 'todo', priority: 'medium' },
-  [DEMO_RUN]: { kind: 'run', id: DEMO_RUN, agentName: 'Worker', harness: 'claude_code', status: 'running', issue: { id: DEMO_TASK, number: 43, identifier: 'MIK-43', title: '演示任务：Coordinator 聊天迁到 OpenUI' }, createdAt: '2026-10-23T14:00:00.000Z', finishedAt: null },
+  [DEMO_RUN]: { kind: 'run', id: DEMO_RUN, agentName: 'Worker', harness: 'claude_code', status: 'running', issue: { id: DEMO_TASK, number: 43, identifier: 'MIK-43', title: '演示任务：Coordinator 聊天迁到 OpenUI' }, name: '演示任务：Coordinator 聊天迁到 OpenUI', summary: null, steps: 12, createdAt: '2026-10-23T14:00:00.000Z', finishedAt: null },
 }
 
 export const AGENT_DEMO_SECTIONS = [
