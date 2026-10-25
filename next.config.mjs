@@ -41,6 +41,9 @@ const nextConfig = {
   serverExternalPackages: ['ai', 'better-auth', 'drizzle-orm'],
   // Build the pinned Linux worker before activating BYOS. The binary path is
   // private server configuration, so tracing cannot infer this asset from JS.
+  outputFileTracingExcludes: {
+    '*': ['./packages/subscription-worker/.upstream/**', './packages/subscription-worker/.cache/**', './packages/subscription-worker/bin/mikka-subscription-fixture'],
+  },
   outputFileTracingIncludes: {
     '/api/agent': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
     '/api/subscriptions': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
