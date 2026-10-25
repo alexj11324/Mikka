@@ -14,3 +14,14 @@ export const factoryStore = createFactoryStore(
     return Boolean(await issueForUser(userId, issueId, false, drizzle(tx)));
   },
 );
+
+import { queueRun } from "@/lib/agent-runs";
+import { createFactoryDispatch } from "./dispatch";
+import { factoryDispatchDatabase } from "./transaction";
+export const dispatchFactoryRun = createFactoryDispatch(
+  pool,
+  factoryStore,
+  (tx, userId, input) => queueRun(userId, input, factoryDispatchDatabase(tx)),
+);
+import { createFactoryReconciler } from "./reconcile";
+export const reconcileFactoryRuns = createFactoryReconciler(pool, factoryStore);

@@ -12,6 +12,10 @@ import {
 } from "./contract";
 import { handleFactory } from "./http";
 import { createFactoryStore, type FactoryTask } from "./store";
+import { createFactoryDispatch } from "./dispatch";
+import { factoryDispatchDatabase } from "./transaction";
+import { createFactoryReconciler } from "./reconcile";
+import { insertRunOnce } from "../run-dispatch";
 
 const dbURL =
   process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true"
@@ -53,7 +57,7 @@ test(
       tx: import("pg").PoolClient,
     ) => {
       const { rows } = await tx.query(
-        "SELECT id FROM issues WHERE id=$1 AND \"userId\"=$2 AND status<>'deleted' FOR SHARE",
+        "SELECT id FROM issues WHERE id=$1 AND \"userId\"=$2 AND content #>> '{attrs,mikka,deletedAt}' IS NULL FOR SHARE",
         [issueId, userId],
       );
       return rows.length === 1;
@@ -172,6 +176,118 @@ test(
       assert.equal(resolved.attempts[0].status, "passed");
       const spec = await route({ needsSpec: true });
       assert.equal(spec.task.stage, "spec");
+      const deviceId = randomUUID(),
+        repoId = randomUUID();
+      await pool.query(
+        "INSERT INTO devices (id,\"ownerId\",name) VALUES ($1,'owner','CI fixture device')",
+        [deviceId],
+      );
+      await pool.query(
+        'INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,\'owner\',\'/fixture/repo\',\'https://example.invalid/fixture.git\')',
+        [repoId, deviceId],
+      );
+      const dispatcher = createFactoryDispatch(
+        pool,
+        store,
+        (tx, userId, input) =>
+          insertRunOnce(factoryDispatchDatabase(tx), userId, input, {
+            deviceId,
+            baseBranch: "main",
+            prompt: "Fixture dispatch with real #191 transaction",
+          }),
+      );
+      const dispatchTask = await route();
+      const dispatchInput = {
+        binding: binding(dispatchTask.task),
+        agentId,
+        deviceRepoId: repoId,
+        note: "same operation",
+      };
+      const queued = await Promise.all(
+        Array.from({ length: 10 }, () => dispatcher("owner", dispatchInput)),
+      );
+      assert.equal(new Set(queued.map((r) => r.runId)).size, 1);
+      assert.equal(queued.filter((r) => !r.replayed).length, 1);
+      await assert.rejects(
+        () =>
+          dispatcher("owner", { ...dispatchInput, note: "changed request" }),
+        /runDispatchKeyConflict/,
+      );
+      let dispatched = await store.read("owner", dispatchTask.task.id);
+      await store.apply("owner", binding(dispatched.task), randomUUID(), {
+        action: "cancel",
+        reason: "Cancel dispatched fixture",
+      });
+      await rejects(() => dispatcher("owner", dispatchInput), "factoryStopped");
+      await pool.query("UPDATE agent_runs SET status='cancelled' WHERE id=$1", [
+        queued[0].runId,
+      ]);
+      // Abort after #191 inserted the run but before stage-event commit.
+      const dispatchRollback = await route();
+      await pool.query(
+        `CREATE FUNCTION factory_dispatch_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected dispatch interruption'; END $$`,
+      );
+      await pool.query(
+        "CREATE TRIGGER factory_inject_dispatch BEFORE INSERT ON factory_events FOR EACH ROW EXECUTE FUNCTION factory_dispatch_fail()",
+      );
+      await assert.rejects(
+        () =>
+          dispatcher("owner", {
+            ...dispatchInput,
+            binding: binding(dispatchRollback.task),
+          }),
+        /injected dispatch/,
+      );
+      await pool.query(
+        "DROP TRIGGER factory_inject_dispatch ON factory_events",
+      );
+      assert.equal(
+        (
+          await pool.query('SELECT id FROM agent_runs WHERE "dispatchKey"=$1', [
+            `factory:${dispatchRollback.task.id}:${dispatchRollback.task.attemptId}`,
+          ])
+        ).rowCount,
+        0,
+      );
+      assert.equal(
+        (await store.read("owner", dispatchRollback.task.id)).attempts[0].runId,
+        null,
+      );
+      const dispatchedRetry = await dispatcher("owner", {
+        ...dispatchInput,
+        binding: binding(dispatchRollback.task),
+      });
+      const completionSha = "c".repeat(40),
+        completionSession = `complete-${randomUUID()}`;
+      await pool.query(
+        'UPDATE agent_runs SET status=\'succeeded\',"stopReason"=\'submitted\',"sessionId"=$2,report=$3,"finishedAt"=now() WHERE id=$1',
+        [
+          dispatchedRetry.runId,
+          completionSession,
+          JSON.stringify({
+            summary: "CI completion fixture",
+            verify: { status: "passed" },
+            publish: { commit: completionSha },
+          }),
+        ],
+      );
+      const reconcile = createFactoryReconciler(pool, store);
+      assert.equal((await reconcile("owner")).recovered, 1);
+      dispatched = await store.read("owner", dispatchRollback.task.id);
+      assert.equal(dispatched.task.stage, "review");
+      assert.equal(dispatched.task.status, "pending");
+      assert.equal(dispatched.candidates[0].sha, completionSha);
+      assert.equal(dispatched.attempts[0].sessionId, completionSession);
+      assert.equal((await reconcile("owner")).recovered, 0);
+      assert.equal(
+        (
+          await dispatcher("owner", {
+            ...dispatchInput,
+            binding: binding(dispatchRollback.task),
+          })
+        ).runId,
+        dispatchedRetry.runId,
+      );
       const external = await route(),
         externalRun = randomUUID();
       const tx = await pool.connect();
@@ -352,11 +468,12 @@ test(
         "factoryStale",
       );
       await pool.query(
-        "UPDATE agent_runs SET status='succeeded',report=$2 WHERE id=$1",
+        "UPDATE agent_runs SET status='succeeded',\"stopReason\"='submitted',report=$2 WHERE id=$1",
         [
           runId,
           JSON.stringify({
             summary: "fixture report",
+            verify: { status: "passed" },
             publish: { commit: "b".repeat(40) },
           }),
         ],

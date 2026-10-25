@@ -4,7 +4,8 @@ import { getWorkflowMetadata } from 'workflow'
 import { z } from 'zod'
 import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
 import { createComposioAITools } from '@/lib/composio-actions'
-import { dispatchRequestKey } from '@/lib/run-dispatch'
+import { bindingSchema, routeSchema } from '@/lib/factory/contract'
+import { factoryDispatchSchema } from '@/lib/factory/dispatch'
 import * as steps from './steps'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
@@ -65,14 +66,30 @@ function coordinatorTools(userId: string) {
       inputSchema: z.object({}),
       execute: () => steps.listAgents(userId),
     }),
+    list_factory_requests: tool({
+      description: 'Read recent authenticated requests to identify the source event for task routing.',
+      inputSchema: z.object({}), execute: () => steps.listFactoryRequests(userId),
+    }),
+    route_factory_task: tool({
+      description: 'Persist routing for the request and issue. Clear authorized work starts execute. Record only material missing information/permissions; spec is optional.',
+      inputSchema: routeSchema.omit({ eventId: true }), execute: input => steps.routeFactoryTask(userId,input),
+    }),
+    get_factory_task: tool({
+      description: 'Read durable routing, current binding, reasons, runs, attempts, candidate and evidence.',
+      inputSchema: z.object({ taskId: id }), execute: input => steps.getFactoryTask(userId,input),
+    }),
+    resolve_factory_task: tool({
+      description: 'Record only the missing items answered by a subsequent actual user request. Actual run permissions are checked again at dispatch.',
+      inputSchema: z.object({ binding: bindingSchema, sourceEventId: id, rationale: z.string().min(1).max(4000), missingInformation: z.array(z.string().min(1).max(4000)).max(20), missingPermissions: z.array(z.string().min(1).max(4000)).max(20), needsSpec: z.boolean() }),
+      execute: input => steps.resolveFactoryTask(userId,input),
+    }),
+    stop_factory_task: tool({
+      description: 'Cancel the task or record withdrawn permission; stop bound runs and block later events.',
+      inputSchema: z.object({ binding: bindingSchema, reason: z.string().min(1).max(4000), action: z.enum(['cancel','revoke']) }), execute: input => steps.stopFactoryTask(userId,input),
+    }),
     dispatch_run: tool({
-      description: 'Queue a run: one agent works one issue in one repository on its device. Returns the run id at once; an [Event] message arrives when the run ends.',
-      inputSchema: z.object({
-        issueId: id, agentId: id,
-        deviceRepoId: id.describe('A repository id from list_agents, on the agent\'s own device.'),
-        note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
-        requestKey: dispatchRequestKey.optional().describe('Stable key for this logical dispatch. Reuse after an error or lost response; choose a new key only for new work.'),
-      }),
+      description: 'Queue and bind one Factory run atomically. Use the exact current pending binding from route_factory_task/get_factory_task. Waiting, cancelled, revoked or stale tasks cannot dispatch. Reuse the same binding after a lost response.',
+      inputSchema: factoryDispatchSchema,
       execute: input => steps.dispatchRun(userId, input),
     }),
     list_runs: tool({

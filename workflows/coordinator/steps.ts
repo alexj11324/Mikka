@@ -1,20 +1,23 @@
 import { generateText, type ModelMessage } from 'ai'
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
-import { addRunMessage, queueRun, readRun, requestRunStop, runViewColumns } from '@/lib/agent-runs'
+import { addRunMessage, readRun, requestRunStop, runViewColumns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db } from '@/lib/db'
-import { agentRuns, agents, deviceRepos, devices, issueMembers, issues } from '@/lib/db/schema'
+import { agentRuns, agents, coordinatorEvents, deviceRepos, devices, factoryAttempts, factoryTasks, issueMembers, issues } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import { type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
-import type { DispatchInput } from '@/lib/run-dispatch'
+import { FactoryError, type FactoryBinding, type FactoryRoute } from '@/lib/factory/contract'
+import type { FactoryDispatchInput } from '@/lib/factory/dispatch'
+import { factoryEventId } from '@/lib/factory/event-id'
+import { dispatchFactoryRun, factoryStore, reconcileFactoryRuns } from '@/lib/factory/server'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -26,7 +29,7 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError) return { error: error.code }
+    if (error instanceof ActionFailureError || error instanceof FactoryError) return { error: error.code }
     throw error
   }
 }
@@ -58,6 +61,7 @@ export async function appendMessages(userId: string, holder: string, messages: M
  */
 export async function preparePrompt(userId: string): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
+  await reconcileFactoryRuns(userId)
   let { summary, memory, messages } = await store.loadConversation(userId)
   const cut = compactionCut(summary, messages)
   if (cut !== null) {
@@ -132,9 +136,37 @@ export async function listAgents(userId: string) {
   }))
 }
 
-export async function dispatchRun(userId: string, input: DispatchInput) {
+export async function dispatchRun(userId: string, input: FactoryDispatchInput) {
   'use step'
-  return asToolResult(() => queueRun(userId, input))
+  return asToolResult(() => dispatchFactoryRun(userId, input))
+}
+
+export async function listFactoryRequests(userId: string) {
+  'use step'
+  return db.select({ sourceEventId: coordinatorEvents.id, text: coordinatorEvents.payload, createdAt: coordinatorEvents.createdAt })
+    .from(coordinatorEvents).where(and(eq(coordinatorEvents.userId,userId),eq(coordinatorEvents.kind,'user_message')))
+    .orderBy(desc(coordinatorEvents.createdAt)).limit(10)
+}
+
+export async function routeFactoryTask(userId: string, input: Omit<FactoryRoute,'eventId'>) {
+  'use step'
+  return asToolResult(() => factoryStore.route(userId,{...input,eventId:input.sourceEventId}))
+}
+
+export async function getFactoryTask(userId: string, input: { taskId: string }) {
+  'use step'
+  return asToolResult(() => factoryStore.read(userId,input.taskId))
+}
+
+export async function resolveFactoryTask(userId: string, input: { binding: FactoryBinding; sourceEventId: string; rationale: string; missingInformation: string[]; missingPermissions: string[]; needsSpec: boolean }) {
+  'use step'
+  const {binding,...resolution} = input
+  return asToolResult(() => factoryStore.apply(userId,binding,input.sourceEventId,{action:'resolve',...resolution}))
+}
+
+export async function stopFactoryTask(userId: string, input: { binding: FactoryBinding; reason: string; action: 'cancel' | 'revoke' }) {
+  'use step'
+  return asToolResult(() => factoryStore.apply(userId,input.binding,factoryEventId(input.action,input.binding.attemptId),{action:input.action,reason:input.reason}))
 }
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }) {
@@ -167,5 +199,13 @@ export async function sendToRun(userId: string, input: { runId: string; text: st
 
 export async function stopRun(userId: string, input: { runId: string }) {
   'use step'
-  return asToolResult(async () => { await requestRunStop(userId, input.runId); return { stopRequested: true } })
+  return asToolResult(async () => {
+    const [linked] = await db.select({taskId:factoryTasks.id}).from(factoryAttempts).innerJoin(factoryTasks,eq(factoryTasks.id,factoryAttempts.taskId))
+      .where(and(eq(factoryAttempts.runId,input.runId),eq(factoryTasks.userId,userId))).limit(1)
+    if (linked) {
+      const {task} = await factoryStore.read(userId,linked.taskId)
+      if (!['cancelled','revoked'].includes(task.status)) await factoryStore.apply(userId,{taskId:task.id,issueId:task.issueId,attemptId:task.attemptId,revision:task.revision,candidateId:task.candidateId},crypto.randomUUID(),{action:'cancel',reason:'Person requested run stop'})
+    } else await requestRunStop(userId,input.runId)
+    return {stopRequested:true}
+  })
 }

@@ -45,18 +45,18 @@ export const runViewColumns = {
  * next poll, claims it, and reports back through `/v1/runs/:runId/complete`.
  * `note` is extra direction for this run only, after the issue.
  */
-export async function queueRun(userId: string, input: DispatchInput): Promise<DispatchResult> {
+export async function queueRun(userId: string, input: DispatchInput, executor: Pick<typeof db, 'select' | 'transaction'> = db): Promise<DispatchResult> {
   const parsed = dispatchInput.safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
-  const issue = await issueForUser(userId, parsed.data.issueId)
+  const issue = await issueForUser(userId, parsed.data.issueId, false, executor)
   if (!issue) throw new ActionFailureError('issueNotFound')
-  const [agent] = await db.select().from(agents)
+  const [agent] = await executor.select().from(agents)
     .where(and(eq(agents.id, parsed.data.agentId), eq(agents.userId, userId))).limit(1)
   if (!agent?.deviceId) throw new ActionFailureError('agentNoDevice')
-  const [repo] = await db.select().from(deviceRepos)
+  const [repo] = await executor.select().from(deviceRepos)
     .where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.deviceId, agent.deviceId), eq(deviceRepos.userId, userId))).limit(1)
   if (!repo) throw new ActionFailureError('agentRepoMissing')
-  return insertRunOnce(db, userId, parsed.data, {
+  return insertRunOnce(executor, userId, parsed.data, {
     deviceId: agent.deviceId, baseBranch: repo.baseBranch,
     prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note),
   })

@@ -256,6 +256,43 @@ export function createFactoryStore(
         snapshot(tx, await owned(tx, userId, taskId)),
       );
     },
+    /** Hold the task fence before #191 takes its dispatch-key then issue locks. */
+    async lockForDispatch(
+      userId: string,
+      rawBinding: FactoryBinding,
+      eventId: string,
+      tx: PoolClient,
+    ) {
+      const parsed = bindingSchema.safeParse(rawBinding);
+      if (!parsed.success) fail("factoryInvalid");
+      uuid(eventId);
+      const binding = parsed.data;
+      const task = await owned(tx, userId, binding.taskId);
+      if (task.issueId !== binding.issueId) fail("factoryNotFound");
+      if (terminal(task)) fail("factoryStopped");
+      const {
+        rows: [prior],
+      } = await tx.query(
+        "SELECT request->'change' AS change, request->'binding'=$3::jsonb AS same FROM factory_events WHERE \"taskId\"=$1 AND \"eventId\"=$2",
+        [task.id, eventId, JSON.stringify(binding)],
+      );
+      if (prior) {
+        if (!prior.same || prior.change.action !== "bind_run")
+          fail("factoryReplayMismatch");
+        return;
+      }
+      if (
+        task.revision !== binding.revision ||
+        task.attemptId !== binding.attemptId ||
+        task.candidateId !== binding.candidateId
+      )
+        fail("factoryStale");
+      if (
+        task.status !== "pending" ||
+        !["spec", "execute"].includes(task.stage)
+      )
+        fail("factoryTransition");
+    },
     /** Trusted backend only. Do not expose finish/advance/bind/candidate to model or worker tools. */
     async apply(
       userId: string,
@@ -436,7 +473,9 @@ export function createFactoryStore(
                 fail("factoryEvidenceRequired");
               if (
                 task.stage === "execute" &&
-                run.report?.publish?.commit !== candidate?.sha
+                (run.report?.publish?.commit !== candidate?.sha ||
+                  run.stopReason !== "submitted" ||
+                  run.report?.verify?.status !== "passed")
               )
                 fail("factoryEvidenceMismatch");
               for (const evidence of change.evidence) {
