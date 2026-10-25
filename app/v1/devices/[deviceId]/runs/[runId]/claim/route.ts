@@ -1,4 +1,5 @@
 import { mailboxes } from '@/lib/mailbox-runtime'
+import { MailboxError } from '@/lib/session-mailbox'
 import { NextResponse } from 'next/server'
 import { and, eq, isNull } from 'drizzle-orm'
 import { RUN_LEASE_MS } from '@mikka/protocol/device'
@@ -104,8 +105,16 @@ export async function POST(
   }
   // Prepare mailbox identity while the attempt is still queued. A transient
   // failure here must remain retryable rather than strand a preparing run.
-  await mailboxes.conversation(run.userId, 'coordinator')
-  await mailboxes.run(run.userId, runId)
+  try {
+    await mailboxes.conversation(run.userId, 'coordinator')
+    await mailboxes.run(run.userId, runId)
+  } catch (error) {
+    // Cancellation can commit after the queued snapshot, while mailbox setup
+    // waits for the run lock. Report that expected refusal without issuing a
+    // token; infrastructure errors must still surface as failures.
+    if (!(error instanceof MailboxError)) throw error
+    return NextResponse.json({ error: 'Run mailbox is unavailable or stale.' }, { status: 409 })
+  }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
   try {
