@@ -67,6 +67,7 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
   const stranger = `actor-stranger-${randomUUID()}`
   const threadId = `actor-test-${randomUUID()}`
   const telegramId = randomUUID()
+  const workspace = randomUUID(), workspaceTeam = randomUUID()
   const input = { title: 'Actor regression', content: { type: 'doc', content: [{ type: 'paragraph' }] }, status: 'todo' as const, priority: 'normal' as const }
   const expectIssue = (result: unknown): typeof issues.$inferSelect => {
     assert.ok(result && typeof result === 'object' && 'issue' in result, JSON.stringify(result))
@@ -82,15 +83,30 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     for (const [id, name] of [[owner, 'Owner'], [member, 'Member'], [stranger, 'Stranger']]) {
       await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$2,$3,false,now(),now())', [id, name, `${id}@example.invalid`])
     }
+    // R-26: a nonowner sees a task only when it is workspace-scoped and linked
+    // to a team in a workspace where they are active. The stranger is not a member.
+    await pool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,$3)', [workspace, owner, `Actor ${workspace}`])
+    for (const user of [owner, member]) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [workspace, user, `${user}@example.invalid`])
+    await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Actor\',\'ACX\')', [workspaceTeam, workspace, owner])
+    // Share a task the way the product does: owner flips it to workspace scope,
+    // it is linked to the team, and the legacy invitation the write actions
+    // still require for nonowners is present.
+    const share = async (id: string) => {
+      expectIssue(await actAs(owner, async () => setIssueScope({ id, revision: (await latest(id)).revision, scope: 'workspace' })))
+      await history(id, 'user', owner)
+      await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [id, workspaceTeam, workspace, owner])
+      await db.insert(issueMembers).values({ issueId: id, userId: owner, memberId: member })
+      return (await latest(id)).revision
+    }
     const root = expectIssue(await actAs(owner, () => saveIssue({ ...input, actorType: 'agent', actorId: 'spoof' } as Parameters<typeof saveIssue>[0])))
     await history(root.id, 'user', owner)
-    await db.insert(issueMembers).values({ issueId: root.id, userId: owner, memberId: member })
-    let saved = expectIssue(await actAs(member, () => saveIssue({ ...input, id: root.id, revision: 1, title: 'Member edit' })))
+    const shared = await share(root.id)
+    let saved = expectIssue(await actAs(member, () => saveIssue({ ...input, id: root.id, revision: shared, title: 'Member edit' })))
     await history(root.id, 'user', member)
     saved = expectIssue(await actAs(member, () => updateIssueMetadata({ id: root.id, revision: saved.revision, patch: { estimate: 3 } })))
     await history(root.id, 'user', member)
     const second = expectIssue(await actAs(owner, () => saveIssue({ ...input, title: 'Relation target' })))
-    await db.insert(issueMembers).values({ issueId: second.id, userId: owner, memberId: member })
+    await share(second.id)
     saved = expectIssue(await actAs(member, () => updateIssueRelation({ id: root.id, revision: saved.revision, kind: 'related', targetId: second.id })))
     await history(root.id, 'user', member)
     await history(second.id, 'user', member)
@@ -105,8 +121,11 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     saved = expectIssue(await actAs(owner, () => updateIssueMetadata({ id: root.id, revision: saved.revision, patch: { assignee: { kind: 'member', id: member } } })))
     assert.deepEqual(await actAs(owner, () => removeMember(root.id, member)), { success: true })
     await history(root.id, 'user', owner)
-    saved = expectIssue(await actAs(owner, async () => setIssueScope({ id: root.id, revision: (await latest(root.id)).revision, scope: 'workspace' })))
+    // Root was shared above; flipping it back to personal is the scope writer
+    // under test here, and it immediately gates the former viewer's history read.
+    saved = expectIssue(await actAs(owner, async () => setIssueScope({ id: root.id, revision: (await latest(root.id)).revision, scope: 'personal' })))
     await history(root.id, 'user', owner)
+    await assert.rejects(actAs(member, () => listIssueVersions(root.id)), { code: 'issueNotFound' })
     const agentId = randomUUID()
     const agent = expectIssue(await actAs(owner, () => saveIssue({ ...input, actorType: 'user', actorId: 'spoof' } as Parameters<typeof saveIssue>[0]), agentActor(agentId)))
     await history(agent.id, 'agent', agentId)
@@ -145,6 +164,10 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
       await db.delete(issueMembers).where(eq(issueMembers.issueId, id))
       await db.delete(issueVersions).where(eq(issueVersions.issueId, id))
     }
+    await pool.query('delete from mikka_team_issues where "teamId"=$1', [workspaceTeam])
+    await pool.query('delete from mikka_teams where id=$1', [workspaceTeam])
+    await pool.query('delete from mikka_workspace_members where "workspaceId"=$1', [workspace])
+    await pool.query('delete from mikka_workspaces where id=$1', [workspace])
     await db.delete(telegramConversations).where(eq(telegramConversations.threadId, threadId))
     await db.delete(telegramLinks).where(eq(telegramLinks.userId, owner))
     await db.delete(issues).where(eq(issues.userId, owner))
