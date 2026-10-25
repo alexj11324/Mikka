@@ -14,6 +14,17 @@ Writes run the app's own server actions inside `actAs` (`lib/acting-user.ts`),
 so an agent gets the same validation and access checks as the UI; a refused
 write returns the action's error code (`issueNotFound`, `issueParentCycle`…).
 
+## Dispatch transactions
+
+The shared `queueRun` path accepts an optional `requestKey` (1–200 characters).
+The owner/key binds the issue, agent, repository and normalized note. A
+transactional advisory lock serializes each key, and another serializes new
+dispatches by owner/issue. A matching replay returns the original `runId`, its
+current `status` and `replayed: true`, including terminal runs. Changed
+parameters return `runDispatchKeyConflict`; an overlapping new run returns
+`runAlreadyActive`. Access checks run before replay lookup. Unkeyed legacy
+callers use the same overlap gate but cannot replay after a run ends.
+
 ## How sign-in works
 
 The app is an OAuth 2.1 server (better-auth's `@better-auth/oauth-provider`

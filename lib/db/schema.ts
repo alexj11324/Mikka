@@ -173,10 +173,16 @@ export const agentRuns = pgTable('agent_runs', {
   status: text('status').$type<RunStatus>().notNull().default('queued'),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),
+  /** Caller-supplied retry identity, scoped to userId. Null for older dispatchers. */
+  dispatchKey: text('dispatchKey'),
+  /** Hash of the original dispatch parameters; rejects reuse for different work. */
+  dispatchFingerprint: text('dispatchFingerprint'),
   baseBranch: text('baseBranch').notNull().default('main'),
   sessionId: text('sessionId'), worktreePath: text('worktreePath'),
   stopReason: text('stopReason'), error: text('error'),
   report: jsonb('report').$type<Record<string, unknown> | null>(),
+  accountActionRefs: jsonb('accountActionRefs').$type<import('../../packages/protocol/src/device').AccountActionRef[]>().notNull().default([]),
+  questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true} | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   /** 1 for the first run; a retry after the device went offline counts up (lib/run-retry.ts). */
   attempt: integer('attempt').notNull().default(1),
@@ -187,7 +193,7 @@ export const agentRuns = pgTable('agent_runs', {
   finishedAt: timestamp('finishedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt)])
+}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`)])
 
 /** The run's event stream, one row per chunk; `seq` dedupes re-sent batches. */
 export const runChunks = pgTable('run_chunks', {
@@ -253,6 +259,7 @@ export const coordinatorEvents = pgTable('coordinator_events', {
   payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
   /** Null until triaged; an untriaged event wakes the Coordinator. */
   tier: text('tier').$type<CoordinatorEventTier>(),
+  accountActionBatch: jsonb('accountActionBatch').$type<import('../operations/action-intents').ActionBatch | null>(),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt)])
@@ -430,3 +437,39 @@ export const pendingActions = pgTable('pending_actions', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   decidedAt: timestamp('decidedAt', { withTimezone: true }),
 }, table => [index('pending_actions_user_status_idx').on(table.userId, table.status, table.createdAt)])
+
+// Factory #192 uses existing issues, Coordinator events and Harness runs.
+export const factoryTasks = pgTable('factory_tasks', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  sourceEventId: uuid('sourceEventId').notNull().references(() => coordinatorEvents.id),
+  route: jsonb('route').$type<import('../factory/contract').FactoryRoute>().notNull(),
+  stage: text('stage').$type<import('../factory/contract').FactoryStage>().notNull(),
+  status: text('status').$type<import('../factory/contract').FactoryStatus>().notNull(),
+  revision: integer('revision').notNull().default(1), attemptId: uuid('attemptId').notNull(), candidateId: uuid('candidateId'),
+  reason: text('reason').notNull(), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('factory_tasks_source_key').on(table.userId, table.issueId, table.sourceEventId), index('factory_tasks_owner_issue_idx').on(table.userId, table.issueId, table.updatedAt)])
+
+export const factoryCandidates = pgTable('factory_candidates', {
+  id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
+  sha: text('sha').notNull(), repository: text('repository').notNull(), environment: text('environment').notNull(), scope: text('scope').notNull(),
+  runId: uuid('runId').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('factory_candidates_task_id_key').on(table.taskId, table.id)])
+
+export const factoryAttempts = pgTable('factory_attempts', {
+  id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
+  stage: text('stage').$type<import('../factory/contract').FactoryStage>().notNull(), ordinal: integer('ordinal').notNull(), position: integer('position').notNull(),
+  status: text('status').$type<import('../factory/contract').FactoryStatus>().notNull(), candidateId: uuid('candidateId'),
+  runId: uuid('runId'), sessionId: text('sessionId'), reason: text('reason').notNull(),
+  output: jsonb('output').$type<Record<string, unknown>>().notNull().default({}),
+  evidence: jsonb('evidence').$type<import('../factory/contract').FactoryEvidence[]>().notNull().default([]),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), finishedAt: timestamp('finishedAt', { withTimezone: true }),
+}, table => [unique('factory_attempts_task_stage_ordinal_key').on(table.taskId, table.stage, table.ordinal), unique('factory_attempts_task_position_key').on(table.taskId, table.position), unique('factory_attempts_task_id_key').on(table.taskId, table.id), uniqueIndex('factory_attempts_one_run_key').on(table.runId).where(sql`${table.runId} IS NOT NULL`), index('factory_attempts_run_idx').on(table.runId)])
+
+export const factoryEvents = pgTable('factory_events', {
+  taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }), eventId: uuid('eventId').notNull(),
+  request: jsonb('request').$type<Record<string, unknown>>().notNull(), result: jsonb('result').$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.taskId, table.eventId] })])

@@ -37,7 +37,7 @@ export const RUN_LEASE_MS = 90_000
 
 export function isDeviceOnline(
   lastSeenAt: string | number | Date | null | undefined,
-  now = Date.now()
+  now = Date.now(),
 ): boolean {
   if (lastSeenAt === null || lastSeenAt === undefined) return false
   const seen =
@@ -52,7 +52,7 @@ export function isDeviceOnline(
 /** "设备 n/m 在线": how many of the user's devices are online. */
 export function devicesOnline(
   devices: readonly { lastSeenAt: string | number | Date | null }[],
-  now = Date.now()
+  now = Date.now(),
 ): { online: number; total: number } {
   return {
     online: devices.filter((d) => isDeviceOnline(d.lastSeenAt, now)).length,
@@ -88,7 +88,7 @@ export const devicePaths = {
   commands: (
     deviceId: string,
     waitSeconds: number,
-    skipRuns: readonly string[] = []
+    skipRuns: readonly string[] = [],
   ) =>
     `/v1/devices/${seg(deviceId)}/commands?wait=${waitSeconds}` +
     (skipRuns.length
@@ -239,7 +239,15 @@ export const RUN_KINDS = ["implement", "acceptance", "fix", "plan"] as const
 export type RunKind = (typeof RUN_KINDS)[number]
 
 /** `POST /v1/devices/:deviceId/runs/:runId/claim`: what the daemon gets. */
+/** Server-issued references; possession never grants execution authority. */
+export const accountActionRefSchema = z.object({
+  sourceEventId: z.uuid(), actionSlotId: z.uuid(), operationId: z.uuid(),
+  proposalDigest: z.string().regex(/^[a-f0-9]{64}$/),
+}).strict()
+export type AccountActionRef = z.infer<typeof accountActionRefSchema>
+
 export const runAssignmentSchema = z.object({
+  accountActionRefs: z.array(accountActionRefSchema).max(20).optional(),
   runId: id,
   issueId: id,
   deviceId: id,
@@ -275,6 +283,9 @@ export const runAssignmentSchema = z.object({
    * one, and the run goes ahead without it.
    */
   mcp: z.object({ url: z.url(), token: z.string().min(1).max(200) }).optional(),
+  /** Question continuation must not silently open a different session. */
+  requireSessionResume: z.boolean().optional(),
+  questionId: z.uuid().optional(),
   /**
    * What the orchestrator dispatched this run for (ADR 0023). `plan` writes a
    * spec and proposes a split instead of changing code (ADR ORV-205).

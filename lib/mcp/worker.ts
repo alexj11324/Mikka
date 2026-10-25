@@ -89,3 +89,13 @@ export async function blocked(run: ReturnType<typeof workerRun>, reason: string)
   await deliver(runBlockedEvent(run, reason))
   return 'Noted. The Coordinator will tell the person.'
 }
+
+/** Revalidate the token and live lease on every lookup; AuthInfo is not a grant.
+ * This endpoint cannot create proposals, approve, reconcile remotely or send. */
+export async function resumeAccountActions(authInfo: AuthInfo | undefined, operationId?: string) {
+  const current = await verifyRunToken(new Request('http://localhost'), authInfo?.token)
+  if (!current) throw new Error('accountActionRunUnavailable')
+  const run = workerRun(current)
+  const { actionIntents } = await import('../operations/action-intent-runtime')
+  return actionIntents().readWorker(run.userId, run.id, operationId)
+}

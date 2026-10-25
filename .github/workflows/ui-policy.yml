@@ -23,7 +23,8 @@ concurrency:
 jobs:
   cloud-secret-access:
     name: Cloud credential access (OIDC)
-    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka'
+    # This isolated ledger candidate is authorized for synthetic tests only.
+    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && !startsWith(github.ref, 'refs/heads/codex/208-')
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -83,6 +84,12 @@ jobs:
       - run: pnpm test:ssh-target
       - run: pnpm test:linear-sync
       - run: pnpm test:coordinator-events
+      - run: pnpm test:factory
+      - name: Factory daemon check regressions and shared report contract
+        run: |
+          pnpm --filter @mikka/protocol exec vitest run src/run.test.ts
+          pnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts src/permissions.test.ts
+          pnpm --filter @mikka/daemon typecheck
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
       - run: pnpm test:integrations
@@ -160,6 +167,14 @@ jobs:
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
+      - name: Apply tracked migrations to disposable browser database
+        run: node scripts/migrate.mjs
+        env:
+          MIGRATE: '1'
+      - name: Factory state and API isolation (temporary Postgres 17 only)
+        run: pnpm test:factory
+        env:
+          FACTORY_MONITOR_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       - name: Group conversation API and migrations (temporary Postgres 17 only)
         run: pnpm test:groups
       - run: pnpm test:e2e:setup
