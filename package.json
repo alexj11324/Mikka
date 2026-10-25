@@ -11,7 +11,7 @@
     "build": "pnpm generate:agent-ui && pnpm lint && pnpm migrate && next build",
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
-    "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs",
+    "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs",
     "dev": "node scripts/dev-preview.mjs",
     "test:preview": "node --test tests/preview-ready.test.mjs",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
