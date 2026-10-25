@@ -1,0 +1,608 @@
+{
+  "sourceSha": "70954888ecf6e13d88cab736060044f9f7dee832",
+  "evidenceCommit": "44e28408b764c15ba35f64e11c8f57068f8ff0ed",
+  "utc": "2026-10-25T18:08:18.973638+00:00",
+  "method": "Python urllib HTTPS with environment CA, no Authorization/cookies; byte-for-byte compare against local archived file",
+  "files": [
+    {
+      "file": "review-7095488/README.md",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/README.md",
+      "bytes": 8430,
+      "sha256": "f16f4609038b270fb5e4be22a266f64d439ad9017deb7c820562ec7d1e5b953a",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/SHA256SUMS",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/SHA256SUMS",
+      "bytes": 5356,
+      "sha256": "704136f70d6294a473c12182db4cbe2d868b1ed2c0f47f8d60a82929af9d7ff1",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/acceptance.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/acceptance.json",
+      "bytes": 6350,
+      "sha256": "aea0ac7f85793204495e5e1bd10abcfb6a1ef77f20a3a80ea2a702a85f6a85ae",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/application-page-0.jsonl",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/application-page-0.jsonl",
+      "bytes": 1131,
+      "sha256": "03d9c004ce21dc40849abc282c082be0369b23878c0522fc18b521ef92936bed",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "raw downloaded API export JSONL",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/audit-deadlock-after-exact.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/audit-deadlock-after-exact.json",
+      "bytes": 1062,
+      "sha256": "1679321fb8417eef299353b97380fb6c4b6829c74e001ae41b9b7a9957463c74",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/audit-deadlock-before-exact.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/audit-deadlock-before-exact.json",
+      "bytes": 1062,
+      "sha256": "90a523e376d950ac0d089b410b0d5a977c9da614d7a60f47308fb5e20ce84306",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/audit-deadlock-before-exact.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/audit-deadlock-before-exact.log",
+      "bytes": 924,
+      "sha256": "ac2e8b10135be774ce28d1cab08d2ad7ca88c264ec5ee342bb5c7dd36e916449",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/audit-http-raw.webm",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/audit-http-raw.webm",
+      "bytes": 681237,
+      "sha256": "15e542b24568e53432e5ce9a38d64d7b562c4661025c2b9ed7090b43a68fd928",
+      "httpStatus": 200,
+      "contentType": "audio/webm",
+      "classification": "raw original uncut Playwright capture",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/base-head-check-comparison.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/base-head-check-comparison.json",
+      "bytes": 9750,
+      "sha256": "3a39fb2f3141c6b565a15a09b7b2af8986194b61896e924275273a4cd7699890",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/ci-failures.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/ci-failures.json",
+      "bytes": 1564,
+      "sha256": "d987c5ee38b55a65f1701a3d9f48068bebee6709cd9bf85eed9347ea468792ac",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/continuation-export.jsonl",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/continuation-export.jsonl",
+      "bytes": 4888,
+      "sha256": "15b665d03324a47fc10fce817f9698debaf62e94f99e567b65276f86643337c5",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "raw downloaded API export JSONL",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/continuation-http.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/continuation-http.json",
+      "bytes": 5588,
+      "sha256": "48a091068c491066df8ea78fe6730cf7cc44dde25e7d60932d689e5e71b272f3",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/continuation-http.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/continuation-http.log",
+      "bytes": 189,
+      "sha256": "9b90523005a3f751f8b0e11f6ecd9490e131b1afcee91f485de3730007d3db37",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/credential-base-expiry-repro.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/credential-base-expiry-repro.json",
+      "bytes": 616,
+      "sha256": "15adef3db49555f6166ef4e98b4137a71919d85d23f0a7c8ba034915eb2df459",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/credential-base-expiry-repro.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/credential-base-expiry-repro.log",
+      "bytes": 593,
+      "sha256": "fbb43730e4b02f7093ad9119606c02e097ec4506808646bb3c0e85d2cc90fc65",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/credential-base-expiry-reproduce.mjs",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/credential-base-expiry-reproduce.mjs",
+      "bytes": 3923,
+      "sha256": "f83b44aa66538a8bfafec71e2341b67fd378d4ee4ca247657b31098d869f8a73",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/database-readback.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/database-readback.json",
+      "bytes": 10391,
+      "sha256": "448ef67dda3017c60e55d61eef7a6464fc22bf835ca1b05aa68d5b9a9dfcb9f5",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/enospc-recovery.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/enospc-recovery.json",
+      "bytes": 8155,
+      "sha256": "cf57f92134b4ccea6b254cb2ba1368d4c2ba1652f5b26d6699f8c9ab269cd11c",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/evidence-inspection.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/evidence-inspection.json",
+      "bytes": 920,
+      "sha256": "d596c226404d6dd1b2258548a8d39e19cd2e3aa942d215d54d0487ed59335df6",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/factory.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/factory.log",
+      "bytes": 20600,
+      "sha256": "fa3fd5dd2d1f4c48124f961d749ca9cb39dacd58e9b0e2d8b4b22063f79eefdc",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/failure-http.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/failure-http.log",
+      "bytes": 143,
+      "sha256": "5a766564cbd7540567f1a7db836579e00f240e43f66121418dcefffcbec97201",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/failure-reproduce.mjs",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/failure-reproduce.mjs",
+      "bytes": 5631,
+      "sha256": "d58b3b606b6ad952a0d34ac535f619ee8ecf4876d0dbc98a0eb694dff4afba52",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/failure-restart-acceptance.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/failure-restart-acceptance.json",
+      "bytes": 2512,
+      "sha256": "79dfb35134af6e23623bc4d8bd61bd74f758a5c2fb635bcec027f792056e94a4",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/http.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/http.log",
+      "bytes": 268,
+      "sha256": "ce541a68b499adf5f5963ea1b5e25ffe5fa76fc3a731e75a104473ab6e1f2f34",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/lint.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/lint.log",
+      "bytes": 1666,
+      "sha256": "836b4eab83e3f14368893583261d2a72e1734a0639675336414e1230c62dd1e4",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/mailbox.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/mailbox.log",
+      "bytes": 3444,
+      "sha256": "0303c77c00fc27cbb8c3431bf9c591db1d51bd8456d432421542c28dd62782c8",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/member-denied.png",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/member-denied.png",
+      "bytes": 8801,
+      "sha256": "5bed235ba8e48cdf9d8e3932b51796da0c0d1ca80b7d83f8ffb374edef88e947",
+      "httpStatus": 200,
+      "contentType": "image/png",
+      "classification": "raw original unedited screenshot",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/migration-manifest.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/migration-manifest.json",
+      "bytes": 912,
+      "sha256": "8c8b5dc3b42b639b55e56be7dcf3197168433451c90a0f5eb2025b4a46c37470",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/migration-repeat.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/migration-repeat.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/migration-rollout.md",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/migration-rollout.md",
+      "bytes": 5751,
+      "sha256": "284b18fee191a94bc19fb018561d284e6e03430dc61409b06a9d2db5d004e787",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/migrations.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/migrations.log",
+      "bytes": 4428,
+      "sha256": "29d342083b6fe5861461e5553509a2331be87312f110eb7d91df0d1b2fec33c4",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/native-video-playback.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/native-video-playback.json",
+      "bytes": 329,
+      "sha256": "ea633d2e9b971b814aae10c87d2fcd0db6db848e067c785d3fb6c33badef0639",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/personal-query.png",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/personal-query.png",
+      "bytes": 90357,
+      "sha256": "ecd504b23e4a03ce91d5c6543d1e07b4b826b247fed74d65b18034c1c1baf375",
+      "httpStatus": 200,
+      "contentType": "image/png",
+      "classification": "raw original unedited screenshot",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/pnpm-check-base-summary.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/pnpm-check-base-summary.log",
+      "bytes": 7072,
+      "sha256": "1c8d928c7b486ea9df736efbb7b1ffc83804761ea00f3639700cebd623a333f7",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/pnpm-check-current-head-summary.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/pnpm-check-current-head-summary.log",
+      "bytes": 224,
+      "sha256": "9ed8ce454aa755f435425d43bc62f9cb4aa8c28fc362e62839d8ca79682a3095",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/pnpm-check-head-summary.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/pnpm-check-head-summary.log",
+      "bytes": 7047,
+      "sha256": "0a5d5d9eb20def4ba11df0397e5d2c36a1dc08ef562ff6bc5ea700dfd4ad35c3",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/policy-integration-contract.md",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/policy-integration-contract.md",
+      "bytes": 6191,
+      "sha256": "d3083c4b9f335a46de1ae6080571c8b5fb3742b24b69fd9bbb5312766d8e01f8",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/postgres.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/postgres.log",
+      "bytes": 2742,
+      "sha256": "942a8b48bd1b4f9da7ed06510e600c25d9cfdfa9f381bd663717d22cbd5c16ea",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/previous-953-file-links.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/previous-953-file-links.json",
+      "bytes": 12158,
+      "sha256": "69350aa16e41538159f150f8a33c555bb837294d99972a2e1569b093ba5a3f98",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/process.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/process.json",
+      "bytes": 563,
+      "sha256": "f09126b9f0f79a77b55e31090ed645c81ea47fc26edcb1baf5a247dbed1a83e8",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/production-build.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/production-build.log",
+      "bytes": 5778,
+      "sha256": "88fe76d1ef9495aedf68ff3b17ba33c87a2f63e9e3f87212578f8acb0e740321",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/recorded-continuation/continuation-export.jsonl",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/recorded-continuation/continuation-export.jsonl",
+      "bytes": 4888,
+      "sha256": "967bc20aa65b0f07c0a33a13604b9647e9cf7bf6976f488b4c1691b3edc71935",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "raw downloaded API export JSONL",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/recorded-continuation/continuation-http.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/recorded-continuation/continuation-http.json",
+      "bytes": 5588,
+      "sha256": "248658fbe052521e1fb19dcc515b655a85f7cbd4b77df8993de8c9ce166165fd",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/recorded-continuation/continuation-live-raw.webm",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/recorded-continuation/continuation-live-raw.webm",
+      "bytes": 819064,
+      "sha256": "150359470a1c36b329629f761082cd53f3d1710ba821f9b251b99489a64ae4f6",
+      "httpStatus": 200,
+      "contentType": "audio/webm",
+      "classification": "raw original uncut Playwright capture",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/recorded-continuation/continuation-live-summary.png",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/recorded-continuation/continuation-live-summary.png",
+      "bytes": 135616,
+      "sha256": "97f0aac74e18c64097d3b08765ce930ce017b2081061506a7d9f4a1c1314d71d",
+      "httpStatus": 200,
+      "contentType": "image/png",
+      "classification": "raw original unedited screenshot",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/recorded-continuation/continuation-live-viewable.mp4",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/recorded-continuation/continuation-live-viewable.mp4",
+      "bytes": 163926,
+      "sha256": "b1b43272835232c0d33178dc58190429b31aa46aadc707b4fb0d0bab83afece1",
+      "httpStatus": 200,
+      "contentType": "application/octet-stream",
+      "classification": "full-duration H264 re-encoding; no cuts; NOT raw",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/recorded-continuation/http.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/recorded-continuation/http.log",
+      "bytes": 189,
+      "sha256": "80f8f43da11948c9c3a433a494d48ffd9bef79375a3215a5b953080fe4b748ac",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/recorded-continuation/reproduce.mjs",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/recorded-continuation/reproduce.mjs",
+      "bytes": 10863,
+      "sha256": "6ce15c9edb8509859941b71e9c9e06274898f1aed884140e4417821d157b4fc1",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/skill-browser.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/skill-browser.log",
+      "bytes": 395,
+      "sha256": "0cb9b4928e75c56b43e9fa8dbe20cad0e28c9e77c3fe94b40858a40710b1a2ca",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/skill.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/skill.log",
+      "bytes": 3498,
+      "sha256": "37b44abad08feb87fd5cd649addff11706f1f0690d8ba8ca920f560a28ec8c6e",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/typecheck.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/typecheck.log",
+      "bytes": 72,
+      "sha256": "9bc4575d28d58e0f51fa39bfb79d07b4857580d34b74ced027f569dca778d557",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/video-info.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/video-info.json",
+      "bytes": 1501,
+      "sha256": "78013d5ee7274a49e77d40f620756d456f45d11471640cc534aebffe23749bd4",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/worker-acceptance.json",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/worker-acceptance.json",
+      "bytes": 3682,
+      "sha256": "bf0e706ad2d98d3b1774908af5df46bdb9a17390c2205727695d6de1f79e3e34",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/worker-http.log",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/worker-http.log",
+      "bytes": 140,
+      "sha256": "2a5154825e6fc4ce71e114264faa26a6bb967327a85a50413b0e2fb935d12902",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/worker-reproduce.mjs",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/worker-reproduce.mjs",
+      "bytes": 4169,
+      "sha256": "2a13fb31aae35eac7e149d70ca764b5aea1e62aa2bd2ad6e7d2fe75ad31b05c8",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "receipt/log/document/reproduction driver",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/workspace-page-0.jsonl",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/workspace-page-0.jsonl",
+      "bytes": 1159,
+      "sha256": "e4d6d20ccf63cbba73cff131b3698140641897f14c2625065db86326c5aba776",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "raw downloaded API export JSONL",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/workspace-page-1.jsonl",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/workspace-page-1.jsonl",
+      "bytes": 1224,
+      "sha256": "0cbd506cf38c46e3edbc0f4fc72717eeca421a0f694ab41b131b48e59604a4c1",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "raw downloaded API export JSONL",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/workspace-page-2.jsonl",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/workspace-page-2.jsonl",
+      "bytes": 1235,
+      "sha256": "8d5496f5174c51fd2853cbec023011442e79f4f2523e070a566c06fa92e5f642",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "raw downloaded API export JSONL",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/workspace-page-3.jsonl",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/workspace-page-3.jsonl",
+      "bytes": 1191,
+      "sha256": "47b444301940e9d4208ee3a5a960d3cf024b1a8dba4ba3bceff054ca455a8d0e",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "classification": "raw downloaded API export JSONL",
+      "anonymous": true
+    },
+    {
+      "file": "review-7095488/workspace-query.png",
+      "directUrl": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/workspace-query.png",
+      "bytes": 202357,
+      "sha256": "24346716e937a25a89af99b40d44fab1561702004cf93b4a612c96d4389e0aaf",
+      "httpStatus": 200,
+      "contentType": "image/png",
+      "classification": "raw original unedited screenshot",
+      "anonymous": true
+    }
+  ]
+}

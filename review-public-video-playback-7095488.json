@@ -1,0 +1,16 @@
+{
+  "source": "70954888ecf6e13d88cab736060044f9f7dee832",
+  "url": "https://raw.githubusercontent.com/alexj11324/Mikka/44e28408b764c15ba35f64e11c8f57068f8ff0ed/review-7095488/recorded-continuation/continuation-live-viewable.mp4",
+  "utc": "2026-10-25T18:08:19.780Z",
+  "authenticated": false,
+  "method": "Chromium native video element fetching public raw.githubusercontent MP4 directly",
+  "environmentLimitation": "ignoreHTTPSErrors enabled only for this isolated media check because cloud Chromium does not trust environment interception CA. Independent urllib anonymous readback verifies HTTPS with environment CA. This is not default-browser TLS verification and does not modify product TLS.",
+  "media": {
+    "currentTime": 1.026782,
+    "duration": 17.68,
+    "width": 1280,
+    "height": 800,
+    "error": null,
+    "paused": false
+  }
+}
