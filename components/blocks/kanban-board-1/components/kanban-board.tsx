@@ -3,7 +3,7 @@
 import { useState, type ComponentProps, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useTranslations } from 'next-intl'
-import { Box, CalendarDays, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, GitMerge, GitPullRequest, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2, X } from 'lucide-react'
+import { Box, CalendarDays, ChevronsLeftRight, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, GitMerge, GitPullRequest, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
@@ -26,8 +26,8 @@ function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typ
   </ScrollAreaPrimitive.Root>
 }
 
-const AGENT_STATE_BADGES = { running: 'info-light', waiting: 'warning-light', failed: 'destructive-light' } as const satisfies Record<AgentState, string>
-const AGENT_STATE_DOTS = { running: 'bg-info', waiting: 'bg-warning', failed: 'bg-destructive' } as const satisfies Record<AgentState, string>
+const AGENT_STATE_BADGES = { running: 'success-light', waiting: 'warning-light', failed: 'destructive-light' } as const satisfies Record<AgentState, string>
+const AGENT_STATE_DOTS = { running: 'bg-success', waiting: 'bg-warning', failed: 'bg-destructive' } as const satisfies Record<AgentState, string>
 
 export type CardHandlers = {
   onOpen: (id: string) => void
@@ -67,16 +67,16 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   const subtasks = context.subtasks.get(task.id)
   const metadata = task.metadata
   const chips = [
-    show('priority') && <CardControlBoundary key="priority"><span className="inline-flex rounded-md border"><IssuePropertyMenu label={tIssue('priorityLabel')} value={task.priority} options={priorityOptions} icon={Flag} iconOnly compact disabled={controlsDisabled} onChange={value => onPriorityChange(task, value)} /></span></CardControlBoundary>,
-    ...(show('labels') ? metadata.labels.map(label => <Badge key={`label-${label.name}`} variant="outline" size="lg" className="max-w-36"><LabelDot color={label.color} /><span className="truncate">{label.name}</span></Badge>) : []),
-    show('project') && metadata.project && <Badge key="project" variant="outline" size="lg" className="max-w-36"><Box /><span className="truncate">{metadata.project}</span></Badge>,
+    show('priority') && <CardControlBoundary key="priority"><IssuePropertyMenu label={tIssue('priorityLabel')} value={task.priority} options={priorityOptions} icon={Flag} iconOnly compact disabled={controlsDisabled} onChange={value => onPriorityChange(task, value)} /></CardControlBoundary>,
+    ...(show('labels') ? metadata.labels.map(label => <Badge key={`label-${label.name}`} variant="outline" size="lg" className="border-transparent px-1 max-w-36"><LabelDot color={label.color} /><span className="truncate">{label.name}</span></Badge>) : []),
+    show('project') && metadata.project && <Badge key="project" variant="outline" size="lg" className="border-transparent px-1 max-w-36"><Box /><span className="truncate">{metadata.project}</span></Badge>,
     ...(show('pullRequests') ? metadata.pullRequests.map(pr => {
       const Icon = pr.state === 'merged' ? GitMerge : pr.state === 'closed' ? X : GitPullRequest
-      return <CardControlBoundary key={pr.url}><Badge variant="outline" size="lg" className="tabular-nums" render={<a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" />}><Icon className={cn(pr.state === 'open' && 'text-success-foreground', pr.state === 'merged' && 'text-info-foreground', pr.state === 'closed' && 'text-destructive')} />#{pr.url.split('/').at(-1)}</Badge></CardControlBoundary>
+      return <CardControlBoundary key={pr.url}><Badge variant="outline" size="lg" className="border-transparent px-1 tabular-nums" render={<a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" />}><Icon className={cn(pr.state === 'open' && 'text-success-foreground', pr.state === 'merged' && 'text-info-foreground', pr.state === 'closed' && 'text-destructive')} />#{pr.url.split('/').at(-1)}</Badge></CardControlBoundary>
     }) : []),
-    show('subtasks') && subtasks && subtasks.total > 0 && <Badge key="subtasks" variant="outline" size="lg" className="tabular-nums" title={tCard('subtasks')}><ListChecks />{subtasks.done}/{subtasks.total}</Badge>,
+    show('subtasks') && subtasks && subtasks.total > 0 && <Badge key="subtasks" variant="outline" size="lg" className="border-transparent px-1 tabular-nums" title={tCard('subtasks')}><ListChecks />{subtasks.done}/{subtasks.total}</Badge>,
     show('agentState') && agentState && <Badge key="agent" variant={AGENT_STATE_BADGES[agentState]} size="lg"><span aria-hidden="true" className={cn('size-1.5 rounded-full', AGENT_STATE_DOTS[agentState])} />{tCard(`agent.${agentState}`)}</Badge>,
-    show('dueDate') && metadata.dueDate && <Badge key="due" variant="outline" size="lg" className="tabular-nums"><CalendarDays />{metadata.dueDate.slice(5)}</Badge>,
+    show('dueDate') && metadata.dueDate && <Badge key="due" variant="outline" size="lg" className="border-transparent px-1 tabular-nums"><CalendarDays />{metadata.dueDate.slice(5)}</Badge>,
   ].filter(Boolean)
 
   const card = <div className={cn('flex flex-col gap-1.5 rounded-lg border bg-card px-3 pt-2.5 pb-3 text-card-foreground shadow-xs transition-shadow hover:border-foreground/20', isOverlay && 'pointer-events-none rotate-1 shadow-lg')}>
@@ -151,21 +151,34 @@ type KanbanBoardProps = Omit<ComponentProps<typeof Kanban<BoardTask>>, 'children
   onViewportKeyDown: ComponentProps<'div'>['onKeyDown']
   onHideColumn: (status: IssueStatus) => void
   onShowColumn: (status: IssueStatus) => void
+  /** Columns folded to a 40px strip (已完成 while the Coordinator sidebar is open), until clicked. */
+  narrowColumns?: IssueStatus[]
 } & CardHandlers
 
-export function KanbanBoard({ columns, hiddenColumns: hidden, context, pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onHideColumn, onShowColumn, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, ...props }: KanbanBoardProps) {
+export function KanbanBoard({ columns, hiddenColumns: hidden, narrowColumns = [], context, pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onHideColumn, onShowColumn, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, ...props }: KanbanBoardProps) {
   const handlers = { onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss }
   const t = useTranslations('Board')
   const tBoard = useTranslations('Shell.board')
   const tIssue = useTranslations('Issue')
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const shown = BOARD_COLUMNS.filter(column => columns.includes(column.value))
+  const [opened, setOpened] = useState<IssueStatus[]>([])
+  const narrow = (status: IssueStatus) => narrowColumns.includes(status) && !opened.includes(status)
+  // Beside the Coordinator sidebar the columns share the width instead of scrolling (R-25); hidden columns stay reachable from 显示.
+  const fit = narrowColumns.length > 0
   return <Kanban {...props} getItemValue={item => item.id} className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
     <BoardScrollArea viewportRef={viewportRef} id={viewportId} role="region" aria-label={t('horizontalScroll')} aria-describedby={instructionsId} tabIndex={0} onKeyDown={onViewportKeyDown}>
-      <KanbanBoardPrimitive className="flex h-full min-h-0 w-max min-w-full items-stretch gap-3 pb-2">
+      <KanbanBoardPrimitive className={cn('flex h-full min-h-0 min-w-full items-stretch gap-3 pb-2', fit ? 'w-full' : 'w-max')}>
         {shown.map(column => {
           const tasks = props.value[column.value] ?? []
-          return <KanbanColumn key={column.value} value={column.value} className="min-h-0 w-60 min-w-60 shrink-0">
+          if (narrow(column.value)) return <KanbanColumn key={column.value} value={column.value} className="min-h-0 w-10 min-w-10 shrink-0">
+            <Button variant="ghost" className="h-full w-10 flex-col items-center justify-start gap-2 rounded-xl bg-muted/60 px-0 py-2.5 font-medium whitespace-normal hover:bg-muted" aria-label={tBoard('expandColumn', { status: statusLabel(column.value) })} onClick={() => setOpened(current => [...current, column.value])}>
+              <column.icon className={cn('size-3.5 shrink-0', column.indicatorClassName)} aria-hidden="true" />
+              <span className="w-[1em] shrink-0 text-center text-sm leading-tight break-all">{statusLabel(column.value)}</span>
+              <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{tasks.length}</span>
+            </Button>
+          </KanbanColumn>
+          return <KanbanColumn key={column.value} value={column.value} className={cn('min-h-0', fit ? 'max-w-72 min-w-44 flex-1 basis-0' : 'w-60 min-w-60 shrink-0')}>
             <section className="group/column flex min-h-0 flex-1 flex-col gap-1 rounded-xl bg-muted/60 p-1.5" aria-label={t('columnLabel', { status: statusLabel(column.value) })}>
               <div className="flex h-8 shrink-0 items-center gap-2 pr-0.5 pl-1.5">
                 <column.icon className={cn('size-3.5 shrink-0', column.indicatorClassName)} aria-hidden="true" />
@@ -175,6 +188,7 @@ export function KanbanBoard({ columns, hiddenColumns: hidden, context, pending =
                   <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" className="ml-auto text-muted-foreground" aria-label={tBoard('columnMenu', { status: statusLabel(column.value) })} />}><Ellipsis /></DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem onClick={() => onHideColumn(column.value)}><EyeOff />{tBoard('hideColumn')}</DropdownMenuItem>
+                    {narrowColumns.includes(column.value) && <DropdownMenuItem onClick={() => setOpened(current => current.filter(item => item !== column.value))}><ChevronsLeftRight />{tBoard('foldColumn')}</DropdownMenuItem>}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -184,7 +198,7 @@ export function KanbanBoard({ columns, hiddenColumns: hidden, context, pending =
             </section>
           </KanbanColumn>
         })}
-        {hidden.length > 0 && <section aria-label={tBoard('hiddenLane')} className="flex w-52 shrink-0 flex-col gap-1 rounded-xl bg-muted/60 p-1.5">
+        {hidden.length > 0 && !fit && <section aria-label={tBoard('hiddenLane')} className="flex w-52 shrink-0 flex-col gap-1 rounded-xl bg-muted/60 p-1.5">
           <h2 className="flex h-8 items-center px-1.5 text-sm font-medium text-muted-foreground">{tBoard('hiddenLane')}</h2>
           {hidden.map(({ status, count }) => {
             const column = BOARD_COLUMNS.find(item => item.value === status)!
