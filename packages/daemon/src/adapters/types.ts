@@ -36,7 +36,9 @@ export interface ExitEvent {
 export type AgentReport = Partial<
   Pick<
     HandoffReport,
-    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria"
+    |
+    "summary" | "openQuestions"
+    | "question" | "nextStep" | "blockedOn" | "plan" | "criteria"
   >
 >
 
@@ -55,6 +57,8 @@ export interface AgentCapabilities {
 
 export interface SessionOptions {
   runId: string
+  /** Question answers must not fall back to a fresh conversation. */
+  requireSessionResume?: boolean
   /**
    * What the orchestrator dispatched this run for (ADR 0023). A `plan` run
    * is told to write a spec instead of code (ADR ORV-205).

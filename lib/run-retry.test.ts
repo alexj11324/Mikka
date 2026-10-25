@@ -14,6 +14,16 @@ test('the last attempt fails instead, for the person', () => {
   assert.equal(outcome.kind, 'failed')
 })
 
+test('a lost question continuation never enters generic device takeover or retry', () => {
+  for (const questionContinuation of [{ questionId: 'question-1', originSessionId: 'original-session' }, {}]) {
+    const outcome = lostRunOutcome({ ...run, questionContinuation })
+    assert.equal(outcome.kind, 'failed')
+    if (outcome.kind === 'failed') assert.match(outcome.error, /original-session.*explicit recovery/)
+    assert.deepEqual(lostRunOutcome({ ...run, questionContinuation, stopRequestedAt: new Date() }), { kind: 'stopped' })
+  }
+  assert.deepEqual(lostRunOutcome({ ...run, questionContinuation: null }), { kind: 'retry', attempt: 2 })
+})
+
 test('a run the person asked to stop just stops', () => {
   assert.deepEqual(lostRunOutcome({ ...run, stopRequestedAt: new Date() }), { kind: 'stopped' })
 })

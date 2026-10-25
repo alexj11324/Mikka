@@ -11,7 +11,7 @@
     "build": "pnpm generate:agent-ui && pnpm lint && pnpm migrate && next build",
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
-    "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs",
+    "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs tests/factory-migration-order.test.mjs",
     "dev": "node scripts/dev-preview.mjs",
     "test:preview": "node --test tests/preview-ready.test.mjs",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
@@ -24,6 +24,9 @@
     "i18n:check": "node scripts/check-i18n.mjs",
     "test:ssh-target": "node --import tsx --test lib/ssh-target.test.ts",
     "test:linear-sync": "node --import tsx --test lib/db/request-scope.test.ts lib/linear-sync/mapping.test.ts lib/linear-sync/markdown.test.ts lib/linear-sync/webhook.test.ts cloudflare/linear-sync/src/index.test.ts",
+    "test:factory-query-http": "node --import tsx --test tests/factory-query-http.test.ts",
+    "test:factory": "node --import tsx --test lib/factory/contract.test.ts lib/factory/postgres.test.ts lib/factory/checks.test.ts lib/factory/check-independence.test.ts lib/factory/approval.test.ts lib/factory/local-publication.test.ts lib/factory/vercel-publication.test.ts lib/factory/vercel-monitor.test.ts lib/factory/monitor-cycle.test.ts lib/factory/monitor.test.ts lib/factory/monitor-dispatch.test.ts lib/factory/questions/contract.test.ts lib/factory/questions/postgres.test.ts",
+    "test:factory-monitor-http": "node --import tsx --test tests/factory-monitor-cycle-http.test.ts",
     "test:coordinator-events": "node --import tsx --test lib/run-retry.test.ts lib/coordinator-events.test.ts lib/coordinator/context.test.ts lib/coordinator/model.test.ts lib/coordinator/triage.test.ts lib/coordinator/decision.test.ts lib/coordinator/group-routing.test.ts lib/coordinator/citations.test.ts lib/link-preview-parse.test.ts",
     "test:integrations": "node --import tsx --test lib/auth-callback.test.ts lib/composio-actions.test.ts lib/pending-action-view.test.ts lib/composio-pagination.test.ts lib/issue-owner-scope.test.ts lib/skills-search.test.ts",
     "test:e2e": "playwright test",
@@ -35,8 +38,8 @@
     "test:auth-return": "node --import tsx --test lib/auth-return.test.ts",
     "test:agent": "node --import tsx --test tests/agent-fetch.test.mjs tests/agent-ui.test.mjs tests/agent-history.test.mjs tests/agent-web-tools.test.mjs",
     "test:acceptance": "node --import tsx --test tests/acceptance.test.mjs",
-    "test:auth-composio": "node --import tsx --test lib/auth-error.test.ts lib/auth-config.test.ts lib/db/config.test.ts lib/auth-return.test.ts lib/composio-config.test.ts lib/composio-webhook.test.ts lib/google-link.test.ts",
-    "check": "pnpm check:agent-ui && pnpm test:preview && pnpm test:agent && pnpm test:acceptance && pnpm test:auth-composio && pnpm test:ui-policy && pnpm test:motion && pnpm test:i18n && pnpm i18n:check && pnpm test:ssh-target && pnpm test:linear-sync && pnpm test:coordinator-events && pnpm test:groups && pnpm test:integrations && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm test:issues && pnpm test:telegram && pnpm test:suggestions && pnpm lint && pnpm typecheck",
+    "test:auth-composio": "node --import tsx --test lib/auth-error.test.ts lib/auth-config.test.ts lib/db/config.test.ts lib/auth-return.test.ts lib/auth-recovery.test.ts lib/composio-config.test.ts lib/composio-webhook.test.ts lib/google-link.test.ts",
+    "check": "pnpm check:agent-ui && pnpm test:preview && pnpm test:agent && pnpm test:acceptance && pnpm test:auth-composio && pnpm test:ui-policy && pnpm test:motion && pnpm test:i18n && pnpm i18n:check && pnpm test:ssh-target && pnpm test:linear-sync && pnpm test:coordinator-events && pnpm test:factory && pnpm test:groups && pnpm test:integrations && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm test:issues && pnpm test:telegram && pnpm test:suggestions && pnpm lint && pnpm typecheck",
     "check:ci": "pnpm check && pnpm build && pnpm test:performance && pnpm test:e2e --grep-invert @performance",
     "test:issues": "node --import tsx --test scripts/issue-checklist.test.mjs scripts/issue-metadata.test.mjs scripts/issue-relations.test.mjs lib/issue-activity.test.ts lib/issue-team-access-policy.test.ts lib/task-identifier.test.ts lib/issue-scope.test.ts lib/workspace-name.test.ts lib/locale-alias.test.ts lib/shortcut-guard.test.ts lib/document-sync-snapshot.test.ts scripts/issue-editor-keys.test.mjs scripts/issue-team-select.test.mjs",
     "test:suggestions": "node --import tsx --test lib/suggestions/suggestions.test.ts",
@@ -45,7 +48,8 @@
     "typecheck": "tsgo --noEmit",
     "daemon": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon --server http://localhost:3000",
     "daemon:login": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon login --server http://localhost:3000",
-    "test:groups": "node --import tsx --test lib/group-conversations.test.ts"
+    "test:groups": "node --import tsx --test lib/group-conversations.test.ts",
+    "test:run-dispatch": "node --import tsx --test tests/run-dispatch.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",
@@ -129,7 +133,8 @@
     "workflow": "5.2.3",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.33",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "@better-auth/core": "1.7.12"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
