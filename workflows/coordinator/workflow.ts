@@ -2,7 +2,7 @@ import { WorkflowAgent } from '@ai-sdk/workflow'
 import { isStepCount, tool } from 'ai'
 import { getWorkflowMetadata } from 'workflow'
 import { z } from 'zod'
-import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL } from '@/lib/coordinator/model'
+import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
 import { createComposioAITools } from '@/lib/composio-actions'
 import * as steps from './steps'
 
@@ -31,8 +31,9 @@ export async function coordinatorTurn(userId: string) {
     }
     try {
       const { instructions, messages } = await steps.preparePrompt(userId)
-      const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS) })
-      await steps.appendMessages(userId, holder, result.response.messages)
+      const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep })
+      // Persist every step and its final warning before forwarding the answer.
+      await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text))
       if (inbox.telegramTargets.length && result.text.trim()) await steps.sendTelegramReply(userId, inbox.telegramTargets, result.text)
     } catch (error) {
       // The messages stay in the conversation; the next wake answers them.

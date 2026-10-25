@@ -10,12 +10,15 @@ import { db } from '@/lib/db'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
-import { issueMembers, issues, telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
+import { issueMembers, issues, linearIssueLinks, telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { issueTeamAccess } from '@/lib/issue-team-access'
 import { isIssueTeamAccessAllowed } from '@/lib/issue-team-access-policy'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
+import { judgeIssueScope } from '@/lib/issue-scope-judge'
+import { after } from 'next/server'
 import { parseTelegramCommand } from './commands'
 import { isPostgresUniqueViolation } from './unique-violation'
 
@@ -99,9 +102,13 @@ function issueContent(description: string) {
   }
 }
 
-function issueLabel(issue: { id: string; content: unknown }) {
-  const number = readIssueMetadata(issue.content as typeof issues.$inferSelect.content).number
-  return number ? 'ORV-' + number : issue.id
+async function issueLabels(tx: Transaction, rows: (typeof issues.$inferSelect)[]) {
+  const identifiers = await taskIdentifiers(rows.map(issue => ({ id: issue.id, ownerId: issue.userId, scope: issue.scope, number: readIssueMetadata(issue.content).number })), tx)
+  return new Map(rows.map(issue => [issue.id, identifiers.get(issue.id) ?? issue.id]))
+}
+
+async function issueLabel(tx: Transaction, issue: typeof issues.$inferSelect) {
+  return (await issueLabels(tx, [issue])).get(issue.id)!
 }
 
 function statusLabel(status: string, t: Translator) {
@@ -117,12 +124,13 @@ function statusLabel(status: string, t: Translator) {
   }
 }
 
-async function findAccessibleIssues(tx: Transaction, userId: string, match?: { id: string } | { number: number }) {
+async function findAccessibleIssues(tx: Transaction, userId: string, match?: { id: string } | { identifier: string; number: number }) {
   const metadata = sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')`
   const condition = match && 'id' in match
     ? eq(issues.id, match.id)
-    : match && 'number' in match
-      ? sql`${metadata}->>'number' = ${String(match.number)}`
+    : match && 'identifier' in match
+      // Narrowed here, then matched exactly against the shown identifier below.
+      ? or(sql`${metadata}->>'number' = ${String(match.number)}`, sql`exists (select 1 from ${linearIssueLinks} where ${linearIssueLinks.issueId} = ${issues.id} and upper(${linearIssueLinks.linearIdentifier}) = ${match.identifier})`)
       : undefined
   const rows = await tx.select({ issue: issues }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
@@ -177,13 +185,14 @@ async function handleCommand(tx: Transaction, conversation: typeof telegramConve
         draftDescription: '',
         updatedAt: new Date(),
       }).where(eq(telegramConversations.threadId, conversation.threadId))
-      return { reply: t('created', { issue: issueLabel(issue), title: issue.title }), issueId: issue.id }
+      return { reply: t('created', { issue: await issueLabel(tx, issue), title: issue.title }), issueId: issue.id }
     }
     case 'issues': {
       const visible = await findAccessibleIssues(tx, userId)
       if (!visible.length) return t('noTasks')
+      const labels = await issueLabels(tx, visible)
       return visible.map(issue => t('issueLine', {
-        issue: issueLabel(issue),
+        issue: labels.get(issue.id)!,
         status: statusLabel(issue.status, t),
         title: issue.title,
       })).join('\n')
@@ -191,16 +200,19 @@ async function handleCommand(tx: Transaction, conversation: typeof telegramConve
     case 'link': {
       if (conversation.draftTitle) return t('finishDraft')
       const id = uuidSchema.safeParse(command.args)
-      const number = command.args.match(/^ORV-([1-9]\d*)$/i)
+      const typed = command.args.trim().toUpperCase()
+      const number = typed.match(/^(?:[A-Z]+-|#)([1-9]\d*)$/)
       const issueNumber = number ? Number(number[1]) : null
       if (!id.success && (!issueNumber || !Number.isSafeInteger(issueNumber))) return t('linkUsage')
-      const matches = await findAccessibleIssues(tx, userId, id.success ? { id: id.data } : { number: issueNumber! })
+      const candidates = await findAccessibleIssues(tx, userId, id.success ? { id: id.data } : { identifier: typed, number: issueNumber! })
+      const labels = await issueLabels(tx, candidates)
+      const matches = id.success ? candidates : candidates.filter(issue => labels.get(issue.id)?.toUpperCase() === typed)
       if (!matches.length) return t('taskUnavailable')
       if (matches.length > 1) return t('ambiguous')
       const issue = matches[0]
       await tx.update(telegramConversations).set({ issueId: issue.id, updatedAt: new Date() })
         .where(eq(telegramConversations.threadId, conversation.threadId))
-      return t('linked', { issue: issueLabel(issue), title: issue.title })
+      return t('linked', { issue: await issueLabel(tx, issue), title: issue.title })
     }
     case 'status': {
       if (!conversation.issueId) return t('notLinked')
@@ -211,7 +223,7 @@ async function handleCommand(tx: Transaction, conversation: typeof telegramConve
         return t('linkedUnavailable')
       }
       return t('issueLine', {
-        issue: issueLabel(issue),
+        issue: await issueLabel(tx, issue),
         status: statusLabel(issue.status, t),
         title: issue.title,
       })
@@ -296,6 +308,7 @@ async function handleTelegramMessage(input: {
       return
     }
     dispatchLinearIssueSync(result.issueId)
+    after(() => judgeIssueScope(result.issueId, 'Telegram'))
     await input.post(result.reply)
     return
   }

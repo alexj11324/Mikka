@@ -386,6 +386,22 @@
         "signature": "AgentIcon(name: \"assistant\" | \"reply\" | \"approve\" | \"question\" | \"progress\" | \"task\" | \"code\" | \"source\", label: string)",
         "description": "现有 Lucide 图标白名单，不是 beUI 独立图标包。用于带中文含义的状态说明，不能传入 SVG、组件代码、路径或任意图标名。"
       },
+      "InlineText": {
+        "signature": "InlineText(parts: any[])",
+        "description": "一段内联正文，parts 依次是文字和 TaskChip / RunChip / SourceChip 引用，chip 跟着文字排版，放不下时整体换行，不单独占一行。只在需要引用任务、运行或网页时使用，其余正文用 TextContent。"
+      },
+      "TaskChip": {
+        "signature": "TaskChip(id: string)",
+        "description": "内联任务引用：状态点、编号、标题。id 必须是工具返回的真实任务 id，宿主按 id 查出状态、编号和标题，点击打开任务；不要再在旁边重复标题。没有真实任务 id 时不要使用。放在 InlineText 的 parts 里。"
+      },
+      "RunChip": {
+        "signature": "RunChip(id: string)",
+        "description": "内联运行引用：Agent 名和 harness 图标，悬停显示状态和所属任务。id 必须是工具返回的真实运行 id；没有时不要使用。放在 InlineText 的 parts 里。"
+      },
+      "SourceChip": {
+        "signature": "SourceChip(url: string, label?: string)",
+        "description": "内联网页来源，例如 pull request 或文档。url 为 http(s) 地址，label 为简短名称，可选；悬停显示网页预览。放在 InlineText 的 parts 里。"
+      },
       "ShadcnCard": {
         "signature": "ShadcnCard(title: string, children: any[], description?: string)",
         "description": "本地 shadcn 卡片。用于有标题的建议、说明或内容分组，可嵌套已注册组件。"
@@ -472,6 +488,18 @@
         ],
         "notes": [
           "Lucide 提供图标；beUI AnimatedBadge 提供动态状态图标；Button 提供操作反馈。不得用动态图标伪造执行结果。"
+        ]
+      },
+      {
+        "name": "任务与来源引用",
+        "components": [
+          "InlineText",
+          "TaskChip",
+          "RunChip",
+          "SourceChip"
+        ],
+        "notes": [
+          "引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。"
         ]
       },
       {
@@ -791,6 +819,18 @@
         "AgentIcon": {
           "$ref": "#/$defs/AgentIcon"
         },
+        "InlineText": {
+          "$ref": "#/$defs/InlineText"
+        },
+        "TaskChip": {
+          "$ref": "#/$defs/TaskChip"
+        },
+        "RunChip": {
+          "$ref": "#/$defs/RunChip"
+        },
+        "SourceChip": {
+          "$ref": "#/$defs/SourceChip"
+        },
         "ShadcnCard": {
           "$ref": "#/$defs/ShadcnCard"
         },
@@ -922,6 +962,10 @@
         "BeQuestions",
         "BeTodoList",
         "AgentIcon",
+        "InlineText",
+        "TaskChip",
+        "RunChip",
+        "SourceChip",
         "ShadcnCard",
         "ShadcnBadge",
         "ShadcnAlert",
@@ -4991,6 +5035,70 @@
           "additionalProperties": false,
           "description": "现有 Lucide 图标白名单，不是 beUI 独立图标包。用于带中文含义的状态说明，不能传入 SVG、组件代码、路径或任意图标名。"
         },
+        "InlineText": {
+          "type": "object",
+          "properties": {
+            "parts": {
+              "minItems": 1,
+              "maxItems": 40,
+              "type": "array",
+              "items": {}
+            }
+          },
+          "required": [
+            "parts"
+          ],
+          "additionalProperties": false,
+          "description": "一段内联正文，parts 依次是文字和 TaskChip / RunChip / SourceChip 引用，chip 跟着文字排版，放不下时整体换行，不单独占一行。只在需要引用任务、运行或网页时使用，其余正文用 TextContent。"
+        },
+        "TaskChip": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "description": "内联任务引用：状态点、编号、标题。id 必须是工具返回的真实任务 id，宿主按 id 查出状态、编号和标题，点击打开任务；不要再在旁边重复标题。没有真实任务 id 时不要使用。放在 InlineText 的 parts 里。"
+        },
+        "RunChip": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "description": "内联运行引用：Agent 名和 harness 图标，悬停显示状态和所属任务。id 必须是工具返回的真实运行 id；没有时不要使用。放在 InlineText 的 parts 里。"
+        },
+        "SourceChip": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "maxLength": 2000,
+              "format": "uri"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "additionalProperties": false,
+          "description": "内联网页来源，例如 pull request 或文档。url 为 http(s) 地址，label 为简短名称，可选；悬停显示网页预览。放在 InlineText 的 parts 里。"
+        },
         "ShadcnCard": {
           "type": "object",
           "properties": {
@@ -5348,6 +5456,10 @@
     "BeQuestions",
     "BeTodoList",
     "AgentIcon",
+    "InlineText",
+    "TaskChip",
+    "RunChip",
+    "SourceChip",
     "ShadcnCard",
     "ShadcnBadge",
     "ShadcnAlert",
