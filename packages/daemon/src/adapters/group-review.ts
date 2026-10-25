@@ -15,7 +15,7 @@ export type GroupReviewImages=z.infer<typeof groupReviewImages>
 export type NativeGroupProcessor=((assignment:GroupReviewAssignment,signal:AbortSignal)=>Promise<GroupReviewOutput>)&{dispose:()=>Promise<void>}
 const runnerPath=resolve(dirname(fileURLToPath(import.meta.url)),'../agents/group-review-cli.mjs')
 const exec=promisify(execFile)
-const output=z.object({body:z.string().trim().min(1).max(32000),content:z.string().max(1_000_000).nullable()}).strict()
+const output=z.object({body:z.string().trim().min(1).max(32000),content:z.string().max(1_000_000).nullable(),mentions:z.array(z.uuid()).max(100).optional()}).strict()
 const artifact=z.object({artifactId:z.uuid(),baseVersionId:z.uuid(),hash:z.string().regex(/^[a-f0-9]{64}$/)}).passthrough()
 const probeSchema=z.object({version:z.string(),help:z.string(),features:z.string()}).strict()
 interface DockerRuntime {args:string[];env:NodeJS.ProcessEnv}
@@ -113,9 +113,9 @@ export async function createNativeGroupProcessor(value:unknown):Promise<NativeGr
    const image=images[assignment.harness]
    if(!image)throw Error('No compatible group CLI image for the authenticated harness')
    const parsed=output.parse(await invoke(image,{action:'execute',harness:assignment.harness,envelope:assignment.envelope},signal))
-   if(parsed.content===null)return{body:parsed.body}
+   if(parsed.content===null)return{body:parsed.body,mentions:parsed.mentions}
    const data=z.object({artifact:artifact}).passthrough().parse(assignment.envelope.untrustedData)
-   return{body:parsed.body,proposal:{artifactId:data.artifact.artifactId,baseVersionId:data.artifact.baseVersionId,baseHash:data.artifact.hash,content:parsed.content}}
+   return{body:parsed.body,mentions:parsed.mentions,proposal:{artifactId:data.artifact.artifactId,baseVersionId:data.artifact.baseVersionId,baseHash:data.artifact.hash,content:parsed.content}}
   },{dispose})
  }catch(error){await dispose();throw error}
 }

@@ -8,10 +8,10 @@ export interface GroupReviewAssignment {
   envelope: { contract: 'mikka.group-review.v1'; workId: string; triggerMessageId: string; conversationId: string; instruction: string; untrustedData: unknown }
   capabilities: { tools: string[]; history: string[]; repository: null; credentials: null }
 }
-export type GroupReviewOutput = { body: string; proposal?: {artifactId:string;baseVersionId:string;baseHash:string;content:string} }
+export type GroupReviewOutput = { body: string; mentions?:string[]; proposal?: {artifactId:string;baseVersionId:string;baseHash:string;content:string} }
 export interface GroupReviewLink {
   poll(): Promise<{runIds:string[]}>
-  claim(runId:string): Promise<GroupReviewAssignment | {status:'cancelled'}>
+  claim(runId:string): Promise<GroupReviewAssignment | {status:'cancelled'|'uncertain'}>
   check(runId:string,claimEpoch:number): Promise<{live:boolean}>
   fail?(runId:string,claimEpoch:number):Promise<unknown>
   complete(runId:string,reply:GroupReviewOutput & {workId:string;triggerMessageId:string;claimEpoch:number}): Promise<unknown>
@@ -35,12 +35,14 @@ export async function runGroupReviewBatch(link:GroupReviewLink,processor:(input:
       void link.check(runId,claim.claimEpoch).then(state=>{if(!state.live)controller.abort()},()=>controller.abort()).finally(()=>{checking=false})
     },1000)
     const timeout=setTimeout(()=>controller.abort(),60000)
+    let submitting=false
     try {
       if(controller.signal.aborted)throw new Error('Group worker stopped')
       const output=await Promise.race([processor(claim,controller.signal),new Promise<never>((_,reject)=>controller.signal.addEventListener('abort',()=>reject(new Error('Group review execution stopped or lease deadline reached')),{once:true}))])
-      results.push(await link.complete(runId,{body:output.body,...(output.proposal?{proposal:output.proposal}:{}),workId:claim.envelope.workId,triggerMessageId:claim.envelope.triggerMessageId,claimEpoch:claim.claimEpoch}))
+      submitting=true
+      results.push(await link.complete(runId,{body:output.body,...(output.mentions?{mentions:output.mentions}:{}),...(output.proposal?{proposal:output.proposal}:{}),workId:claim.envelope.workId,triggerMessageId:claim.envelope.triggerMessageId,claimEpoch:claim.claimEpoch}))
     } catch(error) {
-      if(!signal?.aborted)await link.fail?.(runId,claim.claimEpoch).catch(()=>undefined)
+      if(!submitting&&!signal?.aborted)await link.fail?.(runId,claim.claimEpoch).catch(()=>undefined)
       throw error
     } finally { clearTimeout(timeout);clearInterval(monitor);signal?.removeEventListener('abort',abort);controller.abort() }
   }

@@ -80,7 +80,7 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
     assert.ok(!JSON.stringify(assignment).includes('PRIVATE_INSTRUCTIONS_SENTINEL'))
     assert.deepEqual(assignment.capabilities,{tools:[],history:[],repository:null,credentials:null})
     // No host mounts, network, inherited environment, writable root or privileges.
-    const child=spawn('docker',['run','--rm','--interactive','--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--user','65534','--pids-limit','32','node:24-bookworm-slim','node','-e',`let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{let a=JSON.parse(s).envelope.untrustedData.artifact;console.log(JSON.stringify({body:'Proposed a revision for review.',proposal:{artifactId:a.artifactId,baseVersionId:a.baseVersionId,baseHash:a.hash,content:'hello improved world!'}}))})`],{env:{PATH:process.env.PATH,NODE_ENV:'test'},signal})
+    const child=spawn('docker',['run',...(process.env.KEEP_GROUP_TEST_FIXTURES?[]:['--rm']),'--interactive','--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--user','65534','--pids-limit','32','node:24-bookworm-slim','node','-e',`let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{let a=JSON.parse(s).envelope.untrustedData.artifact;console.log(JSON.stringify({body:'Proposed a revision for review.',proposal:{artifactId:a.artifactId,baseVersionId:a.baseVersionId,baseHash:a.hash,content:'hello improved world!'}}))})`],{env:{PATH:process.env.PATH,NODE_ENV:'test'},signal})
     let text='',err='';child.stdout.on('data',d=>text+=d);child.stderr.on('data',d=>err+=d);child.stdin.end(JSON.stringify(assignment))
     await new Promise<void>((resolve,reject)=>{child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(new Error(err)))})
     return JSON.parse(text)
@@ -102,11 +102,11 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
    const first=(attempts.find(a=>a.status==='fulfilled') as PromiseFulfilledResult<GroupReviewAssignment>).value
    await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=now()-interval \'1 second\' WHERE id=$1',[first.runId])
    await assert.rejects(complete(first),/claim_expired/)
-   const second=await claim(first.runId);assert.equal(second.claimEpoch,first.claimEpoch+1)
-   await assert.rejects(complete(first),/claim_epoch_mismatch/)
-   await assert.rejects(worker({action:'fail',runId:first.runId,claimEpoch:first.claimEpoch,code:'processor_failed'}),/claim_epoch_mismatch/)
-   const one=await complete(second),two=await complete(second);assert.equal(one.replyMessageId,two.replyMessageId)
-   assert.equal((await post(r.path,{action:'read',artifactId:r.base.artifactId})).versions.length,2)
+   const uncertain=await worker({action:'claim',runId:first.runId});assert.equal(uncertain.status,'uncertain')
+   await assert.rejects(complete(first),/execution_uncertain/)
+   const state=await groupReviewCommand(pool,directory,r.path.slice('/artifacts/'.length),'owner',{action:'work',workId:first.runId})
+   assert.equal(state.executionState,'uncertain')
+
   })
   await t.test('cross-owner/browser spoofing and private mailbox routes cannot enter a group mailbox',async()=>{
    const r=await newRequest();await worker({action:'poll'})
@@ -173,5 +173,5 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
    await t.test('actual daemon startup routes BOTH CC/Codex CLI adapters with isolated fake binaries',()=>nativeGroupAcceptance({pool,command:(id:string,user:string,input:unknown)=>groupReviewCommand(pool,directory,id,user,input),port,agentId,ccAgentId,newRequest,post,worker}))
   }
   for(const table of ['session','account','device_tokens','run_tokens'])assert.equal((await pool.query(`SELECT count(*) FROM "${table}"`)).rows[0].count,'0')
- }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));await pool.end();await ws.end();await admin.query(`DROP SCHEMA "${schema}" CASCADE`);await wsAdmin.query(`DROP SCHEMA "${schema}_ws" CASCADE`);await admin.end();await wsAdmin.end()}
+ }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));await pool.end();await ws.end();if(!process.env.KEEP_GROUP_TEST_FIXTURES)await admin.query(`DROP SCHEMA "${schema}" CASCADE`);if(!process.env.KEEP_GROUP_TEST_FIXTURES)await wsAdmin.query(`DROP SCHEMA "${schema}_ws" CASCADE`);await admin.end();await wsAdmin.end()}
 })

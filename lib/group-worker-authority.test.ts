@@ -104,5 +104,5 @@ test('trusted issue-less group HTTP assignment and commit-time authority on sepa
     }
    }
   })
- }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));await pool.end();await ws.end();await admin.query(`DROP SCHEMA "${schema}" CASCADE`);await wa.query(`DROP SCHEMA "${schema}_ws" CASCADE`);await admin.end();await wa.end()}
+ }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));await pool.end();await ws.end();if(!process.env.KEEP_GROUP_TEST_FIXTURES)await admin.query(`DROP SCHEMA "${schema}" CASCADE`);if(!process.env.KEEP_GROUP_TEST_FIXTURES)await wa.query(`DROP SCHEMA "${schema}_ws" CASCADE`);await admin.end();await wa.end()}
 })

@@ -13,3 +13,11 @@ it('host shutdown aborts a processor that never returns without committing outpu
  await expect(runGroupReviewBatch(transport,async()=>{queueMicrotask(()=>controller.abort());return new Promise(()=>{})},controller.signal)).rejects.toThrow('stopped')
  expect(transport.complete).not.toHaveBeenCalled()
 })
+
+it('does not mark failure or reinvoke processor when completion response is lost', async()=>{
+ let processed=0,failures=0
+ const assignment={status:'claimed' as const,runId:'run',harness:'codex' as const,claimEpoch:1,envelope:{contract:'mikka.group-review.v1' as const,workId:'run',triggerMessageId:'trigger',conversationId:'group',instruction:'fixture',untrustedData:{}},capabilities:{tools:[],history:[],repository:null,credentials:null}}
+ const link={poll:async()=>({runIds:['run']}),claim:async()=>assignment,check:async()=>({live:true}),complete:async()=>{throw Error('connection lost after commit')},fail:async()=>{failures++}}
+ await expect(runGroupReviewBatch(link,async()=>{processed++;return{body:'fixture'}})).rejects.toThrow('connection lost')
+ expect(processed).toBe(1);expect(failures).toBe(0)
+})

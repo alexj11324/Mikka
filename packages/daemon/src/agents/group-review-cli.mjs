@@ -26,7 +26,7 @@ if(request.action==='probe'){
  await new Promise(resolve=>process.stdout.write(JSON.stringify({version,help,features}),resolve));process.exit(0)
 }
 if(request.action!=='execute')throw Error('Unknown action')
-const schema={type:'object',additionalProperties:false,properties:{body:{type:'string',minLength:1,maxLength:32000},content:{anyOf:[{type:'null'},{type:'string',maxLength:1000000}]}},required:['body','content']}
+const schema={type:'object',additionalProperties:false,properties:{mentions:{type:'array',items:{type:'string'},maxItems:100},body:{type:'string',minLength:1,maxLength:32000},content:{anyOf:[{type:'null'},{type:'string',maxLength:1000000}]}},required:['body','content','mentions']}
 const prompt=JSON.stringify({instruction:request.envelope.instruction,untrustedData:request.envelope.untrustedData})
 let result
 if(h==='claude_code'){

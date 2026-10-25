@@ -83,6 +83,7 @@ test('disposable Postgres: mixed groups → durable isolated runtime → Artifac
       assert.equal((await pool.query('SELECT count(*) FROM conversation_agent_grants WHERE "conversationId"=$1',[oldGroup])).rows[0].count,'0')
       assert.equal((await pool.query('SELECT title FROM conversations WHERE id=$1',[oldGroup])).rows[0].title,'legacy')
       assert.equal((await pool.query('SELECT body FROM conversation_messages WHERE id=$1',[legacyMessage])).rows[0].body,'legacy history')
+      await pool.query(await migration('20261025082237_group_turn_mailbox_policy.sql'))
       conversationId = await createGroup()
     })
     await t.test('ownership checks reuse transaction clients under a two-connection application pool', async () => {
@@ -246,7 +247,8 @@ test('disposable Postgres: mixed groups → durable isolated runtime → Artifac
       const ownerDeparture=await send('Agent owner removed',memberAgent,'owner');await dispatch(ownerDeparture.id)
       assert.equal((await group({id:conversationId,resource:'members',method:'DELETE',body:'{"memberType":"user","memberId":"member"}'})).status,200)
       await assert.rejects(reply(removed),failure('work_not_live'))
-      await assert.rejects(reply(ownerDeparture),failure('work_not_live'))
+      await assert.rejects(reply(ownerDeparture),failure('runtime_binding_mismatch'))
+      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE id=$1',[ownerDeparture.id])).rowCount,0)
       assert.equal((await pool.query('SELECT 1 FROM run_messages WHERE "runId"=$1',[ownerDeparture.id])).rowCount,0)
       assert.equal((await group({id:conversationId,resource:'members',method:'POST',body:'{"memberType":"user","memberId":"member"}'})).status,200)
       await assert.rejects(reply(removed),failure('work_not_live'))
@@ -316,6 +318,6 @@ test('disposable Postgres: mixed groups → durable isolated runtime → Artifac
       assert.equal(contentHash('hello world!').length,64)
     })
   } finally {
-    await pool.end();await root.query(`DROP SCHEMA "${schema}" CASCADE`);await root.end()
+    await pool.end();if(!process.env.KEEP_GROUP_TEST_FIXTURES)await root.query(`DROP SCHEMA "${schema}" CASCADE`);await root.end()
   }
 })

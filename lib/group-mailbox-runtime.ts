@@ -1,3 +1,4 @@
+import {turnReady,TURN_READY_SQL} from './group-mailbox-turns'
 import { lockedGroupRun } from './group-worker-authority'
 import type { Pool } from 'pg'
 import { SessionMailbox } from './session-mailbox'
@@ -31,12 +32,12 @@ export function groupMailboxAdapter(pool: Pool) {
 export async function pollGroupReviews(pool:Pool,directory:Directory,userId:string,deviceId:string) {
   const device=(await pool.query('SELECT 1 FROM devices WHERE id=$1 AND "ownerId"=$2 AND enabled',[deviceId,userId])).rowCount
   if (!device) return reject(404,'not_found')
-  const pending=(await pool.query(`SELECT w.id FROM conversation_work w JOIN agents a ON a.id=w."agentId" WHERE a."userId"=$1 AND a."deviceId"=$2 AND w.status='pending' ORDER BY w."createdAt",w.id LIMIT 20`,[userId,deviceId])).rows
+  const pending=(await pool.query(`SELECT w.id FROM conversation_work w JOIN agents a ON a.id=w."agentId" WHERE a."userId"=$1 AND a."deviceId"=$2 AND w.status='pending' AND ${TURN_READY_SQL} ORDER BY w."createdAt",w.id LIMIT 20`,[userId,deviceId])).rows
   for (const work of pending) {
     try { await dispatchReviewWork(pool,directory,groupMailboxAdapter(pool),work.id) }
     catch(error) { if (!(error instanceof ReviewFailure) || error.code!=='group_device_unavailable') throw error }
   }
-  return {runIds:(await pool.query(`SELECT r.id FROM agent_runs r JOIN conversation_work w ON w."runId"=r.id JOIN session_mailboxes m ON m.id=r."mailboxId" WHERE r."userId"=$1 AND r."deviceId"=$2 AND r.kind='group_review' AND w.status='dispatched' AND r."stopRequestedAt" IS NULL AND NOT m.disabled AND (r.status='queued' OR (r.status='running' AND r."leaseExpiresAt"<now())) ORDER BY w."createdAt" LIMIT 20`,[userId,deviceId])).rows.map(row=>row.id as string)}
+  return {runIds:(await pool.query(`SELECT r.id FROM agent_runs r JOIN conversation_work w ON w."runId"=r.id JOIN session_mailboxes m ON m.id=r."mailboxId" WHERE r."userId"=$1 AND r."deviceId"=$2 AND r.kind='group_review' AND w.status='dispatched' AND w."uncertainAt" IS NULL AND r."stopRequestedAt" IS NULL AND NOT m.disabled AND (r.status='queued' OR (r.status='running' AND r."leaseExpiresAt"<now())) ORDER BY w."createdAt" LIMIT 20`,[userId,deviceId])).rows.map(row=>row.id as string)}
 }
 export async function claimGroupReview(pool:Pool,directory:Directory,userId:string,deviceId:string,runId:string) {
   return transaction(pool,async client=>{
@@ -49,8 +50,12 @@ export async function claimGroupReview(pool:Pool,directory:Directory,userId:stri
     if (work.status!=='dispatched' || !run.enabled || run.stopRequestedAt) return reject(409,'work_not_live')
     try { await authorizedWork(client,directory,work) }
     catch(error) { if (!(error instanceof ReviewFailure)) throw error; await cancelWork(client,work.conversationId,{workId:work.id});return {status:'cancelled' as const} }
-    if (run.status!=='queued' && !(run.status==='running' && run.leaseExpiresAt && new Date(run.leaseExpiresAt).getTime()<Date.now())) return reject(409,'already_claimed')
-    if (work.claimEpoch>=3) { await cancelWork(client,work.conversationId,{workId:work.id});return {status:'cancelled' as const,reason:'claim_attempt_limit'} }
+    if(work.uncertainAt || (run.status==='running' && run.leaseExpiresAt && new Date(run.leaseExpiresAt).getTime()<Date.now())) {
+      await client.query('UPDATE conversation_work SET "uncertainAt"=coalesce("uncertainAt",now()) WHERE id=$1',[work.id])
+      return {status:'uncertain' as const}
+    }
+    if(run.status!=='queued')return reject(409,'already_claimed')
+    if(!await turnReady(client,work))return reject(409,'waiting_turn')
     const {group}=await requireGroup(client,directory,work.conversationId,work.requestedBy)
     const messages=await new SessionMailbox(pool,group.workspaceId).groupInbox(client,runId,userId)
     if (messages.length!==1 || messages[0].id!==work.id) return reject(409,'isolated_input_required')
