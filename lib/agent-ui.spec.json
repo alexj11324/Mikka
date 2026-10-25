@@ -402,6 +402,10 @@
         "signature": "SourceChip(url: string, label?: string)",
         "description": "内联网页来源，例如 pull request 或文档。url 为 http(s) 地址，label 为简短名称，可选；悬停显示网页预览。放在 InlineText 的 parts 里。"
       },
+      "ComputerCard": {
+        "signature": "ComputerCard(botId: string, runId: string, task: string, state?: \"working\" | \"approval\" | \"done\" | \"failed\", botName?: string, thread?: string)",
+        "description": "电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。botId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working；thread 可选，是这次运行（线程）的名字，例如「#66 预览部署检查」，不是 bot 名。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。"
+      },
       "ShadcnCard": {
         "signature": "ShadcnCard(title: string, children: any[], description?: string)",
         "description": "本地 shadcn 卡片。用于有标题的建议、说明或内容分组，可嵌套已注册组件。"
@@ -496,10 +500,12 @@
           "InlineText",
           "TaskChip",
           "RunChip",
-          "SourceChip"
+          "SourceChip",
+          "ComputerCard"
         ],
         "notes": [
-          "引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。"
+          "引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。",
+          "Agent 用自己的电脑做事时放一张 ComputerCard，画面、状态和审批都在卡片里，正文不再复述操作过程。"
         ]
       },
       {
@@ -831,6 +837,9 @@
         "SourceChip": {
           "$ref": "#/$defs/SourceChip"
         },
+        "ComputerCard": {
+          "$ref": "#/$defs/ComputerCard"
+        },
         "ShadcnCard": {
           "$ref": "#/$defs/ShadcnCard"
         },
@@ -966,6 +975,7 @@
         "TaskChip",
         "RunChip",
         "SourceChip",
+        "ComputerCard",
         "ShadcnCard",
         "ShadcnBadge",
         "ShadcnAlert",
@@ -5099,6 +5109,52 @@
           "additionalProperties": false,
           "description": "内联网页来源，例如 pull request 或文档。url 为 http(s) 地址，label 为简短名称，可选；悬停显示网页预览。放在 InlineText 的 parts 里。"
         },
+        "ComputerCard": {
+          "type": "object",
+          "properties": {
+            "botId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "runId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "task": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "working",
+                "approval",
+                "done",
+                "failed"
+              ]
+            },
+            "botName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "thread": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "required": [
+            "botId",
+            "runId",
+            "task"
+          ],
+          "additionalProperties": false,
+          "description": "电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。botId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working；thread 可选，是这次运行（线程）的名字，例如「#66 预览部署检查」，不是 bot 名。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。"
+        },
         "ShadcnCard": {
           "type": "object",
           "properties": {
@@ -5424,7 +5480,7 @@
       "EntityList size='small' (no header/footer) is only for use inside a CompositeCardItem body; use size='default' everywhere else.",
       "Image URLs must be real (from a tool result or the user) — never invent or template an image URL.",
       "Always pass a category to Icon — it enables a topical fallback when the exact icon name is unavailable.",
-      "你是 Orvilo 工作台中的 UI 生成助手。默认使用简体中文。严格输出 OpenUI Lang，不要输出代码围栏、HTML 或 React 代码。",
+      "你是 Mikka 工作台中的 UI 生成助手。默认使用简体中文。严格输出 OpenUI Lang，不要输出代码围栏、HTML 或 React 代码。",
       "TextContent 的 text 字符串支持 Markdown（标题、粗体、列表、引用、表格、代码块）、KaTeX LaTeX 数学公式及 Mermaid 图表。数学公式使用 $$ 包裹，独立公式的 $$ 分别另起一行。流程图、时序图等使用 text 内标注 mermaid 的三反引号代码围栏。只在字符串内部使用 Markdown 围栏，整体回复仍严格遵循 OpenUI Lang；字符串中的换行、引号和 LaTeX 反斜杠按 OpenUI 字符串语法转义。Mermaid 不含初始化配置、HTML、外部图片或点击动作。",
       "TextContent 使用 JSON 双引号字符串：换行写成 \\n，LaTeX 命令的每个反斜杠写成 \\\\，不要再重复转义整段正文，也不要在双引号内混入真实换行。例如：root = TextContent(\"### 自注意力机制\\n\\n每个 token 投影为查询、键和值。\\n\\n$$\\n\\\\mathrm{Attention}(Q,K,V)=\\\\mathrm{softmax}\\\\left(\\\\frac{QK^\\\\top}{\\\\sqrt{d_k}}\\\\right)V\\n$$\\n\\n- 缩放点积防止 softmax 饱和。\")",
       "Mermaid 图表由宿主统一主题，优先使用 flowchart、sequenceDiagram、stateDiagram-v2、classDiagram、erDiagram。流程图使用简短中文节点、清晰分组和少量连线；短流程可 LR，宽或复杂流程用 TD，避免堆成一张超宽大图。核心节点用 A(核心处理):::focus，完成态用 :::success，需人工确认的节点用 :::warning，样式由宿主定义，不再输出 classDef、style、linkStyle 或硬编码颜色。每图只强调 1–2 个关键节点，其余保持克制。不要在标签内使用 HTML；节点内容尽量简短，需要换行时使用 Mermaid 支持的文字换行。不要生成 click 动作或初始化配置。",
@@ -5460,6 +5516,7 @@
     "TaskChip",
     "RunChip",
     "SourceChip",
+    "ComputerCard",
     "ShadcnCard",
     "ShadcnBadge",
     "ShadcnAlert",

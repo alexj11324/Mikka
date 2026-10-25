@@ -19,7 +19,8 @@ fails, fix it first; do not show work with known failures.
 Grep the screens and the diff for these. They came back from old components
 more than once.
 
-- [ ] No input box in the right panel (R-10).
+- [ ] No input box in the thread list or under a computer screen; an open
+      thread ends in the standard composer (R-10).
 - [ ] No model picker (R-11).
 - [ ] No starter or suggestion cards in a chat (R-12).
 - [ ] No avatar or name on messages in a one-to-one chat (R-13).
@@ -41,7 +42,7 @@ more than once.
       mismatch is resolved by `docs/design/README.md` § When sources
       disagree, and the losing side is fixed or reported.
 - [ ] Groupings and order read exactly as the frame shows (machine picker:
-      R-23). When a frame can be read two ways, ask the design thread before
+      R-23). When a frame can be read two ways, ask Alex before
       building.
 
 ### Copy
