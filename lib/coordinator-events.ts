@@ -83,3 +83,14 @@ export function runQuestionEvent(run: WorkerRun, question: { question: string; o
 export function runBlockedEvent(run: WorkerRun, reason: string): CoordinatorEventInput {
   return workerEvent('run_blocked', run, { reason })
 }
+
+/** The person approved or declined something an agent proposed in their accounts (lib/pending-actions.ts). */
+export function actionDecidedEvent(
+  action: { id: string; userId: string; action: string; input: Record<string, unknown> },
+  decision: { status: 'done' | 'failed' | 'declined'; error: string | null; outcome: Record<string, string> },
+): CoordinatorEventInput {
+  return {
+    userId: action.userId, kind: 'action_decided', dedupeKey: `action_decided:${action.id}`, issueId: null, runId: null,
+    payload: { actionId: action.id, action: action.action, input: action.input, status: decision.status, ...(decision.error ? { error: decision.error } : {}), outcome: decision.outcome },
+  }
+}

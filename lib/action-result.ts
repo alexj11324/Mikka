@@ -30,6 +30,7 @@ export const ACTION_ERROR_CODES = [
   'runInvalid',
   'runNotFound',
   'messageRequired',
+  'pendingActionUnavailable',
   'deviceSaveFailed',
   'tokenCreateFailed',
   'documentPending',
