@@ -1,14 +1,17 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { after } from 'next/server'
-import { and, eq, gt, inArray, isNull } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import type { AuthInfo } from '@modelcontextprotocol/server'
 import { db } from '@/lib/db'
-import { agentRuns, runTokens } from '@/lib/db/schema'
+import { agentRuns, runTokens, issues, issueMembers } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runBlockedEvent, runQuestionEvent, runReportEvent, type CoordinatorEventInput } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { issueForUser } from '@/lib/issue-access'
+import { workspaceDb } from '@/lib/workspace-db'
+import { teamIssues } from '@/lib/db/team-schema'
+import { workspaceMembers } from '@/lib/db/workspace-schema'
 
 // The worker side of the MCP server: the agent inside a run reports progress,
 // asks the person something or says it is blocked. Each call becomes an event
@@ -45,9 +48,9 @@ export async function revokeRunTokens(runId: string): Promise<void> {
  * Reuse the issue policy so workspace suspension and task visibility changes
  * apply equally to human and worker entrypoints.
  */
-async function currentRun(bearerToken?: string) {
+async function currentRun(bearerToken?: string, executor: Pick<typeof db, 'select'> = db, workspaceExecutor: Pick<typeof workspaceDb, 'select'> = workspaceDb, lock = false) {
   if (!bearerToken?.startsWith(RUN_TOKEN_PREFIX)) return undefined
-  const [row] = await db
+  const query = executor
     .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId })
     .from(runTokens)
     .innerJoin(agentRuns, eq(agentRuns.id, runTokens.runId))
@@ -57,7 +60,8 @@ async function currentRun(bearerToken?: string) {
       isNull(agentRuns.stopRequestedAt),
     ))
     .limit(1)
-  if (!row?.issueId || !await issueForUser(row.userId, row.issueId)) return undefined
+  const [row] = await (lock ? query.for('share') : query)
+  if (!row?.issueId || !await issueForUser(row.userId, row.issueId, false, executor, workspaceExecutor) || row.expiresAt.getTime() <= Date.now()) return undefined
   return row
 }
 
@@ -80,13 +84,34 @@ export function workerRun(authInfo: AuthInfo | undefined): { id: string; userId:
 }
 
 async function deliver(event: CoordinatorEventInput, token: string): Promise<void> {
-  // Authentication may have preceded tool execution. Recheck before the side
-  // effect; the bearer stays in memory and never enters the event payload.
-  const run = await currentRun(token)
-  if (!run || run.runId !== event.runId || run.userId !== event.userId || run.issueId !== event.issueId) {
-    throw new Error('MCP run authorization is no longer valid')
-  }
-  await recordCoordinatorEvent(db, event)
+  // Hold current authority through the event commit. Workspace data can live
+  // in a separate database: keep its read locks until the app transaction ends.
+  // Reuse the relation writers' lock in shared mode, then lock issue before run
+  // (the same order as issue deletion/member removal). Never borrow another
+  // pool connection inside these scopes: both pools are bounded.
+  if (!event.issueId) throw new Error('MCP run authorization is no longer valid')
+  await workspaceDb.transaction(async workspaceTx => {
+    await workspaceTx.execute(sql`set local lock_timeout = '5s'`)
+    await workspaceTx.execute(sql`set local statement_timeout = '10s'`)
+    await workspaceTx.execute(sql`select pg_advisory_xact_lock_shared(hashtextextended('mikka-team-relations', 0))`)
+    const [link] = await workspaceTx.select().from(teamIssues).where(eq(teamIssues.issueId, event.issueId!)).for('share').limit(1)
+    if (link) await workspaceTx.select().from(workspaceMembers).where(and(
+      eq(workspaceMembers.workspaceId, link.workspaceId), eq(workspaceMembers.userId, event.userId),
+    )).for('share')
+    await db.transaction(async tx => {
+      await tx.execute(sql`set local lock_timeout = '5s'`)
+      await tx.execute(sql`set local statement_timeout = '10s'`)
+      await tx.select({ id: issues.id }).from(issues).where(eq(issues.id, event.issueId!)).for('share')
+      await tx.select().from(issueMembers).where(and(eq(issueMembers.issueId, event.issueId!), eq(issueMembers.memberId, event.userId))).for('share')
+      // Match deletion's run -> token order instead of relying on a join plan.
+      await tx.select({ id: agentRuns.id }).from(agentRuns).where(eq(agentRuns.id, event.runId!)).for('share')
+      const run = await currentRun(token, tx, workspaceTx, true)
+      if (!run || run.runId !== event.runId || run.userId !== event.userId || run.issueId !== event.issueId) {
+        throw new Error('MCP run authorization is no longer valid')
+      }
+      await recordCoordinatorEvent(tx, event)
+    })
+  })
   after(() => wakeCoordinator(event.userId))
 }
 

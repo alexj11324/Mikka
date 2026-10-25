@@ -31,14 +31,14 @@ The regression uses the existing CI disposable PG17 `mikka_e2e` and built Next H
 
 Assertions cover owner/admin and member success; another workspace denial; personal owner success; missing issue denial; suspension after running/queueing; continued access for the unaffected owner; stop-request denial; explicit token revocation; Coordinator-event DB readback. A seeded foreign-workspace run is defense-in-depth, not a claim that queueRun can create it normally.
 
-The policy check follows the authoritative issue link, not an input workspaceId. It uses both application and workspace database adapters (these share the isolated CI database, but may be separate in deployment). A check immediately before insertion is not a distributed transaction: revocation committing after that last check may still race an in-flight event. No zero-latency global revocation or process-stop SLA is claimed.
+The policy check follows the authoritative issue link, not an input workspaceId. It uses both application and workspace database adapters (these share the isolated CI database, but may be separate in deployment). The final gate holds the existing relation-writer advisory lock in shared mode, workspace link/membership read locks and app issue/member/run/token read locks through the app event commit. Both policy helpers receive the held executors; no additional pool connection is borrowed inside the scopes. Concurrent revocation either commits before this gate and is denied, or waits for the already-authorized event to commit and then denies later requests. Locks have bounded timeouts; run is locked before token, and token expiry is checked again after lock acquisition. This is normal-connection ordering, not distributed two-phase commit: losing the workspace connection can release its locks before the app commit; an app commit followed by workspace COMMIT failure cannot undo the event and may suppress wake or cause duplicate retry events. Cross-database connection-failure atomicity and global process-stop SLA remain open, and require a separately designed failure protocol. No zero-latency global revocation is claimed.
 
 Parent acceptance gates:
 
 1. Independently review the diff and re-run against the combined #169/Factory tree, especially personal ownership semantics.
 2. Freeze candidate SHA, matching migrations and unique authorized Preview URL. Reuse authorized OAuth sessions and two synthetic workspaces; do not inspect real customer records.
 3. Queue and run actual supported Harness work as owner/member; suspend member before the next tool request. Prove MCP denial and unchanged event counts; preserve the unaffected workspace success case. Exercise report, ask and blocked separately.
-4. Verify daemon claim/execution/retry gates with the daemon owner; worker rejection alone does not prove local execution stops. Record the last-check race as an explicit remaining boundary.
+4. Verify daemon claim/execution/retry gates with the daemon owner; worker rejection alone does not prove local execution stops. Record cross-database connection-failure atomicity as an explicit remaining boundary.
 5. Parent coordinates production deployment and repeats the authorized real-user flow. Record UTC, exact service/daemon SHA, environment, synthetic IDs, HTTP outcome and DB readback; upload a redacted video to PR #225. API/CI fixtures are not production acceptance.
 
 Keep issue 207 and this draft open until the broader matrix and production gates are satisfied.
@@ -46,3 +46,18 @@ Keep issue 207 and this draft open until the broader matrix and production gates
 ## Impact discipline
 
 The concrete worker sink is a Coordinator inbox event (report/question/blocked), not arbitrary tool execution or a read of another tenant’s task body. The foreign-run fixture is a negative authorization control; queue-time reachability must not be inferred from that seed. A revoked member may remain an authenticated product user; the authority being withdrawn is access to the linked task. This slice does not claim all P0 gaps are fixed.
+
+## Independent review and deterministic regression
+
+An independent read-only reviewer rejected the first recheck-only candidate for the final SELECT-to-INSERT window. The revised lock protocol incorporates its pool-exhaustion, run-before-token lock ordering and post-lock token-expiry findings. Final approval remains conditional on exact-head real tests, not just source review. The fourth app executor parameter follows #197’s existing helper shape; the fifth workspace executor must also be preserved when integrating #169 visibility helpers.
+
+The HTTP regression now withholds the request body, observes completed authentication SQL in pg_stat_activity, commits suspension and then sends the body; both queued and running tools must return an MCP error without an event. Unique fixture-only BEFORE INSERT triggers pause the actual event INSERT using advisory locks; concurrent membership/stop/token revocations must be observed waiting for the authorized event transaction, then later calls must return 401. Six simultaneous authorized requests exercise both max-five pools. Trigger definitions affect only their synthetic run and remain in the disposable test database; the test issues no DROP/DELETE.
+
+## Parent production video script (not yet executed)
+
+- Record the fixed deployment URL, service SHA, daemon SHA and UTC on a clean recording surface; hide headers, tokens, cookies, private prompts and unrelated account data.
+- Read-only first: confirm the deployed SHA and existing session/workspace context. Use only designated synthetic workspaces and users; never enumerate customer tasks or credentials.
+- Through existing authorized UI/API, create or reuse two controlled workspaces, owners/members and benign no-external-action Harness tasks. Keep all fixture records; cleanup deletion requires separate approval.
+- Record owner/member successful tool results, then an admin suspends the designated member. Record that same run/token’s next report/ask/blocked call fails and read back an unchanged event count, while workspace B still succeeds. Show queued and running cases separately. Tokens remain in the approved client’s memory/configuration and are never displayed.
+- Show a stop request followed by worker rejection. Verify actual daemon stop/claim behavior with its owner separately; worker rejection is not proof a local process stopped.
+- Record failure cases and observed timings without editing them out. Upload only the redacted production video to PR225, with safe synthetic IDs, exact version and pass/fail notes. No production SQL triggers, backend termination, schema changes or fault injection are authorized by this script; deterministic faults stay in the isolated test environment.
