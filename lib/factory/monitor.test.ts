@@ -1,3 +1,6 @@
+import { createFactoryDispatch } from "./dispatch";
+import { factoryDispatchDatabase } from "./transaction";
+import { insertRunOnce } from "../run-dispatch";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import {
@@ -11,7 +14,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { factoryCheckGates, configureFactoryCheck } from "./checks";
+import {
+  factoryCheckGates,
+  configureFactoryCheck,
+  createFactoryCheckClaim,
+} from "./checks";
 import { approvalGate, publishGate, createFactoryApprovals } from "./approval";
 import { createLocalPublicationAdapter } from "./local-publication";
 import { createLocalMonitorProbe } from "./monitor-probe";
@@ -589,11 +596,32 @@ test(
         stage: "monitor",
         reason: "Actual local publication complete",
       });
-      const id = await run(owner, issueId);
-      state = await store.apply(owner, binding(state.task), randomUUID(), {
-        action: "bind_run",
-        runId: id,
+      const dispatch = createFactoryDispatch(pool, store, (tx, userId, input) =>
+        insertRunOnce(factoryDispatchDatabase(tx), userId, input, {
+          deviceId: f.deviceId,
+          baseBranch: "main",
+          prompt: "Explicit local Harness identity fixture",
+        }),
+      );
+      const dispatched = await dispatch(owner, {
+        binding: binding(state.task),
+        agentId: f.agentId,
+        deviceRepoId: f.repoId,
       });
+      const id = dispatched.runId;
+      state = dispatched;
+      const assignment = await createFactoryCheckClaim(pool, authorize)(
+        owner,
+        f.deviceId,
+        id,
+        new Date(Date.now() + 60000).toISOString(),
+      );
+      assert.equal(assignment.baseBranch, sha);
+      assert.equal(assignment.policy.readOnly, true);
+      await pool.query('UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [
+        id,
+        `session:${id}`,
+      ]);
       await probeAndComplete(owner, state.task, id, failure);
       return {
         task: state.task,
@@ -722,15 +750,17 @@ test(
       await t.test(
         "ten distinct failures reuse original issue, despite originating from other tasks",
         async () => {
-          const inputs = await Promise.all(
-            Array.from({ length: 10 }, async (_, i) =>
-              toMonitor(
+          // Normal dispatch permits one live run per issue. Complete observations
+          // sequentially, then deliver their ten distinct persisted events concurrently.
+          const inputs = [];
+          for (let i = 0; i < 10; i++)
+            inputs.push(
+              await toMonitor(
                 "owner",
                 issueId,
                 `HTTP 503 request ${i} token=another-fixture`,
               ),
-            ),
-          );
+            );
           const results = await Promise.all(
             inputs.map((x) => monitor.consume("owner", x.input)),
           );
