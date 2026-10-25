@@ -1,0 +1,8 @@
+{
+  "file": "http-first-diagnostic.log",
+  "redactedFields": 13,
+  "flaggedOccurrences": 8,
+  "raw_sha256": "f8de310155b74bdaf279e6bae5f8a4ad2f2e9aca5a6afecde9f1e05a4b23ac03",
+  "published_sha256": "dc610fcaa871dc91a8c8b17b5c1c8318a51fe1df7f9dee0b9798af52390d1dd6",
+  "reason": "Expired synthetic delivery fencing tokens from the pre-final controlled-transport diagnostic. Not provider credentials. Raw original retained locally; no history rewrite or detector suppression."
+}

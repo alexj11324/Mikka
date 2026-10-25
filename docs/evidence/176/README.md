@@ -16,7 +16,7 @@ The installed SDK's model retry default is explicitly overridden with zero retri
 
 ## Evidence and limits
 
-The raw `.cast` files are actual subprocess PTY recordings, not constructed screenshots. The final `postgres.log`/`.cast` print their exact source SHA and run the formal PG store and actual Coordinator schedule handler. Older SHA recordings and initial failed/diagnostic logs are retained and are not presented as final-source acceptance.
+The raw `.cast` files are actual subprocess PTY recordings, not constructed screenshots. The final `postgres.log`/`.cast` print their exact source SHA and run the formal PG store and actual Coordinator schedule handler. Older SHA recordings and initial failed/diagnostic logs are retained and are not presented as final-source acceptance. The public `http-first-diagnostic.log` is a sanitized copy: 13 expired synthetic delivery-fence fields (including eight flagged occurrences) were redacted after GitGuardian detected them. Its raw original is retained locally and its raw/published hashes are recorded in `redaction.json`; final-source HTTP and PG recordings are unmodified. No history rewrite or detector suppression was used.
 
 | Check | Result and boundary |
 | --- | --- |
