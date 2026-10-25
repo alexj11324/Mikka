@@ -55,9 +55,6 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
     if (!commandHas(scripts[script], file)) throw new Error(`Required script ${script} missing or no longer runs ${file}`)
     selected.add(script); covered.add(file)
   }
-  for (const name of expected) {
-    if (!selected.has(name)) throw new Error(`Expected DB script not enrolled: ${name}`)
-  }
   for (const [file, source] of Object.entries(files)) {
     // Playwright DB fixtures run in the preserved server-backed browser/performance gates.
     if (!/\.(test|spec)\.(ts|mjs|js)$/.test(file) || file === BOOTSTRAP || file === 'scripts/run-db-tests.test.mjs' || file.startsWith('tests/e2e/')) continue
@@ -66,6 +63,9 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
     const matches = Object.entries(scripts).filter(([name, command]) => name.startsWith('test:') && commandHas(command, file))
     if (matches.length !== 1) throw new Error(`DB test ${file} needs one explicit package test script (found ${matches.length})`)
     selected.add(matches[0][0]); covered.add(file)
+  }
+  for (const name of expected) {
+    if (!selected.has(name)) throw new Error(`Expected DB script not enrolled: ${name}`)
   }
   if (!selected.size) throw new Error('No database suites enrolled')
   return { scripts: [...selected].sort(), files: [...covered].sort() }

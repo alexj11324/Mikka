@@ -41,6 +41,8 @@ test('discovers every present pg/DB suite and rejects unregistered or ambiguous 
   assert.throws(() => inventory(tree, scripts), /needs one explicit/)
   const full = { ...scripts, 'test:suggestions-db': `node --test ${extra}`, 'test:another-db': 'node --test lib/another.test.ts' }
   assert.deepEqual(inventory(tree, full).scripts, ['test:another-db', sample.script, 'test:suggestions-db'].sort())
+  assert.deepEqual(inventory(tree, full, ['test:another-db', sample.script, 'test:suggestions-db']).scripts, ['test:another-db', sample.script, 'test:suggestions-db'].sort(), 'pinned discovered suites are validated after enrollment')
+  assert.throws(() => inventory(tree, full, ['test:not-present']), /Expected DB script not enrolled/)
   assert.throws(() => inventory(tree, { ...full, 'test:duplicate': `node --test ${extra}` }), /found 2/)
 })
 test('this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates', () => {
