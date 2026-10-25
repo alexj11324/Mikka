@@ -126,3 +126,19 @@ test('vault rejection during early refresh fences late login response', async ()
   const refreshing = p.getAccessToken(); p.rejectAccessToken(old); release()
   await rejected(refreshing); await rejected(p.getAccessToken()); assert.equal(calls, 2)
 })
+
+test('delayed old-identity denial does not latch rotated credentials while login is pending', async () => {
+  let current = credentials, calls = 0
+  let release!: () => void
+  const p = universalAuthTokenProvider({ origin, credentials: () => current, fetch: async () => {
+    calls++
+    if (calls === 2) await new Promise<void>(r => { release = r })
+    return token(`synthetic-${calls}`)
+  } })
+  const old = await p.getAccessToken()
+  current = { ...credentials, clientSecret: 'synthetic-rotated-pending' }
+  const rotated = p.getAccessToken()
+  p.rejectAccessToken(old); release()
+  assert.equal(await rotated, 'synthetic-2')
+  assert.equal(await p.getAccessToken(), 'synthetic-2'); assert.equal(calls, 2)
+})
