@@ -7,6 +7,9 @@ import type { Message, SlashCommandEvent, Thread } from 'chat'
 import type { TelegramMessage } from '@chat-adapter/telegram'
 import { z } from 'zod'
 import { db } from '@/lib/db'
+import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
+import { userMessageEvent } from '@/lib/coordinator-events'
+import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { issueMembers, issues, linearIssueLinks, telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { userActor } from '@/lib/activity-actor'
@@ -32,6 +35,12 @@ const hashToken = (token: string) => createHash('sha256').update(token).digest('
 function localeOf(raw: unknown): Locale {
   const languageCode = (raw as TelegramMessage | null)?.from?.language_code?.toLowerCase()
   return languageCode?.startsWith('zh') ? 'zh-CN' : 'en'
+}
+
+function messageIdOf(raw: unknown) {
+  if (!raw || typeof raw !== 'object') return null
+  const messageId = (raw as TelegramMessage).message_id
+  return typeof messageId === 'number' && Number.isSafeInteger(messageId) ? messageId : null
 }
 
 async function ensureConversation(tx: Transaction, threadId: string, userId: string) {
@@ -235,17 +244,19 @@ async function handleTelegramMessage(input: {
   isDM: boolean
   author: Pick<Message['author'], 'isBot' | 'isMe' | 'userId' | 'userName'>
   raw: unknown
+  messageId: number | null
   text: string
   post: (text: string) => Promise<unknown>
 }) {
   if (!input.isDM || input.author.isBot || input.author.isMe || !input.author.userId) return
+  const telegramUserId = input.author.userId
   const t = await getTranslations({ locale: localeOf(input.raw), namespace: 'TelegramBot' })
   const username = process.env.TELEGRAM_BOT_USERNAME?.replace(/^@/, '') ?? ''
   const command = parseTelegramCommand(input.text, username)
   if (command?.name === 'start') {
     if (!command.args) {
       const [existing] = await db.select({ userId: telegramLinks.userId }).from(telegramLinks)
-        .where(eq(telegramLinks.telegramUserId, input.author.userId)).limit(1)
+        .where(eq(telegramLinks.telegramUserId, telegramUserId)).limit(1)
       await input.post(existing ? t('alreadyConnected') : t('connect'))
       return
     }
@@ -255,7 +266,7 @@ async function handleTelegramMessage(input: {
     }
     const result = await pairAccount({
       token: command.args,
-      telegramUserId: input.author.userId,
+      telegramUserId,
       telegramUserName: input.author.userName,
       threadId: input.threadId,
     })
@@ -264,7 +275,7 @@ async function handleTelegramMessage(input: {
   }
 
   const [link] = await db.select({ userId: telegramLinks.userId }).from(telegramLinks)
-    .where(eq(telegramLinks.telegramUserId, input.author.userId)).limit(1)
+    .where(eq(telegramLinks.telegramUserId, telegramUserId)).limit(1)
   if (!link) {
     await input.post(t('connect'))
     return
@@ -272,16 +283,31 @@ async function handleTelegramMessage(input: {
   const result = await db.transaction(async tx => {
     const conversation = await ensureConversation(tx, input.threadId, link.userId)
     if (command) return handleCommand(tx, conversation, link.userId, command, t)
-    if (!conversation.draftTitle) return conversation.issueId ? t('linkedChat') : t('startDraftMessage')
     const detail = input.text.trim()
-    if (!detail) return t('textDetailsRequired')
-    const next = conversation.draftDescription ? conversation.draftDescription + '\n' + detail : detail
-    if (next.length > MAX_DRAFT_DESCRIPTION) return t('draftTooLong')
-    await tx.update(telegramConversations).set({ draftDescription: next, updatedAt: new Date() })
-      .where(eq(telegramConversations.threadId, input.threadId))
-    return t('detailsAdded')
+    if (conversation.draftTitle) {
+      if (!detail) return t('textDetailsRequired')
+      const next = conversation.draftDescription ? conversation.draftDescription + '\n' + detail : detail
+      if (next.length > MAX_DRAFT_DESCRIPTION) return t('draftTooLong')
+      await tx.update(telegramConversations).set({ draftDescription: next, updatedAt: new Date() })
+        .where(eq(telegramConversations.threadId, input.threadId))
+      return t('detailsAdded')
+    }
+    if (!detail) return t('coordinatorMessageRequired')
+    if (detail.length > 10_000) return t('coordinatorMessageTooLong')
+    if (!coordinatorEnabled()) return t('coordinatorUnavailable')
+    if (input.messageId === null) return t('messageUnavailable')
+    await recordCoordinatorEvent(tx, userMessageEvent(link.userId, detail, {
+      issueId: conversation.issueId,
+      telegram: { threadId: conversation.threadId, telegramUserId, messageId: input.messageId },
+    }))
+    return { coordinator: true as const }
   })
   if (typeof result !== 'string') {
+    if ('coordinator' in result) {
+      await wakeCoordinator(link.userId)
+      await input.post(t('coordinatorQueued'))
+      return
+    }
     dispatchLinearIssueSync(result.issueId)
     after(() => judgeIssueScope(result.issueId, 'Telegram'))
     await input.post(result.reply)
@@ -296,6 +322,7 @@ export function handleTelegramDirectMessage(thread: Thread, message: Message) {
     isDM: thread.isDM,
     author: message.author,
     raw: message.raw,
+    messageId: messageIdOf(message.raw),
     text: message.text,
     post: text => thread.post(text),
   })
@@ -308,6 +335,7 @@ export function handleTelegramSlashCommand(event: SlashCommandEvent) {
     isDM: raw?.chat.type === 'private',
     author: event.user,
     raw: event.raw,
+    messageId: messageIdOf(raw),
     text: event.text ? event.command + ' ' + event.text : event.command,
     post: text => event.channel.post(text),
   })

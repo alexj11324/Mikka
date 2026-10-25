@@ -11,7 +11,7 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
     // Real entrypoint in an isolated directory: absent drizzle and an instrumented
     // pg module make any file scan or Pool construction fail this regression.
     const source = readFileSync(new URL('./migrate.mjs', import.meta.url), 'utf8')
-      .replace("from 'pg'", "from './pg.mjs'")
+      .replace("'pg'", "'./pg.mjs'")
       .replace("from './migration-order.mjs'", "from './order.mjs'")
     writeFileSync(join(dir, 'migrate.mjs'), source)
     writeFileSync(join(dir, 'pg.mjs'), 'export class Pool { constructor() { throw new Error("DATABASE_ACCESS") } }')

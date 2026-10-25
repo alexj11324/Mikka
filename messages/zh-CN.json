@@ -1628,7 +1628,7 @@
     }
   },
   "TelegramBot": {
-    "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n发送详情后用 /confirm 创建到待办\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",
+    "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n草稿进行中时发送详情，然后用 /confirm 创建到待办\n其他消息会发送给 Orchestrator，回复会发回此处\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",
     "connect": "请在 Mikka 设置 → 集成中连接 Telegram，然后打开生成的链接。",
     "alreadyConnected": "你的 Telegram 账号已连接。发送 /help 查看命令。",
     "paired": "Telegram 已连接到 Mikka。发送 /help 查看命令。",
@@ -1657,6 +1657,11 @@
     "detailsAdded": "详情已添加。可继续发送，或用 /confirm 创建待办任务。",
     "linkedChat": "本会话已关联任务。可用 /status、/unlink 或 /new <标题>。",
     "startDraftMessage": "请用 /new <标题> 开始草稿，发送详情后用 /confirm 创建。",
+    "coordinatorQueued": "已发送给 Orchestrator，收到回复后我会在这里告诉你。",
+    "coordinatorUnavailable": "Orchestrator 当前不可用，请稍后重试。",
+    "coordinatorMessageRequired": "请发送文字消息给 Orchestrator。",
+    "coordinatorMessageTooLong": "消息过长，请缩短后重试。",
+    "messageUnavailable": "无法读取这条 Telegram 消息，请重新发送。",
     "status": {
       "backlog": "待办",
       "todo": "待处理",
