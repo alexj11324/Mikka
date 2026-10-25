@@ -97,3 +97,32 @@ test('real loopback HTTP login/delete/denial and redirect refusal; no real Infis
     await rejected(other.getAccessToken()); assert.equal(logins, 2); assert.equal(deletes, 2)
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())) }
 })
+
+test('old refresh and old vault rejection cannot overwrite a rotated token', async () => {
+  let current = credentials, calls = 0
+  let release!: () => void
+  const p = universalAuthTokenProvider({ origin, credentials: () => current, fetch: async () => {
+    calls++
+    if (calls === 1) { await new Promise<void>(r => { release = r }); return token('synthetic-old') }
+    return token('synthetic-new')
+  } })
+  const old = p.getAccessToken()
+  current = { ...credentials, clientSecret: 'synthetic-rotation' }
+  assert.equal(await p.getAccessToken(), 'synthetic-new')
+  release(); await rejected(old)
+  p.rejectAccessToken('synthetic-old')
+  assert.equal(await p.getAccessToken(), 'synthetic-new'); assert.equal(calls, 2)
+})
+
+test('vault rejection during early refresh fences late login response', async () => {
+  let time = 0, calls = 0
+  let release!: () => void
+  const p = universalAuthTokenProvider({ origin, credentials: () => credentials, now: () => time, fetch: async () => {
+    calls++
+    if (calls > 1) await new Promise<void>(r => { release = r })
+    return token(`synthetic-${calls}`)
+  } })
+  const old = await p.getAccessToken(); time = 540000
+  const refreshing = p.getAccessToken(); p.rejectAccessToken(old); release()
+  await rejected(refreshing); await rejected(p.getAccessToken()); assert.equal(calls, 2)
+})
