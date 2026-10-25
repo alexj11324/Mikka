@@ -1116,7 +1116,10 @@ test(
                 "Cache-Control": "private, no-store",
               });
               res.end(JSON.stringify(result.body));
-            } catch {
+            } catch (error) {
+              // Preserve failure classification without printing session/token bodies.
+              console.error("isolated-auth-fixture", error instanceof Error ? error.name : typeof error,
+                error && typeof error === "object" && "code" in error ? String(error.code) : "no-code");
               res.writeHead(500);
               res.end("local fixture failure");
             }
@@ -1136,7 +1139,10 @@ test(
                 password: "disposable-contract-password",
               }),
             });
-            assert.equal(signin.status, 200);
+            if (signin.status !== 200) {
+              const body = await signin.json().catch(() => null) as {code?:unknown} | null;
+              assert.fail(`Isolated sign-in HTTP ${signin.status}; code=${typeof body?.code === "string" ? body.code : "unclassified"}`);
+            }
             const cookie = signin.headers
               .getSetCookie()
               .map((v) => v.split(";")[0])
