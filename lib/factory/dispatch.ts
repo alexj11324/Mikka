@@ -1,6 +1,10 @@
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { configureFactoryCheck, factoryRepairBrief } from "./checks";
+import {
+  configureFactoryMonitorDispatch,
+  readMonitorDispatchPublication,
+} from "./monitor-dispatch";
 import { factoryEventId } from "./event-id";
 import { bindingSchema, FactoryError } from "./contract";
 import type { createFactoryStore } from "./store";
@@ -35,6 +39,10 @@ export function createFactoryDispatch(
     try {
       await tx.query("BEGIN");
       const task = await store.lockForDispatch(userId, binding, eventId, tx);
+      const monitorPublication =
+        task.stage === "monitor"
+          ? await readMonitorDispatchPublication(tx, task)
+          : undefined;
       const run = await queue(tx, userId, {
         issueId: binding.issueId,
         agentId,
@@ -42,6 +50,14 @@ export function createFactoryDispatch(
         note,
         requestKey: `factory:${binding.taskId}:${binding.attemptId}`,
       });
+      if (monitorPublication)
+        await configureFactoryMonitorDispatch(
+          tx,
+          task,
+          run.runId,
+          monitorPublication,
+          run.replayed,
+        );
       if (task.stage === "spec" && !run.replayed) {
         // Reuse the existing Harness planning run. The queue gate and caller
         // parameter fingerprint remain unchanged; the stage is server-owned.
