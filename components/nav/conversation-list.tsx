@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { PanelLeft, Plus } from 'lucide-react'
+import { PanelLeft, Pin, Plus } from 'lucide-react'
 import { getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
 import { MikkaMark } from '@/components/brand/mikka-mark'
 import { Button } from '@/components/ui/button'
@@ -109,7 +109,7 @@ export function ConversationList({ sessions, active, onOpen, rail, onRail, user,
       <SidebarGroup className="px-2 pt-1"><SidebarMenu aria-label={i18nText('Nav.conversations')} className="gap-0.5">
         <Row name={i18nText('Nav.coordinator')} label={i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
           avatar={<LetterAvatar name="Coordinator" tone="coordinator" />}
-          preview={<><span aria-hidden="true" className="shrink-0">📌</span><span className="shrink-0">{i18nText('Shell.pinned')}</span>{lastReply && <><span aria-hidden="true">·</span><span className="truncate">{coordinatorLine(lastReply.text)}</span></>}</>} />
+          preview={<><span aria-hidden="true" className="flex shrink-0 [&_svg]:size-3"><Pin /></span><span className="shrink-0">{i18nText('Shell.pinned')}</span>{lastReply && <><span aria-hidden="true">·</span><span className="truncate">{coordinatorLine(lastReply.text)}</span></>}</>} />
         {recent.map(session => {
           const name = session.title || untitled
           return <Row key={session.id} name={name} label={name} current={active?.kind === 'agent' && active.sessionId === session.id} unread={unread(session.id)} onClick={() => choose({ kind: 'agent', sessionId: session.id })}
