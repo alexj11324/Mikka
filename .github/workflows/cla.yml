@@ -32,5 +32,6 @@ jobs:
           path-to-signatures: signatures/cla.json
           path-to-document: https://github.com/alexj11324/Mikka/blob/main/CLA.md
           branch: cla-signatures
-          # Repository policy exempts the maintainer, the exact codex account, and bots; this is not a signature.
-          allowlist: alexj11324,codex,*[bot]
+          # Repository policy exempts the maintainer, the exact codex and claude accounts (Claude Code commits
+          # as Claude <noreply@anthropic.com>), and bots; this is not a signature.
+          allowlist: alexj11324,codex,claude,Claude,*[bot]
