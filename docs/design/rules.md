@@ -46,8 +46,10 @@ source wins in a conflict is in [`README.md`](README.md).
   and an A–D choice card.
 - **R-13** One-to-one chats (a bot, the Coordinator, the board's Coordinator
   sidebar) show no avatar or name on messages; the header pill names the bot.
-  Group chats show a 24px avatar on the left at the bottom of each run and
-  the name once per run, 12px Medium in the bot's colour (Figma `224:5023`).
+  Group chats show a 24px avatar on the left at the top of each run, beside
+  the name, which appears once per run, 12px Medium in the bot's colour
+  (Figma `224:5023`). A group's 详情 lists its members, recent threads and
+  files under the group avatar.
 - **R-14** The user's messages sit in an accent-blue bubble with white text
   (`accent/default`); a bot's text sits in the light grey bubble. Charts, OpenUI cards
   and choice cards have no bubble. Bordered cards (document, computer) sit
@@ -86,8 +88,12 @@ source wins in a conflict is in [`README.md`](README.md).
   icon (green online, grey offline, red error), never a text badge.
 - **R-25** Board cards show the id, the assignee's avatar (never a name),
   the status icon, the title, then one row with priority, labels, linked PRs
-  and the latest run's state. The board is the reUI Kanban with no column
-  `+` (R-22). Figma: section `77:2`.
+  and the latest run's state. Only the run state is a tinted pill; priority,
+  labels and PRs are bare icon + text with no border, wrapping onto a second
+  row when needed. The board is the reUI Kanban with no column `+` (R-22) and
+  no page-title pill (the rail says where you are). With the Coordinator
+  sidebar open, 已完成 collapses to a 40px strip (icon, vertical name, count)
+  so the other columns are never cut off. Figma: section `77:2`.
 - **R-26** Workspace tasks sync with Linear (`MIK-xx`); personal tasks stay in
   Mikka. A task can move both ways: a workspace task can be turned back into
   a personal one (its Linear issue is archived; issue #184). Teammates see agent runs on workspace issues only, never left-column
@@ -103,7 +109,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the activity records 「<人> 把任务交给 <Bot>，自己负责」 (Linear's delegate).
 - **R-61** The page has a header line under the breadcrumb and one vertical
   line before the properties column or an open thread. Nothing else gets a
-  line; sections are separated by space.
+  line; sections are separated by space. The content column is centred in
+  the main area, up to 680px wide.
 - **R-62** 线程 lists the threads working on the issue: bot avatar, thread
   name, one line on what it is doing, status, time. Clicking one opens it on
   the right as a conversation that ends in the composer (R-10); people and
@@ -112,7 +119,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   to (Codex, Claude Code) shows as a step 「交给 Codex · …」, never as the
   runner in the list or the header.
 - **R-63** Activity: events (created, handed to, dispatched a thread,
-  status changes) are plain one-line rows. A comment is a card with a 1px
+  status changes) are plain one-line rows; one person's events in the same
+  minute join into one row (「创建了任务，交给 Mikka Backend，自己负责」). A comment is a card with a 1px
   border; its replies sit inside the same card above a 「留下回复…」 row. The
   comment box at the bottom is the same bordered card.
 - **R-64** In a comment you can @ a person or a bot. @ a bot asks it to step
