@@ -56,7 +56,7 @@ test('scheduled minute dispatch is opt-in and daily Linear path is not redirecte
     const configured = {
       CRON_SECRET: 'synthetic-test-only', HYPERDRIVE: { connectionString: 'postgresql://fixture@127.0.0.1/fixture_e2e' },
       LINEAR_CLIENT_ID: 'synthetic-client', LINEAR_CLIENT_SECRET: 'synthetic-secret',
-      LINEAR_TOKEN_ENCRYPTION_KEY: 'synthetic-encryption', LINEAR_WEBHOOK_SECRET: 'synthetic-webhook',
+      LINEAR_TOKEN_ENCRYPTION_KEY: '0'.repeat(64), LINEAR_WEBHOOK_SECRET: 'synthetic-webhook',
     }
     worker.scheduled({ cron: '* * * * *' }, configured, ctx)
     worker.scheduled({ cron: '* * * * *' }, { ...configured, CREDENTIAL_CLEANUP_ENABLED: '0' }, ctx)
