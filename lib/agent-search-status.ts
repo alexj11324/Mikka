@@ -7,7 +7,7 @@ export function agentSearchStatusStream() {
   return new TransformStream<UIMessageChunk, UIMessageChunk>({
     transform(part, controller) {
       if (part.type === 'start-step') { step++; tools.clear() }
-      if (part.type === 'tool-input-start') tools.set(part.toolCallId, part.toolName)
+      if (part.type === 'tool-input-start' || part.type === 'tool-input-available') tools.set(part.toolCallId, part.toolName)
       if (part.type === 'tool-output-available') {
         const tool = tools.get(part.toolCallId)
         const output = part.output

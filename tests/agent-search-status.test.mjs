@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { toUIMessageStream } from 'ai'
 import { agentSearchStatusStream } from '../lib/agent-search-status.ts'
 import { persistAgentStream } from '../lib/agent-history.ts'
 
@@ -33,4 +34,21 @@ test('Degradation notice never becomes persisted assistant text', async () => {
   await persistAgentStream(input, checkpoint => { saved.push(checkpoint) }, new AbortController().signal).pipeTo(new WritableStream())
   assert.equal(saved.at(-1).completion, 'Search unavailable.')
   assert.doesNotMatch(JSON.stringify(saved), /search_degraded/)
+})
+
+
+test('AI SDK complete tool-call events also emit degradation without streamed argument events', async () => {
+  const parts = [
+    { type: 'start-step' },
+    { type: 'tool-call', toolCallId: 'complete-call', toolName: 'web_search', input: { query: 'public query' } },
+    { type: 'tool-result', toolCallId: 'complete-call', toolName: 'web_search', input: { query: 'public query' }, output: { ok: false, notice: 'search_degraded' } },
+  ]
+  const source = new ReadableStream({ start(c) { for (const part of parts) c.enqueue(part); c.close() } })
+  const observed = []
+  await toUIMessageStream({ stream: source }).pipeThrough(agentSearchStatusStream())
+    .pipeTo(new WritableStream({ write(part) { observed.push(part) } }))
+  assert.equal(observed.some(part => part.type === 'tool-input-start'), false)
+  assert.equal(observed.filter(part => part.type === 'data-agent-status').length, 1)
+  assert.deepEqual(observed.find(part => part.type === 'data-agent-status').data,
+    { phase: 'searching', tool: 'web_search', step: 1, notice: 'search_degraded' })
 })
