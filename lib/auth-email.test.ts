@@ -6,6 +6,7 @@ import { getMigrations } from 'better-auth/db/migration'
 import { Pool } from 'pg'
 import { signJWT } from 'better-auth/crypto'
 import { createAuthEmail, AUTH_EMAIL_FROM, type AuthMailContext } from './auth-email'
+import { verificationNavigationResponse } from './auth-verification-response'
 
 const databaseURL = process.env.AUTH_EMAIL_TEST_DATABASE_URL
 if (!databaseURL) throw new Error('Run node scripts/test-auth-email.mjs; never inherit an application database')
@@ -253,4 +254,45 @@ test('HEAD inspection cannot consume a verification link; normal GET consumes ex
   assert.notEqual(head.status, 302)
   assert.equal((await f.get(url)).status, 302)
   assert.equal((await f.get(url)).status, 400)
+})
+
+test('actual verification failures land on a fixed clean page without burning a valid link', async () => {
+  const f = fixture(); const created = await user(f)
+  await f.post('/send-verification-email', { email: created.user.email })
+  const valid = link(f)
+  const wrong = new URL(valid); wrong.searchParams.set('callbackURL', 'https://attacker.invalid/?token=canary')
+  const response = verificationNavigationResponse(new Request(wrong), await f.get(wrong), origin)
+  assert.equal(response.status, 302)
+  assert.equal(response.headers.get('location'), `${origin}/mikka/verify-email?error=INVALID_TOKEN`)
+  assert.equal(response.headers.get('cache-control'), 'no-store')
+  assert.equal(response.headers.get('referrer-policy'), 'no-referrer')
+  assert.equal(await response.text(), '')
+  assert.equal((await pool.query('select "emailVerified" from "user" where id=$1', [created.user.id])).rows[0].emailVerified, false)
+  const success = verificationNavigationResponse(new Request(valid), await f.get(valid), origin)
+  assert.equal(success.headers.get('location'), `${origin}/mikka/sign-in`)
+  const replay = verificationNavigationResponse(new Request(valid), await f.get(valid), origin)
+  assert.equal(replay.headers.get('location'), `${origin}/mikka/verify-email?error=INVALID_TOKEN`)
+})
+
+test('verification navigation preserves rate limits, server failures and unrelated endpoints', () => {
+  for (const path of ['/api/auth/verify-email', '/mikka/api/auth/verify-email']) {
+    const request = new Request(`https://untrusted-host.invalid${path}?callbackURL=https://attacker.invalid`)
+    for (const status of [400, 401, 403]) {
+      assert.equal(verificationNavigationResponse(request, Response.json({ code: 'INVALID_TOKEN', secret: 'canary' }, { status }), origin).headers.get('location'), `${origin}/mikka/verify-email?error=INVALID_TOKEN`)
+    }
+    for (const status of [200, 429, 500, 503]) {
+      const response = new Response(null, { status, headers: { 'retry-after': '60' } })
+      assert.equal(verificationNavigationResponse(request, response, origin), response)
+    }
+    const libraryError = Response.redirect(`${origin}/mikka/sign-in?error=TOKEN_EXPIRED&token=canary`)
+    assert.equal(verificationNavigationResponse(request, libraryError, origin).headers.get('location'), `${origin}/mikka/verify-email?error=INVALID_TOKEN`)
+    for (const destination of [`${origin}/mikka/sign-in`, `${origin}/mikka/sign-in?error=OTHER`, 'https://other.invalid/mikka/sign-in?error=INVALID_TOKEN']) {
+      const unrelated = Response.redirect(destination)
+      assert.equal(verificationNavigationResponse(request, unrelated, origin), unrelated)
+    }
+  }
+  for (const [method, path] of [['POST', '/mikka/api/auth/verify-email'], ['GET', '/mikka/api/auth/reset-password'], ['GET', '/mikka/api/auth/verify-email/extra']]) {
+    const response = new Response(null, { status: 400 })
+    assert.equal(verificationNavigationResponse(new Request(origin + path, { method }), response, origin), response)
+  }
 })

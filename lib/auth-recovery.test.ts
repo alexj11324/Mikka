@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { classifyFailure, newPasswordProblem, readResetLink, recoveryMessageKey } from './auth-recovery'
+import { classifyFailure, newPasswordProblem, readLinkError, readResetLink, recoveryMessageKey } from './auth-recovery'
 
 test('classifies the backend error responses', () => {
   assert.deepEqual(classifyFailure(400, 'INVALID_TOKEN', null), { ok: false, error: 'invalid_token' })
@@ -32,6 +32,11 @@ test('checks the new password length in JavaScript string units before the confi
   assert.equal(newPasswordProblem('😀😀😀😀', '😀😀😀😀'), null)
   assert.equal(newPasswordProblem('long enough', 'long enougH'), 'mismatch')
   assert.equal(newPasswordProblem('long enough', 'long enough'), null)
+})
+
+test('reads a failed verification link and drops the error from the address', () => {
+  assert.deepEqual(readLinkError('https://app.example.com/mikka/verify-email?error=INVALID_TOKEN'), { failed: true, cleaned: '/mikka/verify-email' })
+  assert.deepEqual(readLinkError('https://app.example.com/mikka/en/verify-email'), { failed: false, cleaned: '/mikka/en/verify-email' })
 })
 
 test('takes the reset token out of the address', () => {

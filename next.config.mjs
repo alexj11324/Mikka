@@ -47,7 +47,7 @@ const nextConfig = {
       { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
       { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
     ] }, // next-intl can land the reset link on a locale-prefixed page; it carries the token too.
-      ...['/api/auth/verify-email', '/api/auth/reset-password/:path*', '/reset-password/:path*', '/:locale(en|zh-CN)/reset-password/:path*'].map(source => ({
+      ...['/api/auth/verify-email', '/verify-email', '/:locale(en|zh-CN)/verify-email', '/api/auth/reset-password/:path*', '/reset-password/:path*', '/:locale(en|zh-CN)/reset-password/:path*'].map(source => ({
       source,
       headers: [
         { key: 'Referrer-Policy', value: 'no-referrer' },

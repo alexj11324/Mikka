@@ -76,6 +76,15 @@ export function newPasswordProblem(password: string, confirmation: string): Pass
   return null
 }
 
+// A failed verification link lands on /verify-email?error=… (fixed backend
+// target). Returns whether it failed and the address without the parameter.
+export function readLinkError(href: string): { failed: boolean; cleaned: string } {
+  const url = new URL(href)
+  const failed = url.searchParams.has('error')
+  url.searchParams.delete('error')
+  return { failed, cleaned: `${url.pathname}${url.search}${url.hash}` }
+}
+
 // Reads the reset link the backend redirects to (/reset-password?token=… or
 // ?error=INVALID_TOKEN) and returns the address without either parameter, so
 // the caller can drop the token from the URL before anything else runs.
