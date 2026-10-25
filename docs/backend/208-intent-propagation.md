@@ -64,7 +64,11 @@ parallel dispatch-first barrier, run retry, journal restart, real stdio-to-HTTP
 readback and token revocation. Nine propagation tests pass. Existing Calendar tests
 (10), ledger/session/SIGKILL tests (13), acceptance-driver tests (3), and frozen
 question/monitor PG regressions (23) are separately checked. Local test schemas and
-records are retained. The three selected Factory suites support explicit retention.
+records are retained. The three selected Factory suites support explicit retention
+of schemas and temporary filesystem artifacts. An earlier local monitor-dispatch
+run cleaned its synthetic temporary repository through its pre-existing finally
+handler; the retention flag now covers that directory too. No database records
+were deleted in these runs.
 
 The test HTTP server invokes the real application worker GET route. SDK tool-call
 messages are synthetic; this is not a real model or deployed Workflow scheduler test.
