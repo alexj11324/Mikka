@@ -113,7 +113,7 @@ Linear 同步运行在 Cloudflare Worker 上，通过持久化的 inbox 和 outb
 | 分诊 | 优先按规则处理，必要时通过 Vercel AI Gateway 调用模型，并设置每月费用上限 |
 | 数据 | Neon 托管的 Postgres，Drizzle 迁移位于 [`drizzle/`](drizzle) |
 | 认证 | Better Auth，支持 Google 和 GitHub 登录，并为 MCP 提供 OAuth 2.1 server |
-| 集成 | GitHub 与 Linear 使用 webhook；Gmail、Notion、Slack 通过 Composio 接入；Linear 同步运行在 Cloudflare Worker 上；Telegram 基于 Vercel Chat SDK |
+| 集成 | GitHub 与 Linear 使用 webhook；Gmail、Google 日历、Notion、Slack 通过 Composio 接入；Linear 同步运行在 Cloudflare Worker 上；Telegram 基于 Vercel Chat SDK |
 | Agent | Mikka daemon，内置 Claude Code、Codex 和 Cursor 适配器 |
 
 ## 目录结构
