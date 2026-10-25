@@ -167,4 +167,8 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs
+      - name: Cleaner auth and isolated PostgreSQL retry contract
+        run: node --import tsx --test lib/credentials/universal-auth.test.ts lib/credentials/cleanup-postgres.test.ts
+        env:
+          CLEANER_TEST_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       - run: pnpm build
