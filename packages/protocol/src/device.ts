@@ -22,6 +22,7 @@ import { harnessInfoSchema, harnessSchema } from "./harness"
 import { quotaSnapshotSchema } from "./quota"
 import { runStopReason } from "./run"
 import { MAX_SKILLS_PER_RUN, runSkillSchema } from "./skill"
+import { skillAssignmentReceiptSchema } from './skill-artifact'
 
 const id = z.string().min(1).max(64)
 const isoTime = z.iso.datetime({ offset: true })
@@ -327,6 +328,8 @@ export const runAssignmentSchema = z.object({
    * server: the run simply has none.
    */
   skills: z.array(runSkillSchema).max(MAX_SKILLS_PER_RUN).optional(),
+  /** Server-minted assignment provenance; does not grant any policy permission. */
+  skillReceipt: skillAssignmentReceiptSchema.optional(),
 })
 export type RunAssignment = z.infer<typeof runAssignmentSchema>
 

@@ -1,7 +1,7 @@
 name: Operation ledger PostgreSQL
 on:
   push:
-    branches: ['codex/208-operation-ledger', 'codex/208-calendar-integration', 'codex/208-intent-propagation', 'codex/208-client-integration', 'codex/factory-ledger-integration-20261025']
+    branches: ['codex/208-operation-ledger', 'codex/208-calendar-integration', 'codex/208-intent-propagation', 'codex/208-client-integration', 'codex/factory-ledger-integration-20261025', 'codex/skill-group-integration-20261025']
   pull_request:
     paths: ['lib/operations/**', 'drizzle/*operation_ledger.sql', '.github/workflows/operation-ledger.yml']
 permissions:

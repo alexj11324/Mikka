@@ -257,6 +257,7 @@ export class CursorAdapter implements AgentAdapter {
       accountActionReadback: options.accountActionReadback,
       policy: options.policy,
       skills: options.skills,
+      skillReceipt: options.skillReceipt,
       runDir,
       privateDir: paths.privateDir,
     })

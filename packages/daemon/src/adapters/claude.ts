@@ -374,6 +374,7 @@ export class ClaudeAdapter implements AgentAdapter {
       accountActionReadback: options.accountActionReadback,
       policy: options.policy,
       skills: options.skills,
+      skillReceipt: options.skillReceipt,
       runDir: await claimRunDir(paths),
       privateDir: paths.privateDir,
       // Its session store, so `resume` works; keyed by the cwd it sees.

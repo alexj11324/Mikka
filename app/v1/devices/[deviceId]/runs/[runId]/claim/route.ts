@@ -17,6 +17,9 @@ import {
   factoryQuestions,
 } from '@/lib/factory/server'
 import { blockQuestionRetry } from '@/lib/factory/questions/retry'
+import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
+import { skillAssignments } from '@/lib/self-improvement/server'
+import { ImprovementError } from '@/lib/self-improvement/contract'
 
 import { FactoryError } from '@/lib/factory/contract'
 
@@ -98,6 +101,13 @@ export async function POST(
     )
   }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
+  const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
+  try {
+    await skillAssignments.preflight(caller.userId, runId, supportsSkillArtifacts)
+  } catch (error) {
+    if (!(error instanceof ImprovementError)) throw error
+    return NextResponse.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 409 })
+  }
   let checkAssignment
   let claimed
   if (run.questionContinuation) {
@@ -176,6 +186,16 @@ export async function POST(
       { error: 'Run is already claimed.' },
       { status: 409 },
     )
+  let skillAssignment
+  try {
+    skillAssignment = await skillAssignments.recordClaim(caller.userId, deviceId, runId, leaseExpiresAt, supportsSkillArtifacts)
+  } catch (error) {
+    // No assignment bytes are returned when provenance cannot be recorded.
+    await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Skill assignment provenance unavailable.', finishedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'preparing'), eq(agentRuns.leaseExpiresAt, new Date(leaseExpiresAt))))
+    if (!(error instanceof ImprovementError)) throw error
+    return NextResponse.json({ error: error.code }, { status: 409 })
+  }
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
   const mcp = claimed.length
@@ -229,5 +249,6 @@ export async function POST(
     ...(mcp ? { mcp } : {}),
     ...retry,
     ...checkAssignment,
+    ...skillAssignment,
   })
 }

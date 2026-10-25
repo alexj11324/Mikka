@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { lockFactoryRun } from "./run-fence";
 import { FactoryError } from "./contract";
 import type { FactoryAuthorize } from "./store";
 
@@ -15,37 +16,8 @@ export function createExecutionClaim(pool: Pool, authorize: FactoryAuthorize) {
     const tx = await pool.connect();
     try {
       await tx.query("BEGIN");
-      const { rows: tasks } = await tx.query(
-        `WITH RECURSIVE lineage AS (
-          SELECT id,"retryOf" FROM agent_runs WHERE id=$1
-          UNION SELECT r.id,r."retryOf" FROM agent_runs r JOIN lineage l ON r.id=l."retryOf"
-        ) SELECT t.* FROM factory_tasks t WHERE t.id IN (
-          SELECT a."taskId" FROM factory_attempts a JOIN lineage l ON l.id=a."runId"
-        ) ORDER BY t.id FOR UPDATE OF t`,
-        [runId],
-      );
-      if (tasks.length > 1) throw new FactoryError("factoryRunMismatch");
-      if (tasks.length) {
-        const task = tasks[0];
-        if (
-          task.userId !== userId ||
-          task.status !== "running" ||
-          !["spec", "execute"].includes(task.stage)
-        )
-          throw new FactoryError("factoryStopped");
-        const {
-          rows: [attempt],
-        } = await tx.query(
-          `SELECT "runId",stage,status FROM factory_attempts WHERE id=$1 AND "taskId"=$2`,
-          [task.attemptId, task.id],
-        );
-        if (
-          !attempt ||
-          attempt.runId !== runId ||
-          attempt.stage !== task.stage ||
-          attempt.status !== "running"
-        )
-          throw new FactoryError("factoryRunMismatch");
+      const task = await lockFactoryRun(tx, userId, runId, ["spec", "execute"]);
+      if (task) {
         if (!(await authorize(userId, task.issueId, tx)))
           throw new FactoryError("factoryNotFound");
         const {

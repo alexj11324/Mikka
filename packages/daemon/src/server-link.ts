@@ -11,6 +11,7 @@
 // (`completeRun`: stop reason + handoff report) and the server decides the
 // issue's next step (the orchestrator, later; `MemoryServer.nextOwner` now).
 import { randomUUID } from "node:crypto"
+import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 
 import {
   isTerminalRunState,
@@ -75,6 +76,8 @@ export interface ServerLink {
   pendingRuns(deviceId: string): Promise<string[]>
   /** Fails with `RunNotPinnedHereError` for runs pinned elsewhere. */
   claimRun(deviceId: string, runId: string): Promise<RunAssignment>
+  /** Receipted resumes require a current online source/access/lease fence. */
+  validateSkillReceipt?(runId:string,receiptId:string):Promise<SkillReceiptRevalidation>
   /** Appends to the run's event stream; returns the new tail offset. */
   appendRunChunks(runId: string, batch: ChunkBatch): Promise<{ offset: string }>
   updateRun(runId: string, patch: RunPatch): Promise<void>

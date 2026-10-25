@@ -23,7 +23,9 @@ import {
   skillSlug,
   skillsPromptSection,
   type RunSkill,
+  type SkillAssignmentReceipt,
 } from "@mikka/protocol/skill"
+import { verifyAssignedSkills, verifyMountedSkill } from './skill-artifact'
 
 import type { AgentReport, ExitEvent } from "../adapters/types"
 import { assertSafeId } from "../ids"
@@ -86,6 +88,7 @@ export interface RunContextOptions {
   policy?: RunPolicy
   /** The skills the run was given; none when the assignment carries none. */
   skills?: readonly RunSkill[]
+  skillReceipt?: SkillAssignmentReceipt
   /** Extra writable paths (the harness's own session store). */
   extraWrite?: readonly string[]
   /**
@@ -218,6 +221,7 @@ export class RunContext {
    */
   private writeSkills(): void {
     const skills = this.options.skills ?? []
+    verifyAssignedSkills(skills, this.options.skillReceipt)
     if (skills.length === 0) return
     ownDir(this.skillsDir)
     const taken = new Set<string>()
@@ -227,8 +231,20 @@ export class RunContext {
       for (let n = 2; taken.has(slug); n += 1) slug = `${base}-${n}`
       taken.add(slug)
       const dir = join(this.skillsDir, slug)
+      if (this.options.skillReceipt) {
+        const existing = lstatSync(dir, { throwIfNoEntry:false })
+        if (existing && (!existing.isDirectory() || existing.isSymbolicLink())) throw new Error('Unsafe Skill artifact directory')
+        const file = lstatSync(join(dir, SKILL_BODY_FILE), { throwIfNoEntry:false })
+        if (file && (!file.isFile() || file.isSymbolicLink() || file.nlink!==1)) throw new Error('Unsafe Skill artifact file')
+      }
       mkdirSync(dir, { recursive: true })
-      writeFileSync(join(dir, SKILL_BODY_FILE), skillMarkdown(skill), "utf8")
+      const bodyFile=join(dir,SKILL_BODY_FILE)
+      if (this.options.skillReceipt) {
+        // Never truncate a previous inode. Existing pinned bytes are read-only;
+        // a new pathname uses exclusive creation, rejecting a raced-in link.
+        if (!lstatSync(bodyFile,{throwIfNoEntry:false})) writeFileSync(bodyFile,skillMarkdown(skill),{encoding:'utf8',flag:'wx',mode:0o600})
+      } else writeFileSync(bodyFile, skillMarkdown(skill), "utf8")
+      if (this.options.skillReceipt) verifyMountedSkill(join(dir, SKILL_BODY_FILE), this.options.skillReceipt)
       for (const file of skill.files) {
         const target = resolve(dir, file.path)
         // The path schema already refuses `..`, a leading `/` and a

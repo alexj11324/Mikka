@@ -23,6 +23,8 @@ import type { FactoryDispatchInput } from '@/lib/factory/dispatch'
 import { factoryEventId } from '@/lib/factory/event-id'
 import { dispatchFactoryRun, factoryMonitor, factoryStore, factoryQuestions, reconcileFactoryRuns } from '@/lib/factory/server'
 import type { QuestionReference, ContextQuestionAnswer } from '@/lib/factory/questions/contract'
+import { improvementStore, skillAssignments, improvementFactory } from '@/lib/self-improvement/server'
+import { ImprovementError, type Feedback, type ImprovementHandoff, type ImprovementRehearsal } from '@/lib/self-improvement/contract'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -34,7 +36,7 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError || error instanceof FactoryError || error instanceof OperationError) return { error: error instanceof OperationError ? error.message : error.code }
+    if (error instanceof ActionFailureError || error instanceof FactoryError || error instanceof OperationError || error instanceof ImprovementError) return { error: error instanceof OperationError ? error.message : error.code }
     throw error
   }
 }
@@ -160,6 +162,35 @@ export async function dispatchRun(userId: string, input: FactoryDispatchInput, c
     if (context && options) await prepareAccountActionBatch(userId, context, options)
     return dispatchFactoryRun(userId, input, undefined, context?.sourceEventId)
   })
+}
+
+export async function selectBaselineSkill(userId: string, input: { runId:string }) {
+  'use step'
+  return asToolResult(() => skillAssignments.selectBaseline(userId,input.runId))
+}
+export async function dispatchBaselineRehearsal(userId:string,input:Omit<ImprovementRehearsal,'action'>) {
+  'use step'
+  return asToolResult(()=>improvementFactory.rehearse(userId,{action:'rehearse',...input}))
+}
+export async function recordRunFeedback(userId: string, input: Omit<Feedback,'action'>) {
+  'use step'
+  return asToolResult(() => improvementStore.recordFeedback(userId,{ action:'feedback',...input }))
+}
+export async function proposeSkillImprovement(userId: string, input: { runId:string }) {
+  'use step'
+  return asToolResult(() => improvementStore.propose(userId,input.runId))
+}
+export async function readRunImprovements(userId: string, input: { runId:string }) {
+  'use step'
+  return asToolResult(() => improvementStore.read(userId,input.runId))
+}
+export async function handoffSkillImprovement(userId: string, input: Omit<ImprovementHandoff,'action'>) {
+  'use step'
+  return asToolResult(() => improvementFactory.handoff(userId,{ action:'handoff',...input }))
+}
+export async function getSkillImprovementFactory(userId: string, input: { proposalId:string }) {
+  'use step'
+  return asToolResult(() => improvementFactory.status(userId,input.proposalId))
 }
 
 export async function listFactoryRequests(userId: string) {

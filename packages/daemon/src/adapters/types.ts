@@ -15,6 +15,7 @@ import type {
 } from "@mikka/protocol"
 
 import type { RunChunk } from "../chunks"
+import type { SkillAssignmentReceipt } from '@mikka/protocol/skill'
 import type { Logger } from "../log"
 
 /**
@@ -83,6 +84,7 @@ export interface SessionOptions {
    * written under the run dir and read into the agent's instructions.
    */
   skills?: readonly RunSkill[]
+  skillReceipt?: SkillAssignmentReceipt
   /** Mock harness only: fixture to replay. */
   fixture?: string
   /**

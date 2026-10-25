@@ -28,6 +28,8 @@
 // agent's summary, open questions, next step and blocker are taken from the
 // agent. A submission is `succeeded` only when verify passed.
 import { fixedCheckSnapshot } from "./check"
+import { verifySkillAssignment, verifySkillResume } from '../agents/skill-artifact'
+import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 import { runQuestion } from "@mikka/protocol/run"
 import { randomUUID } from "node:crypto"
 import { resolve } from "node:path"
@@ -90,6 +92,7 @@ export interface SupervisorDeps {
   /** The device's current allow-list (`device_repo`). */
   repos: () => DeviceRepo[]
   log: Logger
+  revalidateSkillAssignment?:(assignment:RunAssignment)=>Promise<SkillReceiptRevalidation>
   /** Watchdog: no progress for this long stops the run (`timeout`). */
   stallMs?: number
   /** How long `stop()` waits for runs to let go (default 3 s). */
@@ -186,6 +189,7 @@ export class RunSupervisor {
   private cutMessages = new Set<string>()
   /** Aborted by `stop()`: kills a running verify command. */
   private stopController = new AbortController()
+  private blockedSkillResumes = new Set<string>()
 
   constructor(private readonly deps: SupervisorDeps) {}
 
@@ -464,8 +468,11 @@ export class RunSupervisor {
   }
 
   /** Picks up every non-terminal run from the journal after a restart. */
-  resumeAll() {
-    for (const entry of this.deps.journal.active()) {
+  async resumeAll(receiptedOnly=false) {
+    const entries=this.deps.journal.active().sort((a,b)=>Number(Boolean(a.assignment.skillReceipt))-Number(Boolean(b.assignment.skillReceipt)))
+    for (const entry of entries) {
+      if (this.stopping) return
+      if (receiptedOnly && !this.blockedSkillResumes.has(entry.assignment.runId)) continue
       if (this.active.has(entry.assignment.runId)) continue
       // A crash between the outbox append and the journal write leaves the
       // outbox one chunk ahead; continue after it so seqs neither repeat nor gap.
@@ -483,6 +490,38 @@ export class RunSupervisor {
           "error",
           new RepoNotAllowedError(entry.assignment.repoId).message,
         )
+        continue
+      }
+      if (entry.assignment.skillReceipt) {
+        // An interrupted finishing/publication window needs the existing
+        // explicit reconciliation path; online access is not permission to
+        // replay an uncertain external effect.
+        if (entry.state==='finishing') {
+          this.deps.journal.update(entry.assignment.runId,{error:'Skill resume blocked: interrupted finishing requires explicit reconciliation.'})
+          continue
+        }
+        try {
+          if (!this.deps.revalidateSkillAssignment) throw new Error('Current Skill source check unavailable')
+          const current=await this.deps.revalidateSkillAssignment(entry.assignment)
+          if (this.stopping) return
+          const latest=this.deps.journal.get(entry.assignment.runId)
+          if (!latest||isTerminalRunState(latest.state)||this.active.has(entry.assignment.runId)) {
+            this.blockedSkillResumes.delete(entry.assignment.runId)
+            continue
+          }
+          if (latest.state!==entry.state||latest.sessionId!==entry.sessionId||latest.worktree!==entry.worktree||latest.assignment.skillReceipt?.id!==entry.assignment.skillReceipt.id)
+            throw new Error('Local Skill resume fence changed')
+          this.leases.set(entry.assignment.runId,Date.parse(verifySkillResume(entry.assignment,current)))
+          this.deps.journal.update(entry.assignment.runId,{error:null})
+          this.blockedSkillResumes.delete(entry.assignment.runId)
+          this.launch(entry.assignment.runId,repo)
+        } catch {
+          const latest=this.deps.journal.get(entry.assignment.runId)
+          if (!latest||isTerminalRunState(latest.state)) {this.blockedSkillResumes.delete(entry.assignment.runId);continue}
+          this.leases.delete(entry.assignment.runId)
+          this.blockedSkillResumes.add(entry.assignment.runId)
+          this.deps.journal.update(entry.assignment.runId,{error:'Skill resume blocked: current online source, authorization and lease required.'})
+        }
         continue
       }
       // The old lease is stale; give the first heartbeat time to renew it.
@@ -925,6 +964,9 @@ export class RunSupervisor {
     const log = this.deps.log.child({ run_id: runId })
     let entry = this.deps.journal.get(runId) as JournalEntry
     const { assignment } = entry
+    verifySkillAssignment(assignment)
+    if (assignment.skillReceipt && (this.leases.get(runId)??0)<=Date.now())
+      throw new Error('Receipted Skill assignment requires a current server lease')
     const adapter = this.adapterFor(runId)
     if (
       assignment.requireSessionResume &&
@@ -1037,6 +1079,7 @@ export class RunSupervisor {
       accountActionReadback: assignment.accountActionRefs?.length && assignment.mcp
         ? { url: assignment.mcp.url.replace(/\/api\/mcp\/?$/, '/api/worker/account-actions'), token: assignment.mcp.token }
         : undefined,
+      skillReceipt: assignment.skillReceipt,
       fixture: assignment.fixture,
       model: assignment.model,
     }
