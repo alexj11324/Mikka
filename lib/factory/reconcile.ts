@@ -42,6 +42,25 @@ export function createFactoryReconciler(
           `SELECT r.*, repo."remoteUrl", repo."repoPath" FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId" WHERE a.id=$1 AND r."userId"=$2 AND r."issueId"=$3 FOR UPDATE OF r`,
           [task.attemptId, userId, task.issueId],
         );
+        if (!run && task.status === "running") {
+          await store.apply(
+            userId,
+            binding(task),
+            factoryEventId("run-missing", task.attemptId),
+            {
+              action: "finish",
+              status: "blocked",
+              reason:
+                "Bound run is unavailable or access changed; execution cannot continue",
+              evidence: [],
+              output: {},
+            },
+            tx,
+          );
+          await tx.query("COMMIT");
+          recovered++;
+          continue;
+        }
         // Consume the existing bounded run-retry chain; never create a retry here.
         for (
           let retry = 1;

@@ -747,6 +747,35 @@ test(
           eventId: phaseEvent,
         });
       }
+      const deletedAgent = randomUUID(),
+        deletedRun = randomUUID();
+      await pool.query(
+        "INSERT INTO agents (id,\"userId\",name,harness) VALUES ($1,'owner','Deleted fixture agent','codex')",
+        [deletedAgent],
+      );
+      await pool.query(
+        'INSERT INTO agent_runs (id,"userId","issueId","agentId",status) VALUES ($1,\'owner\',$2,$3,\'running\')',
+        [deletedRun, issueId, deletedAgent],
+      );
+      const deletedRunTask = await route();
+      await store.apply("owner", binding(deletedRunTask.task), randomUUID(), {
+        action: "bind_run",
+        runId: deletedRun,
+      });
+      await pool.query("DELETE FROM agents WHERE id=$1", [deletedAgent]);
+      assert.equal(
+        (
+          await pool.query("SELECT id FROM agent_runs WHERE id=$1", [
+            deletedRun,
+          ])
+        ).rowCount,
+        0,
+      );
+      await reconcile("owner");
+      const missingRun = await store.read("owner", deletedRunTask.task.id);
+      assert.equal(missingRun.task.status, "blocked");
+      assert.equal(missingRun.attempts[0].runId, deletedRun);
+      assert.match(missingRun.task.reason, /unavailable/);
       const removed = await route();
       await pool.query(
         'UPDATE issues SET content=\'{"attrs":{"mikka":{"deletedAt":"2026-10-25T00:00:00Z"}}}\'::jsonb WHERE id=$1',

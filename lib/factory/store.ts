@@ -471,11 +471,13 @@ export function createFactoryStore(
               'SELECT "sessionId" FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "issueId"=$3',
               [attempt.runId, userId, task.issueId],
             );
-            if (!provenance) fail("factoryRunMismatch");
-            await tx.query(
-              'UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1',
-              [attempt.id, provenance.sessionId],
-            );
+            if (!provenance && change.status !== "blocked")
+              fail("factoryRunMismatch");
+            if (provenance)
+              await tx.query(
+                'UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1',
+                [attempt.id, provenance.sessionId],
+              );
           }
           if (change.status === "passed") {
             const consumerStage = [

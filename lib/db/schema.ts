@@ -416,7 +416,7 @@ export const factoryTasks = pgTable('factory_tasks', {
 export const factoryCandidates = pgTable('factory_candidates', {
   id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
   sha: text('sha').notNull(), repository: text('repository').notNull(), environment: text('environment').notNull(), scope: text('scope').notNull(),
-  runId: uuid('runId').notNull().references(() => agentRuns.id),
+  runId: uuid('runId').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('factory_candidates_task_id_key').on(table.taskId, table.id)])
 
@@ -424,7 +424,7 @@ export const factoryAttempts = pgTable('factory_attempts', {
   id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
   stage: text('stage').$type<import('../factory/contract').FactoryStage>().notNull(), ordinal: integer('ordinal').notNull(), position: integer('position').notNull(),
   status: text('status').$type<import('../factory/contract').FactoryStatus>().notNull(), candidateId: uuid('candidateId'),
-  runId: uuid('runId').references(() => agentRuns.id), sessionId: text('sessionId'), reason: text('reason').notNull(),
+  runId: uuid('runId'), sessionId: text('sessionId'), reason: text('reason').notNull(),
   output: jsonb('output').$type<Record<string, unknown>>().notNull().default({}),
   evidence: jsonb('evidence').$type<import('../factory/contract').FactoryEvidence[]>().notNull().default([]),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), finishedAt: timestamp('finishedAt', { withTimezone: true }),

@@ -26,3 +26,5 @@ Coordinator tools now persist route/clarification and require the exact binding 
 Cloud Preview deployment was denied in the parent-coordinated batch pending user authorization. No deployment retry is made here. All current CI run/session/report fixtures are explicit layer tests, not a claim of real Harness or Preview acceptance.
 
 After main advanced to `99ec7e1` with migrations through `20261025005600`, the imported, undeployed #191 migration was renamed on this candidate only to `20261025011101_run_dispatch_keys.sql` to satisfy the existing migration-order policy. The original #191 branch is unchanged. The #192 migration remains `20261025010001_factory_192_stages.sql`. Attempt history has a per-task monotonic `position` in addition to its per-stage `ordinal`.
+
+Historical candidate/attempt run IDs deliberately survive the existing Agent-to-run deletion cascade. They are validated against current agent_runs ownership/issue/session before mutations or evidence passing. If an Agent deletion removes a bound live run, reconciliation persists blocked with the historical run ID; this preserves deletion behavior and prevents success from missing evidence.

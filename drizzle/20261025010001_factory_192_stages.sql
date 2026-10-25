@@ -16,13 +16,15 @@ CREATE TABLE IF NOT EXISTS factory_candidates (
   id uuid PRIMARY KEY, "taskId" uuid NOT NULL REFERENCES factory_tasks(id) ON DELETE CASCADE,
   sha text NOT NULL CHECK (sha ~ '^[a-f0-9]{40}$'), repository text NOT NULL,
   environment text NOT NULL, scope text NOT NULL,
-  "runId" uuid NOT NULL REFERENCES agent_runs(id), "createdAt" timestamptz NOT NULL DEFAULT now(),
+  -- Historical IDs survive the existing agents -> agent_runs deletion cascade.
+  -- Live ownership/existence is checked transactionally before state changes.
+  "runId" uuid NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now(),
   UNIQUE ("taskId", id)
 );
 CREATE TABLE IF NOT EXISTS factory_attempts (
   id uuid PRIMARY KEY, "taskId" uuid NOT NULL REFERENCES factory_tasks(id) ON DELETE CASCADE,
   stage text NOT NULL, ordinal integer NOT NULL CHECK (ordinal > 0), position integer NOT NULL CHECK (position > 0), status text NOT NULL,
-  "candidateId" uuid, "runId" uuid REFERENCES agent_runs(id), "sessionId" text,
+  "candidateId" uuid, "runId" uuid, "sessionId" text,
   reason text NOT NULL, output jsonb NOT NULL DEFAULT '{}', evidence jsonb NOT NULL DEFAULT '[]',
   "createdAt" timestamptz NOT NULL DEFAULT now(), "finishedAt" timestamptz,
   UNIQUE ("taskId", stage, ordinal), UNIQUE ("taskId", position), UNIQUE ("taskId", id),
