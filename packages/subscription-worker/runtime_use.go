@@ -107,11 +107,15 @@ func (w *Worker) PrepareRuntime(ctx context.Context, epoch int64) (Metadata, err
 		store := w.store(&op)
 		b, e := store.load(ctx, record)
 		if e != nil {
-			_ = w.Repo.Fail(ctx, op, "projection_failed")
+			if failure := w.Repo.Fail(context.WithoutCancel(ctx), op, "publication_failed"); failure != nil {
+				return Metadata{}, failure
+			}
 			return Metadata{}, e
 		}
 		if _, e = store.Save(ctx, hydrate(record, b, true)); e != nil {
-			_ = w.Repo.Fail(ctx, op, "projection_failed")
+			if failure := w.Repo.Fail(context.WithoutCancel(ctx), op, "publication_failed"); failure != nil {
+				return Metadata{}, failure
+			}
 			return Metadata{}, e
 		}
 	}
