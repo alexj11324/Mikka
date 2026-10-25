@@ -11,9 +11,9 @@ export async function issueTeamScope(userId: string, ids: string[] = []) {
   if (!ids.length && !teamIds.length) return []
   return workspaceDb.select().from(teamIssues).where(or(ids.length ? inArray(teamIssues.issueId, ids) : undefined, teamIds.length ? inArray(teamIssues.teamId, teamIds) : undefined))
 }
-export async function issueTeamAccess(issueId: string, userId: string) {
-  const [link] = await workspaceDb.select().from(teamIssues).where(eq(teamIssues.issueId, issueId)).limit(1)
+export async function issueTeamAccess(issueId: string, userId: string, executor: Pick<typeof workspaceDb, 'select'> = workspaceDb) {
+  const [link] = await executor.select().from(teamIssues).where(eq(teamIssues.issueId, issueId)).limit(1)
   if (!link) return { teamId: null, allowed: false, linked: false }
-  const [member] = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, link.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).limit(1)
+  const [member] = await executor.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, link.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).limit(1)
   return { teamId: link.teamId, allowed: !!member, linked: true }
 }
