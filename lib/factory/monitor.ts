@@ -4,6 +4,15 @@ import { z } from "zod";
 import { bindingSchema, FactoryError, type FactoryBinding } from "./contract";
 import { factoryEventId } from "./event-id";
 import { monitorFingerprint } from "./monitor-fingerprint";
+import { readFactoryPublicationReceipt } from "./publication-receipt";
+import { digest } from "./evidence";
+import {
+  createMonitorProbeRecorder,
+  monitorProbePassed,
+  validatedMonitorProof,
+  type MonitorProbeAdapter,
+  type MonitorPublication,
+} from "./monitor-probe";
 import type {
   createFactoryStore,
   FactoryAuthorize,
@@ -30,6 +39,12 @@ export type MonitorNotice = {
   fingerprint: string | null;
   occurrences: number;
   transitionBlocked: boolean;
+  publicationId?: string;
+  target?: string;
+  targetEnvironment?: string;
+  operationId?: string;
+  checkedReference?: string;
+  kind?: string;
 };
 function fail(code: string): never {
   throw new FactoryError(code);
@@ -48,7 +63,7 @@ export const monitorGate: FactoryGate = async (tx, task, attempt, change) => {
   const {
     rows: [observation],
   } = await tx.query(
-    `SELECT o.*,r.report,r.status AS "runStatus",r."stopReason",r."stopRequestedAt",r."finishedAt",
+    `SELECT o.*,r.report,r.status AS "runStatus",r."stopReason",r."stopRequestedAt",r."startedAt",r."finishedAt",
       c.sha,c.environment,c."runId" AS "executeRunId",execution."sessionId" AS "executeSessionId"
      FROM factory_monitor_observations o
      JOIN factory_candidates c ON c.id=o."candidateId" AND c."taskId"=o."taskId"
@@ -74,8 +89,38 @@ export const monitorGate: FactoryGate = async (tx, task, attempt, change) => {
     observation.stopReason !== "submitted" ||
     observation.report?.verify?.status !== "passed" ||
     !observation.report?.verify?.command ||
-    observation.report?.publish?.commit !== observation.sha ||
+    observation.report?.verify?.exitCode !== 0 ||
+    observation.report?.verify?.timedOut !== false ||
+    observation.report?.verify?.signal !== null ||
+    (observation.report?.check &&
+      (observation.report.check.sha !== observation.sha ||
+        observation.report.check.readOnly !== true)) ||
     observation.report?.filesChanged?.length !== 0
+  )
+    return false;
+  let publication: MonitorPublication;
+  try {
+    publication = await readFactoryPublicationReceipt(
+      tx,
+      task.userId,
+      task.id,
+      task.candidateId,
+    );
+  } catch (error) {
+    if (error instanceof FactoryError) return false;
+    throw error;
+  }
+  const proof = await validatedMonitorProof(tx, task, attempt, publication, {
+    id: observation.runId,
+    sessionId: observation.sessionId,
+    startedAt: observation.startedAt,
+    finishedAt: observation.finishedAt,
+  });
+  if (
+    !proof ||
+    !monitorProbePassed(proof.audit, publication) ||
+    !change.output.monitorAudit ||
+    digest(change.output.monitorAudit) !== digest(proof.audit)
   )
     return false;
   const { rows: stages } = await tx.query(
@@ -150,6 +195,7 @@ export function createFactoryMonitor(
     tx: PoolClient,
     notice: MonitorNotice,
   ) => Promise<void> = async () => {},
+  probes: MonitorProbeAdapter[] = [],
 ) {
   async function consume(
     userId: string,
@@ -218,7 +264,7 @@ export function createFactoryMonitor(
         rows: [source],
       } = await tx.query(
         `SELECT r.*,e.id AS "sourceEventId",c.sha,c.repository,c.environment,c.scope,
-          a.id AS "monitorAttemptId",a.position AS "monitorPosition"
+          a.id AS "monitorAttemptId",a.position AS "monitorPosition",a.output AS "monitorOutput"
          FROM coordinator_events e JOIN agent_runs r ON r.id=e."runId" AND r."userId"=e."userId" AND r."issueId"=e."issueId"
          JOIN factory_attempts a ON a."runId"=r.id AND a.id=$4 AND a."taskId"=$3
          JOIN factory_candidates c ON c.id=$5 AND c."taskId"=$3
@@ -242,17 +288,63 @@ export function createFactoryMonitor(
         !["submitted", "error", "timeout"].includes(source.stopReason)
       )
         fail("factoryMonitorSourceMismatch");
-      const failed =
-        source.status === "failed" ||
-        source.report?.verify?.status === "failed";
+      let publication: MonitorPublication | undefined;
+      try {
+        publication = await readFactoryPublicationReceipt(
+          tx,
+          userId,
+          task.id,
+          task.candidateId,
+        );
+      } catch (error) {
+        if (!(error instanceof FactoryError)) throw error;
+      }
+      const attempt = {
+        id: task.attemptId,
+        taskId: task.id,
+        stage: "monitor" as const,
+        ordinal: 1,
+        position: source.monitorPosition,
+        status: task.status,
+        candidateId: task.candidateId,
+        runId: source.id,
+        sessionId: source.sessionId,
+        reason: task.reason,
+        output: source.monitorOutput,
+        evidence: [],
+      };
+      const proof = publication
+        ? await validatedMonitorProof(tx, task, attempt, publication, source)
+        : undefined;
+      const failed = Boolean(
+        proof &&
+        !proof.audit.timedOut &&
+        !proof.audit.signal &&
+        ["content-mismatch", "missing"].includes(proof.audit.errorCode ?? ""),
+      );
+      const initialOutcome: MonitorNotice["outcome"] = failed
+        ? "failed"
+        : publication &&
+            proof &&
+            monitorProbePassed(proof.audit, publication) &&
+            source.status === "succeeded" &&
+            source.report.verify.status === "passed"
+          ? "passed"
+          : "blocked";
       const keys = monitorFingerprint({
         userId,
         workspaceKey: scope,
         repository: source.repository,
-        environment: source.environment,
+        environment: publication?.targetEnvironment ?? "unverified",
+        target: publication
+          ? JSON.stringify([
+              publication.verifiedTarget.kind,
+              publication.target,
+            ])
+          : `unverified:${task.id}:${task.candidateId}`,
         component: source.scope,
-        check: source.report?.verify?.command ?? "runtime",
-        failure: `${source.stopReason}:${source.report?.verify?.status}:${source.report?.verify?.output ?? source.error ?? "run failed"}`,
+        check: "registered-target-readback-v1",
+        failure: proof?.audit.errorCode ?? "probe-or-publication-unverified",
       });
       await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
         JSON.stringify([userId, scope, keys.checkKey]),
@@ -281,7 +373,7 @@ export function createFactoryMonitor(
         incidentId = incident.id;
       }
       const id = randomUUID();
-      const evidence = [
+      const evidence: import("./contract").FactoryEvidence[] = [
         {
           artifact: `run-report:${source.id}`,
           kind: "report" as const,
@@ -293,6 +385,13 @@ export function createFactoryMonitor(
           recordedAt: source.finishedAt.toISOString(),
         },
       ];
+      if (proof)
+        evidence.push({
+          ...evidence[0],
+          artifact: proof.artifact,
+          kind: "log",
+          recordedAt: proof.audit.finishedAt,
+        });
       await tx.query(
         `INSERT INTO factory_monitor_observations (id,"userId","workspaceKey","sourceEventId","runId","sessionId","taskId","candidateId","incidentId","checkKey",request,evidence,outcome)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
@@ -309,7 +408,7 @@ export function createFactoryMonitor(
           keys.checkKey,
           JSON.stringify(input),
           JSON.stringify(evidence),
-          failed ? "failed" : "passed",
+          initialOutcome,
         ],
       );
       const change = {
@@ -319,30 +418,16 @@ export function createFactoryMonitor(
           ? "Persisted monitor failure; original issue retained"
           : "Same-candidate recovery checked after independent verification and approved publication",
         evidence,
-        output: { monitorObservationId: id },
+        output: {
+          ...source.monitorOutput,
+          monitorObservationId: id,
+          ...(proof ? { monitorAudit: proof.audit } : {}),
+        },
       };
-      let outcome: MonitorNotice["outcome"] = failed ? "failed" : "passed";
+      let outcome: MonitorNotice["outcome"] = initialOutcome;
       if (
-        !failed &&
-        !(await monitorGate(
-          tx,
-          task,
-          {
-            id: task.attemptId,
-            taskId: task.id,
-            stage: "monitor",
-            ordinal: 1,
-            position: source.monitorPosition,
-            status: task.status,
-            candidateId: task.candidateId,
-            runId: source.id,
-            sessionId: source.sessionId,
-            reason: task.reason,
-            output: {},
-            evidence: [],
-          },
-          change,
-        ))
+        outcome === "passed" &&
+        !(await monitorGate(tx, task, attempt, change))
       ) {
         outcome = "blocked";
         await tx.query(
@@ -390,6 +475,16 @@ export function createFactoryMonitor(
       const notice = {
         ...(await noticeFor(tx, observation)),
         transitionBlocked,
+        ...(publication
+          ? {
+              publicationId: publication.publicationId,
+              target: publication.target,
+              targetEnvironment: publication.targetEnvironment,
+              operationId: publication.verifiedTarget.operationId,
+              checkedReference: publication.reference,
+              kind: publication.verifiedTarget.kind,
+            }
+          : {}),
       };
       await tx.query(
         "UPDATE factory_monitor_observations SET result=$2 WHERE id=$1",
@@ -430,6 +525,7 @@ export function createFactoryMonitor(
   }
   return {
     consume,
+    probeRun: createMonitorProbeRecorder(pool, authorize, probes),
     /** Called by the existing Coordinator reconciliation; #176 retains ownership of waking it. */
     async reconcile(userId: string) {
       const { rows } = await pool.query(

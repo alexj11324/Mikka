@@ -32,7 +32,12 @@ export async function appendMonitorEvidence(
       // No authorUserId: never impersonate the person who owns the issue.
       body: [
         `Factory monitor: ${notice.outcome}. Occurrences: ${notice.occurrences}.`,
-        `SHA: ${notice.sha}; environment: ${notice.environment}.`,
+        `SHA: ${notice.sha}; candidate environment: ${notice.environment}.`,
+        ...(notice.target
+          ? [
+              `Observed target: ${notice.kind}:${notice.target}; target environment: ${notice.targetEnvironment}; publication: ${notice.publicationId}; operation: ${notice.operationId}; reference: ${notice.checkedReference}.`,
+            ]
+          : []),
         `Task: ${notice.taskId}; candidate: ${notice.candidateId}.`,
         `Event: ${notice.sourceEventId}; run: ${notice.runId}; session: ${notice.sessionId}.`,
         `Evidence: run-report:${notice.runId}; observation: ${notice.observationId}.`,

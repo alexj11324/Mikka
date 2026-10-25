@@ -9,6 +9,8 @@ import { authenticateDevice } from '@/lib/device-link'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
+import { factoryMonitor } from '@/lib/factory/server'
+import { FactoryError } from '@/lib/factory/contract'
 import { revokeRunTokens } from '@/lib/mcp/worker'
 
 export const dynamic = 'force-dynamic'
@@ -45,6 +47,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   let status: RunStatus = runStateForStop(stopReason)
   if (stopReason === 'submitted' && report?.verify.status !== 'passed' && run.kind !== 'plan') {
     status = report?.verify.status === 'failed' ? 'failed' : 'stopped'
+  }
+  if (stopReason === 'submitted') {
+    try { await factoryMonitor.probeRun(run.userId, runId) }
+    catch (error) { if (!(error instanceof FactoryError)) throw error }
   }
   const ended = await db.update(agentRuns)
     .set({ status, stopReason, report: report ?? null, finishedAt: new Date(), updatedAt: new Date() })

@@ -12,6 +12,7 @@ import { workspaceDb } from "@/lib/workspace-db";
 import { teamIssues } from "@/lib/db/team-schema";
 import { eq } from "drizzle-orm";
 import type { FactoryAuthorize } from "./store";
+import { configuredMonitorProbes } from "./monitor-probe";
 import { monitorWorkspacePartition } from "./monitor-fingerprint";
 
 // Preserve existing personal/workspace/team/deletion access rules on every operation.
@@ -59,6 +60,7 @@ export const factoryMonitor = createFactoryMonitor(
     });
   },
   appendMonitorEvidence,
+  configuredMonitorProbes(process.env),
 );
 
 import { queueRun } from "@/lib/agent-runs";

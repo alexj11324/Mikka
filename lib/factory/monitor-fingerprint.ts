@@ -44,6 +44,7 @@ export function monitorFingerprint(input: {
   environment: string;
   component: string;
   check: string;
+  target?: string;
   failure: string;
 }) {
   const checkKey = digest([
@@ -52,6 +53,7 @@ export function monitorFingerprint(input: {
     input.workspaceKey,
     input.repository,
     input.environment,
+    input.target ?? "legacy-unqualified",
     input.component,
     input.check,
   ]);
