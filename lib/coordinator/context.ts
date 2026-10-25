@@ -91,6 +91,13 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         payload.summary ? `The agent's summary: ${payload.summary}` : null,
         note,
       ].filter(Boolean).join('\n')
+    case 'run_retried':
+      return [
+        `[Event] Run ${event.runId} lost its machine (the device went offline), so it was queued again as run ${payload.retryRunId}, attempt ${payload.attempt} of ${payload.maxAttempts}.`,
+        event.issueId ? `Issue: ${event.issueId}.` : null,
+        'Nothing to do; follow the new run.',
+        note,
+      ].filter(Boolean).join('\n')
     case 'issue_done':
       return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to done.`, note].filter(Boolean).join('\n')
     case 'run_report':
