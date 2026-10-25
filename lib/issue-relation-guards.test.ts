@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 import { ActionFailureError } from './action-error'
-import { withIssueMetadata, metadataSchema, readIssueMetadata, type IssueMetadata } from './issue-metadata'
+import { issueWithMetadata, withIssueMetadata, metadataSchema, readIssueMetadata, type IssueMetadata } from './issue-metadata'
 
 // Action-layer guards of updateIssueRelation (app/actions/issue-operations.ts):
 // self links, parent/duplicate/blocking cycles. Pure: the DB, auth and Linear
@@ -54,6 +54,7 @@ function select(fields?: Record<string, { name: string }>) {
     where: (c: Chunk) => { conds = conditions(c); return builder },
     orderBy: () => builder,
     for: async () => run(),
+    // oxlint-disable-next-line unicorn/no-thenable -- Match the awaited Drizzle query builder.
     then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve(run()).then(resolve, reject),
   }
   return builder
@@ -97,6 +98,11 @@ before(async () => {
     },
   } })
   mock.module(file('./issue-numbering.ts'), { namedExports: { allocateIssueNumbers: async () => 1 } })
+  // Identifier formatting reads account data in current main; relation guards do not.
+  mock.module(file('./task-identifier-server.ts'), { namedExports: {
+    issueView: async (issue: Parameters<typeof issueWithMetadata>[0]) => issueWithMetadata(issue),
+    taskIdentifiers: async () => new Map(),
+  } })
   mock.module(file('./linear-sync/dispatch.ts'), { namedExports: { dispatchLinearWork: () => {}, dispatchLinearIssueSync: () => {} } })
   ;({ updateIssueRelation } = await import('../app/actions/issue-operations'))
 })
