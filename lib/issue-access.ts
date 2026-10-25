@@ -32,6 +32,10 @@ async function findIssueForUser(userId: string, id: string, includeDeleted: bool
   const [row] = await executor.select({ issue: issues }).from(issues)
     .where(eq(issues.id, id)).limit(1)
   if (!row) return null
+  // Keep the baseline linked-workspace execution gate, including stale links
+  // on owner-personal tasks. Run history visibility is a separate read policy.
+  const access = await issueTeamAccess(id, userId, workspaceExecutor)
+  if (access.linked && !access.allowed) return null
   // Personal scope never inherits invitations or stale team links.
   if (row.issue.scope === 'personal') {
     if (row.issue.userId !== userId) return null
@@ -39,8 +43,7 @@ async function findIssueForUser(userId: string, id: string, includeDeleted: bool
     return { issue: row.issue, teamId: null }
   }
   // Preserve current execution authority and supplied transaction connections.
-  const access = await issueTeamAccess(id, userId, workspaceExecutor)
-  if (access.linked ? !access.allowed : row.issue.userId !== userId) return null
+  if (!access.linked && row.issue.userId !== userId) return null
   if (!row || (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt)) return null
   return { issue: row.issue, teamId: access.teamId }
 }

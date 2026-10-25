@@ -115,7 +115,7 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     // Revoke after a successful read: no per-request/global positive cache.
     await workspacePool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2',[workspace,member])
     assert.equal(await issueForUser(member,shared),null)
-    assert.equal(await verifyRunToken(new Request('http://localhost'),workerToken.token),undefined)
+    assert.equal(Boolean(await verifyRunToken(new Request('http://localhost'),workerToken.token)),false)
     assert.equal(await tools.getRun(member,sharedRun),null)
     assert.deepEqual((await visibleRuns(member,{issueId:shared})).map(run=>run.id),[workerRun])
     await workspacePool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1 and "userId"=$2',[workspace,member])
@@ -123,6 +123,15 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     assert.equal(await issueForUser(member,shared),null)
     assert.equal(await readRun(member,sharedRun),null)
     assert.equal((await readRun(owner,sharedRun))?.run.id,sharedRun)
+    // Preserve the baseline execution gate even for an owner-personal task
+    // that still has a legacy workspace link. Readable history is not execution.
+    const personalWorkerToken=await issueRunToken({id:privateRun,userId:owner})
+    assert.ok(await verifyRunToken(new Request('http://localhost'),personalWorkerToken.token))
+    await workspacePool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',[workspace,owner])
+    assert.equal(Boolean(await verifyRunToken(new Request('http://localhost'),personalWorkerToken.token)),false)
+    assert.equal(await issueForUser(owner,personal),null)
+    assert.equal((await readRun(owner,privateRun))?.run.id,privateRun)
+    await workspacePool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2',[workspace,owner])
   } finally {
     // Retain all synthetic records; no cleanup mutations.
     await pool.end()

@@ -11,8 +11,8 @@ Personal tasks never inherit workspace membership or legacy invitations.
 
 Integration preserves #280 application/workspace transaction executors in
 issueForUser, mailbox writes, Factory dispatch and current device/worker
-revocation. Workspace-linked issue execution requires current active membership,
-including when the task owner requests execution; metadata sharing does not
+revocation. Issue execution with an existing workspace link requires current active membership,
+including an owner-personal task with a legacy link; metadata sharing does not
 replace this execution check. Owners retain their existing run-history reads.
 No cross-database atomicity or new authorization model is claimed.
 

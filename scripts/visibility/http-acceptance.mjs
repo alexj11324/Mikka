@@ -53,6 +53,17 @@ try{
  await ws.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2',[w1,member])
  await app.query('UPDATE issues SET scope=\'personal\' WHERE id=$1',[shared]);assert.equal((await call(member,'get_run',{runId:run})).error,true)
  evidence.checks.push('membership suspension immediately removes HTTP metadata; personal scope flip removes restored member access')
+ // Existing linked-workspace execution fence also applies to owner-personal
+ // tasks with stale links; authenticating a worker lists tools without executing.
+ const worker='mkw_'+randomBytes(32).toString('base64url')
+ await app.query('INSERT INTO run_tokens(id,"runId","userId","tokenHash","expiresAt") VALUES($1,$2,$3,$4,now()+interval \'1 hour\')',[id(),privateRun,owner,createHash('sha256').update(worker).digest('hex')])
+ const workerAuth=()=>fetch(new URL('/mikka/api/mcp',origin),{method:'POST',headers:{authorization:'Bearer '+worker,'content-type':'application/json',accept:'application/json, text/event-stream'},body:JSON.stringify({jsonrpc:'2.0',id:id(),method:'tools/list',params:{}})})
+ assert.equal((await workerAuth()).status,200)
+ await ws.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',[w1,owner])
+ assert.equal((await workerAuth()).status,401)
+ assert.equal((await value(owner,'get_run',{runId:privateRun})).summary,'private-report-marker')
+ await ws.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2',[w1,owner])
+ evidence.checks.push('owner-personal worker HTTP authentication refuses after linked-workspace revocation while owner history stays readable')
  // Existing daemon authority is independent of OAuth metadata reads.
  const raw='orv_'+randomBytes(32).toString('hex')
  await app.query('INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,\'Retained synthetic device\')',[device,owner])
