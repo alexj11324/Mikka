@@ -1,6 +1,6 @@
 # Independent review and verification (#193)
 
-Candidate base: PR #197, `605bf086d4371e19f2df2e2857a487f1decd649d`. Factory contract v1 is unchanged. The candidate retains only `20261025011101_run_dispatch_keys.sql` for #191 and `20261025010001_factory_192_stages.sql` for #192. There is no new migration or stage source.
+Initial frozen base: PR #197, `605bf086d4371e19f2df2e2857a487f1decd649d`. The parent-coordinated unified #191/#192 baseline `4cd3a1b5fa05773094722bab7774e15a8d49d018` was subsequently merged without conflicts; its stage/candidate runtime contract is unchanged. Factory contract v1 is unchanged. The candidate retains only `20261025011347_run_dispatch_keys.sql` for #191 and `20261025010001_factory_192_stages.sql` for #192. There is no new migration or stage source.
 
 `factoryCheckGates` supplies only review and verify validators to `createFactoryStore(pool, authorize, gates)`. Existing authenticated `route/read/apply`, #191 dispatch transaction and Coordinator preparation/completion events remain the execution path. Pending review and verify dispatch through the same Coordinator tool, on separate run/session identities. No new scheduler is added; #176 still owns reliable wake. Approval, publish and monitor validators remain closed and their implementations are unchanged.
 
@@ -16,8 +16,8 @@ On a disposable remote Linux environment, the local PG test override accepts onl
 
 ```sh
 FACTORY_TEST_DATABASE_URL=postgresql://factory193@127.0.0.1:55493/factory193 pnpm test:factory
-pnpm --filter @mikka/protocol test -- src/run.test.ts
-pnpm --filter @mikka/daemon test -- test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts src/permissions.test.ts
+pnpm --filter @mikka/protocol exec vitest run src/run.test.ts
+pnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts src/permissions.test.ts
 ```
 
 `checks.test.ts` exercises real PG17 migrations/transactions, ten concurrent dispatches, frozen commands, session/SHA/owner rejection, restart reconciliation, real persistence of fixture failure evidence, changed candidates, bounded repairs, missing Harness/command and closed approval. All its Harness reports are explicitly fixtures.
