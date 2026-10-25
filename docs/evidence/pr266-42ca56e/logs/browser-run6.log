@@ -1,0 +1,18 @@
+update_calendar_event-intact proposed {"status":"awaiting_approval","actionId":"fixture-id-ef3300b39fcc","ref":{"sourceEventId":"fixture-id-364a50cca6b9","actionSlotId":"fixture-id-732b1f9648c5","operationId":"fixture-id-ef3300b39fcc","proposalDigest":"c9d5df7e9c51c3a4afc1c898756371c30a011448c2423845193516c93dfc2352"}}
+update_calendar_event-intact update_calendar_event-intact：真实批准，stub提交后丢失响应
+update_calendar_event-intact 再次批准：原生lookup不可用，维持unknown，禁止补发
+update_calendar_event-intact 消费未知事件，再消费后续普通消息：队列必须推进
+update_calendar_event-intact 导入替身的明确收据；再次真实批准，只投影done，不再写provider
+update_calendar_event-intact update_calendar_event-intact PASS：未知与完成两个去重key，外部替身写入总计一次
+update_calendar_event-missing proposed {"status":"awaiting_approval","actionId":"fixture-id-8ee9911e3252","ref":{"sourceEventId":"fixture-id-540fce456b95","actionSlotId":"fixture-id-c008567c6705","operationId":"fixture-id-8ee9911e3252","proposalDigest":"bcd2f012ea074328e5024fdeaf49d09ba421e192422c486c240ab375eb4a0610"}}
+update_calendar_event-missing update_calendar_event-missing：真实批准，stub提交后丢失响应
+update_calendar_event-missing 再次批准：原生lookup不可用，维持unknown，禁止补发
+update_calendar_event-missing 消费未知事件，再消费后续普通消息：队列必须推进
+update_calendar_event-missing 导入替身的明确收据；再次真实批准，只投影done，不再写provider
+update_calendar_event-missing update_calendar_event-missing PASS：未知与完成两个去重key，外部替身写入总计一次
+update_calendar_event-null proposed {"status":"awaiting_approval","actionId":"fixture-id-8495f4d361d6","ref":{"sourceEventId":"fixture-id-7fdb57e364e3","actionSlotId":"fixture-id-8d844bca7964","operationId":"fixture-id-8495f4d361d6","proposalDigest":"b068373d639ac84cdbe80d3a1d82030fffc3667cf77e68eba292e878ddc2a3c8"}}
+update_calendar_event-null update_calendar_event-null：真实批准，stub提交后丢失响应
+update_calendar_event-null 再次批准：原生lookup不可用，维持unknown，禁止补发
+update_calendar_event-null 消费未知事件，再消费后续普通消息：队列必须推进
+update_calendar_event-null 导入替身的明确收据；再次真实批准，只投影done，不再写provider
+update_calendar_event-null update_calendar_event-null PASS：未知与完成两个去重key，外部替身写入总计一次

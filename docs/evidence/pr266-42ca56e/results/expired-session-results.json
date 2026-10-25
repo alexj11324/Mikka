@@ -1,0 +1,14 @@
+[
+  {
+    "action": "send_email",
+    "passed": true,
+    "expiredSessionRejected": true,
+    "providerWrites": 0
+  },
+  {
+    "action": "update_calendar_event",
+    "passed": true,
+    "expiredSessionRejected": true,
+    "providerWrites": 0
+  }
+]

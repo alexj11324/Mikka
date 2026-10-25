@@ -1,0 +1,261 @@
+{
+  "candidateSHA": "42ca56ebee733c9f5ed67bec0d48170e7506814e",
+  "baseSHA": "12368c4051c2b051828f681f46b7ff1148372f96",
+  "captureDateUTC": "2026-10-25",
+  "publicationPurpose": "Previously executed acceptance evidence; no rerun",
+  "files": [
+    {
+      "path": "logs/browser-run1.log",
+      "sourceBytes": 67,
+      "sourceSHA256": "2eb79a1c661f63c0bc1b75d09c0b63a25ae7b13293b4b1e7556179cb23cd2718",
+      "publishedBytes": 67,
+      "publishedSHA256": "2eb79a1c661f63c0bc1b75d09c0b63a25ae7b13293b4b1e7556179cb23cd2718",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:24:37.614609+00:00"
+    },
+    {
+      "path": "logs/browser-run2.log",
+      "sourceBytes": 497,
+      "sourceSHA256": "ba813a1da6b10add21331470a6401fa31dca7fe27ee7fd4e487b2d86d6a419c8",
+      "publishedBytes": 445,
+      "publishedSHA256": "514ed32ea45f4687bb39bc02cba08627940639cc013afa3e16d3cd7bd85a331e",
+      "redacted": true,
+      "sourceMtimeUTC": "2026-10-25T17:30:42.474546+00:00"
+    },
+    {
+      "path": "logs/browser-run3.log",
+      "sourceBytes": 770,
+      "sourceSHA256": "0d91c9dec47d5012c1bb43c1c83febcbbdc318381136b6021d856d7eb265dc75",
+      "publishedBytes": 718,
+      "publishedSHA256": "0f0a7f25bed2c71c9eae6a78451391908f01b58375f86972121bfd7c3c5f36cb",
+      "redacted": true,
+      "sourceMtimeUTC": "2026-10-25T17:31:22.302114+00:00"
+    },
+    {
+      "path": "logs/browser-run4.log",
+      "sourceBytes": 770,
+      "sourceSHA256": "9e00ac4e65daf5ed73307269a6d6e34dd4e374b96078d2c11c400ce0da44fa83",
+      "publishedBytes": 718,
+      "publishedSHA256": "090c3b60203fed8eb507c2eff4be7c626328230e19bc9774d9abb13a08a2680f",
+      "redacted": true,
+      "sourceMtimeUTC": "2026-10-25T17:31:49.245824+00:00"
+    },
+    {
+      "path": "logs/browser-run5.log",
+      "sourceBytes": 3000,
+      "sourceSHA256": "ac83615365efbcd9488f81aca6eed4882584ad33b08caf4ea86f34f1f5744f6f",
+      "publishedBytes": 2792,
+      "publishedSHA256": "984bf7e851ca4e4f905b7d8dc5f26020dd8da7aeafd0cf20e39566d35fe0c7ff",
+      "redacted": true,
+      "sourceMtimeUTC": "2026-10-25T17:33:34.236715+00:00"
+    },
+    {
+      "path": "logs/browser-run6.log",
+      "sourceBytes": 2731,
+      "sourceSHA256": "9ac9c4a1751531cc82c9b287935fb7cee576decf9354c18844c3161d0a3ff7b4",
+      "publishedBytes": 2575,
+      "publishedSHA256": "af3d13657cd06b6296161931d708efd45562b4fb9ef2cd44ffd63e6ffcc7a163",
+      "redacted": true,
+      "sourceMtimeUTC": "2026-10-25T17:34:54.159880+00:00"
+    },
+    {
+      "path": "logs/browser-expiry-run1.log",
+      "sourceBytes": 1087,
+      "sourceSHA256": "cb9d0834aba665b312dab023276005af84c3570087c0c81fde3cbd64d45034e9",
+      "publishedBytes": 983,
+      "publishedSHA256": "139e439861264f5661f86446326d43804833187962186ceed026ec925fdf9080",
+      "redacted": true,
+      "sourceMtimeUTC": "2026-10-25T17:36:25.914926+00:00"
+    },
+    {
+      "path": "logs/browser-expiry-run2.log",
+      "sourceBytes": 1087,
+      "sourceSHA256": "23b52831cc09016656517adced4fb3eaeef1a2cd7209824305a55bafe837836b",
+      "publishedBytes": 983,
+      "publishedSHA256": "e5379824002263a4df357d2498d39eb5fb929555ccc0c4b767039ccad1550c87",
+      "redacted": true,
+      "sourceMtimeUTC": "2026-10-25T17:37:04.314528+00:00"
+    },
+    {
+      "path": "logs/runtime.log",
+      "sourceBytes": 51550,
+      "sourceSHA256": "ad272645095780876ad5d968873fe1f36a9f24ecdde87a704b025c4a2416564a",
+      "publishedBytes": 52009,
+      "publishedSHA256": "ec4afb20bd4addca15f98b588438db5f38fe2da8e5e3fe193183724c79942b4e",
+      "redacted": true,
+      "sourceMtimeUTC": "2026-10-25T17:37:46.166101+00:00"
+    },
+    {
+      "path": "logs/provider.ndjson",
+      "sourceBytes": 9577,
+      "sourceSHA256": "f4e6a4633386f5c068df429d823792b7125943af86059049965052f390a06787",
+      "publishedBytes": 9464,
+      "publishedSHA256": "d5d663f790f6a3161a8cdfecf7db6a6341cb8086d69d1305b23e8ed6ca596ca1",
+      "redacted": true,
+      "sourceMtimeUTC": "2026-10-25T17:37:04.306528+00:00"
+    },
+    {
+      "path": "logs/session-retention-check.log",
+      "sourceBytes": 143,
+      "sourceSHA256": "f60b63110f266fa94bd61869054a677daa52f25e90e558287b48ed945dcbf134",
+      "publishedBytes": 143,
+      "publishedSHA256": "f60b63110f266fa94bd61869054a677daa52f25e90e558287b48ed945dcbf134",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:36:07.455118+00:00"
+    },
+    {
+      "path": "logs/session-retention-retest.log",
+      "sourceBytes": 162,
+      "sourceSHA256": "3b966f87e327a17e0874ecc37f034720d921dfa4bda8ce7182b51821a3fcdf54",
+      "publishedBytes": 162,
+      "publishedSHA256": "3b966f87e327a17e0874ecc37f034720d921dfa4bda8ce7182b51821a3fcdf54",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:37:11.674453+00:00"
+    },
+    {
+      "path": "logs/pg-http-tests.log",
+      "sourceBytes": 4940,
+      "sourceSHA256": "e40ab32285f07c928007f74589f658ed1e146cee5fcce29e749c193cb2c5445b",
+      "publishedBytes": 4940,
+      "publishedSHA256": "e40ab32285f07c928007f74589f658ed1e146cee5fcce29e749c193cb2c5445b",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:24:11.618536+00:00"
+    },
+    {
+      "path": "logs/adapter-tests.log",
+      "sourceBytes": 511,
+      "sourceSHA256": "ed86eca2a2aba047cde9c840df9a30506d7c04d7af202cbfd427da4021906bd1",
+      "publishedBytes": 511,
+      "publishedSHA256": "ed86eca2a2aba047cde9c840df9a30506d7c04d7af202cbfd427da4021906bd1",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:24:11.621304+00:00"
+    },
+    {
+      "path": "results/browser-six-results.json",
+      "sourceBytes": 1089,
+      "sourceSHA256": "3b14af02536fb220df92d50c6679443ffc156b5c1f570b075fad19f655f42905",
+      "publishedBytes": 1089,
+      "publishedSHA256": "3b14af02536fb220df92d50c6679443ffc156b5c1f570b075fad19f655f42905",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:35:02.314337+00:00"
+    },
+    {
+      "path": "results/browser-email-results.json",
+      "sourceBytes": 529,
+      "sourceSHA256": "a1850c2d4c07f8790aa0043cf8406341e442247d39721f7e9acd8de1fadc07d1",
+      "publishedBytes": 529,
+      "publishedSHA256": "a1850c2d4c07f8790aa0043cf8406341e442247d39721f7e9acd8de1fadc07d1",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:33:54.986763+00:00"
+    },
+    {
+      "path": "results/browser-results.json",
+      "sourceBytes": 562,
+      "sourceSHA256": "75028beeb4745f82f88a65c79ef935e1a98d70e5b5ddcbfb3ebe0fe1c490ad49",
+      "publishedBytes": 562,
+      "publishedSHA256": "75028beeb4745f82f88a65c79ef935e1a98d70e5b5ddcbfb3ebe0fe1c490ad49",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:34:56.523855+00:00"
+    },
+    {
+      "path": "results/expired-session-results-before-retention-review.json",
+      "sourceBytes": 247,
+      "sourceSHA256": "a81b0fe7cb6bb5db8c44bd82874fbc8bd71cabd98614ad2bf37c93c7d1d58cd3",
+      "publishedBytes": 247,
+      "publishedSHA256": "a81b0fe7cb6bb5db8c44bd82874fbc8bd71cabd98614ad2bf37c93c7d1d58cd3",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:36:36.627159+00:00"
+    },
+    {
+      "path": "results/expired-session-results.json",
+      "sourceBytes": 247,
+      "sourceSHA256": "a81b0fe7cb6bb5db8c44bd82874fbc8bd71cabd98614ad2bf37c93c7d1d58cd3",
+      "publishedBytes": 247,
+      "publishedSHA256": "a81b0fe7cb6bb5db8c44bd82874fbc8bd71cabd98614ad2bf37c93c7d1d58cd3",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:37:06.694503+00:00"
+    },
+    {
+      "path": "results/ci-status.json",
+      "sourceBytes": 1913,
+      "sourceSHA256": "7eac7940437ab461de1c0fc0c43479fa72a4aa2430c7a91f1596f2b3c4ea330e",
+      "publishedBytes": 1913,
+      "publishedSHA256": "7eac7940437ab461de1c0fc0c43479fa72a4aa2430c7a91f1596f2b3c4ea330e",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:39:14.409196+00:00"
+    },
+    {
+      "path": "results/video-manifest.json",
+      "sourceBytes": 2480,
+      "sourceSHA256": "0896ab64c5aa7f198b65a4d851d38a21b37bd278999712820606c3ac86bccb30",
+      "publishedBytes": 2480,
+      "publishedSHA256": "0896ab64c5aa7f198b65a4d851d38a21b37bd278999712820606c3ac86bccb30",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:37:31.810094+00:00"
+    },
+    {
+      "path": "harness/start.mjs",
+      "sourceBytes": 3982,
+      "sourceSHA256": "41025d02dd4d3d7ac7dca49f848edb16973815d825f72c985bf1f974e2dead62",
+      "publishedBytes": 3982,
+      "publishedSHA256": "41025d02dd4d3d7ac7dca49f848edb16973815d825f72c985bf1f974e2dead62",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:36:26.922783+00:00"
+    },
+    {
+      "path": "harness/record-all.cjs",
+      "sourceBytes": 6685,
+      "sourceSHA256": "69508991dfff9d07242e15680c93506b00e27748482238df6027a1168492cb75",
+      "publishedBytes": 6685,
+      "publishedSHA256": "69508991dfff9d07242e15680c93506b00e27748482238df6027a1168492cb75",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:33:54.988958+00:00"
+    },
+    {
+      "path": "harness/record.cjs",
+      "sourceBytes": 6708,
+      "sourceSHA256": "a480c194cb47e48ad04b3f08cdd3e1aeb21951de404070ddbb7ac71f4b37914a",
+      "publishedBytes": 6708,
+      "publishedSHA256": "a480c194cb47e48ad04b3f08cdd3e1aeb21951de404070ddbb7ac71f4b37914a",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:33:55.003721+00:00"
+    },
+    {
+      "path": "harness/record-expiry.cjs",
+      "sourceBytes": 7354,
+      "sourceSHA256": "91c44675ee983844208d35d4acabafba85bf77bfb26e5df721461d2bca234d69",
+      "publishedBytes": 7354,
+      "publishedSHA256": "91c44675ee983844208d35d4acabafba85bf77bfb26e5df721461d2bca234d69",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:33:38.148511+00:00"
+    },
+    {
+      "path": "harness/control-route.ts",
+      "sourceBytes": 5346,
+      "sourceSHA256": "d1ad49ee0b3546cfe80ff6a7643d28bf96461a443f5eb61125a619acfc2050b0",
+      "publishedBytes": 5346,
+      "publishedSHA256": "d1ad49ee0b3546cfe80ff6a7643d28bf96461a443f5eb61125a619acfc2050b0",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:37:49.743989+00:00"
+    },
+    {
+      "path": "harness/sdk-double.ts",
+      "sourceBytes": 1576,
+      "sourceSHA256": "0d873d39fba163745cd71e1d4dd8d8868e0f2a915adef2014ea5ac2a53ca1101",
+      "publishedBytes": 1576,
+      "publishedSHA256": "0d873d39fba163745cd71e1d4dd8d8868e0f2a915adef2014ea5ac2a53ca1101",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:37:49.746274+00:00"
+    },
+    {
+      "path": "harness/overlay-config.patch",
+      "sourceBytes": 528,
+      "sourceSHA256": "a2542efe99b01d153c0b8b32a5c195ff4cd0782f950d56029821f159bbc5ba49",
+      "publishedBytes": 528,
+      "publishedSHA256": "a2542efe99b01d153c0b8b32a5c195ff4cd0782f950d56029821f159bbc5ba49",
+      "redacted": false,
+      "sourceMtimeUTC": "2026-10-25T17:37:49.738064+00:00"
+    }
+  ],
+  "redaction": "Authentication/SQL parameter lines removed; generated UUID/32-character identifiers deterministically pseudonymized; email strings redacted. No private mapping is published. Unmodified originals remain private. Script fixture literals are intentionally synthetic, not credentials."
+}

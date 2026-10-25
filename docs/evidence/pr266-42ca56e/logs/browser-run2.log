@@ -1,0 +1,4 @@
+send_email-intact proposed {"status":"awaiting_approval","actionId":"fixture-id-f1117a203c28","ref":{"sourceEventId":"fixture-id-ab3599c63f71","actionSlotId":"fixture-id-5455bf4f7f16","operationId":"fixture-id-f1117a203c28","proposalDigest":"d55c66ca74d709025168616b5fac233756d4087834f774601d414c81a6ade150"}}
+send_email-intact send_email-intact：真实批准，stub提交后丢失响应
+TimeoutError locator.click: Timeout 180000ms exceeded.
+

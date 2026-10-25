@@ -1,0 +1,6 @@
+send_email-expired proposed {"status":"awaiting_approval","actionId":"fixture-id-0c8550121d38","ref":{"sourceEventId":"fixture-id-fed92e77b847","actionSlotId":"fixture-id-933fcb52ebed","operationId":"fixture-id-0c8550121d38","proposalDigest":"ed79d6396dd330def429cfb6f1fdf3b97c695918249dcef69a92b6a92ff777c4"}}
+send_email-expired send_email：真实session过期，实际批准必须拒绝
+send_email-expired send_email PASS：session过期后，provider零写入
+update_calendar_event-expired proposed {"status":"awaiting_approval","actionId":"fixture-id-cb6cf8854475","ref":{"sourceEventId":"fixture-id-beb8e1c23f5f","actionSlotId":"fixture-id-e88e716d5487","operationId":"fixture-id-cb6cf8854475","proposalDigest":"e7555726f9f74e6aa4ab26333a6182f9be10028e13fa5b811d9f43407748b7b6"}}
+update_calendar_event-expired update_calendar_event：真实session过期，实际批准必须拒绝
+update_calendar_event-expired update_calendar_event PASS：session过期后，provider零写入

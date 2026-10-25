@@ -1,0 +1,50 @@
+[
+  {
+    "mode": "send_email-intact",
+    "passed": true,
+    "providerWrites": 1,
+    "unknownConsumed": true,
+    "laterMessageConsumed": true,
+    "twoDedupeKeys": true
+  },
+  {
+    "mode": "send_email-missing",
+    "passed": true,
+    "providerWrites": 1,
+    "unknownConsumed": true,
+    "laterMessageConsumed": true,
+    "twoDedupeKeys": true
+  },
+  {
+    "mode": "send_email-null",
+    "passed": true,
+    "providerWrites": 1,
+    "unknownConsumed": true,
+    "laterMessageConsumed": true,
+    "twoDedupeKeys": true
+  },
+  {
+    "mode": "update_calendar_event-intact",
+    "passed": true,
+    "providerWrites": 1,
+    "unknownConsumed": true,
+    "laterMessageConsumed": true,
+    "twoDedupeKeys": true
+  },
+  {
+    "mode": "update_calendar_event-missing",
+    "passed": true,
+    "providerWrites": 1,
+    "unknownConsumed": true,
+    "laterMessageConsumed": true,
+    "twoDedupeKeys": true
+  },
+  {
+    "mode": "update_calendar_event-null",
+    "passed": true,
+    "providerWrites": 1,
+    "unknownConsumed": true,
+    "laterMessageConsumed": true,
+    "twoDedupeKeys": true
+  }
+]

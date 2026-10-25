@@ -1,0 +1,12 @@
+✔ an aborted account lookup never resumes into a provider write (1.814717ms)
+✔ SDK pre-send hook rechecks authority after internal schema preflight (1.682827ms)
+✔ send_email: pinned toolkit/version, approved arguments, preflight fence and unknown receipts (2.521376ms)
+✔ update_calendar_event: pinned toolkit/version, approved arguments, preflight fence and unknown receipts (2.339791ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 663.970765

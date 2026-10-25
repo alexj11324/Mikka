@@ -1,0 +1,22 @@
+send_email-intact proposed {"status":"awaiting_approval","actionId":"fixture-id-617dc74c21c5","ref":{"sourceEventId":"fixture-id-d3c0a5d51aad","actionSlotId":"fixture-id-fd4eedbb5711","operationId":"fixture-id-617dc74c21c5","proposalDigest":"d55c66ca74d709025168616b5fac233756d4087834f774601d414c81a6ade150"}}
+send_email-intact send_email-intact：真实批准，stub提交后丢失响应
+send_email-intact 再次批准：原生lookup不可用，维持unknown，禁止补发
+send_email-intact 消费未知事件，再消费后续普通消息：队列必须推进
+send_email-intact 导入替身的明确收据；再次真实批准，只投影done，不再写provider
+send_email-intact send_email-intact PASS：未知与完成两个去重key，外部替身写入总计一次
+send_email-missing proposed {"status":"awaiting_approval","actionId":"fixture-id-e5d936907f34","ref":{"sourceEventId":"fixture-id-c8d160f72be7","actionSlotId":"fixture-id-4bfb497031f8","operationId":"fixture-id-e5d936907f34","proposalDigest":"90a5bb09d66a02343bf5df27cf456202259b8bbe40a35e591b2887ffbfa42492"}}
+send_email-missing send_email-missing：真实批准，stub提交后丢失响应
+send_email-missing 再次批准：原生lookup不可用，维持unknown，禁止补发
+send_email-missing 消费未知事件，再消费后续普通消息：队列必须推进
+send_email-missing 导入替身的明确收据；再次真实批准，只投影done，不再写provider
+send_email-missing send_email-missing PASS：未知与完成两个去重key，外部替身写入总计一次
+send_email-null proposed {"status":"awaiting_approval","actionId":"fixture-id-5188bd8c0dc6","ref":{"sourceEventId":"fixture-id-fd016779486c","actionSlotId":"fixture-id-76906a57c97a","operationId":"fixture-id-5188bd8c0dc6","proposalDigest":"b3ca1c617fcc28bbac42a497833d537d8ddd93394e520b30f93d03eb3c311521"}}
+send_email-null send_email-null：真实批准，stub提交后丢失响应
+send_email-null 再次批准：原生lookup不可用，维持unknown，禁止补发
+send_email-null 消费未知事件，再消费后续普通消息：队列必须推进
+send_email-null 导入替身的明确收据；再次真实批准，只投影done，不再写provider
+send_email-null send_email-null PASS：未知与完成两个去重key，外部替身写入总计一次
+update_calendar_event-intact proposed {"status":"awaiting_approval","actionId":"fixture-id-1d9ded8d4e81","ref":{"sourceEventId":"fixture-id-78736a55f88d","actionSlotId":"fixture-id-e61e2d51fe2d","operationId":"fixture-id-1d9ded8d4e81","proposalDigest":"c9d5df7e9c51c3a4afc1c898756371c30a011448c2423845193516c93dfc2352"}}
+update_calendar_event-intact update_calendar_event-intact：真实批准，stub提交后丢失响应
+Error apiRequestContext.post: socket hang up (ECONNRESET)
+

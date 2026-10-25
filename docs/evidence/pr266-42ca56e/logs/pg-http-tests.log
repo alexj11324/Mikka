@@ -1,0 +1,55 @@
+▶ trusted submission -> durable batch -> new workflow -> run retry -> daemon read-only recovery
+  ✔ ten submission retries reuse source, changed request conflicts, intentional identical request differs (96.336945ms)
+  ✔ actual tool wrapper persists entire batch before first proposal and distinct identical slots survive concurrency (122.767473ms)
+  ✔ migration replay after SQL commit preserves persisted source slots and operation identity (11.422691ms)
+  ✔ new workflow replays persisted calls before model; regenerated call cannot create another intent (98.717589ms)
+  ✔ SIGKILL after batch commit before proposal: separate process and new holder recover original slots (620.916988ms)
+  ✔ background events still ride with one foreground source; expired preflight cannot create a proposal (478.349548ms)
+  ✔ real Factory dispatch snapshots references in its transaction; device-loss retry copies them (122.018403ms)
+  ✔ actual HTTP worker route checks token, owner, bound reference and live lease without provider writes (87.513634ms)
+  ✔ real daemon journal restart preserves references; local MCP tool reads actual HTTP endpoint (125.839251ms)
+  ✔ mixed approved actions retain type and stable slots across a new workflow (97.121769ms)
+✔ trusted submission -> durable batch -> new workflow -> run retry -> daemon read-only recovery (5149.281012ms)
+▶ actual create_calendar_event proposal/decision entrypoints -> ledger -> local HTTP provider
+  ✔ step retry and ten concurrent proposals reuse persisted identity; actual approval invokes once (326.769195ms)
+  ✔ lost provider response with historical missing input reconciles without resending (6802.211099ms)
+  ✔ lost provider response with historical null input reconciles without resending (7682.127195ms)
+  ✔ revocation committed after invocation reservation fences the actual send (51.62833ms)
+  ✔ provider succeeds then real SQL writeback fails; retry only reads back (60.472177ms)
+  ✔ legacy unbound proposal cannot execute but can be safely declined (16.897762ms)
+  ✔ session expiry during provider preflight prevents the actual HTTP write (1135.795648ms)
+  ✔ decline, expiry, wrong owner and changed pinned account do not invoke provider (86.888634ms)
+✔ actual create_calendar_event proposal/decision entrypoints -> ledger -> local HTTP provider (20650.625875ms)
+▶ actual send_email proposal/decision entrypoints -> ledger -> local HTTP provider
+  ✔ step retry and ten concurrent proposals reuse persisted identity; actual approval invokes once (216.997697ms)
+  ✔ lost provider response with historical missing input reconciles without resending (7312.372965ms)
+  ✔ lost provider response with historical null input reconciles without resending (6501.410461ms)
+  ✔ revocation committed after invocation reservation fences the actual send (53.348233ms)
+  ✔ provider succeeds then real SQL writeback fails; retry only reads back (79.048126ms)
+  ✔ legacy unbound proposal cannot execute but can be safely declined (18.018782ms)
+  ✔ session expiry during provider preflight prevents the actual HTTP write (1140.133146ms)
+  ✔ decline, expiry, wrong owner and changed pinned account do not invoke provider (93.514596ms)
+✔ actual send_email proposal/decision entrypoints -> ledger -> local HTTP provider (15910.112506ms)
+▶ actual update_calendar_event proposal/decision entrypoints -> ledger -> local HTTP provider
+  ✔ step retry and ten concurrent proposals reuse persisted identity; actual approval invokes once (209.825351ms)
+  ✔ maximum-length valid event id remains executable with bounded ledger target (40.093173ms)
+  ✔ lost provider response with historical missing input reconciles without resending (8481.338966ms)
+  ✔ lost provider response with historical null input reconciles without resending (7486.691345ms)
+  ✔ revocation committed after invocation reservation fences the actual send (45.388792ms)
+  ✔ provider succeeds then real SQL writeback fails; retry only reads back (51.904927ms)
+  ✔ legacy unbound proposal cannot execute but can be safely declined (17.253285ms)
+  ✔ session expiry during provider preflight prevents the actual HTTP write (1136.48452ms)
+  ✔ decline, expiry, wrong owner and changed pinned account do not invoke provider (80.237321ms)
+✔ actual update_calendar_event proposal/decision entrypoints -> ledger -> local HTTP provider (18048.565554ms)
+✔ an aborted account lookup never resumes into a provider write (2.240358ms)
+✔ SDK pre-send hook rechecks authority after internal schema preflight (0.811895ms)
+✔ send_email: pinned toolkit/version, approved arguments, preflight fence and unknown receipts (1.944ms)
+✔ update_calendar_event: pinned toolkit/version, approved arguments, preflight fence and unknown receipts (0.70906ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 43
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 55600.915843

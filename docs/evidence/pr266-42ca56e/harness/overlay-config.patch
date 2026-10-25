@@ -1,0 +1,12 @@
+diff --git a/next.config.mjs b/next.config.mjs
+index ae7a5e1..86b2508 100644
+--- a/next.config.mjs
++++ b/next.config.mjs
+@@ -15,6 +15,7 @@ const nextConfig = {
+     },
+   },
+   webpack(config) {
++    if(process.env.ACCEPTANCE_LOCAL_ONLY==='1') config.resolve.alias['@composio/core$']=new URL('./acceptance-fixture/composio-sdk.ts',import.meta.url).pathname
+     config.resolve.alias['react-syntax-highlighter$'] = new URL('./components/workspace/agent-syntax-highlighter.tsx', import.meta.url).pathname
+     return config
+   },

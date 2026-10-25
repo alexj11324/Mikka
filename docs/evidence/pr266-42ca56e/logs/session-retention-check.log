@@ -1,0 +1,3 @@
+prior session rules []
+expiry owners session counts [ { action: 'send_email', sessions: 0 } ]
+local synthetic session retention rule installed

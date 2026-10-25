@@ -1,0 +1,62 @@
+{
+  "sha": "42ca56ebee733c9f5ed67bec0d48170e7506814e",
+  "environment": "local Next dev webpack + PG with SDK transport double; not production",
+  "videos": [
+    {
+      "scenario": "send_email-intact",
+      "file": "266-42ca56e-send_email-intact-raw.webm",
+      "original": "page@e29e20ee6a6b83567eb7ed1c30a5ecf8.webm",
+      "sha256": "79e67f4c244b8151a9bc2ccd4a1b94e77954003182c83f6ad4a6091bbd9c582b",
+      "bytes": 1104309
+    },
+    {
+      "scenario": "send_email-missing",
+      "file": "266-42ca56e-send_email-missing-raw.webm",
+      "original": "page@e8500fcab373277e8b471102378326e1.webm",
+      "sha256": "03e1729e9004cf054e0568c8f6e9a57dacb2486593729a7512b73a5f13d9d4f4",
+      "bytes": 980659
+    },
+    {
+      "scenario": "send_email-null",
+      "file": "266-42ca56e-send_email-null-raw.webm",
+      "original": "page@6d0f75ec34b5f102f2a7ffdd3d8c759c.webm",
+      "sha256": "e19c84f68442919cf9984f6ee0e21bb14cfb41056707b8a90ae073dfb72aa493",
+      "bytes": 1145944
+    },
+    {
+      "scenario": "update_calendar_event-intact",
+      "file": "266-42ca56e-update_calendar_event-intact-raw.webm",
+      "original": "page@0efee16ae302728fc0f3434c61b4c4a4.webm",
+      "sha256": "59ec2d4f7a0ba5e8dac28b4f1a3d109e90f6b9a4a382fa9b8a48ea008b97d219",
+      "bytes": 1163274
+    },
+    {
+      "scenario": "update_calendar_event-missing",
+      "file": "266-42ca56e-update_calendar_event-missing-raw.webm",
+      "original": "page@fe16b1d9b9b10ff6f6a5bd38229487cf.webm",
+      "sha256": "2425a575fac403519e4886950dcd20e40bc027a778cd3b591682be485661806b",
+      "bytes": 1140289
+    },
+    {
+      "scenario": "update_calendar_event-null",
+      "file": "266-42ca56e-update_calendar_event-null-raw.webm",
+      "original": "page@5b53c7645c890fabc0a4a4b2979f15b6.webm",
+      "sha256": "26d7c3d14b5316051c6fba12610ea8b1af356a8a404738e5df2b690a93c13159",
+      "bytes": 1134633
+    },
+    {
+      "scenario": "send_email-expired",
+      "file": "266-42ca56e-send_email-expired-raw.webm",
+      "original": "page@35a121ea3d1d5bd0b46ee65c3f43c709.webm",
+      "sha256": "9ac6096a61daeb6e121f88338980cfd844021e1d016b05f7e2e3b45af7ab65d0",
+      "bytes": 672924
+    },
+    {
+      "scenario": "update_calendar_event-expired",
+      "file": "266-42ca56e-update_calendar_event-expired-raw.webm",
+      "original": "page@b31279af63fc218deafe867149a68b01.webm",
+      "sha256": "e6228d2b828150f93b404dca5d51d51936fd68df29a8515366e1dab2eae19f63",
+      "bytes": 596118
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "mode": "send_email-intact",
+    "passed": true,
+    "providerWrites": 1,
+    "unknownConsumed": true,
+    "laterMessageConsumed": true,
+    "twoDedupeKeys": true
+  },
+  {
+    "mode": "send_email-missing",
+    "passed": true,
+    "providerWrites": 1,
+    "unknownConsumed": true,
+    "laterMessageConsumed": true,
+    "twoDedupeKeys": true
+  },
+  {
+    "mode": "send_email-null",
+    "passed": true,
+    "providerWrites": 1,
+    "unknownConsumed": true,
+    "laterMessageConsumed": true,
+    "twoDedupeKeys": true
+  }
+]

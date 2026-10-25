@@ -1,0 +1,5 @@
+send_email-intact proposed {"status":"awaiting_approval","actionId":"fixture-id-8548fb0475b2","ref":{"sourceEventId":"fixture-id-9c2322726b0a","actionSlotId":"fixture-id-5ccabcfb3589","operationId":"fixture-id-8548fb0475b2","proposalDigest":"d55c66ca74d709025168616b5fac233756d4087834f774601d414c81a6ade150"}}
+send_email-intact send_email-intact：真实批准，stub提交后丢失响应
+send_email-intact 再次批准：原生lookup不可用，维持unknown，禁止补发
+Error response.text: Protocol error (Network.getResponseBody): No data found for resource with given identifier
+Response body is not available for a response that was navigated away from. Read response.body() before triggering any navigation.

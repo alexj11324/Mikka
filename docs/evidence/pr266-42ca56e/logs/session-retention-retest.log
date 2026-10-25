@@ -1,0 +1,5 @@
+[
+  { action: 'send_email', retained: 1, expired: true },
+  { action: 'update_calendar_event', retained: 1, expired: true }
+]
+PASS both expired sessions retained
