@@ -16,8 +16,8 @@ export async function lockFactoryRun(
 ) {
   const { rows: tasks } = await tx.query(
     `WITH RECURSIVE lineage AS (
-          SELECT id,"retryOf" FROM agent_runs WHERE id=$1
-          UNION SELECT r.id,r."retryOf" FROM agent_runs r JOIN lineage l ON r.id=l."retryOf"
+          SELECT id,"retryOf","continuesRunId" FROM agent_runs WHERE id=$1
+          UNION SELECT r.id,r."retryOf",r."continuesRunId" FROM agent_runs r JOIN lineage l ON r.id=l."retryOf" OR r.id=l."continuesRunId"
         ) SELECT t.* FROM factory_tasks t WHERE t.id IN (
           SELECT a."taskId" FROM factory_attempts a JOIN lineage l ON l.id=a."runId"
         ) ORDER BY t.id FOR UPDATE OF t`,

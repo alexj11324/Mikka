@@ -178,6 +178,17 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!proces
     await createFactoryReconciler(pool,factory)(userId)
     await assignments.preflight(userId,retry,true)
   })
+  await t.test('mailbox continuation retains source requirement and cannot evade Factory adoption through continuesRunId',async()=>{
+    const child=randomUUID()
+    await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"continuesRunId")
+      VALUES($1,$2,$3,$4,$5,$6,'queued',$7)`,[child,userId,issueId,agentId,deviceId,repoId,firstRun])
+    await assert.rejects(assignments.preflight(userId,child,true),/sourceRequired/)
+    await assignments.selectBaseline(userId,child)
+    await assert.rejects(assignments.preflight(userId,child,true),/runUnavailable/)
+    const refused=await assignments.renewHeartbeat(userId,deviceId,[child],true)
+    assert.deepEqual(refused.revoked,[child]);assert.deepEqual(refused.legacy,[]);assert.deepEqual(refused.leases,{})
+    assert.equal((await pool.query('SELECT 1 FROM improvement_skill_receipts WHERE "runId"=$1',[child])).rowCount,0)
+  })
   for(const selected of [false,true])for(const stop of ['cancel','revoke'] as const) {
     await t.test(`Factory ${stop} serializes selected=${selected} heartbeat and resume with task-first locking`,async()=>{
       await pool.query(`UPDATE agent_runs SET status='failed' WHERE "userId"=$1 AND status IN ('queued','preparing','running')`,[userId])

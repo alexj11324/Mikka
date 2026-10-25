@@ -61,8 +61,8 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize) {
     const { rows: [selection] } = await pool.query('SELECT "userId" FROM improvement_skill_selections WHERE "runId"=$1', [runId])
     if (!selection) {
       const { rows:[ancestor] }=await pool.query(`WITH RECURSIVE lineage AS (
-        SELECT id,"retryOf","userId",0 AS depth FROM agent_runs WHERE id=$1 AND "userId"=$2
-        UNION ALL SELECT r.id,r."retryOf",r."userId",l.depth+1 FROM agent_runs r JOIN lineage l ON r.id=l."retryOf" WHERE r."userId"=$2 AND l.depth<10
+        SELECT id,"retryOf","continuesRunId","userId" FROM agent_runs WHERE id=$1 AND "userId"=$2
+        UNION SELECT r.id,r."retryOf",r."continuesRunId",r."userId" FROM agent_runs r JOIN lineage l ON r.id=l."retryOf" OR r.id=l."continuesRunId" WHERE r."userId"=$2
       ) SELECT 1 FROM lineage l JOIN improvement_skill_selections s ON s."runId"=l.id AND s."userId"=$2 LIMIT 1`,[runId,userId])
       if (ancestor) throw new ImprovementError('sourceRequired')
       return
@@ -112,8 +112,8 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize) {
   }
   async function renewHeartbeat(userId:string,deviceId:string,runIds:string[],supportsArtifacts:boolean) {
     const {rows}=await pool.query(`WITH RECURSIVE lineage AS (
-      SELECT id AS root,id,"retryOf" FROM agent_runs WHERE "userId"=$1 AND id=ANY($2::uuid[])
-      UNION SELECT l.root,r.id,r."retryOf" FROM agent_runs r JOIN lineage l ON r.id=l."retryOf"
+      SELECT id AS root,id,"retryOf","continuesRunId" FROM agent_runs WHERE "userId"=$1 AND id=ANY($2::uuid[])
+      UNION SELECT l.root,r.id,r."retryOf",r."continuesRunId" FROM agent_runs r JOIN lineage l ON r.id=l."retryOf" OR r.id=l."continuesRunId"
     ) SELECT run.id AS "runId",receipt.id,(s."runId" IS NOT NULL) AS selected FROM agent_runs run
       LEFT JOIN improvement_skill_selections s ON s."runId"=run.id AND s."userId"=$1
       LEFT JOIN improvement_skill_receipts receipt ON receipt."runId"=run.id AND receipt."userId"=$1

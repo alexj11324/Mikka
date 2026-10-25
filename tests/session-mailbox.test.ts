@@ -1,3 +1,4 @@
+import { createFactoryStore } from '../lib/factory/store'
 import { createExecutionClaim } from '../lib/factory/execution-claim'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
@@ -253,6 +254,27 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
       assert.equal((await pool.query('select status from agent_runs where id=$1', [queued])).rows[0].status, 'queued')
       await store.policy(owner, recipient.mailboxId, 0, false)
       assert.equal((await store.run(owner, queued)).mailboxId, recipient.mailboxId)
+    })
+    await t.test('Factory-bound mailbox cannot dispatch an unadopted continuation, including owner resume', async () => {
+      const source=randomUUID(), next=randomUUID(), child=randomUUID()
+      await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES($1,$2,'user_message',$3,'{}')`,[source,owner,source])
+      const factory=createFactoryStore(pool,async(u,i)=>u===owner&&i===issue)
+      const task=(await factory.route(owner,{issueId:issue,sourceEventId:source,eventId:randomUUID(),rationale:'Mailbox integration fixture'})).task
+      await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"sessionId","worktreePath") VALUES($1,$2,$3,$4,$5,$6,'running','factory-cli','/isolated/factory')`,[next,owner,issue,role,device,repo])
+      await pool.query(`UPDATE factory_attempts SET "runId"=$1,status='running' WHERE id=$2`,[next,task.attemptId])
+      await pool.query(`UPDATE factory_tasks SET status='running' WHERE id=$1`,[task.id])
+      const recipient=await store.run(owner,next)
+      await store.complete(owner,next,'succeeded','submitted',{summary:'Await Factory review, not automatic re-execution.'})
+      await store.send(a,{to:recipient.mailboxId,key:randomUUID(),text:'Follow-up'})
+      assert.equal((await store.policy(owner,recipient.mailboxId,2,false)).continuationRunId,null)
+      assert.equal((await store.ownerSend(owner,{to:recipient.mailboxId,key:randomUUID(),text:'Resume through Factory',resume:true})).continuationRunId,undefined)
+      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "continuesRunId"=$1',[next])).rowCount,0)
+      // A pre-existing/unadopted child also fails the actual claim implementation.
+      await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"continuesRunId") VALUES($1,$2,$3,$4,$5,$6,'queued',$7)`,[child,owner,issue,role,device,repo,next])
+      await assert.rejects(createExecutionClaim(pool,async()=>true)(owner,device,child,new Date(Date.now()+60000).toISOString()),/factoryRunMismatch/)
+      await pool.query(`UPDATE factory_tasks SET status='cancelled' WHERE id=$1`,[task.id])
+      await assert.rejects(createExecutionClaim(pool,async()=>true)(owner,device,child,new Date(Date.now()+60000).toISOString()),/factoryStopped/)
+      assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[child])).rows[0].status,'queued')
     })
     await t.test('result/terminal update roll back together if event persistence fails', async () => {
       await pool.query(`create function reject_finish() returns trigger language plpgsql as $$ begin if new.kind='run_finished' then raise exception 'injected completion failure'; end if; return new; end $$`)

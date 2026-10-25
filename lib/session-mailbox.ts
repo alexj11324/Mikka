@@ -106,6 +106,14 @@ export class SessionMailbox {
     // Only a clean, submitted result is eligible. Failure/access/product gates
     // require owner intervention, even if a peer asks to continue.
     if (!run || run.harness !== box.harness || LIVE.includes(run.status) || run.status === 'cancelled' || (!ownerResume && (run.status !== 'succeeded' || run.stopReason !== 'submitted')) || run.stopRequestedAt || !run.enabled || !run.sessionId || !run.worktreePath) return null
+    // Factory continuation belongs to its persisted stage/question state machine,
+    // not a mailbox wake budget. Read lineage without reversing task→mailbox locks.
+    const { rows: factory } = await client.query(`WITH RECURSIVE lineage AS (
+      SELECT id,"retryOf","continuesRunId" FROM agent_runs WHERE id=$1
+      UNION SELECT r.id,r."retryOf",r."continuesRunId" FROM agent_runs r JOIN lineage l
+        ON r.id=l."retryOf" OR r.id=l."continuesRunId"
+    ) SELECT 1 FROM factory_attempts a JOIN lineage l ON a."runId"=l.id LIMIT 1`, [run.id])
+    if (factory.length) return null
     const { rows: pending } = await client.query('select id from run_messages where "mailboxId"=$1 and "acknowledgedAt" is null and failure is null order by sequence limit 50', [box.id])
     if (!pending.length) return null
     const id = randomUUID()
