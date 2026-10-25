@@ -30,7 +30,7 @@ function fingerprint(input: DispatchInput): string {
  * Lock order is always request key, then issue; unkeyed calls take only issue.
  */
 export async function insertRunOnce(database: Pick<typeof db, 'transaction'>, userId: string, input: DispatchInput,
-  brief: { deviceId: string; baseBranch: string; prompt: string }): Promise<DispatchResult> {
+  brief: { workspaceId?: string; deviceId: string; baseBranch: string; prompt: string }): Promise<DispatchResult> {
   return database.transaction(async tx => {
     const hash = input.requestKey ? fingerprint(input) : null
     if (input.requestKey) {
@@ -47,6 +47,7 @@ export async function insertRunOnce(database: Pick<typeof db, 'transaction'>, us
     const [active] = await tx.select({ id: agentRuns.id }).from(agentRuns)
       .where(and(eq(agentRuns.userId, userId), eq(agentRuns.issueId, input.issueId), inArray(agentRuns.status, LIVE_STATUSES))).limit(1)
     if (active) throw new ActionFailureError('runAlreadyActive', { runId: active.id })
+    if (brief.workspaceId) await tx.execute(sql`select set_config('mikka.audit_workspace', ${brief.workspaceId}, true)`)
     const runId = crypto.randomUUID()
     await tx.insert(agentRuns).values({
       id: runId, userId, issueId: input.issueId, agentId: input.agentId, deviceId: brief.deviceId,

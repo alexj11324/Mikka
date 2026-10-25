@@ -1,10 +1,10 @@
-import { authenticateDevice, ownedDevice } from "@/lib/device-link";
+import { authenticateDevice, ownedDevice, withDeviceAuthorization } from "@/lib/device-link";
 import { subscriptionRuntime } from "@/lib/subscription-runtime";
 import { subscriptionNativeHTTP } from "@/lib/subscription-native-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
-export const POST = subscriptionNativeHTTP({
+const handlePOST = subscriptionNativeHTTP({
   authorize: async (request, deviceId) => {
     const caller = await authenticateDevice(request);
     if (
@@ -21,3 +21,5 @@ export const POST = subscriptionNativeHTTP({
   },
   service: () => subscriptionRuntime(true),
 });
+
+export const POST = withDeviceAuthorization(handlePOST);

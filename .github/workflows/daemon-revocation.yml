@@ -1,0 +1,77 @@
+name: Daemon credential revocation
+on:
+  push:
+    branches: ['fix/178-daemon-revocation', 'fix/178-transaction-fence']
+permissions:
+  contents: read
+jobs:
+  isolated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mikka_e2e
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mikka_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      CI: 'true'
+      E2E_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Ephemeral isolated session key
+        run: |
+          node --input-type=module <<'JS'
+          import { randomBytes } from 'node:crypto'
+          import { appendFileSync } from 'node:fs'
+          const key = randomBytes(32).toString('hex')
+          console.log('::add-mask::' + key)
+          appendFileSync(process.env.GITHUB_ENV, 'BETTER_AUTH_SECRET=' + key + '\n')
+          JS
+      - name: Attest exact source
+        run: |
+          git rev-parse HEAD
+          git diff --exit-code HEAD
+      - run: pnpm test:e2e:setup
+      - name: Transaction-local revocation and audit fault regression
+        run: node --conditions=react-server --import ./scripts/daemon/server-only.mjs --import tsx scripts/daemon/revocation-faults.mjs
+      - run: node --import tsx --test lib/db/device-scope.test.ts
+      - run: pnpm typecheck
+      - run: pnpm --filter @mikka/daemon typecheck
+      - run: pnpm build
+      - name: Real Go broker observes actual application revoke
+        working-directory: packages/subscription-worker
+        env:
+          CGO_ENABLED: '0'
+          GOTOOLCHAIN: local
+          GOMODCACHE: ${{ github.workspace }}/packages/subscription-worker/.cache/build-toolchain/modules
+          GOCACHE: ${{ github.workspace }}/packages/subscription-worker/.cache/build-toolchain/objects
+          MIKKA_BYOS_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_e2e
+        run: .cache/build-toolchain/go/bin/go test -mod=readonly -run '^TestDaemonCredentialRevokeCancelsSilentNativeStream$' -count=1 -timeout=45s -v . > ../../test-results/daemon-faults/byos-revocation.log 2>&1
+      - run: pnpm exec playwright test tests/e2e/device-revocation.spec.ts --output=browser-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daemon-revocation-sanitized-evidence
+          path: |
+            browser-results/**/device-revocation-evidence.json
+            test-results/daemon-faults/device-revocation-fault-evidence.json
+            test-results/daemon-faults/byos-revocation.log
+          if-no-files-found: ignore
+          retention-days: 7

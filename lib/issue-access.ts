@@ -1,3 +1,5 @@
+import { appendAudit } from '@/lib/audit/store'
+import { pool } from '@/lib/db'
 import 'server-only'
 import { and, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
@@ -19,7 +21,10 @@ export async function requireUser() {
 export async function requireIssueAccess(id: string, includeDeleted = false) {
   const user = await requireUser()
   const issue = await findIssueForUser(user.id, id, includeDeleted)
-  if (!issue) throw new ActionFailureError('issueNotFound')
+  if (!issue) {
+    await appendAudit(pool, `personal:${user.id}`, { actorId: user.id, actorType: 'human', resourceId: 'issue', action: 'authorization.denied', outcome: 'denied', reason: 'issue_access_denied' })
+    throw new ActionFailureError('issueNotFound')
+  }
   return { ...issue, user }
 }
 

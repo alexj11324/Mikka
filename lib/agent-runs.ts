@@ -1,3 +1,5 @@
+import { workspaceDb } from '@/lib/workspace-db'
+import { teamIssues } from '@/lib/db/team-schema'
 import 'server-only'
 import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
@@ -58,7 +60,9 @@ export async function queueRun(userId: string, input: DispatchInput, executor: P
   const [repo] = await executor.select().from(deviceRepos)
     .where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.deviceId, agent.deviceId), eq(deviceRepos.userId, userId))).limit(1)
   if (!repo) throw new ActionFailureError('agentRepoMissing')
+  const [auditScope] = await workspaceDb.select({ workspaceId: teamIssues.workspaceId }).from(teamIssues).where(eq(teamIssues.issueId, issue.id)).limit(1)
   return insertRunOnce(executor, userId, parsed.data, {
+    workspaceId: issue.scope === 'workspace' ? auditScope?.workspaceId ?? `personal:${userId}` : `personal:${userId}`,
     deviceId: agent.deviceId, baseBranch: repo.baseBranch,
     prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note),
   })

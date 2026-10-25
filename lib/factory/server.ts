@@ -21,7 +21,13 @@ const authorize: FactoryAuthorize = async (userId, issueId, tx) => {
   // Reuse the held transaction: a second pool checkout here can deadlock
   // concurrent operations when the application connection pool is full.
   await tx.query("SELECT id FROM issues WHERE id=$1 FOR SHARE", [issueId]);
-  return Boolean(await issueForUser(userId, issueId, false, drizzle(tx)));
+  const allowedIssue = await issueForUser(userId, issueId, false, drizzle(tx));
+  const allowed = Boolean(allowedIssue);
+  if (allowed) {
+    const [link] = await workspaceDb.select({ workspaceId: teamIssues.workspaceId }).from(teamIssues).where(eq(teamIssues.issueId, issueId)).limit(1);
+    await tx.query("SELECT set_config('mikka.audit_workspace',$1,true)", [allowedIssue?.scope === 'workspace' ? link?.workspaceId ?? `personal:${userId}` : `personal:${userId}`]);
+  }
+  return allowed;
 };
 export const factoryStore = createFactoryStore(pool, authorize, {
   ...factoryCheckGates,

@@ -1,3 +1,5 @@
+import { pool } from "@/lib/db";
+import { appendAudit } from "@/lib/audit/store";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { factoryApprovals } from "@/lib/factory/server";
@@ -27,6 +29,9 @@ async function respond(
         ? await request.json().catch(() => null)
         : undefined,
   });
+  if (result.status >= 400) {
+    await appendAudit(pool, actor ? `personal:${actor.userId}` : "system:auth", { actorId: actor?.userId ?? "anonymous", actorType: actor ? "human" : "anonymous", resourceId: "factory", action: "authorization.denied", outcome: "denied", reason: `factory_http_${result.status}` });
+  }
   return NextResponse.json(result.body, {
     status: result.status,
     headers: { "Cache-Control": "private, no-store" },

@@ -1,3 +1,4 @@
+import { withDeviceAuthorization } from '@/lib/device-link'
 import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { deviceRegistration } from '@mikka/protocol/device'
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic'
  * after a restart. A `deviceId` the caller already owns keeps that id, so the
  * runs pinned to it survive; any other id becomes a new device.
  */
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const parsed = deviceRegistration.safeParse(await request.json().catch(() => null))
@@ -32,3 +33,5 @@ export async function POST(request: Request) {
   await db.insert(devices).values({ id: deviceId, ownerId: caller.userId, ...fields })
   return NextResponse.json({ deviceId, workspaceId: WORKSPACE_ID })
 }
+
+export const POST = withDeviceAuthorization(handlePOST)

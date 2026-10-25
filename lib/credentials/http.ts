@@ -33,10 +33,12 @@ async function body(request: Request): Promise<unknown> {
 export function credentialHttp(options: {
   broker: CredentialBroker; origin: string;
   authenticate: (request: Request) => Promise<Principal | null>
+  denied?: (principal: Principal, reason: string) => Promise<void>
 }) {
   return async (request: Request, action: 'create' | 'get' | 'submit' | 'cancel' | 'events', id?: string): Promise<Response> => {
+    let principal: Principal | null = null
     try {
-      const principal = await options.authenticate(request)
+      principal = await options.authenticate(request)
       if (!principal) throw new CredentialError('credential_auth_required', 401)
       const mutation = ['create', 'submit', 'cancel'].includes(action)
       if (request.method !== (mutation ? 'POST' : 'GET')) throw new CredentialError('credential_method_invalid', 405)
@@ -66,6 +68,7 @@ export function credentialHttp(options: {
       }
       return Response.json(result, { status: action === 'create' ? 201 : 200, headers })
     } catch (error) {
+      if (principal && error instanceof CredentialError && [401,403,404].includes(error.status)) await options.denied?.(principal, error.code)
       // Never stringify arbitrary exceptions, Zod errors, Request, headers or provider errors.
       return Response.json({ error: error instanceof CredentialError ? error.code : 'credential_unavailable' }, {
         status: error instanceof CredentialError ? error.status : 503, headers,

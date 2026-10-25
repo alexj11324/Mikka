@@ -1,3 +1,4 @@
+import { withDeviceAuthorization } from '@/lib/device-link'
 import { NextResponse } from 'next/server'
 import { and, eq, inArray } from 'drizzle-orm'
 import { RUN_CHECKPOINT_MAX_BYTES, runCheckpointSchema } from '@mikka/protocol/device'
@@ -13,7 +14,7 @@ export const dynamic = 'force-dynamic'
  * daemon of the device it runs on. Only the latest one is kept; another
  * machine that takes the run over starts from it.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { runId } = await params
@@ -34,3 +35,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     .onConflictDoUpdate({ target: runCheckpoints.runId, set: values })
   return new NextResponse(null, { status: 204 })
 }
+
+export const POST = withDeviceAuthorization(handlePOST)

@@ -1,3 +1,4 @@
+import { appendAudit } from '@/lib/audit/store'
 import 'server-only'
 import { Pool } from 'pg'
 import { auth } from '@/lib/auth'
@@ -99,6 +100,7 @@ export async function handleCredentialRequest(request: Request, action: 'create'
   try {
     return await credentialHttp({
       broker: ['get', 'events', 'cancel'].includes(action) ? getCredentialCleanupBroker() : getCredentialBroker(), origin: appOrigin!,
+      denied: async (principal, reason) => { await appendAudit(pool, `personal:${principal.ownerId}`, { actorId: principal.ownerId, actorType: 'human', resourceId: 'credential', action: 'authorization.denied', outcome: 'denied', reason }) },
       authenticate: async req => {
         const session = await auth.api.getSession({ headers: req.headers })
         return session?.user && session.session.id ? { ownerId: session.user.id, authSessionId: session.session.id } : null

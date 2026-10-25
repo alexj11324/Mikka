@@ -1,3 +1,4 @@
+import { withDeviceAuthorization } from '@/lib/device-link'
 import { mailboxes } from '@/lib/mailbox-runtime'
 import { NextResponse } from 'next/server'
 import { and, eq, isNull, or, ne } from 'drizzle-orm'
@@ -8,7 +9,7 @@ import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 export const dynamic = 'force-dynamic'
 
 /** `GET /v1/devices/:deviceId/runs?state=queued`: runs waiting for this device. */
-export async function GET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
+async function handleGET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
@@ -23,3 +24,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ devi
     .where(and(eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued'), ne(agentRuns.kind, 'group_review'), isNull(agentRuns.stopRequestedAt), or(isNull(agentRuns.mailboxId), eq(sessionMailboxes.disabled, false))))
   return NextResponse.json({ runIds: rows.map(row => row.id) })
 }
+
+export const GET = withDeviceAuthorization(handleGET)

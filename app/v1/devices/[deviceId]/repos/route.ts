@@ -1,3 +1,4 @@
+import { withDeviceAuthorization } from '@/lib/device-link'
 import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
@@ -7,7 +8,7 @@ import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 export const dynamic = 'force-dynamic'
 
 /** `GET /v1/devices/:deviceId/repos`: the repos this device's agents may work in. */
-export async function GET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
+async function handleGET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
@@ -21,3 +22,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ devi
     })),
   })
 }
+
+export const GET = withDeviceAuthorization(handleGET)

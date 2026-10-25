@@ -1,3 +1,4 @@
+import { withDeviceAdmission } from '@/lib/device-revocation'
 import { NextResponse } from 'next/server'
 import { COMMANDS_MAX_SKIP, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_PARAM } from '@mikka/protocol/device'
 import { authenticateDevice, ownedDevice, pendingCommands, sleep, waitSeconds } from '@/lib/device-link'
@@ -19,7 +20,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ devi
     .split(',').filter(Boolean).slice(0, COMMANDS_MAX_SKIP)
   const deadline = Date.now() + wait * 1000
   for (;;) {
-    const commands = await pendingCommands(deviceId, skip)
+    const commands = await withDeviceAdmission(caller, () => pendingCommands(deviceId, skip))
+    if (!commands) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (commands.length > 0 || Date.now() >= deadline) return NextResponse.json({ commands })
     await sleep(Math.min(1_000, Math.max(50, deadline - Date.now())))
   }

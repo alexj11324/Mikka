@@ -1,3 +1,4 @@
+import { withDeviceAuthorization } from '@/lib/device-link'
 import { NextResponse } from 'next/server'
 import { and, eq, inArray, ne } from 'drizzle-orm'
 import { runPatchSchema } from '@mikka/protocol/device'
@@ -21,7 +22,7 @@ async function ownedRun(runId: string, userId: string): Promise<boolean> {
 }
 
 /** `PATCH /v1/runs/:runId`: the run's live state, session and worktree. */
-export async function PATCH(request: Request, { params }: { params: Promise<{ runId: string }> }) {
+async function handlePATCH(request: Request, { params }: { params: Promise<{ runId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { runId } = await params
@@ -41,3 +42,5 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ru
     .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATES])))
   return new NextResponse(null, { status: 204 })
 }
+
+export const PATCH = withDeviceAuthorization(handlePATCH)

@@ -1,3 +1,4 @@
+import { withDeviceAuthorization } from '@/lib/device-link'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { pool } from '@/lib/db'
@@ -11,7 +12,7 @@ import { ReviewFailure } from '@/lib/group-review-access'
 /** Device auth only. Browser sessions and browser-supplied author fields do not
  * authorize Agent authorship. This route cannot serve private repository runs.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const { runId } = await params
@@ -28,3 +29,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     throw error
   }
 }
+
+export const POST = withDeviceAuthorization(handlePOST)

@@ -19,9 +19,24 @@ export class SessionMailbox {
   }
   private async ensure(client: PoolClient, userId: string, kind: Mailbox['kind'], sessionKey: string): Promise<Mailbox> {
     const { rows } = await client.query<Mailbox>(`insert into session_mailboxes (id,"userId","workspaceId",kind,"sessionKey") values ($1,$2,$3,$4,$5)
-      on conflict ("userId","workspaceId",kind,"sessionKey") do update set "sessionKey"=excluded."sessionKey" returning *`, [randomUUID(), userId, this.workspaceId, kind, sessionKey])
-    return rows[0]
+      on conflict ("userId","workspaceId",kind,"sessionKey") do nothing returning *`, [randomUUID(), userId, this.workspaceId, kind, sessionKey])
+    if (rows[0]) return rows[0]
+    // Existing identities need no no-op UPDATE lock. Completion locks its full
+    // mailbox set in one stable order before mutating any audited run rows.
+    const existing = await client.query<Mailbox>('select * from session_mailboxes where "userId"=$1 and "workspaceId"=$2 and kind=$3 and "sessionKey"=$4', [userId,this.workspaceId,kind,sessionKey])
+    if (!existing.rows[0]) throw new MailboxError('Mailbox unavailable',409)
+    return existing.rows[0]
   }
+  private async completionLocks(client: PoolClient, userId: string, runId: string) {
+    const candidate=(await client.query(`select r."mailboxId",(r."mailboxId" is null or (m."userId"=$2 and m."workspaceId"=$3)) as eligible from agent_runs r left join session_mailboxes m on m.id=r."mailboxId" where r.id=$1 and r."userId"=$2 and r.kind<>'group_review'`, [runId,userId,this.workspaceId])).rows[0]
+    if (!candidate) throw new MailboxError('Unknown run',404)
+    if (!candidate.eligible) throw new MailboxError('Mailbox unavailable',403)
+    const coordinator=await this.ensure(client,userId,'coordinator','coordinator')
+    const ids=[coordinator.id,...(candidate.mailboxId?[candidate.mailboxId]:[])]
+    await client.query('select id from session_mailboxes where id=any($1::uuid[]) order by id for update',[ids])
+    return candidate.mailboxId as string | null
+  }
+
   /** Only call for a verified server-side conversation identity. */
   async conversation(userId: string, kind: 'coordinator' | 'bot', sessionKey = 'coordinator'): Promise<MailboxActor> {
     return this.transaction(async client => {
@@ -162,8 +177,10 @@ export class SessionMailbox {
   /** Owner stop fences this logical session, including a racing queued continuation. */
   async stop(userId: string, runId: string) {
     return this.transaction(async client => {
-      const { rows: [run] } = await client.query('select "mailboxId" from agent_runs where id=$1 and "userId"=$2 and kind<>\'group_review\'', [runId, userId])
+      const lockedMailbox=await this.completionLocks(client,userId,runId)
+      const { rows: [run] } = await client.query('select "mailboxId" from agent_runs where id=$1 and "userId"=$2 and kind<>\'group_review\' for update', [runId, userId])
       if (!run || run.kind === 'group_review') throw new MailboxError('Unknown run', 404)
+      if (run.mailboxId !== lockedMailbox) throw new MailboxError('Mailbox changed; retry',409)
       if (run.mailboxId) {
         const fenced = await client.query('update session_mailboxes set disabled=true,"wakeBudget"=0 where id=$1 and "userId"=$2 and "workspaceId"=$3', [run.mailboxId, userId, this.workspaceId])
         if (!fenced.rowCount) throw new MailboxError('Mailbox unavailable')
@@ -177,8 +194,10 @@ export class SessionMailbox {
   /** Atomically persist the result before making completion observable. */
   async complete(userId: string, runId: string, status: string, stopReason: string, report: Record<string, unknown> | null, existingTransaction?: PoolClient) {
     const work = async (client: PoolClient) => {
+      const lockedMailbox=await this.completionLocks(client,userId,runId)
       const { rows: [run] } = await client.query(`select r.* from agent_runs r join devices d on d.id=r."deviceId" left join session_mailboxes m on m.id=r."mailboxId" where r.id=$1 and r."userId"=$2 and d."ownerId"=$2 and (r."mailboxId" is null or (m."workspaceId"=$3 and m."userId"=$2)) for update of r`, [runId, userId, this.workspaceId])
       if (!run || run.kind === 'group_review') throw new MailboxError('Unknown run', 404)
+      if (run.mailboxId !== lockedMailbox) throw new MailboxError('Mailbox changed; retry',409)
       if (!LIVE.includes(run.status)) return false
       await this.recordCompletion(client, run, status, stopReason, report)
       return true

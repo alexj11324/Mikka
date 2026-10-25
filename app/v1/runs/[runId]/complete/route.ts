@@ -1,3 +1,6 @@
+import { withDeviceAuthorization } from '@/lib/device-link'
+import { randomUUID } from 'node:crypto'
+import { auditActor } from '@/lib/audit/store'
 import { after, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { runStateForStop } from '@mikka/protocol/daemon'
@@ -23,7 +26,7 @@ const LIVE_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finis
  * moves to review, which is the only issue write this route makes. The
  * owner's Coordinator hears that the run ended.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ runId: string }> },) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ runId: string }> },) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { runId } = await params
@@ -55,6 +58,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   const tx = await pool.connect()
   let ended = false
   try { await tx.query('BEGIN')
+    await auditActor(tx, caller.tokenId, 'worker', randomUUID())
     // Match Factory cancellation/answer lock order before touching the run row.
     await tx
     .query(
@@ -101,3 +105,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   }
   return new NextResponse(null, { status: 204 })
 }
+
+export const POST = withDeviceAuthorization(handlePOST)
