@@ -1,0 +1,4 @@
+Source 88eff863c9d4e9c3acf3ee625cb154e456ce81cc
+Command pnpm check
+Exit 1 at test:agent: 54 tests, 51 passed, 3 failed.
+Same unchanged frontend source/static-regex assertions as frozen base20e and earlierhead953. No layout/test assertion changes. Full raw log SHA256 48978d5a619c2ed99feae6fa0008019b1e217b5cbaacb9a5994344857ef2c8d4

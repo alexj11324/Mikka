@@ -1,0 +1,81 @@
+{
+  "sha": "88eff863c9d4e9c3acf3ee625cb154e456ce81cc",
+  "origin": "http://127.0.0.1:3110",
+  "utc": "2026-10-25T17:38:19.893Z",
+  "layer": "actual compiled Next HTTP and isolated PG; synthetic fixture only",
+  "owner": "Mq0BMvbPGVnH3u2nMflz1XBr25ofWbOl",
+  "tenant": "personal:Mq0BMvbPGVnH3u2nMflz1XBr25ofWbOl",
+  "exportId": "31e001a2-27b9-4b08-a4c2-2b96f1c34fe7",
+  "expectedCount": "3",
+  "actualCount": 3,
+  "verifiedHash": "a8f69fbd8290de32f4a7602dea7ef732648608383de38948d08319a5fedefdf4",
+  "requests": [
+    {
+      "id": "c2831a7a-b271-4837-bd2d-c5af6bcfaa96",
+      "path": "/api/auth/sign-up/email",
+      "status": 200,
+      "utc": "2026-10-25T17:38:16.977Z"
+    },
+    {
+      "id": "e7ec5801-e627-4d9d-892f-16b2390a75fe",
+      "path": "/api/audit",
+      "status": 200,
+      "utc": "2026-10-25T17:38:16.994Z"
+    },
+    {
+      "id": "ed8ab426-0a3c-4cfd-94a5-eaee90325665",
+      "path": "/api/audit",
+      "status": 503,
+      "utc": "2026-10-25T17:38:17.020Z"
+    },
+    {
+      "id": "2cbc4bad-710c-40b0-b541-655bf020f0b0",
+      "path": "/api/auth/sign-in/email",
+      "status": 503,
+      "utc": "2026-10-25T17:38:17.112Z"
+    },
+    {
+      "id": "1ee77e58-5f5a-4831-bb97-f2782a2b3a11",
+      "path": "/api/audit",
+      "status": 200,
+      "utc": "2026-10-25T17:38:17.133Z"
+    },
+    {
+      "id": "1a600fb0-0065-4585-93e4-8de48a6c2961",
+      "path": "/api/audit/export",
+      "status": 200,
+      "utc": "2026-10-25T17:38:17.156Z"
+    },
+    {
+      "id": "9a670135-e233-4953-9c72-389b212a589d",
+      "path": "/api/audit/export?id=31e001a2-27b9-4b08-a4c2-2b96f1c34fe7&source=application&after=0&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T17:38:17.169Z"
+    },
+    {
+      "id": "cb24fd4a-3e5c-43fe-a5c6-bccdfe0e7ac0",
+      "path": "/api/audit/export?id=31e001a2-27b9-4b08-a4c2-2b96f1c34fe7&source=application&after=1&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T17:38:19.840Z"
+    },
+    {
+      "id": "38c0f985-3417-408d-b5a2-f2ba2b0244ea",
+      "path": "/api/audit/export?id=31e001a2-27b9-4b08-a4c2-2b96f1c34fe7&source=application&after=2&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T17:38:19.854Z"
+    },
+    {
+      "id": "10f2931d-d92c-4cdf-909c-f806e6681355",
+      "path": "/api/audit",
+      "status": 409,
+      "utc": "2026-10-25T17:38:19.873Z"
+    },
+    {
+      "id": "50349a50-a2b0-42ed-9437-66a68fedaa2d",
+      "path": "/api/audit",
+      "status": 200,
+      "utc": "2026-10-25T17:38:19.893Z"
+    }
+  ],
+  "status": "passed"
+}

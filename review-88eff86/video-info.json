@@ -1,0 +1,65 @@
+[
+  {
+    "file": "audit-http-raw.webm",
+    "sha256": "0a53f05572396727681cfb4a194b6de4451db90b18074c7f44342b60301757e5",
+    "raw": true,
+    "editing": "none; original Playwright capture",
+    "probe": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "vp9",
+          "width": 1280,
+          "height": 800
+        }
+      ],
+      "format": {
+        "duration": "6.240000",
+        "size": "610952"
+      }
+    }
+  },
+  {
+    "file": "recorded-continuation/continuation-live-raw.webm",
+    "sha256": "f5af0c0c5656cd64bfd6cee2c23736a04cbfd50e22773d9a5478c4b796192b95",
+    "raw": true,
+    "editing": "none; original Playwright capture",
+    "probe": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "vp9",
+          "width": 1280,
+          "height": 800
+        }
+      ],
+      "format": {
+        "duration": "17.640000",
+        "size": "803204"
+      }
+    }
+  },
+  {
+    "file": "recorded-continuation/continuation-live-viewable.mp4",
+    "sha256": "f5971a86f46ec22c9443bf9820c81ee744cf414b6243182c5ece344975e87dd5",
+    "raw": false,
+    "editing": "full-duration H264 transcode; no cuts, no overlays added during conversion",
+    "probe": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 800
+        }
+      ],
+      "format": {
+        "duration": "17.640000",
+        "size": "159426"
+      }
+    }
+  }
+]

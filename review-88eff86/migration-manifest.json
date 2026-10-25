@@ -1,0 +1,26 @@
+{
+  "status": "prepared, production execution not authorized",
+  "baseSha": "20e2f2e4ed14a9b08b3ef02fb56199809e29558e",
+  "prerequisiteMigrationCount": 57,
+  "increment": [
+    {
+      "file": "drizzle/20261025170000_security_audit_application.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "bytes": 13216,
+      "sha256": "05e51cde9f9113ef47079cbc1918d4df0f16aafc5533c678776f039039d6da83"
+    },
+    {
+      "file": "drizzle/20261025170001_security_audit_workspace.sql",
+      "target": "DATABASE_URL",
+      "bytes": 6579,
+      "sha256": "65ec137264f3e8d619ebcf8303b9331879fe38851f9b5a3a502643b166302aed"
+    }
+  ],
+  "noProductionExecution": true,
+  "activationRequires": [
+    "approved exact source SHA and both real DB targets",
+    "all prerequisite migrations present",
+    "controlled writer window and mailbox lock-order fix",
+    "actual fixed-environment acceptance and independent review"
+  ]
+}

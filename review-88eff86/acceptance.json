@@ -1,0 +1,184 @@
+{
+  "sha": "88eff863c9d4e9c3acf3ee625cb154e456ce81cc",
+  "origin": "http://127.0.0.1:3110",
+  "utc": "2026-10-25T17:38:05.716Z",
+  "scope": "isolated cloud Linux production-built Next HTTP; synthetic accounts; no real provider/production acceptance",
+  "workspaceId": "7f7c4581-ec16-471b-a0a1-d56794787846",
+  "otherWorkspaceId": "9246e8c3-402d-4fd6-a31b-570c965955ee",
+  "ownerId": "WCsDZFeG7hQEkhQGqqgY9EJ3ioIJBlCy",
+  "memberId": "6K1FlrwHjAjatQ52L4HL6bz4UvDtcBIV",
+  "exportId": "6b1ddd0c-eb23-40e4-ae0d-3ac835d0fb62",
+  "files": [
+    "application-page-0.jsonl",
+    "workspace-page-0.jsonl",
+    "workspace-page-1.jsonl",
+    "workspace-page-2.jsonl",
+    "workspace-page-3.jsonl"
+  ],
+  "requests": [
+    {
+      "requestId": "59e94db9-947d-497b-8831-dfe58e20d096",
+      "method": "POST",
+      "path": "/api/auth/sign-up/email",
+      "status": 200,
+      "utc": "2026-10-25T17:37:59.759Z"
+    },
+    {
+      "requestId": "d70a1242-2f24-486c-97b6-13ac5711d2b0",
+      "method": "POST",
+      "path": "/api/auth/sign-up/email",
+      "status": 200,
+      "utc": "2026-10-25T17:37:59.863Z"
+    },
+    {
+      "requestId": "c2a315d6-f24c-4a90-9138-7863ddc99160",
+      "method": "POST",
+      "path": "/api/auth/sign-up/email",
+      "status": 200,
+      "utc": "2026-10-25T17:37:59.955Z"
+    },
+    {
+      "requestId": "0cd622fd-5e1e-401c-8205-a39d583042d9",
+      "method": "POST",
+      "path": "/api/auth/sign-in/email",
+      "status": 401,
+      "utc": "2026-10-25T17:38:00.057Z"
+    },
+    {
+      "requestId": "05ec38bb-5882-4b52-850d-9469972d7163",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846",
+      "status": 401,
+      "utc": "2026-10-25T17:38:00.079Z"
+    },
+    {
+      "requestId": "38b7a439-53b3-4e3e-9500-98307bd0a861",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846",
+      "status": 403,
+      "utc": "2026-10-25T17:38:00.105Z"
+    },
+    {
+      "requestId": "e50c87eb-d2df-402c-ad48-89708e1a3e98",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846",
+      "status": 403,
+      "utc": "2026-10-25T17:38:00.116Z"
+    },
+    {
+      "requestId": "455f97bd-58ce-4db5-8200-3b518701e5c6",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846",
+      "status": 401,
+      "utc": "2026-10-25T17:38:00.123Z"
+    },
+    {
+      "requestId": "9944c5a1-a6e7-42c1-b7e4-06450f7c622a",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=9246e8c3-402d-4fd6-a31b-570c965955ee",
+      "status": 403,
+      "utc": "2026-10-25T17:38:00.134Z"
+    },
+    {
+      "requestId": "3d5b9b84-dcd6-4dce-bf86-2e0e9515c7bc",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846&source=workspace",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.147Z"
+    },
+    {
+      "requestId": "c69dbb60-4dbd-4605-b671-dc28328cbaf6",
+      "method": "GET",
+      "path": "/api/audit",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.160Z"
+    },
+    {
+      "requestId": "0a9a5e2c-aad9-4897-9712-af6d00dd58cf",
+      "method": "POST",
+      "path": "/api/audit?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.172Z"
+    },
+    {
+      "requestId": "8f6ff04f-f6c8-484c-a691-397547fb3b14",
+      "method": "POST",
+      "path": "/api/audit?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846&source=workspace",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.184Z"
+    },
+    {
+      "requestId": "ecd157fc-9dbd-41e2-810b-6672b891626c",
+      "method": "POST",
+      "path": "/api/audit/export?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.205Z"
+    },
+    {
+      "requestId": "504f0cbd-4daf-48a6-a539-93c5ac9724f1",
+      "method": "POST",
+      "path": "/api/audit/export?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.235Z"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit/export?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846&id=6b1ddd0c-eb23-40e4-ae0d-3ac835d0fb62&source=application&after=0&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.259Z"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit/export?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846&id=6b1ddd0c-eb23-40e4-ae0d-3ac835d0fb62&source=workspace&after=0&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.288Z"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit/export?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846&id=6b1ddd0c-eb23-40e4-ae0d-3ac835d0fb62&source=workspace&after=1&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.302Z"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit/export?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846&id=6b1ddd0c-eb23-40e4-ae0d-3ac835d0fb62&source=workspace&after=2&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.314Z"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit/export?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846&id=6b1ddd0c-eb23-40e4-ae0d-3ac835d0fb62&source=workspace&after=3&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.325Z"
+    },
+    {
+      "requestId": "74002d04-77ab-4548-b604-de339ff24b5a",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846",
+      "status": 403,
+      "utc": "2026-10-25T17:38:00.337Z"
+    },
+    {
+      "requestId": "afa58100-2ab7-4e55-ac1a-31d21b17f818",
+      "method": "POST",
+      "path": "/api/audit?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846&source=workspace",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.351Z"
+    },
+    {
+      "requestId": "4968461a-8ec3-40a3-b300-37d0152696f6",
+      "method": "POST",
+      "path": "/api/audit?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846&source=workspace",
+      "status": 409,
+      "utc": "2026-10-25T17:38:00.361Z"
+    },
+    {
+      "requestId": "553ead5f-6a56-4e32-8d67-871ec36cc629",
+      "method": "POST",
+      "path": "/api/audit?workspaceId=7f7c4581-ec16-471b-a0a1-d56794787846&source=workspace",
+      "status": 200,
+      "utc": "2026-10-25T17:38:00.371Z"
+    }
+  ],
+  "status": "passed"
+}

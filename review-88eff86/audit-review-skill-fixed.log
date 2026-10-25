@@ -1,0 +1,39 @@
+✔ daemon validates assignment bindings and actual bytes without trusting a model report (5.282444ms)
+✔ real RunContext mounts the pinned Skill; tampering and symlink redirection fail (41.128437ms)
+✔ receipted journal resume cannot launch an adapter while online validation is unavailable (2.973075ms)
+✔ local cancellation while online revalidation waits cannot resurrect the run (1.999623ms)
+▶ actual PG17 and HTTP: immutable feedback → scores → aggregate → candidate → fixed synthetic comparison
+  ✔ HTTP authentication, same-origin, strict input and tenant boundaries (66.298586ms)
+  ✔ ten concurrent replay deliveries produce one immutable score and one failure (267.589308ms)
+  ✔ positive or absent evidence is unknown; stopped/cancelled runs and revoked access fail closed (63.046542ms)
+  ✔ agent/repository/issue scopes do not combine failures (68.370577ms)
+  ✔ 24 distinct failures wait; 25 produce exactly one proposal under concurrency and after restart (430.732015ms)
+  ✔ age trigger uses persisted server receipt time and fixed seven-day policy (45.63326ms)
+  ✔ feedback on later-cancelled source runs cannot supply the failure trigger (29.94314ms)
+  ✔ moving a run cannot expose its historical issue score through read or feedback replay (34.828695ms)
+{"layer":"actual-PG17-HTTP","fixtures":"synthetic-run-report-and-identity","retainedSchema":"improvement_0f9ad3cdfa384e19a29b69adcaeb3d24","scorerDigest":"0d715abd15b03dc7d0a4d86467f787dd4cf6dcc9793d933987aee3c7ebcbcd49","migrations":59,"productionAcceptance":false}
+  ✔ a legitimate scorer/baseline upgrade preserves prior score reads and exact event replay (24.514737ms)
+✔ actual PG17 and HTTP: immutable feedback → scores → aggregate → candidate → fixed synthetic comparison (1663.385539ms)
+✔ feedback is a signal; silence and self-reported success never become independent truth (1.314634ms)
+✔ candidate only touches the allowlisted inactive Skill; benchmark and baseline stay fixed (17.95962ms)
+✔ strict input forbids changing identity, target, scorer, budget, approval or benchmark (4.587121ms)
+▶ PG17/HTTP assignment provenance and existing Factory gates
+  ✔ atomic real queue/selection and immutable claim receipt; old worker denied (470.838218ms)
+  ✔ 25 distinct assigned failures feed one proposal and existing Factory dispatch atomically (1318.962235ms)
+  ✔ current access, receipt source binding and cancellation are checked again (48.069931ms)
+  ✔ automatic retry cannot silently lose a selected Skill or evade capability checks (213.941184ms)
+  ✔ mailbox continuation retains source requirement and cannot evade Factory adoption through continuesRunId (10.303568ms)
+  ✔ Factory cancel serializes selected=false heartbeat and resume with task-first locking (47.430491ms)
+  ✔ Factory revoke serializes selected=false heartbeat and resume with task-first locking (44.654806ms)
+  ✔ Factory cancel serializes selected=true heartbeat and resume with task-first locking (38.801752ms)
+{"layer":"actual-PG17-HTTP-wiring","runReportsAndIdentity":"synthetic","modelCalls":0,"activation":false,"retainedSchema":"skill_wiring_128aafde15214654831c6ca8ea6c8aa2"}
+  ✔ Factory revoke serializes selected=true heartbeat and resume with task-first locking (57.850564ms)
+✔ PG17/HTTP assignment provenance and existing Factory gates (2652.362845ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4494.419857

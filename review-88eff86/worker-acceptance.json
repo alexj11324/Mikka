@@ -1,0 +1,104 @@
+{
+  "sha": "88eff863c9d4e9c3acf3ee625cb154e456ce81cc",
+  "origin": "http://127.0.0.1:3110",
+  "utc": "2026-10-25T17:38:11.689Z",
+  "layer": "real Next HTTP and PG with synthetic credential; no daemon/CLI/provider execution",
+  "deviceId": "66d37dab-4280-48ae-8082-922101513bd8",
+  "runId": "f0dc2234-7219-4ed0-af6e-aeaf12312179",
+  "issueId": "29fb23ae-0b53-474e-a385-c7556b924bd3",
+  "actorRecordId": "e7134eac-2111-43a4-af7c-706bceb3682a",
+  "workspaceId": "7f7c4581-ec16-471b-a0a1-d56794787846",
+  "requests": [
+    {
+      "path": "/v1/devices/66d37dab-4280-48ae-8082-922101513bd8/runs/f0dc2234-7219-4ed0-af6e-aeaf12312179/claim",
+      "requestId": "241b42e1-e1e1-4c61-9c95-114d212c30b4",
+      "status": 200,
+      "utc": "2026-10-25T17:38:11.618Z"
+    },
+    {
+      "path": "/v1/devices/66d37dab-4280-48ae-8082-922101513bd8/runs/f0dc2234-7219-4ed0-af6e-aeaf12312179/claim",
+      "requestId": "564fabbe-b8d2-440a-a61a-131c649cb13e",
+      "status": 409,
+      "utc": "2026-10-25T17:38:11.636Z"
+    },
+    {
+      "path": "/v1/runs/f0dc2234-7219-4ed0-af6e-aeaf12312179/complete",
+      "requestId": "cb5e4bb0-393b-44e4-9fde-e8765e364a2c",
+      "status": 204,
+      "utc": "2026-10-25T17:38:11.671Z"
+    },
+    {
+      "path": "/v1/runs/f0dc2234-7219-4ed0-af6e-aeaf12312179/complete",
+      "requestId": "53cc2ece-c37b-4023-8614-a0212b8dd51a",
+      "status": 204,
+      "utc": "2026-10-25T17:38:11.677Z"
+    },
+    {
+      "path": "/api/mcp",
+      "requestId": "c78d9984-473e-4dfc-8c7f-bdf4a903f541",
+      "status": 401,
+      "utc": "2026-10-25T17:38:11.688Z"
+    }
+  ],
+  "rows": [
+    {
+      "seq": "2",
+      "event": {
+        "runId": "f0dc2234-7219-4ed0-af6e-aeaf12312179",
+        "action": "agent_runs.insert",
+        "reason": "queued",
+        "actorId": "system",
+        "outcome": "success",
+        "actorType": "system",
+        "subjectId": "WCsDZFeG7hQEkhQGqqgY9EJ3ioIJBlCy",
+        "resourceId": "f0dc2234-7219-4ed0-af6e-aeaf12312179"
+      },
+      "hash": "6070ef7b714430f8be8d08594b4b1c7151acad785c9390ecc34d3a98bc462f60"
+    },
+    {
+      "seq": "3",
+      "event": {
+        "runId": "f0dc2234-7219-4ed0-af6e-aeaf12312179",
+        "action": "agent_runs.update",
+        "reason": "preparing",
+        "actorId": "system",
+        "outcome": "success",
+        "actorType": "system",
+        "subjectId": "WCsDZFeG7hQEkhQGqqgY9EJ3ioIJBlCy",
+        "resourceId": "f0dc2234-7219-4ed0-af6e-aeaf12312179"
+      },
+      "hash": "f425a7a0601c7efd2ae602c1a93f89b6a9de2f4cab3c0dc93667bf7052c5460f"
+    },
+    {
+      "seq": "4",
+      "event": {
+        "runId": "f0dc2234-7219-4ed0-af6e-aeaf12312179",
+        "action": "worker.claim",
+        "reason": "claimed",
+        "actorId": "e7134eac-2111-43a4-af7c-706bceb3682a",
+        "outcome": "success",
+        "actorType": "worker",
+        "requestId": "0fcc21a6-7edb-478d-8f3d-72a271be5741",
+        "subjectId": "WCsDZFeG7hQEkhQGqqgY9EJ3ioIJBlCy",
+        "resourceId": "f0dc2234-7219-4ed0-af6e-aeaf12312179"
+      },
+      "hash": "2c46d75b8f08c83765371a246c8629178dcbfdea959f3fba1d5d507742aaca7e"
+    },
+    {
+      "seq": "5",
+      "event": {
+        "runId": "f0dc2234-7219-4ed0-af6e-aeaf12312179",
+        "action": "agent_runs.update",
+        "reason": "stopped",
+        "actorId": "e7134eac-2111-43a4-af7c-706bceb3682a",
+        "outcome": "success",
+        "actorType": "worker",
+        "requestId": "5bb38eeb-87d2-4ba9-8df3-f4e25a15d4ee",
+        "subjectId": "WCsDZFeG7hQEkhQGqqgY9EJ3ioIJBlCy",
+        "resourceId": "f0dc2234-7219-4ed0-af6e-aeaf12312179"
+      },
+      "hash": "f6c28b70476328ad29396a8b3c9fa5c39fd10b7652cc4b610725f25a07c2b59a"
+    }
+  ],
+  "status": "passed"
+}
