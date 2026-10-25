@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { fork } from 'node:child_process'
 import { once } from 'node:events'
 import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -11,7 +12,7 @@ import { betterAuth } from 'better-auth'
 import type { CalendarProvider } from './calendar-provider'
 
 const enabled = process.env.OPERATION_DB_TESTS === '1'
-test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP provider', { skip: !enabled }, async t => {
+for (const action of ['create_calendar_event', 'send_email', 'update_calendar_event'] as const) test(`actual ${action} proposal/decision entrypoints -> ledger -> local HTTP provider`, { skip: !enabled }, async t => {
   assert.ok(!process.env.COMPOSIO_API_KEY && !process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL, 'requires isolated fixture without real providers')
   const url = new URL(process.env.OPERATION_TEST_DATABASE_URL!)
   assert.equal(url.hostname, '127.0.0.1'); assert.equal(url.pathname, '/mikka_208_test')
@@ -39,13 +40,13 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
   const runtime = await import('./calendar-runtime')
   const database = await import('../db/request-scope')
   const scope = database.createRequestDatabaseScope(url.toString())
-  t.after(async () => { hooks.deregister(); await scope.close(); await database.pool.end(); await pool.end(); await admin.end() })
+  t.after(async () => { hooks.deregister(); await scope.close(); if (action === 'update_calendar_event') await database.pool.end(); await pool.end(); await admin.end() })
   const storage = (globalThis as unknown as Record<symbol, AsyncLocalStorage<unknown>>)[Symbol.for('WORKFLOW_STEP_CONTEXT_STORAGE')]
   assert.ok(storage, 'actual Workflow SDK step context must exist')
   const objects = new Map<string, string>(); let writes = 0, account = 'fixture-account', loseResponse = false, lookupMissing = false, preflightDelay = 0
-  const providerServer = createServer((req, res) => {
+  const providerServer = createServer(async (req, res) => {
     const key = req.url!.slice(1)
-    if (req.method === 'POST') { writes++; objects.set(key, randomUUID()); if (loseResponse) { loseResponse = false; req.socket.destroy(); return } }
+    if (req.method === 'POST') { let body = ''; for await (const chunk of req) body += chunk; const value = body ? JSON.parse(body) : {}; writes++; objects.set(key, value.objectId ?? randomUUID()); if (loseResponse) { loseResponse = false; req.socket.destroy(); return } }
     res.writeHead(objects.has(key) ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ id: objects.get(key) }))
   })
   providerServer.listen(0, '127.0.0.1'); await once(providerServer, 'listening')
@@ -60,7 +61,7 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
       if (preflightDelay) await new Promise(resolve => setTimeout(resolve, preflightDelay))
       await input.beforeSend()
       input.signal.throwIfAborted()
-      const response = await fetch(`${remote}/${input.idempotencyKey}`, { method: 'POST', signal: AbortSignal.any([input.signal, AbortSignal.timeout(3000)]) })
+      const response = await fetch(`${remote}/${input.idempotencyKey}`, { method: 'POST', body: JSON.stringify({ objectId: input.payload.event_id }), signal: AbortSignal.any([input.signal, AbortSignal.timeout(3000)]) })
       assert.equal(response.status, 200); return receipt((await response.json()).id)
     },
     async lookup(input) {
@@ -72,7 +73,7 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
   let origin = ''
   const makeAuth = (baseURL: string) => betterAuth({ database: pool, baseURL, secret: randomUUID() + randomUUID(), emailAndPassword: { enabled: true }, session: { disableSessionRefresh: true }, logger: { disabled: true } })
   let auth: ReturnType<typeof makeAuth>
-  const input = { summary: 'Controlled fixture', start: '2026-10-27T10:00:00Z', end: '2026-10-27T11:00:00Z', notify_attendees: false }
+  const input = action === 'send_email' ? { to: ['synthetic@example.invalid'], subject: 'Controlled fixture', body: 'Synthetic only' } : action === 'update_calendar_event' ? { event_id: 'synthetic-existing-event', summary: 'Controlled fixture', notify_attendees: false } : { summary: 'Controlled fixture', start: '2026-10-27T10:00:00Z', end: '2026-10-27T11:00:00Z', notify_attendees: false }
   const server = createServer(async (req, res) => {
     try {
       const parts = []; for await (const part of req) parts.push(part)
@@ -88,7 +89,7 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
       const result = await scope.run(() => runtime.withCalendarTestProvider(provider, () => req.url === '/propose'
         // Synthetic SDK context, real getStepMetadata implementation. This verifies
         // application propagation, not a deployed Workflow scheduler restart.
-        ? storage.run({ stepMetadata: { stepId: args.stepId, attempt: args.attempt, stepName: 'proposeAccountAction', stepStartedAt: new Date() } }, () => proposeAction(session.user.id, 'create_calendar_event', args.input ?? input))
+        ? storage.run({ stepMetadata: { stepId: args.stepId, attempt: args.attempt, stepName: 'proposeAccountAction', stepStartedAt: new Date() } }, () => proposeAction(session.user.id, action, args.input ?? input))
         : decidePendingAction(session.user.id, args.id, args.approve, session.session.id)))
       res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(result))
     } catch { res.writeHead(403); res.end() }
@@ -106,7 +107,7 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
   await t.test('step retry and ten concurrent proposals reuse persisted identity; actual approval invokes once', async () => {
     const stepId = randomUUID(), proposals = await Promise.all(Array.from({ length: 10 }, (_, i) => propose(stepId, i + 1)))
     const id = proposals[0].actionId; assert.ok(id); assert.equal(new Set(proposals.map(p => p.actionId)).size, 1); assert.equal(writes, 0)
-    const conflict = await call('/propose', { stepId, attempt: 11, input: { ...input, summary: 'changed' } }); assert.equal((await conflict.json()).error, 'operationBindingConflict')
+    const conflict = await call('/propose', { stepId, attempt: 11, input: { ...input, ...(action === 'send_email' ? {subject:'changed'} : {summary:'changed'}) } }); assert.equal((await conflict.json()).error, 'operationBindingConflict')
     const results = await Promise.all(Array.from({ length: 10 }, () => call('/decide', { id, approve: true })))
     assert.equal(results.every(r => r.status === 200), true); assert.equal(writes, 1)
     assert.equal((await (await call('/decide', { id, approve: true })).json()).status, 'done'); assert.equal(writes, 1)
@@ -114,6 +115,15 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
     assert.equal(row.status, 'succeeded'); assert.equal(row.workspaceId, `personal:${owner}`); assert.ok(row.binding.proposalDigest); assert.equal(row.binding.candidateSha, undefined)
     assert.equal((await propose(stepId, 12)).actionId, id)
     assert.equal((await pool.query('SELECT count(*) FROM coordinator_events WHERE "dedupeKey"=$1', [`action_decided:${id}`])).rows[0].count, '1')
+  })
+  if (action === 'update_calendar_event') await t.test('maximum-length valid event id remains executable with bounded ledger target', async () => {
+    const r = await call('/propose', { stepId: randomUUID(), attempt: 1, input: { ...input, event_id: 'x'.repeat(1024) } })
+    const proposed = await r.json(); assert.ok(proposed.actionId)
+    const before = writes
+    assert.equal((await (await call('/decide', { id: proposed.actionId, approve: true })).json()).status, 'done')
+    assert.equal(writes, before + 1)
+    const row = (await pool.query('SELECT binding FROM operation_ledger WHERE "operationId"=$1', [proposed.actionId])).rows[0]
+    assert.ok(row.binding.target.length < 500)
   })
   for (const historicalInput of ['missing', 'null'] as const) await t.test(`lost provider response with historical ${historicalInput} input reconciles without resending`, async () => {
     const holder = randomUUID()
@@ -145,6 +155,15 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
     assert.equal((await (await call('/decide', { id, approve: true })).json()).status, 'running')
     assert.equal(writes, before + 1, 'lookup null is not permission to resend')
     assert.equal((await pool.query('SELECT count(*) FROM coordinator_events WHERE "dedupeKey"=$1', [`action_uncertain:${id}`])).rows[0].count, '1')
+    const sessionId = (await pool.query('SELECT id FROM "session" WHERE "userId"=$1', [owner])).rows[0].id
+    for (const missing of [true, false]) {
+      const child = fork(new URL('./fixtures/approved-recovery-worker.ts', import.meta.url), { execArgv: ['--conditions=react-server', '--import', 'tsx'], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] })
+      const result = once(child, 'message'), exited = once(child, 'exit')
+      child.send({ url: url.toString(), endpoint: remote, owner, sessionId, id, missing })
+      assert.deepEqual((await result)[0], { status: missing ? 'running' : 'done', executeAttempts: 0 })
+      assert.equal((await exited)[0], 0)
+      assert.equal(writes, before + 1, 'fresh process only queries the committed operation')
+    }
     lookupMissing = false
     await pool.query('UPDATE pending_actions SET "createdAt"=clock_timestamp()-interval \'8 days\' WHERE id=$1', [id])
     const second = await (await call('/decide', { id, approve: true })).json(); assert.equal(second.status, 'done'); assert.equal(writes, before + 1)
@@ -176,7 +195,7 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
   })
   await t.test('legacy unbound proposal cannot execute but can be safely declined', async () => {
     const id = randomUUID(), before = writes
-    await pool.query('INSERT INTO pending_actions (id,"userId",action,input) VALUES ($1,$2,\'create_calendar_event\',$3)', [id, owner, input])
+    await pool.query('INSERT INTO pending_actions (id,"userId",action,input) VALUES ($1,$2,$4,$3)', [id, owner, input, action])
     assert.equal((await call('/decide', { id, approve: true })).status, 403)
     assert.equal((await (await call('/decide', { id, approve: false })).json()).status, 'declined')
     assert.equal(writes, before)

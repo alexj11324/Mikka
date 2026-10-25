@@ -1,13 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
-import { parseActionInput } from '../composio-actions'
+import { parseActionInput, isApprovalAction, type ApprovalActionName } from '../composio-actions'
 import { OperationError } from './ledger'
 import type { AccountActionRef } from '../../packages/protocol/src/device'
 
 export type ActionContext = { sourceEventId: string; holder: string }
 type Call = { toolCallId: string; toolName: string; input: unknown }
-type Slot = { actionSlotId: string; toolCallId: string; input: Record<string, unknown> }
+type Slot = { action?: ApprovalActionName; actionSlotId: string; toolCallId: string; input: Record<string, unknown> }
 export type ActionBatch = { holder: string; closed: boolean; batches: { callsDigest: string; slots: Slot[] }[] }
 export const intentKeyForSlot = (sourceEventId: string, actionSlotId: string) => `event:${sourceEventId}:slot:${actionSlotId}`
 export const intentDigest = (value: unknown): string => {
@@ -38,10 +38,10 @@ export function createActionIntents(pool: Pool) {
   return {
     async persistBatch(owner: string, context: ActionContext, calls: Call[]) {
       if (!calls.length || calls.length > 50 || new Set(calls.map(c => c.toolCallId)).size !== calls.length) fail('accountActionBatchInvalid')
-      const parsed = calls.filter(c => c.toolName === 'create_calendar_event').map(c => {
-        const input = parseActionInput('create_calendar_event', c.input)
+      const parsed = calls.filter(c => isApprovalAction(c.toolName)).map(c => {
+        const input = parseActionInput(c.toolName as ApprovalActionName, c.input)
         if (!input || !c.toolCallId || c.toolCallId.length > 500) fail('accountActionBatchInvalid')
-        return { toolCallId: c.toolCallId, input: input! }
+        return { toolCallId: c.toolCallId, action: c.toolName as ApprovalActionName, input: input! }
       })
       if (!parsed.length) fail('accountActionBatchInvalid')
       const hash = intentDigest(calls)
@@ -90,11 +90,11 @@ export function createActionIntents(pool: Pool) {
 }
 
 /** Must run inside the proposal INSERT transaction, including after async preflight. */
-export async function requireActionSlot(tx: PoolClient, owner: string, authority: ActionContext & { actionSlotId: string }, input: unknown) {
+export async function requireActionSlot(tx: PoolClient, owner: string, authority: ActionContext & { actionSlotId: string }, input: unknown, action: ApprovalActionName = 'create_calendar_event') {
   const lease = await tx.query('SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND "leaseHolder"=$2 AND "leaseUntil">clock_timestamp() FOR UPDATE', [owner, authority.holder])
   if (!lease.rows.length) fail('accountActionLeaseLost')
   const { rows: [source] } = await tx.query('SELECT "accountActionBatch" FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND kind=\'user_message\' FOR UPDATE', [authority.sourceEventId, owner])
   const batch = source?.accountActionBatch as ActionBatch | undefined
   const slot = batch?.batches.flatMap(b => b.slots).find(s => s.actionSlotId === authority.actionSlotId)
-  if (!batch || batch.closed || !slot || intentDigest(slot.input) !== intentDigest(input)) fail('accountActionSlotConflict')
+  if (!batch || batch.closed || !slot || (slot.action ?? 'create_calendar_event') !== action || intentDigest(slot.input) !== intentDigest(input)) fail('accountActionSlotConflict')
 }

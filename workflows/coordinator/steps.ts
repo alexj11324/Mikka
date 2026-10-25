@@ -17,7 +17,6 @@ import { runComposioAction } from '@/lib/composio'
 import { proposeCalendarBatch, recoverCalendarBatch, prepareAccountActionBatch } from '@/lib/operations/action-intent-runtime'
 import { OperationError } from '@/lib/operations/ledger'
 import type { ActionContext } from '@/lib/operations/action-intents'
-import { proposeAction } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
@@ -119,12 +118,9 @@ export async function composioAction(userId: string, action: ComposioActionName,
 
 export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, context?: ActionContext, options?: Pick<ToolExecutionOptions<unknown>, 'messages' | 'toolCallId'>) {
   'use step'
-  if (action === 'create_calendar_event') {
-    if (!context || !options) return { error: 'accountActionSourceRequired' }
-    try { return await proposeCalendarBatch(userId, context, options) }
-    catch (error) { if (error instanceof OperationError) return { error: error.message }; throw error }
-  }
-  return proposeAction(userId, action, input)
+  if (!context || !options) return { error: 'accountActionSourceRequired' }
+  try { return await proposeCalendarBatch(userId, context, options, action) }
+  catch (error) { if (error instanceof OperationError) return { error: error.message }; throw error }
 }
 
 export async function listIssues(userId: string, input: { status?: string }) {

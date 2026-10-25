@@ -1,6 +1,7 @@
 import 'server-only'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { getStepMetadata } from 'workflow'
+import type { ApprovalActionName } from '../composio-actions'
 import { pool } from '../db'
 import { getComposio } from '../composio'
 import { composioCalendarProvider, type CalendarProvider } from './calendar-provider'
@@ -14,9 +15,10 @@ export function withCalendarTestProvider<T>(provider: CalendarProvider, work: ()
   if (process.env.NODE_ENV !== 'test' || process.env.OPERATION_DB_TESTS !== '1') throw new Error('test provider unavailable')
   return testProvider.run(provider, work)
 }
-export function calendarOperations() {
-  return createCalendarOperations(pool, testProvider.getStore() ?? composioCalendarProvider(getComposio()))
+export function approvedActionOperations(action: ApprovalActionName) {
+  return createCalendarOperations(pool, testProvider.getStore() ?? composioCalendarProvider(getComposio(), action), action)
 }
+export function calendarOperations() { return approvedActionOperations('create_calendar_event') }
 export function currentCalendarIntentKey() {
   // SDK stepId is stable when its attempt increases. No model argument or prompt key.
   return `workflow-step:${getStepMetadata().stepId}`

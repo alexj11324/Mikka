@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
-import { parseActionInput } from '../composio-actions'
+import { parseActionInput, type ApprovalActionName } from '../composio-actions'
 import { createOperationLedger, OperationError, type OperationIntent, type OperationRecord } from './ledger'
 import { requireOperationSession, withOperationSession } from './session-authorization'
 import { requireActionSlot, type ActionContext } from './action-intents'
@@ -19,7 +19,7 @@ interface Proposal { id: string; userId: string; action: string; input: Record<s
 // scope avoids inventing a workspace DB relationship or using a browser cookie.
 const scope = (owner: string) => `personal:${owner}`
 const identity = (p: Proposal) => ({ operationId: p.id, ownerId: p.userId, workspaceId: scope(p.userId) })
-const intent = (p: Proposal): OperationIntent => ({ ...identity(p), provider: p.operationBinding.provider, accountId: p.operationBinding.accountId, action: p.action, target: 'calendar:primary', approvalId: p.id, proposalDigest: digest([p.action, p.operationBinding]), payloadDigest: p.operationBinding.payloadDigest })
+const intent = (p: Proposal): OperationIntent => ({ ...identity(p), provider: p.operationBinding.provider, accountId: p.operationBinding.accountId, action: p.action, target: p.action === 'send_email' ? 'gmail:outbound' : p.action === 'update_calendar_event' ? `calendar:primary:event:${digest(p.input.event_id)}` : 'calendar:primary', approvalId: p.id, proposalDigest: digest([p.action, p.operationBinding]), payloadDigest: p.operationBinding.payloadDigest })
 
 async function bounded<T>(call: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController()
@@ -28,7 +28,7 @@ async function bounded<T>(call: (signal: AbortSignal) => Promise<T>): Promise<T>
   finally { clearTimeout(timer) }
 }
 
-export function createCalendarOperations(pool: Pool, provider: CalendarProvider) {
+export function createCalendarOperations(pool: Pool, provider: CalendarProvider, action: ApprovalActionName = 'create_calendar_event') {
   async function transaction<T>(work: (tx: PoolClient) => Promise<T>) {
     const tx = await pool.connect()
     try { await tx.query('BEGIN'); const result = await work(tx); await tx.query('COMMIT'); return result }
@@ -38,7 +38,7 @@ export function createCalendarOperations(pool: Pool, provider: CalendarProvider)
   async function owned(tx: PoolClient, owner: string, id: string) {
     const { rows } = await tx.query<Proposal>('SELECT * FROM pending_actions WHERE id=$1 AND "userId"=$2 FOR UPDATE', [id, owner])
     const row = rows[0]
-    if (!row || row.action !== 'create_calendar_event' || !row.operationBinding) throw new OperationError('pendingActionUnavailable')
+    if (!row || row.action !== action || !row.operationBinding) throw new OperationError('pendingActionUnavailable')
     bindingSchema.parse(row.operationBinding)
     if (digest(row.input) !== row.operationBinding.payloadDigest) throw new OperationError('operationBindingConflict')
     return row
@@ -61,27 +61,27 @@ export function createCalendarOperations(pool: Pool, provider: CalendarProvider)
   return {
     async propose(owner: string, raw: unknown, intentKey: string, authority?: ActionContext & { actionSlotId: string }) {
       z.string().min(1).max(500).parse(intentKey)
-      const input = parseActionInput('create_calendar_event', raw)
+      const input = parseActionInput(action, raw)
       if (!input) throw new OperationError('invalidIntegrationInput')
       const hash = digest(input)
       // Serialize by trusted durable step identity before resolving account. Replay
       // returns original proposal even if accounts changed; execution rechecks it.
       return transaction(async tx => {
-        if (authority) await requireActionSlot(tx, owner, authority, input)
+        if (authority) await requireActionSlot(tx, owner, authority, input, action)
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['calendar-intent', owner, intentKey])])
         const prior = await tx.query<Proposal>('SELECT * FROM pending_actions WHERE "userId"=$1 AND "intentKey"=$2', [owner, intentKey])
         if (prior.rows[0]) {
           const p = prior.rows[0]
-          if (p.action !== 'create_calendar_event' || p.operationBinding?.payloadDigest !== hash) throw new OperationError('operationBindingConflict')
+          if (p.action !== action || p.operationBinding?.payloadDigest !== hash) throw new OperationError('operationBindingConflict')
           return { status: p.status === 'pending' ? 'awaiting_approval' : p.status, actionId: p.id }
         }
         const count = await tx.query(`SELECT count(*) FROM pending_actions WHERE "userId"=$1 AND status='pending' AND "createdAt">clock_timestamp()-interval '7 days'`, [owner])
         if (Number(count.rows[0].count) >= 20) throw new OperationError('tooManyPendingActions')
-        const selected = await bounded(() => provider.prepare(owner))
-        if (authority) await requireActionSlot(tx, owner, authority, input)
-        const binding = bindingSchema.parse({ ...selected, provider: provider.name, payloadDigest: hash })
+        const selected = await bounded(() => provider.prepare(owner, input))
+        if (authority) await requireActionSlot(tx, owner, authority, input, action)
+        const binding = bindingSchema.parse({ accountId: selected.accountId, version: selected.version, provider: provider.name, payloadDigest: hash })
         const id = randomUUID()
-        await tx.query('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding","sourceEventId","actionSlotId") VALUES ($1,$2,\'create_calendar_event\',$3,$4,$5,$6,$7)', [id, owner, input, intentKey, binding, authority?.sourceEventId ?? null, authority?.actionSlotId ?? null])
+        await tx.query('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding","sourceEventId","actionSlotId",context) VALUES ($1,$2,$8,$3,$4,$5,$6,$7,$9)', [id, owner, input, intentKey, binding, authority?.sourceEventId ?? null, authority?.actionSlotId ?? null, action, selected.context ?? null])
         return { status: 'awaiting_approval', actionId: id }
       })
     },
@@ -93,7 +93,7 @@ export function createCalendarOperations(pool: Pool, provider: CalendarProvider)
         const execution = await tx.query('SELECT status,"invokedAt" FROM operation_ledger WHERE "operationId"=$1 AND "ownerId"=$2 FOR UPDATE', [id, actor.userId])
         await requireOperationSession(tx, actor, actor.userId)
         if (!approve) {
-          const legacy = await tx.query("UPDATE pending_actions SET status='declined',\"decidedAt\"=clock_timestamp() WHERE id=$1 AND \"userId\"=$2 AND action='create_calendar_event' AND \"operationBinding\" IS NULL AND status='pending' RETURNING id", [id, actor.userId])
+          const legacy = await tx.query("UPDATE pending_actions SET status='declined',\"decidedAt\"=clock_timestamp() WHERE id=$1 AND \"userId\"=$2 AND action=$3 AND \"operationBinding\" IS NULL AND status='pending' RETURNING id", [id, actor.userId, action])
           if (legacy.rows.length) return null
         }
         const row = await owned(tx, actor.userId, id)

@@ -175,4 +175,27 @@ test('trusted submission -> durable batch -> new workflow -> run retry -> daemon
     await run(() => worker.revokeRunTokens(retryId))
     assert.equal((await fetch(`${origin}/api/worker/account-actions`, { headers: { Authorization: `Bearer ${token}` } })).status, 401)
   })
+  await t.test('mixed approved actions retain type and stable slots across a new workflow', async () => {
+    const mixedOwner = 'mixed-owner', h = randomUUID()
+    const submitted = await run(() => recordUserSubmission(mixedOwner, 'Synthetic mixed actions', randomUUID()))
+    const inbox = await run(() => store.takeInbox(mixedOwner, h)); assert.ok(inbox.actionContext)
+    const mixed = [call('create'),
+      { type: 'tool-call' as const, toolCallId: 'mail', toolName: 'send_email', input: { to: ['synthetic@example.invalid'], subject: 'Fixture', body: 'No real send' } },
+      { type: 'tool-call' as const, toolCallId: 'update', toolName: 'update_calendar_event', input: { event_id: 'fixture-existing', summary: 'Fixture' } }]
+    const options = { messages: [{ role: 'assistant' as const, content: mixed }], toolCallId: 'mail' }
+    await assert.rejects(run(() => runtime.proposeCalendarBatch(mixedOwner, inbox.actionContext!, options, 'update_calendar_event')), /accountActionSlotConflict/)
+    const original = await Promise.all(mixed.map(c => run(() => runtime.proposeCalendarBatch(mixedOwner, inbox.actionContext!, { ...options, toolCallId: c.toolCallId }))))
+    assert.equal(new Set(original.map(p => p.actionId)).size, 3)
+    await run(() => store.failTurn(mixedOwner, h, 'synthetic lost workflow'))
+    const next = await run(() => store.takeInbox(mixedOwner, randomUUID())); assert.ok(next.actionContext)
+    const recovered = await run(() => runtime.recoverCalendarBatch(mixedOwner, next.actionContext!))
+    const serialized = JSON.stringify(recovered)
+    for (const c of mixed) assert.ok(serialized.includes(c.toolName))
+    for (const p of original) assert.ok(serialized.includes(p.actionId))
+    assert.equal((await pool.query('SELECT count(*) FROM pending_actions WHERE "sourceEventId"=$1', [submitted.sourceEventId])).rows[0].count, '3')
+    // Old persisted Calendar slots did not have action; recovery remains compatible.
+    await pool.query(`UPDATE coordinator_events SET "accountActionBatch"=jsonb_set("accountActionBatch",'{batches,0,slots,0}',("accountActionBatch"#>'{batches,0,slots,0}')-'action') WHERE id=$1`, [submitted.sourceEventId])
+    assert.ok(JSON.stringify(await run(() => runtime.recoverCalendarBatch(mixedOwner, next.actionContext!))).includes(original[0].actionId))
+  })
+
 })
