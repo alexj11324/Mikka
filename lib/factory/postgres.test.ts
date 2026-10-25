@@ -26,7 +26,8 @@ if (localDB) {
 }
 const dbURL =
   localDB ??
-  (process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true"
+  (process.env.FACTORY_LOCAL_DB_TESTS === "1" ||
+  (process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true")
     ? process.env.E2E_DATABASE_URL
     : undefined);
 if (dbURL && !localDB) {
@@ -810,7 +811,7 @@ test(
           rollbackEventId,
           candidateIds: state.candidates.map((c: { id: string }) => c.id),
           phaseEvidence,
-          note: "isolated CI fixture evidence; not real Mikka/Harness acceptance",
+          note: "isolated PG fixture evidence; not real Mikka/Harness acceptance",
         }),
       );
     } finally {

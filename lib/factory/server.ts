@@ -3,6 +3,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { pool } from "@/lib/db";
 import { issueForUser } from "@/lib/issue-access";
 import { createFactoryStore } from "./store";
+import { approvalGate, publishGate, createFactoryApprovals } from "./approval";
+import { configuredLocalPublicationAdapters } from "./local-publication";
 import { createFactoryCheckClaim, factoryCheckGates } from "./checks";
 import { createFactoryMonitor, monitorGate } from "./monitor";
 import { appendMonitorEvidence } from "./monitor-evidence";
@@ -21,8 +23,16 @@ const authorize: FactoryAuthorize = async (userId, issueId, tx) => {
 };
 export const factoryStore = createFactoryStore(pool, authorize, {
   ...factoryCheckGates,
+  approval: approvalGate,
+  publish: publishGate,
   monitor: monitorGate,
 });
+export const factoryApprovals = createFactoryApprovals(
+  pool,
+  authorize,
+  factoryStore,
+  configuredLocalPublicationAdapters(process.env),
+);
 export const claimFactoryCheckRun = createFactoryCheckClaim(pool, authorize);
 export const factoryMonitor = createFactoryMonitor(
   pool,
