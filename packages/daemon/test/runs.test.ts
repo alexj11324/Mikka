@@ -88,7 +88,7 @@ function states(chunks: RunChunk[]) {
 
 afterEach(async () => {
   for (const daemon of daemons.splice(0)) await daemon.stop()
-  cleanupTempDirs()
+  if (process.env.RETAIN_SYNTHETIC_RECORDS !== "1") cleanupTempDirs()
 })
 
 describe("mock runs", () => {
@@ -645,21 +645,31 @@ describe("run stops", () => {
   })
 
   it("lease: a run whose lease cannot be renewed stops as device_lost", async () => {
-    const { server, dataDir } = await setup(undefined, 300)
+    const { server, dataDir } = await setup(undefined, 30_000)
     const daemon = await boot(server, dataDir)
     const runId = queue(server, "stall")
     await daemon.syncWithServer()
     await waitFor(() => daemon.supervisor.get(runId).state === "running")
     expect(daemon.supervisor.get(runId).leaseExpiresAt).toBeDefined()
-    // The heartbeat renews the lease while the server is reachable.
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    // Observe an actual heartbeat renewal rather than assuming a 300ms lease
+    // outlives synchronous git work on a contended CI runner.
+    const firstLease = Date.parse(daemon.supervisor.get(runId).leaseExpiresAt!)
+    await waitFor(() => Date.parse(daemon.supervisor.get(runId).leaseExpiresAt!) > firstLease)
     expect(daemon.supervisor.get(runId).state).toBe("running")
+    if (process.env.RETAIN_SYNTHETIC_RECORDS === "1") {
+      writeFileSync(join(daemon.supervisor.get(runId).worktree!, "lease-fixture-retained.txt"), "Synthetic lease test evidence\n")
+    }
 
     server.online = false
+    // Drive the existing watchdog clock explicitly. The exact boundary is
+    // still valid, then one millisecond past it must fence the run.
+    const expiry = Date.parse(daemon.supervisor.get(runId).leaseExpiresAt!)
+    daemon.supervisor.check(expiry)
+    expect(daemon.supervisor.get(runId).state).toBe("running")
+    daemon.supervisor.check(expiry + 1)
     await daemon.supervisor.idle()
     expect(daemon.supervisor.get(runId).stopReason).toBe("device_lost")
-    // Meanwhile the server sees an active run without a fresh lease.
-    expect(server.unownedRuns()).toEqual([runId])
+    expect(server.unownedRuns(expiry + 1)).toEqual([runId])
 
     server.online = true
     await waitFor(() => daemon.status().pendingUploads === 0)

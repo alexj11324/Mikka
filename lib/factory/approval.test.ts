@@ -147,6 +147,7 @@ test(
           "utf8",
         ),
       );
+      if (process.env.RETAIN_SYNTHETIC_RECORDS === "1") await pool.query(`CREATE RULE retain_auth_fixture_sessions AS ON DELETE TO "session" DO INSTEAD UPDATE "session" SET "expiresAt"=clock_timestamp()-interval '1 second' WHERE id=OLD.id`);
       await pool.query(
         `INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('fixture-owner','Fixture','fixture@example.invalid',true,now(),now())`,
       );
@@ -1595,9 +1596,9 @@ test(
       );
     } finally {
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      if (process.env.RETAIN_SYNTHETIC_RECORDS !== "1") await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
       await admin.end();
-      await rm(directory, { recursive: true, force: true });
+      if (process.env.RETAIN_SYNTHETIC_RECORDS !== "1") await rm(directory, { recursive: true, force: true });
     }
   },
 );

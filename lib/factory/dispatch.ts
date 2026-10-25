@@ -1,3 +1,4 @@
+import { actionRefsForSource } from "../operations/action-intents";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { configureFactoryCheck, factoryRepairBrief } from "./checks";
@@ -31,7 +32,7 @@ export function createFactoryDispatch(
   queue: QueueFactoryRun,
 ) {
   return async (userId: string, input: FactoryDispatchInput,
-    existingTransaction?: PoolClient,) => {
+    existingTransaction?: PoolClient, actionSourceEventId?: string,) => {
     const parsed = factoryDispatchSchema.safeParse(input);
     if (!parsed.success) throw new FactoryError("factoryInvalid");
     const { binding, agentId, deviceRepoId, note } = parsed.data;
@@ -52,6 +53,14 @@ export function createFactoryDispatch(
         note,
         requestKey: `factory:${binding.taskId}:${binding.attemptId}`,
       });
+      if (!run.replayed) {
+        const refs = await actionRefsForSource(tx, userId, task.sourceEventId);
+        if (actionSourceEventId && actionSourceEventId !== task.sourceEventId) {
+          refs.push(...await actionRefsForSource(tx, userId, actionSourceEventId));
+        }
+        if (refs.length > 20) throw new FactoryError("factoryInvalid");
+        await tx.query('UPDATE agent_runs SET "accountActionRefs"=$3 WHERE id=$1 AND "userId"=$2', [run.runId, userId, JSON.stringify(refs)]);
+      }
       if (monitorPublication)
         await configureFactoryMonitorDispatch(
           tx,

@@ -74,6 +74,8 @@ export interface McpServerSpec {
 }
 
 export interface RunContextOptions {
+  accountActionReadback?: { url: string; token: string }
+
   harness: Exclude<Harness, "mock">
   /** What the run is for; `plan` runs are told to write a spec (ADR ORV-205). */
   kind?: RunKind
@@ -266,6 +268,7 @@ export class RunContext {
       ],
       allowDomains: [
         ...HARNESS_DOMAINS[this.options.harness],
+        ...(this.options.accountActionReadback ? [new URL(this.options.accountActionReadback.url).hostname] : []),
         ...runDomains(
           runPolicy(this.options.policy),
           this.options.networkAllow ?? [],
@@ -300,7 +303,13 @@ export class RunContext {
       command,
       args: [MCP_SERVER_SCRIPT, "--handoff", this.handoffFile],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.
-      env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},
+      env: {
+        ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
+        ...(this.options.accountActionReadback ? {
+          MIKKA_ACTION_READBACK_URL: this.options.accountActionReadback.url,
+          MIKKA_ACTION_READBACK_TOKEN: this.options.accountActionReadback.token,
+        } : {}),
+      },
     }
   }
 

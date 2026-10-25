@@ -207,6 +207,7 @@ export async function POST(
     baseBranch: run.baseBranch,
     harness: agent.harness,
     prompt: run.prompt,
+    accountActionRefs: run.accountActionRefs,
     kind: run.kind,
     leaseExpiresAt,
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),

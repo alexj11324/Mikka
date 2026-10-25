@@ -11,6 +11,7 @@ import {
   questionReferenceSchema,
   questionEscalationSchema,
 } from '@/lib/factory/questions/contract'
+import type { ActionContext } from '@/lib/operations/action-intents'
 import * as steps from './steps'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
@@ -25,10 +26,6 @@ const MAX_ROUNDS = 10
 export async function coordinatorTurn(userId: string) {
   'use workflow'
   const holder = getWorkflowMetadata().workflowRunId
-  const agent = new WorkflowAgent({
-    model: COORDINATOR_MODEL,
-    tools: coordinatorTools(userId),
-  })
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const inbox = await steps.takeInbox(userId, holder)
     if (!inbox.held) return
@@ -37,11 +34,14 @@ export async function coordinatorTurn(userId: string) {
       return
     }
     try {
+      const recovered = inbox.actionContext ? await steps.recoverAccountActions(userId, inbox.actionContext) : []
+      const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, tools: coordinatorTools(userId, inbox.actionContext) })
       const { instructions, messages } = await steps.preparePrompt(userId)
+      messages.push(...recovered)
       const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep, })
       // Every step's messages, not only the final step's: the tool calls and
       // results are history the next turn needs.
-      await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text),)
+      await steps.appendMessages(userId, holder, [...recovered, ...result.responseMessages], turnWarning(result.finishReason, result.text), inbox.actionContext)
     } catch (error) {
       // The messages stay in the conversation; the next wake answers them.
       await steps.failTurn(userId, holder, error instanceof Error ? error.message : String(error),)
@@ -52,11 +52,11 @@ export async function coordinatorTurn(userId: string) {
 }
 
 /** The Coordinator's tools. Each one runs as a step scoped to the person. */
-function coordinatorTools(userId: string) {
+function coordinatorTools(userId: string, context?: ActionContext) {
   const id = z.uuid()
   return {
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input)),
-    ...createGoogleAITools((action, input) => steps.composioAction(userId, action, input), (action, input) => steps.proposeAccountAction(userId, action, input)),
+    ...createGoogleAITools((action, input) => steps.composioAction(userId, action, input), (action, input, options) => steps.proposeAccountAction(userId, action, input, context, { toolCallId: options.toolCallId, messages: options.messages })),
     list_issues: tool({
       description: 'List the person\'s issues, most recently updated first. Optionally only one status (todo, doing, review, done and so on).',
       inputSchema: z.object({ status: z.string().optional() }),
@@ -132,7 +132,7 @@ function coordinatorTools(userId: string) {
     dispatch_run: tool({
       description: 'Queue and bind one Factory run atomically. Use the exact current pending binding from route_factory_task/get_factory_task. Waiting, cancelled, revoked or stale tasks cannot dispatch. Reuse the same binding after a lost response.',
       inputSchema: factoryDispatchSchema,
-      execute: ( input) => steps.dispatchRun(userId, input),
+      execute: (input, options) => steps.dispatchRun(userId, input, context, { toolCallId: options.toolCallId, messages: options.messages }),
     }),
     list_runs: tool({
       description: 'List recent runs, newest first, optionally for one issue or only those still going.',

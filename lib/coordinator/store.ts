@@ -1,5 +1,6 @@
 import 'server-only'
 import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
+import type { ActionContext, ActionBatch } from '../operations/action-intents'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
 import { agentRuns, agents, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, type CoordinatorEventTier } from '@/lib/db/schema'
@@ -28,7 +29,7 @@ async function nextPosition(executor: Executor, userId: string): Promise<number>
 
 /** Undelivered events that should start a turn; issue_done is background even before triage. */
 function waking(userId: string) {
-  return and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), ne(coordinatorEvents.kind, 'issue_done'), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background')))
+  return and(eq(coordinatorEvents.userId, userId), or(isNull(coordinatorEvents.deliveredAt), sql`${coordinatorEvents.accountActionBatch}->>'closed' = 'false'`), ne(coordinatorEvents.kind, 'issue_done'), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background')))
 }
 
 /** Whether any undelivered event should start a turn. */
@@ -43,7 +44,7 @@ export async function hasWakingEvents(userId: string): Promise<boolean> {
  * but do not count: with nothing else waiting, nothing moves. `held` is false
  * when another turn holds the lease; that turn will pick the events up.
  */
-export async function takeInbox(userId: string, holder: string): Promise<{ held: boolean; added: number }> {
+export async function takeInbox(userId: string, holder: string): Promise<{ held: boolean; added: number; actionContext?: ActionContext }> {
   return db.transaction(async tx => {
     const now = new Date()
     await tx.insert(coordinatorSessions).values({ userId }).onConflictDoNothing()
@@ -53,7 +54,7 @@ export async function takeInbox(userId: string, holder: string): Promise<{ held:
       .returning({ userId: coordinatorSessions.userId })
     if (!taken) return { held: false, added: 0 }
     const due = await tx.select().from(coordinatorEvents).where(waking(userId))
-      .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+      .orderBy(asc(coordinatorEvents.createdAt)).limit(1)
     if (!due.length) return { held: true, added: 0 }
     const backgroundLimit = INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
@@ -61,13 +62,19 @@ export async function takeInbox(userId: string, holder: string): Promise<{ held:
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
     if (!events.length) return { held: true, added: 0 }
+    const source = due[0]
+    const actionContext = source.kind === 'user_message' ? { sourceEventId: source.id, holder } : undefined
+    if (actionContext && (!source.accountActionBatch || !source.accountActionBatch.batches.length)) {
+      await tx.update(coordinatorEvents).set({ accountActionBatch: { holder, closed: false, batches: [] } satisfies ActionBatch }).where(eq(coordinatorEvents.id, source.id))
+    }
     const first = await nextPosition(tx, userId)
-    await tx.insert(coordinatorMessages).values(events.map((event, index) => ({
+    const undelivered = events.filter(event => !event.deliveredAt)
+    if (undelivered.length) await tx.insert(coordinatorMessages).values(undelivered.map((event, index) => ({
       id: crypto.randomUUID(), userId, position: first + index,
       message: { role: 'user', content: eventPrompt(event) } satisfies ModelMessage,
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
-    return { held: true, added: events.length }
+    return { held: true, added: events.length, actionContext }
   })
 }
 
@@ -93,8 +100,11 @@ export async function setEventTier(id: string, tier: CoordinatorEventTier): Prom
  * Appends the turn's new messages and renews the lease. `warning` says why the
  * reply may be cut short; it shows in the chat until a turn ends cleanly.
  */
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null): Promise<void> {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, actionContext?: ActionContext): Promise<void> {
   await db.transaction(async tx => {
+    const lease = await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "leaseHolder"=${holder} AND "leaseUntil">clock_timestamp() FOR UPDATE`)
+    if (!lease.rows.length) throw new Error('accountActionLeaseLost')
+    if (actionContext) await tx.execute(sql`UPDATE coordinator_events SET "accountActionBatch"=jsonb_set("accountActionBatch",'{closed}','true') WHERE id=${actionContext.sourceEventId} AND "userId"=${userId}`)
     if (messages.length) {
       const first = await nextPosition(tx, userId)
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => ({

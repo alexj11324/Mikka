@@ -239,7 +239,15 @@ export const RUN_KINDS = ["implement", "acceptance", "fix", "plan"] as const
 export type RunKind = (typeof RUN_KINDS)[number]
 
 /** `POST /v1/devices/:deviceId/runs/:runId/claim`: what the daemon gets. */
+/** Server-issued references; possession never grants execution authority. */
+export const accountActionRefSchema = z.object({
+  sourceEventId: z.uuid(), actionSlotId: z.uuid(), operationId: z.uuid(),
+  proposalDigest: z.string().regex(/^[a-f0-9]{64}$/),
+}).strict()
+export type AccountActionRef = z.infer<typeof accountActionRefSchema>
+
 export const runAssignmentSchema = z.object({
+  accountActionRefs: z.array(accountActionRefSchema).max(20).optional(),
   runId: id,
   issueId: id,
   deviceId: id,

@@ -1,5 +1,5 @@
 import type { Composio } from '@composio/core'
-import { tool } from 'ai'
+import { tool, type ToolExecutionOptions } from 'ai'
 import { z } from 'zod'
 
 import { listComposioPages } from '@/lib/composio-pagination'
@@ -151,7 +151,7 @@ export function parseActionInput(actionName: ComposioActionName, input: unknown)
   return parsed.success ? parsed.data as Record<string, unknown> : null
 }
 
-function actionArguments(actionName: ComposioActionName, input: Record<string, unknown>): Record<string, unknown> {
+export function actionArguments(actionName: ComposioActionName, input: Record<string, unknown>): Record<string, unknown> {
   const action = COMPOSIO_ACTIONS[actionName]
   return 'toArguments' in action ? (action.toArguments as (value: Record<string, unknown>) => Record<string, unknown>)(input) : input
 }
@@ -217,14 +217,14 @@ const PROPOSAL_NOTE = ' Nothing happens yet: the person sees exactly this in the
  */
 export function createGoogleAITools(
   execute: (action: ComposioActionName, input: unknown) => Promise<unknown>,
-  propose: (action: ApprovalActionName, input: unknown) => Promise<unknown>,
+  propose: (action: ApprovalActionName, input: unknown, options: ToolExecutionOptions<unknown>) => Promise<unknown>,
 ) {
   return {
     search_gmail: tool({ ...COMPOSIO_ACTIONS.fetch_recent_gmail, title: 'Search Gmail', description: 'Search the person\'s Gmail with a Gmail search query, e.g. "from:ana is:unread newer_than:7d".', execute: input => execute('fetch_recent_gmail', input) }),
     list_calendar_events: tool({ ...COMPOSIO_ACTIONS.list_calendar_events, execute: input => execute('list_calendar_events', input) }),
     get_calendar_event: tool({ ...COMPOSIO_ACTIONS.get_calendar_event, execute: input => execute('get_calendar_event', input) }),
-    send_email: tool({ ...COMPOSIO_ACTIONS.send_email, description: COMPOSIO_ACTIONS.send_email.description + PROPOSAL_NOTE, execute: input => propose('send_email', input) }),
-    create_calendar_event: tool({ ...COMPOSIO_ACTIONS.create_calendar_event, description: COMPOSIO_ACTIONS.create_calendar_event.description + PROPOSAL_NOTE, execute: input => propose('create_calendar_event', input) }),
-    update_calendar_event: tool({ ...COMPOSIO_ACTIONS.update_calendar_event, description: COMPOSIO_ACTIONS.update_calendar_event.description + PROPOSAL_NOTE, execute: input => propose('update_calendar_event', input) }),
+    send_email: tool({ ...COMPOSIO_ACTIONS.send_email, description: COMPOSIO_ACTIONS.send_email.description + PROPOSAL_NOTE, execute: (input, options) => propose('send_email', input, options) }),
+    create_calendar_event: tool({ ...COMPOSIO_ACTIONS.create_calendar_event, description: COMPOSIO_ACTIONS.create_calendar_event.description + PROPOSAL_NOTE, execute: (input, options) => propose('create_calendar_event', input, options) }),
+    update_calendar_event: tool({ ...COMPOSIO_ACTIONS.update_calendar_event, description: COMPOSIO_ACTIONS.update_calendar_event.description + PROPOSAL_NOTE, execute: (input, options) => propose('update_calendar_event', input, options) }),
   }
 }

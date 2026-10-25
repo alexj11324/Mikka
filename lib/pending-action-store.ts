@@ -1,5 +1,7 @@
 import 'server-only'
-import { and, desc, eq, gt } from 'drizzle-orm'
+import { OperationError } from './operations/ledger'
+import { calendarOperations, currentCalendarIntentKey } from './operations/calendar-runtime'
+import { and, desc, eq, gt, or } from 'drizzle-orm'
 import { isApprovalAction, parseActionInput } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
 import { db } from '@/lib/db'
@@ -18,6 +20,10 @@ export async function proposeAction(userId: string, action: string, input: unkno
   if (!isApprovalAction(action)) return { error: 'integrationActionNotAllowed' }
   const parsed = parseActionInput(action, input)
   if (!parsed) return { error: 'invalidIntegrationInput' }
+  if (action === 'create_calendar_event') {
+    try { return await calendarOperations().propose(userId, parsed, currentCalendarIntentKey()) }
+    catch (error) { if (error instanceof OperationError) return { error: error.message }; throw error }
+  }
   const waiting = await db.$count(pendingActions, and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
   if (waiting >= MAX_PENDING) return { error: 'tooManyPendingActions: ask the person to approve or decline the waiting ones first' }
   let context: PendingActionView['context'] = null
@@ -34,7 +40,7 @@ export async function proposeAction(userId: string, action: string, input: unkno
 /** The person's proposals still waiting for them, newest first. */
 export async function listPendingActions(userId: string): Promise<PendingActionView[]> {
   const rows = await db.select().from(pendingActions)
-    .where(and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
+    .where(and(eq(pendingActions.userId, userId), or(and(eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))), and(eq(pendingActions.action, 'create_calendar_event'), eq(pendingActions.status, 'running')))))
     .orderBy(desc(pendingActions.createdAt)).limit(MAX_PENDING)
   return rows.flatMap(row => isApprovalAction(row.action)
     ? [{ id: row.id, action: row.action, input: row.input, context: row.context as PendingActionView['context'], status: row.status, createdAt: row.createdAt.toISOString() }]

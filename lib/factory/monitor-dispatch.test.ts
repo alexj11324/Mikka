@@ -664,9 +664,9 @@ test(
       );
     } finally {
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      if (process.env.RETAIN_SYNTHETIC_RECORDS !== "1") await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
       await admin.end();
-      await rm(root, { recursive: true, force: true });
+      if (process.env.RETAIN_SYNTHETIC_RECORDS !== "1") await rm(root, { recursive: true, force: true });
     }
   },
 );
