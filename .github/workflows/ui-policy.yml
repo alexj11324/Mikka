@@ -83,6 +83,7 @@ jobs:
       - run: pnpm test:ssh-target
       - run: pnpm test:linear-sync
       - run: pnpm test:coordinator-events
+      - run: pnpm test:factory
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
       - run: pnpm test:integrations
@@ -160,6 +161,8 @@ jobs:
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
+      - name: Factory state and API isolation (temporary Postgres 17 only)
+        run: pnpm test:factory
       - name: Group conversation API and migrations (temporary Postgres 17 only)
         run: pnpm test:groups
       - run: pnpm test:e2e:setup
