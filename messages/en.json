@@ -113,6 +113,7 @@
     "myTasks": "My tasks",
     "agent": "Agent",
     "coordinator": "Coordinator",
+    "coordinatorWorking": "Coordinator, working",
     "yourTeams": "Your teams",
     "home": "Home",
     "tasks": "Tasks",
@@ -1627,7 +1628,7 @@
     }
   },
   "TelegramBot": {
-    "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nSend details, then /confirm to create it in Backlog\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
+    "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
     "connect": "Connect Telegram from Mikka Settings → Integrations, then open the link here.",
     "alreadyConnected": "Your Telegram account is already connected. Send /help for commands.",
     "paired": "Telegram is connected to Mikka. Send /help to see commands.",
@@ -1656,6 +1657,11 @@
     "detailsAdded": "Details added. Send more, or use /confirm to create the Backlog task.",
     "linkedChat": "This chat is linked to a task. Use /status, /unlink, or /new <title>.",
     "startDraftMessage": "Start a task draft with /new <title>. Send details, then /confirm.",
+    "coordinatorQueued": "Sent to the Orchestrator. I’ll reply here when it answers.",
+    "coordinatorUnavailable": "The Orchestrator is not available right now. Try again shortly.",
+    "coordinatorMessageRequired": "Send a text message to the Orchestrator.",
+    "coordinatorMessageTooLong": "That message is too long. Shorten it and try again.",
+    "messageUnavailable": "I couldn’t read that Telegram message. Please send it again.",
     "status": {
       "backlog": "Backlog",
       "todo": "Todo",
@@ -2112,6 +2118,10 @@
     "organizingResponseContent": "Organizing response content",
     "preparingAResponse": "Preparing a response",
     "waitingForAResponse": "Waiting for a response",
+    "agentStatusThinking": "Thinking…",
+    "agentStatusSearching": "Searching…",
+    "agentStatusReading": "Reading the page…",
+    "agentStatusWorking": "Using a tool…",
     "requestFailedPleaseTryAgain": "Request failed. Please try again.",
     "yourInputHasBeenPreserved": "Your input has been preserved.",
     "retryThisResponse": "Retry this response",
@@ -2303,7 +2313,6 @@
     }
   },
   "Shell": {
-    "pinned": "Pinned",
     "searchPlaceholder": "Search conversations, tasks, agents, knowledge",
     "searchLabel": "Search everything",
     "searchDescription": "Search conversations, tasks and projects. Use the arrow keys to choose and Enter to open.",
@@ -2323,8 +2332,6 @@
     "attach": "Add file",
     "attachUnsupported": "Only text files up to {max} characters can be attached",
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
-    "whoIsWorking": "Who's working",
-    "agentsWorking": "{count, plural, one {# agent is} other {# agents are}} on tasks",
     "panel": {
       "label": "Right panel",
       "tabs": "Right panel content",
@@ -2342,7 +2349,7 @@
     "details": {
       "conversation": "This conversation",
       "kind": "Type",
-      "coordinatorKind": "Coordinator · pinned",
+      "coordinatorKind": "Coordinator",
       "agentKind": "Agent conversation",
       "updated": "Last activity",
       "none": "No messages yet"
@@ -2441,6 +2448,8 @@
       "property": { "identifier": "ID", "priority": "Priority", "assignee": "Assignee", "labels": "Labels", "pullRequests": "PR", "subtasks": "Subtasks", "agentState": "Agent state", "project": "Project", "dueDate": "Due date", "createdAt": "Created" },
       "hiddenColumns": "Hidden columns",
       "hiddenLane": "Hidden",
+      "expandColumn": "Expand the {status} column",
+      "foldColumn": "Fold to a strip",
       "hideColumn": "Hide column",
       "hideColumnNamed": "Hide {status} column",
       "showColumn": "Show {status} column",
