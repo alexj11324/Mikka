@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { ArrowUp, Plus, Send } from 'lucide-react'
+import { ArrowUp, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCoordinatorChat, sendCoordinatorMessage, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import { cn } from '@/lib/utils'
@@ -13,7 +13,6 @@ import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { useActionError } from '@/lib/use-action-error'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from '@/components/ui/message-scroller'
@@ -90,7 +89,6 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={t('conversation')}>
           <MessageScrollerContent className={cn('mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 pb-6', compact ? 'pt-4' : 'pt-18')}>
-            {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyMedia variant="icon"><Send /></EmptyMedia><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty>}
             {items.map(item => <MessageScrollerItem key={item.position} messageId={String(item.position)} scrollAnchor={item.from === 'person'}>
               {item.from === 'event'
                 ? <p className="text-center text-xs text-muted-foreground">{item.text.replace(/^\[Event\]\s*/, '')}</p>

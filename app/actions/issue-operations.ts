@@ -13,8 +13,18 @@ import { readIssueMetadata, withIssueMetadata, type IssueMetadata } from '@/lib/
 import { allocateIssueNumbers } from '@/lib/issue-numbering'
 import { createsIssueCycle } from '@/lib/issue-relations'
 import { dispatchLinearIssueSync, dispatchLinearWork } from '@/lib/linear-sync/dispatch'
+import { activityActor } from '@/lib/activity-actor'
 
 const relationSchema = z.object({ id: z.uuid(), revision: z.number().int().positive(), targetId: z.uuid().nullable(), kind: z.enum(['parent', 'child', 'related', 'blockedBy', 'blocks', 'duplicate']), remove: z.boolean().default(false) })
+
+/**
+ * Runs after the write has committed. Scheduling Linear sync can throw (e.g. `after` outside a
+ * request); that must not turn a saved change into a "save failed" response, so it only logs.
+ */
+function scheduleLinearWork() {
+  try { dispatchLinearWork() }
+  catch (error) { console.error('Linear background sync could not be scheduled', error instanceof Error ? error.name : 'UnknownError') }
+}
 
 export async function listIssueConnections(id: string) {
   const { issue, user } = await requireIssueAccess(id)
@@ -83,12 +93,12 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
         for (const [id, patch] of patches) {
           const row = rows.find(row => row.id === id)!
           const [saved] = await tx.update(issues).set({ content: withIssueMetadata(row.content, patch.metadata), status: patch.status ?? row.status, revision: row.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, issue.userId))).returning()
-          await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: issue.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
+          await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: issue.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
           if (id === current.id) savedCurrent = saved
         }
         return { issue: await issueView(savedCurrent, tx) }
       })
-      if ('issue' in result) dispatchLinearWork()
+      if ('issue' in result) scheduleLinearWork()
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
@@ -120,7 +130,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
         const number = await allocateIssueNumbers(tx, ownerId)
         const newMetadata = { ...metadata, number, parentId: child ? source.id : null, blockedByIds: [], relatedIds: [], duplicateOfId: null, favoriteUserIds: [], subscriberUserIds: [], deletedAt: null, assignee: child || source.userId === user.id ? metadata.assignee : null }
         const [created] = await tx.insert(issues).values({ id: crypto.randomUUID(), userId: ownerId, title: parsed.data.title ?? t('defaultDuplicateTitle', { title: source.title.slice(0, 195) }), content: withIssueMetadata(child ? { type: 'doc', content: [{ type: 'paragraph' }] } : source.content, newMetadata), status: 'todo', priority: source.priority, revision: 1 }).returning()
-        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: created.id, userId: ownerId, revision: 1, title: created.title, content: created.content, status: created.status, priority: created.priority })
+        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: created.id, userId: ownerId, revision: 1, title: created.title, content: created.content, status: created.status, priority: created.priority, ...activityActor(user.id) })
         if (child) {
           const members = await tx.select({ memberId: issueMembers.memberId }).from(issueMembers).where(and(eq(issueMembers.issueId, source.id), eq(issueMembers.userId, source.userId)))
           if (members.length) await tx.insert(issueMembers).values(members.map(member => ({ issueId: created.id, userId: ownerId, memberId: member.memberId })))
@@ -135,14 +145,14 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
               const id = crypto.randomUUID()
               const copyMetadata = { ...item.metadata, number: await allocateIssueNumbers(tx, ownerId), parentId: mapping.get(parentId)!, blockedByIds: [], relatedIds: [], duplicateOfId: null, favoriteUserIds: [], subscriberUserIds: [], deletedAt: null, assignee: source.userId === user.id ? item.metadata.assignee : null }
               const [copy] = await tx.insert(issues).values({ id, userId: ownerId, title: original.title, content: withIssueMetadata(original.content, copyMetadata), status: 'todo', priority: original.priority, revision: 1 }).returning()
-              await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: 1, title: copy.title, content: copy.content, status: copy.status, priority: copy.priority })
+              await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: 1, title: copy.title, content: copy.content, status: copy.status, priority: copy.priority, ...activityActor(user.id) })
               mapping.set(item.id, id); queue.push(item.id)
             }
           }
         }
         return { issue: await issueView(created, tx) }
       })
-      if ('issue' in result) dispatchLinearWork()
+      if ('issue' in result) scheduleLinearWork()
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error

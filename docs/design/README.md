@@ -43,7 +43,7 @@ Notes:
   (for example the `border-input` hairline, R-31) is a bug, not a choice.
 - A measured value (a width, a gap) that differs between Figma and code is a
   conflict. Do not pick one quietly: use the order above, and if it is still
-  unclear ask the design thread.
+  unclear ask Alex.
 - Chat messages, project memory and handoff notes are not sources. If a rule
   matters, it goes into `rules.md` or `decisions.md`.
 
@@ -52,11 +52,11 @@ Notes:
 | What | Where | Kept by |
 | --- | --- | --- |
 | Words | `docs/design/glossary.md` | Whoever changes the model, in the same PR |
-| Product and visual rules | `docs/design/rules.md` | Any thread, after Alex decides; the design thread checks wording |
+| Product and visual rules | `docs/design/rules.md` | Any thread, after Alex decides |
 | Components | `docs/design/components.md` | The thread that adds or retires a component |
 | Decisions | `docs/design/decisions.md` | Whoever hears the decision, the same day |
-| Brand mark | `docs/design/brand.md` | Design thread |
-| Figma file | `zPe5LKycb2XuT1ivCLRw07`, style guide section `98:2` | Design thread only (one thread owns all Figma work) |
+| Brand mark | `docs/design/brand.md` | Any thread, after Alex decides |
+| Figma file | `zPe5LKycb2XuT1ivCLRw07`, style guide section `98:2` | Any thread; new work goes on its own page, named with the feature and date |
 | Tokens in code | `app/globals.css`, mapped in `rules.md` § Tokens | Frontend threads; any token change updates Figma too |
 | Enforced rules | `scripts/lint-ui.mjs`, `scripts/*-policy.mjs`, `ui-policy.json` | Frontend threads |
 | UI copy | `messages/zh-CN.json`, `messages/en.json` | The thread that writes the UI |
