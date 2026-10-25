@@ -8,6 +8,7 @@ import { agentRuns, runTokens } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runBlockedEvent, runQuestionEvent, runReportEvent, type CoordinatorEventInput } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
+import { issueForUser } from '@/lib/issue-access'
 
 // The worker side of the MCP server: the agent inside a run reports progress,
 // asks the person something or says it is blocked. Each call becomes an event
@@ -40,11 +41,11 @@ export async function revokeRunTokens(runId: string): Promise<void> {
 }
 
 /**
- * Checks a run token: unrevoked, unexpired, and its run still live. A run
- * that ended any way (completed, cancelled, failed at claim) shuts its token
- * out even before the revoke.
+ * Resolve current authority, not the permission that existed at queue time.
+ * Reuse the issue policy so workspace suspension and task visibility changes
+ * apply equally to human and worker entrypoints.
  */
-export async function verifyRunToken(_request: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
+async function currentRun(bearerToken?: string) {
   if (!bearerToken?.startsWith(RUN_TOKEN_PREFIX)) return undefined
   const [row] = await db
     .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId })
@@ -53,9 +54,17 @@ export async function verifyRunToken(_request: Request, bearerToken?: string): P
     .where(and(
       eq(runTokens.tokenHash, hashToken(bearerToken)), isNull(runTokens.revokedAt), gt(runTokens.expiresAt, new Date()),
       eq(agentRuns.userId, runTokens.userId), inArray(agentRuns.status, [...LIVE_STATUSES]),
+      isNull(agentRuns.stopRequestedAt),
     ))
     .limit(1)
-  if (!row) return undefined
+  if (!row?.issueId || !await issueForUser(row.userId, row.issueId)) return undefined
+  return row
+}
+
+/** Authenticate every HTTP request against the current run and issue policy. */
+export async function verifyRunToken(_request: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
+  const row = await currentRun(bearerToken)
+  if (!row || !bearerToken) return undefined
   return {
     token: bearerToken, clientId: `run:${row.runId}`, scopes: [],
     expiresAt: Math.floor(row.expiresAt.getTime() / 1000),
@@ -64,28 +73,34 @@ export async function verifyRunToken(_request: Request, bearerToken?: string): P
 }
 
 /** The run a worker request comes from. */
-export function workerRun(authInfo: AuthInfo | undefined): { id: string; userId: string; issueId: string | null } {
+export function workerRun(authInfo: AuthInfo | undefined): { id: string; userId: string; issueId: string | null; token: string } {
   const extra = authInfo?.extra
-  if (typeof extra?.runId !== 'string' || typeof extra.userId !== 'string') throw new Error('MCP request is not a run')
-  return { id: extra.runId, userId: extra.userId, issueId: typeof extra.issueId === 'string' ? extra.issueId : null }
+  if (typeof extra?.runId !== 'string' || typeof extra.userId !== 'string' || typeof authInfo?.token !== 'string') throw new Error('MCP request is not a run')
+  return { id: extra.runId, userId: extra.userId, issueId: typeof extra.issueId === 'string' ? extra.issueId : null, token: authInfo.token }
 }
 
-async function deliver(event: CoordinatorEventInput): Promise<void> {
+async function deliver(event: CoordinatorEventInput, token: string): Promise<void> {
+  // Authentication may have preceded tool execution. Recheck before the side
+  // effect; the bearer stays in memory and never enters the event payload.
+  const run = await currentRun(token)
+  if (!run || run.runId !== event.runId || run.userId !== event.userId || run.issueId !== event.issueId) {
+    throw new Error('MCP run authorization is no longer valid')
+  }
   await recordCoordinatorEvent(db, event)
   after(() => wakeCoordinator(event.userId))
 }
 
 export async function report(run: ReturnType<typeof workerRun>, text: string) {
-  await deliver(runReportEvent(run, text))
+  await deliver(runReportEvent(run, text), run.token)
   return 'Reported.'
 }
 
 export async function ask(run: ReturnType<typeof workerRun>, question: { question: string; options?: string[]; context?: string }) {
-  await deliver(runQuestionEvent(run, question))
+  await deliver(runQuestionEvent(run, question), run.token)
   return 'Asked. The answer will come as a follow-up instruction.'
 }
 
 export async function blocked(run: ReturnType<typeof workerRun>, reason: string) {
-  await deliver(runBlockedEvent(run, reason))
+  await deliver(runBlockedEvent(run, reason), run.token)
   return 'Noted. The Coordinator will tell the person.'
 }
