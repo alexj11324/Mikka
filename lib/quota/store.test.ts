@@ -50,7 +50,7 @@ test('real PostgreSQL quota contention, restart, retries and authorization', { s
       await pool.query('INSERT INTO quota_test_members(owner_id,workspace_id) VALUES ($1,$2)',[owner,workspace])
       return { owner,workspace,policy }
     }
-    const request = (owner: string, key = randomUUID(), resource='agent.turn', binding: unknown={}) => ({ ownerId:owner,key,resource,binding })
+    const request = (owner: string, key: string = randomUUID(), resource='agent.turn', binding: unknown={}) => ({ ownerId:owner,key,resource,binding })
     const state = async (id:string) => (await pool.query('SELECT * FROM quota_reservations WHERE id=$1',[id])).rows[0]
 
     await t.test('10 simultaneous mixed entry requests share tenant concurrency; other tenant proceeds', async () => {
@@ -117,6 +117,30 @@ test('real PostgreSQL quota contention, restart, retries and authorization', { s
       const {owner}=await fixture({rateLimit:1})
       const r=await store.reserve(request(owner));await store.finish(owner,r.id,'refunded')
       await assert.rejects(new QuotaStore(pool,authorize).reserve(request(owner)),{code:'quotaRateExceeded'})
+    })
+    await t.test('operator allocation and override are rechecked at activation/renewal; tenant admins cannot raise caps',async()=>{
+      const f=await fixture({budgetUnits:0})
+      await assert.rejects(configureQuota(pool,f.workspace,f.owner,{...f.policy,budgetUnits:101}),{code:'quotaAllocationExceeded'})
+      await assert.rejects(configureQuota(pool,f.workspace,f.owner,{...f.policy,resources:{'agent.turn':{units:0,unknownCostApproved:true}}}),{code:'quotaAllocationExceeded'})
+      await configureQuota(pool,f.workspace,f.owner,{...f.policy,override:{units:1,until:new Date(Date.now()+60000).toISOString(),reason:'synthetic authorized override'}})
+      const r=await store.reserve(request(f.owner))
+      await pool.query("UPDATE quota_tenants SET override_until=clock_timestamp()-interval '1 second' WHERE workspace_id=$1",[f.workspace])
+      await assert.rejects(store.activate(f.owner,r.id),{code:'quotaBudgetExhausted'})
+      await store.finish(f.owner,r.id,'refunded')
+      await pool.query("UPDATE quota_tenants SET budget_units=1 WHERE workspace_id=$1",[f.workspace])
+      const active=await store.reserve(request(f.owner));await store.activate(f.owner,active.id)
+      await pool.query('UPDATE quota_allocations SET revoked_at=clock_timestamp() WHERE workspace_id=$1',[f.workspace])
+      await assert.rejects(store.renew(f.owner,active.id,90000),{code:'quotaAllocationUnavailable'})
+      await store.finish(f.owner,active.id,'uncertain')
+      assert.equal((await state(active.id)).settled_units,'1')
+    })
+    await t.test('SQL write fault rolls back reservation and releases the tenant lock',async()=>{
+      const {owner}=await fixture()
+      await pool.query(`CREATE FUNCTION quota_test_write_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.request_key='synthetic-write-fault' THEN RAISE EXCEPTION 'injected quota insert failure'; END IF; RETURN NEW; END $$`)
+      await pool.query('CREATE TRIGGER quota_test_write_fault BEFORE INSERT ON quota_reservations FOR EACH ROW EXECUTE FUNCTION quota_test_write_fault()')
+      await assert.rejects(store.reserve(request(owner,'synthetic-write-fault')),/injected quota insert failure/)
+      assert.equal(Number((await pool.query('SELECT count(*) n FROM quota_reservations WHERE owner_id=$1',[owner])).rows[0].n),0)
+      await store.reserve(request(owner))
     })
     await t.test('unknown configuration/cost, suspension, workspace mismatch and expired override fail closed',async()=>{
       await assert.rejects(store.reserve(request(randomUUID())),{code:'quotaNotConfigured'})

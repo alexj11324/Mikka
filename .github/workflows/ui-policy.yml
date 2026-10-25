@@ -162,6 +162,8 @@ jobs:
           MIGRATION_BOOTSTRAP_CI: '1'
       - name: Group conversation API and migrations (temporary Postgres 17 only)
         run: pnpm test:groups
+      - name: Migrate the isolated application database, including backend-only quota tables
+        run: MIGRATE=1 pnpm migrate
       - run: pnpm test:e2e:setup
       - name: Verify legacy workspace migration and idempotency
         run: node --test tests/workspace-migration.test.mjs

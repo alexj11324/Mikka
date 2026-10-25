@@ -99,7 +99,7 @@ export async function forget(userId: string, input: { text: string }) {
 
 export async function composioAction(userId: string, action: ComposioActionName, input: unknown) {
   'use step'
-  return runComposioAction(userId, action, input)
+  return runComposioAction(userId, action, input, `composio:${getStepMetadata().stepId}`)
 }
 
 export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown) {

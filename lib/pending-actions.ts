@@ -26,7 +26,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
   let error: string | null = null
   let outcome: Record<string, string> = {}
   if (approve) {
-    const result = await runComposioAction(userId, row.action, row.input)
+    const result = await runComposioAction(userId, row.action, row.input, `approved-action:${row.id}`)
     if ('error' in result) {
       status = 'failed'
       error = result.error

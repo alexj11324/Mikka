@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, rail, app, openCreateIssue, openIssueFromSearch, seedTask } from './fixtures'
+import { test, expect, register, rail, app, openCreateIssue, openIssueFromSearch, seedTask, seedCoordinatorAdmission } from './fixtures'
 
 test('未登录访问受保护页面、注册和登录链接', async ({ page }) => {
   await page.goto(app('/settings/members'))
@@ -65,6 +65,7 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
 
 test('注册、创建任务、菜单、搜索、视图切换和退出登录', async ({ page }) => {
   const account = await register(page)
+  await seedCoordinatorAdmission(page)
   await expect(page.getByRole('button', { name: /^Coordinator/ })).toHaveAttribute('aria-current', 'page')
   await rail(page, '看板').click()
   await expect(page.getByRole('heading', { name: '看板', exact: true })).toBeVisible()

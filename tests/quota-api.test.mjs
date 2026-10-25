@@ -24,7 +24,7 @@ test('actual Next HTTP Agent, Coordinator, administrator and daemon quota gates'
   assert.ok(secret?.length>=32,'Ephemeral auth secret required')
   const origin='http://localhost:3215',base=`${origin}/mikka`
   const results=[]
-  const evidence={utc:new Date().toISOString(),sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),environment:base,migration:'20261025165100_tenant_quotas.sql',results}
+  const evidence={utc:new Date().toISOString(),sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),environment:base,fixtures:[],requests:[],migration:'20261025165100_tenant_quotas.sql',results}
   let log=''
   const child=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--port','3215'],{cwd:new URL('..',import.meta.url),env:{...process.env,
     MIKKA_DATABASE_URL:target,DATABASE_URL:target,BETTER_AUTH_URL:origin,
@@ -49,7 +49,12 @@ test('actual Next HTTP Agent, Coordinator, administrator and daemon quota gates'
       await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES ($1,$2,\'Quota test\',$3,\'admin\',\'active\')',[workspace,owner,`${owner}@example.invalid`])
       const signature=createHmac('sha256',secret).update(token).digest('base64')
       const headers={cookie:`better-auth.session_token=${encodeURIComponent(`${token}.${signature}`)}`,origin,'content-type':'application/json'}
-      const request=async(path,body,method='POST')=>fetch(`${base}${path}`,{method:method==='PUT'?'PUT':'POST',headers,body:body===undefined?undefined:JSON.stringify(body)})
+      evidence.fixtures.push({owner,workspace})
+      const request=async(path,body,method='POST')=>{
+        const response=await fetch(`${base}${path}`,{method:method==='PUT'?'PUT':'POST',headers,body:body===undefined?undefined:JSON.stringify(body)})
+        evidence.requests.push({owner,workspace,path,method,status:response.status,utc:new Date().toISOString()})
+        return response
+      }
       const policy={windowStart:new Date(Date.now()-60000).toISOString(),windowEnd:new Date(Date.now()+3600000).toISOString(),budgetUnits:0,concurrencyLimit:1,rateLimit:100,rateWindowSeconds:60,
         resources:{'agent.turn':{units:1,unknownCostApproved:true},'coordinator.submit':{units:1,unknownCostApproved:true},'coordinator.model':{units:1,unknownCostApproved:true},'daemon.run':{units:1,unknownCostApproved:true}},paused:false,owners:[owner],override:null}
       await pool.query(`INSERT INTO quota_allocations(workspace_id,max_budget_units,max_concurrency,max_rate_limit,resources,expires_at,granted_by,reason)
@@ -59,7 +64,7 @@ test('actual Next HTTP Agent, Coordinator, administrator and daemon quota gates'
       return{owner,workspace,request,configure,policy,headers}
     }
     const check=async(name,action)=>{
-      await t.test(name,async()=>{await action();results.push({name,result:'passed',utc:new Date().toISOString()})})
+      await t.test(name,async()=>{try{await action();results.push({name,result:'passed',utc:new Date().toISOString()})}catch(error){results.push({name,result:'failed',message:String(error.message).slice(0,500),utc:new Date().toISOString()});throw error}})
     }
     await check('ordinary Agent 10-way budget denial returns 429 and leaves no running turns',async()=>{
       const f=await fixture()
@@ -110,7 +115,11 @@ test('actual Next HTTP Agent, Coordinator, administrator and daemon quota gates'
       await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,$2,'quota issue','{}','todo','normal')`,[issue,f.owner])
       const runs=Array.from({length:10},()=>randomUUID())
       for(const run of runs)await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId","deviceRepoId","issueId",status) VALUES ($1,$2,$3,$4,$5,$6,'queued')`,[run,f.owner,agent,device,repo,issue])
-      const daemon=(path,body)=>fetch(`${base}${path}`,{method:'POST',headers:{authorization:`Bearer ${deviceToken}`,'content-type':'application/json'},body:JSON.stringify(body??{})})
+      const daemon=async(path,body)=>{
+        const response=await fetch(`${base}${path}`,{method:'POST',headers:{authorization:`Bearer ${deviceToken}`,'content-type':'application/json'},body:JSON.stringify(body??{})})
+        evidence.requests.push({owner:f.owner,workspace:f.workspace,path,method:'POST',status:response.status,utc:new Date().toISOString()})
+        return response
+      }
       const responses=await Promise.all(runs.map(run=>daemon(`/v1/devices/${device}/runs/${run}/claim`)))
       assert.equal(responses.filter(r=>r.status===200).length,1)
       assert.equal(responses.filter(r=>r.status===429).length,9)

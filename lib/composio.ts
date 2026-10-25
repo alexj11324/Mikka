@@ -11,9 +11,9 @@ export function getComposio() {
   return apiKey ? new Composio({ apiKey }) : null
 }
 
-export async function runComposioAction(userId: string, action: ComposioActionName, input: unknown): Promise<ComposioActionResult> {
+export async function runComposioAction(userId: string, action: ComposioActionName, input: unknown, operationKey: string = crypto.randomUUID()): Promise<ComposioActionResult> {
   try {
-    const quota = await beginQuota({ ownerId: userId, resource: 'composio.action', key: crypto.randomUUID(), binding: { action, input } })
+    const quota = await beginQuota({ ownerId: userId, resource: 'composio.action', key: operationKey, binding: { action, input } })
     const result = await executeComposioAction(userId, action, input, getComposio(), async error => {
       const failure = quotaFailure(error)
       await tenantQuotas.finish(userId, quota.id, failure.outcome, undefined, failure.retryAfter)
