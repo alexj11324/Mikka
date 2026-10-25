@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdir, writeFile, copyFile, readFile } from 'node:fs/promises'
+import { mkdir, writeFile, copyFile, readFile, mkdtemp, rm } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { getMigrations } from 'better-auth/db/migration'
 import { oauthProvider } from '@better-auth/oauth-provider'
@@ -102,6 +102,30 @@ try {
   assert.equal((await anonymous.call('/v1/mailbox','POST',{action:'inbox'},{authorization:`Bearer ${workerToken}`})).status,401)
   const heartbeat=await anonymous.call(`/v1/devices/${deviceId}/heartbeat`,'POST',{harnesses:[],runs:[{runId,lastProgressAt:new Date().toISOString()}],worktreeDiskBytes:0},deviceHeaders)
   assert.equal(heartbeat.status,200);assert.ok(heartbeat.body.revoked.includes(runId));assert.deepEqual(heartbeat.body.leases,{})
+  // Actual daemon + actual compiled HTTP: restarting the same journal twice cannot mint local lease grace.
+  const {tsImport}=await import('tsx/esm/api')
+  const {Daemon}=await tsImport('../../packages/daemon/src/main.ts',import.meta.url)
+  const {HttpServerLink}=await tsImport('../../packages/daemon/src/server-link-http.ts',import.meta.url)
+  const stateDir=await mkdtemp('/tmp/policy-daemon-')
+  try {
+    const assignment={runId,issueId,deviceId,repoId,baseBranch:'main',harness:'mock',prompt:'Synthetic policy restart probe.',leaseExpiresAt:new Date(Date.now()+60000).toISOString()}
+    await writeFile(`${stateDir}/device.json`,JSON.stringify({deviceId,credential:deviceToken,repos:[{repoId,name:'Synthetic',path:stateDir}]}),{mode:0o600})
+    await writeFile(`${stateDir}/runs.json`,JSON.stringify({version:1,runs:{[runId]:{assignment,state:'running',sessionId:'synthetic-session',worktree:null,lastSeq:0,error:null,updatedAt:new Date().toISOString()}}}),{mode:0o600})
+    for(let restart=0;restart<2;restart++) {
+      const link=new HttpServerLink(`${origin.origin}/mikka`,async(input,init)=>{
+        const response=await fetch(input,init)
+        receipts.push({requestId:randomUUID(),method:init?.method??'GET',path:new URL(input instanceof Request?input.url:String(input)).pathname,status:response.status,utc:new Date().toISOString(),probe:`daemon-restart-${restart+1}`})
+        return response
+      })
+      let daemon
+      try {
+        daemon=await new Daemon({dataDir:stateDir,flavor:'dev',link,credential:deviceToken,harnesses:[{harness:'mock',installed:true,version:'test'}],heartbeatMs:60000,commandsWaitSeconds:0,quotaSource:null}).start()
+        assert.deepEqual(daemon.supervisor.activeRunIds(),[])
+        assert.equal(daemon.supervisor.get(runId).leaseExpiresAt,undefined)
+        assert.match(daemon.supervisor.get(runId).error,/current online policy/)
+      } finally {await daemon?.stop()}
+    }
+  } finally {await rm(stateDir,{recursive:true,force:true})}
   const revoked=await owner.call(policy(w),'POST',{expectedVersion:2,document:{...doc(w),state:'revoked'}});assert.equal(revoked.status,201)
   assert.equal((await owner.call(policy(w))).body.blocked,'policyRevoked')
   assert.equal((await owner.call('/api/agent','POST',{prompt:'Synthetic revocation probe.'})).body.error,'policyRevoked')
