@@ -92,6 +92,8 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
     const folded = messages.filter(row => row.position <= cut)
     const { text } = await generateText({
       model: COORDINATOR_MODEL,
+      maxRetries:0,
+      timeout:{totalMs:45000},
       instructions: SUMMARY_INSTRUCTIONS,
       messages: [...promptMessages(summary, folded), { role: 'user', content: 'Write the summary now.' }],
     })
@@ -101,6 +103,9 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
   }
   return { instructions: instructionsWithMemory(`${COORDINATOR_INSTRUCTIONS}\n\n${MAILBOX_INSTRUCTIONS}\n\n${SCHEDULE_INSTRUCTIONS}`, memory), messages: promptMessages(summary, messages) }
 }
+// A request may already have been sent. The persisted inbox, rather than an
+// automatic step retry, records an uncertain outcome for reconciliation.
+preparePrompt.maxRetries=0
 
 export async function remember(userId: string, input: { note: string }) {
   'use step'
