@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
 import { featureAvailability, gatedFeatureEnabled, gatedFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
 
@@ -57,4 +58,10 @@ test('gated features are on only when the remote flag is exactly true', () => {
   assert.equal(gatedFeatures.cloudComputer, 'mikka-cloud-computer')
   for (const remote of [undefined, false, 'control', 'true']) assert.equal(gatedFeatureEnabled(remote), false)
   assert.equal(gatedFeatureEnabled(true), true)
+})
+
+test('the locale layout mounts the pageview tracker whenever PostHog is configured', () => {
+  // instrumentation-client.ts turns off automatic pageviews; without this component nothing is ever sent.
+  const layout = readFileSync(new URL('../app/[locale]/layout.tsx', import.meta.url), 'utf8')
+  assert.match(layout, /posthogConfig\.token && <PostHogAnalytics \/>/)
 })
