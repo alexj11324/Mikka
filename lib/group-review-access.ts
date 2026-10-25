@@ -8,9 +8,15 @@ export class ReviewFailure extends Error {
 export function reject(status: number, code: string): never { throw new ReviewFailure(status, code) }
 export async function transaction<T>(pool: Pool, fn: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect()
-  try { await client.query('BEGIN'); const result = await fn(client); await client.query('COMMIT'); return result }
-  catch (error) { await client.query('ROLLBACK'); throw error }
-  finally { client.release() }
+  let began = false, broken = false
+  try { await client.query('BEGIN'); began = true; const result = await fn(client); await client.query('COMMIT'); return result }
+  catch (error) {
+    // A refused scoped BEGIN already rolls back/releases its connection. Never
+    // replace its typed authority error with a second cleanup failure.
+    if (began) await client.query('ROLLBACK').catch(() => { broken = true })
+    throw error
+  }
+  finally { client.release(broken) }
 }
 /** Conversation lock is always first; all writes and revocations share this order. */
 export async function requireGroup(client: PoolClient, directory: Directory, conversationId: string, userId: string) {

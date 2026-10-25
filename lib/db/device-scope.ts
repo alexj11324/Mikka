@@ -74,8 +74,8 @@ function fencedClient(client: PoolClient, caller: DeviceAuthority): PoolClient {
       }
     }
     if (/^(?:commit|rollback)(?:\s+(?:work|transaction))?$/i.test(text)) {
-      // Cleanup ROLLBACK after a refused BEGIN is harmless; never promote a
-      // released/failed connection into an unguarded new transaction.
+      // A refused BEGIN already releases the connection and rejects later
+      // queries above. Callers must not issue a second cleanup ROLLBACK.
       const result = await rawQuery(...args)
       transaction = false
       return result

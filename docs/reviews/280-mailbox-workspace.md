@@ -9,3 +9,9 @@ Independent review found a multi-dispatch poll pool cycle beyond the single-comm
 `test-group-poll-pools.ts` exercises five real two-dispatch polls at the second app borrow, with five concurrent writers holding app connections before borrowing workspace. The former outer-authority mode reproduces acquisition failures; per-dispatch mode completes. Fixtures remain retained. The test rejects URL query overrides.
 
 Validation distinguishes handler/Postgres lock tests, actual Next HTTP exchange requests, shipped MCP stdio/socket recovery, and CI builds. Infrastructure retry/token creation in MCP acceptance is controlled fixture SQL, not daemon automatic reclaim. No real provider, production SQL, deployment, or production user acceptance is claimed. R alone coordinates main integration.
+
+## BEGIN-time device revocation follow-up
+
+Scoped BEGIN can roll back and release its client before rejecting admission. The shared group transaction helper now records successful BEGIN admission and skips redundant rollback on a rejected BEGIN. Cleanup failure after an admitted transaction cannot replace the original error, and the broken client is discarded. No string-based authentication classification or permission relaxation.
+
+The real PostgreSQL/HTTP regression uses production admission, scoped-client and group claim/exchange handlers in a local Node HTTP harness. Revocation commits after raw BEGIN but before its authority check: baseline returns500; fixed returns401 with no protected callback writes, one physical rollback/release, and the same max1 backend reusable. Ordinary SQL42P01 remains500; subsequent authorized transaction commits. A rollback-failure injection preserves original error identity. This is not a production or instrumented Next-server race demonstration. The workflow runs the regression alongside the existing actual compiled Next exchange matrix.
