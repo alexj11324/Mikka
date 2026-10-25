@@ -19,6 +19,8 @@ test('owner revokes credential durably; old daemon API calls and attributed work
   const daemon = await playwright.request.newContext({ baseURL })
   const tokenId = randomUUID(), bearer = `orv_${randomBytes(32).toString('hex')}`, otherId = randomUUID(), otherBearer = `orv_${randomBytes(32).toString('hex')}`
   const checks: string[] = []
+  const startedAt = new Date().toISOString()
+  const endpointResults: {method:string;path:string;status:number}[] = []
   let runtime: ChildProcessWithoutNullStreams | undefined
   async function runtimeCommand(command: Record<string,unknown>) {
     const lines = createInterface({input:runtime!.stdout})
@@ -110,6 +112,7 @@ test('owner revokes credential durably; old daemon API calls and attributed work
     ]
     for(const [method,path] of endpoints) {
       const response=await daemon.fetch('/mikka'+path,{method,headers,...(method==='GET'?{}:{data:{}})})
+      endpointResults.push({method,path,status:response.status()})
       expect([401,403],path).toContain(response.status())
     }
     checks.push(`${endpoints.length} protected endpoint methods refuse old token`)
@@ -127,7 +130,7 @@ test('owner revokes credential durably; old daemon API calls and attributed work
     expect(text).not.toContain('tokenHash')
     checks.push('re-enable and re-registration cannot revive token; sibling token works; worker token revoked and lease expired')
     const evidencePath = info.outputPath('device-revocation-evidence.json')
-    writeFileSync(evidencePath,JSON.stringify({sha:process.env.GITHUB_SHA,environment:'isolated PG + actual Next HTTP',checks},null,2))
+    writeFileSync(evidencePath,JSON.stringify({sha:process.env.GITHUB_SHA,base:'a3294781eae74d824087c9c80bfc3f6093f196d7',migration:'20261025185500_daemon_revocation.sql',startedAt,finishedAt:new Date().toISOString(),environment:'isolated PG + actual Next HTTP',fixture:{deviceId,runId,tokenId},revocation:{revokedAt:receipt.revokedAt,stopRequestedAt:state.stopRequestedAt,leaseExpiresAt:state.leaseExpiresAt},endpointResults,checks},null,2))
     await info.attach('device-revocation-evidence',{path:evidencePath,contentType:'application/json'})
   } finally { if(runtime){runtime.stdin.write(JSON.stringify({action:'stop'})+'\n');await new Promise<void>(resolve=>{if(runtime!.exitCode!==null)resolve();else runtime!.once('exit',()=>resolve())})}await owner.dispose();await outsider.dispose();await daemon.dispose();await pg.end() }
 })
