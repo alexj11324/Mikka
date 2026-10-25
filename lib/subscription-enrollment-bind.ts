@@ -7,7 +7,7 @@ export function enrollmentBindHTTP(deps: {
   handoff?(request: Request, userId: string, body: z.infer<typeof input>): Promise<string | null>
   session(request: Request): Promise<{ userId: string } | null>
   workspace(userId: string, workspaceId: string): Promise<void>
-  client(): Pick<EnrollmentClient, 'bind'>
+  client(request: Request): Pick<EnrollmentClient, 'bind'>
 }) {
   return async (request: Request) => {
     const headers = { 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer' }
@@ -31,7 +31,7 @@ export function enrollmentBindHTTP(deps: {
       const principal = directPrincipal ?? await deps.handoff?.(request, session.userId, body)
       if (!principal) return Response.json({ error: 'auth_required' }, { status: 401, headers })
       await deps.workspace(session.userId, body.workspaceId)
-      return Response.json(await deps.client().bind(principal, body.id, session.userId, body.workspaceId), { headers })
+      return Response.json(await deps.client(request).bind(principal, body.id, session.userId, body.workspaceId), { headers })
     } catch { return Response.json({ error: 'subscription_binding_unavailable' }, { status: 409, headers }) }
   }
 }

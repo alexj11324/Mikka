@@ -56,6 +56,17 @@ func (w *Worker) enrollmentCleanupStatus(ctx context.Context) (*EnrollmentCleanu
 	if total == 0 {
 		return nil, nil
 	}
+	// External source custody is retained durably, even in later processes that
+	// lack the one-time transfer configuration. Never send its name to local GC.
+	var external bool
+	if err = w.Repo.DB.QueryRowContext(ctx, `select exists(select 1 from byos_environment_transfers e join byos_enrollment_transfers t on t."enrollmentId"=e."enrollmentId" where t."connectionId"=$1 and e."ownerId"=$2 and e."workspaceId"=$3 and e."retainSource")`, w.Scope.ConnectionID, w.Scope.OwnerID, w.Scope.WorkspaceID).Scan(&external); err != nil {
+		return nil, ErrDatabase
+	}
+	if external && s.Pending > 0 {
+		s.State = "external_source_retained"
+		s.Protected = s.Pending
+		return s, nil
+	}
 	if s.Pending == 0 {
 		return s, nil
 	}

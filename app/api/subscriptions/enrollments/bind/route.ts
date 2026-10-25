@@ -1,3 +1,4 @@
+import { enrollmentTransferConfiguration } from '@/lib/subscription-transfer-runtime'
 import { auth } from '@/lib/auth'
 import { pool } from '@/lib/db'
 import { authorizeSubscriptionWorkspace } from '@/lib/subscription-runtime'
@@ -25,11 +26,11 @@ export const POST = enrollmentBindHTTP({
     return enrollmentOperator(new Request(request.url, { headers: { authorization: `Bearer ${operator}` } }), operator)
   },
   workspace: authorizeSubscriptionWorkspace,
-  client: () => {
+  client: request => {
     const databaseUrl = pool.options.connectionString
     const canonicalGrantPath = process.env.MIKKA_BYOS_INFISICAL_PATH
     const accessPath = process.env.MIKKA_BYOS_ACCESS_INFISICAL_PATH
     if (!databaseUrl || !canonicalGrantPath || !accessPath) throw new Error('subscription_binding_unavailable')
-    return new EnrollmentClient({ ...enrollmentConfiguration(), databaseUrl, canonicalGrantPath, accessPath })
+    return new EnrollmentClient({ ...enrollmentConfiguration(), databaseUrl, canonicalGrantPath, accessPath, ...enrollmentTransferConfiguration(new URL(request.url).origin) })
   },
 })

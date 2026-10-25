@@ -10,11 +10,12 @@ const store = z.object({
 export const subscriptionTransferApproval = z.object({
   transferId: z.uuid(), enrollmentId: z.uuid(),
   ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
-  provider: z.enum(['claude','codex']), providerSubject: z.string().min(1).max(256),
+  sourcePrincipal: z.string().regex(/^operator:[a-f0-9]{64}$/),
+  provider: z.literal('claude'), providerSubject: z.string().min(1).max(256),
   source: store, destination: store,
   destinationOrigin: z.literal('https://app.aspectlylabs.com'),
   destinationDatabaseIdentity: z.string().regex(/^[a-f0-9]{64}$/),
-  sourceDigest: z.string().regex(/^[a-f0-9]{64}$/), sourceRevision: z.number().int().positive(),
+  sourceDigest: z.string().regex(/^[a-f0-9]{64}$/), sourceRevision: z.literal(1),
   expiresAt: z.iso.datetime(), deleteSource: z.literal(false),
 }).strict()
 export function validateSubscriptionTransferApproval(value: unknown, actor: {
@@ -29,7 +30,6 @@ export function validateSubscriptionTransferApproval(value: unknown, actor: {
     approval.destination.grantPath !== '/byos/grants') throw new Error('subscription_transfer_not_authorized')
   return approval
 }
-// This contract is deliberately not a transfer executor: activation additionally
-// requires a durable one-use transfer journal and locked source revision/digest,
-// create-only destination publication, read-back integrity, and authenticated
-// owner binding. Neither a parsed approval nor an operator grants task access.
+// The server loads this manifest from controlled configuration, never request
+// JSON. The worker journals its digest before reads and alone decides whether an
+// expired approval is an identical durable recovery, rather than a new transfer.

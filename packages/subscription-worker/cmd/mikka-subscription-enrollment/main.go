@@ -7,7 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
- "errors"
+	"errors"
 	"fmt"
 	worker "github.com/alexj11324/Mikka/subscription-worker"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -28,18 +28,21 @@ func run() error {
 	input := bufio.NewScanner(io.LimitReader(os.Stdin, 131072))
 	input.Buffer(make([]byte, 4096), 65536)
 	var config struct {
-		Origin             string `json:"infisicalOrigin"`
-		Project            string `json:"project"`
-		Environment        string `json:"environment"`
-		Token              string `json:"workloadToken"`
-		AttemptPath        string `json:"attemptPath"`
-		ClaimPath          string `json:"claimPath"`
-		GrantPath          string `json:"grantPath"`
-		Principal          string `json:"principal"`
-		DatabaseURL        string `json:"databaseUrl"`
-		CanonicalGrantPath string `json:"canonicalGrantPath"`
-		AccessPath         string `json:"accessPath"`
-		RetainSources      bool   `json:"retainSources"`
+		Origin             string                   `json:"infisicalOrigin"`
+		Project            string                   `json:"project"`
+		Environment        string                   `json:"environment"`
+		Token              string                   `json:"workloadToken"`
+		AttemptPath        string                   `json:"attemptPath"`
+		ClaimPath          string                   `json:"claimPath"`
+		GrantPath          string                   `json:"grantPath"`
+		Principal          string                   `json:"principal"`
+		DatabaseURL        string                   `json:"databaseUrl"`
+		CanonicalGrantPath string                   `json:"canonicalGrantPath"`
+		AccessPath         string                   `json:"accessPath"`
+		RetainSources      bool                     `json:"retainSources"`
+		TransferApproval   *worker.TransferApproval `json:"transferApproval"`
+		SourceToken        string                   `json:"sourceToken"`
+		RuntimeOrigin      string                   `json:"runtimeOrigin"`
 	}
 	if !input.Scan() || json.Unmarshal(input.Bytes(), &config) != nil || config.Token == "" || config.AttemptPath == config.ClaimPath || config.AttemptPath == config.GrantPath || config.ClaimPath == config.GrantPath {
 		return worker.ErrUnsupported
@@ -111,14 +114,37 @@ func run() error {
 			return storeErr
 		}
 		binder := worker.EnrollmentBinder{Enrollment: &e, Repo: &worker.Repository{DB: db}, Secrets: canonical, AccessSecrets: access, DatabaseIdentity: identity}
-		result, err = binder.Bind(ctx, config.Principal, request.ID, request.OwnerID, request.WorkspaceID)
+		if config.TransferApproval != nil {
+			a := config.TransferApproval
+			if config.SourceToken == "" {
+				return worker.ErrUnsupported
+			}
+			source := func(path string) (worker.SecretStore, error) {
+				return worker.NewInfisical(worker.InfisicalConfig{Origin: a.Source.Origin, ProjectID: a.Source.ProjectID, Environment: a.Source.Environment, Path: path, Token: func(context.Context) (string, error) { return config.SourceToken, nil }})
+			}
+			sa, e1 := source("/byos/enrollment-attempts")
+			sc, e2 := source("/byos/enrollment-claims")
+			sg, e3 := source(a.Source.GrantPath)
+			if e1 != nil || e2 != nil || e3 != nil {
+				return worker.ErrUnsupported
+			}
+			binder.Enrollment = &worker.Enrollment{Attempts: sa, Claims: sc, Grants: sg, RetainSources: true}
+			result, err = binder.Transfer(ctx, *a, a.SourcePrincipal, request.ID, request.OwnerID, request.WorkspaceID, config.RuntimeOrigin)
+		} else {
+			result, err = binder.Bind(ctx, config.Principal, request.ID, request.OwnerID, request.WorkspaceID)
+		}
 	default:
 		err = worker.ErrUnsupported
 	}
 	if err != nil {
 		code := "subscription_enrollment_unavailable"
- if errors.Is(err, worker.ErrStoreDenied) { code = "secret_store_denied" }
- return json.NewEncoder(os.Stdout).Encode(map[string]any{"error": code})
+		if errors.Is(err, worker.ErrSourceStoreDenied) {
+			code = "source_secret_store_denied"
+		}
+		if errors.Is(err, worker.ErrStoreDenied) {
+			code = "secret_store_denied"
+		}
+		return json.NewEncoder(os.Stdout).Encode(map[string]any{"error": code})
 	}
 	return json.NewEncoder(os.Stdout).Encode(map[string]any{"result": result})
 }

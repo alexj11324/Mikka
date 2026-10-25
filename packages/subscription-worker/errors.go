@@ -8,18 +8,19 @@ type Refusal string
 func (e Refusal) Error() string { return string(e) }
 
 const (
-	ErrUnavailable     Refusal = "account_unavailable"
-	ErrStale           Refusal = "stale_operation"
-	ErrBusy            Refusal = "credential_busy"
-	ErrDatabase        Refusal = "metadata_unavailable"
-	ErrCredential      Refusal = "invalid_credential_bundle"
-	ErrStore           Refusal = "secret_store_unavailable"
-	ErrStoreDenied     Refusal = "secret_store_denied"
-	ErrCreateUncertain Refusal = "secret_create_outcome_unknown"
-	ErrMissing         Refusal = "secret_not_found"
-	ErrIntegrity       Refusal = "credential_integrity_failed"
-	ErrUnsupported     Refusal = "provider_route_unavailable"
-	ErrProvider        Refusal = "provider_operation_failed"
+	ErrUnavailable       Refusal = "account_unavailable"
+	ErrStale             Refusal = "stale_operation"
+	ErrBusy              Refusal = "credential_busy"
+	ErrDatabase          Refusal = "metadata_unavailable"
+	ErrCredential        Refusal = "invalid_credential_bundle"
+	ErrStore             Refusal = "secret_store_unavailable"
+	ErrStoreDenied       Refusal = "secret_store_denied"
+	ErrSourceStoreDenied Refusal = "source_secret_store_denied"
+	ErrCreateUncertain   Refusal = "secret_create_outcome_unknown"
+	ErrMissing           Refusal = "secret_not_found"
+	ErrIntegrity         Refusal = "credential_integrity_failed"
+	ErrUnsupported       Refusal = "provider_route_unavailable"
+	ErrProvider          Refusal = "provider_operation_failed"
 )
 
 func safeCode(err error) string {

@@ -2,6 +2,7 @@
 import { spawn } from 'node:child_process'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
+import type { subscriptionTransferApproval } from './subscription-transfer-contract'
 
 const status = z.object({ id: z.uuid(), provider: z.literal('claude'), state: z.enum(['pending_unbound', 'custody_unconfirmed']), taskUseAllowed: z.literal(false) }).strict()
 const started = z.object({ id: z.uuid(), provider: z.literal('claude'), state: z.literal('awaiting_consent'), taskUseAllowed: z.literal(false), authorizationUrl: z.url(), expiresAt: z.iso.datetime(), handoffKey: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict()
@@ -24,6 +25,9 @@ export interface EnrollmentConfiguration {
   canonicalGrantPath?: string
   accessPath?: string
   retainSources?: boolean
+  transferApproval?: z.infer<typeof subscriptionTransferApproval>
+  runtimeOrigin?: string
+  sourceTokens?: { getAccessToken(): Promise<string>; rejectAccessToken(token: string): void }
 }
 export function enrollmentOperator(request: Request, token: string | undefined): string | null {
   if (!token || token.length < 32) return null
@@ -42,14 +46,17 @@ export class EnrollmentClient {
     return this.invoke('', {method:'handoff',...body}, status)
   }
   async bind(principal: string, id: string, ownerId: string, workspaceId: string) {
-    const sourceCleanup = z.object({ pending: z.number().int().nonnegative(), failed: z.number().int().nonnegative(), protected: z.number().int().nonnegative(), uncertainCreates: z.number().int().nonnegative(), state: z.enum(['complete', 'awaiting_publication', 'configuration_required', 'ownership_unconfirmed', 'creation_outcome_unknown', 'deletion_failed', 'deletion_not_authorized', 'pending']) }).strict()
+    const sourceCleanup = z.object({ pending: z.number().int().nonnegative(), failed: z.number().int().nonnegative(), protected: z.number().int().nonnegative(), uncertainCreates: z.number().int().nonnegative(), state: z.enum(['complete', 'awaiting_publication', 'configuration_required', 'ownership_unconfirmed', 'creation_outcome_unknown', 'deletion_failed', 'deletion_not_authorized', 'external_source_retained', 'pending']) }).strict()
     const cleanup = z.object({ pending: z.number().int().nonnegative(), failed: z.number().int().nonnegative(), providerRevocation: z.literal('not_implemented'), uncertainCreates: z.number().int().nonnegative(), enrollment: sourceCleanup.optional() }).strict()
     return this.invoke(principal, { method: 'bind', id, ownerId, workspaceId }, z.object({ id: z.uuid(), provider: z.literal('claude'), state: z.literal('connected'), revision: z.number().int().positive(), credentialVersion: z.number().int().positive(), cleanup: cleanup.optional() }).strict())
   }
   private async invoke(principal: string, request: Record<string, string>, schema: z.ZodType) {
-    const { binary, tokens, ...storedConfig } = this.config
+    const { binary, tokens, sourceTokens, transferApproval, ...storedConfig } = this.config
+    const transfer = request.method === 'bind' && request.id === transferApproval?.enrollmentId ? transferApproval : undefined
+    const sourceToken = transfer ? await sourceTokens?.getAccessToken() : undefined
+    if (transfer && !sourceToken) throw new Error('subscription_transfer_unavailable')
     const issuedToken = tokens ? await tokens.get('custody') : undefined
-    const config = { ...storedConfig, workloadToken: issuedToken ?? storedConfig.workloadToken }
+    const config = { ...storedConfig, ...(transfer ? { transferApproval: transfer, sourceToken } : {}), workloadToken: issuedToken ?? storedConfig.workloadToken }
     const env: NodeJS.ProcessEnv = { PATH: process.env.PATH, LANG: 'C.UTF-8', NODE_ENV: 'production' }
     // Honor the platform's normal proxy/CA controls; no provider/local CLI
     // credentials, database URL, HOME or unrelated platform keys are inherited.
@@ -69,7 +76,10 @@ export class EnrollmentClient {
         try {
           if (code !== 0) throw new Error()
           const frame = JSON.parse(raw)
-          if (frame.error === 'secret_store_denied' && issuedToken) tokens?.reject('custody', issuedToken)
+          if (frame.error === 'secret_store_denied') {
+            if (issuedToken) tokens?.reject('custody', issuedToken)
+          }
+          if (frame.error === 'source_secret_store_denied' && sourceToken) sourceTokens?.rejectAccessToken(sourceToken)
           const result = schema.parse(frame.result) as Record<string, unknown>
           if (typeof result.authorizationUrl === 'string') {
             const target = new URL(result.authorizationUrl)

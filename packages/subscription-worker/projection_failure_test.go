@@ -78,3 +78,21 @@ func TestLegacyProjectionFailurePersistenceErrorIsNotHidden(t *testing.T) {
 		t.Fatal("persistence failure hidden", err)
 	}
 }
+
+func TestLegacyProjectionCancellationStillPersistsFailure(t *testing.T) {
+	w, _, _ := fixtureWorker(t, "codex")
+	initial := mustAcquire(t, w)
+	if _, err := w.Repo.DB.Exec(`update byos_connections set "accessSecretName"=null,"accessDigest"=null where id=$1`, w.Scope.ConnectionID); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	w.Secrets = &projectionReadFailure{SecretStore: w.Secrets, failAt: 1, beforeFailure: cancel}
+	if _, err := w.PrepareRuntime(ctx, initial.Revision); err != ErrStore {
+		t.Fatal("unexpected cancellation result", err)
+	}
+	r, err := w.Repo.Lookup(context.Background(), w.Scope)
+	if err != nil || r.State != "reconnect_required" {
+		t.Fatal("cancellation stranded projection", r.State, err)
+	}
+}
