@@ -20,7 +20,7 @@ test('actual proposal/decision entrypoints -> ledger -> local calendar HTTP prov
   await admin.query(`CREATE SCHEMA ${schema}`)
   url.searchParams.set('options', `-c search_path=${schema}`)
   const pool = new Pool({ connectionString: url.toString() })
-  for (const name of ['20261023221259_application_baseline.sql', '0001_agents_devices.sql', '0007_coordinator_events.sql', '0011_coordinator_event_tier.sql', '0009_oauth_provider.sql', '20261025043000_pending_actions.sql', '20261025052001_operation_ledger.sql', '20261025060001_calendar_operation_binding.sql']) {
+  for (const name of ['20261023221259_application_baseline.sql', '0001_agents_devices.sql', '0007_coordinator_events.sql', '0011_coordinator_event_tier.sql', '0009_oauth_provider.sql', '20261025043000_pending_actions.sql', '20261025052001_operation_ledger.sql', '20261025060001_calendar_operation_binding.sql', '20261025070001_account_action_intents.sql']) {
     await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
   }
   await pool.query('CREATE RULE retain_test_sessions AS ON DELETE TO "session" DO INSTEAD NOTHING')

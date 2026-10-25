@@ -181,6 +181,7 @@ export const agentRuns = pgTable('agent_runs', {
   sessionId: text('sessionId'), worktreePath: text('worktreePath'),
   stopReason: text('stopReason'), error: text('error'),
   report: jsonb('report').$type<Record<string, unknown> | null>(),
+  accountActionRefs: jsonb('accountActionRefs').$type<import('../../packages/protocol/src/device').AccountActionRef[]>().notNull().default([]),
   questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true} | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   /** 1 for the first run; a retry after the device went offline counts up (lib/run-retry.ts). */
@@ -258,6 +259,7 @@ export const coordinatorEvents = pgTable('coordinator_events', {
   payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
   /** Null until triaged; an untriaged event wakes the Coordinator. */
   tier: text('tier').$type<CoordinatorEventTier>(),
+  accountActionBatch: jsonb('accountActionBatch').$type<import('../operations/action-intents').ActionBatch | null>(),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt)])

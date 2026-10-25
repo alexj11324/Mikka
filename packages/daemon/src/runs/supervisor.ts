@@ -1034,6 +1034,9 @@ export class RunSupervisor {
       networkAllow: repo.networkAllow,
       policy: assignment.policy,
       skills: assignment.skills,
+      accountActionReadback: assignment.accountActionRefs?.length && assignment.mcp
+        ? { url: assignment.mcp.url.replace(/\/api\/mcp\/?$/, '/api/worker/account-actions'), token: assignment.mcp.token }
+        : undefined,
       fixture: assignment.fixture,
       model: assignment.model,
     }

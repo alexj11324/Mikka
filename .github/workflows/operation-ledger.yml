@@ -1,7 +1,7 @@
 name: Operation ledger PostgreSQL
 on:
   push:
-    branches: ['codex/208-operation-ledger', 'codex/208-calendar-integration']
+    branches: ['codex/208-operation-ledger', 'codex/208-calendar-integration', 'codex/208-intent-propagation']
   pull_request:
     paths: ['lib/operations/**', 'drizzle/*operation_ledger.sql', '.github/workflows/operation-ledger.yml']
 permissions:
@@ -39,8 +39,16 @@ jobs:
           OPERATION_DB_TESTS: '1'
           OPERATION_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_208_test
 
-      - run: node --conditions=react-server --import tsx --test lib/operations/calendar-integration.test.ts lib/operations/calendar-provider.test.ts
+      - run: node --conditions=react-server --import tsx --test lib/operations/calendar-integration.test.ts lib/operations/calendar-provider.test.ts lib/operations/action-intents.test.ts
         env:
           NODE_ENV: test
           OPERATION_DB_TESTS: '1'
           OPERATION_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_208_test
+
+      - name: Preserve frozen question and monitor behavior on isolated PostgreSQL
+        run: |
+          psql postgresql://postgres@127.0.0.1:5432/mikka_208_test -c 'CREATE DATABASE mikka_e2e'
+          node --import tsx --test lib/factory/questions/postgres.test.ts lib/factory/monitor-cycle.test.ts lib/factory/monitor-dispatch.test.ts
+        env:
+          E2E_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_e2e
+          RETAIN_SYNTHETIC_RECORDS: '1'

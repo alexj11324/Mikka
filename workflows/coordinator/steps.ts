@@ -1,4 +1,4 @@
-import { generateText, type ModelMessage } from 'ai'
+import { generateText, type ModelMessage, type ToolExecutionOptions } from 'ai'
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, readRun, requestRunStop, runViewColumns } from '@/lib/agent-runs'
@@ -11,6 +11,9 @@ import { agentRuns, agents, coordinatorEvents, deviceRepos, devices, factoryAtte
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
+import { proposeCalendarBatch, recoverCalendarBatch, prepareAccountActionBatch } from '@/lib/operations/action-intent-runtime'
+import { OperationError } from '@/lib/operations/ledger'
+import type { ActionContext } from '@/lib/operations/action-intents'
 import { proposeAction } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -31,7 +34,7 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError || error instanceof FactoryError) return { error: error.code }
+    if (error instanceof ActionFailureError || error instanceof FactoryError || error instanceof OperationError) return { error: error instanceof OperationError ? error.message : error.code }
     throw error
   }
 }
@@ -51,9 +54,9 @@ export async function failTurn(userId: string, holder: string, error: string) {
   await store.failTurn(userId, holder, error)
 }
 
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null) {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, actionContext?: ActionContext) {
   'use step'
-  await store.appendMessages(userId, holder, messages, warning)
+  await store.appendMessages(userId, holder, messages, warning, actionContext)
 }
 
 /**
@@ -102,8 +105,13 @@ export async function composioAction(userId: string, action: ComposioActionName,
   return runComposioAction(userId, action, input)
 }
 
-export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown) {
+export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, context?: ActionContext, options?: Pick<ToolExecutionOptions<unknown>, 'messages' | 'toolCallId'>) {
   'use step'
+  if (action === 'create_calendar_event') {
+    if (!context || !options) return { error: 'accountActionSourceRequired' }
+    try { return await proposeCalendarBatch(userId, context, options) }
+    catch (error) { if (error instanceof OperationError) return { error: error.message }; throw error }
+  }
   return proposeAction(userId, action, input)
 }
 
@@ -146,9 +154,12 @@ export async function listAgents(userId: string) {
   }))
 }
 
-export async function dispatchRun(userId: string, input: FactoryDispatchInput) {
+export async function dispatchRun(userId: string, input: FactoryDispatchInput, context?: ActionContext, options?: Pick<ToolExecutionOptions<unknown>, 'messages' | 'toolCallId'>) {
   'use step'
-  return asToolResult(() => dispatchFactoryRun(userId, input))
+  return asToolResult(async () => {
+    if (context && options) await prepareAccountActionBatch(userId, context, options)
+    return dispatchFactoryRun(userId, input, undefined, context?.sourceEventId)
+  })
 }
 
 export async function listFactoryRequests(userId: string) {
@@ -312,4 +323,9 @@ export async function stopRun(userId: string, input: { runId: string }) {
     } else await requestRunStop(userId,input.runId)
     return {stopRequested:true}
   })
+}
+
+export async function recoverAccountActions(userId: string, context: ActionContext) {
+  'use step'
+  return recoverCalendarBatch(userId, context)
 }

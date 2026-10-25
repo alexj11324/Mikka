@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { parseActionInput } from '../composio-actions'
 import { createOperationLedger, OperationError, type OperationIntent, type OperationRecord } from './ledger'
 import { requireOperationSession, withOperationSession } from './session-authorization'
+import { requireActionSlot, type ActionContext } from './action-intents'
 import type { CalendarProvider } from './calendar-provider'
 
 function canonical(value: unknown): unknown {
@@ -58,7 +59,7 @@ export function createCalendarOperations(pool: Pool, provider: CalendarProvider)
     return { status: row.status === 'succeeded' ? 'done' as const : 'running' as const, error: row.status === 'succeeded' ? null : 'operationUncertain' }
   }
   return {
-    async propose(owner: string, raw: unknown, intentKey: string) {
+    async propose(owner: string, raw: unknown, intentKey: string, authority?: ActionContext & { actionSlotId: string }) {
       z.string().min(1).max(500).parse(intentKey)
       const input = parseActionInput('create_calendar_event', raw)
       if (!input) throw new OperationError('invalidIntegrationInput')
@@ -66,6 +67,7 @@ export function createCalendarOperations(pool: Pool, provider: CalendarProvider)
       // Serialize by trusted durable step identity before resolving account. Replay
       // returns original proposal even if accounts changed; execution rechecks it.
       return transaction(async tx => {
+        if (authority) await requireActionSlot(tx, owner, authority, input)
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['calendar-intent', owner, intentKey])])
         const prior = await tx.query<Proposal>('SELECT * FROM pending_actions WHERE "userId"=$1 AND "intentKey"=$2', [owner, intentKey])
         if (prior.rows[0]) {
@@ -76,9 +78,10 @@ export function createCalendarOperations(pool: Pool, provider: CalendarProvider)
         const count = await tx.query(`SELECT count(*) FROM pending_actions WHERE "userId"=$1 AND status='pending' AND "createdAt">clock_timestamp()-interval '7 days'`, [owner])
         if (Number(count.rows[0].count) >= 20) throw new OperationError('tooManyPendingActions')
         const selected = await bounded(() => provider.prepare(owner))
+        if (authority) await requireActionSlot(tx, owner, authority, input)
         const binding = bindingSchema.parse({ ...selected, provider: provider.name, payloadDigest: hash })
         const id = randomUUID()
-        await tx.query('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding") VALUES ($1,$2,\'create_calendar_event\',$3,$4,$5)', [id, owner, input, intentKey, binding])
+        await tx.query('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding","sourceEventId","actionSlotId") VALUES ($1,$2,\'create_calendar_event\',$3,$4,$5,$6,$7)', [id, owner, input, intentKey, binding, authority?.sourceEventId ?? null, authority?.actionSlotId ?? null])
         return { status: 'awaiting_approval', actionId: id }
       })
     },

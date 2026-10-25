@@ -245,6 +245,12 @@ const authed = withMcpAuth(handler, verifyMcpToken, {
  * picks these tools instead of the person's.
  */
 const workerHandler = createMcpHandler(server => {
+  server.registerTool('resume_account_actions', {
+    title: 'Read bound account actions',
+    description: 'Recover the persisted operation references and status assigned to this live run. Read-only: cannot approve or send. Omit operationId to list bound actions.',
+    inputSchema: z.object({ operationId: z.uuid().optional() }),
+  }, async ({ operationId }, ctx) => message(JSON.stringify(await worker.resumeAccountActions(ctx.http?.authInfo, operationId))))
+
   server.registerTool('report', {
     title: 'Report progress',
     description: 'Tell the person\'s Coordinator about progress on this run. Use it sparingly, at milestones (a plan settled, a hard part solved, ready for review), not after every step.',

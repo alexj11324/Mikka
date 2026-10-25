@@ -284,7 +284,7 @@ function fail(id, code, message) {
   )
 }
 
-function handle(message) {
+async function handle(message) {
   const { id, method, params } = message
   if (id === undefined || id === null) return // notifications
   switch (method) {
@@ -297,8 +297,25 @@ function handle(message) {
     case "ping":
       return reply(id, {})
     case "tools/list":
-      return reply(id, { tools: TOOLS })
+      return reply(id, { tools: [...TOOLS, ...(process.env.MIKKA_ACTION_READBACK_URL ? [{
+        name: 'resume_account_actions', description: 'Read the current server status of this run’s bound account actions. Does not create, approve, retry a send, or finish the run.',
+        inputSchema: { type: 'object', properties: { operationId: { type: 'string', format: 'uuid' } }, additionalProperties: false },
+      }] : [])] })
     case "tools/call": {
+      if (params?.name === 'resume_account_actions') {
+        try {
+          const url = new URL(process.env.MIKKA_ACTION_READBACK_URL)
+          if (!url.pathname.endsWith('/api/worker/account-actions') || url.username || url.password || url.search || url.hash || !(url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === '127.0.0.1'))) throw new Error('invalid endpoint')
+          const input = params.arguments ?? {}
+          if (Object.keys(input).some(k => k !== 'operationId') || (input.operationId !== undefined && !/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(input.operationId))) throw new Error('invalid operation')
+          if (input.operationId) url.searchParams.set('operationId', input.operationId)
+          const response = await fetch(url, { headers: { Authorization: `Bearer ${process.env.MIKKA_ACTION_READBACK_TOKEN}` }, redirect: 'error', signal: AbortSignal.timeout(10000) })
+          if (!response.ok) throw new Error('unavailable')
+          return reply(id, { content: [{ type: 'text', text: JSON.stringify(await response.json()) }] })
+        } catch {
+          return reply(id, { isError: true, content: [{ type: 'text', text: 'Bound account actions unavailable; no action was sent.' }] })
+        }
+      }
       const kind = KINDS[params?.name]
       if (!kind) return fail(id, -32602, `Unknown tool: ${params?.name}`)
       let planned
@@ -331,5 +348,5 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   } catch {
     return fail(null, -32700, "Parse error")
   }
-  handle(message)
+  void handle(message)
 })

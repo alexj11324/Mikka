@@ -626,8 +626,8 @@ export function createFactoryQuestions(
           requireSessionResume: true,
         };
         await tx.query(
-          'UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1',
-          [run.runId, JSON.stringify(continuation)],
+          'UPDATE agent_runs SET "questionContinuation"=$2,"accountActionRefs"=$3 WHERE id=$1',
+          [run.runId, JSON.stringify(continuation), JSON.stringify(origin.accountActionRefs ?? [])],
         );
         const result: QuestionContinuation = {
           questionId: q.id,

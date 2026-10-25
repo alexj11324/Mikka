@@ -56,6 +56,8 @@ export interface AgentCapabilities {
 }
 
 export interface SessionOptions {
+  accountActionReadback?: { url: string; token: string }
+
   runId: string
   /** Question answers must not fall back to a fresh conversation. */
   requireSessionResume?: boolean
