@@ -1,8 +1,11 @@
 import { withRequestLog } from '@/lib/request-log'
+import { after } from 'next/server'
 import { db } from '@/lib/db'
 import { linearSyncInbox } from '@/lib/db/schema'
 import { dispatchLinearWebhook } from '@/lib/linear-sync/dispatch'
 import { parseLinearWebhookRequest } from '@/lib/linear-sync/webhook'
+import { linearWebhookNotifications } from '@/lib/suggestions/sources'
+import { ingestNotifications } from '@/lib/suggestions/store'
 
 export const runtime = 'nodejs'
 
@@ -16,7 +19,14 @@ async function handlePOST(request: Request) {
     eventType: parsed.eventType,
     payload: parsed.payload,
   }).onConflictDoNothing().returning({ deliveryId: linearSyncInbox.deliveryId })
-  if (saved) dispatchLinearWebhook(saved.deliveryId)
+  if (saved) {
+    dispatchLinearWebhook(saved.deliveryId)
+    // The same delivery feeds the suggestions list; only a first delivery, so a retry is not judged twice.
+    after(async () => {
+      try { await ingestNotifications(await linearWebhookNotifications(parsed.organizationId, parsed.payload)) }
+      catch (error) { console.error('Linear suggestion ingest failed', error instanceof Error ? error.message : error) }
+    })
+  }
   return new Response(null, { status: 200 })
 }
 
