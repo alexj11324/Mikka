@@ -1,13 +1,21 @@
 // Server-side cycle guard for updateIssueRelation, against a real database.
 // Runs the action through actAs (the same path MCP tools use).
-// Needs MIKKA_DATABASE_URL (issues) and DATABASE_URL (workspace tables, read by issue access);
-// run it via ~/.mikka/local-run.sh, which sets both to dev-local. CI runs it with REQUIRE_DB=1 once #85 (MIK-19) merges.
-// Skips without them; REQUIRE_DB=1 makes a missing database a failure.
+// Only GitHub Actions' disposable mikka_e2e service may run this fixture.
+// REQUIRE_DB=1 makes missing or foreign targets a failure before any connection.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 
-const hasDb = Boolean(process.env.MIKKA_DATABASE_URL && process.env.DATABASE_URL)
+let hasDb = false
+try {
+  const target = new URL(process.env.E2E_DATABASE_URL ?? '')
+  hasDb = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true'
+    && target.hostname === '127.0.0.1' && target.port === '5432' && target.pathname === '/mikka_e2e'
+    && !target.search && !target.hash && ['postgres:', 'postgresql:'].includes(target.protocol)
+    && process.env.MIKKA_DATABASE_URL === process.env.E2E_DATABASE_URL
+    && process.env.DATABASE_URL === process.env.E2E_DATABASE_URL
+    && (!process.env.ORVILO_DATABASE_URL || process.env.ORVILO_DATABASE_URL === process.env.E2E_DATABASE_URL)
+} catch { /* no eligible ephemeral service */ }
 if (!hasDb && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 but MIKKA_DATABASE_URL or DATABASE_URL is not set')
 
 test('updateIssueRelation rejects a parent cycle on the server', { skip: !hasDb && 'no MIKKA_DATABASE_URL / DATABASE_URL' }, async () => {

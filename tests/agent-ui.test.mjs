@@ -40,7 +40,10 @@ test('Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片
   const workspace = await readFile(new URL('../components/workspace/issue-workspace.tsx', import.meta.url), 'utf8')
   const overview = await readFile(new URL('../components/workspace/workspace-overview.tsx', import.meta.url), 'utf8')
   const demo = await readFile(new URL('../components/workspace/agent-demo.tsx', import.meta.url), 'utf8')
-  assert.match(workspace, /if \(typeof window !== 'undefined'\) \{\s*void import\('\.\/agent-panel'\)\.catch\(\(\) => \{\}\)\s*void import\('\.\/create-issue-dialog'\)/)
+  const preload = workspace.match(/if \(typeof window !== 'undefined'\) \{([\s\S]*?)\n\}/)?.[1]
+  assert.ok(preload, 'browser-only preload stays at module scope')
+  assert.match(preload, /void import\('\.\/agent-panel'\)\.catch/)
+  assert.match(preload, /void import\('\.\/create-issue-dialog'\)\.catch/)
   assert.match(overview, /dynamic\(\(\) => import\('\.\/agent-panel'\)/)
   assert.match(demo, /src: withBasePath\('\/placeholder\.svg/)
   const tools = await readFile(new URL('../components/workspace/agent-demo-tools.tsx', import.meta.url), 'utf8')
@@ -78,7 +81,7 @@ test('普通聊天正文不加载公式引擎，含公式时复用完整 Markdow
   const math = await readFile(new URL('../components/workspace/agent-math-markdown.tsx', import.meta.url), 'utf8')
   assert.doesNotMatch(markdown, /from '(?:remark-math|rehype-katex)'|import 'katex\//)
   assert.match(markdown, /dynamic\(\(\) => import\('\.\/agent-math-markdown'\)/)
-  assert.match(markdown, /props\.text\.includes\('\$'\)/)
+  assert.match(markdown, /hasMathDelimiters\(props\.text\)/)
   assert.match(math, /<AgentMarkdownContent/)
   assert.match(math, /trust: false/)
   assert.match(math, /katex\/dist\/katex.min.css/)
@@ -355,7 +358,7 @@ test('功能分组完整且每个本地组件仅属于一个功能组', () => {
   const names = agentComponentGroups.flatMap(group => group.components)
   assert.deepEqual([...names].sort(), Object.keys(agentComponentCatalog).sort())
   assert.equal(new Set(names).size, names.length)
-  assert.equal(agentComponentGroups.length, 5)
+  assert.equal(agentComponentGroups.length, 6)
 })
 
 test('审批、问题、回复和任务计划均可解析', () => {
@@ -430,14 +433,18 @@ test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 
   assert.doesNotMatch(starters, /<Button|function AgentStarters/)
 })
 
-test('Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单', async () => {
+test('Agent 保留应用外壳、居中输入与当前导航标题', async () => {
   const source = await readFile(new URL('../components/workspace/agent-chat.tsx', import.meta.url), 'utf8')
-  for (const name of ['SidebarTrigger', 'AgentWelcome', 'Popover', 'PopoverTrigger', 'Command', 'CommandItem']) {
+  for (const name of ['SidebarTrigger', 'AgentWelcome', 'ConversationPill']) {
     assert.match(source, new RegExp(`<${name}[\\s>]`))
   }
   assert.doesNotMatch(source, /<AnimatedSidebar[\s>]|<AnimatedSidebarTrigger|<AISidebar/)
-  assert.match(source, /aria-label=\{\(agentCopy\.switchConversation\s*\+\s*\(title\)\)\}/)
-  for (const key of ['newTask', 'search']) assert.ok(source.includes(`size="icon" aria-label={agentCopy.${key}}`))
+  assert.match(source, /<ConversationPill name=\{title\}/)
+  assert.ok(source.includes('size="icon" aria-label={agentCopy.newTask}'))
+  assert.match(source, /onClick=\{onReset\}/)
+  const navigation = await readFile(new URL('../components/nav/conversation-list.tsx', import.meta.url), 'utf8')
+  assert.match(navigation, /onOpen\(conversation\)/)
+  assert.match(navigation, /sessionId: session\.id/)
   assert.doesNotMatch(source, /ChatApp|AnimatedSidebarInset/)
   assert.match(source, /turns\.length === 0 \? <AgentWelcome/)
   const welcome = await readFile(new URL('../components/workspace/agent-welcome.tsx', import.meta.url), 'utf8')
@@ -518,4 +525,28 @@ test('beUI 限制按钮语义、状态、数字和小数位', () => {
   for (const precision of [-1, 5, 1.5]) {
     assert.equal(BeStat.props.safeParse({ label: '用户输入', value: 12.5, precision }).success, false)
   }
+})
+
+test('\\( \\) 与 \\[ \\] 定界符转换为 KaTeX 公式，代码内容保持原样，中文使用 cjk_fallback', async () => {
+  const { normalizeMathDelimiters, hasMathDelimiters } = await import('../lib/math-delimiters.ts')
+  const source = String.raw`设 \(x^2 + y^2 = r^2\)，其中 \(\text{半径}\) 为 r。
+\[
+E = mc^2 \quad \text{（质能方程）}
+\]
+- 列表里：\(\alpha\) 与 \[\beta = 2\]
+
+代码：` + '`\\(x\\)`'
+  assert.ok(hasMathDelimiters(source))
+  assert.equal(normalizeMathDelimiters('无公式 $$a \\\\[2pt] b$$'), '无公式 $$a \\\\[2pt] b$$')
+  const markup = renderToStaticMarkup(Markdown({
+    remarkPlugins: [remarkMath],
+    rehypePlugins: [[rehypeKatex, { trust: false, strict: 'ignore', throwOnError: false, maxExpand: 1000, maxSize: 20 }]],
+    children: normalizeMathDelimiters(source),
+  }))
+  assert.equal([...markup.matchAll(/class="katex-display"/g)].length, 1)
+  assert.equal([...markup.matchAll(/class="katex"/g)].length, 5)
+  assert.match(markup, /<li>列表里：<span class="katex">/)
+  assert.match(markup, /class="mord cjk_fallback">半径</)
+  assert.match(markup, /<code>\\\(x\\\)<\/code>/)
+  assert.doesNotMatch(markup, /katex-error/)
 })
