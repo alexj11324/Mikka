@@ -1469,7 +1469,7 @@
     },
     "linear": {
       "title": "Linear",
-      "description": "连接 Linear 账号，在 Linear 和 Orvilo 之间同步任务与评论。",
+      "description": "连接 Linear 账号，在 Linear 和 Mikka 之间同步任务与评论。",
       "connected": "已连接",
       "connectedTo": "已连接到 {organization}",
       "connect": "连接 Linear",
@@ -1489,7 +1489,7 @@
       "retry": "重试同步",
       "loadError": "无法加载 Linear 设置。",
       "operationError": "Linear 同步操作失败，请重试。",
-      "teamAlreadyLinked": "此 Linear 团队已连接到另一个 Orvilo 账号。"
+      "teamAlreadyLinked": "此 Linear 团队已连接到另一个 Mikka 账号。"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",

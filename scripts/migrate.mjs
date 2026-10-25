@@ -23,8 +23,7 @@ if (!gate.run) {
 console.log(`migrate: running (${gate.reason})`)
 
 const targets = {
-  // ORVILO_DATABASE_URL is the pre-rename name.
-  MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL ?? process.env.ORVILO_DATABASE_URL,
+  MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL,
   DATABASE_URL: process.env.DATABASE_URL,
 }
 

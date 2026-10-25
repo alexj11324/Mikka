@@ -88,7 +88,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   }
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
-  <section aria-label={t('label')} className="orvilo-agent flex min-h-0 flex-1 flex-col">
+  <section aria-label={t('label')} className="mikka-agent flex min-h-0 flex-1 flex-col">
     <MessageScrollerProvider defaultScrollPosition="end">
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={t('conversation')}>
