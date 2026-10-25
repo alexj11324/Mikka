@@ -39,7 +39,7 @@ try{
  assert.equal((await command({action:'list'},null)).status,401)
  const start=Date.now()+2500
  const created=await command({action:'create',requestId:randomUUID(),definition:definition({kind:'once',at:new Date(start).toISOString()})})
- assert.equal(created.status,200)
+ assert.equal(created.status,200,JSON.stringify(created.body))
  const schedule=created.body.schedule
  assert.equal((await command({action:'history',scheduleId:schedule.id},otherCookie)).status,403) // other cannot use owner's private source conversation
  console.log(JSON.stringify({at:stamp(),phase:'created before service restart',scheduleId:schedule.id,dueAt:schedule.next_at,slaMs:10000}))

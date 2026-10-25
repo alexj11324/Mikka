@@ -1,3 +1,5 @@
+import { appOrigin } from '@/lib/mcp/resource'
+import { scheduleOriginAllowed } from '@/lib/schedules/http'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { executeScheduleCommand } from '@/lib/schedules/runtime'
@@ -6,10 +8,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 const inputSchema = z.object({ workspaceId: z.uuid(), conversation: z.enum(['bot','coordinator']), sessionId: z.string().min(1).max(200), sourceId: z.string().min(1).max(200), command: commandSchema }).strict()
 export async function POST(request: Request) {
-  if (request.headers.get('cookie')) {
-    try { if (new URL(request.headers.get('origin') ?? '').origin !== new URL(request.url).origin) return Response.json({ error: 'originRejected' }, { status: 403 }) }
-    catch { return Response.json({ error: 'originRejected' }, { status: 403 }) }
-  }
+  if (!scheduleOriginAllowed(request, appOrigin)) return Response.json({ error: 'originRejected' }, { status: 403 })
   const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
   if (!session?.user) return Response.json({ error: 'authRequired' }, { status: 401 })
   const text = await request.text()
