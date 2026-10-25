@@ -10,6 +10,7 @@ test('worker MCP rechecks current issue authority after queueing and revocation'
   expect(target.pathname).toBe('/mikka_e2e')
   const pool = new Pool({ connectionString: target.toString() })
   const owner = `authz-owner-${randomUUID()}`, member = `authz-member-${randomUUID()}`
+  const otherOwner = `authz-owner-b-${randomUUID()}`, otherMember = `authz-member-b-${randomUUID()}`
   const workspaceA = randomUUID(), workspaceB = randomUUID(), teamA = randomUUID(), teamB = randomUUID()
   const issueA = randomUUID(), issueB = randomUUID(), personal = randomUUID()
   const evidence: { check: string; status: number }[] = []
@@ -34,15 +35,16 @@ test('worker MCP rechecks current issue authority after queueing and revocation'
     return Number((await pool.query('select count(*) from coordinator_events where "runId"=$1',[run])).rows[0].count)
   }
   try {
-    for (const [workspace,team] of [[workspaceA,teamA],[workspaceB,teamB]]) {
-      await pool.query('insert into mikka_workspaces(id,"userId",name) values($1,$2,$3)',[workspace,owner,'Authorization fixture'])
-      await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,$4,$5)',[team,workspace,owner,'Fixture','AUTHZ'])
-      await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$3,$4,$5)',[workspace,owner,'Fixture owner',`${owner}@example.invalid`,'admin'])
+    for (const [workspace,team,workspaceOwner] of [[workspaceA,teamA,owner],[workspaceB,teamB,otherOwner]]) {
+      await pool.query('insert into mikka_workspaces(id,"userId",name) values($1,$2,$3)',[workspace,workspaceOwner,'Authorization fixture'])
+      await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,$4,$5)',[team,workspace,workspaceOwner,'Fixture','AUTHZ'])
+      await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$3,$4,$5)',[workspace,workspaceOwner,'Fixture owner',`${workspaceOwner}@example.invalid`,'admin'])
     }
     await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$3,$4,$5)',[workspaceA,member,'Fixture member',`${member}@example.invalid`,'member'])
+    for (const userId of [otherMember,owner]) await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$3,$4,$5)',[workspaceB,userId,'Fixture member',`${userId}@example.invalid`,'member'])
     for (const [issue,workspace,team] of [[issueA,workspaceA,teamA],[issueB,workspaceB,teamB],[personal,null,null]]) {
-      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,$4,$5,$6,$7)',[issue,owner,'Synthetic authorization fixture',{type:'doc',content:[]},'todo','normal',workspace?'workspace':'personal'])
-      if(workspace) await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)',[issue,team,workspace,owner])
+      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,$4,$5,$6,$7)',[issue,workspace === workspaceB ? otherOwner : owner,'Synthetic authorization fixture',{type:'doc',content:[]},'todo','normal',workspace?'workspace':'personal'])
+      if(workspace) await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)',[issue,team,workspace,workspace === workspaceB ? otherOwner : owner])
     }
     const admin = await runFor(owner,issueA), active = await runFor(member,issueA), queued = await runFor(member,issueA,'queued')
     await call(admin.token,'workspace owner/admin',200)
@@ -50,6 +52,10 @@ test('worker MCP rechecks current issue authority after queueing and revocation'
     await call(active.token,'active member ask',200,'ask')
     await call(active.token,'active member blocked',200,'blocked')
     expect(await events(active.run)).toBe(3)
+    const independent = await runFor(otherMember,issueB), secondAdmin = await runFor(otherOwner,issueB), multiWorkspace = await runFor(owner,issueB)
+    await call(secondAdmin.token,'independent workspace B owner',200)
+    await call(independent.token,'independent workspace B member',200)
+    await call(multiWorkspace.token,'same user active in both workspaces',200)
     const foreign = await runFor(member,issueB)
     await call(foreign.token,'member of A cannot act on B',401)
     expect.soft(await events(foreign.run)).toBe(0)
@@ -65,6 +71,8 @@ test('worker MCP rechecks current issue authority after queueing and revocation'
     expect.soft(await events(active.run)).toBe(3)
     expect.soft(await events(queued.run)).toBe(0)
     await call(admin.token,'other active owner remains allowed',200)
+    await call(independent.token,'workspace B remains unaffected by A revocation',200)
+    expect(await events(independent.run)).toBe(2)
     await pool.query('update agent_runs set "stopRequestedAt"=now() where id=$1',[admin.run])
     await call(admin.token,'stop request rejects live token',401)
     await pool.query('update run_tokens set "revokedAt"=now() where "runId"=$1',[privateRun.run])
