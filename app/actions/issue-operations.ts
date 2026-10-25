@@ -16,6 +16,15 @@ import { dispatchLinearIssueSync, dispatchLinearWork } from '@/lib/linear-sync/d
 
 const relationSchema = z.object({ id: z.uuid(), revision: z.number().int().positive(), targetId: z.uuid().nullable(), kind: z.enum(['parent', 'child', 'related', 'blockedBy', 'blocks', 'duplicate']), remove: z.boolean().default(false) })
 
+/**
+ * Runs after the write has committed. Scheduling Linear sync can throw (e.g. `after` outside a
+ * request); that must not turn a saved change into a "save failed" response, so it only logs.
+ */
+function scheduleLinearWork() {
+  try { dispatchLinearWork() }
+  catch (error) { console.error('Linear background sync could not be scheduled', error instanceof Error ? error.name : 'UnknownError') }
+}
+
 export async function listIssueConnections(id: string) {
   const { issue, user } = await requireIssueAccess(id)
   const rows = await db.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, content: issues.content, createdAt: issues.createdAt }).from(issues)
@@ -88,7 +97,7 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
         }
         return { issue: await issueView(savedCurrent, tx) }
       })
-      if ('issue' in result) dispatchLinearWork()
+      if ('issue' in result) scheduleLinearWork()
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
@@ -142,7 +151,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
         }
         return { issue: await issueView(created, tx) }
       })
-      if ('issue' in result) dispatchLinearWork()
+      if ('issue' in result) scheduleLinearWork()
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error

@@ -62,7 +62,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
       BETTER_AUTH_URL: http://localhost:3000
       MIKKA_DATABASE_URL: postgres://mikka:mikka@127.0.0.1:5432/mikka
       NEXT_TELEMETRY_DISABLED: '1'
@@ -76,6 +75,12 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Fresh random secret per run, test-only. Masked in logs and never echoed.
+      - name: Generate ephemeral test-only auth secret
+        run: |
+          secret="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")"
+          echo "::add-mask::$secret"
+          echo "BETTER_AUTH_SECRET=$secret" >> "$GITHUB_ENV"
       - run: pnpm test:ui-policy
       - run: pnpm test:motion
       - run: pnpm test:i18n
@@ -86,6 +91,10 @@ jobs:
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
       - run: pnpm test:integrations
+      - run: pnpm test:agent
+      - run: pnpm test:acceptance
+      - run: pnpm test:suggestions
+      - run: pnpm test:db-runner
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:issues
@@ -138,6 +147,7 @@ jobs:
           --health-retries 10
     env:
       CI: 'true'
+      REQUIRE_DB: '1'
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
@@ -154,17 +164,21 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Generate ephemeral test-only auth secret
-        run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+        run: |
+          secret="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")"
+          echo "::add-mask::$secret"
+          echo "BETTER_AUTH_SECRET=$secret" >> "$GITHUB_ENV"
       - run: pnpm exec playwright install --with-deps chromium
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
-      - name: Group conversation API and migrations (temporary Postgres 17 only)
-        run: pnpm test:groups
       - run: pnpm test:e2e:setup
-      - name: Verify legacy workspace migration and idempotency
-        run: node --test tests/workspace-migration.test.mjs
+      - name: Required DB suites (temporary Postgres 17, no skips)
+        run: pnpm test:db
+        env:
+          REQUIRE_DB: '1'
+          DB_TEST_EXPECTED: test:groups,test:migrations,test:relation-cycle,test:workspace-migration-db
       - run: pnpm build
         id: build
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
