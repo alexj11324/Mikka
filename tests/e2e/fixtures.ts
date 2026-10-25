@@ -66,6 +66,18 @@ export async function seedTask(page: Page, title: string, { status = 'todo', pri
   return id
 }
 
+/** Initialize the authenticated workspace directory before a fixture reads it.
+ * Registration may reach the Coordinator before this lazy context is loaded.
+ * Returns the selected, authorized workspace; does not change UI or quota policy.
+ */
+export async function initializeWorkspace(page: Page): Promise<{ id: string; name: string }> {
+  const response = await page.request.get(app('/api/workspace'))
+  expect(response.status()).toBe(200)
+  const context = await response.json()
+  expect(context.workspace?.id).toEqual(expect.any(String))
+  return context.workspace
+}
+
 /** The current conversation's title pill over the chat (desktop). */
 export function conversationPill(page: Page) {
   // Conversations opened earlier stay mounted but hidden; only the current one is visible.
