@@ -32,8 +32,11 @@ export class SessionMailbox {
     if (!candidate) throw new MailboxError('Unknown run',404)
     if (!candidate.eligible) throw new MailboxError('Mailbox unavailable',403)
     const coordinator=await this.ensure(client,userId,'coordinator','coordinator')
+    // Keep the full sorted writer lock set before audited run mutations. FK
+    // KEY SHARE must remain compatible: a sender may already hold target M
+    // while referencing C, as completion holds C and waits for M.
     const ids=[coordinator.id,...(candidate.mailboxId?[candidate.mailboxId]:[])]
-    await client.query('select id from session_mailboxes where id=any($1::uuid[]) order by id for update',[ids])
+    await client.query('select id from session_mailboxes where id=any($1::uuid[]) order by id for no key update',[ids])
     return candidate.mailboxId as string | null
   }
 

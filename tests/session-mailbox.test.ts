@@ -286,6 +286,7 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
     })
     await t.test('owner send and completion preserve both envelopes across the FK lock barrier', async () => {
       await mailboxCompletionLockAcceptance(pool, workspace, { owner, issue, role, device, repo })
+      await mailboxCompletionLockAcceptance(pool, workspace, { owner, issue, role, device, repo, mailboxFirst: true })
     })
     await t.test('result/terminal update roll back together if event persistence fails', async () => {
       await pool.query(`create function reject_finish() returns trigger language plpgsql as $$ begin if new.kind='run_finished' then raise exception 'injected completion failure'; end if; return new; end $$`)
@@ -326,8 +327,8 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
       // Retry of a continuation must canonicalize through the shared mailbox,
       // rather than making the continuation run a new logical sender.
       const continuation = randomUUID(), continuationRetry = randomUUID()
-      await insert(continuation, null, 1)
-      await pool.query(`update agent_runs set "mailboxId"=$1,"continuesRunId"=$2,status='failed',"stopReason"='device_lost' where id=$3`, [first.mailboxId,root,continuation])
+      await pool.query(`insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"stopReason","mailboxId","continuesRunId")
+        values ($1,$2,$3,$4,$5,$6,'failed','device_lost',$7,$8)`, [continuation,owner,issue,role,device,repo,first.mailboxId,root])
       await insert(continuationRetry, continuation, 2)
       const continued = await store.run(owner, continuationRetry)
       const continuedInput = { ...input, key: randomUUID() }
