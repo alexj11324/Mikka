@@ -69,8 +69,8 @@ try {
     const result=await c.call('/api/auth/sign-up/email','POST',{name:'Synthetic policy acceptance',email:`policy-${randomUUID()}@example.invalid`,password:randomBytes(32).toString('base64url')})
     assert.equal(result.status,200);return result.body.user.id
   }
-  const oauthMcp = await oauthMcpAcceptance({app,workspace,origin,client,signup,receipts,route})
   const userId=await signup(owner), memberId=await signup(member)
+  const oauthMcp = await oauthMcpAcceptance({app,workspace,origin,admin:owner,ownerId:userId,memberId,receipts,route})
   await workspace.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,'Synthetic policy acceptance'),($3,$2,'Synthetic second workspace')`,[w,userId,other])
   await workspace.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,'Synthetic','policy@example.invalid','admin'),($3,$2,'Synthetic','policy@example.invalid','admin'),($1,$4,'Synthetic','member@example.invalid','member')`,[w,userId,other,memberId])
   assert.equal((await anonymous.call(policy(w))).status,401)

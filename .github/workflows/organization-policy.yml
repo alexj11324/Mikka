@@ -27,6 +27,7 @@ jobs:
     env:
       MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/policy_app_e2e
       DATABASE_URL: postgresql://postgres@127.0.0.1:5432/policy_workspace_e2e
+      POLICY_APP_TEST_URL: postgresql://postgres@127.0.0.1:5432/policy_app_e2e
       POLICY_WORKSPACE_TEST_URL: postgresql://postgres@127.0.0.1:5432/policy_workspace_e2e
       REQUIRE_POLICY_DB: '1'
       CI: 'true'
@@ -59,7 +60,8 @@ jobs:
         run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
       - run: pnpm --filter @mikka/daemon test
       - name: Generate isolated auth secret
-        run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+        run: |
+          node -e "const s=require('node:crypto').randomBytes(32).toString('hex'); console.log('::add-mask::'+s); require('node:fs').appendFileSync(process.env.GITHUB_ENV,'BETTER_AUTH_SECRET='+s+'\n')"
       - run: pnpm exec next build --webpack
       - run: git rev-parse HEAD > .next/policy-source-sha
       - name: Compiled Next policy API regression
@@ -67,7 +69,7 @@ jobs:
           set -euo pipefail
           pnpm exec next start --hostname 127.0.0.1 --port 3130 > policy-next.log 2>&1 &
           node scripts/policy/http-acceptance.mjs | tee policy-http.log
-          node -e "const a=require('./policy-http-evidence/acceptance.json'); if(a.results!=='passed'||a.requests.length<30) process.exit(1)"
+          node -e "const a=require('./policy-http-evidence/acceptance.json'); if(a.results!=='passed'||a.requests.length<60||!a.oauthMcp?.events?.length) process.exit(1)"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

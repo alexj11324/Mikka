@@ -3,9 +3,8 @@ import { randomUUID, randomBytes, createHash } from 'node:crypto'
 import { request as httpRequest } from 'node:http'
 
 // Only called by the loopback, separate _e2e database acceptance harness.
-export async function oauthMcpAcceptance({ app, workspace, origin, client, signup, receipts, route }) {
-  const admin = client(), member = client()
-  const ownerId = await signup(admin), memberId = await signup(member), w = randomUUID()
+export async function oauthMcpAcceptance({ app, workspace, origin, admin, ownerId, memberId, receipts, route }) {
+  const w = randomUUID()
   await workspace.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,'Synthetic OAuth MCP policy')`, [w, ownerId])
   await workspace.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,'Synthetic','oauth-admin@example.invalid','admin'),($1,$3,'Synthetic','oauth-member@example.invalid','member')`, [w, ownerId, memberId])
   const clientId = randomUUID(), tokenId = randomUUID(), token = `mka_${randomBytes(32).toString('base64url')}`
@@ -69,5 +68,6 @@ export async function oauthMcpAcceptance({ app, workspace, origin, client, signu
   await call('list_issues',{},null) // Existing local reads remain available.
   const events=(await workspace.query(`SELECT event->>'reason' reason,count(*)::int count FROM security_audit_events WHERE tenant=$1 AND event->>'action'='policy.tool' GROUP BY 1`,[w])).rows
   assert.ok(events.some(r=>r.reason==='policyRevoked' && r.count>=7))
+  await publish('enforce') // Reuse the same two synthetic users without rate-limit bypasses.
   return {workspaceId:w,versions:version,events,providerConfiguration:'absent; unmanaged returned composioNotConfigured; managed returned policy denial before client construction'}
 }

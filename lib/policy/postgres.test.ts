@@ -1,3 +1,6 @@
+import { MockLanguageModelV4 } from "ai/test";
+import { APICallError } from "ai";
+import { generatePolicyText } from "./generate-text";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { policySqlClient } from "./sql-client";
 import assert from "node:assert/strict";
@@ -480,6 +483,62 @@ test(
             /policyAccessDenied/,
           );
           assert.equal(sends, 1);
+        },
+      );
+      await t.test(
+        "real policy publication, revoke and revision during retryable SDK failure prevent a second send",
+        async () => {
+          for (const change of ["publish", "revoke", "revision"]) {
+            const id = randomUUID(),
+              actor = `retry_${randomUUID()}`;
+            await pool.query(
+              `INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,'Synthetic retry')`,
+              [id, actor],
+            );
+            await pool.query(
+              `INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,'Synthetic','retry@example.invalid','admin')`,
+              [id, actor],
+            );
+            let sends = 0,
+              gates = 0;
+            const model = new MockLanguageModelV4({
+              doGenerate: async () => {
+                sends++;
+                await store.publish(id, actor, 0, {
+                  ...document(id),
+                  state: change === "revoke" ? "revoked" : "enforce",
+                });
+                if (change === "revision")
+                  await store.publish(id, actor, 1, document(id));
+                throw new APICallError({
+                  message: "Synthetic 503 after real policy change",
+                  url: "https://fixture.invalid",
+                  requestBodyValues: {},
+                  statusCode: 503,
+                  isRetryable: true,
+                });
+              },
+            });
+            const gate = async () => {
+              gates++;
+              await authorizeModelRequest(store, actor, AGENT_ROUTE);
+            };
+            await assert.rejects(
+              generatePolicyText(gate, {
+                model,
+                prompt: "synthetic",
+                maxRetries: 9,
+              }),
+              /Synthetic 503/,
+            );
+            assert.equal(sends, 1);
+            await assert.rejects(
+              generatePolicyText(gate, { model, prompt: "synthetic" }),
+              change === "revoke" ? /policyRevoked/ : /policyBudgetUnavailable/,
+            );
+            assert.equal(sends, 1);
+            assert.equal(gates, 2);
+          }
         },
       );
       await t.test(

@@ -9,7 +9,8 @@ import { PolicyStore } from "./store";
 import { policyHttp } from "./http";
 import { authorizeModelRequest } from "./model";
 import type { PolicyClient } from "./sql-client";
-import { PolicyError, type ModelRoute } from "./contract";
+import { workerPolicyScope } from "./run-scope";
+import { type ModelRoute } from "./contract";
 
 export function policyStore() {
   return new PolicyStore(
@@ -46,18 +47,9 @@ export async function authorizePolicyWorker(
   issueId?: string,
   workspaceId?: string,
 ) {
-  // #210 captures the original tenant across retry and later task moves.
-  const captured = (
-    await pool.query(
-      "SELECT tenant FROM security_audit_resource_scopes WHERE source='agent_runs' AND resource=$1 AND owner_id=$2",
-      [runId, userId],
-    )
-  ).rows[0];
-  if (captured?.tenant && !captured.tenant.startsWith("personal:")) {
-    if (workspaceId && workspaceId !== captured.tenant)
-      throw new PolicyError("policyScopeMismatch", 403);
-    workspaceId = captured.tenant;
-  }
+  const scope = await workerPolicyScope(pool, userId, runId, workspaceId);
+  if (!scope.verified) await policyStore().denyWorker(userId, runId);
+  workspaceId = scope.workspaceId;
   return policyStore().denyWorker(userId, runId, issueId, workspaceId);
 }
 /** Existing tool/native transports cannot attest to all model/network child calls. */
@@ -77,16 +69,12 @@ export async function workerPolicyInTransaction(
   runId: string,
   issueId: string,
 ) {
-  const captured = (
-    await app.query(
-      "SELECT tenant FROM security_audit_resource_scopes WHERE source='agent_runs' AND resource=$1 AND owner_id=$2",
-      [runId, userId],
-    )
-  ).rows[0];
-  const workspaceId =
-    captured?.tenant && !captured.tenant.startsWith("personal:")
-      ? captured.tenant
-      : undefined;
+  const scope = await workerPolicyScope(app, userId, runId);
+  if (!scope.verified) {
+    const denied = await policyStore().workerDenial(workspace, userId, runId);
+    if (denied) return denied;
+  }
+  const workspaceId = scope.workspaceId;
   return policyStore().workerDenial(
     workspace,
     userId,
