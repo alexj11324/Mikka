@@ -1,0 +1,325 @@
+$ pnpm check:agent-ui && pnpm test:preview && pnpm test:agent && pnpm test:byos && pnpm test:acceptance && pnpm test:auth-composio && pnpm test:ui-policy && pnpm test:motion && pnpm test:i18n && pnpm i18n:check && pnpm test:ssh-target && pnpm test:linear-sync && pnpm test:coordinator-events && pnpm test:factory && pnpm test:groups && pnpm test:integrations && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm test:issues && pnpm test:telegram && pnpm test:suggestions && pnpm test:schedules && pnpm lint && pnpm typecheck
+$ node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check
+OpenUI 组件目录与提示词已校验：111 个组件定义。
+$ node --test tests/preview-ready.test.mjs
+✔ background precompilation is enabled by default and only explicit zero disables it (2.006193ms)
+✔ startup compiles chat, images, history and workspace with read-only HEAD requests (104.539745ms)
+✔ startup begins every warmup without waiting for other routes (0.817135ms)
+✔ startup supports deployments without a base path (0.7278ms)
+✔ page warmup accepts the sign-in redirect but API redirects remain failures (0.734981ms)
+✔ compile failures cannot report preview ready (1.604503ms)
+✔ optional warmup aborts a stalled request instead of hanging startup work (44.204878ms)
+✔ page requests never wait for unrelated AI routes or readiness marker files (14.110365ms)
+✔ preview bootstrap script is inside head to avoid hydration failure (2.469718ms)
+✔ startup preserves readiness output and starts default warmup without awaiting it (2.415864ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 353.150814
+$ node --import tsx --test tests/agent-fetch.test.mjs tests/agent-ui.test.mjs tests/agent-history.test.mjs tests/agent-web-tools.test.mjs
+✔ 配图关键词闭合即预加载，不等待卡片介绍、标签或回复完成 (17.319225ms)
+✔ 图片观察不预加载推理，不吞正文，并限制为最多六张不同配图 (11.230993ms)
+✔ 正常结束保留全部正文，不人为截断长回复 (2.519697ms)
+✔ 思考耗尽预算和空回复不会显示为成功 (5.775965ms)
+✔ 流提前断开保留正文并通知重试，已有错误不重复追加 (1.29404ms)
+✔ 主动停止不生成空回复或连接中断错误 (1.750213ms)
+✔ 请求头尚未返回时，即使预览传输忽略取消，也能结束等待 (1.659361ms)
+✔ 响应头已返回时，停止会中断流读取并取消上游 (90.173801ms)
+✔ 正常 SSE 响应保持内容、状态和响应头 (8.101354ms)
+✔ 完成前保存完整回复，不保存推理片段 (7.677178ms)
+✔ 失败回复保留正文和错误，不误标为完成 (1.091759ms)
+✔ 断流保存为失败，不静默当作成功 (0.699524ms)
+✔ 取消请求保存已生成片段且取消上游 (1.096994ms)
+✔ 数据库检查点缓慢时正文继续返回，完成前仍等待保存 (2.203677ms)
+✔ 保存失败必须向客户端报告错误 (1.020326ms)
+✔ KaTeX 样式字体与 rehype 渲染引擎使用同一版本 (29.773957ms)
+✔ 演示公式覆盖行内、对齐、矩阵及长公式，且不输出解析错误 (97.015673ms)
+✖ Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀 (51.804227ms)
+✔ 综合演示每个分组都可解析，覆盖全部本地回复组件 (61.812164ms)
+✔ beUI 代码块在 OpenUI 和 Markdown 中真正接入，等待状态使用 ReasoningText (33.413188ms)
+✔ 普通聊天正文不加载公式引擎，含公式时复用完整 Markdown 渲染 (1.512782ms)
+✔ 图片解析保留真实来源和许可，拒绝不安全资源 (7.97394ms)
+✔ 配图检索通过固定来源查询，并正确处理无结果及上游错误 (27.7941ms)
+✔ 图片复用正文入口并共享 SWR 预加载，回复缩略图不懒加载 (4.721334ms)
+✔ 资料配图和详细回答规则进入模型规范 (9.505162ms)
+✔ TextContent 统一支持 Markdown、LaTeX 和 Mermaid，保留旧字号契约 (9.162842ms)
+✔ Beautiful Mermaid 实际渲染六类图表，主题自适应且样式不污染其他回复 (327.026769ms)
+✔ 精致图表优先，复杂语法保留严格 Mermaid 回退和 SVG 清洗 (2.39658ms)
+✔ 混合真实换行与 JSON 转义的回复仍正确渲染标题、列表和自注意力公式 (38.583136ms)
+✔ 修复仅处理 OpenUI 字符串语法，保留代码、矩阵换行、转义引号与流式前缀 (11.788397ms)
+✔ 相关追问支持具体问题、上下文及内联继续，不再被提示词压制 (16.053031ms)
+✔ 完整正文和可自动补齐的括号不会误报失败 (9.081567ms)
+✔ 真实缺少段落与组件格式错误分别说明原因 (9.314738ms)
+✔ 紧凑推荐卡片可解析且模型规范优先小卡片 (30.516765ms)
+✔ beUI 组件包含在运行时和可序列化规范中 (21.193368ms)
+✔ beUI OpenUI Lang 输出可解析且保留旧组件兼容 (7.111279ms)
+✔ 功能分组完整且每个本地组件仅属于一个功能组 (0.248839ms)
+✔ 审批、问题、回复和任务计划均可解析 (5.016325ms)
+✔ 问题、任务与图标严格限制输入，不能��造审批结果 (2.596884ms)
+✔ 49 项 AI Elements 对照不遗漏且 beUI 对应源码可导入 (7.859698ms)
+✔ 会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 会话组件 (3.176488ms)
+✖ Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单 (1.787923ms)
+✔ 服务端和 beUI 界面均使用 DS 4.1 Flash (1.997608ms)
+✔ 停止按钮先取消表单默认行为，避免同步恢复后误发草稿 (2.698531ms)
+✔ 回复动作统一直接请求，澄清使用内联问题卡片 (5.468285ms)
+✔ beUI 限制按钮语义、状态、数字和小数位 (2.033415ms)
+✔ \( \) 与 \[ \] 定界符转换为 KaTeX 公式，代码内容保持原样，中文使用 cjk_fallback (22.542735ms)
+✔ 联网工具只暴露搜索和网页读取，保留 DS 聊天及认证 (12.974586ms)
+✔ 拒绝非 HTTPS、凭据、内网地址、IP 及自定义端口 (9.651704ms)
+✔ 搜索保留原始来源、日期和检索时间，裁剪内容 (5.708175ms)
+✔ 网页先检查 DNS，拒绝混合公共和私网解析 (0.690363ms)
+✔ 网页只返回有效正文，不把重定向或上游错误当成资料 (1.741731ms)
+✔ 计费验证未完成时说明具体原因且不重复调用上游 (1.076238ms)
+✔ 上游失败不泄漏错误详情，限制每轮费用，取消传播 (1.986598ms)
+ℹ tests 54
+ℹ suites 0
+ℹ pass 52
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13248.331241
+
+✖ failing tests:
+
+test at tests/agent-ui.test.mjs:39:1
+✖ Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀 (51.804227ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /if \(typeof window !== 'undefined'\) void import\('\.\/agent-panel'\)/. Input:
+  
+  "'use client'\n" +
+    "import { useTranslations } from 'next-intl'\n" +
+    '\n' +
+    "import { useCallback, useEffect, useRef, useState } from 'react'\n" +
+    "import useSWR, { useSWRConfig } from 'swr'\n" +
+    "import { toast } from 'sonner'\n" +
+    "import { useSearchParams } from 'next/navigation'\n" +
+    "import { usePathname, useRouter } from '@/i18n/navigation'\n" +
+    "import dynamic from 'next/dynamic'\n" +
+    "import { Skeleton } from '@/components/ui/skeleton'\n" +
+    "import { Columns3, List, Plus, Search } from 'lucide-react'\n" +
+    "import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'\n" +
+    "import { IconRail, type RailDestination } from '@/components/nav/icon-rail'\n" +
+    "import { ConversationList, type Conversation } from '@/components/nav/conversation-list'\n" +
+    "import type { AgentSessionRequest } from './agent-panel'\n" +
+    "import { TeamHome } from '@/components/teams/team-home'\n" +
+    "import { AppFrame, AppShell, AppShellContent, SignOutBoundary, WindowBar } from '@/components/app-shell'\n" +
+    "import { IssueList } from './issue-list'\n" +
+    "import { BoardPage } from './board-page'\n" +
+    "import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'\n" +
+    "import { GlobalSearch, SearchPill } from '@/components/nav/global-search'\n" +
+    "import { ContextPanel } from '@/components/nav/context-panel'\n" +
+    "import { listTaskRuns } from '@/app/actions/task-runs'\n" +
+    "import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'\n" +
+    "import { sessionPreview } from '@/lib/agent-history'\n" +
+    "import { PanelRight } from 'lucide-react'\n" +
+    "import { ISSUE_STATUSES, issueIdentifier, type IssueStatus, type IssueView } from './issue-properties'\n" +
+    "import { listIssues } from '@/app/actions/issues'\n" +
+    "import { authClient } from '@/lib/auth-client'\n" +
+    "import { Button } from '@/components/ui/button'\n" +
+    "import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'\n" +
+    "import { ShortcutKeys } from '@/components/shortcut-keys'\n" +
+    "import { Badge } from '@/components/ui/badge'\n" +
+    "import { Input } from '@/components/ui/input'\n" +
+    "import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'\n" +
+    "import { listProjects } from '@/app/actions/projects'\n" +
+    "import { listTeams } from '@/app/actions/teams'\n" +
+    "import { listProjectTeams } from '@/app/actions/team-relations'\n" +
+    "import { WorkspaceOverview } from './workspace-overview'\n" +
+    "import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'\n" +
+    "import { PluginsSkillsView } from '@/components/plugins/plugins-skills-view'\n" +
+    "import type { WorkspaceSection } from './workspace-navigation'\n" +
+    "import { pushSettingsHistory } from '@/lib/settings-navigation'\n" +
+    "import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'\n" +
+    "import { fetchSettingsData } from '@/lib/settings-data'\n" +
+    "import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'\n" +
+    "import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'\n" +
+    "import { useAgentHistory } from '@/hooks/use-agent-history'\n" +
+    "import { useWorkspace } from '@/hooks/use-workspace'\n" +
+    '\n' +
+    '// Start the chunk download during module evaluation, before hydration and its effects.\n' +
+    "if (typeof window !== 'undefined') {\n" +
+    "  void import('./agent-panel').catch(() => {})\n" +
+    "  void import('./create-issue-dialog').catch(() => {})\n" +
+    '}\n' +
+    '\n' +
+    'function DetailLoading() {\n' +
+    "  const t = useTranslations('Workspace')\n" +
+    `  return <div role="status" aria-label={t('loadingEditor')} className="flex flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>\n` +
+    '}\n' +
+    "const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })\n" +
+    "const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module => module.ProjectWorkspace), { loading: DetailLoading })\n" +
+    '// Settings open through history.pushState; without their own fallback a first chunk load suspends\n' +
+    "// up to the route's loading boundary, which can stay stuck on the skeleton.\n" +
+    "const SettingsShell = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsShell), { loading: WorkspaceLoading })\n" +
+    "const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })\n" +
+    '\n' +
+    "export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'account'; googleEnabled?: boolean }) {\n" +
+    '  const i18nText = useTranslations()\n' +
+    '  const { data: workspaceData } = useWorkspace(user.email)\n' +
+    '  const { data: agentHistory } = useAgentHistory(user.id, initialAgentHistory)\n' +
+    "  const t = useTranslations('Workspace')\n" +
+    "  const tIssue = useTranslations('Issue')\n" +
+    "  const tPlugins = useTranslations('Plugins')\n" +
+    '  const params = useSearchParams()\n' +
+    '  const pathname = usePathname()\n' +
+    '  const router = useRouter()\n' +
+    "  const { data: workspaceContext } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })\n" +
+    '  const { mutate: clearCache } = useSWRConfig()\n' +
+    '  const sectionTitles: Record<WorkspaceSection, string> = {\n' +
+    "    inbox: i18nText('Overview.sections.inbox'),\n" +
+    "    'my-issues': i18nText('Overview.sections.myIssues'),\n" +
+    "    agent: i18nText('Overview.sections.agent'),\n" +
+    "    coordinator: i18nText('Overview.sections.coordinator'),\n" +
+    "    projects: i18nText('Overview.sections.projects'),\n" +
+    "    views: i18nText('Overview.sections.views'),\n" +
+    "    'team-home': i18nText('Overview.sections.teamHome'),\n" +
+    "    'team-issues': i18nText('Overview.sections.teamIssues'),\n" +
+    "    'team-projects': i18nText('Overview.sections.teamProjects'),\n" +
+    "    'all-issues': i18nText('Overview.sections.allIssues'),\n" +
+    "    plugins: tPlugins('title'),\n" +
+    '  }\n' +
+    '  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value\n' +
+    '  const [settingsOpen, setSettingsOpen] = useState(Boolean(initialSettingsSection))\n' +
+    "  const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members' | 'integrations' | 'account'; invite: boolean }>({ section: initialSettingsSection ?? 'preferences', invite: false })\n" +
+    "  const [linearNotice, setLinearNotice] = useState<'connected' | 'error' | null>(null)\n" +
+    '  useEffect(() => {\n' +
+    '    const url = new URL(window.location.href)\n' +
+    "    const result = url.searchParams.get('linear')\n" +
+    "    if (result !== 'connected' && result !== 'error') return\n" +
+    '    setSettingsOpen(true)\n' +
+    "    setSettingsTarget({ section: 'integrations', invite: false })\n" +
+    '    setLinearNotice(result)\n' +
+    "    url.searchParams.delete('linear')\n" +
+    "    window.history.replaceState(null, '', url)\n" +
+    '  }, [])\n' +
+    '  const [boardBusy, setBoardBusy] = useState(false)\n' +
+    "  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], listIssues, { fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })\n" +
+    '  // Keep failed refreshes out of document flow so the board/list never jumps.\n' +
+    "  const listErrorMessage = t('listError')\n" +
+    '  useEffect(() => {\n' +
+    '    const id = `issue-list-error-${user.id}`\n' +
+    '    if (error) toast.error(listErrorMessage, { id, duration: Infinity })\n' +
+    '    else toast.dismiss(id)\n' +
+    '    return () => { toast.dismiss(id) }\n' +
+    '  }, [error, listErrorMessage, user.id])\n' +
+    "  const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects)\n" +
+    "  const { data: teams = [] } = useSWR('teams', listTeams)\n" +
+    "  const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams)\n" +
+    "  const { data: taskRuns = [] } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: boardBusy ? 0 : 15000, revalidateOnFocus: false })\n" +
+    "  const { data: coordinatorChat } = useSWR<CoordinatorChatView>('coordinator-chat', () => getCoordinatorChat(), { revalidateOnFocus: false })\n" +
+    '  const [panelOpen, setPanelOpen] = useState(true)\n' +
+    "  useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])\n" +
+    "  function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem('mikka:context-panel', next ? '1' : '0') } catch { /* storage unavailable */ } }\n" +
+    '  const [coordinatorPrefill, setCoordinatorPrefill] = useState<{ text: string; nonce: number }>()\n' +
+    "  const [teamId, setTeamId] = useState<string | null>(params.get('team'))\n" +
+    '  const activeTeam = teams.find(team => team.id === teamId)\n' +
+    "  const [section, setSection] = useState<WorkspaceSection>(params.get('team') ? 'team-home' : initialSection)\n" +
+    '  function changeSection(next: WorkspaceSection) {\n' +
+    '    setSection(next)\n' +
+    '    const url = new URL(window.location.href)\n' +
+    "    if (next === 'agent' || next === 'coordinator') url.searchParams.set('section', next)\n" +
+    "    else url.searchParams.delete('section')\n" +
+    "    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)\n" +
+    '  }\n' +
+    '  const [agentRequest, setAgentRequest] = useState<AgentSessionRequest>()\n' +
+    '  const [activeAgentId, setActiveAgentId] = useState<string | null>(null)\n' +
+    '  // Sessions the open Agent panel knows about, including ones still streaming and not saved yet.\n' +
+    '  const [liveSessions, setLiveSessions] = useState<SavedAgentSession[]>([])\n' +
+    "  const lastConversation = useRef<Conversation>(initialSection === 'agent' ? { kind: 'agent', sessionId: null } : { kind: 'coordinator' })\n" +
+    '  const [projectId, setProjectId] = useState<string | null>(null)\n' +
+    '  const [creationProject, setCreationProject] = useState<string | null>(null)\n' +
+    "  const [layout, setLayout] = useState<'board' | 'list'>('board')\n" +
+    '  const [selected, setSelected] = useState<string | null>(initialSelected)\n' +
+    '  const [pendingSelection, setPendingSelection] = useState<string | null | undefined>(und'... 19032 more characters
+  
+      at TestContext.<anonymous> (/workspace/Mikka-179/tests/agent-ui.test.mjs:43:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '\'use client\'\nimport { useTranslations } from \'next-intl\'\n\nimport { useCallback, useEffect, useRef, useState } from \'react\'\nimport useSWR, { useSWRConfig } from \'swr\'\nimport { toast } from \'sonner\'\nimport { useSearchParams } from \'next/navigation\'\nimport { usePathname, useRouter } from \'@/i18n/navigation\'\nimport dynamic from \'next/dynamic\'\nimport { Skeleton } from \'@/components/ui/skeleton\'\nimport { Columns3, List, Plus, Search } from \'lucide-react\'\nimport { ToggleGroup, ToggleGroupItem } from \'@/components/ui/toggle-group\'\nimport { IconRail, type RailDestination } from \'@/components/nav/icon-rail\'\nimport { ConversationList, type Conversation } from \'@/components/nav/conversation-list\'\nimport type { AgentSessionRequest } from \'./agent-panel\'\nimport { TeamHome } from \'@/components/teams/team-home\'\nimport { AppFrame, AppShell, AppShellContent, SignOutBoundary, WindowBar } from \'@/components/app-shell\'\nimport { IssueList } from \'./issue-list\'\nimport { BoardPage } from \'./board-page\'\nimport { NewTaskDialog } from \'@/components/coordinator/new-task-dialog\'\nimport { GlobalSearch, SearchPill } from \'@/components/nav/global-search\'\nimport { ContextPanel } from \'@/components/nav/context-panel\'\nimport { listTaskRuns } from \'@/app/actions/task-runs\'\nimport { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from \'@/app/actions/coordinator\'\nimport { sessionPreview } from \'@/lib/agent-history\'\nimport { PanelRight } from \'lucide-react\'\nimport { ISSUE_STATUSES, issueIdentifier, type IssueStatus, type IssueView } from \'./issue-properties\'\nimport { listIssues } from \'@/app/actions/issues\'\nimport { authClient } from \'@/lib/auth-client\'\nimport { Button } from \'@/components/ui/button\'\nimport { Tooltip, TooltipContent, TooltipTrigger } from \'@/components/ui/tooltip\'\nimport { ShortcutKeys } from \'@/components/shortcut-keys\'\nimport { Badge } from \'@/components/ui/badge\'\nimport { Input } from \'@/components/ui/input\'\nimport { NativeSelect, NativeSelectOption } from \'@/components/ui/native-select\'\nimport { listProjects } from \'@/app/actions/projects\'\nimport { listTeams } from \'@/app/actions/teams\'\nimport { listProjectTeams } from \'@/app/actions/team-relations\'\nimport { WorkspaceOverview } from \'./workspace-overview\'\nimport { WorkspaceContentLoading, WorkspaceLoading } from \'./workspace-loading\'\nimport { PluginsSkillsView } from \'@/components/plugins/plugins-skills-view\'\nimport type { WorkspaceSection } from \'./workspace-navigation\'\nimport { pushSettingsHistory } from \'@/lib/settings-navigation\'\nimport { bufferTypeAhead, typingOrDialog } from \'@/lib/shortcut-guard\'\nimport { fetchSettingsData } from \'@/lib/settings-data\'\nimport type { WorkspaceSwitcher } from \'@/lib/workspace-switcher\'\nimport type { AgentHistory, SavedAgentSession } from \'@/lib/agent-history\'\nimport { useAgentHistory } from \'@/hooks/use-agent-history\'\nimport { useWorkspace } from \'@/hooks/use-workspace\'\n\n// Start the chunk download during module evaluation, before hydration and its effects.\nif (typeof window !== \'undefined\') {\n  void import(\'./agent-panel\').catch(() => {})\n  void import(\'./create-issue-dialog\').catch(() => {})\n}\n\nfunction DetailLoading() {\n  const t = useTranslations(\'Workspace\')\n  return <div role="status" aria-label={t(\'loadingEditor\')} className="flex flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>\n}\nconst TaskDetail = dynamic(() => import(\'./task-detail\').then(module => module.TaskDetail), { loading: DetailLoading })\nconst ProjectWorkspace = dynamic(() => import(\'./project-workspace\').then(module => module.ProjectWorkspace), { loading: DetailLoading })\n// Settings open through history.pushState; without their own fallback a first chunk load suspends\n// up to the route\'s loading boundary, which can stay stuck on the skeleton.\nconst SettingsShell = dynamic(() => import(\'@/components/settings/settings-shell\').then(module => module.SettingsShell), { loading: WorkspaceLoading })\nconst SettingsView = dynamic(() => import(\'@/components/settings/settings-view\').then(module => module.SettingsView), { loading: WorkspaceContentLoading })\n\nexport function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = \'coordinator\', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: \'integrations\' | \'account\'; googleEnabled?: boolean }) {\n  const i18nText = useTranslations()\n  const { data: workspaceData } = useWorkspace(user.email)\n  const { data: agentHistory } = useAgentHistory(user.id, initialAgentHistory)\n  const t = useTranslations(\'Workspace\')\n  const tIssue = useTranslations(\'Issue\')\n  const tPlugins = useTranslations(\'Plugins\')\n  const params = useSearchParams()\n  const pathname = usePathname()\n  const router = useRouter()\n  const { data: workspaceContext } = useSWR(\'/api/workspace/switcher\', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })\n  const { mutate: clearCache } = useSWRConfig()\n  const sectionTitles: Record<WorkspaceSection, string> = {\n    inbox: i18nText(\'Overview.sections.inbox\'),\n    \'my-issues\': i18nText(\'Overview.sections.myIssues\'),\n    agent: i18nText(\'Overview.sections.agent\'),\n    coordinator: i18nText(\'Overview.sections.coordinator\'),\n    projects: i18nText(\'Overview.sections.projects\'),\n    views: i18nText(\'Overview.sections.views\'),\n    \'team-home\': i18nText(\'Overview.sections.teamHome\'),\n    \'team-issues\': i18nText(\'Overview.sections.teamIssues\'),\n    \'team-projects\': i18nText(\'Overview.sections.teamProjects\'),\n    \'all-issues\': i18nText(\'Overview.sections.allIssues\'),\n    plugins: tPlugins(\'title\'),\n  }\n  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value\n  const [settingsOpen, setSettingsOpen] = useState(Boolean(initialSettingsSection))\n  const [settingsTarget, setSettingsTarget] = useState<{ section: \'preferences\' | \'members\' | \'integrations\' | \'account\'; invite: boolean }>({ section: initialSettingsSection ?? \'preferences\', invite: false })\n  const [linearNotice, setLinearNotice] = useState<\'connected\' | \'error\' | null>(null)\n  useEffect(() => {\n    const url = new URL(window.location.href)\n    const result = url.searchParams.get(\'linear\')\n    if (result !== \'connected\' && result !== \'error\') return\n    setSettingsOpen(true)\n    setSettingsTarget({ section: \'integrations\', invite: false })\n    setLinearNotice(result)\n    url.searchParams.delete(\'linear\')\n    window.history.replaceState(null, \'\', url)\n  }, [])\n  const [boardBusy, setBoardBusy] = useState(false)\n  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR([\'issues\', user.id], listIssues, { fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })\n  // Keep failed refreshes out of document flow so the board/list never jumps.\n  const listErrorMessage = t(\'listError\')\n  useEffect(() => {\n    const id = `issue-list-error-${user.id}`\n    if (error) toast.error(listErrorMessage, { id, duration: Infinity })\n    else toast.dismiss(id)\n    return () => { toast.dismiss(id) }\n  }, [error, listErrorMessage, user.id])\n  const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR([\'projects\', user.id], listProjects)\n  const { data: teams = [] } = useSWR(\'teams\', listTeams)\n  const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR(\'project-teams\', listProjectTeams)\n  const { data: taskRuns = [] } = useSWR(\'task-runs\', () => listTaskRuns(), { refreshInterval: boardBusy ? 0 : 15000, revalidateOnFocus: false })\n  const { data: coordinatorChat } = useSWR<CoordinatorChatView>(\'coordinator-chat\', () => getCoordinatorChat(), { revalidateOnFocus: false })\n  const [panelOpen, setPanelOpen] = useState(true)\n  useEffect(() => { try { if (window.localStorage.getItem(\'mikka:context-panel\') === \'0\') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])\n  function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem(\'mikka:context-panel\', next ? \'1\' : \'0\') } catch { /* storage unavailable */ } }\n  const [coordinatorPrefill, setCoordinatorPrefill] = useState<{ text: string; nonce: number }>()\n  const [teamId, setTeamId] = useState<string | null>(params.get(\'team\'))\n  const activeTeam = teams.find(team => team.id === teamId)\n  const [section, setSection] = useState<WorkspaceSection>(params.get(\'team\') ? \'team-home\' : initialSection)\n  function changeSection(next: WorkspaceSection) {\n    setSection(next)\n    const url = new URL(window.location.href)\n    if (next === \'agent\' || next === \'coordinator\') url.searchParams.set(\'section\', next)\n    else url.searchParams.delete(\'section\')\n    window.history.replaceState(window.history.state, \'\', `${url.pathname}${url.search}${url.hash}`)\n  }\n  const [agentRequest, setAgentRequest] = useState<AgentSessionRequest>()\n  const [activeAgentId, setActiveAgentId] = useState<string | null>(null)\n  // Sessions the open Agent panel knows about, including ones still streaming and not saved yet.\n  const [liveSessions, setLiveSessions] = useState<SavedAgentSession[]>([])\n  const lastConversation = useRef<Conversation>(initialSection === \'agent\' ? { kind: \'agent\', sessionId: null } : { kind: \'coordinator\' })\n  const [projectId, setProjectId] = useState<string | null>(null)\n  const [creationProject, setCreationProject] = useState<string | null>(null)\n  const [layout, setLayout] = useState<\'board\' | \'list\'>(\'board\')\n  const [selected, setSelected] = useState<string | null>(initialSelected)\n  const [pendingSelection, setPendingSelection] = useState<string | null | undefined>(und'... 19032 more characters,
+    expected: /if \(typeof window !== 'undefined'\) void import\('\.\/agent-panel'\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/agent-ui.test.mjs:433:1
+✖ Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单 (1.787923ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /<Popover[\s>]/. Input:
+  
+  "'use client'\n" +
+    '\n' +
+    "import { useAgentCopy } from '@/hooks/use-agent-copy'\n" +
+    "import type { ReactNode } from 'react'\n" +
+    "import { MessageSquarePlus } from 'lucide-react'\n" +
+    "import { SidebarTrigger } from '@/components/ui/sidebar'\n" +
+    "import { AgentWelcome } from './agent-welcome'\n" +
+    "import { Button } from '@/components/ui/button'\n" +
+    "import { ConversationPill } from '@/components/nav/conversation-pill'\n" +
+    "import { AgentConversation, type AgentTurn } from './agent-conversation'\n" +
+    "import type { SavedAgentSession } from '@/lib/agent-history'\n" +
+    '\n' +
+    'export type AgentChatSession = SavedAgentSession & { running?: boolean }\n' +
+    '\n' +
+    'type AgentChatNavigation = {\n' +
+    '  sessions: AgentChatSession[]\n' +
+    '  sessionId: string | null\n' +
+    '  onSelect: (id: string) => void\n' +
+    '  onReset: () => void\n' +
+    '  onDemo?: () => void\n' +
+    '}\n' +
+    '\n' +
+    'export function AgentChat({ turns, composer, streaming, sessions, sessionId, onSelect, onReset, onDemo, onSuggestion }: AgentChatNavigation & {\n' +
+    '  turns: AgentTurn[]\n' +
+    '  composer: ReactNode\n' +
+    '  streaming: boolean\n' +
+    '  onSuggestion: (prompt: string) => void\n' +
+    '}) {\n' +
+    '  const agentCopy = useAgentCopy()\n' +
+    '\n' +
+    '  const title = sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || agentCopy.newConversation\n' +
+    '\n' +
+    '  return <section aria-label={agentCopy.agentConversationWorkspace} className="mikka-agent relative flex size-full min-h-0 flex-col">\n' +
+    '    <AgentChatHeader title={title} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} onDemo={onDemo} />\n' +
+    '    <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />\n' +
+    '    {turns.length === 0 ? <AgentWelcome composer={composer} sessions={sessions} onSelect={onSelect} onSuggestion={onSuggestion} /> : <>\n' +
+    '      <AgentConversation turns={turns} streaming={streaming} />\n' +
+    '      <footer className="shrink-0 px-4 pb-4 pt-2 sm:px-8 sm:pb-6">\n' +
+    '        <div className="mx-auto w-full max-w-3xl">{composer}</div>\n' +
+    '      </footer>\n' +
+    '    </>}\n' +
+    '  </section>\n' +
+    '}\n' +
+    '\n' +
+    'function AgentChatHeader({ title, streaming, onReset, onDemo }: AgentChatNavigation & { title: string; streaming: boolean }) {\n' +
+    '  const agentCopy = useAgentCopy()\n' +
+    '\n' +
+    '  // Desktop shows the conversation as the centered pill (MIK-40) and switches conversations in the left list or ⌘K.\n' +
+    '  return <>\n' +
+    '    <ConversationPill name={title} />\n' +
+    '    {streaming && <span role="status" className="sr-only">{agentCopy.responding}</span>}\n' +
+    '    <header className="flex h-12 shrink-0 items-center gap-2 px-4 md:hidden">\n' +
+    '      <SidebarTrigger aria-label={agentCopy.toggleSidebar} />\n' +
+    '      <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{title}</h1>\n' +
+    '      {onDemo && <Button variant="ghost" size="sm" onClick={onDemo}>{agentCopy.componentDemo}</Button>}\n' +
+    '      <Button variant="ghost" size="icon" aria-label={agentCopy.newTask} title={agentCopy.newTask} onClick={onReset}><MessageSquarePlus aria-hidden="true" data-icon="inline-start" /></Button>\n' +
+    '    </header>\n' +
+    '  </>\n' +
+    '}\n'
+  
+      at TestContext.<anonymous> (/workspace/Mikka-179/tests/agent-ui.test.mjs:436:12)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `'use client'\n\nimport { useAgentCopy } from '@/hooks/use-agent-copy'\nimport type { ReactNode } from 'react'\nimport { MessageSquarePlus } from 'lucide-react'\nimport { SidebarTrigger } from '@/components/ui/sidebar'\nimport { AgentWelcome } from './agent-welcome'\nimport { Button } from '@/components/ui/button'\nimport { ConversationPill } from '@/components/nav/conversation-pill'\nimport { AgentConversation, type AgentTurn } from './agent-conversation'\nimport type { SavedAgentSession } from '@/lib/agent-history'\n\nexport type AgentChatSession = SavedAgentSession & { running?: boolean }\n\ntype AgentChatNavigation = {\n  sessions: AgentChatSession[]\n  sessionId: string | null\n  onSelect: (id: string) => void\n  onReset: () => void\n  onDemo?: () => void\n}\n\nexport function AgentChat({ turns, composer, streaming, sessions, sessionId, onSelect, onReset, onDemo, onSuggestion }: AgentChatNavigation & {\n  turns: AgentTurn[]\n  composer: ReactNode\n  streaming: boolean\n  onSuggestion: (prompt: string) => void\n}) {\n  const agentCopy = useAgentCopy()\n\n  const title = sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || agentCopy.newConversation\n\n  return <section aria-label={agentCopy.agentConversationWorkspace} className="mikka-agent relative flex size-full min-h-0 flex-col">\n    <AgentChatHeader title={title} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} onDemo={onDemo} />\n    <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />\n    {turns.length === 0 ? <AgentWelcome composer={composer} sessions={sessions} onSelect={onSelect} onSuggestion={onSuggestion} /> : <>\n      <AgentConversation turns={turns} streaming={streaming} />\n      <footer className="shrink-0 px-4 pb-4 pt-2 sm:px-8 sm:pb-6">\n        <div className="mx-auto w-full max-w-3xl">{composer}</div>\n      </footer>\n    </>}\n  </section>\n}\n\nfunction AgentChatHeader({ title, streaming, onReset, onDemo }: AgentChatNavigation & { title: string; streaming: boolean }) {\n  const agentCopy = useAgentCopy()\n\n  // Desktop shows the conversation as the centered pill (MIK-40) and switches conversations in the left list or ⌘K.\n  return <>\n    <ConversationPill name={title} />\n    {streaming && <span role="status" className="sr-only">{agentCopy.responding}</span>}\n    <header className="flex h-12 shrink-0 items-center gap-2 px-4 md:hidden">\n      <SidebarTrigger aria-label={agentCopy.toggleSidebar} />\n      <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{title}</h1>\n      {onDemo && <Button variant="ghost" size="sm" onClick={onDemo}>{agentCopy.componentDemo}</Button>}\n      <Button variant="ghost" size="icon" aria-label={agentCopy.newTask} title={agentCopy.newTask} onClick={onReset}><MessageSquarePlus aria-hidden="true" data-icon="inline-start" /></Button>\n    </header>\n  </>\n}\n`,
+    expected: /<Popover[\s>]/,
+    operator: 'match',
+    diff: 'simple'
+  }
+[ELIFECYCLE] Command failed with exit code 1.
+[ELIFECYCLE] Command failed with exit code 1.

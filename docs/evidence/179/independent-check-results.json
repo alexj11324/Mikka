@@ -1,0 +1,146 @@
+[
+  {
+    "step": "check:agent-ui",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:preview",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:byos",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:acceptance",
+    "status": 1,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:auth-composio",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:ui-policy",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:motion",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:i18n",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "i18n:check",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:ssh-target",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:linear-sync",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:coordinator-events",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:factory",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:groups",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:integrations",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:csv",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:analytics",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:settings",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:issues",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:telegram",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:suggestions",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "test:schedules",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "lint",
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  {
+    "step": "typecheck",
+    "status": 0,
+    "signal": null,
+    "error": null
+  }
+]

@@ -72,7 +72,7 @@ admit/settle future scheduled model work before enabling it for a budgeted tenan
 
 ## Time and failure contract
 
-- Once: explicit offset/Z instant plus validated IANA zone; past times reject.
+- Once: explicit offset/Z instant plus validated IANA zone; ambiguous abbreviations and past times reject.
 - Interval: fixed UTC elapsed minutes, explicit future start; zone retained for
   user readback. Daily: local HH:mm, explicit earlier/later fold choice; missing
   local time skips that date. New York and Lord Howe transitions are tested.
@@ -109,4 +109,4 @@ chat through its existing history endpoint. It does not count as OAuth/model-cha
 acceptance. Provider calls, arbitrary write tasks, parent-approved nonproduction
 Preview/OAuth/model conversation and production verification remain outstanding.
 
-Evidence and exact code SHA will be linked after actual runs. Keep #179 open.
+Actual fixed-runtime evidence, raw recordings, process/DB/event IDs, retained failures and explicit remaining gates: [evidence/179](../evidence/179/README.md). Runtime code SHA is `9c5c67c717618ee77126a82b6d7aea61e1e2ce0c`. Keep #179 open.

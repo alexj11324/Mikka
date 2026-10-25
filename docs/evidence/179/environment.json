@@ -1,0 +1,45 @@
+{
+  "runtimeCodeCommit": "9c5c67c717618ee77126a82b6d7aea61e1e2ce0c",
+  "baseCommit": "470b3247ff12b50ba942ae93418ff4600c77edd5",
+  "environment": "isolated cloud Linux, Node 24 Docker, PostgreSQL 17, loopback-only application",
+  "origin": "http://127.0.0.1:3179/mikka",
+  "migration": "20261025180001_user_schedules.sql (58 tracked migrations checked; disposable DB only)",
+  "checks": {
+    "pnpm check": {
+      "exitCode": 0,
+      "notes": "Corrected stale tests only; no frontend layout changes"
+    },
+    "PG/process/DST/origin/inbox tests": {
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    "policy/Worker tests": {
+      "passed": 6,
+      "failed": 0
+    },
+    "production Next build": {
+      "exitCode": 0
+    },
+    "worker artifact tracing/smoke": {
+      "exitCode": 0
+    }
+  },
+  "actualModelConversation": "not passed: no provider credentials enabled; expected HTTP 503",
+  "production": "not attempted; parent-controlled migration, deployment, cron and authorization gates remain",
+  "buildId": "hvu1vvuTgTfBXceyfTipU",
+  "httpAcceptance": {
+    "startUTC": "2026-10-25T18:25:35.530Z",
+    "endUTC": "2026-10-25T18:26:41.285Z",
+    "owner": "http179-b11d3f7c-731c-4c4e-8b32-592eb2cf32a4",
+    "workspaceId": "59940b37-acbe-4a1a-99bf-23e3efd537c0",
+    "botSessionId": "25424c08-7be4-4281-8f40-fd73386c685f",
+    "onceScheduleId": "1709c617-5398-47fd-ac7a-381c702e463a",
+    "repeatScheduleId": "19318036-968b-444d-bc15-336869421d40",
+    "declaredOnceSlaMs": 10000,
+    "result": "passed isolated Next HTTP/PG/process acceptance",
+    "authentication": "real Better Auth implementation with synthetic seeded local users/sessions; not OAuth acceptance",
+    "providerCalls": 0
+  },
+  "localSchemaNotes": "Disposable development PG evolved with the tracked migration plus reported_at ADD COLUMN during implementation. Fresh PG CI independently applies the final migration from empty state. No production DB was touched."
+}

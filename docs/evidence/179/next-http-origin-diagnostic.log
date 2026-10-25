@@ -1,0 +1,20 @@
+{"at":"2026-10-25T18:15:31.516Z","phase":"authenticated real Next/PG","owner":"http179-c1c26b0d-e352-432d-8708-83c82bb09b5c","workspace":"7e184abb-c5de-4f5c-845e-991feebb6e5e","bot":"7ad7eefd-7763-49e3-bd9c-a8e64bfb5138","source":"e2bb77b5-b1d7-4ca3-a531-9d43b5f96640"}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: {"error":"originRejected"}
+
+403 !== 200
+
+    at file:///workspace/Mikka-179/scripts/verify-schedules-http.mjs:42:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 403,
+  expected: 200,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

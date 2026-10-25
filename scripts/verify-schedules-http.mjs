@@ -8,6 +8,12 @@ if(new URL(origin).hostname!=='127.0.0.1'||!database||new URL(database).hostname
 const secret=process.env.SCHEDULE_TEST_AUTH_SECRET
 const cron=process.env.SCHEDULE_TEST_CRON_SECRET
 if(!secret||!cron)throw new Error('Synthetic test secrets required')
+let ready=false
+for(let attempt=0;attempt<40;attempt++){
+ try { if((await fetch(`${origin}/mikka/api/auth/get-session`)).status===200){ready=true;break} } catch {}
+ await new Promise(resolve=>setTimeout(resolve,250))
+}
+if(!ready)throw new Error('Built Next service did not become ready in 10 seconds')
 const pool=new Pool({connectionString:database})
 const workspace=randomUUID(),bot=randomUUID(),source=randomUUID(),owner=`http179-${randomUUID()}`,other=`http179-${randomUUID()}`
 const stamp=()=>new Date().toISOString()

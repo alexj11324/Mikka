@@ -1,0 +1,24 @@
+⚠ Serde warning for classes "Run", "ChannelImpl", "Message", "ThreadImpl", "GatewayEmbeddingModel", "GatewayImageModel", "GatewayLanguageModel": Workflow bundle contains Node.js built-in imports: crypto, fs, path. These will fail at runtime in the workflow sandbox. Add "use step" to methods that depend on Node.js APIs so they are stripped from the workflow bundle.
+✓ Compiled workflows in 3.6s (65 steps, 1 workflow)
+▲ Next.js 16.1.6 (Turbopack)
+- Experiments (use with caution):
+  ✓ globalNotFound
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.5min
+  Running next.config.js provided runAfterProductionCompile ...
+✓ Completed runAfterProductionCompile in 8ms
+  Running TypeScript ...
+  Collecting page data using 4 workers ...
+Error: Auth origins must be HTTPS (or HTTP loopback in development/CI) without credentials, paths, queries or fragments
+    at a (.next/server/chunks/[root-of-the-server]__e5aef149._.js:1:2839)
+    at <unknown> (.next/server/chunks/[root-of-the-server]__e5aef149._.js:1:3369)
+    at Array.map (<anonymous>)
+    at r (.next/server/chunks/[root-of-the-server]__e5aef149._.js:1:3362)
+    at <unknown> (.next/server/chunks/[root-of-the-server]__e5aef149._.js:5:8100)
+
+> Build error occurred
+Error: Failed to collect page data for /api/agent/images
+    at ignore-listed frames {
+  type: 'Error'
+}
