@@ -36,12 +36,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
       - run: node --import tsx --test lib/quota/store.test.ts
+      - run: node --import tsx --test lib/quota/composio.test.ts
       - run: MIGRATE=1 pnpm migrate
       - run: pnpm build
       - run: node --import tsx --test tests/quota-api.test.mjs
+      - run: node --import tsx --test tests/quota-claim-fault.test.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: tenant-quota-evidence
-          path: quota-api-evidence.json
+          path: |
+            quota-api-evidence.json
+            quota-claim-fault-evidence.json
+            quota-composio-evidence.json
           if-no-files-found: ignore

@@ -52,7 +52,9 @@ action creates a new server attempt and is charged separately; transport replays
 retain the original turn key. Reconciliation or a new explicit logical
 operation is needed; the quota ledger does not pretend to cache a model reply.
 
-Before-send failure or expiry refunds the allowance. An explicit initial
+Expiry while still reserved, or a confirmed pre-send failure before expiry,
+refunds the allowance. An executing lease that has already become uncertain
+retains its allowance, including when its old preparation later fails. An explicit initial
 401/402/403/429 rejection refunds it; transport loss, cancellation after dispatch,
 worker death, or unknown partial work consumes the full reserved allowance.
 A later 429 in a multi-step Agent turn cannot refund earlier accepted work.
@@ -64,9 +66,22 @@ There is no exactly-once claim for external effects.
 Concurrency counts active reservations, including nested work: an Agent turn
 and an external tool invoked by it can occupy two slots. Provision the approved
 allocation accordingly. This is an execution safety limit, not a commercial tier.
-Models have zero SDK retries, bounded generation time below the quota lease, and
-bounded output. Daemon quota leases match existing run leases; expired/revoked
+Models have zero SDK retries and bounded generation time below the quota lease.
+Ordinary Agent output retains its existing provider-controlled token limit. Daemon quota leases match existing run leases; expired/revoked
 claims cannot be renewed and must be retried through normal fenced run recovery.
+Claim activation and the queued-to-preparing run CAS share one PostgreSQL
+transaction and one persisted deadline. A SQL error or process death inside that
+transaction leaves a reserved allowance and queued run, permitting one safe
+retry. Once committed, the bound run prevents reissuing an ambiguous payload.
+
+Composio has a 270-second whole-operation deadline within its 300-second lease.
+The AbortSignal reaches actual account, schema and execution HTTP requests;
+pagination rejects repeated cursors and more than 50 pages. Its final SDK
+`beforeExecute` hook runs after the SDK's internal schema/file preflight and
+atomically rechecks the original executing lease, allocation, membership and
+backoff immediately before dispatch. It cannot renew an expired lease.
+Cancellation after a confirmed local HTTP effect leaves an uncertain charge and
+blocks replay. No background operation is abandoned by a timeout race.
 
 ## Actual call sites
 
@@ -78,9 +93,9 @@ claims cannot be renewed and must be retried through normal fenced run recovery.
 | Coordinator HTTP/action/MCP user submissions | Shared `recordCoordinatorEvent` gate before user-message enqueue; system completion events remain deliverable |
 | Decision Gateway | Owner/event key and tenant gate, while preserving existing dedicated Gateway key budget and fixed-rule fallback; absent tenant context uses rules |
 | Agent web tools | Gate before the existing bounded Gateway tool operation; preserves DNS/URL restrictions and cancellation |
-| Composio | Shared wrapper for existing callers, including approved actions; admission before service access, known preflight refunds, provider rejection/backoff observation |
+| Composio | Shared wrapper for existing callers, including approved actions; admission before service access, bounded transport cancellation, final SDK pre-send fence, known preflight refunds, provider rejection/backoff observation |
 | App/action/MCP/Coordinator run dispatch | Shared `queueRun` admission; current domain validation preserved |
-| Daemon claim/heartbeat/complete/recovery | Separate per-run execution reservation, CAS claim, no losing-claim payload, renewable bounded lease, idempotent terminal settlement and uncertain crash settlement |
+| Daemon claim/heartbeat/complete/recovery | Separate per-run execution reservation, same-transaction activation/run CAS, no losing-claim payload, renewable bounded lease, idempotent terminal settlement and uncertain crash settlement |
 | Administrative policy | `PUT /api/workspaces/:workspaceId/quota`; authenticated same-origin active admin; operator grant cap; immutable live window; append-only policy events |
 | Usage query | `GET /api/workspaces/:workspaceId/quota`; active member only, shared usage totals and limits, no credential or model payload disclosure |
 
@@ -165,3 +180,58 @@ exited child. The driver now bounds readiness probes, retains child output as it
 arrives, records startup failure, and cleans up on test cancellation without
 waiting for an exit event that already happened. The failed launch and font
 fetch errors remain in the private evidence directory.
+
+### Independent review corrections (2026-10-25)
+
+The old candidate `905fea22` passed its CI but had two independently identified
+pre-send gaps. New isolated regressions first reproduced both before correction:
+
+- A real `agent_runs` BEFORE UPDATE trigger forced the claim CAS to fail after
+  separately committed quota activation. HTTP returned 500 and left a queued run
+  with no reservation binding; same-key retries returned 409 even after expiry.
+  The corrected actual handler returns 503 with queued/reserved state, then one
+  retry binds the preparing run and quota atomically. A separate worker killed
+  by SIGKILL inside the combined transaction verifies rollback and recovery.
+- The real Composio SDK used controlled loopback HTTP for accounts, schema and
+  execution, with actual PG allowance/HTTP-effect records. Delayed preflight
+  formerly dispatched after a competing request expired its lease; a timeout
+  formerly left the HTTP request running and dispatched later. Corrected tests
+  cover ordinary preflight, the SDK's additional internal schema fetch, actual
+  socket cancellation, a successful execution control and response loss after
+  one confirmed effect. That last case remains uncertain and cannot resend.
+
+`tests/quota-claim-fault.test.mjs` boots the real Next HTTP handler against
+synthetic application tables. `lib/quota/composio.test.ts` uses the installed
+SDK with a loopback base URL, synthetic key and tracking disabled; it does not
+replace handlers or manufacture SDK successes. Test-only PG expiry advancement
+models a delayed host without waiting five minutes; the separate deadline case
+uses a real timer and verifies that the actual HTTP socket closes. These tests
+run in the quota CI workflow alongside the existing actual-app HTTP suite.
+Failures and corrected results remain in `/workspace/evidence-215/`; final SHA
+and CI links are recorded in the PR after execution, with runner parent counts
+distinguished from independent scenarios. No production/provider acceptance is
+implied by these regressions.
+
+The controlled SDK suite also exposed a wrapped-HTTP-429 observation gap: its
+HTTP API error carries `status` and `Headers` inside `cause`. Bounded error-cause
+inspection now recognizes that explicit rejection, refunds the allowance and
+persists Retry-After; a different logical request is denied without another
+HTTP execution. A 500 or unknown/cyclic error remains uncertain. The real SDK
+regression first failed with an uncertain charge, then passed after correction.
+
+The broader `pnpm check` additionally exposed an old candidate output-cap
+regression; the extra ordinary-Agent 8192-token cap was removed to preserve
+existing provider output semantics. Two unrelated source-layout assertions at
+`tests/agent-ui.test.mjs:39` and `:433` still fail identically in a clean detached
+base `40cbaff` worktree (hydration preload and conversation Popover expectations).
+Their source files are unchanged here. These baseline failures are retained for
+parent/Claude coordination; no frontend layout or assertion is changed to hide
+them. Individual remaining standard checks are run and recorded separately.
+
+A third base-reproduced source assertion is
+`tests/acceptance.test.mjs:7`: it expects only `NODE_ENV === development` before
+partitioned-cookie options, while unchanged base auth also requires HTTPS. The
+new quota work does not change auth or weaken that condition. The broader check
+remains red for these three verified baseline assertions; the other 18 remaining
+script groups pass, including types/lint. This differs from the repository CI
+workflow, which does not run those two source-test files.

@@ -126,7 +126,6 @@ export async function POST(request: Request) {
     stopWhen: isStepCount(5),
     prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
     maxRetries: 0,
-    maxOutputTokens: 8192,
     timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
     abortSignal: request.signal,
     onChunk: ({ chunk }) => {

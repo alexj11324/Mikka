@@ -25,8 +25,8 @@ export class QuotaStore {
       // backoff and renewal. Re-read authorization and wall time AFTER waiting.
       const { rows: [tenant] } = await client.query(`SELECT t.* FROM quota_tenants t JOIN quota_owners o USING(workspace_id) WHERE o.owner_id=$1 FOR UPDATE OF t`, [ownerId])
       if (!tenant) throw new QuotaError('quotaNotConfigured', 503, 60)
-      if (!await this.authorize(ownerId, tenant.workspace_id)) throw new QuotaError('quotaAccessDenied', 403)
       const { rows: [allocation] } = await client.query('SELECT * FROM quota_allocations WHERE workspace_id=$1 FOR SHARE', [tenant.workspace_id])
+      if (!await this.authorize(ownerId, tenant.workspace_id)) throw new QuotaError('quotaAccessDenied', 403)
       const { rows: [{ now }] } = await client.query('SELECT clock_timestamp() AS now')
       tenant.allocation = allocation
       const result = await action(client, tenant, now)
@@ -101,6 +101,12 @@ export class QuotaStore {
   }
 
   async activate(ownerId: string, id: string): Promise<Reservation> {
+    return this.activateBound(ownerId, id, async () => {})
+  }
+
+  /** Only database writes belong in bind: activation and domain CAS commit
+   * together, before any execution payload or external effect can be issued. */
+  async activateBound(ownerId: string, id: string, bind: (client: PoolClient, reservation: Reservation) => Promise<void>): Promise<Reservation> {
     return this.transaction(ownerId, async (client, tenant, now) => {
       await this.expire(client, tenant.workspace_id, now)
       const { rows: [row] } = await client.query('SELECT * FROM quota_reservations WHERE id=$1 AND owner_id=$2 AND workspace_id=$3', [id, ownerId, tenant.workspace_id])
@@ -111,7 +117,23 @@ export class QuotaStore {
       if (backoff) throw new QuotaError('providerBackoff', 429, (backoff.retry_at - now.getTime()) / 1000)
       if (row.state !== 'reserved') throw new QuotaError(row.state === 'uncertain' ? 'quotaOutcomeUncertain' : 'quotaAlreadyDispatched', 409)
       const { rows: [active] } = await client.query(`UPDATE quota_reservations SET state='executing' WHERE id=$1 RETURNING *`, [id])
+      await bind(client, active)
       return active
+    })
+  }
+
+  /** Final pre-send fence. Rechecks the original executing lease without
+   * extending it, so old preflight work cannot resurrect an expired slot. */
+  async revalidate(ownerId: string, id: string): Promise<Reservation> {
+    return this.transaction(ownerId, async (client, tenant, now) => {
+      await this.expire(client, tenant.workspace_id, now)
+      const { rows: [row] } = await client.query('SELECT * FROM quota_reservations WHERE id=$1 AND owner_id=$2 AND workspace_id=$3', [id, ownerId, tenant.workspace_id])
+      if (!row || row.state !== 'executing') throw new QuotaError('quotaLeaseLost', 409)
+      this.checkPolicy(tenant, row.resource, now)
+      await this.checkHeldBudget(client, tenant, now)
+      const { rows: [backoff] } = await client.query('SELECT retry_at FROM quota_backoffs WHERE workspace_id=$1 AND resource=$2 AND retry_at > $3', [tenant.workspace_id, row.resource, now])
+      if (backoff) throw new QuotaError('providerBackoff', 429, (backoff.retry_at.getTime() - now.getTime()) / 1000)
+      return row
     })
   }
 

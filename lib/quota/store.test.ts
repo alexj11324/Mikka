@@ -7,7 +7,7 @@ import { once } from 'node:events'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { QuotaStore } from './store'
-import { QuotaError, quotaResponse, retryAfterSeconds } from './errors'
+import { QuotaError, quotaResponse, retryAfterSeconds, quotaFailure } from './errors'
 import { configureQuota, quotaPolicySchema } from './config'
 
 const url = process.env.QUOTA_TEST_DATABASE_URL
@@ -24,6 +24,11 @@ test('Retry-After parses delta/date, rounds safely and fails conservatively', ()
   assert.equal(retryAfterSeconds('junk'),60)
   assert.equal(retryAfterSeconds('0'),1)
   assert.equal(quotaResponse(new QuotaError('limited',429,3.2)).headers.get('Retry-After'),'4')
+  assert.deepEqual(quotaFailure({statusCode:429,responseHeaders:{'retry-after':'3.2'}}),{outcome:'refunded',retryAfter:4})
+  assert.deepEqual(quotaFailure({cause:{status:429,headers:new Headers({'retry-after':'30'})}}),{outcome:'refunded',retryAfter:30})
+  assert.deepEqual(quotaFailure({statusCode:500,cause:{status:429}}),{outcome:'uncertain'})
+  const cycle: {cause?: unknown} = {};cycle.cause=cycle
+  assert.deepEqual(quotaFailure(cycle),{outcome:'uncertain'})
 })
 
 test('real PostgreSQL quota contention, restart, retries and authorization', { skip: !url, timeout: 120000 }, async t => {
@@ -40,6 +45,7 @@ test('real PostgreSQL quota contention, restart, retries and authorization', { s
     await pool.query(migration); await pool.query(migration)
     await pool.query('CREATE TABLE quota_test_members(owner_id text PRIMARY KEY,workspace_id uuid NOT NULL,active boolean NOT NULL DEFAULT true)')
     await pool.query('CREATE TABLE quota_test_effects(operation_id text PRIMARY KEY,created_at timestamptz DEFAULT clock_timestamp())')
+    await pool.query('CREATE TABLE quota_test_claims(id uuid PRIMARY KEY,status text NOT NULL,quota_id uuid)')
     const fixture = async (changes: Record<string,unknown> = {}) => {
       const owner = randomUUID(), workspace = randomUUID()
       const policy = quotaPolicySchema.parse({ windowStart:new Date(Date.now()-60000).toISOString(),windowEnd:new Date(Date.now()+3600000).toISOString(),budgetUnits:100,
@@ -152,6 +158,25 @@ test('real PostgreSQL quota contention, restart, retries and authorization', { s
       await assert.rejects(store.reserve(request(owner,'synthetic-write-fault')),/injected quota insert failure/)
       assert.equal(Number((await pool.query('SELECT count(*) n FROM quota_reservations WHERE owner_id=$1',[owner])).rows[0].n),0)
       await store.reserve(request(owner))
+    })
+    await t.test('SIGKILL inside activation/domain CAS rolls both back and allows one bounded retry',async()=>{
+      const {owner}=await fixture(),key=randomUUID()
+      await pool.query("INSERT INTO quota_test_claims(id,status) VALUES($1,'queued')",[key])
+      const child=spawn(process.execPath,['--import','tsx',new URL('./restart-worker.ts',import.meta.url).pathname],{cwd:new URL('../..',import.meta.url),env:{...process.env,QUOTA_TEST_DATABASE_URL:target.toString(),QUOTA_TEST_OWNER:owner,QUOTA_TEST_KEY:key,QUOTA_TEST_PHASE:'claim-cas'},stdio:['ignore','pipe','pipe']})
+      let stderr='';child.stderr.on('data',chunk=>stderr+=chunk)
+      await new Promise<void>((resolve,reject)=>{child.stdout.on('data',chunk=>{if(String(chunk).includes('READY'))resolve()});child.once('exit',code=>reject(new Error(`claim worker exited ${code}: ${stderr}`)))})
+      const exited=once(child,'exit');child.kill('SIGKILL');assert.equal((await exited)[1],'SIGKILL')
+      const reservation=await store.reserve(request(owner,key))
+      assert.equal(reservation.state,'reserved')
+      const before=(await pool.query('SELECT status,quota_id FROM quota_test_claims WHERE id=$1',[key])).rows[0]
+      assert.deepEqual(before,{status:'queued',quota_id:null})
+      await store.activateBound(owner,reservation.id,async client=>{
+        const result=await client.query("UPDATE quota_test_claims SET status='preparing',quota_id=$2 WHERE id=$1 AND status='queued' RETURNING id",[key,reservation.id])
+        assert.equal(result.rowCount,1)
+      })
+      const after=(await pool.query('SELECT status,quota_id FROM quota_test_claims WHERE id=$1',[key])).rows[0]
+      assert.deepEqual(after,{status:'preparing',quota_id:reservation.id})
+      await assert.rejects(store.activateBound(owner,reservation.id,async()=>{throw new Error('must not bind twice')}),{code:'quotaAlreadyDispatched'})
     })
     await t.test('unknown configuration/cost, suspension, workspace mismatch and expired override fail closed',async()=>{
       await assert.rejects(store.reserve(request(randomUUID())),{code:'quotaNotConfigured'})

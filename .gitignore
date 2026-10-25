@@ -43,4 +43,6 @@ next-env.d.ts
 
 # Isolated quota regression output
 quota-api-evidence.json
+quota-claim-fault-evidence.json
+quota-composio-evidence.json
 .quota-node-modules/

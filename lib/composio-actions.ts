@@ -163,7 +163,7 @@ export async function executeComposioAction(
   actionName: string,
   input: unknown,
   client: ComposioActionClient | null,
-  onFailure?: (error: unknown) => Promise<void>,
+  options: { signal?: AbortSignal; beforeExecute?: () => Promise<void>; onFailure?: (error: unknown) => Promise<void> } = {},
 ): Promise<ComposioActionResult> {
   if (!Object.hasOwn(COMPOSIO_ACTIONS, actionName)) return { error: 'integrationActionNotAllowed' }
   const action = COMPOSIO_ACTIONS[actionName as ComposioActionName]
@@ -172,14 +172,16 @@ export async function executeComposioAction(
   if (!client) return { error: 'composioNotConfigured' }
 
   try {
+    options.signal?.throwIfAborted()
     const accounts = await listComposioPages(cursor => client.connectedAccounts.list({
       userIds: [userId], toolkitSlugs: [action.toolkit], statuses: ['ACTIVE'], cursor,
-    }))
+    }, { signal: options.signal }), { signal: options.signal })
     const active = accounts.filter(account => account.toolkit.slug === action.toolkit && account.status === 'ACTIVE' && !account.isDisabled)
     if (active.length === 0) return { error: 'integrationNotConnected' }
     if (active.length > 1) return { error: 'integrationMultipleAccounts' }
 
-    const schema = await client.tools.getRawComposioToolBySlug(action.slug)
+    const schema = await client.tools.getRawComposioToolBySlug(action.slug, undefined, { signal: options.signal })
+    options.signal?.throwIfAborted()
     if (!schema.version || schema.version === 'latest') return { error: 'integrationActionVersionUnavailable' }
 
     const result = await client.tools.execute(action.slug, {
@@ -187,12 +189,17 @@ export async function executeComposioAction(
       connectedAccountId: active[0].id,
       version: schema.version,
       arguments: actionArguments(actionName as ComposioActionName, parsed),
-    })
+    }, { signal: options.signal, beforeExecute: async ({ params }) => {
+      options.signal?.throwIfAborted()
+      await options.beforeExecute?.()
+      options.signal?.throwIfAborted()
+      return params
+    } })
     return result.successful
       ? { data: result.data, ...(result.logId ? { logId: result.logId } : {}) }
       : { error: result.error ?? 'integrationActionFailed', ...(result.logId ? { logId: result.logId } : {}) }
   } catch (error) {
-    await onFailure?.(error)
+    await options.onFailure?.(error)
     console.error('Composio action failed', {
       action: action.slug,
       error: error instanceof Error ? error.name : 'unknown',

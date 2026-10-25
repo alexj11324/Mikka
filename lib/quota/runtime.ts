@@ -5,7 +5,7 @@ import { pool } from '@/lib/db'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { QuotaStore, type QuotaRequest } from './store'
-import { QuotaError, retryAfterSeconds } from './errors'
+import { QuotaError, quotaFailure } from './errors'
 
 export const tenantQuotas = new QuotaStore(pool, async (ownerId, workspaceId) => {
   const [member] = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers)
@@ -18,14 +18,7 @@ export async function beginQuota(input: QuotaRequest) {
   return tenantQuotas.activate(input.ownerId, reservation.id)
 }
 
-export function quotaFailure(error: unknown): { outcome: 'refunded' | 'uncertain'; retryAfter?: number } {
-  const e = error as { statusCode?: number; responseHeaders?: Record<string,string> }
-  // These are explicit provider rejections before generation, not transport loss.
-  if ([401, 402, 403, 429].includes(e?.statusCode ?? 0)) {
-    return { outcome: 'refunded', ...(e.statusCode === 429 ? { retryAfter: retryAfterSeconds(e.responseHeaders?.['retry-after']) } : {}) }
-  }
-  return { outcome: 'uncertain' }
-}
+export { quotaFailure } from './errors'
 
 export async function withTenantQuota<T>(ownerId: string, resource: string, binding: unknown, action: () => Promise<T>, key: string = randomUUID()): Promise<T> {
   const reservation = await beginQuota({ ownerId, resource, binding, key })

@@ -9,7 +9,8 @@ import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
 import { latestCheckpoint } from '@/lib/run-leases'
 import { retryNote } from '@/lib/run-retry'
-import { beginQuota, tenantQuotas } from '@/lib/quota/runtime'
+import { tenantQuotas } from '@/lib/quota/runtime'
+import type { Reservation } from '@/lib/quota/store'
 import { QuotaError, quotaResponse } from '@/lib/quota/errors'
 
 export const dynamic = 'force-dynamic'
@@ -42,29 +43,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       .where(eq(agentRuns.id, runId))
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
-  const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
-  let quota: Awaited<ReturnType<typeof beginQuota>>
+  let quota: Reservation
   try {
-    quota = await beginQuota({ ownerId: run.userId, key: `daemon:${run.id}`, resource: 'daemon.run', binding: { runId, issueId: run.issueId, agentId: run.agentId, repoId: repo.id }, leaseMs: RUN_LEASE_MS })
+    const reserved = await tenantQuotas.reserve({ ownerId: run.userId, key: `daemon:${run.id}`, resource: 'daemon.run', binding: { runId, issueId: run.issueId, agentId: run.agentId, repoId: repo.id }, leaseMs: RUN_LEASE_MS })
+    quota = await tenantQuotas.activateBound(run.userId, reserved.id, async (client, active) => {
+      const { rows } = await client.query(`UPDATE agent_runs SET status='preparing',"startedAt"=clock_timestamp(),
+        "leaseExpiresAt"=$4,"quotaReservationId"=$5,"updatedAt"=clock_timestamp()
+        WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 AND status='queued' RETURNING id`,
+      [runId, run.userId, deviceId, active.expires_at, active.id])
+      if (!rows.length) throw new QuotaError('quotaRunClaimLost', 409)
+    })
   } catch (error) {
     if (error instanceof QuotaError) return quotaResponse(error)
     return NextResponse.json({ error: 'quotaUnavailable' }, { status: 503 })
   }
-  const claimed = await db.update(agentRuns)
-    .set({ status: 'preparing', startedAt: new Date(), leaseExpiresAt: new Date(leaseExpiresAt), quotaReservationId: quota.id, updatedAt: new Date() })
-    .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
-    .returning({ id: agentRuns.id })
-  if (!claimed.length) {
-    await tenantQuotas.finish(run.userId, quota.id, 'refunded')
-    return NextResponse.json({ error: 'Run is no longer queued.' }, { status: 409 })
-  }
+  // The run and quota share one persisted deadline, including any wait between
+  // reservation and activation. A lost response cannot reissue this payload.
+  const leaseExpiresAt = quota.expires_at.toISOString()
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
-  const mcp = claimed.length
-    ? await issueRunToken(run)
+  const mcp = await issueRunToken(run)
       .then(({ token }) => ({ url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token }))
       .catch((error: unknown) => { console.error('Could not issue a run token', error instanceof Error ? error.message : error); return undefined })
-    : undefined
   // A retry after a lost lease works on in the lost attempt's worktree and,
   // when the harness can, its session; the daemon falls back to `prompt`.
   // Another machine has no such worktree and starts from the latest
@@ -80,6 +80,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       ...(resumeFrom ? { resumeFrom } : {}),
     }
     : {}
+  // Do not hand a newly constructed payload to a worker after its deadline.
+  if (Date.now() >= quota.expires_at.getTime()) return quotaResponse(new QuotaError('quotaLeaseLost', 409))
   return NextResponse.json({
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
     baseBranch: repo.baseBranch, harness: agent.harness, prompt: run.prompt,
