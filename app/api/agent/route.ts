@@ -1,7 +1,7 @@
 import { scheduleTools } from '@/lib/schedules/tools'
-import { executeScheduleCommand } from '@/lib/schedules/runtime'
+import { executeScheduleCommand, selectedScheduleWorkspace } from '@/lib/schedules/runtime'
 import { ScheduleError, SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/contract'
-import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { cookies } from 'next/headers'
 import { pool } from '@/lib/db'
 import { subscriptionRepositoryIfInstalled } from '@/lib/subscription-binding-discovery'
 import { mailboxes } from '@/lib/mailbox-runtime'
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
     console.error('Could not prepare Bot mailbox; continuing without mailbox tools')
     return null
   })
-  const scheduleWorkspace = await loadWorkspaceContext(undefined, session.user).then(context => context.workspace.id).catch(() => null)
+  const scheduleWorkspace = await selectedScheduleWorkspace(session.user.id, (await cookies()).get('mikka-workspace')?.value).catch(() => null)
   const generationError = modelSource ? () => 'Subscription connection unavailable.' : agentErrorMessage
   const result = streamText({
     model,
