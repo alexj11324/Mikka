@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-25 | The user's chat messages are blue bubbles with white text; bots stay light grey (「用户发的信息能不能换成蓝色呀？」, accepted with the Figma page) | R-14 | Bot and user share one bubble (2026-10-24) |
 | 2026-10-25 | The issue page follows Linear: assignee is a person with the bot handed the work under it; comments are bordered cards with replies inside; events are plain lines; @ a person or a bot, never a thread; talk to a thread by opening it on the right (「Linear的做法是应该被我们奉为瑰宝的东西」) | R-60–R-64, R-31 | Bot as assignee; comments as grey blocks; a 回复线程 chip in the comment box |
 | 2026-10-25 | Input boxes go only where there is a conversation. The ban was about the thread list and the computer screen, which are not chats; an open thread is a conversation with its agent and ends in the standard composer (「那个地方根本不是聊天界面，但他写上去了…结果就变成了所有地方的右边都不能加输入框了」) | R-10 | "Right panel never has an input box" (2026-10-24) |
 | 2026-10-25 | Any thread may edit the Figma file and the design docs; no single design thread owns them. New Figma work goes on its own page (「readme 相关的只由设计线程维护，你可以把它删掉」) | `README.md` | Figma owned by the design thread only |
@@ -48,9 +49,9 @@ Only these frames count as a source (file `zPe5LKycb2XuT1ivCLRw07`).
 | ~~Nav v3.1 shell~~ | ~~`48:2`~~ moved to 归档 2026-10-25; the shell is what PR #165 built (`components/app-shell.tsx`) | ~~2026-10-24~~ |
 | Kanban v2 | `77:2`, frames `89:2`–`92:2` | 2026-10-23 |
 | Cloud computer | `102:65` | 2026-10-24 06:19 |
-| Style guide | `98:2` (rule 8 out of date, see R-36) | 2026-10-24 |
+| Style guide | `98:2` | 2026-10-24 |
 | 新建 Bot dialog | `195:3225` | in review |
-| Group chat | `205:4488` | in review |
+| Group chat | `224:5023` (blue user bubbles; `205:4488` archived) | 2026-10-25 |
 | Artifact viewer | `178:11626` | in review |
 | Issue detail, threads and comments | page `220:5022`, frames `220:5023`, `220:5199` | 2026-10-25 |
 

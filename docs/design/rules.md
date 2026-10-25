@@ -47,8 +47,9 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-13** One-to-one chats (a bot, the Coordinator, the board's Coordinator
   sidebar) show no avatar or name on messages; the header pill names the bot.
   Group chats show a 24px avatar on the left at the bottom of each run and
-  the name once per run, 12px Medium in the bot's colour (Figma `205:4488`).
-- **R-14** Bot text uses the same bubble as the user's. Charts, OpenUI cards
+  the name once per run, 12px Medium in the bot's colour (Figma `224:5023`).
+- **R-14** The user's messages sit in an accent-blue bubble with white text
+  (`accent/default`); a bot's text sits in the light grey bubble. Charts, OpenUI cards
   and choice cards have no bubble. Bordered cards (document, computer) sit
   below the text bubble, never inside it.
 - **R-15** A task mentioned in chat is an inline chip with the board's status
@@ -138,8 +139,7 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   label under each icon (主页, 看板…), and one rounded content card. Build on
   `components/app-shell.tsx`; no reUI App Shell blocks.
 - **R-36** Bots use bloub avatars (`BotAvatar`, Figma `196:3571`, all 16
-  shapes kept); people use letter avatars. (The Figma style guide's rule 8, "渐变球", predates bloub
-  and is out of date.)
+  shapes kept); people use letter avatars.
 - **R-37** Animate only when the user's action changes a size or position.
   Position and size move with springs; opacity and colour use a duration.
 - **R-38** Light-theme hover and column backgrounds use `rgba(0,0,0,a)`
