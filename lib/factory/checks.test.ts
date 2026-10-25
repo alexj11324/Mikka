@@ -123,6 +123,7 @@ test(
           timeout?: boolean;
           noRuntime?: boolean;
           finding?: boolean;
+          noTimes?: boolean;
         } = {},
       ) => {
         const run = (
@@ -170,13 +171,14 @@ test(
         const sessionId =
           options.sessionId ?? `fixture-session-${randomUUID()}`;
         await pool.query(
-          `UPDATE agent_runs SET status=$2,"stopReason"=$3,"sessionId"=$4,report=$5,"finishedAt"=now() WHERE id=$1`,
+          `UPDATE agent_runs SET status=$2,"stopReason"=$3,"sessionId"=$4,report=$5,"startedAt"=CASE WHEN $6 THEN NULL ELSE coalesce("startedAt",now()) END,"finishedAt"=now() WHERE id=$1`,
           [
             runId,
             options.failed || options.timeout ? "failed" : "succeeded",
             options.timeout ? "timeout" : "submitted",
             sessionId,
             JSON.stringify(report),
+            options.noTimes ?? false,
           ],
         );
         if (run.kind === "acceptance" && !options.noRuntime) {
@@ -340,6 +342,7 @@ test(
         { command: "different" },
         { noCriteria: true },
         { timeout: true },
+        { noTimes: true },
       ]) {
         const t = await route(),
           impl = await dispatch(t.task);

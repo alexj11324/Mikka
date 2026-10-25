@@ -32,6 +32,7 @@ export async function reconcileFactoryCheck(
     stopRequestedAt: Date | null;
     error: string | null;
     finishedAt: Date | null;
+    startedAt: Date | null;
   },
 ) {
   if (
@@ -111,6 +112,8 @@ export async function reconcileFactoryCheck(
     "Independent read-only session and real command passed on the fixed candidate";
   if (
     !run.sessionId ||
+    !run.startedAt ||
+    !run.finishedAt ||
     !run.report ||
     !candidate ||
     ["blocked", "device_lost", "timeout"].includes(run.stopReason)

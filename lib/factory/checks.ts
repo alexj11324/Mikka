@@ -143,6 +143,11 @@ const checkGate: FactoryGate = async (tx, task, attempt, change) => {
     run?.status !== "succeeded" ||
     run.stopReason !== "submitted" ||
     !run.sessionId ||
+    !run.startedAt ||
+    !run.finishedAt ||
+    !Number.isFinite(new Date(run.startedAt).getTime()) ||
+    !Number.isFinite(new Date(run.finishedAt).getTime()) ||
+    new Date(run.finishedAt).getTime() < new Date(run.startedAt).getTime() ||
     report?.check?.sha !== assignment.baseBranch ||
     report?.check?.readOnly !== true ||
     report?.verify?.status !== "passed" ||
