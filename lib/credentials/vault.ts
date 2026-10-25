@@ -7,6 +7,8 @@ export interface CredentialVault {
   remove(ref: string): Promise<void>
 }
 
+export type VaultFailure = { stage: 'authentication' | 'request'; kind: 'unavailable' | 'http'; status?: number }
+
 export class InfisicalCredentialVault implements CredentialVault {
   constructor(private readonly config: {
     origin: string; projectId: string; environment: string; secretPath: string;
