@@ -2324,8 +2324,6 @@
     "attach": "添加文件",
     "attachUnsupported": "只能附加 {max} 字以内的文本文件",
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
-    "whoIsWorking": "谁在工作",
-    "agentsWorking": "{count} 个 agent 正在处理任务",
     "panel": {
       "label": "右栏",
       "tabs": "右栏内容",

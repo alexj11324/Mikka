@@ -6,8 +6,6 @@ import { useTranslations } from 'next-intl'
 import { ArrowUp, Plus, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCoordinatorChat, sendCoordinatorMessage, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
-import { listTaskRuns } from '@/app/actions/task-runs'
-import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { cn } from '@/lib/utils'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
 import { Input } from '@/components/ui/input'
@@ -30,8 +28,6 @@ import { PendingActions } from './pending-actions'
 export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false }: { onOpenIssue: (id: string) => void; prefill?: { text: string; nonce: number }; placeholder?: string; compact?: boolean }) {
   const t = useTranslations('Coordinator')
   const tShell = useTranslations('Shell')
-  const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000, revalidateOnFocus: false })
-  const working = [...new Map((runs ?? []).filter(run => ['preparing', 'running', 'finishing'].includes(run.status)).map(run => [run.agentId, run.agentName])).values()]
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const fileId = useId()
@@ -112,7 +108,6 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       </MessageScroller>
     </MessageScrollerProvider>
     <div className={cn('mx-auto flex w-full max-w-3xl flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4')}>
-      {!compact && working.length > 0 && <p className="flex items-center gap-3 px-2 text-xs text-muted-foreground"><span>{tShell('whoIsWorking')}</span><span className="flex [&>*+*]:-ml-1.5">{working.slice(0, 5).map(name => <LetterAvatar key={name} name={name} size="stack" />)}</span><span>{tShell('agentsWorking', { count: working.length })}</span></p>}
       {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
       {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}

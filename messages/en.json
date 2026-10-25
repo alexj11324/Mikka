@@ -2324,8 +2324,6 @@
     "attach": "Add file",
     "attachUnsupported": "Only text files up to {max} characters can be attached",
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
-    "whoIsWorking": "Who's working",
-    "agentsWorking": "{count, plural, one {# agent is} other {# agents are}} on tasks",
     "panel": {
       "label": "Right panel",
       "tabs": "Right panel content",
