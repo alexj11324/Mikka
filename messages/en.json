@@ -132,7 +132,9 @@
     "collapseList": "Collapse conversation list",
     "newConversation": "New conversation",
     "pinned": "Pinned",
-    "untitledConversation": "Untitled conversation"
+    "untitledConversation": "Untitled conversation",
+    "openBotChat": "Open Bot chat",
+    "archivedConversation": "Archived: {title}"
   },
   "Plugins": {
     "title": "Plugins and skills",
@@ -1453,7 +1455,8 @@
     },
     "sections": {
       "members": {
-        "description": "Manage members, roles, and invitations."
+        "title": "Members",
+        "description": "Manage workspace members, roles, and invitations."
       },
       "preferences": {
         "title": "Preferences",
@@ -1482,10 +1485,6 @@
       "teams": {
         "title": "Teams",
         "description": "Organize teams and the work they own together."
-      },
-      "members": {
-        "title": "Members",
-        "description": "Manage workspace members, roles, and invitations."
       }
     },
     "appearance": {
@@ -2428,9 +2427,20 @@
     "board": {
       "toolbar": "Board toolbar",
       "scopeLabel": "Task scope",
-      "scope": { "all": "All", "workspace": "Workspace", "personal": "Personal" },
+      "scope": {
+        "all": "All",
+        "workspace": "Workspace",
+        "personal": "Personal"
+      },
       "filter": "Filter",
-      "filterField": { "status": "Status", "priority": "Priority", "assignee": "Assignee", "labels": "Labels", "project": "Project", "agentState": "Agent state" },
+      "filterField": {
+        "status": "Status",
+        "priority": "Priority",
+        "assignee": "Assignee",
+        "labels": "Labels",
+        "project": "Project",
+        "agentState": "Agent state"
+      },
       "removeFilter": "Remove {field} filter",
       "me": "Me",
       "noProject": "No project",
@@ -2440,12 +2450,31 @@
       "viewList": "List view",
       "display": "Display",
       "sort": "Sort",
-      "sortBy": { "priority": "Priority", "updated": "Last updated", "created": "Created" },
+      "sortBy": {
+        "priority": "Priority",
+        "updated": "Last updated",
+        "created": "Created"
+      },
       "completed": "Completed tasks",
-      "completedRange": { "week": "Past week", "month": "Past month", "all": "All" },
+      "completedRange": {
+        "week": "Past week",
+        "month": "Past month",
+        "all": "All"
+      },
       "showEmpty": "Show empty columns",
       "cardProperties": "Card properties",
-      "property": { "identifier": "ID", "priority": "Priority", "assignee": "Assignee", "labels": "Labels", "pullRequests": "PR", "subtasks": "Subtasks", "agentState": "Agent state", "project": "Project", "dueDate": "Due date", "createdAt": "Created" },
+      "property": {
+        "identifier": "ID",
+        "priority": "Priority",
+        "assignee": "Assignee",
+        "labels": "Labels",
+        "pullRequests": "PR",
+        "subtasks": "Subtasks",
+        "agentState": "Agent state",
+        "project": "Project",
+        "dueDate": "Due date",
+        "createdAt": "Created"
+      },
       "hiddenColumns": "Hidden columns",
       "hiddenLane": "Hidden",
       "expandColumn": "Expand the {status} column",
@@ -2468,7 +2497,11 @@
         "linkPr": "Link PR",
         "discuss": "Discuss",
         "delete": "Delete",
-        "agent": { "running": "Running", "waiting": "Needs approval", "failed": "Run failed" }
+        "agent": {
+          "running": "Running",
+          "waiting": "Needs approval",
+          "failed": "Run failed"
+        }
       },
       "title": "Board",
       "synced": "Synced with Linear",
@@ -2478,5 +2511,12 @@
       "expand": "Show conversation",
       "unassigned": "Unassigned"
     }
+  },
+  "LegacyChat": {
+    "title": "Chat history",
+    "readOnly": "This chat is read-only. Continue your work in the Bot chat.",
+    "empty": "No saved messages.",
+    "loadError": "Unable to load saved chat history.",
+    "retry": "Retry"
   }
 }

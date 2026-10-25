@@ -29,10 +29,11 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 
 - **Bot 负责协调，线程负责执行。**
   - Bot 与你对话，制定计划并分派任务，本身不直接执行工作。
-  - 每项工作在独立的**线程**中运行。线程对应一次 agent 运行，拥有独立的名称，通常关联一个任务。一个 bot 可以同时管理多个线程。
+  - 每项工作在独立的**线程**中运行。线程对应一次工作运行，拥有独立的名称，通常关联一个任务。一个 bot 可以同时管理多个线程。
   - 完整定义参见 [术语表](docs/design/glossary.md)。
+  - **Harness 是执行层，不是另一个 Bot。** Coordinator 通过 Mikka 的 AI SDK / Workflow harness 处理对话和工具；派发的编码线程由 daemon 选择 Claude Code、Codex 或 Cursor CLI harness 执行。旧的独立 Agent 聊天已退役，历史记录仅供查看。
 
-- **统一协调多个 agent。**
+- **由 Coordinator 协调多个执行 harness。**
   - Coordinator 是常驻运行的 bot。当运行结束、任务状态变更或 worker 提出问题时，它会被唤醒并决定下一步操作，仅在需要你决策时发出通知。
   - 你可以为不同类型的工作创建专门的 bot，也可以将多个 bot 加入群聊，由它们分工协作。
 
@@ -42,7 +43,7 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 
 - **运行在你自己的设备上。**
   - Mikka daemon 可连接你的 Mac、Linux 主机或服务器。
-  - Daemon 通过你已安装并登录的 CLI 运行 agent，因此沿用你现有的订阅与配置。
+  - Daemon 通过你已安装并登录的 CLI harness 执行线程，因此沿用你现有的订阅与配置。
 
 - **故障后自动恢复。**
   - 每次运行均持有租约。设备在运行中途离线时，Mikka 会在原有的 worktree 和 agent session 中重试，无需从头开始。
@@ -102,7 +103,7 @@ Claude Code 会打开浏览器完成登录。登录后，agent 可以读取和�
 
 [`packages/daemon`](packages/daemon) 中的 daemon 会检测设备上已安装的 agent CLI，并通过它们运行线程：
 
-| Agent | 检测的 CLI |
+| 执行 harness | 检测的 CLI |
 | --- | --- |
 | Claude Code | `claude` |
 | Codex | `codex` |
@@ -135,7 +136,7 @@ Linear 同步运行在 Cloudflare Worker 上，通过持久化的 inbox 和 outb
 | 数据 | Neon 托管的 Postgres，Drizzle 迁移位于 [`drizzle/`](drizzle) |
 | 认证 | Better Auth，支持 Google 和 GitHub 登录，并为 MCP 提供 OAuth 2.1 server |
 | 集成 | GitHub 与 Linear 使用 webhook；Gmail、Google 日历、Notion、Slack 通过 Composio 接入；Linear 同步运行在 Cloudflare Worker 上；Telegram 基于 Vercel Chat SDK |
-| Agent | Mikka daemon，内置 Claude Code、Codex 和 Cursor 适配器 |
+| 执行 harness | Mikka daemon，内置 Claude Code、Codex 和 Cursor 适配器 |
 
 ## 目录结构
 
@@ -144,7 +145,7 @@ app/                 # Next.js 路由、server actions 与 API（MCP、webhook�
 components/          # React 界面组件
 lib/                 # 业务逻辑：Coordinator、任务、Linear 同步、MCP、认证
 workflows/           # 持久化 workflow（Coordinator）
-packages/daemon/     # 本地 daemon，通过用户自己的 CLI 运行 agent
+packages/daemon/     # 本地 daemon 和 CLI 执行 harness 适配器
 packages/protocol/   # 服务端与 daemon 共用的类型定义
 packages/config/     # 共享配置
 cloudflare/          # 用于 Linear 同步的 Cloudflare Worker

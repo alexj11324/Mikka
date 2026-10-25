@@ -1,0 +1,69 @@
+name: Legacy chat retirement
+on:
+  push:
+    branches: ['codex/retire-legacy-chat-firecrawl']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-e2e:
+    name: Retired POST, archived history and current Bot entry
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate ephemeral test-only auth secret
+        run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Bootstrap empty database using tracked migrations only
+        run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
+        env:
+          MIGRATION_BOOTSTRAP_CI: '1'
+      - run: pnpm test:e2e:setup
+      - run: pnpm test:agent
+      - run: pnpm typecheck
+      - run: pnpm build
+        id: build
+      - name: Actual Next HTTP and focused browser regression (fixtures only)
+        run: pnpm exec playwright test tests/e2e/agent.spec.ts tests/e2e/agent-performance.spec.ts tests/e2e/progressive-loading.spec.ts tests/e2e/history-request-observer.spec.ts
+      - name: Upload browser failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-chat-retirement-evidence
+          path: |
+            playwright-report/
+            test-results/
+            playwright-performance-report/
+            performance-results/
+          if-no-files-found: ignore
+          retention-days: 7
