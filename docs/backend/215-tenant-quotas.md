@@ -148,3 +148,20 @@ and ordinary repository build. No repository Next configuration is changed.
   production-flow video to claim. A parent-authorized integrated user acceptance
   recording remains a release artifact, not a reason to fabricate a demo.
 - #215 remains open until applicable integrated acceptance and independent review.
+
+### Measurement inventory
+
+| Existing source | What can be measured | Limitation / admission policy |
+| --- | --- | --- |
+| Ordinary Agent / Coordinator SDK | Model requests, bounded steps/output; Coordinator returned token observations | No current verified per-request price/remaining spend source. Operator-approved admission units, not inferred currency. |
+| Decision Gateway | Existing dedicated key budget and fixed-rule fallback | Keep #128's provider-side cap. No new shared Gateway budget or price assumption. |
+| Gateway web and Composio | Bounded requested operations, explicit rejection status / Retry-After when available | Tool/service charge and provider completion after transport loss are not authoritative billing readback. Unknown cost requires operator allocation. |
+| Daemon subscription quota protocol | Vendor, source, `ok`/`unknown`, used window fraction, reset time and observation time | This is a numeric observation, not a monetary ledger or authorization to extract a credential. It cannot establish exact per-run dollar cost; readers and subscription semantics remain unchanged. |
+| Native daemon run | Claim, heartbeat lease, run completion / uncertain loss | Admission units do not represent the provider's actual subscription debit. Live provider exhaustion, disconnected custody and balance reconciliation remain integrated #172/#207 acceptance gates. |
+| Cloud computer / persistent schedules | Candidate #172/#179 own actual resource and occurrence lifecycle | Current main lacks these executors. Parent must wire the same gate at the final boundary; no cloud/provider execution was purchased or presumed tested. |
+
+A failed local acceptance launch exposed a driver cleanup bug after an already
+exited child. The driver now bounds readiness probes, retains child output as it
+arrives, records startup failure, and cleans up on test cancellation without
+waiting for an exit event that already happened. The failed launch and font
+fetch errors remain in the private evidence directory.

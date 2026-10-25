@@ -3,6 +3,7 @@ import { createHash, createHmac, randomUUID } from 'node:crypto'
 import { execFileSync, spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { appendFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -26,18 +27,28 @@ test('actual Next HTTP Agent, Coordinator, administrator and daemon quota gates'
   const results=[]
   const evidence={utc:new Date().toISOString(),sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),environment:base,fixtures:[],requests:[],migration:'20261025165100_tenant_quotas.sql',results}
   let log=''
+  const runtimeLog=join(directory,'next-runtime.log');await writeFile(runtimeLog,'')
   const child=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--port','3215'],{cwd:new URL('..',import.meta.url),env:{...process.env,
     MIKKA_DATABASE_URL:target,DATABASE_URL:target,BETTER_AUTH_URL:origin,
     // Synthetic non-secrets. The egress sentinel rejects external requests.
     OPENCODE_API_KEY:'synthetic-quota-test-no-provider-access',AI_GATEWAY_API_KEY:'synthetic-quota-test-no-provider-access',
     QUOTA_NETWORK_EVIDENCE:network,NODE_OPTIONS:`${process.env.NODE_OPTIONS??''} --import=${new URL('./fixtures/quota-network-guard.mjs',import.meta.url).pathname}`,
   },stdio:['ignore','pipe','pipe']})
-  child.stdout.on('data',d=>log+=d);child.stderr.on('data',d=>log+=d)
+  child.stdout.on('data',d=>{log+=d;appendFileSync(runtimeLog,d)})
+  child.stderr.on('data',d=>{log+=d;appendFileSync(runtimeLog,d)})
+  let cleanupPromise
+  const cleanup=()=>cleanupPromise??=(async()=>{
+    if(child.exitCode===null&&child.signalCode===null){const exit=once(child,'exit');child.kill('SIGTERM');await exit}
+    evidence.runtimeLog=runtimeLog
+    await writeFile('quota-api-evidence.json',JSON.stringify(evidence,null,2))
+    await pool.end()
+  })()
+  t.after(cleanup)
   try{
     let ready=false
     for(let i=0;i<120;i++){
       if(child.exitCode!==null)throw new Error(`Next exited: ${log}`)
-      try{await fetch(`${base}/api/agent`,{method:'HEAD'});ready=true;break}catch{}
+      try{await fetch(`${base}/api/agent`,{method:'HEAD',signal:AbortSignal.timeout(2000)});ready=true;break}catch{}
       await delay(250)
     }
     assert.ok(ready,'Next must start')
@@ -147,11 +158,8 @@ test('actual Next HTTP Agent, Coordinator, administrator and daemon quota gates'
     assert.equal(external,'',`External provider calls were attempted: ${external}`)
     evidence.externalNetworkAttempts=0
     evidence.syntheticRecordsRetained=true
-  }finally{
-    const exit=once(child,'exit');child.kill('SIGTERM');await exit
-    await writeFile(join(directory,'next-runtime.log'),log)
-    evidence.runtimeLog=join(directory,'next-runtime.log')
-    await writeFile('quota-api-evidence.json',JSON.stringify(evidence,null,2))
-    await pool.end()
-  }
+  }catch(error){
+    evidence.serverFailure={message:String(error.message).slice(0,1000),utc:new Date().toISOString()}
+    throw error
+  }finally{await cleanup()}
 })
