@@ -11,7 +11,8 @@ permissions:
 
 jobs:
   dispatch-postgres:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    # Retained-fixture acceptance for #110 runs in agent-exchanges.yml.
+    if: github.ref != 'refs/heads/codex/110-agent-exchange-readonly' && github.head_ref != 'codex/110-agent-exchange-readonly' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:

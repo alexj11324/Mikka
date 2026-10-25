@@ -2,9 +2,11 @@ import type {Pool} from 'pg'
 import {z} from 'zod'
 import type {Directory} from './group-conversations-store'
 import {pollGroupReviews,claimGroupReview,finishGroupReview,checkGroupReview,failGroupReview} from './group-mailbox-runtime'
+import {appendAgentExchange,exchangeInput} from './conversation-exchanges'
 import {ReviewFailure} from './group-review-access'
 const command=z.discriminatedUnion('action',[
   z.object({action:z.literal('poll')}).strict(),
+  z.object({action:z.literal('exchange'),runId:z.uuid(),exchange:exchangeInput}).strict(),
   z.object({action:z.literal('claim'),runId:z.uuid()}).strict(),
   z.object({action:z.literal('check'),runId:z.uuid(),claimEpoch:z.number().int().positive()}).strict(),
   z.object({action:z.literal('fail'),runId:z.uuid(),claimEpoch:z.number().int().positive(),code:z.literal('processor_failed')}).strict(),
@@ -18,7 +20,7 @@ export async function handleGroupWorkerRequest(request:Request,deviceId:string,d
   if (!z.uuid().safeParse(deviceId).success || !parsed.success) return json({error:'invalid_input'},422)
   const input=parsed.data
   try {
-    const result=input.action==='poll'?await pollGroupReviews(deps.pool,deps.directory,caller.userId,deviceId):input.action==='claim'?await claimGroupReview(deps.pool,deps.directory,caller.userId,deviceId,input.runId):input.action==='check'?await checkGroupReview(deps.pool,deps.directory,caller.userId,deviceId,input.runId,input.claimEpoch):input.action==='fail'?await failGroupReview(deps.pool,deps.directory,caller.userId,deviceId,input.runId,input.claimEpoch):await finishGroupReview(deps.pool,deps.directory,caller.userId,deviceId,input.runId,input.reply)
+    const result=input.action==='exchange'?await appendAgentExchange(deps.pool,deps.directory,caller.userId,deviceId,input.runId,input.exchange):input.action==='poll'?await pollGroupReviews(deps.pool,deps.directory,caller.userId,deviceId):input.action==='claim'?await claimGroupReview(deps.pool,deps.directory,caller.userId,deviceId,input.runId):input.action==='check'?await checkGroupReview(deps.pool,deps.directory,caller.userId,deviceId,input.runId,input.claimEpoch):input.action==='fail'?await failGroupReview(deps.pool,deps.directory,caller.userId,deviceId,input.runId,input.claimEpoch):await finishGroupReview(deps.pool,deps.directory,caller.userId,deviceId,input.runId,input.reply)
     return json(result)
   } catch(error) {if(error instanceof ReviewFailure)return json({error:error.code},error.status);throw error}
 }

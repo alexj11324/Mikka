@@ -84,6 +84,7 @@ test('disposable Postgres: mixed groups → durable isolated runtime → Artifac
       assert.equal((await pool.query('SELECT title FROM conversations WHERE id=$1',[oldGroup])).rows[0].title,'legacy')
       assert.equal((await pool.query('SELECT body FROM conversation_messages WHERE id=$1',[legacyMessage])).rows[0].body,'legacy history')
       await pool.query(await migration('20261025082237_group_turn_mailbox_policy.sql'))
+      await pool.query(await migration('20261025202112_conversation_exchange_scopes.sql'))
       conversationId = await createGroup()
     })
     await t.test('ownership checks reuse transaction clients under a two-connection application pool', async () => {

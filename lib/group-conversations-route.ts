@@ -1,3 +1,4 @@
+import { withExchangeReadAuthority } from '@/lib/conversation-exchange-authority'
 import { groupDirectory } from '@/lib/group-conversations-directory'
 import { NextResponse } from 'next/server'
 import { and, eq, inArray } from 'drizzle-orm'
@@ -30,7 +31,7 @@ export const directory = groupDirectory({
 export async function respondGroup(request: Request, resource: GroupRequest['resource'], id?: string) {
   const session = await auth.api.getSession({ headers: request.headers })
   const url = new URL(request.url)
-  const result = await handleGroup(pool, directory, {
+  const handle = async (readDirectory: typeof directory) => handleGroup(pool, readDirectory, {
     userId: session?.user?.id ?? null, method: request.method as GroupRequest['method'], resource, id,
     origin: request.headers.get('origin'),
     // Do not trust client-controlled x-forwarded-host to satisfy the Origin check.
@@ -38,5 +39,7 @@ export async function respondGroup(request: Request, resource: GroupRequest['res
     body: request.method !== 'GET' ? await request.text().catch(() => '') : undefined,
     before: url.searchParams.get('before'), limit: url.searchParams.get('limit'), workspaceId: url.searchParams.get('workspaceId'),
   })
+  const result = resource === 'messages' && request.method === 'GET'
+    ? await withExchangeReadAuthority(workspaceDb.$client, handle) : await handle(directory)
   return NextResponse.json(result.body, { status: result.status, headers: { 'Cache-Control': 'private, no-store' } })
 }

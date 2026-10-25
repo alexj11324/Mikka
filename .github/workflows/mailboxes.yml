@@ -4,6 +4,8 @@ permissions:
   contents: read
 jobs:
   mailboxes:
+    # Retained-fixture acceptance for #110 runs in agent-exchanges.yml.
+    if: github.ref != 'refs/heads/codex/110-agent-exchange-readonly' && github.head_ref != 'codex/110-agent-exchange-readonly'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:

@@ -1,0 +1,78 @@
+name: Scoped Agent exchange acceptance
+on:
+  push:
+    branches: ['codex/110-agent-exchange-readonly']
+  pull_request:
+    paths: ['lib/conversation-exchange*', 'lib/conversation-links-route.ts', 'app/api/conversation-links/**', 'scripts/test-agent-exchanges.ts', '.github/workflows/agent-exchanges.yml']
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: exchange
+          POSTGRES_PASSWORD: exchange-synthetic
+          POSTGRES_DB: mikka_exchange
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U exchange -d mikka_exchange"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      MIKKA_DATABASE_URL: postgresql://exchange:exchange-synthetic@127.0.0.1:5432/mikka_exchange
+      DATABASE_URL: postgresql://exchange:exchange-synthetic@127.0.0.1:5432/mikka_exchange
+      EXCHANGE_TEST_DATABASE_URL: postgresql://exchange:exchange-synthetic@127.0.0.1:5432/mikka_exchange
+      BETTER_AUTH_SECRET: synthetic-110-auth-secret-no-live-access-0000
+      BETTER_AUTH_URL: http://localhost:3110
+      NEXT_TELEMETRY_DISABLED: '1'
+      EXCHANGE_REQUIRE_CLEAN: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Freeze checkout evidence
+        run: |
+          mkdir -p exchange-evidence
+          git rev-parse HEAD > exchange-evidence/sha.txt
+          git diff --exit-code HEAD
+      - name: Fresh tracked migrations and idempotent repeat (synthetic PG only)
+        run: |
+          MIGRATE=1 pnpm migrate > exchange-evidence/migrations.log
+          MIGRATE=1 pnpm migrate > exchange-evidence/migrations-repeat.log
+      - name: Handler and PostgreSQL permissions/concurrency matrix (retain fixtures)
+        run: pnpm test:agent-exchanges > exchange-evidence/handlers.log
+        env:
+          EXCHANGE_EVIDENCE_PATH: exchange-evidence/handlers.json
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - name: Complete production build including pinned Linux workers
+        run: pnpm build > exchange-evidence/build.log 2>&1
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Actual compiled Next HTTP and synthetic sessions
+        run: |
+          pnpm start --port 3110 > /tmp/exchange-next.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --silent --output /dev/null http://localhost:3110/mikka/api/auth/get-session; then break; fi
+            sleep 1
+          done
+          pnpm test:agent-exchanges > exchange-evidence/http.log
+        env:
+          EXCHANGE_HTTP_ORIGIN: http://localhost:3110
+          EXCHANGE_RECORDING_DIR: exchange-evidence/recording
+          EXCHANGE_EVIDENCE_PATH: exchange-evidence/http.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scoped-agent-exchange-evidence
+          path: exchange-evidence/
+          if-no-files-found: error

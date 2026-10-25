@@ -491,3 +491,22 @@ export const factoryEvents = pgTable('factory_events', {
   request: jsonb('request').$type<Record<string, unknown>>().notNull(), result: jsonb('result').$type<Record<string, unknown>>().notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.taskId, table.eventId] })])
+
+/** Provenance for newly created, explicitly scoped MIK-15 exchanges only. */
+export const conversationExchangeScopes = pgTable('conversation_exchange_scopes', {
+  linkId: uuid('linkId').primaryKey().references(() => conversationLinks.id),
+  sourceId: uuid('sourceId').notNull().references(() => conversations.id),
+  dmId: uuid('dmId').notNull().unique().references(() => conversations.id),
+  triggerMessageId: uuid('triggerMessageId').notNull().references(() => conversationMessages.id),
+  anchorPosition: bigint('anchorPosition', { mode: 'bigint' }).notNull(),
+  requestedBy: text('requestedBy').notNull(), requesterJoinedAt: timestamp('requesterJoinedAt', { withTimezone: true }).notNull(),
+  agentA: uuid('agentA').notNull().references(() => agents.id), agentB: uuid('agentB').notNull().references(() => agents.id),
+  grantA: uuid('grantA').notNull(), grantB: uuid('grantB').notNull(),
+  joinedA: timestamp('joinedA', { withTimezone: true }).notNull(), joinedB: timestamp('joinedB', { withTimezone: true }).notNull(),
+  revokedAt: timestamp('revokedAt', { withTimezone: true }),
+}, t => [index('conversation_exchange_source_idx').on(t.sourceId, t.anchorPosition)])
+export const conversationExchangeMessages = pgTable('conversation_exchange_messages', {
+  messageId: uuid('messageId').primaryKey().references(() => conversationMessages.id),
+  linkId: uuid('linkId').notNull().references(() => conversationExchangeScopes.linkId),
+  workId: uuid('workId').notNull(), hash: text('hash').notNull(),
+}, t => [index('conversation_exchange_messages_link_idx').on(t.linkId)])
