@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { issueMembers, issues, linearIssueLinks, telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
+import { userActor } from '@/lib/activity-actor'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { issueTeamAccess } from '@/lib/issue-team-access'
@@ -168,7 +169,7 @@ async function handleCommand(tx: Transaction, conversation: typeof telegramConve
         content: issueContent(conversation.draftDescription),
         status: 'backlog',
         priority: 'normal',
-      })
+      }, userActor(userId))
       if (!issue) return t('draftInvalid')
       await tx.update(telegramConversations).set({
         issueId: issue.id,
