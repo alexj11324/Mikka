@@ -1911,7 +1911,6 @@
   "Coordinator": {
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
-    "emptyTitle": "Talk to your Coordinator",
     "usedTools": "Used {tools}",
     "pendingActions": {
       "label": "Waiting for your approval",
@@ -2248,8 +2247,8 @@
       "briefing": "{count, plural, one {# new message is} other {# new messages are}} worth a look, starting with",
       "noneToday": "No new suggestions today.",
       "routine": "Routine",
-      "emptyTitle": "Nothing here",
-      "emptyDescription": "Check back later",
+      "empty": "Nothing to read right now",
+      "connect": "Connect apps",
       "refresh": "Refresh suggestions",
       "loadError": "Suggestions failed to load.",
       "action": {
@@ -2267,13 +2266,13 @@
       }
     },
     "tasks": {
-      "mine": "My tasks",
+      "mine": "Tasks",
       "waiting": "Waiting on you",
       "running": "Running",
       "failed": "Failed",
       "doneToday": "Done",
       "today": "today {count}",
-      "empty": "No tasks handed to an agent yet.",
+      "empty": "No tasks yet",
       "status": {
         "waiting_input": "needs your reply",
         "queued": "queued",
@@ -2282,15 +2281,12 @@
         "finishing": "finishing",
         "failed": "failed",
         "succeeded": "done"
-      },
-      "command": "Direct this task…",
-      "commandLabel": "Send an instruction to the Coordinator",
-      "send": "Send",
-      "sent": "Sent to the Coordinator.",
-      "sendFailed": "That didn't send. Try again."
+      }
     },
     "empty": {
-      "nothing": "Nothing here",
+      "browser": "No web pages opened yet",
+      "knowledge": "No documents yet",
+      "schedules": "No scheduled tasks yet",
       "arrange": "Let an agent set it up",
       "knowledgePrompt": "Help me put the documents I use often into the knowledge base: ",
       "schedulesPrompt": "Help me set up a scheduled task: "

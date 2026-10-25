@@ -1911,7 +1911,6 @@
   "Coordinator": {
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
-    "emptyTitle": "和你的 Coordinator 聊聊",
     "usedTools": "调用了 {tools}",
     "pendingActions": {
       "label": "等你确认",
@@ -2248,8 +2247,8 @@
       "briefing": "有 {count} 条新消息值得看，先看",
       "noneToday": "今天还没有新的建议。",
       "routine": "例行事项",
-      "emptyTitle": "这里是空的",
-      "emptyDescription": "Check back later",
+      "empty": "暂时没有要看的消息",
+      "connect": "连接应用",
       "refresh": "刷新建议",
       "loadError": "建议加载失败。",
       "action": {
@@ -2267,13 +2266,13 @@
       }
     },
     "tasks": {
-      "mine": "我的任务",
+      "mine": "任务",
       "waiting": "等你",
       "running": "运行中",
       "failed": "出错",
       "doneToday": "已完成",
       "today": "今天 {count}",
-      "empty": "还没有派给 Agent 的任务。",
+      "empty": "还没有任务",
       "status": {
         "waiting_input": "等你回复",
         "queued": "排队中",
@@ -2282,15 +2281,12 @@
         "finishing": "收尾中",
         "failed": "失败",
         "succeeded": "已完成"
-      },
-      "command": "指挥这个任务…",
-      "commandLabel": "给 Coordinator 发指令",
-      "send": "发送",
-      "sent": "已发给 Coordinator。",
-      "sendFailed": "没发出去，再试一次。"
+      }
     },
     "empty": {
-      "nothing": "这里是空的",
+      "browser": "还没打开过网页",
+      "knowledge": "还没有资料",
+      "schedules": "还没有定时任务",
       "arrange": "让 Agent 安排",
       "knowledgePrompt": "帮我把常用的资料整理进知识库：",
       "schedulesPrompt": "帮我设一个定时任务："
