@@ -4,6 +4,18 @@ import type { Pool, PoolClient } from 'pg'
 export class DeviceAuthorityRevoked extends Error {
   constructor() { super('Device authority revoked') }
 }
+/** Only a typed revocation cause is authentication failure. Bound traversal and
+ * avoid invoking arbitrary cause getters; ordinary SQL/connection errors stay 500. */
+export function isDeviceAuthorityRevoked(error: unknown): boolean {
+  const seen = new Set<Error>()
+  for (let depth = 0; depth < 8 && error instanceof Error; depth++) {
+    if (error instanceof DeviceAuthorityRevoked) return true
+    if (seen.has(error)) return false
+    seen.add(error)
+    error = Object.getOwnPropertyDescriptor(error, 'cause')?.value
+  }
+  return false
+}
 export type DeviceAuthority = { tokenId: string; userId: string }
 const authority = new AsyncLocalStorage<{ caller: DeviceAuthority; pools: WeakMap<Pool, Pool> }>()
 

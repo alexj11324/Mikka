@@ -2,7 +2,7 @@ import 'server-only'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import type { Pool as DatabasePool } from 'pg'
 import { pool } from '@/lib/db'
-import { withDeviceDatabaseAuthority, DeviceAuthorityRevoked } from '@/lib/db/device-scope'
+import { withDeviceDatabaseAuthority, isDeviceAuthorityRevoked } from '@/lib/db/device-scope'
 import { appendAudit, auditActor } from '@/lib/audit/store'
 import type { DeviceCaller } from '@/lib/device-link'
 
@@ -17,7 +17,7 @@ export async function withDeviceAdmission<T>(caller: DeviceCaller, fn: () => Pro
       return deviceRequestCaller.run(caller, fn)
     })
   } catch (error) {
-    if (error instanceof DeviceAuthorityRevoked) return null
+    if (isDeviceAuthorityRevoked(error)) return null
     throw error
   }
 }

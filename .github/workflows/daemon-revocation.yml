@@ -51,6 +51,7 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Transaction-local revocation and audit fault regression
         run: node --conditions=react-server --import ./scripts/daemon/server-only.mjs --import tsx scripts/daemon/revocation-faults.mjs
+      - run: node --import tsx --test lib/db/device-scope.test.ts
       - run: pnpm typecheck
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm build

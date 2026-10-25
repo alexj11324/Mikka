@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { test, expect } from '@playwright/test'
 import { Pool } from 'pg'
+import { request as httpRequest } from 'node:http'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { writeFileSync } from 'node:fs'
@@ -161,6 +162,64 @@ test('owner revokes credential durably; old daemon API calls and attributed work
       faultLocker.release()
       if(faultRequest)await faultRequest.catch(()=>undefined)
     }
+
+    // Hold the request body after initial admission/ownedRun. A PG table-lock
+    // barrier proves ownedRun was entered, then its COMMIT proves it finished.
+    // Revoke before supplying the rest of the body forces ORM BEGIN admission.
+    for (let attempt=0;attempt<6;attempt++) {
+      const midId=randomUUID(),midRun=randomUUID(),midBearer='orv_'+randomBytes(32).toString('hex')
+      await pg.query('INSERT INTO device_tokens(id,"userId","tokenHash","lastUsedAt") VALUES($1,$2,$3,now())',[midId,userId,createHash('sha256').update(midBearer).digest('hex')])
+      await pg.query('INSERT INTO agent_runs(id,"userId","agentId","deviceId","deviceTokenId",status) VALUES($1,$2,$3,$4,$5,$6)',[midRun,userId,agentId,deviceId,midId,'preparing'])
+      const barrier=await pg.connect()
+      const payload=JSON.stringify({fromSeq:1,chunks:[{type:'text-delta',delta:'must not persist after mid-request revoke'}]})
+      let finishBody: (()=>void)|undefined
+      let requestDone: Promise<number>|undefined
+      try {
+        await barrier.query('BEGIN')
+        await barrier.query('LOCK TABLE agent_runs IN ACCESS EXCLUSIVE MODE')
+        const barrierPid=(await barrier.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+        requestDone=new Promise<number>((resolve,reject)=>{
+          const req=httpRequest(new URL(`/mikka/v1/runs/${midRun}/events`,origin),{method:'POST',headers:{authorization:'Bearer '+midBearer,'content-type':'application/json','content-length':Buffer.byteLength(payload)}},response=>{response.resume();response.on('end',()=>resolve(response.statusCode!))})
+          req.on('error',reject)
+          req.setTimeout(15000,()=>req.destroy(new Error('mid-request fixture timeout')))
+          req.write(payload.slice(0,-1))
+          finishBody=()=>req.end(payload.slice(-1))
+        })
+        let readers: {pid:number}[]=[]
+        await expect.poll(async()=>{readers=(await pg.query('SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))',[barrierPid])).rows;return readers.length}).toBe(1)
+        const readerPid=readers[0].pid
+        await barrier.query('COMMIT')
+        await expect.poll(async()=>{const row=(await pg.query('SELECT state,query FROM pg_stat_activity WHERE pid=$1',[readerPid])).rows[0];return row?.state==='idle' && row.query==='COMMIT'}).toBe(true)
+        expect((await owner.post(`/mikka/api/device-tokens/${midId}/revoke`,{headers:{origin}})).status()).toBe(200)
+        finishBody!()
+        finishBody=undefined
+        expect(await requestDone).toBe(401)
+        expect(Number((await pg.query('SELECT count(*) FROM run_chunks WHERE "runId"=$1',[midRun])).rows[0].count)).toBe(0)
+      } finally {
+        await barrier.query('ROLLBACK')
+        barrier.release()
+        finishBody?.()
+        if(requestDone)await requestDone.catch(()=>undefined)
+      }
+    }
+    checks.push('six actual HTTP requests revoked after ownedRun commit and before ORM BEGIN return 401 with zero chunks; pool remains available')
+
+    // Independent SQL failure stays 500; retry the same batch after clearing
+    // only its retained fixture fault control, using a still-live sibling token.
+    const sqlRun=randomUUID(),sqlFault='sqlfault_'+randomUUID().replaceAll('-','')
+    await pg.query('INSERT INTO agent_runs(id,"userId","agentId","deviceId","deviceTokenId",status) VALUES($1,$2,$3,$4,$5,$6)',[sqlRun,userId,agentId,deviceId,otherId,'preparing'])
+    await pg.query('CREATE TABLE IF NOT EXISTS daemon_sql_fault_controls(id uuid PRIMARY KEY,enabled boolean NOT NULL)')
+    await pg.query('INSERT INTO daemon_sql_fault_controls VALUES($1,true)',[sqlRun])
+    await pg.query(`CREATE FUNCTION ${sqlFault}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF EXISTS(SELECT 1 FROM daemon_sql_fault_controls WHERE id='${sqlRun}'::uuid AND enabled) THEN RAISE EXCEPTION 'isolated independent SQL failure'; END IF; RETURN NEW; END $$`)
+    await pg.query(`CREATE TRIGGER ${sqlFault} BEFORE INSERT ON run_chunks FOR EACH ROW WHEN (NEW."runId"='${sqlRun}'::uuid) EXECUTE FUNCTION ${sqlFault}()`)
+    const sqlOptions={headers:{authorization:'Bearer '+otherBearer},data:{fromSeq:1,chunks:[{type:'text-delta',delta:'retry same synthetic batch'}]}}
+    expect((await daemon.post(`/mikka/v1/runs/${sqlRun}/events`,sqlOptions)).status()).toBe(500)
+    expect(Number((await pg.query('SELECT count(*) FROM run_chunks WHERE "runId"=$1',[sqlRun])).rows[0].count)).toBe(0)
+    await pg.query('UPDATE daemon_sql_fault_controls SET enabled=false WHERE id=$1',[sqlRun])
+    expect((await daemon.post(`/mikka/v1/runs/${sqlRun}/events`,sqlOptions)).status()).toBe(200)
+    expect((await daemon.post(`/mikka/v1/runs/${sqlRun}/events`,sqlOptions)).status()).toBe(200)
+    expect(Number((await pg.query('SELECT count(*) FROM run_chunks WHERE "runId"=$1',[sqlRun])).rows[0].count)).toBe(1)
+    checks.push('independent SQL fault remains 500 with zero writes; same-batch explicit retry succeeds once after fault cleared')
 
     const evidencePath = info.outputPath('device-revocation-evidence.json')
     writeFileSync(evidencePath,JSON.stringify({sha:process.env.GITHUB_SHA,base:'a3294781eae74d824087c9c80bfc3f6093f196d7',migration:'20261025185500_daemon_revocation.sql',startedAt,finishedAt:new Date().toISOString(),environment:'isolated PG + actual Next HTTP',fixture:{deviceId,runId,tokenId},revocation:{revokedAt:receipt.revokedAt,stopRequestedAt:state.stopRequestedAt,leaseExpiresAt:state.leaseExpiresAt},endpointResults,checks},null,2))
