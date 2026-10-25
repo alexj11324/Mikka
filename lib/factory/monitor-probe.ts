@@ -144,7 +144,7 @@ export function createLocalMonitorProbe(config: {
               reference: receipt.reference,
             }),
           ],
-          { timeout: 5000, maxBuffer: 32768, env: {} },
+          { timeout: 5000, maxBuffer: 32768, env: { NODE_ENV: "test" } },
         );
         stdout = result.stdout;
         stderr = result.stderr;
@@ -410,7 +410,9 @@ export async function validatedMonitorProof(
   );
   if (
     !row ||
-    row.chunk.type !== "factory-monitor-probe" ||
+    row.chunk?.type !== "factory-monitor-probe" ||
+    !monitorAuditSchema.safeParse(row.chunk.audit).success ||
+    !bindingSchema.safeParse(row.chunk.binding).success ||
     digest(row.chunk) !== proof.artifactHash ||
     digest(row.chunk.audit) !== digest(a) ||
     digest(row.chunk.binding) !== digest(proof.binding)
