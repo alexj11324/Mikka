@@ -74,7 +74,9 @@ export async function wakeFixture(pool: Pool) {
     [workspace, owner, `${owner}@example.invalid`],
   )
   await pool.query(
-    `INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,tier,wake_workspace_id) VALUES($1,$2,'user_message',$3,$4,'attention',$5)`,
+    // These fixtures represent already-due work. A PG microsecond default can
+    // otherwise be later than an immediate JS millisecond claim in fast CI.
+    `INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,tier,wake_workspace_id,wake_next_at) VALUES($1,$2,'user_message',$3,$4,'attention',$5,clock_timestamp()-interval '1 second')`,
     [
       eventId,
       owner,
