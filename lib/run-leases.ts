@@ -23,16 +23,23 @@ import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATT
  */
 export async function renewRunLeases(deviceId: string, runIds: readonly string[], now = new Date()): Promise<{ leases: Record<string, string>; revoked?: string[] }> {
   if (!runIds.length) return { leases: {} }
-  const leaseExpiresAt = new Date(now.getTime() + RUN_LEASE_MS)
-  const renewed = await db.update(agentRuns)
-    .set({ leaseExpiresAt, updatedAt: now })
-    // Group claims belong to the dedicated epoch-bound worker protocol. A
-    // generic device heartbeat must neither extend those claims nor resurrect
-    // an ordinary attempt whose lease expired while waiting for this row lock.
-    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, [...runIds]),
-      inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), ne(agentRuns.kind, 'group_review'),
-      isNull(agentRuns.stopRequestedAt), gt(agentRuns.leaseExpiresAt, sql`clock_timestamp()`)))
-    .returning({ id: agentRuns.id })
+  const {renewed,leaseExpiresAt} = await db.transaction(async tx => {
+    // Lock before evaluating time. An UPDATE predicate can be evaluated before
+    // a row-lock wait, even when it contains clock_timestamp(). Group claims
+    // belong exclusively to the dedicated epoch-bound protocol.
+    await tx.select({id:agentRuns.id}).from(agentRuns)
+      .where(and(eq(agentRuns.deviceId,deviceId),inArray(agentRuns.id,[...runIds]),ne(agentRuns.kind,'group_review')))
+      .orderBy(agentRuns.id).for('update')
+    const renewedAt=new Date(Math.max(now.getTime(),Date.now()))
+    const leaseExpiresAt=new Date(renewedAt.getTime()+RUN_LEASE_MS)
+    const renewed=await tx.update(agentRuns)
+      .set({leaseExpiresAt,updatedAt:renewedAt})
+      .where(and(eq(agentRuns.deviceId,deviceId),inArray(agentRuns.id,[...runIds]),
+        inArray(agentRuns.status,[...LEASED_RUN_STATUSES]),ne(agentRuns.kind,'group_review'),
+        isNull(agentRuns.stopRequestedAt),gt(agentRuns.leaseExpiresAt,sql`clock_timestamp()`)))
+      .returning({id:agentRuns.id})
+    return {renewed,leaseExpiresAt}
+  })
   const held = new Set(renewed.map(run => run.id))
   const revoked = runIds.filter(id => !held.has(id))
   return { leases: Object.fromEntries([...held].map(id => [id, leaseExpiresAt.toISOString()])), ...(revoked.length ? { revoked } : {}) }
