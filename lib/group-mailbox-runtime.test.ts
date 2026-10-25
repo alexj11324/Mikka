@@ -67,7 +67,7 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
   for(const name of orderMigrations((await readdir(new URL('../drizzle/',import.meta.url))).filter(n=>n.endsWith('.sql')))){
    const sql=await readFile(new URL('../drizzle/'+name,import.meta.url),'utf8');await(/^--\s*target:\s*DATABASE_URL/m.test(sql)?ws:pool).query(sql)
   }
-  await pool.query(await readFile(new URL('../drizzle/20261024140000_group_review_mailboxes.sql',import.meta.url),'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261025052033_group_review_mailboxes.sql',import.meta.url),'utf8'))
   for(const u of ['owner','member','outsider'])await ws.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')',[workspaceId,u,u+'@example.invalid'])
   await pool.query('INSERT INTO devices (id,"ownerId",name,enabled) VALUES ($1,\'owner\',\'controlled fixture\',true),($2,\'outsider\',\'foreign\',true)',[deviceId,foreignDevice])
   await pool.query('INSERT INTO agents (id,"userId",name,harness,instructions,"deviceId") VALUES ($1,\'owner\',\'Agent\',\'codex\',\'PRIVATE_INSTRUCTIONS_SENTINEL\',$2)',[agentId,deviceId])
@@ -151,7 +151,7 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
    const box=(await pool.query('SELECT "mailboxId" FROM agent_runs WHERE id=$1',[r.work.workId])).rows[0].mailboxId
    await pool.query(`UPDATE session_mailboxes SET kind='run',"workspaceId"='legacy-singleton',"wakeBudget"=2 WHERE id=$1`,[box])
    await pool.query('UPDATE run_messages SET "mailboxId"=null WHERE "runId"=$1',[r.work.workId])
-   const sql=await readFile(new URL('../drizzle/20261024140000_group_review_mailboxes.sql',import.meta.url),'utf8')
+   const sql=await readFile(new URL('../drizzle/20261025052033_group_review_mailboxes.sql',import.meta.url),'utf8')
    await pool.query(sql);await pool.query(sql)
    const row=(await pool.query('SELECT * FROM session_mailboxes WHERE id=$1',[box])).rows[0]
    assert.equal(row.kind,'group');assert.equal(row.workspaceId,workspaceId);assert.equal(row.wakeBudget,0)

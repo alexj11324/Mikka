@@ -4,6 +4,7 @@
   "description": "Local Mikka daemon: runs agents through the user's own CLIs",
   "type": "module",
   "private": true,
+  "license": "AGPL-3.0-only",
   "bin": {
     "mikka": "./bin/mikka.ts"
   },

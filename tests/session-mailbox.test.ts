@@ -24,7 +24,7 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
     const dir = new URL('../drizzle/', import.meta.url)
     const names = orderMigrations((await readdir(dir)).filter(name => name.endsWith('.sql')))
     for (const name of names) {
-      if (['20261024080000_session_mailboxes.sql','20261024140000_group_review_mailboxes.sql'].includes(name)) continue
+      if (['20261025052031_session_mailboxes.sql','20261025052033_group_review_mailboxes.sql'].includes(name)) continue
       const sql = await readFile(new URL(name, dir), 'utf8')
       if (/^--\s*target:\s*DATABASE_URL/m.test(sql)) continue
       await pool.query(sql)
@@ -40,9 +40,9 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"stopReason","sessionId","worktreePath") values ($1,$2,$3,$4,$5,$6,\'succeeded\',\'submitted\',\'legacy-terminal-cli\',\'/isolated/legacy-worktree\')', [legacyTerminal, owner, issue, role, device, repo])
     await pool.query('insert into agent_sessions (id,"userId",title) values ($1,$2,\'Existing Bot conversation\')', [legacyBot, owner])
     await pool.query('insert into coordinator_sessions ("userId") values ($1)', [owner])
-    const migration = await readFile(new URL('20261024080000_session_mailboxes.sql', dir), 'utf8')
+    const migration = await readFile(new URL('20261025052031_session_mailboxes.sql', dir), 'utf8')
     await pool.query(migration)
-    await pool.query(await readFile(new URL('20261024140000_group_review_mailboxes.sql', dir), 'utf8'))
+    await pool.query(await readFile(new URL('20261025052033_group_review_mailboxes.sql', dir), 'utf8'))
     const firstIdentities = (await pool.query('select id,kind,"sessionKey","latestRunId",harness from session_mailboxes order by id')).rows
     await pool.query(migration)
     assert.deepEqual((await pool.query('select id,kind,"sessionKey","latestRunId",harness from session_mailboxes order by id')).rows, firstIdentities, 'migration replay must preserve every address and continuation pointer')

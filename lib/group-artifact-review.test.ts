@@ -77,7 +77,7 @@ test('disposable Postgres: mixed groups → durable isolated runtime → Artifac
       await pool.query(`INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,'agent',$2,'member')`, [oldGroup,agentId])
       const legacyMessage = randomUUID()
       await pool.query(`INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body) VALUES ($1,$2,1,'user','owner','legacy history')`,[legacyMessage,oldGroup])
-      const sql = await migration('20261024090000_group_artifact_review.sql')
+      const sql = await migration('20261025052032_group_artifact_review.sql')
       await Promise.all([pool.query(sql),pool.query(sql)])
       await pool.query(sql)
       assert.equal((await pool.query('SELECT count(*) FROM conversation_agent_grants WHERE "conversationId"=$1',[oldGroup])).rows[0].count,'0')

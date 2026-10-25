@@ -39,12 +39,19 @@ import {
   type HandoffReport,
   type HeartbeatRun,
   type Harness,
+  type RunCheckpoint,
   type RunPublish,
   type RunState,
   type RunSummary,
   type StopReason,
 } from "@mikka/protocol"
 
+import {
+  applyCheckpoint,
+  hasCommit,
+  headCommit,
+  takeCheckpoint,
+} from "../agents/checkpoint"
 import type {
   AgentAdapter,
   AgentEvent,
@@ -151,7 +158,18 @@ interface ActiveRun {
   /** Aborted by `stop()`, or when a cancelled session does not exit. */
   abort: AbortController
   cancelTimer?: NodeJS.Timeout
+  /** The repo checkout the run's worktree belongs to. */
+  repoPath: string
+  /** A tool call finished since the last checkpoint. */
+  checkpointDue?: boolean
+  checkpointing?: boolean
+  lastCheckpointAt?: number
+  /** Tree of the last checkpoint taken; unchanged trees are not sent. */
+  lastCheckpointTree?: string
 }
+
+/** A run with no tool call in this long still gets a checkpoint when it changed. */
+export const CHECKPOINT_EVERY_MS = 2 * 60_000
 
 export class RunSupervisor {
   private active = new Map<string, ActiveRun>()
@@ -209,6 +227,54 @@ export class RunSupervisor {
   renewLeases(leases: Record<string, string>) {
     for (const [runId, expiry] of Object.entries(leases)) {
       if (this.active.has(runId)) this.leases.set(runId, Date.parse(expiry))
+    }
+  }
+
+  /**
+   * Stops the runs the server says this device no longer holds. Runs without
+   * a server lease (local dev runs) were never the server's to take back.
+   */
+  revokeLeases(runIds: readonly string[]) {
+    for (const runId of runIds) {
+      const run = this.active.get(runId)
+      if (run && !run.forcedStop && this.leases.has(runId))
+        this.forceStop(runId, run, "device_lost")
+    }
+  }
+
+  /**
+   * Saves the work in progress of runs that had a tool call since their last
+   * checkpoint, or none for `CHECKPOINT_EVERY_MS`, through `save`. The
+   * daemon calls it after each heartbeat; a failed save is tried again on
+   * the next one.
+   */
+  async saveCheckpoints(
+    save: (runId: string, checkpoint: RunCheckpoint) => Promise<void>,
+    now = Date.now()
+  ) {
+    for (const [runId, run] of this.active) {
+      const entry = this.deps.journal.get(runId)
+      if (!entry?.worktree || !entry.baseCommit || run.checkpointing) continue
+      if (run.forcedStop || run.cancelRequested) continue
+      const since = run.lastCheckpointAt ?? run.lastProgressAt
+      if (!run.checkpointDue && now - since < CHECKPOINT_EVERY_MS) continue
+      run.checkpointing = true
+      try {
+        const taken = await takeCheckpoint({
+          repoPath: run.repoPath,
+          worktree: entry.worktree,
+          baseCommit: entry.baseCommit,
+          lastTree: run.lastCheckpointTree,
+        })
+        if (taken?.checkpoint) await save(runId, taken.checkpoint)
+        if (taken) run.lastCheckpointTree = taken.tree
+        run.checkpointDue = false
+        run.lastCheckpointAt = now
+      } catch (error) {
+        this.deps.log.warn({ run_id: runId, err: error }, "checkpoint failed")
+      } finally {
+        run.checkpointing = false
+      }
     }
   }
 
@@ -726,6 +792,9 @@ export class RunSupervisor {
     repo: DeviceRepo,
     assignment: RunAssignment
   ): Promise<string> {
+    // Taking over a run from another machine: start where it started.
+    const resume = assignment.resumeFrom?.baseCommit
+    if (resume && (await hasCommit(repo.path, resume))) return resume
     const branch = assignment.pushBranch
     if (!branch || repo.push?.approved !== true) return assignment.baseBranch
     try {
@@ -786,6 +855,7 @@ export class RunSupervisor {
 
   private launch(runId: string, repo: DeviceRepo) {
     const run: ActiveRun = {
+      repoPath: repo.path,
       session: null,
       cancelRequested: false,
       lastProgressAt: Date.now(),
@@ -824,6 +894,14 @@ export class RunSupervisor {
       entry = this.deps.journal.get(runId) as JournalEntry
     }
 
+    // A retry after a lost lease can arrive while the earlier attempt is
+    // still stopping here; let it stop before working on in its worktree.
+    const earlier = assignment.continuesRunId
+      ? this.active.get(assignment.continuesRunId)
+      : undefined
+    if (!entry.worktree && earlier) await earlier.done
+    if (this.stopping) return
+
     // A follow-up run continues the earlier run's worktree (ADR 0023);
     // otherwise one per run, reused when resuming after a restart.
     const continued =
@@ -845,11 +923,30 @@ export class RunSupervisor {
       ))
     if (!entry.worktree) {
       // A continued worktree was bootstrapped by the run that made it.
+      // The commit checkpoints diff against: a continued worktree keeps the
+      // earlier run's, so its checkpoints still carry everything since.
+      const baseCommit =
+        (continued && assignment.continuesRunId
+          ? this.deps.journal.get(assignment.continuesRunId)?.baseCommit
+          : undefined) ?? (await headCommit(repo.path, worktree))
+      // Taking over from a machine that went offline: its saved work goes
+      // on as uncommitted changes, before setup sees the tree.
+      if (!continued && assignment.resumeFrom) {
+        const applied = await applyCheckpoint({
+          repoPath: repo.path,
+          worktree,
+          checkpoint: assignment.resumeFrom,
+        })
+        log.info(
+          { files: assignment.resumeFrom.files, applied },
+          "checkpoint from the earlier attempt"
+        )
+      }
       const setup = continued
         ? "continued"
         : await this.deps.worktrees.bootstrap(worktree, repo.path, repo.setup)
       log.info({ worktree, setup }, "worktree ready")
-      this.deps.journal.update(runId, { worktree })
+      this.deps.journal.update(runId, { worktree, baseCommit })
     }
     if (this.stopping) return
 
@@ -943,6 +1040,11 @@ export class RunSupervisor {
           // Streamed text is not progress; tool calls, steps and files are.
           if (!event.chunk.type.endsWith("-delta"))
             run.lastProgressAt = Date.now()
+          if (
+            event.chunk.type === "tool-output-available" ||
+            event.chunk.type === "tool-output-error"
+          )
+            run.checkpointDue = true
           this.emit(runId, event.chunk)
           continue
         }

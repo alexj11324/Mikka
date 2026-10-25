@@ -637,13 +637,17 @@ export class Daemon {
       const deviceId = this.device.deviceId as string
       // Heartbeat first: lease renewal must not wait on anything else.
       const quotas = this.quota?.snapshot().quotas
-      const { leases } = await link.heartbeat(deviceId, {
+      const { leases, revoked } = await link.heartbeat(deviceId, {
         harnesses: this.harnesses,
         runs: this.supervisor.heartbeatRuns(),
         worktreeDiskBytes: await this.worktrees.diskUsage(),
         ...(quotas ? { quotas } : {}),
       })
       this.supervisor.renewLeases(leases)
+      if (revoked) this.supervisor.revokeLeases(revoked)
+      // Work in progress leaves the machine, so another can take over.
+      const checkpointRun = link.checkpointRun?.bind(link)
+      if (checkpointRun) await this.supervisor.saveCheckpoints(checkpointRun)
       this.saveDevice({ repos: await link.listRepos(deviceId) })
       this.server = "online"
       await this.outbox.flushAll()

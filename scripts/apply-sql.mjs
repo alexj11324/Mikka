@@ -12,8 +12,6 @@ if (!file) {
 }
 const configuredUrl = process.env.MIKKA_DATABASE_URL_UNPOOLED
   ?? process.env.MIKKA_DATABASE_URL
-  ?? process.env.ORVILO_DATABASE_URL_UNPOOLED
-  ?? process.env.ORVILO_DATABASE_URL
 if (!configuredUrl) {
   console.error('MIKKA_DATABASE_URL is not set (pass --env-file=.env.local)')
   process.exit(1)
