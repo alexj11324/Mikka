@@ -4,12 +4,11 @@ import { test } from 'node:test'
 import { settingsItemVisible } from '../lib/settings-sidebar-search.ts'
 
 const zh = JSON.parse(readFileSync(new URL('../messages/zh-CN.json', import.meta.url), 'utf8')).Settings
-const billing = { groupTitle: 'Administration', groupLabel: zh.groups.administration, itemTitle: 'Billing', label: zh.nav.billing, routed: false }
+const workspaceItem = { groupTitle: 'Administration', groupLabel: zh.groups.administration, itemTitle: 'Workspace', label: zh.sections.workspace.title, section: 'workspace', routed: false }
 
-test('zh-CN 下「账单」与「Billing」都能搜到账单', () => {
-  assert.equal(zh.nav.billing, '账单')
-  for (const query of ['账单', 'Billing', 'billing', '  BILL ', '管理']) assert.equal(settingsItemVisible({ ...billing, query }), true, query)
-  assert.equal(settingsItemVisible({ ...billing, query: '团队' }), false)
+test('zh-CN 下中文标题与英文名都能搜到工作区', () => {
+  for (const query of [zh.sections.workspace.title, 'Workspace', 'workspace', '  WORK ', zh.groups.administration]) assert.equal(settingsItemVisible({ ...workspaceItem, query }), true, query)
+  assert.equal(settingsItemVisible({ ...workspaceItem, query: 'zzz-no-match' }), false)
 })
 
 test('团队、成员仅在路由设置页显示，搜索不改变该规则', () => {

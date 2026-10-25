@@ -7,7 +7,8 @@ import { db } from '@/lib/db'
 import { agents, issues, issueMembers, issueVersions, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { listProjects } from '@/app/actions/projects'
-import { assigneeSchema, issueWithMetadata, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { issueView } from '@/lib/task-identifier-server'
+import { assigneeSchema, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 
 const patchSchema = z.object({
@@ -83,7 +84,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, next), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId), eq(issues.revision, latest.revision))).returning()
         if (!saved) return { error: 'issueOutdated' }
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority })
-        return { issue: issueWithMetadata(saved) }
+        return { issue: await issueView(saved, tx) }
       })
       if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
       return result

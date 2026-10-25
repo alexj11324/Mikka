@@ -33,7 +33,6 @@ export const ENV_DENY_PATTERNS: readonly RegExp[] = [
   /^GH_TOKEN$/,
   /^NPM_TOKEN$/,
   /^MIKKA_/,
-  /^ORVILO_/, // pre-rename name of the same variables
   /^ELECTRON_/,
   /^NODE_OPTIONS$/,
   /SECRET/,

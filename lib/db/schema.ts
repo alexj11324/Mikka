@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, varchar, jsonb, integer, timestamp, primaryKey, index, unique, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -20,8 +20,19 @@ export const issues = pgTable('issues', {
   title: varchar('title', { length: 200 }).notNull(),
   content: jsonb('content').$type<JSONContent>().notNull(),
   status: text('status').notNull(), priority: text('priority').notNull(),
+  // Workspace issues sync with Linear; personal ones never leave Mikka (MIK-46).
+  scope: text('scope').$type<'workspace' | 'personal'>().notNull().default('personal'),
+  // The agent judges scope at creation; a person's change wins and teaches the next judgment (MIK-47).
+  scopeSetBy: text('scopeSetBy').$type<'agent' | 'user'>().notNull().default('agent'),
+  scopeConfidence: real('scopeConfidence'),
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+// The personal issue prefix someone chose; without a row it comes from their email (MIK-46).
+export const issuePrefixes = pgTable('issue_prefixes', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  prefix: varchar('prefix', { length: 4 }).notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 export const agentSessions = pgTable('agent_sessions', {
@@ -167,6 +178,10 @@ export const agentRuns = pgTable('agent_runs', {
   stopReason: text('stopReason'), error: text('error'),
   report: jsonb('report').$type<Record<string, unknown> | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
+  /** 1 for the first run; a retry after the device went offline counts up (lib/run-retry.ts). */
+  attempt: integer('attempt').notNull().default(1),
+  /** The run this one retries, when its device went offline. */
+  retryOf: uuid('retryOf').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
   stopRequestedAt: timestamp('stopRequestedAt', { withTimezone: true }),
   startedAt: timestamp('startedAt', { withTimezone: true }),
   finishedAt: timestamp('finishedAt', { withTimezone: true }),
@@ -180,6 +195,21 @@ export const runChunks = pgTable('run_chunks', {
   seq: integer('seq').notNull(), chunk: jsonb('chunk').$type<Record<string, unknown>>().notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('run_chunks_run_seq_key').on(table.runId, table.seq)])
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' })
+
+/**
+ * The latest work in progress of a run, saved by the daemon so another
+ * machine can take the run over (lib/run-leases.ts). `patch` is a gzipped
+ * `git diff --binary` against `baseCommit`.
+ */
+export const runCheckpoints = pgTable('run_checkpoints', {
+  runId: uuid('runId').primaryKey().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(), baseCommit: text('baseCommit').notNull(),
+  patch: bytea('patch').notNull(), files: integer('files').notNull(),
+  takenAt: timestamp('takenAt', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
 
 /**
  * A token the agent inside one run uses for the worker tools of the MCP
@@ -201,10 +231,11 @@ export const runTokens = pgTable('run_tokens', {
  * `dedupeKey` keeps a repeated write to one row.
  */
 /**
+ * `action_decided` follows the person approving or declining a pending action.
  * `run_report`, `run_question` and `run_blocked` come from the agent inside a
  * run, through the worker tools of the MCP server (lib/mcp/worker.ts).
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth
@@ -244,6 +275,59 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   lastError: text('lastError'),
   lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// --- Suggestions (MIK-41) ---------------------------------------------------
+//
+// External notifications from connected apps, judged by fixed rules or the
+// decision model (lib/suggestions). Only `shown` rows reach the person; hidden
+// rows stay so a repeat delivery is not judged again. The Coordinator never
+// writes here.
+
+/** The connected apps a suggestion can come from. */
+export const SUGGESTION_SOURCES = ['gmail', 'slack', 'notion', 'github', 'linear'] as const
+export type SuggestionSource = (typeof SUGGESTION_SOURCES)[number]
+/** What the person would do with it: answer, review a PR, take on an assigned issue, or read. */
+export const SUGGESTION_ACTIONS = ['reply', 'review', 'handle', 'read'] as const
+export type SuggestionAction = (typeof SUGGESTION_ACTIONS)[number]
+/** Who decided: a fixed rule, the decision model, or the fallback when the model did not answer. */
+export type SuggestionDecider = 'rule' | 'model' | 'fallback'
+
+export const suggestions = pgTable('suggestions', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  source: text('source').$type<SuggestionSource>().notNull(),
+  externalId: text('externalId').notNull(),
+  action: text('action').$type<SuggestionAction>().notNull(),
+  /** The source's own text: the email subject, the Slack message, the PR title. */
+  title: text('title').notNull(), url: text('url'), actor: text('actor'),
+  shown: boolean('shown').notNull(),
+  decidedBy: text('decidedBy').$type<SuggestionDecider>().notNull(),
+  probability: real('probability'),
+  /** Assigned to the person or their review is requested. */
+  required: boolean('required').notNull().default(false),
+  occurredAt: timestamp('occurredAt', { withTimezone: true }).notNull(),
+  dismissedAt: timestamp('dismissedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('suggestions_external_key').on(table.userId, table.source, table.externalId), index('suggestions_user_shown_idx').on(table.userId, table.shown, table.createdAt)])
+
+/**
+ * The "早上好" briefing, one per person per local day. `first` is written
+ * right after the person connects an app; `daily` the first time the list is
+ * read on a new day. `highlights` are suggestion ids the briefing names.
+ */
+export const briefings = pgTable('briefings', {
+  userId: text('userId').notNull(), localDate: text('localDate').notNull(),
+  kind: text('kind').$type<'first' | 'daily'>().notNull(), timeZone: text('timeZone').notNull(),
+  highlights: jsonb('highlights').$type<string[]>().notNull(),
+  counts: jsonb('counts').$type<Partial<Record<SuggestionSource, number>>>().notNull(),
+  total: integer('total').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.localDate] })])
+
+/** When the person's Composio trigger subscriptions were last checked (lib/suggestions/sources.ts). */
+export const suggestionTriggerChecks = pgTable('suggestion_trigger_checks', {
+  userId: text('userId').primaryKey(),
+  checkedAt: timestamp('checkedAt', { withTimezone: true }).notNull(),
 })
 
 /** The Coordinator's conversation, one AI SDK model message per row, in `position` order. */
@@ -295,3 +379,54 @@ export const telegramConversations = pgTable('telegram_conversations', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('telegram_conversations_user_idx').on(table.userId)])
+
+/** Group history retains former memberships; agent DMs are exposed only through links. */
+export const conversations = pgTable('conversations', {
+  id: uuid('id').primaryKey(), workspaceId: uuid('workspaceId').notNull(),
+  kind: text('kind').$type<'group' | 'agent_dm'>().notNull(), title: text('title').notNull(),
+  createdBy: text('createdBy').notNull(), lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull().default(sql`0`),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
+export const conversationMembers = pgTable('conversation_members', {
+  conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  memberType: text('memberType').$type<'user' | 'agent'>().notNull(), memberId: text('memberId').notNull(),
+  role: text('role').$type<'owner' | 'member'>().notNull(),
+  joinedAt: timestamp('joinedAt', { withTimezone: true }).notNull().defaultNow(), leftAt: timestamp('leftAt', { withTimezone: true }),
+}, t => [primaryKey({ columns: [t.conversationId, t.memberType, t.memberId] }), index('conversation_members_identity_idx').on(t.memberType, t.memberId)])
+export const conversationMessages = pgTable('conversation_messages', {
+  id: uuid('id').primaryKey(), conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  position: bigint('position', { mode: 'bigint' }).notNull(), authorType: text('authorType').$type<'user' | 'agent'>().notNull(),
+  authorId: text('authorId').notNull(), body: text('body').notNull(), mentions: jsonb('mentions').notNull().default([]),
+  replyToId: uuid('replyToId'), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [unique('conversation_messages_position_key').on(t.conversationId, t.position), index('conversation_messages_timeline_idx').on(t.conversationId, t.position.desc())])
+// Same names/types as unmerged MIK-8 (#69); deliberately no FK: 'coordinator' is also a valid id.
+export const conversationReads = pgTable('conversation_reads', {
+  userId: text('userId').notNull(), conversationId: text('conversationId').notNull(),
+  lastReadPosition: integer('lastReadPosition').notNull().default(0), lastReadMessageId: text('lastReadMessageId'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.conversationId] })])
+export const conversationLinks = pgTable('conversation_links', {
+  id: uuid('id').primaryKey(), sourceConversationId: uuid('sourceConversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  linkedConversationId: uuid('linkedConversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  anchorPosition: bigint('anchorPosition', { mode: 'bigint' }).notNull(), firstPosition: bigint('firstPosition', { mode: 'bigint' }).notNull(),
+  lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull(), messageCount: bigint('messageCount', { mode: 'bigint' }).notNull(),
+}, t => [index('conversation_links_source_idx').on(t.sourceConversationId, t.anchorPosition)])
+
+/**
+ * Something an agent wants to do in the person's own accounts (send an email,
+ * create or change a calendar event). It stays `pending` until the person
+ * approves or declines it; approving runs exactly `input` (lib/pending-actions.ts).
+ * `context` is what the card shows besides the input, such as the event being changed.
+ */
+export const PENDING_ACTION_STATUSES = ['pending', 'running', 'done', 'failed', 'declined'] as const
+export type PendingActionStatus = (typeof PENDING_ACTION_STATUSES)[number]
+export const pendingActions = pgTable('pending_actions', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  action: text('action').notNull(),
+  input: jsonb('input').$type<Record<string, unknown>>().notNull(),
+  context: jsonb('context').$type<Record<string, unknown> | null>(),
+  status: text('status').$type<PendingActionStatus>().notNull().default('pending'),
+  result: jsonb('result').$type<Record<string, unknown> | null>(), error: text('error'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  decidedAt: timestamp('decidedAt', { withTimezone: true }),
+}, table => [index('pending_actions_user_status_idx').on(table.userId, table.status, table.createdAt)])

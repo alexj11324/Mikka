@@ -1,60 +1,253 @@
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/brand/mikka-icon-dark.svg">
+  <img src="public/brand/mikka-icon-light.svg" alt="Mikka" width="112">
+</picture>
+
 # Mikka
 
-> **Your AI lead built for ambitious work — every agent, from laptop to cloud, working as one team.**
->
-> 为大事而生的 AI lead：从本地到云端，所有 Agent 协作如一。
+### The AI lead for ambitious work.
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+Every agent, from laptop to cloud, working as one team.
 
-## Built with v0
+[![CI](https://github.com/alexj11324/Mikka/actions/workflows/ui-policy.yml/badge.svg?branch=main)](https://github.com/alexj11324/Mikka/actions/workflows/ui-policy.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![LINUX DO](https://img.shields.io/badge/LINUX%20DO-Community-FFB003)](https://linux.do)
 
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
+[Open Mikka](https://app.aspectlylabs.com/mikka) · [Docs](https://aspectlylabs.com/mikka/docs) · [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart)
 
-[Continue working on v0 →](https://v0.app/chat/projects/prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH)
+**English** · [简体中文](README.zh-CN.md)
 
-## Cloud Preview development
+</div>
 
-Develop and test on cloud Preview deployments. Vercel previews, v0 previews and Cloudflare-hosted previews use their own HTTPS origin and an isolated Preview database. Set `BETTER_AUTH_URL` to the current origin without `/mikka`; if omitted, Vercel Preview prefers its deployment URL, and v0/Cloudflare Pages use their supplied preview URL. Vercel Preview uses the Neon integration's branch-specific `DATABASE_URL` ahead of global `MIKKA_DATABASE_URL` or `ORVILO_DATABASE_URL` overrides. Other environments retain their existing database selection.
+Mikka coordinates the coding agents you already use as a single team. Describe
+what you need to a bot in natural language. The bot breaks the request into
+tasks and assigns each one to Claude Code, Codex or Cursor. Tasks run on your
+own machines today; cloud computers are coming soon.
 
-### Google and GitHub login
+You can follow each task in real time, step in when a decision is needed, and
+review the results.
 
-Use Better Auth's built-in OAuth proxy so changing Preview URLs do not require changing provider registrations. Set `BETTER_AUTH_OAUTH_PROXY_URL` to the stable callback hub origin on both the hub and participating previews. Set the same dedicated `BETTER_AUTH_OAUTH_PROXY_SECRET` on those deployments, alongside matching Google/GitHub client credentials. Keep `BETTER_AUTH_SECRET` separate for each environment. The proxy exchanges the provider code on the hub and completes login against the originating Preview database; it does not create the Preview user or session in the hub database.
+## How Mikka works
 
-Register these exact provider callbacks when the hub is `https://app.aspectlylabs.com`:
+- **Bots coordinate. Threads execute.**
+  - A bot chats with you, plans the work and hands it out. It does not do the
+    work directly.
+  - Each piece of work runs in a **thread**: one agent run with its own name,
+    usually tied to a task. One bot can run many threads at once.
+  - The full definitions are in the [glossary](docs/design/glossary.md).
 
-```text
-https://app.aspectlylabs.com/mikka/api/auth/callback/google
-https://app.aspectlylabs.com/mikka/api/auth/callback/github
+- **One coordinator for many agents.**
+  - The Coordinator is a long-running bot. It wakes when a run ends, a task
+    changes state, or a worker asks a question, decides the next step, and
+    notifies you only when your input is required.
+  - You can create dedicated bots for different kinds of work, or add several
+    bots to a group chat to divide the work among them.
+
+- **Asks before it guesses.**
+  - When a request is unclear, the Coordinator asks you for the missing details
+    in chat before it dispatches a run.
+  - While a run works, its agent can ask a question or report that it is
+    blocked. The Coordinator puts the question to you with its options, never
+    answers for you, and sends your answer back to the run.
+
+- **Runs on your own machines.**
+  - The Mikka daemon connects your Mac, Linux machine or server.
+  - It runs agents through the CLIs you have already installed and signed in
+    to, so your existing plans and settings apply.
+
+- **Recovers from failures.**
+  - Each run holds a lease. If a machine goes offline mid-run, Mikka retries
+    the run in the same worktree and session instead of starting over.
+
+- **Fits into your existing tools.**
+  - Tasks sync both ways with Linear, other agents can operate Mikka through
+    MCP, and a Telegram message can create a task.
+
+### How a task moves
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/task-flow-dark.svg">
+  <img src="docs/assets/task-flow-light.svg" alt="How a task moves through Mikka: a request is triaged, clarified with you in chat when unclear, and dispatched; the agent can ask you questions while it works; planned Factory stages add review, verification, release approval and monitoring.">
+</picture>
+
+The solid path ships today. A finished run reports its result in chat. The
+dashed loop is the planned Factory process: independent review and verification
+([#193](https://github.com/alexj11324/Mikka/issues/193)), a fix run when a check fails, release approval by a person
+([#194](https://github.com/alexj11324/Mikka/issues/194)), and monitoring that turns incidents into issues
+([#195](https://github.com/alexj11324/Mikka/issues/195)). Systematic routing of ambiguous requests is tracked in
+[#192](https://github.com/alexj11324/Mikka/issues/192).
+
+## What Mikka does today
+
+- **Turns requests into tasks.** The Coordinator breaks a request into tasks,
+  dispatches runs, and decides whether each task belongs to the workspace or to
+  you. You can change the assignment in one click.
+- **Makes progress visible.** Every thread shows what its agent
+  is doing. Workers report progress, ask questions and flag blocks through
+  Mikka's MCP tools, and the Coordinator triages each one.
+- **Cites its sources.** Replies show the tasks, runs and web pages they draw
+  on as chips you can open.
+- **Keeps tasks in one place.** Tasks show on a board and a list, with
+  relations, activity history and per-person task numbers. They sync both ways
+  with Linear.
+- **Filters notifications.** Mikka collects notifications from GitHub, Linear,
+  Notion, Slack and Gmail, surfaces only those that need your attention, and
+  writes a daily briefing.
+- **Works from other tools.** Operate Mikka from Claude Code or Codex through its
+  [MCP server](https://aspectlylabs.com/mikka/docs/mcp), or create tasks from
+  Telegram.
+- **Supports teams.** Workspaces, members, invitations and teams, with Google
+  and GitHub sign-in.
+- **Bilingual interface.** The app is available in English and Simplified Chinese.
+
+## What we're building
+
+Work in progress is tracked in
+[GitHub issues](https://github.com/alexj11324/Mikka/issues), mirrored from
+Linear (`MIK-xx`).
+
+| Area | Planned | Tracking |
+| --- | --- | --- |
+| **Cloud computer** | Each bot gets its own desktop, which you can watch live, take control of, and hand back. It sleeps when idle and keeps its disk. Your own machines can also be connected. | [#172](https://github.com/alexj11324/Mikka/issues/172), [#147](https://github.com/alexj11324/Mikka/issues/147) |
+| **Approvals in chat** | When an agent needs authorization, you respond in the chat: allow once, deny, or allow for the rest of the task. | [#147](https://github.com/alexj11324/Mikka/issues/147), [#177](https://github.com/alexj11324/Mikka/issues/177) |
+| **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
+| **Factory** | An end-to-end delivery process: one run per task at a time, durable stage state, independent review and verification threads, and human release approval based on recorded evidence. | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
+| **Cross-machine handoff** | Save work in progress and resume interrupted runs on another machine. | [PR #201](https://github.com/alexj11324/Mikka/pull/201) |
+| **Scheduled tasks** | Bots run tasks at a set time or on a recurring schedule and report the results in chat. | [#179](https://github.com/alexj11324/Mikka/issues/179) |
+| **Connected apps** | Workflows for mail, calendar, documents and Slack that can take actions, not only read, subject to your approval. | [#177](https://github.com/alexj11324/Mikka/issues/177) |
+| **Secure credentials** | Agents request credentials through a secure form. A vault holds them, and a controlled browser uses them only for approved actions. | [#180](https://github.com/alexj11324/Mikka/issues/180) |
+| **Usability** | Onboarding, ⌘K search, a knowledge base, web search for agents, and team visibility settings. | [#129](https://github.com/alexj11324/Mikka/issues/129), [#131](https://github.com/alexj11324/Mikka/issues/131), [#134](https://github.com/alexj11324/Mikka/issues/134), [#100](https://github.com/alexj11324/Mikka/issues/100), [#127](https://github.com/alexj11324/Mikka/issues/127) |
+
+## Connect your agents
+
+### Operate Mikka through MCP
+
+Mikka is an MCP server (Streamable HTTP, OAuth 2.1). Add it to Claude Code:
+
+```sh
+claude mcp add --transport http mikka https://app.aspectlylabs.com/mikka/api/mcp
 ```
 
-Use the corresponding exact callback paths if the hub changes. The proxy URL is an origin, without `/mikka` or `/api/auth`. Install the same application configuration on the hub and previews; setting both proxy variables enables the plugin. A missing proxy variable leaves direct provider callbacks enabled. Provider credentials and secrets belong in Infisical and the hosting environments, never in committed files or `.env.local`.
+Claude Code completes sign-in in your browser. Agents can then read and modify
+tasks, dispatch runs and update the Coordinator's memory. Other clients and the
+full tool list are in the [MCP docs](https://aspectlylabs.com/mikka/docs/mcp).
 
-Actual `VERCEL_URL`, `VERCEL_BRANCH_URL`, `VERCEL_PROJECT_PRODUCTION_URL`, `V0_RUNTIME_URL`, `V0_DEV_APP_URL`, `V0_BUILD_URL`, `V0_SANDBOX_URL` and `CF_PAGES_URL` origins are trusted in every runtime mode. A changing v0 origin such as `https://ios-kn1ogl39.v0.build` therefore trusts only its configured exact origin automatically. No central preview registry, provider callback update or `*.v0.build` wildcard is needed: the installed OAuth proxy authenticates the encrypted authorization-state package using the dedicated shared proxy secret, then returns the encrypted provider profile to the issuing Preview's origin-bound completion URL. The Preview restores its own OAuth state and creates its own session. The hub can trust only itself; it does not need every changing Preview origin in its allowlist. Deployments receiving the shared proxy secret are trusted participants.
+### Run agents on your own machine
 
-Use `AUTH_TRUSTED_ORIGINS` only for additional project-controlled HTTPS origins or project-scoped hostname patterns needed by direct auth requests. Never trust shared hosting domains such as `*.vercel.app`, `*.v0.build`, `*.pages.dev` or `*.workers.dev`. Workers deployments without `CF_PAGES_URL` must set their exact `BETTER_AUTH_URL` and any additional controlled origins. Invalid non-HTTPS origins, credentials or URL paths fail configuration validation.
+The daemon in [`packages/daemon`](packages/daemon) detects the agent CLIs on
+the machine and runs threads through them:
 
-For optional localhost debugging, set `BETTER_AUTH_URL=http://localhost:3000` and use development mode (`pnpm dev`). HTTP loopback origins are allowed only in development and CI; other origins and the OAuth proxy hub still require HTTPS. Inject the matching provider credentials and both proxy variables to return through the same fixed hub, without adding localhost callbacks in Google Console. Without the proxy variables, use a separate development OAuth client with `http://localhost:3000/mikka/api/auth/callback/google` registered. Local HTTP uses Better Auth's default cookies; HTTPS development previews retain partitioned cookies. Keep real credentials out of local files. This does not replace deployed runtime acceptance.
+| Agent | CLI it looks for |
+| --- | --- |
+| Claude Code | `claude` |
+| Codex | `codex` |
+| Cursor | `cursor-agent` or `agent` |
 
-Validate login from each deployed Preview: the provider authorization URL must name the stable hub callback, then return to the originating Preview and create its own session. Confirm a foreign origin cannot initiate a trusted callback. Unit tests validate configuration and real Better Auth request handling without starting a local server; provider login and cloud database acceptance still require deployed testing.
+Each run uses its own git worktree, so parallel threads stay isolated.
 
-Runtime acceptance follows [docs/acceptance.md](docs/acceptance.md): use direct Google/GitHub OAuth, reuse authorized sessions, and do not repeatedly ask the user for a Mikka password.
+## Architecture
 
-Google login requests only `openid`, `email`, and `profile`. Google branding verification requires a public Mikka homepage with a service description and links to privacy and terms pages on a verified domain; those pages are not in this repository yet. Existing email/password users can sign in with their password and link Google under Settings → Integrations; Mikka keeps Better Auth's verified-email account-linking check enabled.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
+  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: clients reach the Next.js app on Vercel, the Coordinator dispatches runs to the daemon on your machine, agents report back through MCP, and state lives in Postgres and syncs with Linear.">
+</picture>
 
-### Composio
+The web app, Telegram and MCP clients all reach the same Next.js application on
+Vercel. Events such as a finished run or a worker question go to the
+Coordinator, a durable workflow that triages each event and decides the next
+step.
 
-Notion and Slack connections use Composio-managed OAuth and the signed-in Mikka user ID. Set `COMPOSIO_API_KEY` on the server. Configure Composio's callback verifier for the intended cloud deployment's `/mikka/api/integrations/composio/callback`, and set that exact URL in `COMPOSIO_CALLBACK_VERIFIER_URL`. Mikka only starts connection flows when those values match, and Composio keeps the connection pending until the signed-in Mikka user completes it. The social-login proxy does not relay Composio or Linear OAuth callbacks.
+Runs execute on your machines. The daemon registers the device, claims runs
+through the device API, and starts the agent CLI in a dedicated git worktree.
+The agent reports progress, questions and blocks through Mikka's MCP worker
+tools.
 
-Composio outbound event delivery uses a webhook subscription. Configure its URL as the intended cloud deployment's `/mikka/api/webhooks/composio`, select event types, and save the signing secret as `COMPOSIO_WEBHOOK_SECRET`. The receiver verifies and acknowledges events; app-specific event actions still need to be selected.
+Linear sync runs in a Cloudflare Worker that exchanges changes with Postgres
+through a durable inbox and outbox.
 
-## Learn More
+Dashed boxes and lines are on the roadmap: the Scheduler
+([#179](https://github.com/alexj11324/Mikka/issues/179)), Factory stages ([#191](https://github.com/alexj11324/Mikka/issues/191)–[#194](https://github.com/alexj11324/Mikka/issues/194)), Monitoring
+([#195](https://github.com/alexj11324/Mikka/issues/195)), the cloud computer ([#172](https://github.com/alexj11324/Mikka/issues/172)), handoff between machines
+([PR #201](https://github.com/alexj11324/Mikka/pull/201)), local computer use ([#147](https://github.com/alexj11324/Mikka/issues/147)), connected-app actions
+([#177](https://github.com/alexj11324/Mikka/issues/177)) and the credential vault ([#180](https://github.com/alexj11324/Mikka/issues/180)).
 
-To learn more, take a look at the following resources:
+## Built with
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
+| Layer | Stack |
+| --- | --- |
+| App | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, ReUI |
+| Bots | Vercel AI SDK; the Coordinator is a durable loop on [Vercel Workflow](workflows/coordinator) |
+| Triage | Rules first, then a model call through Vercel AI Gateway with a monthly cost cap |
+| Data | Postgres on Neon, Drizzle migrations in [`drizzle/`](drizzle) |
+| Auth | Better Auth, with Google and GitHub sign-in and an OAuth 2.1 server for MCP |
+| Integrations | GitHub and Linear webhooks; Composio for Gmail, Google Calendar, Notion and Slack; a Cloudflare Worker for Linear sync; Vercel Chat SDK for Telegram |
+| Agents | The Mikka daemon, with adapters for Claude Code, Codex and Cursor |
 
-## Telegram
+## Repository layout
 
-See [docs/telegram.md](docs/telegram.md) for production configuration and bot commands.
+```text
+app/                 # Next.js routes, server actions and API (MCP, webhooks, daemon /v1)
+components/          # React UI
+lib/                 # Domain logic: coordinator, issues, Linear sync, MCP, auth
+workflows/           # Durable workflows (the Coordinator)
+packages/daemon/     # Local daemon that runs agents through your own CLIs
+packages/protocol/   # Types shared by the server and the daemon
+packages/config/     # Shared configuration
+cloudflare/          # Cloudflare Worker for Linear sync
+drizzle/             # Database migrations
+messages/, i18n/     # English and Simplified Chinese strings
+tests/               # Unit, acceptance and Playwright tests
+docs/                # Engineering and design docs
+```
+
+## Development
+
+Mikka is developed against cloud Preview deployments, not a local server.
+Builds, type checks and end-to-end tests run in CI, and each pull request gets
+its own Preview URL. Credentials live in Infisical Cloud; never commit them or
+store them in a local `.env` file.
+
+Install dependencies and run the checks that do not require a server:
+
+```sh
+pnpm install
+pnpm check
+```
+
+`pnpm check:ci` is the full CI gate: `check`, plus the production build,
+performance tests and Playwright tests.
+
+Start with these documents:
+
+- [`AGENTS.md`](AGENTS.md): the rules every contributor and coding agent follows.
+- [`docs/design/README.md`](docs/design/README.md): read before any design,
+  spec or UI work.
+- [`docs/design/glossary.md`](docs/design/glossary.md): what bot, thread and
+  chat mean.
+- [`docs/acceptance.md`](docs/acceptance.md): how a change is accepted on a
+  Preview.
+- [`docs/review-checklist.md`](docs/review-checklist.md): complete before
+  presenting UI to others.
+
+## Get access
+
+Mikka is in early access. Email
+[mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com) for an invite, then
+follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart).
+
+## License
+
+Mikka is licensed under [AGPL-3.0-only](LICENSE). Third-party components keep
+their own licenses; see
+[`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md).
+
+If you run a modified version of Mikka as a network service, the AGPL requires
+you to offer its users the source code of your version.
+
+## Contributing
+
+Contributions are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first.
+Contributions are made under the project's [AGPL-3.0-only](LICENSE) license;
+no separate contributor agreement is required.

@@ -8,6 +8,7 @@ const run = (payload: Record<string, unknown>) => ({ kind: 'run_finished' as con
 test('clear cases follow the rules', () => {
   assert.equal(ruleTier({ kind: 'user_message', payload: { text: 'hi' } }), 'attention')
   assert.equal(ruleTier({ kind: 'issue_done', payload: { title: 'x' } }), 'background')
+  assert.equal(ruleTier({ kind: 'run_retried', payload: { retryRunId: 'r2', attempt: 2, maxAttempts: 3 } }), 'background')
   assert.equal(ruleTier(run({ status: 'failed' })), 'attention')
   assert.equal(ruleTier(run({ status: 'cancelled' })), 'background')
   assert.equal(ruleTier(run({ status: 'stopped' })), 'background')
@@ -51,7 +52,8 @@ test('worker events: questions and blocks need the person, reports go to the mod
   const report = { kind: 'run_report' as const, payload: { text: 'Migrated the users table' } }
   assert.equal(ruleTier(report), null)
   assert.deepEqual(triageState(report), { agentProgressNote: 'Migrated the users table' })
-  assert.match(triageQuestions(report).needsPerson.instructions, /progress note/)
+  assert.match(triageQuestions(report)[0].instructions, /progress note/)
+  assert.equal(triageQuestions(report)[0].type, 'predicate')
   assert.equal(tierFromDecision(0.9, 'run_report'), 'attention')
   assert.equal(tierFromDecision(0.1, 'run_report'), 'background')
 })

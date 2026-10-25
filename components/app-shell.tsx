@@ -1,16 +1,64 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
-import { TooltipProvider } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Button } from '@/components/ui/button'
+import { ArrowLeft, ArrowRight, PanelLeft } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
-export function AppShell({ children, variant = 'workspace', fixed = false }: { children: ReactNode; variant?: 'workspace' | 'settings'; fixed?: boolean }) {
-  return <TooltipProvider><SidebarProvider className={cn(fixed && 'h-svh overflow-hidden', variant === 'settings' && 'h-svh overflow-hidden bg-sidebar [--background:var(--settings-background)] [--foreground:var(--settings-foreground)] [--card:var(--settings-card)] [--card-foreground:var(--settings-foreground)] [--sidebar:var(--settings-sidebar)] [--sidebar-foreground:var(--settings-sidebar-foreground)] [--sidebar-accent:var(--settings-sidebar-accent)] [--sidebar-accent-foreground:var(--settings-foreground)] [--sidebar-border:var(--settings-border)] [--border:var(--settings-border)] [--input:var(--settings-input)] [--muted-foreground:var(--settings-muted-foreground)]')}>{children}</SidebarProvider></TooltipProvider>
+export function AppShell({ children, variant = 'workspace', fixed = false, topBar = false }: { children: ReactNode; variant?: 'workspace' | 'settings'; fixed?: boolean; topBar?: boolean }) {
+  return <TooltipProvider><SidebarProvider className={cn(fixed && 'h-svh overflow-hidden', topBar && 'md:pt-10', variant === 'settings' && 'h-svh overflow-hidden bg-sidebar [--background:var(--settings-background)] [--foreground:var(--settings-foreground)] [--card:var(--settings-card)] [--card-foreground:var(--settings-foreground)] [--sidebar:var(--settings-sidebar)] [--sidebar-foreground:var(--settings-sidebar-foreground)] [--sidebar-accent:var(--settings-sidebar-accent)] [--sidebar-accent-foreground:var(--settings-foreground)] [--sidebar-border:var(--settings-border)] [--border:var(--settings-border)] [--input:var(--settings-input)] [--muted-foreground:var(--settings-muted-foreground)]')}>{children}</SidebarProvider></TooltipProvider>
+}
+
+/**
+ * The app window, built like Comma's shell: one gray frame that never scrolls,
+ * the window bar across the top, the rail on the left, and every page inside a
+ * single rounded card. Columns inside the card scroll on their own.
+ */
+export function AppFrame({ bar, rail, children }: { bar: ReactNode; rail: ReactNode; children: ReactNode }) {
+  const t = useTranslations('Shell')
+  return <TooltipProvider><SidebarProvider className="h-svh min-h-0 flex-col overflow-hidden bg-shell-chrome">
+    {bar}
+    <div className="flex min-h-0 flex-1 md:pr-2 md:pb-2">
+      {rail}
+      <section data-slot="app-frame-content" aria-label={t('window')} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background md:rounded-xl md:shadow-xs md:ring-1 md:ring-border">{children}</section>
+    </div>
+  </SidebarProvider></TooltipProvider>
+}
+
+type NavigationHistory = EventTarget & { canGoBack: boolean; canGoForward: boolean }
+
+/** Back and forward follow the browser's own history; where the Navigation API is missing both stay enabled. */
+function useHistoryButtons() {
+  const [state, setState] = useState({ back: true, forward: true })
+  useEffect(() => {
+    const navigation = (window as Window & { navigation?: NavigationHistory }).navigation
+    if (!navigation) return
+    const update = () => setState({ back: navigation.canGoBack, forward: navigation.canGoForward })
+    update()
+    navigation.addEventListener('currententrychange', update)
+    return () => navigation.removeEventListener('currententrychange', update)
+  }, [])
+  return state
+}
+
+/** The strip above the card: history on the left, search centered, page actions on the right. */
+export function WindowBar({ center, trailing }: { center: ReactNode; trailing?: ReactNode }) {
+  const t = useTranslations('Shell')
+  const history = useHistoryButtons()
+  return <div data-slot="window-bar" className="hidden h-11 shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center gap-3 pr-2 pl-3 md:grid">
+    <div className="flex items-center gap-0.5">
+      <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t('back')} disabled={!history.back} onClick={() => window.history.back()} />}><ArrowLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('back')}</TooltipContent></Tooltip>
+      <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t('forward')} disabled={!history.forward} onClick={() => window.history.forward()} />}><ArrowRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('forward')}</TooltipContent></Tooltip>
+    </div>
+    <div className="flex min-w-0 justify-center">{center}</div>
+    <div className="flex items-center justify-end gap-0.5">{trailing}</div>
+  </div>
 }
 
 export function SignOutBoundary({ pending, children }: { pending: boolean; children: ReactNode }) {
@@ -31,11 +79,12 @@ export function SignOutBoundary({ pending, children }: { pending: boolean; child
   </>
 }
 
-export function AppShellContent({ parent, title, actions, children, variant = 'workspace', hideHeader = false }: { parent: string; title: string; actions?: ReactNode; children: ReactNode; variant?: 'workspace' | 'settings'; hideHeader?: boolean }) {
+export function AppShellContent({ parent, title, actions, children, variant = 'workspace', hideHeader = false, listToggle = true }: { parent: string; title: string; actions?: ReactNode; children: ReactNode; variant?: 'workspace' | 'settings'; hideHeader?: boolean; listToggle?: boolean }) {
   const i18nText = useTranslations();
-  const { isMobile, openMobile, open } = useSidebar()
-  return <SidebarInset className={cn('min-h-0 min-w-0', variant === 'settings' && 'overflow-y-auto overscroll-contain md:my-2 md:mr-2 md:rounded-xl md:border md:shadow-sm')}>
-    {!hideHeader && <header className={cn('flex h-12 shrink-0 items-center justify-between gap-3 px-4', variant === 'settings' && 'md:hidden')}>
+  const { isMobile, openMobile, open, toggleSidebar } = useSidebar()
+  return <SidebarInset className={cn('min-h-0 min-w-0', variant === 'workspace' && 'overflow-y-auto overscroll-contain', variant === 'settings' && 'overflow-y-auto overscroll-contain md:my-2 md:mr-2 md:rounded-xl md:border md:shadow-sm')}>
+    {/* Desktop has no title bar (MIK-40): the top bar searches and the pill names the conversation. Phones keep it, having no rail. */}
+    {!hideHeader && <header className={cn('flex h-12 shrink-0 items-center justify-between gap-3 px-4 md:hidden')}>
       <div className="flex min-w-0 items-center gap-2">
         <SidebarTrigger className="-ml-1" aria-label={i18nText("Workspace.toggleSidebar")} aria-expanded={isMobile ? openMobile : open} />
         <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
@@ -43,6 +92,8 @@ export function AppShellContent({ parent, title, actions, children, variant = 'w
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </header>}
+    {/* With the list collapsed, its panel button waits at the top left (Figma 60:299). */}
+    {variant === 'workspace' && listToggle && !open && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="absolute top-3 left-3 z-20 hidden md:inline-flex" aria-label={i18nText('Shell.openList')} aria-expanded={false} onClick={toggleSidebar} />}><PanelLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="right">{i18nText('Shell.openList')}</TooltipContent></Tooltip>}
     {children}
   </SidebarInset>
 }

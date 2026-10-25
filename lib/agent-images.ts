@@ -63,7 +63,7 @@ export async function findAgentImage(query: string, signal?: AbortSignal) {
     iiextmetadatafilter: 'Artist|LicenseShortName', iiurlwidth: '500',
   }).toString()
   const response = await fetch(url, {
-    headers: { 'User-Agent': 'Orvilo-UI-Agent/1.0 (Wikimedia Commons image lookup)' },
+    headers: { 'User-Agent': 'Mikka-UI-Agent/1.0 (Wikimedia Commons image lookup)' },
     next: { revalidate: 86400 },
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(8000)]) : AbortSignal.timeout(8000),
   })
