@@ -17,6 +17,7 @@ type Session = {
   contextIdentity: string
   fenced: boolean; phase: BrowserIsolationPhase | 'idle'; active: Set<Promise<unknown>>
   authenticated?: { reference: string; serviceId: string; expiresAt: number; sensitiveHashes: string[]; sensitiveLengths: number[] }
+  destroying?: Promise<void>
   expiryTimer?: ReturnType<typeof setTimeout>
   endedReference?: string; revoked?: boolean; executing: boolean
   permittedNavigation?: string
@@ -165,8 +166,16 @@ export class OwnedChromiumExecutor {
 
   async #destroy(session: Session) {
     if (session.expiryTimer) clearTimeout(session.expiryTimer)
-    await bounded(session.browser.close(), 5000)
-    await rm(session.directory, { recursive: true, force: true })
+    // TTL, cancellation and an in-flight action may all request destruction.
+    // Join the same attempt; a failed attempt remains fenced and may be retried.
+    if (session.destroying) return session.destroying
+    const attempt = (async () => {
+      await bounded(session.browser.close(), 5000)
+      await rm(session.directory, { recursive: true, force: true })
+    })()
+    session.destroying = attempt
+    try { await attempt }
+    finally { if (session.destroying === attempt) session.destroying = undefined }
   }
 
   async #routes(session: Session, allowed: Set<string>, getOnly = false) {

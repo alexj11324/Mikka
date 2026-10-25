@@ -410,8 +410,7 @@ With the user's explicit staging approval this script was executed through the i
 platform proxy on 2026-10-24: four random synthetic records each returned POST 200,
 GET 200 with in-process value comparison, DELETE 200 and final exact-name GET 404.
 The dedicated `mik79` child folder was created after metadata confirmed it absent;
-no business values or IAM were accessed. Evidence/manifest:
-`/workspace/credential-backend-delivery/real-vault-GdnpQJ/`.
+no business values or IAM were accessed. Detailed operator evidence is retained privately.
 This is vault CRUD evidence only and cannot establish full Mikka system acceptance.
 Do not copy an admin token
 between threads or into any agent configuration.
@@ -441,13 +440,10 @@ local env file, command line, chat or repository. Official contracts:
 [read](https://infisical.com/docs/api-reference/endpoints/secrets/read),
 [delete](https://infisical.com/docs/api-reference/endpoints/secrets/delete).
 
-Existing main leases expire 90 seconds after claim and do not renew at heartbeat. The
-credential broker does not weaken that check. Read-only inspection found PR #79 candidate
-`9760e91299bf54165c04a2caafb383f9cc85b13f` implements `recordDeviceHeartbeat(db, deviceId,
-harnesses, reportedRunIds)` and the existing `{leases: Record<runId, ISOTime>}` reply.
-That candidate is not merged or included in this patch; long-running production sessions
-need its separately reviewed renewal behavior. The local end-to-end test finishes inside
-the legitimate initial lease; expired leases are explicitly tested as rejected.
+Current main includes heartbeat lease renewal and lost-run recovery. The credential
+broker rechecks the current lease, task and execution session on every use; it does
+not implement a competing heartbeat protocol. A reclaimed/retried run cannot reuse
+an old credential binding. Expired leases continue to fail closed.
 
 Reproducible Linux test command (needs a dedicated loopback Postgres cluster and Chromium;
 the runner creates two randomly named databases and drops only those it created):

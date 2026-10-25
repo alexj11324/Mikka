@@ -1,230 +1,76 @@
-# Credential backend verification — 2026-10-24
+# Credential backend verification
 
-Repository: `alexj11324/Mikka`, `/workspace/Mikka`, branch `work`.
-Base is `5a0e1c411f487fee433c48414f7130d0d58dad92`; verified against
-`git ls-remote origin refs/heads/main` before implementation. The requested local delivery commit is recorded in the external
-manifest. No push, PR, merge or deployment was performed. Delivery includes a patch
-against this baseline.
+**Acceptance status: NOT COMPLETE (#180 / MIK79).** No deployment, real target-account
+login, model-driven harness turn, frontend screenshot or production isolation acceptance
+is claimed. Frontend implementation belongs to the separate Claude workflow.
 
-**Acceptance status: NOT COMPLETE (#180 / MIK79).** The first commit `4bc7258`
-was a local candidate. The system-registration increment below is not evidence of
-real Infisical, deployed Mikka, frontend or real-account acceptance.
+## Candidate history
 
-## Executed evidence
+The initial backend and system integration were frozen at `e7ab80c593f6ae8b3ad345f8873c56f2b67b1679`
+on base `5a0e1c411f487fee433c48414f7130d0d58dad92`. That candidate passed 18
+HTTP/Postgres/Chromium tests and an actual Next → daemon bridge → harness MCP child
+transport test using synthetic vault/site fixtures. This was local system evidence,
+not complete product acceptance. The independently reviewed fixes covered pool reuse,
+policy drift, cleanup retry, cancellation races, cookie redaction and bridge recovery.
+These were scoped engineering reviews, not a sealed security scanner run.
 
-- `CREDENTIAL_TEST_ADMIN_DATABASE_URL=<isolated-loopback-/postgres> node scripts/test-credential-backend.mjs`:
-  **16 reported tests, 16 pass, 0 fail, 0 skipped**. Final TAP:
-  `/workspace/credential-backend-delivery/acceptance.tap`.
-- Real HTTP, Better Auth signup/session cookies, two newly created Postgres databases,
-  actual advisory locks/CAS/lifecycle triggers, real localhost upstream and Chromium.
-  Vault storage and Infisical transport are **synthetic fakes/contracts**, not real
-  Infisical acceptance. No real account login or OAuth grant was performed.
-- Cross-user/session/workspace/task/run/target refusals; CSRF, size/schema rejection;
-  nonce replay; cancel/expire racing put/read; cancellation after use admission; explicit
-  session save; workspace suspension/deletion, auth session revocation, device disable,
-  run stop/session change; deletion retry and late provider write tombstones; five
-  concurrent operations with an application pool of size one; service policy drift.
-- Real browser static-form fill/POST, synthetic site's authenticated-cookie/selector
-  verification, secret-window DOM/screenshot/click refusals, blocked raw CDP/recording,
-  process/profile destruction and blank-context restoration after success/failure/cancel.
-  Actual executable removal forces replacement launch failure: the session remains
-  quarantined, observers receive 423, and the vault entry is removed.
-- Test output contains no synthetic credential marker (runner checks before printing
-  or writing TAP). Postgres server log check: **0 marker occurrences**. DB rows/events
-  are checked for secret/nonce absence; provider errors and echo response bodies/headers
-  are not returned.
-- Entire current-main migration chain including the new migration ran successfully on
-  two additional fresh disposable Postgres databases. Three credential lifecycle
-  triggers verified. Log: `/tmp/mikka-credential-full-migrations.log`.
-- Migration naming/order checks: **28 files accepted**; migration policy tests:
-  **11 pass**. Existing auth/config/request-scope regression tests: **13 pass**;
-  `/tmp/mikka-credential-regressions.tap`.
-- `oxlint --deny-warnings` over every new source/test/route/script: **pass**.
-- Initial focused typecheck passed. After installing the exact frozen lockfile's
-  dependencies, the whole-checkout and daemon-package `tsgo --noEmit` both pass.
-  The earlier 23 missing-dependency errors are historical, not current blockers.
+An explicitly authorized, separate real Infisical staging check created four synthetic
+records, compared values inside the trusted process, deleted each record and confirmed
+exact-name GET 404. Pending record cleanup was zero. This proves provider CRUD only;
+it is not proof of real account login or a combined deployed flow. It is not repeated
+by normal tests. Raw logs, record identifiers and operator manifests remain private.
 
-## Independent reviews
+## Current-main integration
 
-The initial read-only trace checked AGENTS.md, authentication, application/workspace
-databases, run/device/session APIs, migration tooling and the cloud computer handoff.
-No Infisical adapter or enforceable shared CUA gateway was present on main.
+The resumed candidate incorporates main `8f8484f` without textual merge conflicts.
+Runtime SQL and fixtures now use the renamed `mikka_team_issues` / `mikka_teams` tables.
+Main's existing heartbeat renewal and lost-run recovery are preserved; this backend
+adds no separate renewal protocol. Credential bindings remain tied to the original
+owner, task, run, execution session and current lease.
 
-Independent review `credential_review` identified connection-pool reborrowing, missing
-cleanup scheduling/disabled-cleanup behavior, policy drift, and the existing 90-second
-lease renewal gap. Fixed: lock-held queries reuse the current client; complete policy
-fingerprints; independent cleanup factory and staged cron; database lifecycle revocation.
-The existing daemon lease gap was deliberately not patched into this task.
+Fresh integration checks: actual Next/worker MCP/harness-child/browser flow passed;
+root and daemon typechecks, focused lint, 35-file migration policy and 11 migration
+policy tests passed. The 18-case HTTP/SQL/Chromium suite initially reported a normal
+finish cleanup quarantine while running alongside Next. Its serial rerun passed 18/18;
+the initial failure is retained and its underlying close/delete error was not captured.
+Review identified overlapping TTL/cancel/finish destruction as a separate concurrency
+risk. Destruction now joins one attempt per session, retains the five-second deadline,
+and permits cleanup retry after failure; the suite includes concurrent finish signals.
+Own unshipped migrations were renamed after current main's newest migration. Final
+post-change results are recorded in the draft PR; this summary does not erase failures.
 
-Fresh read-only reviewer `fresh_browser_review` examined all changed source, SQL and
-configuration, then rechecked the final deadline and user/workspace existence changes.
-It found no exploitable secret disclosure or authorization bypass within the stated
-owned-session boundary. Its WebSocket egress candidate was closed by disabling page JS,
-blocking Service Workers/WebSockets and keeping the exact URL allowlist. The reviewer
-also ran the synthetic Infisical contract test (1 pass), with no services or credentials.
+## Reproduction
 
-Earlier reviewed one-shot checkpoint SHA-256:
-`e4b1ceb0fd52ce85499207d4ca77234bcf130dba52a2d2db1006a8c4ab75ef7b`.
-The final read-only increment confirmed user/workspace joins and real POST-window 423
-assertions without new findings. This is a scoped engineering/security review, not a
-completed Codex Security scanner/SARIF run: the cloud skill's referenced preflight
-resource/helper and scan tools were unavailable in this host.
+Use a dedicated cloud Linux environment, Chromium and a disposable loopback Postgres
+cluster. The scripts create uniquely named fixture databases and remove only their
+own databases. Never point them at application databases.
 
-## Integration boundaries and remaining gates
+```sh
+CREDENTIAL_TEST_ADMIN_DATABASE_URL=postgresql://fixture@127.0.0.1:5432/postgres \
+  node --import tsx scripts/test-credential-backend.mjs
+CREDENTIAL_TEST_ADMIN_DATABASE_URL=postgresql://fixture@127.0.0.1:5432/postgres \
+  node --import tsx scripts/accept-credential-system.mjs
+node --import tsx --test lib/credentials/daemon-bridge.test.ts
+```
 
-- Default production credential admission is disabled. No production platform telemetry
-  or ingress body-capture exclusions have been verified. Parent's current online
-  permission metadata confirms an existing project admin identity; the separate authorized
-  staging synthetic CRUD below has passed. Historical read-only identity notes do not
-  describe that current identity. No IAM was changed.
-- Owned Chromium is an optional **dedicated trusted runner** module, tested locally.
-  It supports allowlisted static forms, not JS login, arbitrary websites or existing
-  shared browsers. A same-task continuation policy now retains authentication for
-  declared page navigation, non-form anchor clicks and structured business-region reads.
-  Finish/cancel/disconnect/TTL destroys it; there is no cross-task cookie persistence.
-  Same-host hostile shell/process access is outside its boundary. Production runner,
-  Chromium sandbox, cgroup/watchdog crash cleanup and service isolation are not deployed.
-- Cleanup/quarantine holds the fence until destruction and replacement succeed. Deadline
-  checks do not guarantee hard-time reclamation if a database query stalls. Forced
-  replacement launch and real directory-permission deletion failure/quarantine/retry
-  are tested. Host crashes are not dynamically tested.
-- Read-only PR #79 inspection: candidate
-  `9760e91299bf54165c04a2caafb383f9cc85b13f`, existing `recordDeviceHeartbeat` renewal
-  and `{leases}` protocol. Not merged/copied or required by the short local test.
-  Main's 90-second run lease remains a fail-closed limit on longer sessions.
-- The system increment changes daemon main, run-context and its MCP bridge, preserving
-  existing handoff tools. It reuses the existing `RunAssignment.mcp` field; no protocol
-  schema, heartbeat, `adapters/claude.ts` or subscription launcher source changes.
-- **BYOS combination:** preserve its subscriptions cron while appending this patch's
-  credential-cleanup cron. Merge `package.json` and `pnpm-lock.yaml` additions rather
-  than replacing either file. Production cron config is staged only; no schedule was
-  deployed or paid resource created.
-- After specific user authorization, real Infisical synthetic writes/reads/deletes were
-  executed only in staging `/credential-acceptance/mik79` (details below). OAuth grants,
-  real account login/revocation, IAM changes, SMS/email and publish/deploy were never run.
+The system driver runs actual Next routes, Better Auth, device registration/claim,
+worker MCP, the actual RunContext MCP child, commands delivery and owned Chromium.
+Its vault/site are synthetic. PASS is emitted only after process/database cleanup and
+output-confidentiality checks. Use normal owned cache mounts when running in a container;
+do not disable SWC ownership checks or expand sandbox privileges to make tests pass.
 
-Frontend/API wiring and the owned-runner integration contract are in
-[`credential-backend.md`](credential-backend.md). No product UI or Figma was authored.
+## Remaining gates
 
-## Retained-task continuation increment
+- Actual model-driven harness turn and SRT per-run isolation. The prior ordinary
+  container rejected user-namespace creation with `Operation not permitted`; no
+  privileged retry or security bypass was performed.
+- Authorized real target-account login and the same-version Claude secure form,
+  including genuine UI evidence. Do not send credentials through chat/tool arguments.
+- Actual ingress/APM/telemetry exclusions, a dedicated trusted browser runner and
+  supervisor reclamation after host crash. Opt-in configuration is not isolation proof.
+- Same-version integration with BYOS: preserve its cron and dependency additions and
+  reconcile daemon hooks. Existing shared CUA remains unavailable for secret filling.
 
-The prior one-shot limit was replaced with a same-task, reference-bound continuation
-policy. Real Chromium now logs in, destroys the password process/profile while internally
-retaining only the selected HttpOnly cookie, restores a password-free authenticated
-process, clicks to a second protected project page and returns its business text through
-the unified broker. Named navigation back also succeeds. This is a real protected-browser
-action, not only a fixed account identifier. The fixture rotates its cookie and echoes it
-in a readable region; output is redacted, including across the output truncation boundary.
-
-New acceptance verifies unlogged-in refusal, sensitive-phase action refusal, owner/task
-refusal, normal task completion, cancellation, TTL expiry, run completion and real
-chmod-based cleanup failure followed by quarantine and successful sweep retry.
-
-Independent retained_session_review found and verified fixes for cleanup ownership retry,
-lost replacement handles, cancel/restore races, second-service exclusion, stale tombstones,
-truncation/overlap redaction, cookie rotation/path coverage and the account projection.
-This increment remains an engineering/manual security review, not a sealed scan.
-The earlier owned-executor hash above identifies the earlier one-shot checkpoint only;
-current file hashes and local commit are recorded in the delivery manifest.
-
-## System-registration and bounded fallback increment
-
-Current local suite: **18 pass, 0 fail, 0 skip**, including the real HTTP/SQL and
-Chromium cases above plus live tool-context derivation, saved API credential finish,
-cross-service browser-request exclusion, an injected direct-fill failure followed by
-actual keyboard fill/POST while observers remain fenced, and a real readonly password
-target entering `handoff_required` without vault read and with complete cleanup.
-TAP: `/tmp/mikka-credential-acceptance-KUkMkG/acceptance.tap`.
-
-The actual harness MCP child was spawned from `RunContext.mcpServer()` and exercised
-over stdio against a synthetic HTTP backend: **1 pass**. It preserves the three old
-handoff tools; discovery makes zero backend requests; the platform token is absent
-from child argv/env/output; a transient initialization 503 recovers; wrong-run and
-stopped calls refuse without forwarding. This is real transport, not a model-driven
-run or proof of SRT proxy isolation. Existing daemon `agents.test.ts`: **17 pass,
-7 host/network-gated skips**. Full root and daemon typechecks pass; migration policy
-checks accept **30 files**; the full migration chain including browser binding and
-handoff ran successfully on two fresh disposable databases.
-
-Fresh independent review found and rechecked fixes for API finish, blocking remote
-tool discovery and a permanently rejected initialization promise. Its final fallback
-review found no new blocking path within the owned, static-form boundary. No scanner
-seal, actual model run, shared-browser safety or generic website-login proof is claimed.
-
-The earlier host attempt `/tmp/mikka-system-credential-XKxSzS/next.log` failed before
-routes: SWC rejected cache ancestry whose root owner was UID 65534. This is superseded
-by the successful normal Docker runtime evidence below. The dedicated-runner cleanup
-getter is independent of browser admission/configuration and sees later-created sessions.
-SRT per-run proxy, deployed telemetry, durable host-crash reclamation and same-version
-frontend/real-account acceptance remain unverified. No security-check skip, dependency
-downgrade, push or deployment was performed.
-
-## Authorized real Infisical synthetic CRUD
-
-User explicitly approved staging `/credential-acceptance/mik79`. This environment's
-normal Universal Auth configuration succeeded through its inherited platform proxy;
-tokens remained only inside trusted backend probe processes. No admin token was
-copied into this thread, CLI argv, repository, model tools or a harness process.
-
-The initial missing test folder produced POST/DELETE 404. Metadata showed no `mik79`
-child under `/credential-acceptance`; the dedicated child was created, ID
-`8c292056-e9d5-4148-a4c0-c1601ceb7ad2`. It remains as an empty test directory for
-subsequent integration; this task did not delete a pre-existing folder.
-
-Four new random synthetic records subsequently each completed **POST 200 → GET 200
-with in-process equality check → DELETE 200 → exact-name GET 404**. Final pending
-record cleanup count is **0**. Earlier failed-attempt names were also independently
-rechecked as DELETE 404 / GET 404. No broad secret list, business value read, IAM,
-production or account operation occurred. This is actual Infisical adapter CRUD,
-not full Mikka or real-account/provider-login acceptance.
-
-Evidence (no values or tokens):
-`/workspace/credential-backend-delivery/real-vault-GdnpQJ/provider-report.json` and
-`manifest.json`; earlier exact-name cleanup reports are under `real-vault-Rxx6mj`
-and `real-vault-NFe2ZR`. The no-secret, write-ahead recovery driver is
-`scripts/accept-credential-vault.mjs`. It is never run by normal tests/startup.
-
-## Normal Docker recovery and actual Next/harness runtime
-
-SWC 1.16.18's native carrier checks every ancestor of its selected cache. A current-user
-directory under the host's `/workspace` still traversed the untrusted UID-65534 `/`.
-A standard container supplies a root-owned `/` and accepts the task's UID-1000 cache.
-The initial read-only-container tmpfs was `noexec`; a task-owned executable bind mount
-resolved that separate restriction without changing shared ancestors or disabling checks.
-Official implementation reference: [SWC native cache ownership checks](https://github.com/swc-project/swc/blob/main/crates/swc_native_addon/src/platform/unix.rs).
-
-Runtime image `mikka-mik79-runtime:local`, immutable image ID
-`sha256:fde3f7ef6b1bcf7fdf67d6e4467b6f1ac018b27592266828918ee728705ecd08`,
-uses Node 24 Bookworm with official signed Debian Git/OpenSSL/Chromium packages. Build
-uses the inherited normal HTTPS proxy and public CA verification. It contains no real
-Infisical authentication variables. Its Dockerfile is preserved under
-`/workspace/credential-backend-delivery/system-runtime/`.
-
-The application runs as UID 1000 with a read-only root/source/dependency mount, writable
-task-owned cache and temporary snapshot, no published ports, and the network namespace
-of this task's isolated `postgres:17` fixture container. Both use loopback only; there is
-no external target login or new paid infrastructure. The source snapshot excludes `.git`,
-environment files and ignored build caches. The driver's child environment is synthetic.
-
-First actual run reached Next/Better Auth/device registration, then caught an invalid
-fixture priority (`none`); the fixture was corrected to the existing valid `normal`
-without changing any product constraint. Subsequent actual runtime passed:
-
-- Better Auth HTTP signup/session and cross-owner secure-route rejection.
-- Actual device registration, run claim and execution-session patch.
-- Actual worker MCP tools listing and the existing `RunContext.mcpServer()` stdio child
-  forwarding through the daemon-owned bridge to Next; no platform token in its config.
-- Independent owner HTTP create/submit and ready reference delivered by actual daemon
-  commands API, then real Chromium static-form login, protected-page navigation/read,
-  finish and replay refusal.
-- Actual HTTP cancellation and DB-clock expiry followed by harness status/use refusal;
-  fixture vault records cleared. This remains a synthetic vault/site test, separately
-  from the already completed real Infisical four-record CRUD; it does not repeat it.
-
-Intermediate evidence is under
-`system-runtime/tmp/mikka-system-credential-UuPMu5` and
-`system-runtime/tmp/mikka-system-credential-RwFWTw` in the delivery directory. The final
-frozen rerun and commit are recorded in its updated manifest. The reviewer required
-PASS only after all cleanup/marker checks and confirmed child termination; the driver
-now writes `FAIL_CLEANUP` when reclamation is not confirmed. No model invocation,
-SRT isolation, real-user account, frontend screenshot or deployed-runtime proof is claimed.
+The API contract is in [credential-backend.md](credential-backend.md). Public delivery
+contains source, synthetic tests and technical summaries only. No issue should be closed
+on the strength of local tests or a draft PR.

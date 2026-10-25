@@ -92,10 +92,10 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
     status text DEFAULT 'running', "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz DEFAULT now()+interval '90 seconds');`)
   await workspace.query(`CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY);
     CREATE TABLE mikka_workspace_members ("workspaceId" uuid, "userId" text, status text DEFAULT 'active');
-    CREATE TABLE orvilo_team_issues ("issueId" uuid, "workspaceId" uuid);`)
-  await app.query(await readFile(new URL('../../drizzle/20261024184000_credential_broker.sql', import.meta.url), 'utf8'))
-  await app.query(await readFile(new URL('../../drizzle/20261024202653_credential_browser_binding.sql', import.meta.url), 'utf8'))
-  await app.query(await readFile(new URL('../../drizzle/20261024202654_credential_handoff.sql', import.meta.url), 'utf8'))
+    CREATE TABLE mikka_team_issues ("issueId" uuid, "workspaceId" uuid);`)
+  await app.query(await readFile(new URL('../../drizzle/20261025052200_credential_broker.sql', import.meta.url), 'utf8'))
+  await app.query(await readFile(new URL('../../drizzle/20261025052201_credential_browser_binding.sql', import.meta.url), 'utf8'))
+  await app.query(await readFile(new URL('../../drizzle/20261025052202_credential_handoff.sql', import.meta.url), 'utf8'))
   upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening')
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
@@ -170,7 +170,7 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
   await app.query('INSERT INTO agent_runs (id,"userId","issueId","deviceId","sessionId") VALUES ($1,$2,$3,$4,$5)', [runId, alice.id, taskId, deviceId, executionSession])
   await workspace.query('INSERT INTO mikka_workspaces VALUES ($1)', [workspaceId])
   await workspace.query('INSERT INTO mikka_workspace_members ("workspaceId","userId") VALUES ($1,$2)', [workspaceId, alice.id])
-  await workspace.query('INSERT INTO orvilo_team_issues VALUES ($1,$2)', [taskId, workspaceId])
+  await workspace.query('INSERT INTO mikka_team_issues VALUES ($1,$2)', [taskId, workspaceId])
   const binding: Binding & { serviceId: string } = { ownerId: alice.id, authSessionId: alice.sessionId, workspaceId, taskId, runId, executionSession, serviceId: 'fixture' }
   async function call(path: string, body?: unknown, cookie = alice.cookie, extra: Record<string, string> = {}) {
     return fetch(`${origin}/api/credential-requests${path}`, {
@@ -578,7 +578,12 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
       // Old terminal request tombstones must not destroy the currently authenticated reference.
       await retainedBroker.sweep()
       assert.deepEqual(await retainedBroker.continueBrowser(request.id, expected), { accountId: 'ACCOUNT-42' })
-      assert.equal((await retainedBroker.finishBrowser(request.id, expected)).state, 'consumed')
+      // Task finish and two independent lifecycle signals share one destruction.
+      const [finished] = await Promise.all([
+        retainedBroker.finishBrowser(request.id, expected),
+        executor.end(binding, request.id), executor.end(binding, request.id),
+      ])
+      assert.equal(finished.state, 'consumed')
       await assert.rejects(retainedBroker.continueBrowser(request.id, expected), { code: 'credential_request_gone' })
       assert.throws(() => executor.state(binding), { code: 'browser_session_not_found' })
 

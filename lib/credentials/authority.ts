@@ -20,7 +20,7 @@ export class PostgresCredentialAuthority implements CredentialAuthority {
     if (!run || readIssueMetadata(run.content).deletedAt) return null
     const membership = await this.workspace.query(`SELECT m."userId" FROM mikka_workspace_members m
       JOIN mikka_workspaces w ON w.id=m."workspaceId"
-      JOIN orvilo_team_issues t ON t."workspaceId"=m."workspaceId" AND t."issueId"=$3
+      JOIN mikka_team_issues t ON t."workspaceId"=m."workspaceId" AND t."issueId"=$3
       WHERE m."workspaceId"=$1 AND m."userId"=$2 AND m.status='active'`, [workspaceId, principal.ownerId, run.issueId])
     if (!membership.rowCount) return null
     return { ...principal, workspaceId, runId, taskId: run.issueId, executionSession: run.sessionId }

@@ -82,7 +82,7 @@ export class CredentialExecutionTools {
     )
       throw new CredentialError("credential_not_found", 404);
     const membership = await this.options.workspace.query(
-      `SELECT t."workspaceId" FROM orvilo_team_issues t
+      `SELECT t."workspaceId" FROM mikka_team_issues t
       JOIN mikka_workspaces w ON w.id=t."workspaceId"
       JOIN mikka_workspace_members m ON m."workspaceId"=t."workspaceId" AND m."userId"=$2 AND m.status='active'
       WHERE t."issueId"=$1`,
