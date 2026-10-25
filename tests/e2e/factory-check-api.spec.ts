@@ -181,6 +181,55 @@ test("Factory check claim pins SHA/read-only/command and preserves trusted recei
     await reconcile(userId);
     state = await store.read(userId, state.task.id);
     expect(state.task.stage).toBe("verify");
+    // Historical lease retries must not turn a strict question continuation
+    // into an ordinary claim that could start a fresh Harness session.
+    const strictRun = randomUUID(),
+      retryRun = randomUUID(),
+      nestedRetry = randomUUID();
+    await pool.query(
+      `INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"questionContinuation") VALUES ($1,$2,$3,$4,$5,$6,'failed',$7)`,
+      [
+        strictRun,
+        userId,
+        issueId,
+        agentId,
+        deviceId,
+        repoId,
+        JSON.stringify({ originSessionId: "strict-fixture-session" }),
+      ],
+    );
+    for (const [id, parent] of [
+      [retryRun, strictRun],
+      [nestedRetry, retryRun],
+    ]) {
+      await pool.query(
+        `INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"retryOf") VALUES ($1,$2,$3,$4,$5,$6,'queued',$7)`,
+        [id, userId, issueId, agentId, deviceId, repoId, parent],
+      );
+    }
+    for (const id of [retryRun, nestedRetry]) {
+      expect(
+        (
+          await client.post(app(`/v1/devices/${deviceId}/runs/${id}/claim`))
+        ).status(),
+      ).toBe(409);
+      expect(
+        (
+          await pool.query(
+            'SELECT count(*)::int AS n FROM run_tokens WHERE "runId"=$1',
+            [id],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+      expect(
+        (
+          await pool.query(
+            'SELECT status,"stopReason" FROM agent_runs WHERE id=$1',
+            [id],
+          )
+        ).rows[0],
+      ).toMatchObject({ status: "failed", stopReason: "blocked" });
+    }
     await testInfo.attach("factory-check-http-evidence.json", {
       body: JSON.stringify({
         layer: "CI HTTP/PG fixture, not CC/Codex acceptance",

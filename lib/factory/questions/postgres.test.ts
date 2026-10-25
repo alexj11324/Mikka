@@ -10,6 +10,9 @@ import { createFactoryDispatch } from "../dispatch";
 import { factoryDispatchDatabase } from "../transaction";
 import { insertRunOnce } from "../../run-dispatch";
 import { createFactoryQuestions, questionReference } from "./store";
+import { createFactoryReconciler } from "../reconcile";
+import { lostRunOutcome } from "../../run-retry";
+import { blockQuestionRetry } from "./retry";
 
 const local = process.env.FACTORY_QUESTION_TEST_URL;
 const dbURL =
@@ -525,6 +528,145 @@ test(
           assert.equal(
             (await questions.read(userId, f.questionId)).answerId !== null,
             true,
+          );
+        },
+      );
+      await t.test(
+        "lost continuation settles durably without generic replay on Coordinator recovery",
+        async () => {
+          const f = await fixture();
+          const request = facts(f);
+          const answer = await questions.answer(orchestrator, request);
+          await questions.claimContinuation(
+            userId,
+            deviceId,
+            answer.continuationRunId,
+            new Date(Date.now() + 60000).toISOString(),
+          );
+          const {
+            rows: [run],
+          } = await pool.query("SELECT * FROM agent_runs WHERE id=$1", [
+            answer.continuationRunId,
+          ]);
+          const outcome = lostRunOutcome(run);
+          assert.equal(outcome.kind, "failed");
+          if (outcome.kind !== "failed")
+            throw new Error("Continuation must not retry");
+          // Persist the same terminal result as the existing lease reclaimer.
+          await pool.query(
+            `UPDATE agent_runs SET status='failed',"stopReason"='device_lost',error=$2,"finishedAt"=now() WHERE id=$1`,
+            [run.id, outcome.error],
+          );
+          const reconcile = createFactoryReconciler(pool, store, questions);
+          await reconcile(userId);
+          await reconcile(userId);
+          assert.equal(
+            (await questions.read(userId, f.questionId)).status,
+            "blocked",
+          );
+          assert.equal(
+            (await store.read(userId, f.task.id)).task.status,
+            "blocked",
+          );
+          assert.equal(
+            (
+              await pool.query('SELECT id FROM agent_runs WHERE "retryOf"=$1', [
+                run.id,
+              ])
+            ).rowCount,
+            0,
+          );
+          assert.equal(
+            (await questions.read(userId, f.questionId)).answerId,
+            request.answerId,
+          );
+        },
+      );
+      await t.test(
+        "missing continuation blocks durably and retains its answer",
+        async () => {
+          const f = await fixture();
+          const request = facts(f);
+          const answer = await questions.answer(orchestrator, request);
+          await pool.query("DELETE FROM agent_runs WHERE id=$1", [
+            answer.continuationRunId,
+          ]);
+          await createFactoryReconciler(pool, store, questions)(userId);
+          assert.equal(
+            (await questions.read(userId, f.questionId)).status,
+            "blocked",
+          );
+          assert.equal(
+            (await questions.read(userId, f.questionId)).answerId,
+            request.answerId,
+          );
+          assert.equal(
+            (await store.read(userId, f.task.id)).task.status,
+            "blocked",
+          );
+        },
+      );
+      await t.test(
+        "claim guard blocks historical retry descendants but preserves normal and strict original runs",
+        async () => {
+          const f = await fixture();
+          const answer = await questions.answer(orchestrator, facts(f));
+          const child = async (parent: string) => {
+            const id = randomUUID();
+            await pool.query(
+              `INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"retryOf") VALUES ($1,$2,$3,$4,$5,$6,'queued',$7)`,
+              [id, userId, f.issueId, agentId, deviceId, repoId, parent],
+            );
+            return id;
+          };
+          const first = await child(answer.continuationRunId);
+          const second = await child(first);
+          assert.equal(
+            await blockQuestionRetry(pool, "foreign", f.issueId, first),
+            false,
+          );
+          assert.equal(
+            await blockQuestionRetry(pool, userId, randomUUID(), first),
+            false,
+          );
+          for (const id of [first, second]) {
+            assert.equal(
+              await blockQuestionRetry(pool, userId, f.issueId, id),
+              true,
+            );
+            assert.equal(
+              (
+                await pool.query(
+                  'SELECT status,"stopReason" FROM agent_runs WHERE id=$1',
+                  [id],
+                )
+              ).rows[0].stopReason,
+              "blocked",
+            );
+          }
+          assert.equal(
+            await blockQuestionRetry(
+              pool,
+              userId,
+              f.issueId,
+              await child(f.runId),
+            ),
+            false,
+          );
+          assert.equal(
+            await blockQuestionRetry(
+              pool,
+              userId,
+              f.issueId,
+              answer.continuationRunId,
+            ),
+            false,
+          );
+          await questions.claimContinuation(
+            userId,
+            deviceId,
+            answer.continuationRunId,
+            new Date(Date.now() + 60000).toISOString(),
           );
         },
       );

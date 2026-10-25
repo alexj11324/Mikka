@@ -739,16 +739,17 @@ export function createFactoryQuestions(
           [runId, userId, q.issueId],
         );
         if (
-          !run ||
+          run &&
           !["succeeded", "failed", "stopped", "cancelled"].includes(run.status)
         )
           return view(q);
         const cancelled =
           stopped(task) ||
-          run.stopRequestedAt ||
-          run.status === "cancelled" ||
-          run.stopReason === "cancelled";
+          run?.stopRequestedAt ||
+          run?.status === "cancelled" ||
+          run?.stopReason === "cancelled";
         const resumed =
+          run &&
           run.sessionId === q.originSessionId &&
           ["submitted", "asked_human", "blocked", "turn_ended"].includes(
             run.stopReason,

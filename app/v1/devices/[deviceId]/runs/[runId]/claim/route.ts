@@ -12,6 +12,7 @@ import { retryNote } from '@/lib/run-retry'
 import { pool } from '@/lib/db'
 import { isFactoryCheckRun } from '@/lib/factory/checks'
 import { claimFactoryCheckRun, factoryQuestions } from '@/lib/factory/server'
+import { blockQuestionRetry } from '@/lib/factory/questions/retry'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +51,11 @@ export async function POST(
   if (!run)
     return NextResponse.json(
       { error: 'Run is not queued for this device.' },
+      { status: 409 },
+    )
+  if (run.retryOf && run.issueId && await blockQuestionRetry(pool, caller.userId, run.issueId, runId))
+    return NextResponse.json(
+      { error: 'Generic retry cannot resume a question continuation.' },
       { status: 409 },
     )
   const [agent] = await db

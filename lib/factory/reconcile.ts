@@ -19,9 +19,39 @@ export function createFactoryReconciler(
   store: ReturnType<typeof createFactoryStore>,
   questions?: Pick<
     ReturnType<typeof createFactoryQuestions>,
-    "record" | "settle">,
+    "record" | "settle"
+  >,
 ) {
   return async (userId: string) => {
+    // Device-loss completion does not pass through the daemon completion route.
+    // Settle durable question continuations before generic retry adoption, also
+    // for monitor tasks handled by their own validator. This is replayable on
+    // the existing Coordinator wake/read path; no new scheduler is introduced.
+    if (questions) {
+      let cursor: string | null = null;
+      while (true) {
+        const { rows: endedQuestions } = await pool.query(
+          `SELECT q.id,q."continuationRunId" FROM factory_questions q
+         LEFT JOIN agent_runs r ON r.id=q."continuationRunId" AND r."userId"=q."userId" AND r."issueId"=q."issueId"
+         WHERE q."userId"=$1 AND q.status='resuming' AND (r.id IS NULL OR r.status IN ('succeeded','failed','stopped','cancelled'))
+         AND ($2::uuid IS NULL OR q.id>$2::uuid) ORDER BY q.id LIMIT 50`,
+          [userId, cursor],
+        );
+        for (const question of endedQuestions) {
+          try {
+            await questions.settle(userId, question.continuationRunId);
+          } catch (error) {
+            if (
+              !(error instanceof FactoryError) ||
+              error.code !== "factoryNotFound"
+            )
+              throw error;
+          }
+        }
+        if (endedQuestions.length < 50) break;
+        cursor = endedQuestions[endedQuestions.length - 1].id;
+      }
+    }
     const { rows: pending } = await pool.query(
       `SELECT t.id FROM factory_tasks t WHERE t."userId"=$1 AND t.stage IN ('spec','execute','review','verify') AND (t.status='running' OR (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId"))) ORDER BY t."updatedAt" LIMIT 50`,
       [userId],
@@ -71,6 +101,7 @@ export function createFactoryReconciler(
           let retry = 1;
           ["spec", "execute"].includes(task.stage) &&
           run?.stopReason === "device_lost" &&
+          !run.questionContinuation &&
           !run.stopRequestedAt &&
           retry < MAX_RUN_ATTEMPTS;
           retry++
@@ -109,8 +140,7 @@ export function createFactoryReconciler(
         }
         const eventId = factoryEventId("run-completion", run.id);
         if (
-          !
-          run.stopRequestedAt &&
+          !run.stopRequestedAt &&
           ["asked_human", "blocked"].includes(run.stopReason)
         ) {
           if (questions) {
@@ -121,14 +151,14 @@ export function createFactoryReconciler(
             } catch (error) {
               await tx.query("ROLLBACK TO SAVEPOINT question_recovery");
               if (!(error instanceof FactoryError)) throw error;
-          await store.apply(
-            userId,
-            binding(task),
+              await store.apply(
+                userId,
+                binding(task),
                 factoryEventId("question-recovery-blocked", run.id),
-            {
-              action: "finish",
+                {
+                  action: "finish",
                   status: "blocked",
-              reason: `Question recovery blocked: ${error.code}`,
+                  reason: `Question recovery blocked: ${error.code}`,
                   evidence: [],
                   output: { runId: run.id },
                 },
