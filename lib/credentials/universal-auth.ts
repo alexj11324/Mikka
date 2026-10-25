@@ -4,6 +4,7 @@ type Credentials = { clientId: string; clientSecret: string } | undefined
 /** Server-side only, owned by runtime.ts. No credential/token is persisted or logged. */
 export function universalAuthTokenProvider(options: {
   origin: string; credentials: () => Credentials; fetch?: typeof fetch; now?: () => number; minimumValidityMs?: number
+  onFailure?: (failure: { kind: 'http' | 'response_or_transport'; status?: number }) => void
 }) {
   const origin = new URL(options.origin)
   if (origin.protocol !== 'https:' || origin.origin !== options.origin) throw new CredentialError('vault_configuration_invalid', 503)
@@ -34,12 +35,14 @@ export function universalAuthTokenProvider(options: {
     const epoch = generation
     const startedAt = now()
     const task = (async () => {
+      let httpFailure: number | undefined
       try {
         const response = await (options.fetch ?? fetch)(new URL('/api/v1/auth/universal-auth/login', origin), {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(next), redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(5000),
         })
         if (!response.ok) {
+          httpFailure = response.status
           if ((response.status === 401 || response.status === 403) && epoch === generation) denied = true
           await response.body?.cancel(); throw failure()
         }
@@ -56,6 +59,7 @@ export function universalAuthTokenProvider(options: {
         cached = { value: data.accessToken, refreshAt }
         return cached.value
       } catch {
+        try { options.onFailure?.(httpFailure === undefined ? { kind: 'response_or_transport' } : { kind: 'http', status: httpFailure }) } catch { /* Diagnostics must not alter auth failure. */ }
         if (epoch === generation) { cached = undefined; retryAt = now() + 30000 }
         throw failure() // Never retain upstream response, request, or error cause.
       }
