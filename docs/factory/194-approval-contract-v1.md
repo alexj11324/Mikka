@@ -6,7 +6,7 @@ Base: coordinated #191+#192 `7e93b86277fbfeb1a5f19d41bcc0c03596484491`, with coo
 
 `lib/factory/server.ts` installs only `approvalGate` and `publishGate`. #193 must compose its own review/verify gates into that same store. They are absent on this candidate and remain closed. #194 never promotes executor self-report into an independent result. Existing daemon candidate commit/push is unchanged: it precedes candidate review and is not a merge/deployment approval. The concrete upstream rows and evidence requirements are in [the #193 handoff](194-upstream-evidence.md).
 
-Migrations: #192 `20261025013402_factory_192_stages.sql`, imported #191 `20261025013401_run_dispatch_keys.sql`, new #194 `20261025013403_factory_194_approvals.sql`. The obsolete `20261025004500`, `20261025011101`, `20261025011347`, `20261025010001` and `20261025012001` candidate filenames are absent. The new migration is reentrant and adds consumer ledgers only.
+Migrations: #192 `20261025051202_factory_192_stages.sql`, imported #191 `20261025051201_run_dispatch_keys.sql`, new #194 `20261025051203_factory_194_approvals.sql`. The obsolete `20261025004500`, `20261025011101`, `20261025011347`, `20261025010001` and `20261025012001` candidate filenames are absent. The new migration is reentrant and adds consumer ledgers only.
 
 ## Browser API
 

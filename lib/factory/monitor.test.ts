@@ -644,7 +644,7 @@ test(
         await pool.query(await readFile(new URL(name, dir), "utf8"));
       await pool.query(
         await readFile(
-          new URL("20261025014500_factory_195_monitor.sql", dir),
+          new URL("20261025051204_factory_195_monitor.sql", dir),
           "utf8",
         ),
       );

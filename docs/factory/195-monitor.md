@@ -44,7 +44,7 @@ docker stop mikka-monitor-195-pg
 
 Tests bootstrap all tracked SQL in a fresh PG17 schema, use the **actual #193/#194/#195 validators**, actual #194 approval/publication service and ledger reader, actual local publication adapter and child-process readback. They exercise concurrent replay/dedupe, rollback/restart, fences, issue association/deletion, repair/cycles, malformed target/environment/SHA/operation/reference, timing, uncertain publication, actual approval revocation, raw evidence tampering and local/cloud separation. Disposable OAuth identities and Harness/review conclusions are explicitly fixtures; running a local command or real publication adapter does not establish actual OAuth or CC/Codex Harness acceptance. Optional `FACTORY_MONITOR_EVIDENCE_DIR` saves sanitized local receipt/probe artifacts privately. CI runs temporary PG17 checks plus remote typecheck/build/browser regressions. Neither CI nor these local layers constitute final system acceptance.
 
-Migration ordering remains exactly #191 `20261025013401_run_dispatch_keys.sql`, #192 `20261025013402_factory_192_stages.sql`, #194 `20261025013403_factory_194_approvals.sql`, #195 `20261025014500_factory_195_monitor.sql`. Superseded names are absent; no migration SQL or naming is changed by this handoff.
+Migration ordering remains exactly #191 `20261025051201_run_dispatch_keys.sql`, #192 `20261025051202_factory_192_stages.sql`, #194 `20261025051203_factory_194_approvals.sql`, #195 `20261025051204_factory_195_monitor.sql`. Superseded names are absent; no migration SQL or naming is changed by this handoff.
 
 ## Remaining real acceptance
 

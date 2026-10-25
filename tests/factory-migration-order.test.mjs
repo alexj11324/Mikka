@@ -9,7 +9,8 @@ const names=readdirSync(dir).filter(n=>n.endsWith('.sql'))
 test('one canonical Factory migration per component, after main and before consumers, with unchanged shared SQL',()=>{
   const ordered=orderMigrations(names)
   let previous=ordered.indexOf(manifest.mainLatestMigration)
-  assert.ok(previous>=0)
+  // The refreshed main migration need not be imported with unrelated main code.
+  for (const entry of manifest.shared) assert.ok(entry.file > manifest.mainLatestMigration)
   for(const entry of manifest.shared){
     for(const old of entry.obsolete)assert.ok(!names.includes(old),`Duplicate/obsolete migration: ${old}`)
     const pattern=entry.issue===191?/_run_dispatch_keys\.sql$/:/_factory_192_stages\.sql$/
@@ -19,8 +20,12 @@ test('one canonical Factory migration per component, after main and before consu
     assert.equal(createHash('sha256').update(readFileSync(new URL(entry.file,dir))).digest('hex'),entry.sha256)
   }
   for(const entry of manifest.downstream){
+    for(const old of entry.obsolete ?? []) assert.ok(!names.includes(old))
     if(entry.from)assert.ok(!names.includes(entry.from),`Use the coordinator's canonical rename for #${entry.issue}`)
     if(entry.migration && names.includes(entry.migration)){
+      assert.ok(entry.migration > manifest.mainLatestMigration)
+      assert.equal(names.filter(n=>n.endsWith(entry.migration.slice(14))).length,1)
+      assert.equal(createHash('sha256').update(readFileSync(new URL(entry.migration,dir))).digest('hex'),entry.sha256)
       assert.ok(ordered.indexOf(entry.migration)>previous)
       previous=ordered.indexOf(entry.migration)
     }
