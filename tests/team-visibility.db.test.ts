@@ -29,15 +29,15 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     for (const [id, name] of [[owner, 'Owner'], [member, 'Member'], [foreign, 'Foreign']]) await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$2,$3,true,now(),now())', [id, name, `${id}@example.invalid`])
     for (const [id, user] of [[workspace, owner], [otherWorkspace, foreign]]) await pool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,$3)', [id,user,`Visibility ${id}`])
     for (const [w,u] of [[workspace,owner],[workspace,member],[otherWorkspace,foreign]]) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [w,u,`${u}@example.invalid`])
-    for (const [id,w,u] of [[team,workspace,owner],[otherTeam,otherWorkspace,foreign]]) await pool.query('insert into orvilo_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Visibility\',\'VIS\')', [id,w,u])
+    for (const [id,w,u] of [[team,workspace,owner],[otherTeam,otherWorkspace,foreign]]) await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Visibility\',\'VIS\')', [id,w,u])
     for (const [id,u,scope,label] of [[shared,owner,'workspace','shared-label'],[personal,owner,'personal','secret-label'],[foreignIssue,foreign,'workspace','foreign-label'],[unlinked,owner,'workspace','invite-label']]) {
       await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'doing\',\'none\',$5)', [id,u,id,doc(label),scope])
       await pool.query('insert into issue_members ("issueId","userId","memberId") values ($1,$2,$3)', [id,u,member])
     }
     // Stale invitations cannot bypass a workspace link; personal scope wins
     // even over both a team link and an explicit legacy invitation.
-    for (const id of [shared,personal]) await pool.query('insert into orvilo_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [id,team,workspace,owner])
-    await pool.query('insert into orvilo_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [foreignIssue,otherTeam,otherWorkspace,foreign])
+    for (const id of [shared,personal]) await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [id,team,workspace,owner])
+    await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [foreignIssue,otherTeam,otherWorkspace,foreign])
     for (const [id,u] of [[agent,owner],[ownAgent,member]]) await pool.query('insert into agents (id,"userId",harness,name,instructions) values ($1,$2,\'codex\',$3,\'secret-standing-instructions\')', [id,u,`private-agent-${id}`])
     for (const [id,issue,u,a] of [[sharedRun,shared,owner,agent],[privateRun,personal,owner,agent],[orphanRun,null,owner,agent],[foreignRun,foreignIssue,foreign,agent]]) {
       await pool.query('insert into agent_runs (id,"userId","issueId","agentId",status,prompt,error,"stopReason",report) values ($1,$2,$3,$4,\'running\',\'secret-prompt\',\'secret-error\',\'secret-stop\',$5)', [id,u,issue,a,JSON.stringify({summary:'secret-report',memory:'secret-memory'})])
@@ -103,9 +103,9 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     await pool.query('delete from agent_runs where id=any($1::uuid[])',[[sharedRun,privateRun,orphanRun,foreignRun]])
     await pool.query('delete from agents where id=any($1::uuid[])',[[agent,ownAgent]])
     await pool.query('delete from issue_members where "issueId"=any($1::uuid[])',[[shared,personal,foreignIssue,unlinked]])
-    await pool.query('delete from orvilo_team_issues where "issueId"=any($1::uuid[])',[[shared,personal,foreignIssue,unlinked]])
+    await pool.query('delete from mikka_team_issues where "issueId"=any($1::uuid[])',[[shared,personal,foreignIssue,unlinked]])
     await pool.query('delete from issues where id=any($1::uuid[])',[[shared,personal,foreignIssue,unlinked]])
-    await pool.query('delete from orvilo_teams where id=any($1::uuid[])',[[team,otherTeam]])
+    await pool.query('delete from mikka_teams where id=any($1::uuid[])',[[team,otherTeam]])
     await pool.query('delete from mikka_workspace_members where "workspaceId"=any($1::uuid[])',[[workspace,otherWorkspace]])
     await pool.query('delete from mikka_workspaces where id=any($1::uuid[])',[[workspace,otherWorkspace]])
     await pool.query('delete from "user" where id=any($1::text[])',[[owner,member,foreign]])
