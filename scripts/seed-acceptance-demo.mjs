@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto'
 import { Pool } from 'pg'
 
 const email = process.argv[2]
-if (!/^acceptance-[\da-f-]+@preview\.(mikka|orvilo)\.invalid$/.test(email ?? '')) throw new Error('Provide an existing Acceptance Guest email')
-const main = new Pool({ connectionString: process.env.MIKKA_DATABASE_URL ?? process.env.ORVILO_DATABASE_URL, max: 1 })
+if (!/^acceptance-[\da-f-]+@preview\.mikka\.invalid$/.test(email ?? '')) throw new Error('Provide an existing Acceptance Guest email')
+const main = new Pool({ connectionString: process.env.MIKKA_DATABASE_URL, max: 1 })
 const projects = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 })
 const id = key => {
   const h = createHash('sha256').update(`${email}:demo-v1:${key}`).digest('hex')
