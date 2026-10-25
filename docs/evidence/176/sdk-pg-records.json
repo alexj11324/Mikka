@@ -1,0 +1,86 @@
+{
+  "at": "2026-10-25T20:40:18.514Z",
+  "sourceSha": "06fdd2d53083f6fd25796558adb54f16071808e9",
+  "runtimeSource": "1b8a18e0b7284fee286cd53d27d939532fcdc6fd",
+  "runtimeSourceUnchanged": true,
+  "nextBuildId": "J7xNWwztPE5HgHdMqUhT4",
+  "origin": "http://127.0.0.1:3177/mikka",
+  "workflowWorld": "actual installed SDK Local World 5.2.3; no cloud service",
+  "modelGeneration": false,
+  "realHarness": false,
+  "events": [
+    {
+      "id": "db33e8cc-e741-4756-b752-6de36ad23361",
+      "wake_status": "completed",
+      "wake_error": null,
+      "wake_attempts": 2,
+      "wake_generation_state": "returned",
+      "processed_at": "2026-10-25T20:38:08.276Z",
+      "wake_checkpoint_digest": "cb741c8b323fedaba8af9af84134f640f18d40ad0dc4db56ffc5c27b31398ed5"
+    },
+    {
+      "id": "93bf6f37-53ae-4a3b-9bf2-b04dfd489a1c",
+      "wake_status": "completed",
+      "wake_error": null,
+      "wake_attempts": 2,
+      "wake_generation_state": "returned",
+      "processed_at": "2026-10-25T20:38:16.827Z",
+      "wake_checkpoint_digest": "cb741c8b323fedaba8af9af84134f640f18d40ad0dc4db56ffc5c27b31398ed5"
+    },
+    {
+      "id": "6dda5755-5b58-482d-a1ef-c0f5fb49639f",
+      "wake_status": "pending",
+      "wake_error": "wakeAdmissionDeferred",
+      "wake_attempts": 0,
+      "wake_generation_state": "not_started",
+      "processed_at": null,
+      "wake_checkpoint_digest": null
+    },
+    {
+      "id": "3191679f-6027-4b71-bd0c-6373fec0bd08",
+      "wake_status": "completed",
+      "wake_error": null,
+      "wake_attempts": 1,
+      "wake_generation_state": "returned",
+      "processed_at": "2026-10-25T20:38:17.360Z",
+      "wake_checkpoint_digest": "74e6f573221bd4a52cb28b75c8080974b1780ae9cfaaeda03e1bf6b6c2f70e4d"
+    }
+  ],
+  "messageCounts": [
+    {
+      "source_event_id": "93bf6f37-53ae-4a3b-9bf2-b04dfd489a1c",
+      "role": "assistant",
+      "count": 1
+    },
+    {
+      "source_event_id": "6dda5755-5b58-482d-a1ef-c0f5fb49639f",
+      "role": "user",
+      "count": 1
+    },
+    {
+      "source_event_id": "db33e8cc-e741-4756-b752-6de36ad23361",
+      "role": "user",
+      "count": 1
+    },
+    {
+      "source_event_id": "db33e8cc-e741-4756-b752-6de36ad23361",
+      "role": "assistant",
+      "count": 1
+    },
+    {
+      "source_event_id": "3191679f-6027-4b71-bd0c-6373fec0bd08",
+      "role": "assistant",
+      "count": 1
+    },
+    {
+      "source_event_id": "3191679f-6027-4b71-bd0c-6373fec0bd08",
+      "role": "user",
+      "count": 1
+    },
+    {
+      "source_event_id": "93bf6f37-53ae-4a3b-9bf2-b04dfd489a1c",
+      "role": "user",
+      "count": 1
+    }
+  ]
+}
