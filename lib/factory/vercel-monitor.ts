@@ -12,9 +12,9 @@ class ProbeFailure extends Error {
     super(category);
   }
 }
-const fail = (category: string): never => {
+function fail(category: string): never {
   throw new ProbeFailure(category);
-};
+}
 function object(value: unknown): Record<string, any> {
   if (!value || typeof value !== "object" || Array.isArray(value))
     fail("response-invalid");
