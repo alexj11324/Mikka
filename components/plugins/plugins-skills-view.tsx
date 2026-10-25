@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { ArrowUpRight, MonitorSmartphone, Puzzle, Search } from 'lucide-react'
+import { ArrowUpRight, Puzzle, Search } from 'lucide-react'
 
 import { Link } from '@/i18n/navigation'
 import { withBasePath } from '@/lib/base-path'
 import type { SkillsSearchResult } from '@/lib/skills-search'
 import { IntegrationsSettings } from '@/components/settings/integrations-settings'
+import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
+import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { Frame, FramePanel } from '@/components/reui/frame'
 import { IconTile } from '@/components/reui/icon-tile'
 import { Button } from '@/components/ui/button'
@@ -59,26 +61,15 @@ export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean })
             <TabsTrigger value="skills">{t('skillsTab')}</TabsTrigger>
           </TabsList>
           <TabsContent value="plugins" className="flex flex-col gap-6 pt-4">
-            <section className="flex flex-col gap-3">
-              <h2 className="text-sm font-semibold">{t('agentRuntime')}</h2>
-              <Frame>
-                <FramePanel>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="flex min-w-0 items-center gap-3">
-                      <IconTile size="sm" variant="elevated" aria-hidden="true"><MonitorSmartphone /></IconTile>
-                      <span className="flex min-w-0 flex-col gap-0.5">
-                        <span className="text-sm font-medium">{t('agentDevices')}</span>
-                        <span className="text-xs text-muted-foreground">{t('agentRuntimeDescription')}</span>
-                      </span>
-                    </span>
-                    <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/devices" />}>
-                      {t('manageDevices')}
-                    </Button>
-                  </div>
-                </FramePanel>
-              </Frame>
-            </section>
-            <IntegrationsSettings googleEnabled={googleEnabled} showWebhookDetails={false} />
+            <SettingsSection id="agent-runtime-heading" title={t('agentRuntime')}>
+              <SettingRow title={t('agentDevices')} description={t('agentRuntimeDescription')}>
+                <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/devices" />}>
+                  {t('manageDevices')}
+                </Button>
+              </SettingRow>
+            </SettingsSection>
+            <GoogleSignInSettings googleEnabled={googleEnabled} />
+            <IntegrationsSettings showWebhookDetails={false} />
           </TabsContent>
           <TabsContent value="skills" className="flex flex-col gap-5 pt-4">
             <div className="flex flex-col gap-3">

@@ -17,6 +17,7 @@ import dynamic from 'next/dynamic'
 import { AgentResponse } from './agent-response'
 import { AgentChat, type AgentChatSession } from './agent-chat'
 import { AgentInteractionContext } from './agent-interaction'
+import { ComputerConversation } from '@/components/computer/computer-agents'
 import { fetchAgentResponse, observeAgentImages } from '@/lib/agent-fetch'
 import { preloadAgentImage } from '@/lib/agent-image-loader'
 import { withBasePath } from '@/lib/base-path'
@@ -180,7 +181,7 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
     }
   }
 
-  return <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt, 'inline') }}>
+  return <AgentInteractionContext value={{ busy: isLoading, continueFromAnswer: prompt => request(prompt, 'inline') }}><ComputerConversation id={sessionIdRef.current}>
       <AgentChat
         turns={[
           ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse completion={turn.completion} error={turn.error} stopped={turn.stopped} isLoading={false} onAction={handleUIAction} /> })),
@@ -192,8 +193,7 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
         onSelect={onSelect}
         onReset={onReset}
         onDemo={onDemo}
-        onSuggestion={prompt => { updateDraft(prompt); inputRef.current?.focus() }}
         composer={<AgentComposer ref={inputRef} isEmpty={!question} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} />}
       />
-    </AgentInteractionContext>
+    </ComputerConversation></AgentInteractionContext>
 }

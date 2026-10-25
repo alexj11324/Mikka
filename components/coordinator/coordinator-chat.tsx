@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { ArrowUp, Plus, Send } from 'lucide-react'
+import { ArrowUp, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCoordinatorChat, sendCoordinatorMessage, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import { listTaskRuns } from '@/app/actions/task-runs'
@@ -15,7 +15,6 @@ import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { useActionError } from '@/lib/use-action-error'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from '@/components/ui/message-scroller'
@@ -24,6 +23,7 @@ import { useLinkPreviews, type AgentCitations } from '@/components/workspace/age
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
 import { AgentThemeProvider } from '@/components/workspace/agent-theme'
 import { CoordinatorReply } from './coordinator-reply'
+import { PendingActions } from './pending-actions'
 
 /** The person's conversation with their Coordinator, which dispatches agents to issues. */
 export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false }: { onOpenIssue: (id: string) => void; prefill?: { text: string; nonce: number }; placeholder?: string; compact?: boolean }) {
@@ -88,12 +88,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   }
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
-  <section aria-label={t('label')} className="orvilo-agent flex min-h-0 flex-1 flex-col">
+  <section aria-label={t('label')} className="mikka-agent flex min-h-0 flex-1 flex-col">
     <MessageScrollerProvider defaultScrollPosition="end">
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={t('conversation')}>
           <MessageScrollerContent className={cn('mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 pb-6', compact ? 'pt-4' : 'pt-18')}>
-            {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyMedia variant="icon"><Send /></EmptyMedia><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty>}
             {items.map(item => <MessageScrollerItem key={item.position} messageId={String(item.position)} scrollAnchor={item.from === 'person'}>
               {item.from === 'event'
                 ? <p className="text-center text-xs text-muted-foreground">{item.text.replace(/^\[Event\]\s*/, '')}</p>
@@ -115,6 +114,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
       {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
+      <PendingActions />
       {/* Grok-style composer: one rounded bar, attach on the left, send on the right. */}
       <form onSubmit={send}>
         <FieldGroup className="sr-only"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>

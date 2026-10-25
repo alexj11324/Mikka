@@ -10,6 +10,7 @@ test('allows supported local destinations with validated settings context', () =
   assert.equal(safeAuthReturn('/settings?section=preferences'), '/settings?section=preferences')
   assert.equal(safeAuthReturn(`/settings?section=workspace&workspace=${workspaceId}`), `/settings?section=workspace&workspace=${workspaceId}`)
   assert.equal(safeAuthReturn('/settings?section=integrations'), '/settings?section=integrations')
+  assert.equal(safeAuthReturn('/settings?section=account'), '/settings?section=account')
   assert.equal(safeAuthReturn(`/settings/teams?workspace=${workspaceId}&create=1`), `/settings/teams?workspace=${workspaceId}&create=1`)
   assert.equal(safeAuthReturn(`/settings/members?workspace=${workspaceId}&invite=1`), `/settings/members?workspace=${workspaceId}&invite=1`)
   assert.equal(safeAuthReturn(`/?issue=${issueId}`), `/?issue=${issueId}`)

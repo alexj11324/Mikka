@@ -44,7 +44,8 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(panel.locator('[data-slot="frame"]')).toHaveCount(0)
   await expect(panel.locator('form')).toBeVisible()
   await expect(panel.getByText('今天想完成什么？', { exact: true })).toHaveCount(0)
-  await expect(panel.getByRole('region', { name: '推荐建议' })).toBeVisible()
+  // No starter cards (R-12) and no model picker (R-11).
+  await expect(panel.getByRole('region', { name: '推荐建议' })).toHaveCount(0)
   await expect(panel.locator('[data-slot="message-scroller"]')).toHaveCount(0)
   await expect(page.locator('main')).toHaveCount(1)
   await expect(panel.locator('header')).toHaveCount(1)
@@ -54,9 +55,6 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   const send = panel.getByRole('button', { name: '发送消息' })
   await expect(send).toBeDisabled()
 
-  await panel.getByRole('button', { name: '拆解项目计划 把想法拆成清晰的阶段和可执行任务', exact: true }).click()
-  await expect(input).toHaveValue('帮我把一个新项目拆解成清晰的阶段、交付物和可执行任务。')
-  await expect(input).toBeFocused()
   await panel.getByRole('button', { name: '添加到提问', exact: true }).click()
   await page.getByRole('dialog', { name: '添加到提问', exact: true }).getByRole('button', { name: '拆解项目计划', exact: true }).click()
   await expect(input).toHaveValue('帮我把一个新项目拆解成清晰的阶段、交付物和可执行任务。')
@@ -95,7 +93,8 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(input).toHaveValue('')
   await expect(send).toBeDisabled()
   await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
-  await expect(panel.getByRole('region', { name: '推荐建议' })).toBeVisible()
+  // No starter cards (R-12) and no model picker (R-11).
+  await expect(panel.getByRole('region', { name: '推荐建议' })).toHaveCount(0)
 
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(input).toBeVisible()
@@ -408,8 +407,8 @@ test('beUI 功能组展示回复与计划，审批和多步回答直接继续且
     return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'x-vercel-ai-ui-message-stream': 'v1' }, body: openUIStream(`root = Stack([response, tasks, approval, questions, icon])
 response = BeResponse([TextContent("按功能组合的回复内容")])
 tasks = BeTodoList("建议任务计划", [{ id: "one", title: "整理需求", status: "completed", progress: 100 }], "suggestion")
-approval = BeApproval("确认需求方案", "先整理需求再提供设计建议。", "项目是 Orvilo，当前正在讨论首版范围。")
-questions = BeQuestions("项目是 Orvilo，需要明确首版范围和检查要求。", [{ id: "scope", title: "首版范围？", options: [{ value: "small", label: "精简首版" }, { value: "large", label: "完整版本" }] }, { id: "checks", title: "需要哪些检查？", options: [{ value: "types", label: "类型检查" }, { value: "keyboard", label: "键盘交互" }], multiple: true, allowCustom: true }])
+approval = BeApproval("确认需求方案", "先整理需求再提供设计建议。", "项目是 Mikka，当前正在讨论首版范围。")
+questions = BeQuestions("项目是 Mikka，需要明确首版范围和检查要求。", [{ id: "scope", title: "首版范围？", options: [{ value: "small", label: "精简首版" }, { value: "large", label: "完整版本" }] }, { id: "checks", title: "需要哪些检查？", options: [{ value: "types", label: "类型检查" }, { value: "keyboard", label: "键盘交互" }], multiple: true, allowCustom: true }])
 icon = AgentIcon("question", "等待你的意见")`) })
   })
   await input.fill('请给出项目建议和澄清问题')
@@ -426,7 +425,7 @@ icon = AgentIcon("question", "等待你的意见")`) })
   await expect(input).toHaveValue('未发送的独立草稿')
   await expect(panel.getByText('同意这个建议方案，已提交给 Agent；未执行工作区操作。', { exact: true })).toBeVisible()
   expect(submissions).toHaveLength(2)
-  expect(submissions[1].prompt).toContain('项目是 Orvilo')
+  expect(submissions[1].prompt).toContain('项目是 Mikka')
   expect(submissions[1].prompt).toContain('同意这个建议方案')
   await expect(panel.getByRole('button', { name: '同意并继续', exact: true })).toHaveCount(0)
   await panel.getByRole('radio', { name: '精简首版' }).check()
@@ -462,7 +461,7 @@ test('beUI 内联回答失败与停止后���留选择，可在原卡片重
   await page.route('**/api/agent', route => {
     submissions.push(route.request().postDataJSON())
     const response = submissions.length === 1
-      ? openUIStream('root = BeQuestions("Orvilo 首版建议", [{ id: "scope", title: "选择验证范围？", options: [{ value: "types", label: "类型检查" }, { value: "keyboard", label: "键盘交互" }], multiple: true, allowCustom: true }])')
+      ? openUIStream('root = BeQuestions("Mikka 首版建议", [{ id: "scope", title: "选择验证范围？", options: [{ value: "types", label: "类型检查" }, { value: "keyboard", label: "键盘交互" }], multiple: true, allowCustom: true }])')
       : submissions.length === 2
         ? 'data: {"type":"error","errorText":"测试：请重试本次回答。"}\n\ndata: [DONE]\n\n'
         : openUIStream('root = TextContent("已按保留的答案继续。")')
@@ -524,8 +523,8 @@ test('旧按钮直接提问，纯文本在原卡片回答且失败可重试', as
     const body = submissions.length === 1
       ? openUIStream(`root = Stack([note, question, button])
 note = ShadcnAlert("需要更多信息", "在下方补充你的需求，直接提交即可。")
-question = BeQuestions("为 Orvilo 工作台提供任务建议，用户尚未说明具体需求。", [{ id: "goal", title: "你想完成什么任务？", allowCustom: true }])
-button = BeButton("填入提问", "为 Orvilo 本周任务建议一个计划结构，仅建议不执行。", "outline")`)
+question = BeQuestions("为 Mikka 工作台提供任务建议，用户尚未说明具体需求。", [{ id: "goal", title: "你想完成什么任务？", allowCustom: true }])
+button = BeButton("填入提问", "为 Mikka 本周任务建议一个计划结构，仅建议不执行。", "outline")`)
       : submissions.length === 2
         ? 'data: {"type":"error","errorText":"测试：提问失败，请在原卡片重试。"}\n\ndata: [DONE]\n\n'
         : openUIStream(`root = TextContent("第 ${submissions.length} 次请求直接继续成功。")`)
@@ -715,7 +714,7 @@ test('OpenUI 表格、Tabs 和表单直接提交，兼容按钮续问且会话�
   await expect(panel.getByText('以上为建议计划，尚未保存到工作区。', { exact: true })).toBeVisible()
   await panel.getByRole('tab', { name: '阶段计划' }).click()
   await input.fill('未发送的表单外草稿')
-  await panel.getByRole('textbox', { name: /^项目名称/ }).fill('Orvilo 发布')
+  await panel.getByRole('textbox', { name: /^项目名称/ }).fill('Mikka 发布')
   await panel.getByRole('button', { name: '提交回答并继续', exact: true }).click()
   await expect(panel.getByText('已根据项目名称继续提供建议。', { exact: true })).toBeVisible()
   await expect(input).toHaveValue('未发送的表单外草稿')
