@@ -72,9 +72,9 @@ export type FactoryGates = Partial<
 >;
 const terminal = (task: FactoryTask) =>
   task.status === "cancelled" || task.status === "revoked";
-const fail = (code: string): never => {
+function fail(code: string): never {
   throw new FactoryError(code);
-};
+}
 const uuid = (value: string) => {
   if (!z.uuid().safeParse(value).success) fail("factoryInvalid");
 };
