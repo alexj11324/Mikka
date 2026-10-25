@@ -38,18 +38,19 @@ export async function factoryCheckIndependent(
      LEFT JOIN agent_runs r ON r.id=a."runId" WHERE a."taskId"=$1`,
     [task.id],
   );
-  let child = rows.find((a) => a.id === task.attemptId);
-  const session = child?.run?.sessionId;
+  const current = rows.find((a) => a.id === task.attemptId);
+  const session = current?.run?.sessionId;
   if (
     task.status !== "running" ||
     !["review", "verify"].includes(task.stage) ||
     !task.candidateId ||
-    !child ||
-    child.runId !== runId ||
-    child.status !== "running" ||
+    !current ||
+    current.runId !== runId ||
+    current.status !== "running" ||
     !session
   )
     return false;
+  let child: AttemptRun = current;
   const valid = (a: AttemptRun) =>
     a.taskId === task.id &&
     a.stage === task.stage &&
@@ -65,8 +66,7 @@ export async function factoryCheckIndependent(
   const ancestors = new Set<string>();
   const visited = new Set([child.id]);
   while (true) {
-    if (!valid(child)) return false;
-    const run = child.run!;
+    const run: CheckRun = child.run!;
     const link = run.questionContinuation;
     // Look up by the persisted continuation binding, not an untrusted UUID
     // supplied in run metadata. Missing/corrupt metadata fails closed.
@@ -77,9 +77,10 @@ export async function factoryCheckIndependent(
       [run.id],
     );
     if (!link) {
-      if (q) return false;
+      if (q || (ancestors.size > 0 && !valid(child))) return false;
       break;
     }
+    if (!valid(child)) return false;
     const parent = rows.find((a) => a.id === q?.attemptId);
     const origin = parent?.run;
     const waiting = q?.waitingBinding;
