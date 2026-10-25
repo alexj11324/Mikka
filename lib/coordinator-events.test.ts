@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { issueDoneEvent, runBlockedEvent, runFinishedEvent, runQuestionEvent, runReportEvent, telegramReplyTargets, userMessageEvent } from './coordinator-events'
+import { issueDoneEvent, runBlockedEvent, runFinishedEvent, runQuestionEvent, runReportEvent, runRetriedEvent, telegramReplyTargets, userMessageEvent } from './coordinator-events'
 
 const issue = { id: 'issue-1', userId: 'user-1', title: 'Fix login', status: 'done', revision: 4 }
 
@@ -46,6 +46,11 @@ test('a finished run is one event per run, with its summary', () => {
 })
 
 const workerRun = { id: 'run-1', userId: 'user-1', issueId: 'issue-1' }
+
+test('a retry after the device went offline is one event per lost run', () => {
+  const event = runRetriedEvent(workerRun, { runId: 'run-2', attempt: 2, maxAttempts: 3 })
+  assert.deepEqual(event, { userId: 'user-1', kind: 'run_retried', dedupeKey: 'run_retried:run-1', issueId: 'issue-1', runId: 'run-1', payload: { retryRunId: 'run-2', attempt: 2, maxAttempts: 3 } })
+})
 
 test('worker tool calls become events on the run, each one new', () => {
   const first = runReportEvent(workerRun, 'Tests pass')

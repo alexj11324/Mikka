@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
-import { featureAvailability, upcomingFeatures } from '../lib/feature-flags.ts'
+import { featureAvailability, gatedFeatureEnabled, gatedFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
 
 test('pageviews strip query strings, hashes, document identifiers and unapproved properties', () => {
   const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: {
@@ -39,7 +40,7 @@ test('unknown events, replay and raw exception events never pass the allowlist',
   }
   assert.equal(sanitizeAnalyticsEvent(null), null)
   assert.deepEqual(sanitizeAnalyticsEvent({ event: '$pageview', properties: { $current_url: 'not a url' } }).properties, {})
-  assert.deepEqual(sanitizeAnalyticsEvent({ event: 'orvilo_team_created', properties: { name: 'private' } }).properties, {})
+  assert.deepEqual(sanitizeAnalyticsEvent({ event: 'mikka_team_created', properties: { name: 'private' } }).properties, {})
 })
 
 test('all upcoming features fail closed, even if the remote switch is accidentally enabled', () => {
@@ -51,4 +52,16 @@ test('all upcoming features fail closed, even if the remote switch is accidental
     }
     assert.equal(featureAvailability(feature, true).reason, 'FeatureCopy.c_7a3f5896')
   }
+})
+
+test('gated features are on only when the remote flag is exactly true', () => {
+  assert.equal(gatedFeatures.cloudComputer, 'mikka-cloud-computer')
+  for (const remote of [undefined, false, 'control', 'true']) assert.equal(gatedFeatureEnabled(remote), false)
+  assert.equal(gatedFeatureEnabled(true), true)
+})
+
+test('the locale layout mounts the pageview tracker whenever PostHog is configured', () => {
+  // instrumentation-client.ts turns off automatic pageviews; without this component nothing is ever sent.
+  const layout = readFileSync(new URL('../app/[locale]/layout.tsx', import.meta.url), 'utf8')
+  assert.match(layout, /posthogConfig\.token && <PostHogAnalytics \/>/)
 })

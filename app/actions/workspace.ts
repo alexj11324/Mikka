@@ -33,7 +33,7 @@ async function result<T>(operation: () => Promise<T>) {
 async function rememberWorkspace(workspaceId: string) {
   const cookieStore = await cookies()
   const options = { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'none' as const : 'lax' as const, secure: true, path: '/', maxAge: 31536000 }
-  cookieStore.set('orvilo-workspace', workspaceId, options)
+  cookieStore.set('mikka-workspace', workspaceId, options)
   cookieStore.set('mikka-workspace', workspaceId, options)
 }
 
@@ -75,7 +75,7 @@ export async function switchWorkspace(input: string | { workspaceId?: string; ac
     if (parsed.workspaceId) await rememberWorkspace(parsed.workspaceId)
     else {
       const cookieStore = await cookies()
-      cookieStore.delete('orvilo-workspace')
+      cookieStore.delete('mikka-workspace')
       cookieStore.delete('mikka-workspace')
     }
     return { workspaceId: parsed.workspaceId }

@@ -22,7 +22,7 @@ const previewImage = { src: withBasePath('/placeholder.svg?height=360&width=640'
 export function AgentDemo({ onClose }: { onClose: () => void }) {
   const [run, setRun] = useState(0)
   const [feedback, setFeedback] = useState('点击确认、提问或追问按钮，即可看到本地反馈。')
-  return <section aria-label="Agent 组件演示" className="orvilo-agent flex size-full min-h-0 flex-col">
+  return <section aria-label="Agent 组件演示" className="mikka-agent flex size-full min-h-0 flex-col">
     <header className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 px-4 py-2">
       <SidebarTrigger aria-label="展开或收起侧边栏" />
       <h1 className="text-sm font-medium">Agent 综合演示</h1>

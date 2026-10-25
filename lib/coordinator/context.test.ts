@@ -77,6 +77,7 @@ test('events read as messages from Mikka', () => {
     eventPrompt({ kind: 'run_finished', issueId: 'i1', runId: 'r1', payload: { status: 'succeeded', stopReason: 'submitted', summary: 'Fixed it' } }),
     '[Event] Run r1 ended with status succeeded (submitted).\nIssue: i1.\nThe agent\'s summary: Fixed it',
   )
+  assert.match(eventPrompt({ kind: 'run_retried', issueId: 'i1', runId: 'r1', payload: { retryRunId: 'r2', attempt: 2, maxAttempts: 3 } }), /queued again as run r2, attempt 2 of 3/)
   assert.match(eventPrompt({ kind: 'issue_done', issueId: 'i1', runId: null, payload: { title: 'Login', previousStatus: 'review' } }), /moved from review to done/)
 })
 

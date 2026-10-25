@@ -3,7 +3,7 @@ import { isStepCount, tool } from 'ai'
 import { getWorkflowMetadata } from 'workflow'
 import { z } from 'zod'
 import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
-import { createComposioAITools } from '@/lib/composio-actions'
+import { createComposioAITools, createGoogleAITools } from '@/lib/composio-actions'
 import { splitTelegramText } from '@/lib/telegram/messages'
 import * as steps from './steps'
 
@@ -35,9 +35,16 @@ export async function coordinatorTurn(userId: string) {
       const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep })
       await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text))
       if (inbox.telegramTargets.length && result.text.trim()) {
+        // The reply is saved and shows on the web; a Telegram failure (a
+        // blocked bot, an outage) must not fail the turn and stall the inbox.
+        // A thread whose chunk fails gets no later chunks; other threads still do.
         const threads = await steps.telegramReplyThreads(userId, inbox.telegramTargets)
         for (const threadId of threads) {
-          for (const chunk of splitTelegramText(result.text)) await steps.sendTelegramChunk(threadId, chunk)
+          try {
+            for (const chunk of splitTelegramText(result.text)) await steps.sendTelegramChunk(threadId, chunk)
+          } catch (error) {
+            console.error('Telegram reply failed', error instanceof Error ? error.message : String(error))
+          }
         }
       }
     } catch (error) {
@@ -54,6 +61,7 @@ function coordinatorTools(userId: string) {
   const id = z.uuid()
   return {
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input)),
+    ...createGoogleAITools((action, input) => steps.composioAction(userId, action, input), (action, input) => steps.proposeAccountAction(userId, action, input)),
     list_issues: tool({
       description: 'List the person\'s issues, most recently updated first. Optionally only one status (todo, doing, review, done and so on).',
       inputSchema: z.object({ status: z.string().optional() }),

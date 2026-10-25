@@ -20,20 +20,19 @@ type AgentChatNavigation = {
   onDemo?: () => void
 }
 
-export function AgentChat({ turns, composer, streaming, sessions, sessionId, onSelect, onReset, onDemo, onSuggestion }: AgentChatNavigation & {
+export function AgentChat({ turns, composer, streaming, sessions, sessionId, onSelect, onReset, onDemo }: AgentChatNavigation & {
   turns: AgentTurn[]
   composer: ReactNode
   streaming: boolean
-  onSuggestion: (prompt: string) => void
 }) {
   const agentCopy = useAgentCopy()
 
   const title = sessions.find(session => session.id === sessionId)?.title || turns[0]?.question || agentCopy.newConversation
 
-  return <section aria-label={agentCopy.agentConversationWorkspace} className="orvilo-agent relative flex size-full min-h-0 flex-col">
+  return <section aria-label={agentCopy.agentConversationWorkspace} className="mikka-agent relative flex size-full min-h-0 flex-col">
     <AgentChatHeader title={title} streaming={streaming} sessions={sessions} sessionId={sessionId} onSelect={onSelect} onReset={onReset} onDemo={onDemo} />
     <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
-    {turns.length === 0 ? <AgentWelcome composer={composer} sessions={sessions} onSelect={onSelect} onSuggestion={onSuggestion} /> : <>
+    {turns.length === 0 ? <AgentWelcome composer={composer} sessions={sessions} onSelect={onSelect} /> : <>
       <AgentConversation turns={turns} streaming={streaming} />
       <footer className="shrink-0 px-4 pb-4 pt-2 sm:px-8 sm:pb-6">
         <div className="mx-auto w-full max-w-3xl">{composer}</div>
