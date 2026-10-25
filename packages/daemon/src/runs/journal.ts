@@ -14,6 +14,8 @@ export interface JournalEntry {
   state: RunState
   sessionId: string | null
   worktree: string | null
+  /** The commit the worktree started from; checkpoints diff against it. */
+  baseCommit?: string
   /** Last seq assigned to this run's events. */
   lastSeq: number
   error: string | null
