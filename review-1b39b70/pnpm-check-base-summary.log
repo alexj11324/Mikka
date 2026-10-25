@@ -1,0 +1,92 @@
+> next-app@0.0.1 check /workspace/mikka-audit-base-20e
+> pnpm check:agent-ui && pnpm test:preview && pnpm test:agent && pnpm test:byos && pnpm test:acceptance && pnpm test:auth-composio && pnpm test:ui-policy && pnpm test:motion && pnpm test:i18n && pnpm i18n:check && pnpm test:ssh-target && pnpm test:linear-sync && pnpm test:coordinator-events && pnpm test:factory && pnpm test:groups && pnpm test:integrations && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm test:issues && pnpm test:telegram && pnpm test:suggestions && pnpm lint && pnpm typecheck
+> next-app@0.0.1 check:agent-ui /workspace/mikka-audit-base-20e
+> node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check
+> next-app@0.0.1 test:preview /workspace/mikka-audit-base-20e
+> node --test tests/preview-ready.test.mjs
+✔ background precompilation is enabled by default and only explicit zero disables it (1.105848ms)
+✔ startup compiles chat, images, history and workspace with read-only HEAD requests (21.139585ms)
+✔ startup begins every warmup without waiting for other routes (0.482741ms)
+✔ startup supports deployments without a base path (0.406819ms)
+✔ page warmup accepts the sign-in redirect but API redirects remain failures (0.358748ms)
+✔ compile failures cannot report preview ready (1.136744ms)
+✔ optional warmup aborts a stalled request instead of hanging startup work (11.090134ms)
+✔ page requests never wait for unrelated AI routes or readiness marker files (1.936733ms)
+✔ preview bootstrap script is inside head to avoid hydration failure (0.738959ms)
+✔ startup preserves readiness output and starts default warmup without awaiting it (0.65855ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 102.211709
+> next-app@0.0.1 test:agent /workspace/mikka-audit-base-20e
+> node --import tsx --test tests/agent-fetch.test.mjs tests/agent-ui.test.mjs tests/agent-history.test.mjs tests/agent-web-tools.test.mjs
+✔ 配图关键词闭合即预加载，不等待卡片介绍、标签或回复完成 (33.942692ms)
+✔ 图片观察不预加载推理，不吞正文，并限制为最多六张不同配图 (11.684049ms)
+✔ 正常结束保留全部正文，不人为截断长回复 (1.098518ms)
+✔ 思考耗尽预算和空回复不会显示为成功 (2.545719ms)
+✔ 流提前断开保留正文并通知重试，已有错误不重复追加 (0.926766ms)
+✔ 主动停止不生成空回复或连接中断错误 (0.375524ms)
+✔ 请求头尚未返回时，即使预览传输忽略取消，也能结束等待 (1.224033ms)
+✔ 响应头已返回时，停止会中断流读取并取消上游 (47.08693ms)
+✔ 正常 SSE 响应保持内容、状态和响应头 (1.865118ms)
+✔ 完成前保存完整回复，不保存推理片段 (17.983176ms)
+✔ 失败回复保留正文和错误，不误标为完成 (0.823843ms)
+✔ 断流保存为失败，不静默当作成功 (0.816132ms)
+✔ 取消请求保存已生成片段且取消上游 (1.896813ms)
+✔ 数据库检查点缓慢时正文继续返回，完成前仍等待保存 (1.331311ms)
+✔ 保存失败必须向客户端报告错误 (0.830373ms)
+✔ KaTeX 样式字体与 rehype 渲染引擎使用同一版本 (19.89335ms)
+✔ 演示公式覆盖行内、对齐、矩阵及长公式，且不输出解析错误 (68.722421ms)
+✖ Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀 (32.986527ms)
+✔ 综合演示每个分组都可解析，覆盖全部本地回复组件 (65.066844ms)
+✔ beUI 代码块在 OpenUI 和 Markdown 中真正接入，等待状态使用 ReasoningText (10.914149ms)
+✔ 普通聊天正文不加载公式引擎，含公式时复用完整 Markdown 渲染 (0.888749ms)
+✔ 图片解析保留真实来源和许可，拒绝不安全资源 (5.952554ms)
+✔ 配图检索通过固定来源查询，并正确处理无结果及上游错误 (20.814285ms)
+✔ 图片复用正文入口并共享 SWR 预加载，回复缩略图不懒加载 (1.992423ms)
+✔ 资料配图和详细回答规则进入模型规范 (7.542756ms)
+✔ TextContent 统一支持 Markdown、LaTeX 和 Mermaid，保留旧字号契约 (6.776567ms)
+✔ Beautiful Mermaid 实际渲染六类图表，主题自适应且样式不污染其他回复 (196.148207ms)
+✔ 精致图表优先，复杂语法保留严格 Mermaid 回退和 SVG 清洗 (2.380836ms)
+✔ 混合真实换行与 JSON 转义的回复仍正确渲染标题、列表和自注意力公式 (20.151799ms)
+✔ 修复仅处理 OpenUI 字符串语法，保留代码、矩阵换行、转义引号与流式前缀 (6.192086ms)
+✔ 相关追问支持具体问题、上下文及内联继续，不再被提示词压制 (14.574278ms)
+✔ 完整正文和可自动补齐的括号不会误报失败 (4.549979ms)
+✔ 真实缺少段落与组件格式错误分别说明原因 (3.661861ms)
+✔ 紧凑推荐卡片可解析且模型规范优先小卡片 (5.585343ms)
+✔ beUI 组件包含在运行时和可序列化规范中 (9.74665ms)
+✔ beUI OpenUI Lang 输出可解析且保留旧组件兼容 (4.207154ms)
+✔ 功能分组完整且每个本地组件仅属于一个功能组 (0.199884ms)
+✔ 审批、问题、回复和任务计划均可解析 (7.121745ms)
+✔ 问题、任务与图标严格限制输入，不能��造审批结果 (2.776398ms)
+✔ 49 项 AI Elements 对照不遗漏且 beUI 对应源码可导入 (24.565939ms)
+✔ 会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 会话组件 (2.095836ms)
+✖ Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单 (1.214208ms)
+✔ 服务端和 beUI 界面均使用 DS 4.1 Flash (2.468674ms)
+✔ 停止按钮先取消表单默认行为，避免同步恢复后误发草稿 (1.488351ms)
+✔ 回复动作统一直接请求，澄清使用内联问题卡片 (2.527911ms)
+✔ beUI 限制按钮语义、状态、数字和小数位 (0.911312ms)
+✔ \( \) 与 \[ \] 定界符转换为 KaTeX 公式，代码内容保持原样，中文使用 cjk_fallback (15.53327ms)
+✖ 联网工具只暴露搜索和网页读取，保留 DS 聊天及认证 (13.125732ms)
+✔ 拒绝非 HTTPS、凭据、内网地址、IP 及自定义端口 (6.506953ms)
+✔ 搜索保留原始来源、日期和检索时间，裁剪内容 (3.0488ms)
+✔ 网页先检查 DNS，拒绝混合公共和私网解析 (0.394431ms)
+✔ 网页只返回有效正文，不把重定向或上游错误当成资料 (1.20187ms)
+✔ 计费验证未完成时说明具体原因且不重复调用上游 (0.409824ms)
+✔ 上游失败不泄漏错误详情，限制每轮费用，取消传播 (1.686975ms)
+ℹ tests 54
+ℹ suites 0
+ℹ pass 51
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3938.995104
+✖ failing tests:
+✖ Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀 (32.986527ms)
+✖ Agent 只保留应用外壳，初始输入居中��会话导航收进标题菜单 (1.214208ms)
+✖ 联网工具只暴露搜索和网页读取，保留 DS 聊天及认证 (13.125732ms)

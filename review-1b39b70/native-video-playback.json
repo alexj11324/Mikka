@@ -1,0 +1,13 @@
+{
+  "source": "1b39b709ce361b9643524aea983860e6de818ff6",
+  "method": "unmodified native Chromium video element on loopback, H264 format copy",
+  "utc": "2026-10-25T18:36:37.693Z",
+  "result": {
+    "currentTime": 1.028298,
+    "duration": 17.68,
+    "width": 1280,
+    "height": 800,
+    "error": null,
+    "paused": false
+  }
+}

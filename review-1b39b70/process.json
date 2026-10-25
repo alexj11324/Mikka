@@ -1,0 +1,12 @@
+{
+  "sourceSha": "1b39b709ce361b9643524aea983860e6de818ff6",
+  "image": "sha256:739f342b809d803f7351c2825e9bb6eb31ace41d16373f2ff3048270261d0d66",
+  "startedAt": "2026-10-25T18:35:27.649181061Z",
+  "buildId": "BNyB52AKfuDaT1iEq87V5",
+  "origin": "http://127.0.0.1:3110/mikka",
+  "dbTargets": [
+    "audit_app_1b_e2e",
+    "audit_workspace_1b_e2e"
+  ],
+  "scope": "isolated synthetic cloud Linux; no production deployment"
+}

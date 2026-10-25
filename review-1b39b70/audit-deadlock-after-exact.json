@@ -1,0 +1,50 @@
+{
+  "schema": "audit_lock_95a0b4a531064d6c940635858ff9a07f",
+  "tenant": "bcb8596d-c6c3-4e09-ab95-a02789ee1be6",
+  "owner": "owner_5082ab08-81f2-42a5-a26a-3528e57a239a",
+  "source": "1b39b709ce361b9643524aea983860e6de818ff6",
+  "expectDeadlock": false,
+  "observations": [
+    {
+      "stage": "stop holds audit H at barrier; complete entered",
+      "stop": {
+        "pid": 103,
+        "wait_event": "advisory",
+        "blockers": [
+          100
+        ]
+      },
+      "complete": {
+        "pid": 104,
+        "wait_event": "transactionid",
+        "blockers": [
+          103
+        ]
+      }
+    },
+    {
+      "stage": "both barriers released",
+      "result": [
+        {
+          "ok": true,
+          "code": ""
+        },
+        {
+          "ok": true,
+          "code": ""
+        }
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "id": "b9f9ba7b-da6a-4692-a71d-f54c218446f7",
+      "status": "stopped"
+    },
+    {
+      "id": "e71db5a2-f672-45e6-b9a8-dfb35bb3de87",
+      "status": "cancelled"
+    }
+  ],
+  "utc": "2026-10-25T18:31:02.489Z"
+}

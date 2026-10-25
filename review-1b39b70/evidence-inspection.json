@@ -1,0 +1,16 @@
+{
+  "sourceSha": "1b39b709ce361b9643524aea983860e6de818ff6",
+  "checkedAt": "2026-10-25T18:42:45.864700+00:00",
+  "scope": "synthetic isolated acceptance only, not production",
+  "checks": [
+    "No serialized literal token/private-key/session-cookie pattern detected in text files",
+    "Original screenshots/live console inspected; only synthetic opaque references and fixed safe codes",
+    "Raw WebMs byte-identical to original page@ captures",
+    "Full17.68s H264 re-encoding, no cuts, fully decoded and native Chromium playback beyond1s/errornull",
+    "Credential runner suppresses fixture-secret-marker echoes; before/after logs contain only sanitized assertions"
+  ],
+  "limits": [
+    "Not a claim of full product/production/provider/daemon acceptance video",
+    "Public anonymous download/media readback is a separate supplemental receipt after upload"
+  ]
+}

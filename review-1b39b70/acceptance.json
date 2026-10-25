@@ -1,0 +1,184 @@
+{
+  "sha": "1b39b709ce361b9643524aea983860e6de818ff6",
+  "origin": "http://127.0.0.1:3110",
+  "utc": "2026-10-25T18:34:59.090Z",
+  "scope": "isolated cloud Linux production-built Next HTTP; synthetic accounts; no real provider/production acceptance",
+  "workspaceId": "e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba",
+  "otherWorkspaceId": "3ff6e0cf-0339-4a27-8e19-4a05a3215417",
+  "ownerId": "cfhKckCKsXyNxY4xiSjhJJL9INw5mJ4r",
+  "memberId": "tJMv63sEOwznEtYV4AqjScgtzhoUXeCA",
+  "exportId": "018462de-a5d4-4326-b932-313d3fc299e6",
+  "files": [
+    "application-page-0.jsonl",
+    "workspace-page-0.jsonl",
+    "workspace-page-1.jsonl",
+    "workspace-page-2.jsonl",
+    "workspace-page-3.jsonl"
+  ],
+  "requests": [
+    {
+      "requestId": "52089ec9-e347-483a-ada6-36423890502a",
+      "method": "POST",
+      "path": "/api/auth/sign-up/email",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.091Z"
+    },
+    {
+      "requestId": "ef1efab8-7901-4f71-9391-def61ea39c0a",
+      "method": "POST",
+      "path": "/api/auth/sign-up/email",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.192Z"
+    },
+    {
+      "requestId": "7574bb72-dd70-4692-962d-6cd2546aed01",
+      "method": "POST",
+      "path": "/api/auth/sign-up/email",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.282Z"
+    },
+    {
+      "requestId": "c3084c7c-a23d-45e4-abfa-e747c0e814d2",
+      "method": "POST",
+      "path": "/api/auth/sign-in/email",
+      "status": 401,
+      "utc": "2026-10-25T18:34:53.375Z"
+    },
+    {
+      "requestId": "1efbe171-ce38-4f80-b8de-393181c467f7",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba",
+      "status": 401,
+      "utc": "2026-10-25T18:34:53.401Z"
+    },
+    {
+      "requestId": "3380c451-55f6-43d9-972f-79ce9c8cf4be",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba",
+      "status": 403,
+      "utc": "2026-10-25T18:34:53.428Z"
+    },
+    {
+      "requestId": "5a8d66c0-f44d-4e9c-911f-1899b38e1524",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba",
+      "status": 403,
+      "utc": "2026-10-25T18:34:53.438Z"
+    },
+    {
+      "requestId": "569ef084-302a-4165-82fa-6df788ea197f",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba",
+      "status": 401,
+      "utc": "2026-10-25T18:34:53.446Z"
+    },
+    {
+      "requestId": "ddc075c7-b783-43c7-a08a-cd05d2fbe64e",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=3ff6e0cf-0339-4a27-8e19-4a05a3215417",
+      "status": 403,
+      "utc": "2026-10-25T18:34:53.458Z"
+    },
+    {
+      "requestId": "4d9c93eb-fd72-442e-bfbc-a6fcaf24d301",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba&source=workspace",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.478Z"
+    },
+    {
+      "requestId": "dcbd0759-fcad-4388-8cc5-391999652760",
+      "method": "GET",
+      "path": "/api/audit",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.511Z"
+    },
+    {
+      "requestId": "7c2825d7-6c69-4917-9151-0205c56b8523",
+      "method": "POST",
+      "path": "/api/audit?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.530Z"
+    },
+    {
+      "requestId": "c3e786ec-e483-4e4a-998e-7b403db8233c",
+      "method": "POST",
+      "path": "/api/audit?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba&source=workspace",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.546Z"
+    },
+    {
+      "requestId": "822b3919-14fc-476e-80f7-394dde7236a5",
+      "method": "POST",
+      "path": "/api/audit/export?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.588Z"
+    },
+    {
+      "requestId": "e98e1d43-0d06-4998-ab4f-895ed3176ca0",
+      "method": "POST",
+      "path": "/api/audit/export?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.598Z"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit/export?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba&id=018462de-a5d4-4326-b932-313d3fc299e6&source=application&after=0&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.614Z"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit/export?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba&id=018462de-a5d4-4326-b932-313d3fc299e6&source=workspace&after=0&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.624Z"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit/export?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba&id=018462de-a5d4-4326-b932-313d3fc299e6&source=workspace&after=1&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.634Z"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit/export?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba&id=018462de-a5d4-4326-b932-313d3fc299e6&source=workspace&after=2&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.644Z"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit/export?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba&id=018462de-a5d4-4326-b932-313d3fc299e6&source=workspace&after=3&limit=1",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.654Z"
+    },
+    {
+      "requestId": "07bcab0a-e344-4844-8e7e-2564ec63e054",
+      "method": "GET",
+      "path": "/api/audit?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba",
+      "status": 403,
+      "utc": "2026-10-25T18:34:53.663Z"
+    },
+    {
+      "requestId": "3bd2979e-92f3-42a1-830f-ae703edb68bc",
+      "method": "POST",
+      "path": "/api/audit?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba&source=workspace",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.674Z"
+    },
+    {
+      "requestId": "626b472e-c0bc-4135-9a8a-22f86da6cc25",
+      "method": "POST",
+      "path": "/api/audit?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba&source=workspace",
+      "status": 409,
+      "utc": "2026-10-25T18:34:53.683Z"
+    },
+    {
+      "requestId": "e596baab-bc6c-441f-9267-138d03ab7188",
+      "method": "POST",
+      "path": "/api/audit?workspaceId=e3946fc1-8f43-4a36-9b2f-e9800e6cf1ba&source=workspace",
+      "status": 200,
+      "utc": "2026-10-25T18:34:53.693Z"
+    }
+  ],
+  "status": "passed"
+}
