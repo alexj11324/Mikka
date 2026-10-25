@@ -123,6 +123,7 @@
     "next-intl": "^4.14.9",
     "next-themes": "latest",
     "pg": "^8.23.1",
+    "playwright-core": "1.64.1",
     "posthog-js": "1.438.13",
     "react": "^19.2.4",
     "react-day-picker": "9.8.0",
