@@ -35,7 +35,7 @@ Sizes are the visible size of the dot grid, not the `<img>` box.
 
 | Placement | Size | Notes |
 | --- | --- | --- |
-| Conversation list header (top left) | 28px | Mark only, no "Mikka" wordmark. Same height as the header's `+` button (`h-7`). |
+| Bot list header (top left) | 28px | Mark only, no "Mikka" wordmark. Same height as the header's `+` button (`h-7`). |
 | Sign-in / sign-up (`auth-logo.tsx`) | 24px | Mark plus "Mikka" in `text-lg font-semibold`, gap 10px (`gap-2.5`). |
 | Onboarding welcome | 56px | Mark only, centered above the "欢迎来到 Mikka" title. |
 | Browser tab | 16 / 32px | `app/icon.svg`. |

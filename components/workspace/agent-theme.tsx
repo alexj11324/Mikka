@@ -26,7 +26,7 @@ const agentTheme = createTheme({
   fontLabel: 'var(--font-sans)',
 })
 
-/** Themes OpenUI's own components inside any `.orvilo-agent` conversation. */
+/** Themes OpenUI's own components inside any `.mikka-agent` conversation. */
 export function AgentThemeProvider({ children }: { children: ReactNode }) {
-  return <ThemeProvider cssSelector=".orvilo-agent" lightTheme={agentTheme} darkTheme={agentTheme}>{children}</ThemeProvider>
+  return <ThemeProvider cssSelector=".mikka-agent" lightTheme={agentTheme} darkTheme={agentTheme}>{children}</ThemeProvider>
 }
