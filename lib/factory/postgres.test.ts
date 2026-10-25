@@ -172,6 +172,38 @@ test(
       assert.equal(resolved.attempts[0].status, "passed");
       const spec = await route({ needsSpec: true });
       assert.equal(spec.task.stage, "spec");
+      const external = await route(),
+        externalRun = randomUUID();
+      const tx = await pool.connect();
+      try {
+        await tx.query("BEGIN");
+        await tx.query(
+          `INSERT INTO agent_runs (id,"userId","issueId","agentId",status) VALUES ($1,'owner',$2,$3,'queued')`,
+          [externalRun, issueId, agentId],
+        );
+        await store.apply(
+          "owner",
+          binding(external.task),
+          randomUUID(),
+          { action: "bind_run", runId: externalRun },
+          tx,
+        );
+        await tx.query("ROLLBACK");
+      } finally {
+        tx.release();
+      }
+      assert.equal(
+        (
+          await pool.query("SELECT id FROM agent_runs WHERE id=$1", [
+            externalRun,
+          ])
+        ).rowCount,
+        0,
+      );
+      assert.equal(
+        (await store.read("owner", external.task.id)).attempts[0].runId,
+        null,
+      );
       const finish: FactoryChange = {
         action: "finish",
         status: "passed",
@@ -530,9 +562,10 @@ test(
         });
       }
       const removed = await route();
-      await pool.query("UPDATE issues SET status='deleted' WHERE id=$1", [
-        issueId,
-      ]);
+      await pool.query(
+        'UPDATE issues SET content=\'{"attrs":{"mikka":{"deletedAt":"2026-10-25T00:00:00Z"}}}\'::jsonb WHERE id=$1',
+        [issueId],
+      );
       await rejects(
         () => store.read("owner", removed.task.id),
         "factoryNotFound",

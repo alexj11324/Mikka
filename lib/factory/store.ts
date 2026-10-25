@@ -87,7 +87,11 @@ export function createFactoryStore(
 ) {
   async function transaction<T>(
     fn: (tx: PoolClient) => Promise<T>,
+    existing?: PoolClient,
   ): Promise<T> {
+    // #191 can enqueue and bind on its already-open transaction. Its caller
+    // owns BEGIN/COMMIT/ROLLBACK; an error must roll back the entire dispatch.
+    if (existing) return fn(existing);
     const tx = await pool.connect();
     try {
       await tx.query("BEGIN");
@@ -258,6 +262,7 @@ export function createFactoryStore(
       rawBinding: FactoryBinding,
       eventId: string,
       rawChange: FactoryChange,
+      existingTransaction?: PoolClient,
     ) {
       const bp = bindingSchema.safeParse(rawBinding),
         cp = changeSchema.safeParse(rawChange);
@@ -523,7 +528,10 @@ export function createFactoryStore(
             change.reason,
           );
         }
-        if (task.attemptId === attempt.id) {
+        const stoppedFinishedAttempt =
+          (change.action === "cancel" || change.action === "revoke") &&
+          ["passed", "failed", "blocked"].includes(attempt.status);
+        if (task.attemptId === attempt.id && !stoppedFinishedAttempt) {
           await tx.query(
             "UPDATE factory_attempts SET status=$2,reason=$3,\"finishedAt\"=CASE WHEN $2 IN ('passed','failed','blocked','cancelled','revoked') THEN now() ELSE NULL END WHERE id=$1",
             [attempt.id, task.status, task.reason],
@@ -543,7 +551,7 @@ export function createFactoryStore(
           ],
         );
         return save(tx, task, eventId, request);
-      });
+      }, existingTransaction);
     },
   };
 }
