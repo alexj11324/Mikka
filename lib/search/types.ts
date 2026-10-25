@@ -3,7 +3,7 @@ export type SearchResult = { title: string; url: string; snippet: string }
 export type SearchOutcome = 'ok' | 'rate_limited' | 'upstream_error' | 'timeout' | 'error'
 
 export type SearchResponse =
-  | { ok: true; results: SearchResult[]; cached: boolean }
+  | { ok: true; results: SearchResult[]; cached: boolean; fetchedAt?: string; cacheAgeMs?: number }
   | { ok: false; error: 'searchUnavailable'; outcome: Exclude<SearchOutcome, 'ok'> }
 
 export type SearchOptions = { limit?: number; signal?: AbortSignal }

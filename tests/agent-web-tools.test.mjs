@@ -88,3 +88,39 @@ test('Timeout and upstream errors degrade explicitly, cap turn calls, and propag
   const cancelled = toolsFor({ signal: controller.signal, search: async () => { throw new Error('must not run') } })
   await assert.rejects(cancelled.web_search.execute({ query: 'public weather' }, context), { name: 'AbortError' })
 })
+
+
+test('A new Agent turn after 59 minutes preserves provider retrieval time and exposes cache age', async () => {
+  const base = Date.parse('2026-10-25T20:00:00.000Z')
+  let now = base
+  let calls = 0
+  // The original #64 provider contract still only returns result arrays.
+  const web = createWebService({ now: () => now, provider: { name: 'legacy-array-provider', search: async () => {
+    calls++
+    return [{ title: 'Public weather', url: 'https://www.weather.gov/', snippet: 'Time-sensitive evidence' }]
+  } } })
+  const first = await toolsFor({ search: web.search }).web_search.execute({ query: 'current weather' }, context)
+  assert.equal(first.retrievedAt, '2026-10-25T20:00:00.000Z')
+  assert.equal(first.cached, false)
+  assert.equal(first.cacheAgeMs, 0)
+  now += 59 * 60_000
+  const cached = await toolsFor({ search: web.search }).web_search.execute({ query: 'current weather' }, context)
+  assert.equal(calls, 1)
+  assert.equal(cached.retrievedAt, first.retrievedAt)
+  assert.equal(cached.cached, true)
+  assert.equal(cached.cacheAgeMs, 59 * 60_000)
+  now += 2 * 60_000
+  const refreshed = await toolsFor({ search: web.search }).web_search.execute({ query: 'current weather' }, context)
+  assert.equal(calls, 2)
+  assert.equal(refreshed.retrievedAt, '2026-10-25T21:01:00.000Z')
+  assert.equal(refreshed.cached, false)
+  assert.equal(refreshed.cacheAgeMs, 0)
+})
+
+test('Legacy service responses with no fetchedAt never fabricate a current retrieval timestamp', async () => {
+  const tools = toolsFor({ search: async () => ({ ok: true, cached: true, results: [] }) })
+  const output = await tools.web_search.execute({ query: 'public query' }, context)
+  assert.equal(output.retrievedAt, null)
+  assert.equal(output.cached, true)
+  assert.equal(output.cacheAgeMs, null)
+})

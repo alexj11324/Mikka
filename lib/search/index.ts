@@ -34,10 +34,11 @@ export function createWebService({ provider = createFirecrawlProvider(), authori
       if (!ctx.userId || (operation === 'search' && (!input.trim() || input.trim().length > 500))) throw new Error('Invalid input')
       const key = JSON.stringify([ctx.userId, ctx.workspaceId, options.limit ?? 5, input.trim().replace(/\s+/g, ' ')])
       const hit = operation === 'search' ? cache.get(key) : undefined
-      if (hit && started - hit.at < CACHE_TTL_MS) {
+      const cacheReadAt = now()
+      if (hit && cacheReadAt - hit.at < CACHE_TTL_MS) {
         cache.delete(key); cache.set(key, hit)
         log('cache_hit')
-        return structuredClone({ ...hit.response, cached: true })
+        return structuredClone({ ...hit.response, cached: true, cacheAgeMs: Math.max(0, cacheReadAt - hit.at) })
       }
       const recent = (calls.get(ctx.userId) ?? []).filter(at => started - at < 60_000)
       if (recent.length >= USER_LIMIT_PER_MINUTE) {
@@ -55,8 +56,9 @@ export function createWebService({ provider = createFirecrawlProvider(), authori
       }
       const results = await abortable(() => provider.search(input, { ...options, signal }), signal)
       signal.throwIfAborted()
-      const response = { ok: true as const, results, cached: false }
-      cache.delete(key); cache.set(key, { at: started, response: structuredClone(response) })
+      const fetchedAtMs = now()
+      const response = { ok: true as const, results, cached: false, fetchedAt: new Date(fetchedAtMs).toISOString(), cacheAgeMs: 0 }
+      cache.delete(key); cache.set(key, { at: fetchedAtMs, response: structuredClone(response) })
       if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!)
       log('ok')
       return response

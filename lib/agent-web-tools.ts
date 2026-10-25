@@ -32,7 +32,7 @@ export function createAgentWebTools(options: {
       return unavailable(response.outcome)
     }
     const retrievedAt = new Date().toISOString()
-    if ('results' in response) return { ok: true as const, retrievedAt, results: response.results, markdown: response.results.map(item => `## ${item.title}\n${item.url}\n\n${item.snippet}`).join('\n\n'), untrustedContent: true }
+    if ('results' in response) return { ok: true as const, retrievedAt: response.fetchedAt ?? null, cached: response.cached, cacheAgeMs: response.cacheAgeMs ?? null, results: response.results, markdown: response.results.map(item => `## ${item.title}\n${item.url}\n\n${item.snippet}`).join('\n\n'), untrustedContent: true }
     return { ok: true as const, retrievedAt, url: response.page.url, content: response.page.markdown, untrustedContent: true }
   }
   return {
