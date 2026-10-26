@@ -1,3 +1,4 @@
+import { isolatedPostgresURL } from '../../tests/helpers/isolated-postgres.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -8,6 +9,8 @@ import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { improvementTestDatabase } from './test-database'
 import { createSkillAssignments, assignedSkillForRun } from './assignments'
 import { createImprovementStore } from './store'
+import type { FailureQualityProvider } from './regression'
+import { BASELINE_MARKDOWN } from './builtin-skill'
 import { createImprovementFactoryBridge } from './factory-bridge'
 import { handleImprovement } from './http'
 import { BASELINE_ARTIFACT, BASELINE_SKILL } from './builtin-skill'
@@ -18,11 +21,21 @@ import { approvalGate,publishGate,createFactoryApprovals } from '../factory/appr
 import { handleFactoryApproval } from '../factory/approval-http'
 import { insertRunOnce } from '../run-dispatch'
 import { factoryDispatchDatabase } from '../factory/transaction'
+import { digest } from './contract'
 import { verifySkillAssignment } from '../../packages/daemon/src/agents/skill-artifact'
+
+// Explicit test-only training evaluator fixture; no model evaluation or production acceptance claim.
+const qualityProvider: FailureQualityProvider = async (_tx, _userId, sources) => ({
+  instanceId: 'bd646e22-f944-4104-bc11-722d7337b34d', instanceDigest: 'c'.repeat(64),
+  assignmentDigest: digest([...sources].sort((a,b)=>a.runId.localeCompare(b.runId))),
+  fields: { command:{missing:sources.length,incorrect:0}, exitCode:{missing:sources.length,incorrect:0},
+    commit:{missing:sources.length,incorrect:0}, environment:{missing:sources.length,incorrect:0},
+    verification:{missing:sources.length,incorrect:0}, unknowns:{missing:sources.length,incorrect:0} },
+})
 
 const databaseURL = improvementTestDatabase(process.env)
 test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databaseURL,timeout:120000},async t=>{
-  const target=new URL(databaseURL!)
+  const target=new URL(await isolatedPostgresURL(databaseURL!))
   const admin=new Pool({connectionString:target.toString(),max:1}),schema=`skill_wiring_${randomUUID().replaceAll('-','')}`
   await admin.query(`CREATE SCHEMA "${schema}"`);target.searchParams.set('options',`-c search_path=${schema}`)
   const pool=new Pool({connectionString:target.toString(),max:12})
@@ -37,10 +50,10 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databa
   await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","verifyCommand") VALUES($1,$2,$3,'/synthetic/mikka','node acceptance.mjs')`,[repoId,deviceId,userId])
   let allowed=true
   const authorize=async(u:string,i:string)=>allowed&&u===userId&&i===issueId
-  const assignments=createSkillAssignments(pool,authorize),scores=createImprovementStore(pool,authorize)
+  const assignments=createSkillAssignments(pool,authorize),scores=createImprovementStore(pool,authorize,qualityProvider)
   const factory=createFactoryStore(pool,authorize,{...factoryCheckGates,approval:approvalGate,publish:publishGate})
   const dispatch=createFactoryDispatch(pool,factory,(tx,u,input)=>insertRunOnce(factoryDispatchDatabase(tx),u,input,{deviceId,baseBranch:'main',prompt:input.note??'Synthetic actual queue gate'}))
-  const bridge=createImprovementFactoryBridge(pool,factory,dispatch,assignments)
+  const bridge=createImprovementFactoryBridge(pool,factory,dispatch,assignments,qualityProvider)
   const approvals=createFactoryApprovals(pool,authorize,factory,[])
   const binding=(task:FactoryTask)=>({taskId:task.id,issueId,attemptId:task.attemptId,revision:task.revision,candidateId:task.candidateId})
   async function route() {
@@ -127,14 +140,37 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databa
     assert.equal((await post(req)).status,409)
     assert.equal((await pool.query('SELECT * FROM improvement_factory_links')).rowCount,0)
     await pool.query('UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1',[firstRun,repoId])
+    const originalReport=(await pool.query('SELECT report FROM agent_runs WHERE id=$1',[firstRun])).rows[0].report
+    await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1',[firstRun,JSON.stringify({...originalReport,summary:'mutated after immutable score'})])
+    assert.equal((await post(req)).status,409)
+    await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1',[firstRun,JSON.stringify(originalReport)])
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1',[firstRun])
+    assert.equal((await post(req)).status,409)
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1',[firstRun])
+    assert.equal((await post({...req,agentId:randomUUID()})).status,409)
+    assert.equal((await pool.query('SELECT * FROM improvement_factory_links')).rowCount,0)
     const responses=await Promise.all(Array.from({length:10},()=>post(req)))
     for(const response of responses)assert.equal(response.status,200)
     assert.equal((await pool.query('SELECT * FROM improvement_factory_links')).rowCount,1)
     const link=(await pool.query('SELECT * FROM improvement_factory_links')).rows[0]
     const run=(await pool.query('SELECT * FROM agent_runs WHERE id=$1',[link.runId])).rows[0]
-    assert.ok(run.prompt.includes(proposal.proposal.candidate.diff));assert.ok(!run.prompt.includes('UNTRUSTED'))
+    assert.equal(proposal.proposal.status,'awaiting_model_candidate')
+    assert.equal(proposal.proposal.result.kind,'not_evaluated')
+    assert.equal(proposal.proposal.candidate.baseline,BASELINE_MARKDOWN)
+    assert.ok(run.prompt.includes(JSON.stringify(proposal.proposal.candidate.signals)));assert.ok(!run.prompt.includes('UNTRUSTED'))
+    assert.ok(run.prompt.includes('name: Run report'));assert.ok(run.prompt.length<=10000)
+    assert.equal(proposal.proposal.candidate.diff,undefined)
     assert.equal((await factory.read(userId,task.id)).task.stage,'execute')
     const state=await bridge.status(userId,proposalId);assert.equal(state.productionEligible,false)
+    // A lost response does not exempt replay from current source integrity or cancellation.
+    await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1',[firstRun,JSON.stringify({...originalReport,summary:'mutated before replay'})])
+    assert.equal((await post(req)).status,409)
+    await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1',[firstRun,JSON.stringify(originalReport)])
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1',[firstRun])
+    assert.equal((await post(req)).status,409)
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1',[firstRun])
+    assert.equal((await post(req)).status,200)
+    assert.equal((await pool.query('SELECT * FROM improvement_factory_links')).rowCount,1)
     // Existing #193/#194 instances, not substitute mock gates. Missing real
     // evidence or human approval cannot be turned into a synthetic pass.
     for(const stage of ['review','verify','approval'] as const){

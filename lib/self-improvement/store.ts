@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { commandSchema, digest, ImprovementError, type Feedback } from './contract'
 import { SCORER, SCORER_DIGEST, score } from './scorer'
-import { createSkillCandidate, SKILL_PATH, BASELINE } from './regression'
+import { createGenerationRequest, failureQuality, type FailureQualityProvider, SKILL_PATH, BASELINE } from './regression'
+import { BASELINE_ARTIFACT, BASELINE_MARKDOWN } from './builtin-skill'
 import { assignedSkillForRun } from './assignments'
 
 type Authorize = (userId: string, issueId: string, tx: PoolClient) => Promise<boolean>
@@ -17,7 +18,7 @@ function sameSource(snapshot: Record<string, unknown>, run: Run) {
     snapshot.deviceRepoId === run.deviceRepoId && snapshot.repository === run.repository
 }
 
-export function createImprovementStore(pool: Pool, authorize: Authorize) {
+export function createImprovementStore(pool: Pool, authorize: Authorize, qualityProvider?: FailureQualityProvider) {
   async function withRun<T>(userId: string, runId: string, work: (tx: PoolClient, run: Run, bucket: string) => Promise<T>) {
     if (!userId || !commandSchema.options[1].shape.runId.safeParse(runId).success) throw new ImprovementError('notFound')
     const tx = await pool.connect()
@@ -95,7 +96,7 @@ export function createImprovementStore(pool: Pool, authorize: Authorize) {
       await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`improvement-bucket:${userId}:${bucket}`])
       // One immutable source per distinct run, not per feedback delivery. A
       // previously proposed run cannot repeatedly fund new proposals.
-      const { rows: failures } = await tx.query(`SELECT DISTINCT ON (s."runId") s.id,s."runId",s."createdAt"
+      const { rows: failures } = await tx.query(`SELECT DISTINCT ON (s."runId") s.id,s."runId",s."createdAt",s.reason,s.snapshot
         FROM improvement_scores s JOIN agent_runs r ON r.id=s."runId"
         WHERE s."userId"=$1 AND s.bucket=$2 AND s.outcome='failure'
         AND r."userId"=$1 AND r."issueId"=$3 AND r."agentId"=$4 AND r."deviceRepoId"=$5
@@ -104,29 +105,26 @@ export function createImprovementStore(pool: Pool, authorize: Authorize) {
         ORDER BY s."runId",s."createdAt",s.id`, [userId, bucket, run.issueId, run.agentId, run.deviceRepoId])
       // Lock all source runs and recheck cancellation/binding after any writer
       // that raced the discovery query commits. Lock order is stable by run ID.
-      const { rows: sources } = await tx.query(`SELECT id FROM agent_runs
+      const { rows: sources } = await tx.query(`SELECT id,report FROM agent_runs
         WHERE id=ANY($1::uuid[]) AND "userId"=$2 AND "issueId"=$3 AND "agentId"=$4 AND "deviceRepoId"=$5
         AND status IN ('succeeded','failed') AND "stopRequestedAt" IS NULL
         ORDER BY id FOR SHARE`, [failures.map(row => row.runId), userId, run.issueId, run.agentId, run.deviceRepoId])
-      const eligible = new Set(sources.map(row => row.id))
-      const currentFailures = failures.filter(row => eligible.has(row.runId))
+      const eligible = new Map(sources.map(row => [row.id, row.report]))
+      const currentFailures = failures.filter(row => eligible.has(row.runId)).map(row => ({ ...row, report: eligible.get(row.runId) }))
       const { rows: [age] } = await tx.query(`SELECT min("createdAt") <= now()-($3 * interval '1 day') AS aged
         FROM improvement_scores WHERE "userId"=$1 AND bucket=$2 AND id=ANY($4::uuid[])`, [userId, bucket, SCORER.oldestFailureDays, currentFailures.map(row => row.id)])
       if (currentFailures.length < SCORER.distinctFailures && !age.aged) {
         const { rows: [existing] } = await tx.query('SELECT * FROM improvement_proposals WHERE "userId"=$1 AND bucket=$2 ORDER BY "createdAt" DESC,id DESC LIMIT 1', [userId, bucket])
         return { proposal: existing ?? null, pendingDistinctFailures: currentFailures.length, trigger: 'below_fixed_trigger' }
       }
-      // The first loop leaves the candidate unchanged for human review. Further
-      // feedback cannot manufacture duplicate proposals of identical bytes.
-      const candidate = createSkillCandidate()
-      const fingerprint = digest({ bucket, candidateDigest: candidate.candidateDigest })
+      const { candidate, result } = createGenerationRequest(currentFailures, BASELINE_MARKDOWN, BASELINE_ARTIFACT, await failureQuality(qualityProvider, tx, userId, currentFailures))
+      const fingerprint = digest({ bucket, kind: candidate.kind, sourceIds: candidate.sourceIds, baselineDigest: candidate.baselineDigest })
       const { rows: [existing] } = await tx.query('SELECT * FROM improvement_proposals WHERE "userId"=$1 AND fingerprint=$2', [userId, fingerprint])
-      if (existing) return { proposal: existing, pendingDistinctFailures: currentFailures.length, trigger: 'existing_candidate' }
+      if (existing) return { proposal: existing, pendingDistinctFailures: currentFailures.length, trigger: 'existing_source_proposal' }
       const id = randomUUID()
-      const { result, ...document } = candidate
       const { rows: [proposal] } = await tx.query(`INSERT INTO improvement_proposals(id,"userId",bucket,fingerprint,"issueId","scorerDigest",candidate,result,status)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,'awaiting_independent_review') RETURNING *`,
-      [id, userId, bucket, fingerprint, run.issueId, SCORER_DIGEST, JSON.stringify(document), JSON.stringify(result)])
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,'awaiting_model_candidate') RETURNING *`,
+      [id, userId, bucket, fingerprint, run.issueId, SCORER_DIGEST, JSON.stringify(candidate), JSON.stringify(result)])
       for (const source of currentFailures) await tx.query(`INSERT INTO improvement_proposal_sources("proposalId","scoreId","userId",bucket,"runId") VALUES($1,$2,$3,$4,$5)`, [id, source.id, userId, bucket, source.runId])
       return { proposal, pendingDistinctFailures: 0, trigger: currentFailures.length >= SCORER.distinctFailures ? 'distinct_failures' : 'oldest_failure' }
     })

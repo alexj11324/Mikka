@@ -6,14 +6,25 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { createImprovementStore } from './store'
+import type { FailureQualityProvider } from './regression'
+import { BASELINE_ARTIFACT, BASELINE_MARKDOWN } from './builtin-skill'
 import { handleImprovement } from './http'
 import { digest } from './contract'
 import { SCORER, SCORER_DIGEST } from './scorer'
 import { improvementTestDatabase } from './test-database'
 
+// Explicit test-only training evaluator fixture; no model evaluation or production acceptance claim.
+const qualityProvider: FailureQualityProvider = async (_tx, _userId, sources) => ({
+  instanceId: 'bd646e22-f944-4104-bc11-722d7337b34d', instanceDigest: 'c'.repeat(64),
+  assignmentDigest: digest([...sources].sort((a,b)=>a.runId.localeCompare(b.runId))),
+  fields: { command:{missing:sources.length,incorrect:0}, exitCode:{missing:sources.length,incorrect:0},
+    commit:{missing:sources.length,incorrect:0}, environment:{missing:sources.length,incorrect:0},
+    verification:{missing:sources.length,incorrect:0}, unknowns:{missing:sources.length,incorrect:0} },
+})
+
 const testURL = improvementTestDatabase(process.env)
 const enabled = Boolean(testURL)
-test('actual PG17 and HTTP: immutable feedback → scores → aggregate → candidate → fixed synthetic comparison', { skip: !enabled, timeout: 120000 }, async t => {
+test('actual PG17 and HTTP: immutable feedback → scores → aggregate → immutable request awaiting real model candidate', { skip: !enabled, timeout: 120000 }, async t => {
   // Never fall back to an application URL. Retain this synthetic schema for
   // inspection; deleting fixtures requires separate approval.
   const target = new URL(testURL!)
@@ -52,7 +63,7 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
   let access = true
   const authorizedIssues = new Set<string>([issueId])
   const authorize = async (userId: string, issue: string) => access && userId === owner && authorizedIssues.has(issue)
-  let store = createImprovementStore(pool, authorize)
+  let store = createImprovementStore(pool, authorize, qualityProvider)
   const runs: string[] = []
   async function makeRun(options: { status?: string; agent?: string; repo?: string; issue?: string; report?: unknown } = {}) {
     const id = randomUUID()
@@ -163,16 +174,21 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
     assert.equal((await pool.query('SELECT * FROM improvement_proposals')).rowCount, 1)
     assert.equal((await pool.query('SELECT * FROM improvement_proposal_sources')).rowCount, 25)
     const proposal = results[0].proposal
-    assert.equal(proposal.status, 'awaiting_independent_review')
-    assert.equal(proposal.candidate.candidateDigest, digest(proposal.candidate.content))
-    assert.equal(proposal.result.noRegression, true)
+    assert.equal(proposal.status, 'awaiting_model_candidate')
+    assert.equal(proposal.candidate.baseline, BASELINE_MARKDOWN)
+    assert.equal(proposal.candidate.baselineDigest, BASELINE_ARTIFACT.sha256)
+    assert.equal(proposal.candidate.sourceIds.length, 25)
+    assert.deepEqual(proposal.candidate.sourceIds, [...proposal.candidate.sourceIds].sort())
+    assert.equal(proposal.candidate.content, undefined)
+    assert.equal(proposal.result.kind, 'not_evaluated')
+    assert.equal(proposal.result.noRegression, undefined)
     assert.equal(proposal.result.independentVerification, false)
     assert.equal(proposal.result.productionEligible, false)
-    assert.ok(!proposal.candidate.content.includes('UNTRUSTED'))
+    assert.ok(!JSON.stringify(proposal.candidate).includes('UNTRUSTED'))
     assert.equal((await pool.query('SELECT count(*) FROM factory_tasks')).rows[0].count, '0', 'Offline proposals must not write Factory state')
     await pool.end()
     pool = new Pool({ connectionString: target.toString(), max: 12 })
-    store = createImprovementStore(pool, authorize)
+    store = createImprovementStore(pool, authorize, qualityProvider)
     assert.equal((await propose(first)).proposal.id, proposalId)
     const read = await fetch(`${origin}?runId=${first}`, { headers: { 'x-test-user': 'owner' } })
     assert.equal(read.status, 200)
@@ -191,10 +207,11 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
       VALUES($1,$2,$3,$4,$5,'synthetic-old','unknown','synthetic old receipt',now()-interval '8 days')`, [id, owner, randomUUID(), runId, issueId])
     await pool.query(`INSERT INTO improvement_scores(id,"userId","runId",bucket,"scorerDigest",outcome,reason,snapshot,"createdAt")
       VALUES($1,$2,$3,$4,$5,'failure','synthetic-old','{}',now()-interval '8 days')`, [id, owner, runId, bucket, SCORER_DIGEST])
-    // Existing identical candidate is reused, rather than manufacturing a PR.
+    // A new immutable source set yields a new generation request, never fixed candidate bytes.
     const result = await propose(runId)
-    assert.equal(result.trigger, 'existing_candidate')
-    assert.equal(result.pendingDistinctFailures, 1)
+    assert.equal(result.trigger, 'oldest_failure')
+    assert.equal(result.pendingDistinctFailures, 0)
+    assert.deepEqual(result.proposal.candidate.sourceIds, [id])
 
     const ageAgent = randomUUID()
     await pool.query(`INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,'codex','synthetic-aged-agent')`, [ageAgent, owner])
