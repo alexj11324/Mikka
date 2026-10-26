@@ -1,8 +1,7 @@
 // Applies pending drizzle/*.sql files in order and records each one, so a
 // file runs once per database. Runs as part of `pnpm build`, but only for
 // Vercel production builds unless MIGRATE=1 is set; preview and local builds
-// skip it. Explicit MIGRATE=0 also skips production migration; deployment
-// alone must not override an operator-managed migration plan.
+// skip it. Explicit MIGRATE=0 skips before reading files or opening a database.
 //
 // A file targets MIKKA_DATABASE_URL unless its first lines contain
 // `-- target: DATABASE_URL` (the workspace database).

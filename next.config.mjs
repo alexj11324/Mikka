@@ -40,7 +40,8 @@ const nextConfig = {
     ]
   },
   transpilePackages: ['@mikka/protocol'],
-  serverExternalPackages: ['ai', 'better-auth', 'drizzle-orm'],
+  // Bundle better-auth/react with Next's SSR React dispatcher.
+  serverExternalPackages: ['ai', 'drizzle-orm'],
   // Default pnpm build compiles pinned Linux workers before Next tracing. The binary path is
   // private server configuration, so tracing cannot infer this asset from JS.
   outputFileTracingExcludes: {
