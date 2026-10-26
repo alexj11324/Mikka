@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { retainedGoPattern, retainedGoTap } from './byos-go-evidence.mjs'
+import { retainedGoPattern, retainedGoTap, retainedCleanupSnapshots } from './byos-go-evidence.mjs'
 import { parseEvidence } from '../scripts/db-test-plan.mjs'
 
 test('retained Go evidence requires exact completed tests and refuses pending, skipped or failed output', () => {
@@ -28,4 +28,18 @@ test('retained Go evidence requires exact completed tests and refuses pending, s
   ]) assert.throws(() => retainedGoTap(json(invalid), contract))
   assert.throws(() => retainedGoTap(raw + '\nnot-json', contract))
   assert.throws(() => retainedGoPattern({ ...contract, retainedCount: contract.retainedCount + 1 }))
+})
+
+
+test('cleanup snapshots reassemble split Go output and retain exact two blocked receipts', () => {
+  const snapshot = { Status: 'blocked', EffectsComplete: false, Artifacts: [{ Name: 'a'.repeat(1800) }], Attempts: [{ StateHash: 'b'.repeat(64) }], EnrollmentRows: [] }
+  const make = value => '    fixture.go:1: retained cleanup exact inventory: ' + JSON.stringify(value) + '\n'
+  const log = make(snapshot) + make({ ...snapshot, EnrollmentRows: null })
+  const events = []
+  for (let i = 0; i < log.length; i += 1024) events.push({ Test: 'TestCleanupPauseRetainsArtifactsAndAttempts', Action: 'output', Output: log.slice(i, i + 1024) })
+  const raw = events.map(x => JSON.stringify(x)).join('\n')
+  assert.deepEqual(retainedCleanupSnapshots(raw), [snapshot, { ...snapshot, EnrollmentRows: null }])
+  assert.throws(() => retainedCleanupSnapshots(events.slice(0, -1).map(x => JSON.stringify(x)).join('\n')))
+  assert.throws(() => retainedCleanupSnapshots(raw + '\n' + raw))
+  assert.throws(() => retainedCleanupSnapshots(JSON.stringify({ Test: 'TestCleanupPauseRetainsArtifactsAndAttempts', Action: 'output', Output: make({ ...snapshot, EffectsComplete: true }) })))
 })

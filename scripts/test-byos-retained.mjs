@@ -1,11 +1,11 @@
 // Retained-only acceptance; original worker/native/Go disposal remains pending.
 import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { existsSync, mkdirSync, realpathSync, readFileSync } from "node:fs"
+import { existsSync, mkdirSync, realpathSync, readFileSync, writeFileSync } from "node:fs"
 import { createServer } from "node:net"
 import { fileURLToPath } from "node:url"
 import { Pool } from "pg"
-import { retainedGoPattern, retainedGoTap } from "../tests/byos-go-evidence.mjs"
+import { retainedGoPattern, retainedGoTap, retainedCleanupSnapshots } from "../tests/byos-go-evidence.mjs"
 
 if(process.env.RETAIN_SYNTHETIC_RECORDS!=="1")throw Error("BYOS retained acceptance requires retained synthetic fixtures")
 if (process.platform !== "linux")
@@ -170,6 +170,15 @@ try {
   }
   // Docker exit 0 is required above; raw output stays in the retained log, never stdout.
   console.log(retainedGoTap(readFileSync(goEvidence, "utf8"), goContract))
+  // Publish only the two explicitly synthetic cleanup snapshots, never raw Go logs.
+  const cleanupSnapshots = retainedCleanupSnapshots(readFileSync(goEvidence, "utf8"))
+  mkdirSync(`${root}test-results/r0`, { recursive: true })
+  writeFileSync(`${root}test-results/r0/byos-cleanup-inventory-${suffix}.json`, JSON.stringify({
+    kind: "synthetic-cleanup-setup-only", postgresContainer: name, compilerContainer: compilerName,
+    database, snapshots: cleanupSnapshots, approvalEligible: false,
+    executedDeletion: false, disposition: "retained", source: "TestCleanupPauseRetainsArtifactsAndAttempts"
+  }, null, 2), { mode: 0o600, flag: "wx" })
+
   await run(process.execPath, ["--import", "tsx", "--test", "--test-reporter=tap", "tests/byos-enrollment-migration.db.test.mjs", "tests/byos-environment-transfer.test.mjs", "tests/byos-oauth-retained.db.test.mjs", "tests/byos-binding-retained.db.test.mjs"], {
     ...baseEnv, NODE_ENV:"test", RETAIN_SYNTHETIC_RECORDS:"1", MIKKA_BYOS_FIXTURE_BINARY:`${worker}bin/mikka-subscription-fixture`, MIKKA_BYOS_TEST_DATABASE_URL:url, MIKKA_BYOS_WORKSPACE_TEST_DATABASE_URL:workspaceURL.toString()
   })

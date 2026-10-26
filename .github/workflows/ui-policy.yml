@@ -107,7 +107,7 @@ jobs:
       - run: pnpm test:db-runner
       - run: pnpm test:audit-contract
       - run: pnpm test:disposal-inventory
-      - run: node --import tsx --test lib/factory/agent-absence-setup.unit.test.ts lib/factory/create-only-bootstrap.unit.test.mjs
+      - run: node --import tsx --test lib/factory/agent-absence-setup.unit.test.ts lib/factory/create-only-bootstrap.unit.test.mjs tests/byos-go-evidence.test.mjs
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:issues

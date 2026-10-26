@@ -45,3 +45,31 @@ export function retainedGoTap(raw, contract) {
     `1..${expected.size}`, `# tests ${expected.size}`, `# pass ${expected.size}`,
     '# fail 0', '# skipped 0', '# todo 0', '# cancelled 0'].join('\n')
 }
+
+// Go's test2json may split a single log line across several Output events.
+export function retainedCleanupSnapshots(raw) {
+  const snapshots = []
+  let pending = ''
+  for (const line of raw.split('\n').filter(line => line.trim())) {
+    const event = JSON.parse(line)
+    if (event.Test !== 'TestCleanupPauseRetainsArtifactsAndAttempts' || event.Action !== 'output') continue
+    if (typeof event.Output !== 'string') throw Error('Invalid cleanup output event')
+    pending += event.Output
+    if (pending.length > 65536) throw Error('Cleanup output exceeds receipt budget')
+    let end
+    while ((end = pending.indexOf('\n')) >= 0) {
+      const complete = pending.slice(0, end)
+      pending = pending.slice(end + 1)
+      const match = complete.match(/retained cleanup (?:future )?exact inventory: (\{.*\})$/)
+      if (!match) continue
+      const snapshot = JSON.parse(match[1])
+      if (snapshot.Status !== 'blocked' || snapshot.EffectsComplete !== false ||
+          !Array.isArray(snapshot.Artifacts) || snapshot.Artifacts.length > 4 ||
+          !Array.isArray(snapshot.Attempts) || snapshot.Attempts.length !== 1 ||
+          (snapshot.EnrollmentRows !== null && (!Array.isArray(snapshot.EnrollmentRows) || snapshot.EnrollmentRows.length > 2))) throw Error('Invalid cleanup snapshot receipt')
+      snapshots.push(snapshot)
+    }
+  }
+  if (pending || snapshots.length !== 2) throw Error('Missing exact retained cleanup snapshot receipts')
+  return snapshots
+}

@@ -3,6 +3,7 @@ package worker
 import (
  "context"
  "errors"
+ "encoding/json"
  "testing"
 )
 
@@ -49,6 +50,7 @@ func TestCleanupPauseRetainsArtifactsAndAttempts(t *testing.T){
  calls:=0
  w.cleanupObserver=&cleanupPreviewObserver{ArtifactBudget:4,AttemptBudget:1,Observe:func(p cleanupPreview)error{
   calls++
+  evidence,marshalErr:=json.Marshal(p);if marshalErr!=nil{t.Fatal(marshalErr)};t.Logf("retained cleanup exact inventory: %s",evidence)
   if len(p.EnrollmentRows)!=2{t.Fatal("missing exact enrollment composite PKs")}
   for _,row:=range p.EnrollmentRows{if row.EnrollmentID!=enrollment||row.TransferID!=transfer||row.ConnectionID!=w.Scope.ConnectionID||!row.Eligible||!row.Settled||row.RetainSource{t.Fatal("enrollment association mismatch")}}
 
@@ -64,12 +66,18 @@ func TestCleanupPauseRetainsArtifactsAndAttempts(t *testing.T){
  w.cleanupObserver.Observe=func(cleanupPreview)error{return errors.New("synthetic observer failure")}
  _,err=w.Cleanup(context.Background());if !errors.Is(err,ErrCleanupPaused)||!errors.Is(err,errCleanupPreviewRefused){t.Fatal("observer failure resumed cleanup",err)}
  assertCleanupPreviewRetained(t,w,store,5,state)
+ // A foreign transfer must be refused, never silently omitted by an owner filter.
+ if _,err:=w.Repo.DB.Exec(`update byos_enrollment_transfers set "ownerId"='foreign-fixture' where "enrollmentId"=$1`,enrollment);err!=nil{t.Fatal(err)}
+ w.cleanupObserver.Observe=func(cleanupPreview)error{t.Fatal("foreign enrollment reached observer");return nil}
+ if _,err:=w.Cleanup(context.Background());!errors.Is(err,errCleanupPreviewRefused){t.Fatal("foreign enrollment not refused",err)}
+ assertCleanupPreviewRetained(t,w,store,5,state)
  // Retained active OAuth artifact: its attempt becomes eligible only if an
  // approved future store deletion succeeds. No store call is made here.
  future,futureStore,futureState,futureName:=cleanupPreviewFixture(t,0)
  if _,err:=future.Repo.DB.Exec(`update byos_secret_artifacts set "deletedAt"=null,"publishedAt"=now() where name=$1`,futureName);err!=nil{t.Fatal(err)}
  future.cleanupObserver=&cleanupPreviewObserver{ArtifactBudget:1,AttemptBudget:1,Observe:func(p cleanupPreview)error{
   if len(p.Attempts)!=1||p.Attempts[0].StateHash!=futureState||p.Attempts[0].EligibleNow{t.Fatal("future attempt PK not frozen")}
+  evidence,marshalErr:=json.Marshal(p);if marshalErr!=nil{t.Fatal(marshalErr)};t.Logf("retained cleanup future exact inventory: %s",evidence)
   return nil
  }}
  if _,err:=future.Cleanup(context.Background());!errors.Is(err,ErrCleanupPaused)||errors.Is(err,errCleanupPreviewRefused){t.Fatal(err)}
