@@ -1,7 +1,7 @@
 import 'server-only'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { issues, issueVersions, linearIssueLinks, linearSyncOutbox } from '@/lib/db/schema'
+import { issues, issueVersions, linearIssueLinks, linearIssuePublications, linearSyncOutbox } from '@/lib/db/schema'
 import { activityActor } from '@/lib/activity-actor'
 import { issueView } from '@/lib/task-identifier-server'
 import type { TaskScope } from '@/lib/task-identifier'
@@ -34,8 +34,12 @@ async function changeScopeTransaction(userId: string, input: { id: string; revis
     if (latest.revision !== input.revision) return { error: 'issueStale' as const }
     if (input.scope === 'personal' && !options.allowLinkedPersonal) {
       const [currentLink] = await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(eq(linearIssueLinks.issueId, input.id)).limit(1)
-      const [outgoing] = await tx.select({ id: linearSyncOutbox.id }).from(linearSyncOutbox).where(and(eq(linearSyncOutbox.issueId, input.id), inArray(linearSyncOutbox.status, ['queued', 'processing']))).limit(1)
-      if (currentLink || outgoing) return { error: 'issueScopeInLinear' as const }
+      const [outgoing] = await tx.select({ id: linearSyncOutbox.id }).from(linearSyncOutbox).where(and(eq(linearSyncOutbox.issueId, input.id), inArray(linearSyncOutbox.status, ['queued', 'processing', 'failed']))).limit(1)
+      // A committed reservation can have reached the provider even if every
+      // response/lookup was lost. Terminal jobs and absent links prove nothing
+      // about remote existence; keep disposition unresolved and fail closed.
+      const [publication] = await tx.select({ id: linearIssuePublications.id }).from(linearIssuePublications).where(eq(linearIssuePublications.issueId, input.id)).limit(1)
+      if (currentLink || outgoing || publication) return { error: 'issueScopeInLinear' as const }
     }
     const [saved] = await tx.update(issues).set({ scope: input.scope, scopeSetBy: 'user', scopeConfidence: null, revision: latest.revision + 1, updatedAt: new Date() })
       .where(and(eq(issues.id, latest.id), eq(issues.userId, userId), eq(issues.revision, input.revision))).returning()

@@ -2,7 +2,7 @@
 
 The policy choice in [#184](https://github.com/alexj11324/Mikka/issues/184) remains open: its text says “Archiving the Linear issue is the proposed default.” It retains an explicit **Open point** for unlink-only, and has no comments confirming either policy. [#91](https://github.com/alexj11324/Mikka/pull/91) and [#160](https://github.com/alexj11324/Mikka/pull/160) provided identifiers and the forward transition; neither completed the reverse transition. No equivalent active scope candidate was found beyond this PR.
 
-Branch `codex/184-personal-revert-20261026` is based on main `470c5cd4873634ff2b992598349ab52cffe1ee62`; R/Claude's main changes, CLA deletion, UI layout and auth/migration-runner logic are preserved. The public action still uses `allowLinkedPersonal: false`. Its linked/queued Linear transition remains closed until the provider disposition is selected and reviewed. The internal transition is exercised only on synthetic fixtures.
+Branch `codex/184-personal-revert-20261026` is based on main `470c5cd4873634ff2b992598349ab52cffe1ee62`; R/Claude's main changes, CLA deletion, UI layout and auth/migration-runner logic are preserved. The public action still uses `allowLinkedPersonal: false`. Its linked, queued/processing/failed, or retained-publication Linear transition remains closed until the provider disposition is selected and reviewed. The internal transition is exercised only on synthetic fixtures.
 
 ## Completed backend behavior
 
@@ -40,11 +40,23 @@ node --test-force-exit --import ./scripts/server-test.mjs --import tsx \
   --test tests/issue-scope-detachment.db.test.ts
 ```
 
-**23 tests pass, zero failures/skips.** They cover owner/stale/pending gates; concurrent clicks; identifier/history; immediate task/run/token/lease revocation; native claim HTTP 200 before and 409 after retirement; stale imports/comments/inbox/outbox; rollback; queue/scope and heartbeat/completion deadlocks; native HTTP completion paused after live-read; atomic completion/retirement ordering; postcommit generation dispatch; compatibility controls; delayed update/create/failure; old comment isolation; repeated re-publication; old-job replay; webhook diagnostic races; lost-response retry with one stable identity; and claim reclamation with a fresh snapshot. The final migration also passes reapplication without losing retained identities.
+**28 tests pass, zero failures/skips.** They cover owner/stale/pending gates; concurrent clicks; identifier/history; immediate task/run/token/lease revocation; native claim HTTP 200 before and 409 after retirement; stale imports/comments/inbox/outbox; rollback; queue/scope and heartbeat/completion deadlocks; native HTTP completion paused after live-read; atomic completion/retirement ordering; postcommit generation dispatch; compatibility controls; delayed update/create/failure; old comment isolation; repeated re-publication; old-job replay; webhook diagnostic races; lost-response retry with one stable identity; and claim reclamation with a fresh snapshot. The final migration also passes reapplication without losing retained identities.
 
-The real production GraphQL/client/token code made **34 synthetic GraphQL calls redirected to a loopback HTTP provider fixture**, with controlled delayed/lost responses. All other non-loopback fetches are prohibited; real provider requests remain **zero**. This is a mock provider boundary over real HTTP, not real Linear acceptance or a deployed Preview.
+The real production GraphQL/client/token code made **70 synthetic GraphQL calls redirected to a loopback HTTP provider fixture**, with controlled delayed/lost responses. All other non-loopback fetches are prohibited; real provider requests remain **zero**. This is a mock provider boundary over real HTTP, not real Linear acceptance or a deployed Preview.
 
 Additional checks: typecheck; denied-warning oxlint; UI/interaction lint; migration/i18n checks; 83 issue tests; 17 Linear tests; protocol completion tests 4/4; and migration/inventory/i18n regressions. The CI inventory change only pins the existing new DB suite; migration-runner logic is unchanged. Raw logs, fixture IDs, CI summaries and synthetic-only PG dumps are retained under `/workspace/scratch/issue184-evidence/`.
+
+## Public retry generation regression
+
+The independent review reproduced a P2 regression at `38ee473`: after the ordinary public personal-to-workspace action creates generation 2 and its initial job is done, `retryLinearIssue` inserted a new job with the database default generation 1. The worker made no provider request, marked it done and left the link pending. The retained pre-fix run asserts `1 !== 2`; the normal forward action itself succeeds as a control.
+
+The public retry now takes the task row lock, rechecks owner/current workspace/deletion state, and captures the current generation in that transaction. It restarts failed jobs only in that generation, clears their claim, and inserts explicit generation for new work. Stale open jobs are finished without retagging their identity; old failed jobs remain retained. The task lock serializes retries without taking the old issue-ID advisory lock in the reverse order from imports. A retry that waited for retirement returns an error without enqueue or dispatch. A retry that waited for a personal/workspace round trip captures generation 3 and publishes a fresh remote UUID.
+
+Both public actions execute with the actual Next `AfterContext` lifecycle in the real PG suite; their scheduled worker callbacks run after the action. The regression asserts queued generation before response close, provider HTTP after close, and final synced link/done job. It also covers restarting a current-generation failed job and preserving old-generation failed/processing identities.
+
+The conservative public personal gate now checks **any retained publication** and **failed outbox jobs**, as well as links and queued/processing work. A real loopback sequence makes seven transport failures, then succeeds remotely on attempt eight while losing both response and fallback lookup. With no link and an exhausted failed job, the action stays blocked with unchanged scope/revision and zero additional provider calls. A reservation still blocks after its job becomes terminal; a failed job without a reservation also blocks. Absence of a link or a terminal job is not proof that an external issue does not exist. These are policy guards, not authorization to archive.
+
+The before/after logs (`issue184-retry-before.log`, `issue184-retry-after.log`), public-action fixture IDs, provider JSONB evidence and synthetic-only dumps remain under `/workspace/scratch/issue184-evidence/`. Typecheck, denied-warning lint and 17 Linear unit tests pass for this increment; exact-head CI results are recorded in `manifest.json` after completion. Real Linear requests remain zero.
 
 ## Remaining policy and acceptance gates
 

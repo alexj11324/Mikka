@@ -1,3 +1,4 @@
+import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -42,6 +43,19 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const { changeIssueScopeLocally } = await import('../lib/issue-scope-store')
   const { actAs } = await import('../lib/acting-user')
   const { setIssueScope } = await import('../app/actions/issues')
+  const { retryLinearIssue } = await import('../app/actions/linear-sync')
+  const { AfterContext } = await import('next/dist/server/after/after-context')
+  const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
+  // Run the public actions and their actual Next after callbacks in request order.
+  async function action<T>(fn: () => Promise<T>, beforeClose?: () => Promise<void>) {
+    const waits: Promise<unknown>[] = [], errors: unknown[] = []
+    let close = () => {}
+    const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: callback => { close = callback }, onTaskError: error => { errors.push(error) } })
+    return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, async () => {
+      try { const result = await actAs(owner, fn); await beforeClose?.(); return result }
+      finally { close(); await Promise.all(waits); assert.deepEqual(errors, []) }
+    })
+  }
   const { issueForUser } = await import('../lib/issue-access')
   const { readRun, queueRun, visibleRuns } = await import('../lib/agent-runs')
   const { issueRunToken, verifyRunToken } = await import('../lib/mcp/worker')
@@ -538,6 +552,110 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,1)
     assert.deepEqual(provider.requests.filter(record=>record.operation==='MikkaLinearCreateIssue'&&record.variables.input?.id===reserved.linearIssueId).map(record=>record.variables.input!.id),[reserved.linearIssueId,reserved.linearIssueId])
     assert.deepEqual((await pool.query('select status,attempts from linear_sync_outbox where "issueId"=$1',[id])).rows[0],{status:'done',attempts:2})
+  })
+  await t.test('public forward scope and manual retry both publish generation 2, including a new outbox after done', async () => {
+    const id=randomUUID();fixtureIds.push(id)
+    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Public forward control\',$3,\'todo\',\'normal\',\'personal\')',[id,owner,doc])
+    await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,owner])
+    assert.ok('issue' in await action(()=>setIssueScope({id,revision:1,scope:'workspace'})))
+    const before=(await pool.query('select * from linear_issue_links where "issueId"=$1',[id])).rows[0]
+    assert.ok(before);assert.equal(before.syncStatus,'synced')
+    assert.equal((await pool.query('select "scopeVersion" from issues where id=$1',[id])).rows[0].scopeVersion,2)
+    const calls=provider.requests.length
+    assert.deepEqual(await action(()=>retryLinearIssue(id),async()=>{
+      const job=(await pool.query('select "scopeVersion" from linear_sync_outbox where "issueId"=$1 and status=\'queued\'',[id])).rows[0]
+      assert.equal(job?.scopeVersion,2)
+    }),{success:true})
+    assert.ok(provider.requests.length>calls,'manual retry must reach the loopback provider')
+    const after=(await pool.query('select * from linear_issue_links where "issueId"=$1',[id])).rows[0]
+    assert.equal(after.linearIssueId,before.linearIssueId);assert.equal(after.syncStatus,'synced')
+    assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status=\'done\' and "scopeVersion"=2',[id])).rows[0].n,2)
+    // A failed job from an older generation must never be retagged/restarted.
+    const stale=randomUUID()
+    await pool.query('insert into linear_sync_outbox (id,"issueId","scopeVersion",status) values ($1,$2,1,\'failed\')',[stale,id])
+    assert.deepEqual(await action(()=>retryLinearIssue(id)),{success:true})
+    assert.equal((await pool.query('select status from linear_sync_outbox where id=$1',[stale])).rows[0].status,'failed')
+    assert.equal((await pool.query('select "syncStatus" from linear_issue_links where "issueId"=$1',[id])).rows[0].syncStatus,'synced')
+    const current=(await pool.query('select id from linear_sync_outbox where "issueId"=$1 and "scopeVersion"=2 order by "createdAt" desc limit 1',[id])).rows[0]
+    await pool.query('update linear_sync_outbox set status=\'failed\',attempts=8,"lastError"=\'synthetic exhausted\' where id=$1',[current.id])
+    assert.deepEqual(await action(()=>retryLinearIssue(id)),{success:true})
+    assert.deepEqual((await pool.query('select status,attempts,"scopeVersion" from linear_sync_outbox where id=$1',[current.id])).rows[0],{status:'done',attempts:1,scopeVersion:2})
+    const staleOpen=randomUUID()
+    await pool.query('insert into linear_sync_outbox (id,"issueId","scopeVersion",status,"claimToken") values ($1,$2,1,\'processing\',$3)',[staleOpen,id,randomUUID()])
+    assert.deepEqual(await action(()=>retryLinearIssue(id),async()=>{
+      assert.deepEqual((await pool.query('select status,"claimToken","scopeVersion" from linear_sync_outbox where id=$1',[staleOpen])).rows[0],{status:'done',claimToken:null,scopeVersion:1})
+      assert.equal((await pool.query('select "scopeVersion" from linear_sync_outbox where "issueId"=$1 and status=\'queued\'',[id])).rows[0].scopeVersion,2)
+    }),{success:true})
+    assert.equal((await pool.query('select "syncStatus" from linear_issue_links where "issueId"=$1',[id])).rows[0].syncStatus,'synced')
+  })
+  await t.test('public retry revalidates personal scope after waiting for retirement and never dispatches',async()=>{
+    const id=randomUUID();await seed(id,id,false)
+    const lock=await pool.connect()
+    let retry:Promise<unknown>|undefined
+    try {
+      await lock.query('begin');await lock.query('select id from issues where id=$1 for update',[id])
+      retry=action(()=>retryLinearIssue(id))
+      await waitFor(async()=>Boolean((await pool.query("select 1 from pg_stat_activity where datname=current_database() and wait_event_type='Lock' and query like '%issues%for update%' and pid<>pg_backend_pid()")).rows[0]),'retry did not reach the task lock')
+      await lock.query('update issues set scope=\'personal\',revision=revision+1 where id=$1',[id])
+      const calls=provider.requests.length
+      await lock.query('commit')
+      assert.deepEqual(await retry,{error:'linearIssueInvalid'})
+      assert.equal(provider.requests.length,calls)
+      assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status<>\'done\'',[id])).rows[0].n,0)
+      assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,0)
+    } finally {await lock.query('rollback');lock.release();if(retry) await retry}
+  })
+  await t.test('public retry captures the new generation after a locked personal/workspace round trip',async()=>{
+    const id=randomUUID();await seed(id,id,false)
+    const lock=await pool.connect()
+    let retry:Promise<unknown>|undefined
+    try {
+      await lock.query('begin');await lock.query('select id from issues where id=$1 for update',[id])
+      retry=action(()=>retryLinearIssue(id),async()=>{
+        assert.equal((await pool.query('select "scopeVersion" from linear_sync_outbox where "issueId"=$1 and status=\'queued\'',[id])).rows[0].scopeVersion,3)
+      })
+      await waitFor(async()=>Boolean((await pool.query("select 1 from pg_stat_activity where datname=current_database() and wait_event_type='Lock' and query like '%issues%for update%' and pid<>pg_backend_pid()")).rows[0]),'retry did not wait for the scope lock')
+      await lock.query('update issues set scope=\'personal\',revision=revision+1 where id=$1',[id])
+      await lock.query('update issues set scope=\'workspace\',revision=revision+1 where id=$1',[id])
+      // Simulate the forward enqueue already consumed before the manual retry.
+      await lock.query('update linear_sync_outbox set status=\'done\' where "issueId"=$1',[id])
+      await lock.query('commit')
+      assert.deepEqual(await retry,{success:true})
+      const link=(await pool.query('select * from linear_issue_links where "issueId"=$1',[id])).rows[0]
+      assert.equal(link.syncStatus,'synced');assert.notEqual(link.linearIssueId,id)
+      assert.equal((await pool.query('select "scopeVersion" from linear_issue_publications where id=$1',[link.publicationId])).rows[0].scopeVersion,3)
+      assert.ok(provider.issues.has(link.linearIssueId));assert.equal(provider.issues.has(id),false)
+    } finally {await lock.query('rollback');lock.release();if(retry) await retry}
+  })
+  await t.test('public retirement remains gated after a lost create and all eight retries with no link',async()=>{
+    const id=randomUUID();await seed(id,id,false)
+    for(let attempt=1;attempt<=7;attempt++) {
+      provider.failNext('MikkaLinearCreateIssue');provider.failNext('MikkaLinearIssue')
+      await pool.query('update linear_sync_outbox set "availableAt"=now() where "issueId"=$1',[id])
+      await processLinearIssueOutbox(id)
+      assert.deepEqual((await pool.query('select status,attempts from linear_sync_outbox where "issueId"=$1',[id])).rows[0],{status:'queued',attempts:attempt})
+    }
+    const hold=provider.hold('MikkaLinearCreateIssue','after',true)
+    provider.failNext('MikkaLinearIssue')
+    await pool.query('update linear_sync_outbox set "availableAt"=now() where "issueId"=$1',[id])
+    const last=processLinearIssueOutbox(id)
+    await hold.arrived;hold.release();await last
+    assert.ok(provider.issues.has(id),'synthetic create really succeeded before the response was lost')
+    assert.deepEqual((await pool.query('select status,attempts from linear_sync_outbox where "issueId"=$1',[id])).rows[0],{status:'failed',attempts:8})
+    assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,0)
+    const calls=provider.requests.length
+    assert.deepEqual(await actAs(owner,()=>setIssueScope({id,revision:1,scope:'personal'})),{error:'issueScopeInLinear'})
+    // A reservation is independently sufficient even when the job is terminal.
+    await pool.query('update linear_sync_outbox set status=\'done\' where "issueId"=$1',[id])
+    assert.deepEqual(await actAs(owner,()=>setIssueScope({id,revision:1,scope:'personal'})),{error:'issueScopeInLinear'})
+    assert.deepEqual((await pool.query('select scope,revision from issues where id=$1',[id])).rows[0],{scope:'workspace',revision:1})
+    assert.equal(provider.requests.length,calls)
+  })
+  await t.test('a failed outbox without a publication also conservatively gates the public scope action',async()=>{
+    const id=randomUUID();await seed(id,id,false)
+    await pool.query('update linear_sync_outbox set status=\'failed\',attempts=8 where "issueId"=$1',[id])
+    assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,0)
+    assert.deepEqual(await actAs(owner,()=>setIssueScope({id,revision:1,scope:'personal'})),{error:'issueScopeInLinear'})
   })
   await t.test('a reclaimed outbox claim fences the old response and refreshes its snapshot after the writer lock',async()=>{
     const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
