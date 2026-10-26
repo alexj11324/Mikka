@@ -59,7 +59,7 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem'>
 export const MOCK_READ_KEY = 'mikka:mock-conversation-read:'
 
 /**
- * Local mock until Backend ships the API. Persists per conversation in localStorage so two
+ * In-memory/localStorage stand-in for the API, used by unit tests. Persists per conversation in localStorage so two
  * tabs share it (storage events) and e2e can seed it. Follows the server rules: messageId must
  * be a persisted message the page has observed, given either as its uuid or its numeric position
  * (422 only when no such message exists), forward-only via max(). unreadCount
@@ -116,5 +116,4 @@ export function createMockReadSource(storage: () => StorageLike | null = () => (
   }
 }
 
-// TODO(MIK-8): switch to `httpReadSource` once Backend & Infra ship /api/conversations/:id/read.
-export const conversationReadSource: ConversationReadSource = createMockReadSource()
+export const conversationReadSource: ConversationReadSource = httpReadSource

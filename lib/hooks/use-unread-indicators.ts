@@ -94,14 +94,17 @@ export function useUnreadIndicators({ conversationId, items, rootRef, source = c
 
   useEffect(() => { const id = requestAnimationFrame(measure); return () => cancelAnimationFrame(id) }, [items, divider, measure])
 
-  // On open, place the divider about a third of the way down the viewport.
+  // On open, place the divider about a third of the way down the viewport. The scroller applies
+  // its own scroll-to-end one frame after content first appears, so wait a frame past that.
   const placed = useRef(false)
+  const placeFrame = useRef(0)
   useEffect(() => {
     if (placed.current || divider === undefined) return
     placed.current = true
-    const id = requestAnimationFrame(() => { if (divider !== null) scrollToDivider(); ready.current = true; measure() })
-    return () => cancelAnimationFrame(id)
+    placeFrame.current = requestAnimationFrame(() => { placeFrame.current = requestAnimationFrame(() => { if (divider !== null) scrollToDivider(); ready.current = true; measure() }) })
   })
+  // Only unmount cancels the placement; a re-render in between must not drop it.
+  useEffect(() => () => cancelAnimationFrame(placeFrame.current), [])
 
   function scrollToDivider() {
     const element = viewport()

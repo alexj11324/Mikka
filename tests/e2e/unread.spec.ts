@@ -1,19 +1,20 @@
-import type { Page } from '@playwright/test'
-import { test, expect, register } from './fixtures'
+import type { BrowserContext, Page } from '@playwright/test'
+import { test, expect, register, app } from './fixtures'
 
-// MIK-8. Backend's /api/conversations/:id/read is not live yet, so the UI reads its
-// position from the localStorage-backed mock source (lib/conversation-reads.ts); tests
-// seed that key. Messages come from rewriting only the `getCoordinatorChat` server
-// action response (same approach as working-status.spec.ts); no production code changes.
-const READ_KEY = 'mikka:mock-conversation-read:coordinator'
+// MIK-8. Messages come from rewriting only the `getCoordinatorChat` server action response
+// (same approach as working-status.spec.ts), so their positions aren't real rows. The read API
+// is answered here with the server's rules (lib/conversation-reads-store.ts): forward-only,
+// 422 for a message the chat doesn't have. One store per browser context, so two pages share it.
 type Item = { position: number; from: 'person' | 'coordinator'; text: string; tools: string[]; createdAt: string; pending?: true }
 const message = (position: number, from: Item['from'] = 'coordinator'): Item => ({ position, from, text: `消息 ${position} ${'内容 '.repeat(40)}`, tools: [], createdAt: '2026-10-22T00:00:00.000Z' })
 const range = (from: number, to: number, who: Item['from'] = 'coordinator') => Array.from({ length: to - from + 1 }, (_, index) => message(from + index, who))
 
+const chats = new WeakMap<BrowserContext, { items: Item[] }>()
 const ITEMS = /"items"\s*:\s*\[[^\]]*\]/
 
 async function mockChat(page: Page, initial: Item[]) {
   const state = { items: initial, rewrites: 0, actionId: null as string | null }
+  chats.set(page.context(), state)
   await page.route('**/*', async route => {
     const request = route.request()
     const actionId = request.headers()['next-action']
@@ -30,27 +31,43 @@ async function mockChat(page: Page, initial: Item[]) {
   return state
 }
 
-async function seedRead(page: Page, position: number | null, extra: Record<string, unknown> = {}) {
-  // Only on the first load of this page, so a reload / second page doesn't reset state.
-  await page.addInitScript(([key, value, more]) => {
-    if (sessionStorage.getItem('mik8-seeded')) return
-    sessionStorage.setItem('mik8-seeded', '1')
-    if (value === null && !Object.keys(more).length) localStorage.removeItem(key)
-    else localStorage.setItem(key, JSON.stringify({ lastReadMessageId: value === null ? null : String(value), lastReadPosition: value, unreadCount: 0, ...more }))
-  }, [READ_KEY, position, extra] as [string, number | null, Record<string, unknown>])
+type ReadState = { lastReadPosition: number | null; posts: number; simulateStatus?: number }
+const reads = new WeakMap<BrowserContext, ReadState>()
+
+async function seedRead(page: Page, position: number | null, extra: { simulateStatus?: number } = {}) {
+  const context = page.context()
+  const existing = reads.get(context)
+  if (existing) return existing
+  const state: ReadState = { lastReadPosition: position, posts: 0, ...extra }
+  reads.set(context, state)
+  const answer = () => ({ lastReadMessageId: state.lastReadPosition === null ? null : String(state.lastReadPosition), lastReadPosition: state.lastReadPosition, unreadCount: 0 })
+  await context.route('**/api/conversations/coordinator/read', async route => {
+    const request = route.request()
+    if (request.method() === 'GET') return route.fulfill({ json: answer() })
+    state.posts++
+    if (state.simulateStatus) return route.fulfill({ status: state.simulateStatus, json: { error: 'simulated' } })
+    const messageId = (JSON.parse(request.postData() ?? '{}') as { messageId?: string }).messageId ?? ''
+    const target = Number(messageId)
+    if (!/^\d+$/.test(messageId) || !chats.get(context)?.items.some(item => item.position === target && !item.pending)) return route.fulfill({ status: 422, json: { error: 'messageNotFound' } })
+    state.lastReadPosition = Math.max(state.lastReadPosition ?? 0, target)
+    return route.fulfill({ json: answer() })
+  })
+  return state
 }
-const storedPosts = (page: Page) => page.evaluate(key => JSON.parse(localStorage.getItem(key) ?? 'null')?.posts ?? 0, READ_KEY)
+const storedPosts = (page: Page) => reads.get(page.context())?.posts ?? 0
 
 async function openCoordinator(page: Page) {
   await page.getByRole('button', { name: 'Coordinator', exact: true }).first().click()
   await expect(page.getByRole('region', { name: 'Coordinator', exact: true })).toBeVisible()
 }
 
+// The sidebar previews the last message too, so look inside the conversation only.
+const conversation = (page: Page) => page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
 const divider = (page: Page) => page.locator('[data-unread-divider]')
 const topPill = (page: Page) => page.locator('[data-unread-pill="up"]')
 const bottomPill = (page: Page) => page.locator('[data-unread-pill="down"]')
 const viewport = (page: Page) => page.locator('[data-slot="message-scroller-viewport"]')
-const storedPosition = (page: Page) => page.evaluate(key => JSON.parse(localStorage.getItem(key) ?? 'null')?.lastReadPosition ?? null, READ_KEY)
+const storedPosition = (page: Page) => reads.get(page.context())?.lastReadPosition ?? null
 
 
 test('未读：首次进入没有已读记录时不显示分隔线', async ({ page }) => {
@@ -58,7 +75,7 @@ test('未读：首次进入没有已读记录时不显示分隔线', async ({ pa
   await seedRead(page, null)
   await register(page)
   await openCoordinator(page)
-  await expect(page.getByText('消息 6', { exact: false })).toBeVisible()
+  await expect(conversation(page).getByText('消息 6', { exact: false })).toBeVisible()
   await expect(divider(page)).toHaveCount(0)
   expect(chat.rewrites, '必须真正改写到 getCoordinatorChat').toBeGreaterThan(0)
 })
@@ -68,7 +85,7 @@ test('未读：全部已读时不显示分隔线', async ({ page }) => {
   await seedRead(page, 6)
   await register(page)
   await openCoordinator(page)
-  await expect(page.getByText('消息 6', { exact: false })).toBeVisible()
+  await expect(conversation(page).getByText('消息 6', { exact: false })).toBeVisible()
   await expect(divider(page)).toHaveCount(0)
   expect(chat.rewrites).toBeGreaterThan(0)
 })
@@ -78,7 +95,7 @@ test('未读：自己发的消息不产生分隔线', async ({ page }) => {
   await seedRead(page, 3)
   await register(page)
   await openCoordinator(page)
-  await expect(page.getByText('消息 4', { exact: false })).toBeVisible()
+  await expect(conversation(page).getByText('消息 4', { exact: false })).toBeVisible()
   await expect(divider(page)).toHaveCount(0)
 })
 
@@ -125,13 +142,13 @@ test('未读：不在底部时有新消息进来出现底部按钮，点击滚�
   await seedRead(page, 30)
   await register(page)
   await openCoordinator(page)
-  await expect(page.getByText('消息 30', { exact: false })).toBeInViewport()
+  await expect(conversation(page).getByText('消息 30', { exact: false })).toBeInViewport()
   await viewport(page).evaluate(element => element.scrollTo({ top: 0 }))
   chat.items = [...chat.items, ...range(31, 33)]
   // Coordinator polls every 10s when idle.
   await expect(bottomPill(page)).toContainText('3 条新消息', { timeout: 15_000 })
   await bottomPill(page).getByRole('button', { name: /条新消息/ }).click()
-  await expect(page.getByText('消息 33', { exact: false })).toBeInViewport()
+  await expect(conversation(page).getByText('消息 33', { exact: false })).toBeInViewport()
   await expect(bottomPill(page)).toHaveCount(0)
 })
 
@@ -140,7 +157,7 @@ test('未读：手动滚到底部时底部按钮自动消失，计数归零', as
   await seedRead(page, 30)
   await register(page)
   await openCoordinator(page)
-  await expect(page.getByText('消息 30', { exact: false })).toBeInViewport()
+  await expect(conversation(page).getByText('消息 30', { exact: false })).toBeInViewport()
   await viewport(page).evaluate(element => element.scrollTo({ top: 0 }))
   chat.items = [...chat.items, ...range(31, 32)]
   await expect(bottomPill(page)).toBeVisible({ timeout: 15_000 })
@@ -195,32 +212,36 @@ test('未读：可视区域最后一条是未落库的合成消息时，上报�
   await openCoordinator(page)
   await expect.poll(() => storedPosition(page)).toBeGreaterThan(10)
   await viewport(page).evaluate(element => element.scrollTo({ top: element.scrollHeight }))
-  await expect(page.getByText('消息 31', { exact: false })).toBeInViewport()
+  await expect(conversation(page).getByText('消息 31', { exact: false })).toBeInViewport()
   await expect.poll(() => storedPosition(page), { timeout: 5000 }).toBe(30)
   await page.waitForTimeout(2500)
   expect(await storedPosition(page)).toBe(30)
 })
 
-for (const status of [422, 403]) {
-  test(`未读：POST /read 返回 ${status} 时静默降级，界面无报错且不重试`, async ({ page }) => {
-    await mockChat(page, range(1, 40))
-    await seedRead(page, 10, { simulateStatus: status })
-    await register(page)
-    await openCoordinator(page)
-    await expect(divider(page)).toBeInViewport()
-    await expect.poll(() => storedPosts(page), { timeout: 5000 }).toBeGreaterThan(0)
-    for (const top of [0.5, 0.8, 1]) {
-      await viewport(page).evaluate((element, ratio) => element.scrollTo({ top: element.scrollHeight * ratio }), top)
-      await page.waitForTimeout(1500)
-    }
-    await page.evaluate(() => {
-      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
-      document.dispatchEvent(new Event('visibilitychange'))
+for (const [status, reason] of [[422, 'Unprocessable Entity'], [403, 'Forbidden']] as const) {
+  test.describe(`POST ${status}`, () => {
+    // The one failed POST is logged by the browser; anything beyond it means a retry or a real error.
+    test.use({ expectedConsoleErrors: [{ path: app('/api/conversations/coordinator/read'), message: `Failed to load resource: the server responded with a status of ${status} (${reason})` }] })
+    test(`未读：POST /read 返回 ${status} 时静默降级，界面无报错且不重试`, async ({ page }) => {
+      await mockChat(page, range(1, 40))
+      await seedRead(page, 10, { simulateStatus: status })
+      await register(page)
+      await openCoordinator(page)
+      await expect(divider(page)).toBeInViewport()
+      await expect.poll(() => storedPosts(page), { timeout: 5000 }).toBeGreaterThan(0)
+      for (const top of [0.5, 0.8, 1]) {
+        await viewport(page).evaluate((element, ratio) => element.scrollTo({ top: element.scrollHeight * ratio }), top)
+        await page.waitForTimeout(1500)
+      }
+      await page.evaluate(() => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+      await page.waitForTimeout(500)
+      expect(await storedPosts(page), '失败后本次访问不再发送').toBe(1)
+      expect(await storedPosition(page)).toBe(10)
+      await expect(divider(page)).toHaveCount(1)
+      await expect(page.getByRole('alert').filter({ hasText: /失败|错误|出错|error|failed/i })).toHaveCount(0)
     })
-    await page.waitForTimeout(500)
-    expect(await storedPosts(page), '失败后本次访问不再发送').toBe(1)
-    expect(await storedPosition(page)).toBe(10)
-    await expect(divider(page)).toHaveCount(1)
-    await expect(page.getByRole('alert').filter({ hasText: /失败|错误|出错|error|failed/i })).toHaveCount(0)
   })
 }
