@@ -171,3 +171,10 @@ the separate verification container on this vfs-backed host, including on a
 standalone retry. No timeout or assertion was relaxed, and leaked disposable
 containers from those failed tests were removed. Neither result is real-provider
 acceptance.
+
+A device-authenticated exact-operation review ledger now checks the run owner,
+workspace, bound Bot and display before recording a review. A session-authenticated
+owner can approve or deny a single operation; altered digests, cross-workspace
+decisions, stale/cancelled runs and replay are rejected. Run-wide approval is
+not implemented and fails explicitly. This ledger is not yet wired to the
+hosted daemon or chat events, so it is not end-to-end approval acceptance.

@@ -31,6 +31,7 @@ jobs:
       - run: pnpm exec oxlint --deny-warnings lib/computer app/api/bots
       - run: pnpm --filter @mikka/protocol exec vitest run src/computer.test.ts
       - run: node --import ./scripts/server-test.mjs --import tsx --test lib/computer/handler.test.ts
+      - run: node --import ./scripts/server-test.mjs --import tsx --test lib/cua/local-review.test.ts
       - run: node --test packages/daemon/src/computer/broker.test.mjs
       - run: node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts
         env:
