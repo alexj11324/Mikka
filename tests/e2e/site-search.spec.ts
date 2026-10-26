@@ -77,7 +77,7 @@ test('owner titles and authorized group titles page beyond 100 with exact projec
 test('auth, unsupported sources, invalid input and workspace existence share private responses', async ({ request }) => {
   expect((await get(request, { source: 'history' }, false)).response.status()).toBe(401)
   for (const source of ['agents', 'knowledge']) expect((await get(request, { source })).response.status()).toBe(422)
-  for (const params of [{ source: 'history', q: 'x'.repeat(201) }, { source: 'history', cursor: 'bad' }, { source: 'groups' }, { source: 'history', workspaceId: workspace }]) expect((await get(request, params)).response.status()).toBe(400)
+  for (const params of [{ source: 'history', q: 'x'.repeat(201) }, { source: 'history', cursor: 'bad' }, { source: 'groups' }, { source: 'history', workspaceId: workspace }] as Record<string, string>[]) expect((await get(request, params)).response.status()).toBe(400)
   const foreign = await get(request, { source: 'groups', workspaceId: otherWorkspace })
   const missing = await get(request, { source: 'groups', workspaceId: randomUUID() })
   expect(foreign.response.status()).toBe(403)
@@ -86,7 +86,7 @@ test('auth, unsupported sources, invalid input and workspace existence share pri
   expect((await get(request, { source: 'history', q: 'different', cursor: first.body.nextCursor })).response.status()).toBe(400)
 })
 
-test('continuations recheck group leave, workspace suspension and real auth expiry', async ({ request }) => {
+test('continuations recheck group leave, workspace suspension and real auth revocation', async ({ request }) => {
   const params = { source: 'groups', workspaceId: workspace, q: `${prefix}-group-`, limit: '1' }
   const first = await get(request, params)
   expect(first.body.nextCursor).toBeTruthy()
@@ -100,6 +100,7 @@ test('continuations recheck group leave, workspace suspension and real auth expi
   expect((await get(request, { source: 'tasks', workspaceId: workspace })).response.status()).toBe(403)
   // Owner archives remain personal even when a workspace membership is suspended.
   expect((await get(request, { source: 'history', q: `${prefix}-history-` })).body.items.length).toBeGreaterThan(0)
-  await pool.query('update session set "expiresAt"=now()-interval \'1 second\' where id=$1', [sessionId])
+  await pool.query('update session set token=$1 where id=$2', [randomUUID(), sessionId])
   expect((await get(request, { source: 'history' })).response.status()).toBe(401)
+  expect((await pool.query('select id from session where id=$1', [sessionId])).rowCount).toBe(1)
 })

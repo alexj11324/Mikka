@@ -48,7 +48,7 @@ are invalid. Unsupported sources never return an empty successful page.
 Only explicit title projections are selected. No prompts, completions, message
 bodies, agent configuration/instructions, run logs, Coordinator memory, private
 agent_dm or linked private exchanges are searched/returned. Search does not
-change data or call external providers. No migrations, index additions,
+change application data or call external providers. No migrations, index additions,
 credentials or new services. Large title-substring performance on production
 has not been established; existing owner/member indexes still bound visibility.
 
@@ -58,7 +58,7 @@ Input units cover limits and bound microsecond cursors. `tests/e2e/site-search.s
 runs actual built Next HTTP + Better Auth against isolated PG17. It retains
 synthetic fixtures, covers 130 history/125 group results, foreign owners/workspaces,
 private DMs/nonmembers, literal wildcard matching, body exclusion, exact result
-allowlists, task reuse, session expiry, group exit and workspace suspension.
+allowlists, task reuse, session revocation, group exit and workspace suspension.
 The dedicated `site-search.yml` executes this profile, types and lint. This is a
 post-build Playwright API profile, not a stubbed handler or pre-build R0 recipe;
 it does not edit the R0 inventory/schema/permission helpers.
