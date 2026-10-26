@@ -1,17 +1,21 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { NativeCoordinatorError } from '../lib/coordinator/native-store'
+import type { RunDetail } from '../lib/agent-runs'
+import { workspaceRunView } from '../lib/run-visibility'
 
 let revoked = false
 let uncertain = false
 const checks = mock.fn(async () => { if (revoked) throw new NativeCoordinatorError(409,'coordinatorExpiredOrLeaseLost') })
 const effect = mock.fn(async () => { if (uncertain) throw new Error('retryable transport failure'); return {ok:true} })
+let runDetail: RunDetail | null = null
+const readRunResult = mock.fn(async (_userId: string, _runId: string) => runDetail)
 const stub = (path: string, namedExports: Record<string,unknown>) => mock.module(new URL(path,import.meta.url).href,{namedExports})
 stub('../lib/coordinator/native.ts',{nativeCoordinatorStore:{assertToolActive:checks}})
 stub('../lib/coordinator/store.ts',{editMemory:effect})
 stub('../lib/coordinator/issue-create.ts',{createIssueFromRequest:effect})
 stub('../lib/issue-visibility.ts',{issueVisibility:effect})
-stub('../lib/agent-runs.ts',{addRunMessage:effect,queueRun:effect,readRun:effect,requestRunStop:effect,visibleRuns:effect})
+stub('../lib/agent-runs.ts',{addRunMessage:effect,queueRun:effect,readRun:readRunResult,requestRunStop:effect,visibleRuns:effect})
 stub('../lib/db/index.ts',{db:null})
 stub('../lib/search/index.ts',{webSearch:effect})
 stub('../lib/device-link.ts',{DEVICE_ONLINE_WINDOW_MS:60_000})
@@ -32,7 +36,7 @@ before(async()=>{steps=await import('../workflows/coordinator/steps')})
 const scope={holder:'holder',turnId:'turn',callId:'call'}
 const user='host-owned-user'
 
-beforeEach(()=>{revoked=false;uncertain=false;checks.mock.resetCalls();effect.mock.resetCalls()})
+beforeEach(()=>{revoked=false;uncertain=false;runDetail=null;checks.mock.resetCalls();effect.mock.resetCalls();readRunResult.mock.resetCalls()})
 
 const binding={taskId:'task',issueId:'issue',attemptId:'attempt',revision:1,candidateId:null}
 const reference={questionId:'question',questionRevision:1,binding,originRunId:'run',originSessionId:'session'}
@@ -82,6 +86,7 @@ for (const [name,call] of Object.entries(calls)) {
     await assert.rejects(call(),/coordinatorExpiredOrLeaseLost/)
     assert.deepEqual(checks.mock.calls.map(call=>call.arguments),[[user,scope.holder,scope.turnId,scope.callId]])
     assert.equal(effect.mock.callCount(),0)
+    assert.equal(readRunResult.mock.callCount(),0)
   })
 }
 test('a retried business step rechecks authorization rather than reusing a prior successful guard',async()=>{
@@ -121,4 +126,46 @@ test('evaluation Coordinator actions preserve host-owned identity and fixed trai
   assert.deepEqual(effect.mock.calls.map(call=>call.arguments),[
     [user,'source'],[user,'instance',true],[user,'instance','proposal','candidate'],[user,'evaluation',false],[user,'evaluation'],
   ])
+})
+
+const stoppedRun: RunDetail['run'] = {
+  id:'run',issueId:'issue',agentId:'agent',agentName:'Agent',harness:'codex',status:'stopped',kind:'implement',
+  stopReason:'turn_ended',error:null,report:null,createdAt:new Date('2026-10-26T12:00:00Z'),startedAt:null,finishedAt:null,
+}
+const hostReport = {
+  summary:'The model claims another source and model; use the recorded host fields.',
+  sourceCommit:'a'.repeat(40),
+  skillMount:{receiptId:'receipt',versionId:'version',sha256:'b'.repeat(64),sessionId:'session',mountedAt:'2026-10-26T12:00:00Z'},
+  runtime:{harness:'codex',requestedModel:'requested-model',observedModel:null,policyDigest:'c'.repeat(64),sourceCommit:'a'.repeat(40)},
+  verify:{status:'not_run',command:'node verify.mjs',exitCode:null},
+  privateExtra:'do not expose the whole report',
+}
+
+test('getRun exposes exact persisted host evidence for a stopped owned run',async()=>{
+  runDetail={run:{...stoppedRun,report:hostReport},chunks:[],messages:[]}
+  const result=await steps.getRun(user,{runId:'run'},scope)
+  assert.ok('id' in result)
+  assert.deepEqual({sourceCommit:result.sourceCommit,skillMount:result.skillMount,runtime:result.runtime,verify:result.verify},
+    {sourceCommit:hostReport.sourceCommit,skillMount:hostReport.skillMount,runtime:hostReport.runtime,verify:hostReport.verify})
+  assert.equal(result.status,'stopped')
+  assert.equal(result.summary,hostReport.summary)
+  assert.equal('privateExtra' in result,false)
+  assert.deepEqual(readRunResult.mock.calls.map(call=>call.arguments),[[user,'run']])
+})
+
+test('getRun leaves missing host evidence null instead of inferring it from a summary',async()=>{
+  for (const report of [null,{summary:JSON.stringify(hostReport)}]) {
+    runDetail={run:{...stoppedRun,report},chunks:[],messages:[]}
+    const result=await steps.getRun(user,{runId:'run'})
+    assert.ok('id' in result)
+    assert.deepEqual([result.sourceCommit,result.skillMount,result.runtime,result.verify],[null,null,null,null])
+  }
+})
+
+test('getRun preserves the restricted teammate projection with no host evidence',async()=>{
+  runDetail={run:workspaceRunView({...stoppedRun,report:hostReport}),chunks:[],messages:[]}
+  const result=await steps.getRun(user,{runId:'run'})
+  assert.ok('id' in result)
+  assert.deepEqual([result.summary,result.sourceCommit,result.skillMount,result.runtime,result.verify],[null,null,null,null,null])
+  assert.equal(JSON.stringify(result).includes('requested-model'),false)
 })
