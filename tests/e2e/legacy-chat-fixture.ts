@@ -16,6 +16,7 @@ export async function seedLegacyHistory(email: string) {
     expect(user).toBeTruthy()
     await pool.query('INSERT INTO agent_sessions (id, "userId", title) VALUES ($1, $2, $3)', [id, user.id, title])
     await pool.query('INSERT INTO agent_turns (id, "sessionId", "userId", prompt, completion, status, "attemptId") VALUES ($1, $2, $3, $4, $5, $6, $7)', [randomUUID(), id, user.id, '公开测试历史问题', completion, 'complete', randomUUID()])
+    await pool.query('INSERT INTO agent_turns (id, "sessionId", "userId", prompt, completion, status, error, "attemptId", "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now() + interval \'1 second\')', [randomUUID(), id, user.id, '公开测试未完成问题', '', 'failed', '受控历史失败信息', randomUUID()])
     return { id, title, completion }
   } finally { await pool.end() }
 }

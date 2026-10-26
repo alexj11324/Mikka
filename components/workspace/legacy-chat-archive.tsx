@@ -41,7 +41,11 @@ export function LegacyChatArchive({ userId, initialHistory, request, onActive, o
           : history.turns.length === 0 ? <p className="px-4 py-2 text-sm text-muted-foreground">{t('empty')}</p>
             : <AgentConversation streaming={false} turns={history.turns.map(turn => ({
               id: turn.id, question: turn.prompt,
-              response: <div inert><AgentGenerativeUI response={turn.completion} isStreaming={false} onAction={() => {}} showErrors={false} /></div>,
+              response: <div inert>
+                <AgentGenerativeUI response={turn.completion} isStreaming={false} onAction={() => {}} showErrors={false} />
+                {turn.error && <p className="text-sm text-muted-foreground">{turn.error}</p>}
+                {turn.status !== 'complete' && <p className="text-sm text-muted-foreground">{t('incomplete')}</p>}
+              </div>,
             }))} />}
     </section>
   </AgentInteractionContext></AgentThemeProvider>

@@ -25,6 +25,8 @@ test('历史仅可读取，原始数据保留，新对话动作进入当前 Bot'
   await expect(archive.getByText('已保存的公开测试历史正文', { exact: true })).toBeVisible()
   await expect(archive.getByText('此对话仅供查看。请在 Bot 对话中继续工作。', { exact: true })).toBeVisible()
   await expect(archive.locator('form, textarea')).toHaveCount(0)
+  await expect(archive.getByText('受控历史失败信息', { exact: true })).toBeVisible()
+  await expect(archive.getByText('此历史回复未完成。', { exact: true })).toBeVisible()
   const historicalAction = archive.locator('[inert] button').first()
   await expect(historicalAction).toHaveText('旧消息动作')
   await historicalAction.evaluate(button => (button as HTMLButtonElement).click())
