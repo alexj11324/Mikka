@@ -7,7 +7,7 @@ import { issueView } from '@/lib/task-identifier-server'
 import type { TaskScope } from '@/lib/task-identifier'
 
 /** Local half of the two-way transition. The linked path remains gated at the
- * action boundary until #184's archive/unlink decision and external fence land.
+ * action boundary until #184's archive/unlink decision is confirmed.
  * No provider request is made here. The DB trigger atomically detaches the link,
  * cancels outgoing work and revokes other people's runs before commit. */
 export async function changeIssueScopeLocally(userId: string, input: { id: string; revision: number; scope: TaskScope }, options: { allowLinkedPersonal: boolean }) {

@@ -2,6 +2,7 @@ import 'server-only'
 import { eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { issueDocuments, issues, linearCommentLinks, linearConnections, linearIssueLinks } from '@/lib/db/schema'
+import { requireCurrentPublication, withCurrentPublication, type Publication } from './publication'
 import { hashValue } from './crypto'
 import { createLinearComment, linearComment, updateLinearComment } from './client'
 import { linearAccessToken } from './tokens'
@@ -29,7 +30,8 @@ async function externalCommentExists(token: string, commentId: string, issueId: 
   } catch { return false }
 }
 
-export async function linearCommentSync(issue: IssueRow, issueLink: IssueLink, state: string | null, ownerToken: string, organizationId: string) {
+export async function linearCommentSync(issue: IssueRow, issueLink: IssueLink, state: string | null, ownerToken: string, organizationId: string, snapshot: Publication) {
+  const guard = () => requireCurrentPublication(snapshot)
   const doc = loadIssueDocument(state, issue.content)
   try {
     const threads = readIssueThreads(doc)
@@ -52,24 +54,27 @@ export async function linearCommentSync(issue: IssueRow, issueLink: IssueLink, s
           const token = await commentToken(issue.userId, link.authorUserId, organizationId, ownerToken)
           const exists = await externalCommentExists(token, link.linearCommentId, issueLink.linearIssueId)
           if (exists) {
+            await guard()
             await updateLinearComment(token, link.linearCommentId, plainTextToLinearMarkdown(message.body))
           } else {
+            await guard()
             const created = await createLinearComment(token, { id: link.linearCommentId, issueId: issueLink.linearIssueId, body: plainTextToLinearMarkdown(message.body), ...(parentId ? { parentId } : {}) }).catch(async error => {
+              await guard()
               if (await externalCommentExists(token, link!.linearCommentId, issueLink.linearIssueId)) return { id: link!.linearCommentId }
               throw error
             })
             link = { ...link, linearCommentId: created.id }
           }
-          await db.update(linearCommentLinks).set({ bodyHash: hashValue(message.body), syncStatus: 'synced', lastError: null, updatedAt: new Date() }).where(eq(linearCommentLinks.id, link.id))
+          await withCurrentPublication(snapshot, tx => tx.update(linearCommentLinks).set({ bodyHash: hashValue(message.body), syncStatus: 'synced', lastError: null, updatedAt: new Date() }).where(eq(linearCommentLinks.id, link!.id)))
           if (index === 0) rootCommentId = link.linearCommentId
           continue
         }
 
         const linearCommentId = crypto.randomUUID()
-        const [inserted] = await db.insert(linearCommentLinks).values({
+        const [inserted] = await withCurrentPublication(snapshot, tx => tx.insert(linearCommentLinks).values({
           id: crypto.randomUUID(), issueLinkId: issueLink.id, threadId: thread.id, messageId: message.id,
           linearCommentId, parentLinearCommentId: parentId ?? null, bodyHash: hashValue(message.body), authorUserId: message.authorUserId ?? null, syncStatus: 'pending',
-        }).onConflictDoNothing().returning()
+        }).onConflictDoNothing().returning())
         link = inserted ?? byLocalId.get(`${thread.id}\0${message.id}`)
         if (!link) throw new Error('Could not reserve the Linear comment mapping')
         byLocalId.set(`${thread.id}\0${message.id}`, link)
@@ -78,18 +83,21 @@ export async function linearCommentSync(issue: IssueRow, issueLink: IssueLink, s
         const token = await commentToken(issue.userId, message.authorUserId, organizationId, ownerToken)
         let created: { id: string }
         if (await externalCommentExists(token, link.linearCommentId, issueLink.linearIssueId)) created = { id: link.linearCommentId }
-        else created = await createLinearComment(token, { id: link.linearCommentId, issueId: issueLink.linearIssueId, body: plainTextToLinearMarkdown(message.body), ...(parentId ? { parentId } : {}) }).catch(async error => {
-          if (await externalCommentExists(token, link!.linearCommentId, issueLink.linearIssueId)) return { id: link!.linearCommentId }
-          await db.update(linearCommentLinks).set({ syncStatus: 'error', lastError: error instanceof Error ? error.message.slice(0, 300) : 'Linear comment sync failed', updatedAt: new Date() }).where(eq(linearCommentLinks.id, link!.id))
-          throw error
-        })
-        await db.update(linearCommentLinks).set({ linearCommentId: created.id, syncStatus: 'synced', lastError: null, bodyHash: hashValue(message.body), updatedAt: new Date() }).where(eq(linearCommentLinks.id, link.id))
+        else {
+          await guard()
+          created = await createLinearComment(token, { id: link.linearCommentId, issueId: issueLink.linearIssueId, body: plainTextToLinearMarkdown(message.body), ...(parentId ? { parentId } : {}) }).catch(async error => {
+            await guard()
+            if (await externalCommentExists(token, link!.linearCommentId, issueLink.linearIssueId)) return { id: link!.linearCommentId }
+            await withCurrentPublication(snapshot, tx => tx.update(linearCommentLinks).set({ syncStatus: 'error', lastError: error instanceof Error ? error.message.slice(0, 300) : 'Linear comment sync failed', updatedAt: new Date() }).where(eq(linearCommentLinks.id, link!.id)))
+            throw error
+          })
+        }
+        await withCurrentPublication(snapshot, tx => tx.update(linearCommentLinks).set({ linearCommentId: created.id, syncStatus: 'synced', lastError: null, bodyHash: hashValue(message.body), updatedAt: new Date() }).where(eq(linearCommentLinks.id, link.id)))
         if (index === 0) rootCommentId = created.id
       }
     }
   } finally { doc.destroy() }
 }
-
 export async function applyLinearCommentToApp(input: {
   issue: IssueRow
   issueLink: IssueLink

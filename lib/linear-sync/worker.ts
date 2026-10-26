@@ -1,7 +1,7 @@
 import 'server-only'
 import { and, eq, inArray } from 'drizzle-orm'
 import { pool, db } from '@/lib/db'
-import { issues, linearCommentLinks, linearConnections, linearIssueDetachments, linearIssueLinks, linearSyncInbox, linearSyncOutbox, linearTeamSyncs } from '@/lib/db/schema'
+import { issues, linearCommentLinks, linearConnections, linearIssueDetachments, linearIssueLinks, linearIssuePublications, linearSyncInbox, linearSyncOutbox, linearTeamSyncs } from '@/lib/db/schema'
 import { LinearApiError, sanitizeLinearError } from './graphql'
 import { applyLinearCommentToApp } from './comment-sync'
 import { createAppIssueFromLinear, applyLinearIssueToApp, LinearSyncConflictError, syncAppIssueToLinear } from './issue-sync'
@@ -9,7 +9,7 @@ import { linearAccessToken } from './tokens'
 import { linearComment, linearIssue } from './client'
 
 type InboxRow = typeof linearSyncInbox.$inferSelect
-type OutboxJob = { id: string; issueId: string; attempts: number }
+type OutboxJob = { id: string; issueId: string; attempts: number; scopeVersion: number; claimToken: string }
 type WebhookEvent = {
   action?: string
   type?: string
@@ -32,58 +32,58 @@ async function claimOutbox(issueId?: string): Promise<OutboxJob | null> {
   try {
     await client.query('begin')
     const predicate = issueId ? `and "issueId" = $1` : ''
-    const { rows } = await client.query<OutboxJob>(`select id, "issueId", attempts from linear_sync_outbox
+    const { rows } = await client.query<OutboxJob>(`select id, "issueId", attempts, "scopeVersion" from linear_sync_outbox
       where ((status = 'queued' and "availableAt" <= now()) or (status = 'processing' and "lastAttemptAt" < now() - interval '5 minutes')) ${predicate}
       order by "availableAt", "createdAt" for update skip locked limit 1`, issueId ? [issueId] : [])
     const job = rows[0]
     if (!job) { await client.query('commit'); return null }
+    const claimToken = crypto.randomUUID()
     await client.query(`update linear_sync_outbox set status = 'processing', attempts = attempts + 1,
-      "lastAttemptAt" = now(), "updatedAt" = now() where id = $1`, [job.id])
+      "lastAttemptAt" = now(), "updatedAt" = now(), "claimToken" = $2 where id = $1`, [job.id, claimToken])
     await client.query('commit')
-    return { ...job, attempts: job.attempts + 1 }
+    return { ...job, attempts: job.attempts + 1, claimToken }
   } catch (error) { await client.query('rollback'); throw error }
   finally { client.release() }
 }
 
-async function finishOutbox(job: OutboxJob, observedUpdatedAt: Date | null) {
-  const client = await pool.connect()
-  try {
-    await client.query('begin')
-    const { rows } = await client.query<{ updatedAt: Date | null }>(`select i."updatedAt" from issues i where i.id = $1 for update`, [job.issueId])
-    const changed = Boolean(rows[0]?.updatedAt && observedUpdatedAt && rows[0].updatedAt.getTime() > observedUpdatedAt.getTime())
-    await client.query(`update linear_sync_outbox set status = $2, attempts = case when $2 = 'queued' then 0 else attempts end,
-      "availableAt" = now(), "lastError" = null, "updatedAt" = now() where id = $1`, [job.id, changed ? 'queued' : 'done'])
-    await client.query('commit')
-  } catch (error) { await client.query('rollback'); throw error }
-  finally { client.release() }
+async function finishOutbox(job: OutboxJob, result: Awaited<ReturnType<typeof syncAppIssueToLinear>>) {
+  await db.transaction(async tx => {
+    const [issue] = await tx.select().from(issues).where(eq(issues.id, job.issueId)).for('update')
+    const [claimed] = await tx.select().from(linearSyncOutbox).where(eq(linearSyncOutbox.id, job.id)).for('update')
+    if (!claimed || claimed.status !== 'processing' || claimed.claimToken !== job.claimToken) return
+    const current = issue?.scope === 'workspace' && issue.scopeVersion === job.scopeVersion
+    const changed = current && result && issue.updatedAt.getTime() > result.observedUpdatedAt.getTime()
+    await tx.update(linearSyncOutbox).set({ status: changed ? 'queued' : 'done', claimToken: null, attempts: changed ? 0 : claimed.attempts,
+      availableAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(linearSyncOutbox.id, job.id))
+    if (current && result) await tx.update(linearTeamSyncs).set({ lastError: null, lastErrorAt: null, updatedAt: new Date() })
+      .where(and(eq(linearTeamSyncs.ownerId, issue.userId), eq(linearTeamSyncs.active, true)))
+  })
 }
 
-async function failOutbox(job: OutboxJob, issueId: string, error: unknown) {
+async function failOutbox(job: OutboxJob, error: unknown) {
   const permanent = error instanceof LinearApiError ? !error.retryable : error instanceof LinearSyncConflictError ? !error.retryable : true
   const status = permanent || job.attempts >= 8 ? 'failed' : 'queued'
   const message = errorText(error)
-  await db.update(linearSyncOutbox).set({ status, availableAt: new Date(Date.now() + retryDelay(job.attempts) * 1000), lastError: message, updatedAt: new Date() }).where(eq(linearSyncOutbox.id, job.id))
-  await db.update(linearIssueLinks).set({ syncStatus: 'error', lastError: message, updatedAt: new Date() }).where(eq(linearIssueLinks.issueId, issueId))
-  const [issue] = await db.select({ ownerId: issues.userId }).from(issues).where(eq(issues.id, issueId)).limit(1)
-  if (issue) await db.update(linearTeamSyncs).set({ lastError: message, lastErrorAt: new Date(), updatedAt: new Date() }).where(and(eq(linearTeamSyncs.ownerId, issue.ownerId), eq(linearTeamSyncs.active, true)))
+  await db.transaction(async tx => {
+    const [issue] = await tx.select().from(issues).where(eq(issues.id, job.issueId)).for('update')
+    const [claimed] = await tx.select().from(linearSyncOutbox).where(eq(linearSyncOutbox.id, job.id)).for('update')
+    if (!claimed || claimed.status !== 'processing' || claimed.claimToken !== job.claimToken) return
+    const current = issue?.scope === 'workspace' && issue.scopeVersion === job.scopeVersion
+    await tx.update(linearSyncOutbox).set({ status: current ? status : 'done', claimToken: null,
+      availableAt: new Date(Date.now() + retryDelay(job.attempts) * 1000), lastError: current ? message : null, updatedAt: new Date() }).where(eq(linearSyncOutbox.id, job.id))
+    if (!current) return
+    await tx.update(linearIssueLinks).set({ syncStatus: 'error', lastError: message, updatedAt: new Date() }).where(eq(linearIssueLinks.issueId, job.issueId))
+    await tx.update(linearTeamSyncs).set({ lastError: message, lastErrorAt: new Date(), updatedAt: new Date() }).where(and(eq(linearTeamSyncs.ownerId, issue.userId), eq(linearTeamSyncs.active, true)))
+  })
 }
 
 async function processOutboxOne(issueId?: string) {
   const job = await claimOutbox(issueId)
   if (!job) return false
-  const [issue] = await db.select({ updatedAt: issues.updatedAt }).from(issues).where(eq(issues.id, job.issueId)).limit(1)
-  if (!issue) {
-    await db.update(linearSyncOutbox).set({ status: 'done', updatedAt: new Date() }).where(eq(linearSyncOutbox.id, job.id))
-    return true
-  }
   try {
-    await syncAppIssueToLinear(job.issueId)
-    await finishOutbox(job, issue.updatedAt)
-    const [latestIssue] = await db.select({ ownerId: issues.userId }).from(issues).where(eq(issues.id, job.issueId)).limit(1)
-    if (latestIssue) await db.update(linearTeamSyncs).set({ lastError: null, lastErrorAt: null, updatedAt: new Date() }).where(and(eq(linearTeamSyncs.ownerId, latestIssue.ownerId), eq(linearTeamSyncs.active, true)))
-  } catch (error) {
-    await failOutbox(job, job.issueId, error)
-  }
+    const result = await syncAppIssueToLinear(job.issueId, job)
+    await finishOutbox(job, result)
+  } catch (error) { await failOutbox(job, error) }
   return true
 }
 
@@ -97,6 +97,22 @@ async function teamForEvent(organizationId: string | undefined, teamId: string |
     .innerJoin(linearConnections, eq(linearConnections.userId, linearTeamSyncs.ownerId))
     .where(and(eq(linearTeamSyncs.linearTeamId, teamId), eq(linearTeamSyncs.active, true), eq(linearConnections.organizationId, organizationId))).limit(1)
   return row?.team ?? null
+}
+
+/** A webhook can be delayed in HTTP too. Its old remote identity must not
+ * clear or replace diagnostics for a later publication after scope retirement. */
+async function eventTeamState(team: typeof linearTeamSyncs.$inferSelect, remoteId: string | null, message: string | null) {
+  return db.transaction(async tx => {
+    if (remoteId) {
+      const [publication] = await tx.select().from(linearIssuePublications).where(eq(linearIssuePublications.linearIssueId, remoteId)).limit(1)
+      const localId = publication?.issueId ?? (/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(remoteId) ? remoteId : null)
+      const [issue] = localId ? await tx.select().from(issues).where(eq(issues.id, localId)).for('update') : []
+      const [detached] = await tx.select({ id: linearIssueDetachments.linearIssueId }).from(linearIssueDetachments).where(eq(linearIssueDetachments.linearIssueId, remoteId)).limit(1)
+      if (detached || (publication && (!issue || issue.scope !== 'workspace' || issue.scopeVersion !== publication.scopeVersion || publication.retiredAt || publication.teamSyncId !== team.id))) return false
+    }
+    await tx.update(linearTeamSyncs).set({ lastError: message, lastErrorAt: message ? new Date() : null, updatedAt: new Date() }).where(eq(linearTeamSyncs.id, team.id))
+    return true
+  })
 }
 
 async function processIssueEvent(event: WebhookEvent) {
@@ -126,7 +142,7 @@ async function processIssueEvent(event: WebhookEvent) {
 
   if (link) await applyLinearIssueToApp(team, remote)
   else await createAppIssueFromLinear(team, remote)
-  await db.update(linearTeamSyncs).set({ lastError: null, lastErrorAt: null, updatedAt: new Date() }).where(eq(linearTeamSyncs.id, team.id))
+  await eventTeamState(team, remoteId, null)
 }
 
 async function issueLinkForComment(event: WebhookEvent, comment: Record<string, unknown>) {
@@ -181,7 +197,7 @@ async function processCommentEvent(event: WebhookEvent) {
   const [issue] = await db.select().from(issues).where(eq(issues.id, resolved.link.issueId)).limit(1)
   if (!issue) return
   await importLinearCommentChain(token, issue, resolved.link, remote)
-  await db.update(linearTeamSyncs).set({ lastError: null, lastErrorAt: null, updatedAt: new Date() }).where(eq(linearTeamSyncs.id, resolved.team.id))
+  await eventTeamState(resolved.team, resolved.remoteIssueId, null)
 }
 
 async function importLinearCommentChain(token: string, issue: typeof issues.$inferSelect, issueLink: typeof linearIssueLinks.$inferSelect, comment: NonNullable<Awaited<ReturnType<typeof linearComment>>>) {
@@ -263,7 +279,8 @@ async function processInboxOne(deliveryId?: string) {
     const payload = row.payload as WebhookEvent
     const data = payload.data
     const team = await teamForEvent(payload.organizationId, stringField(data?.team as Record<string, unknown> | undefined, 'id') ?? stringField(data, 'teamId') ?? stringField((data?.issue as Record<string, unknown> | undefined)?.team as Record<string, unknown> | undefined, 'id'))
-    if (team) await db.update(linearTeamSyncs).set({ lastError: message, lastErrorAt: new Date(), updatedAt: new Date() }).where(eq(linearTeamSyncs.id, team.id))
+    const remoteId = payload.type === 'Comment' ? stringField(data, 'issueId') ?? stringField(data?.issue as Record<string, unknown> | undefined, 'id') : stringField(data, 'id')
+    if (team && !await eventTeamState(team, remoteId, message)) await db.update(linearSyncInbox).set({ status: 'done', lastError: null, processedAt: new Date() }).where(eq(linearSyncInbox.deliveryId, row.deliveryId))
   }
   return true
 }

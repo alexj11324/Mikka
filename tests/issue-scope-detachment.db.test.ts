@@ -62,8 +62,10 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const fixtureIds: string[] = [issue]
   const noExternalFetch = globalThis.fetch
   let rejectedExternalRequests = 0
+  let linearLoopbackOrigin: string | undefined
   globalThis.fetch = (async (input, init) => {
     const target = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
+    if (target.origin === 'https://api.linear.app' && target.pathname === '/graphql' && linearLoopbackOrigin) return noExternalFetch(new URL('/graphql', linearLoopbackOrigin), init)
     if (target.hostname !== '127.0.0.1') { rejectedExternalRequests++; throw new Error('External network prohibited in scope acceptance') }
     return noExternalFetch(input, init)
   }) as typeof fetch
@@ -83,11 +85,11 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   await pool.query('insert into device_repos (id,"deviceId","userId","repoPath") values ($1,$2,$3,\'/synthetic/owner\')', [ownerRepo,ownerDevice,owner])
   const deviceToken = `synthetic-${randomUUID()}`
   await pool.query('insert into device_tokens (id,"userId","tokenHash") values ($1,$2,$3)', [randomUUID(),member,hashDeviceToken(deviceToken)])
-  async function seed(id: string, remote = id) {
+  async function seed(id: string, remote = id, linked = true) {
     if (!fixtureIds.includes(id)) fixtureIds.push(id)
     await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Synthetic scope task\',$3,\'todo\',\'normal\',\'workspace\')', [id,owner,doc])
     await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [id,team,workspace,owner])
-    await pool.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") values ($1,$2,$3,$4,$5,\'MIK-184\')', [randomUUID(),id,owner,sync,remote])
+    if (linked) await pool.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") values ($1,$2,$3,$4,$5,\'MIK-184\')', [randomUUID(),id,owner,sync,remote])
   }
   const localFlip = (id: string, revision = 1) => changeIssueScopeLocally(owner, { id,revision,scope:'personal' }, { allowLinkedPersonal: true })
   await seed(issue)
@@ -392,8 +394,172 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.ok(await verifyRunToken(new Request('http://127.0.0.1/'),token))
     assert.equal((await pool.query('select count(*)::int n from coordinator_events where "runId"=$1',[fixture.run])).rows[0].n,0)
   })
+  const { linearLoopback }=await import('./support/linear-loopback')
+  const provider=await linearLoopback({id:team,key:'MIK',name:'Synthetic'})
+  linearLoopbackOrigin=provider.origin
+  t.after(()=>provider.close())
+  const encryptionKey=process.env.LINEAR_TOKEN_ENCRYPTION_KEY
+  // Synthetic-only material in memory; no provider credential is requested or used.
+  process.env.LINEAR_TOKEN_ENCRYPTION_KEY='11'.repeat(32)
+  t.after(()=>{if(encryptionKey===undefined) delete process.env.LINEAR_TOKEN_ENCRYPTION_KEY;else process.env.LINEAR_TOKEN_ENCRYPTION_KEY=encryptionKey})
+  const { seal }=await import('../lib/linear-sync/crypto')
+  await pool.query('insert into linear_connections ("userId","linearUserId","organizationId","organizationName","accessToken","refreshToken","expiresAt") values ($1,\'synthetic\',\'synthetic\',\'Synthetic\',$2,$2,now()+interval \'1 hour\')',[owner,seal('synthetic-loopback-only')])
+  async function waitFor(check:()=>Promise<boolean>,label:string) {
+    for(let n=0;n<300;n++) {if(await check()) return}
+    assert.fail(label)
+  }
+  async function setDiscussion(id:string,body:string) {
+    const {loadIssueDocument,upsertLinearComment,encodedIssueDocument}=await import('../lib/linear-sync/document')
+    const document=loadIssueDocument(null,{type:'doc',content:[]})
+    try {
+      upsertLinearComment(document,{threadId:'scope-thread',messageId:'scope-message',author:'Synthetic',body,at:new Date().toISOString()})
+      await pool.query('insert into issue_documents ("issueId","userId",state) values ($1,$2,$3) on conflict ("issueId") do update set state=excluded.state',[id,owner,encodedIssueDocument(document)])
+    } finally {document.destroy()}
+  }
+  async function privatize(id:string,title='personal-only-draft') {
+    const revision=(await pool.query('select revision from issues where id=$1',[id])).rows[0].revision
+    assert.ok('issue' in await localFlip(id,revision))
+    const privateContent={type:'doc',attrs:{mikka:{number:12}},content:[{type:'paragraph',content:[{type:'text',text:'privatebodysecret'}]}]}
+    await pool.query('update issues set title=$2,content=$3,revision=revision+1,"updatedAt"=now() where id=$1',[id,title,JSON.stringify(privateContent)])
+  }
+  async function republish(id:string,title='new-publication-title') {
+    await pool.query('update issues set title=$2,revision=revision+1,"updatedAt"=now() where id=$1',[id,title])
+    const revision=(await pool.query('select revision from issues where id=$1',[id])).rows[0].revision
+    assert.ok('issue' in await changeIssueScopeLocally(owner,{id,revision,scope:'workspace'},{allowLinkedPersonal:true}))
+    await processLinearIssueOutbox(id)
+    const link=(await pool.query('select * from linear_issue_links where "issueId"=$1',[id])).rows[0]
+    assert.ok(link)
+    return link
+  }
+  await t.test('an in-flight old update cannot write personal state or upload its captured comments',async()=>{
+    const id=randomUUID();await seed(id)
+    provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
+    await setDiscussion(id,'old-publication-comment')
+    const hold=provider.hold('MikkaLinearUpdateIssue'),request=processLinearIssueOutbox(id)
+    try {
+      await hold.arrived
+      await privatize(id)
+      const snapshot=(await pool.query('select scope,title from issues where id=$1',[id])).rows[0]
+      assert.deepEqual(snapshot,{scope:'personal',title:'personal-only-draft'})
+      const before=provider.requests.length
+      hold.release();await request
+      assert.deepEqual((await pool.query('select scope,title from issues where id=$1',[id])).rows[0],snapshot)
+      assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,0)
+      assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status<>\'done\'',[id])).rows[0].n,0)
+      await syncAppIssueToLinear(id);await processLinearIssueOutbox(id)
+      assert.equal(provider.requests.length,before)
+      assert.equal(JSON.stringify(provider.requests.filter(record=>record.variables.id===id||record.variables.input?.id===id)).includes('personal-only-draft'),false)
+      assert.equal(JSON.stringify(provider.requests.filter(record=>record.variables.id===id||record.variables.input?.id===id)).includes('privatebodysecret'),false)
+      assert.equal([...provider.comments.values()].some(comment=>comment.issue.id===id),false)
+    } finally {hold.release();await request}
+  })
+  await t.test('a delayed create cannot attach to or upload old comments into a new publication identity',async()=>{
+    const id=randomUUID();await seed(id,id,false);await setDiscussion(id,'old-publication-comment')
+    const hold=provider.hold('MikkaLinearCreateIssue'),old=processLinearIssueOutbox(id)
+    try {
+      await hold.arrived
+      const reserved=(await pool.query('select * from linear_issue_publications where "issueId"=$1',[id])).rows[0]
+      assert.equal(reserved.linearIssueId,id)
+      await privatize(id)
+      assert.equal((await pool.query('select count(*)::int n from linear_issue_detachments where "linearIssueId"=$1',[id])).rows[0].n,1)
+      await setDiscussion(id,'new-publication-comment')
+      const current=await republish(id)
+      assert.notEqual(current.linearIssueId,id);assert.notEqual(current.publicationId,reserved.id)
+      assert.equal(provider.issues.has(id),false)
+      assert.equal(provider.issues.get(current.linearIssueId)?.title,'new-publication-title')
+      const before=JSON.stringify(current)
+      hold.release();await old
+      assert.equal(JSON.stringify((await pool.query('select * from linear_issue_links where "issueId"=$1',[id])).rows[0]),before)
+      assert.equal(provider.issues.get(current.linearIssueId)?.title,'new-publication-title')
+      assert.equal(provider.issues.get(id)?.title,'Synthetic scope task')
+      assert.equal(provider.issues.get(id)?.description?.includes('privatebodysecret'),false)
+      const bodies=[...provider.comments.values()].filter(comment=>comment.issue.id===current.linearIssueId).map(comment=>comment.body)
+      const {plainTextToLinearMarkdown}=await import('../lib/linear-sync/markdown')
+      assert.deepEqual(bodies,[plainTextToLinearMarkdown('new-publication-comment')])
+      await assert.rejects(pool.query('update linear_issue_publications set "linearIssueId"=$2 where id=$1',[reserved.id,current.linearIssueId]),(error:unknown)=>(error as {code:string}).code==='23514')
+      assert.equal(await createAppIssueFromLinear(teamSync,provider.issues.get(id)!),null)
+      assert.equal((await pool.query('select count(*)::int n from issues where id=$1',[current.linearIssueId])).rows[0].n,0)
+      assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,2)
+      await privatize(id,'second-personal-draft')
+      const third=await republish(id,'third-publication-title')
+      assert.notEqual(third.linearIssueId,current.linearIssueId);assert.notEqual(third.linearIssueId,id)
+      const calls=provider.requests.length
+      // A delayed/requeued old job keeps its captured generation, even when the
+      // same local task is workspace again. It must not publish the new state.
+      await pool.query('update linear_sync_outbox set status=\'queued\',"availableAt"=now() where "issueId"=$1 and "scopeVersion"=1',[id])
+      await processLinearIssueOutbox(id)
+      assert.equal(provider.requests.length,calls)
+      assert.equal((await pool.query('select "linearIssueId" from linear_issue_links where "issueId"=$1',[id])).rows[0].linearIssueId,third.linearIssueId)
+    } finally {hold.release();await old}
+  })
+  await t.test('a late retired provider failure cannot overwrite the new link, job or diagnostics',async()=>{
+    const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
+    const hold=provider.hold('MikkaLinearUpdateIssue','after',true),old=processLinearIssueOutbox(id)
+    try {
+      await hold.arrived;await privatize(id)
+      const current=await republish(id)
+      await pool.query('update linear_issue_links set "syncStatus"=\'error\',"lastError"=\'new-generation-diagnostic\' where id=$1',[current.id])
+      await pool.query('update linear_team_syncs set "lastError"=\'new-generation-diagnostic\' where id=$1',[sync])
+      hold.release();await old
+      const latest=(await pool.query('select "linearIssueId","lastError" from linear_issue_links where "issueId"=$1',[id])).rows[0]
+      assert.deepEqual(latest,{linearIssueId:current.linearIssueId,lastError:'new-generation-diagnostic'})
+      assert.equal((await pool.query('select "lastError" from linear_team_syncs where id=$1',[sync])).rows[0].lastError,'new-generation-diagnostic')
+      assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status<>\'done\'',[id])).rows[0].n,0)
+    } finally {hold.release();await old}
+  })
+  await t.test('a webhook paused in HTTP cannot clear diagnostics of a later publication',async()=>{
+    const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
+    const deliveryId=`held-webhook-${randomUUID()}`
+    await pool.query('insert into linear_sync_inbox ("deliveryId","organizationId","eventType",payload) values ($1,\'synthetic\',\'Issue\',$2)',[deliveryId,JSON.stringify({type:'Issue',action:'update',organizationId:'synthetic',data:{id,teamId:team}})])
+    const hold=provider.hold('MikkaLinearIssue'),inbox=processLinearInboxDelivery(deliveryId)
+    try {
+      await hold.arrived;await privatize(id);const current=await republish(id)
+      await pool.query('update linear_team_syncs set "lastError"=\'new-inbox-generation\' where id=$1',[sync])
+      hold.release();await inbox
+      assert.equal((await pool.query('select "lastError" from linear_team_syncs where id=$1',[sync])).rows[0].lastError,'new-inbox-generation')
+      assert.equal((await pool.query('select "linearIssueId" from linear_issue_links where "issueId"=$1',[id])).rows[0].linearIssueId,current.linearIssueId)
+      assert.equal((await pool.query('select title from issues where id=$1',[id])).rows[0].title,'new-publication-title')
+    } finally {hold.release();await inbox}
+  })
+  await t.test('lost create responses retry the committed identity instead of creating another remote issue',async()=>{
+    const id=randomUUID();await seed(id,id,false)
+    const hold=provider.hold('MikkaLinearCreateIssue','after',true)
+    provider.failNext('MikkaLinearIssue')
+    const first=processLinearIssueOutbox(id)
+    await hold.arrived;hold.release();await first
+    const reserved=(await pool.query('select * from linear_issue_publications where "issueId"=$1',[id])).rows[0]
+    const queued=(await pool.query('select status,attempts from linear_sync_outbox where "issueId"=$1',[id])).rows[0]
+    assert.deepEqual(queued,{status:'queued',attempts:1})
+    assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,0)
+    await pool.query('update linear_sync_outbox set "availableAt"=now() where "issueId"=$1',[id])
+    await processLinearIssueOutbox(id)
+    const link=(await pool.query('select * from linear_issue_links where "issueId"=$1',[id])).rows[0]
+    assert.equal(link.linearIssueId,reserved.linearIssueId)
+    assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,1)
+    assert.deepEqual(provider.requests.filter(record=>record.operation==='MikkaLinearCreateIssue'&&record.variables.input?.id===reserved.linearIssueId).map(record=>record.variables.input!.id),[reserved.linearIssueId,reserved.linearIssueId])
+    assert.deepEqual((await pool.query('select status,attempts from linear_sync_outbox where "issueId"=$1',[id])).rows[0],{status:'done',attempts:2})
+  })
+  await t.test('a reclaimed outbox claim fences the old response and refreshes its snapshot after the writer lock',async()=>{
+    const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
+    await pool.query('update linear_issue_links set "linearUpdatedAt"=\'2020-01-01T00:00:00Z\' where "issueId"=$1',[id])
+    const hold=provider.hold('MikkaLinearUpdateIssue'),old=processLinearIssueOutbox(id)
+    let reclaimed:Promise<void>|undefined
+    try {
+      await hold.arrived
+      const token=(await pool.query('select "claimToken" from linear_sync_outbox where "issueId"=$1',[id])).rows[0].claimToken
+      await pool.query('update issues set title=\'newer-same-generation\',"updatedAt"=now() where id=$1',[id])
+      await pool.query('update linear_sync_outbox set "lastAttemptAt"=now()-interval \'6 minutes\' where "issueId"=$1',[id])
+      reclaimed=processLinearIssueOutbox(id)
+      await waitFor(async()=>Boolean((await pool.query('select 1 from linear_sync_outbox where "issueId"=$1 and "claimToken"<>$2',[id,token])).rows[0]),'new claim did not take ownership')
+      hold.release();await old;await reclaimed
+      assert.equal(provider.issues.get(id)?.title,'newer-same-generation')
+      assert.equal((await pool.query('select "syncStatus" from linear_issue_links where "issueId"=$1',[id])).rows[0].syncStatus,'synced')
+      assert.deepEqual((await pool.query('select status,attempts from linear_sync_outbox where "issueId"=$1',[id])).rows[0],{status:'done',attempts:2})
+    } finally {hold.release();await Promise.allSettled([old,reclaimed].filter(Boolean))}
+  })
+  t.diagnostic(`Synthetic provider boundary: ${provider.requests.length} GraphQL calls redirected to loopback HTTP; no real Linear acceptance`)
   assert.equal(rejectedExternalRequests,0,'no real provider request is permitted or required')
-  await pool.query(await readFile(new URL('../drizzle/20261026025303_personal_scope_detachment.sql', import.meta.url), 'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261026033440_linear_publications.sql', import.meta.url), 'utf8'))
   assert.equal((await pool.query('select scope from issues where id=$1',[issue])).rows[0].scope,'personal')
   assert.equal((await pool.query('select count(*)::int n from linear_issue_detachments where "issueId"=$1',[issue])).rows[0].n,1)
   t.diagnostic(`Synthetic fixtures retained: ${JSON.stringify({database,owner,member,workspace,team,fixtureIds,memberRun,ownerRun})}`)

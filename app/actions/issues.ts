@@ -172,7 +172,7 @@ export async function setIssueScope(input: { id: string; revision: number; scope
     const { issue } = await requireIssueAccess(parsed.data.id)
     if (issue.userId !== userId) return { error: 'issueScopeOwnerOnly' }
     // #184 leaves archive vs unlink open. Keep linked transitions closed until
-    // the disposition and the external writer fence have been reviewed.
+    // the provider disposition is confirmed and reviewed.
     const result = await changeIssueScopeLocally(userId, parsed.data, { allowLinkedPersonal: false })
     if ('issue' in result && parsed.data.scope === 'workspace') dispatchLinearIssueSync(issue.id)
     return result

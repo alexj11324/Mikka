@@ -79,7 +79,18 @@ export const linearTeamSyncs = pgTable('linear_team_syncs', {
   active: boolean('active').notNull().default(true), lastError: text('lastError'), lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('linear_team_syncs_owner_idx').on(table.ownerId, table.active), uniqueIndex('linear_team_syncs_one_active_per_owner_key').on(table.ownerId).where(sql`${table.active}`)])
+/** One immutable remote identity per workspace scope generation. Reservation
+ * commits before provider IO, so an ambiguous response is retried with this ID. */
+export const linearIssuePublications = pgTable('linear_issue_publications', {
+  id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  ownerId: text('ownerId').notNull(), teamSyncId: uuid('teamSyncId').notNull(),
+  scopeVersion: integer('scopeVersion').notNull(), linearIssueId: text('linearIssueId').notNull().unique(),
+  writePending: boolean('writePending').notNull().default(false),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  retiredAt: timestamp('retiredAt', { withTimezone: true }),
+}, table => [uniqueIndex('linear_issue_publications_scope_key').on(table.issueId, table.scopeVersion), uniqueIndex('linear_issue_publications_active_key').on(table.issueId).where(sql`${table.retiredAt} is null`)])
 export const linearIssueLinks = pgTable('linear_issue_links', {
+  publicationId: uuid('publicationId').references(() => linearIssuePublications.id, { onDelete: 'set null' }),
   id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().unique().references(() => issues.id, { onDelete: 'cascade' }),
   ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
   teamSyncId: uuid('teamSyncId').notNull().references(() => linearTeamSyncs.id, { onDelete: 'cascade' }),
@@ -94,8 +105,8 @@ export const linearIssueLinks = pgTable('linear_issue_links', {
 export const linearIssueDetachments = pgTable('linear_issue_detachments', {
   linearIssueId: text('linearIssueId').primaryKey(),
   issueId: uuid('issueId').notNull(), ownerId: text('ownerId').notNull(),
-  teamSyncId: uuid('teamSyncId').notNull(), linearIdentifier: text('linearIdentifier').notNull(),
-  sourceLinkId: uuid('sourceLinkId').notNull().unique(),
+  teamSyncId: uuid('teamSyncId'), linearIdentifier: text('linearIdentifier'),
+  sourceLinkId: uuid('sourceLinkId').unique(), publicationId: uuid('publicationId'),
   detachedAt: timestamp('detachedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('linear_issue_detachments_issue_idx').on(table.issueId)])
 export const linearCommentLinks = pgTable('linear_comment_links', {
@@ -105,6 +116,7 @@ export const linearCommentLinks = pgTable('linear_comment_links', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('linear_comment_links_local_key').on(table.issueLinkId, table.threadId, table.messageId)])
 export const linearSyncOutbox = pgTable('linear_sync_outbox', {
+  scopeVersion: integer('scopeVersion').notNull().default(1), claimToken: uuid('claimToken'),
   id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
   status: text('status').notNull().default('queued'), attempts: integer('attempts').notNull().default(0),
   availableAt: timestamp('availableAt', { withTimezone: true }).notNull().defaultNow(), lastError: text('lastError'),
