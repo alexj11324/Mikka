@@ -1,6 +1,7 @@
 import 'next/dist/server/node-environment-baseline'
+import './fixtures/team-auth-runtime.mjs'
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { createServer } from 'node:http'
 import { promisify } from 'node:util'
@@ -28,8 +29,24 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   globalThis.fetch=(async(input,init)=>{ const target=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url); if(target.hostname==='127.0.0.1') return originalFetch(input,init); externalCalls++;throw new Error('Real provider requests prohibited') }) as typeof fetch
   t.after(async()=>{globalThis.fetch=originalFetch;await Promise.all([app.end(),workspace.end()])})
   const {actAs}=await import('../lib/acting-user')
-  const {agentActor}=await import('../lib/activity-actor')
-  const {createIssueForTeam}=await import('../app/actions/issues')
+  const {agentActor,userActor}=await import('../lib/activity-actor')
+  const {workspaceDb}=await import('../lib/workspace-db')
+  const {db}=await import('../lib/db')
+  const {teamIssueCreateRequests}=await import('../lib/db/schema')
+  const {createIssueForUserInTransaction}=await import('../lib/issue-create')
+  const {issueForUser}=await import('../lib/issue-access')
+  const {createIssueForTeam,setIssueScope,saveIssue}=await import('../app/actions/issues')
+  const {exchangeDocument}=await import('../app/actions/collaboration')
+  const {AfterContext}=await import('next/dist/server/after/after-context')
+  const {workAsyncStorage}=await import('next/dist/server/app-render/work-async-storage.external')
+  const Y=await import('yjs')
+  async function withAfter<T>(fn:()=>Promise<T>) {
+    const waits:Promise<unknown>[]=[],errors:unknown[]=[];let close=()=>{}
+    const afterContext=new AfterContext({waitUntil:promise=>{waits.push(promise)},onClose:callback=>{close=callback},onTaskError:error=>{errors.push(error)}})
+    return workAsyncStorage.run({afterContext} as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,async()=>{
+      try{return await fn()}finally{close();await Promise.all(waits);assert.deepEqual(errors,[])}
+    })
+  }
   const {retryLinearIssue}=await import('../app/actions/linear-sync')
   const {syncAppIssueToLinear}=await import('../lib/linear-sync/issue-sync')
   const {processLinearIssueOutbox}=await import('../lib/linear-sync/worker')
@@ -47,13 +64,122 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   await app.query('create trigger team184_fail_create before insert on issue_versions for each row execute function team184_fail_create()')
   const content={type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'synthetic task'}]}]}
   const input=(team:string)=>({requestId:randomUUID(),teamId:team,title:'Explicit team task',content,status:'todo',priority:'normal'})
-  const query=(who:string,value:ReturnType<typeof input>)=>actAs(who,()=>createIssueForTeam(value))
+  const testGlobals=globalThis as typeof globalThis & {teamCreateTestUser?:string}
+  const query=(who:string,value:ReturnType<typeof input>)=>{testGlobals.teamCreateTestUser=who;return createIssueForTeam(value)}
   await workspace.query(`create table team184_controls ("teamId" uuid primary key, fail boolean not null default false, pause boolean not null default false)`)
   await workspace.query(`create function team184_inject() returns trigger language plpgsql as $$ begin
     if exists(select 1 from team184_controls where "teamId"=new."teamId" and fail) then raise exception 'synthetic association failure'; end if;
     if exists(select 1 from team184_controls where "teamId"=new."teamId" and pause) then perform pg_advisory_xact_lock(hashtextextended('team184-barrier',0)); end if;
     return new; end $$`)
   await workspace.query('create trigger team184_inject before insert on mikka_team_issues for each row execute function team184_inject()')
+  await t.test('save, legacy scope click, title/document writes and manual retry keep personal data out of Linear',async()=>{
+    const created=await withAfter(()=>actAs(owner,()=>saveIssue({title:'Legacy UI task',content,status:'todo',priority:'normal'})))
+    assert.ok('issue' in created && created.issue);const id=created.issue.id
+    await workspace.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,teamId,workspaceId,owner])
+    // The real legacy UI passes only these three fields, no explicit target.
+    assert.deepEqual(await actAs(owner,()=>setIssueScope({id,revision:created.issue.revision,scope:'workspace'})),{error:'issueScopeTeamRequired'})
+    const updated=await withAfter(()=>actAs(owner,()=>saveIssue({id,revision:created.issue.revision,title:'Private revised title',content,status:'todo',priority:'normal'})))
+    assert.ok('issue' in updated && updated.issue);assert.equal(updated.issue.scope,'personal')
+    const ydoc=new Y.Doc()
+    try {
+      const seed=Buffer.from(Y.encodeStateAsUpdate(ydoc)).toString('base64')
+      await withAfter(()=>actAs(owner,()=>exchangeDocument({id,seed})))
+    } finally {ydoc.destroy()}
+    assert.deepEqual(await actAs(owner,()=>retryLinearIssue(id)),{error:'linearIssueInvalid'})
+    await syncAppIssueToLinear(id);await processLinearIssueOutbox(id)
+    assert.equal((await app.query('select scope from issues where id=$1',[id])).rows[0].scope,'personal')
+    for(const table of ['linear_sync_outbox','linear_issue_publications','linear_issue_links']) {
+      assert.equal((await app.query(`select count(*)::int n from ${table} where "issueId"=$1`,[id])).rows[0].n,0)
+    }
+    assert.equal(externalCalls,0)
+  })
+  await t.test('MCP creation ignores a spoofed scope or team context and stays personal',async()=>{
+    const {createIssue}=await import('../lib/mcp/actions')
+    const input={title:'MCP scope spoof',body:'ambiguous work',scope:'workspace',teamId} as Parameters<typeof createIssue>[1]
+    const created=await withAfter(()=>createIssue(owner,input,agentActor(randomUUID())))
+    assert.ok('id' in created)
+    const row=(await app.query('select scope,"linearSyncBlocked" from issues where id=$1',[created.id])).rows[0]
+    assert.deepEqual(row,{scope:'personal',linearSyncBlocked:false})
+    for(const table of ['linear_sync_outbox','linear_issue_publications','linear_issue_links']) assert.equal((await app.query(`select count(*)::int n from ${table} where "issueId"=$1`,[created.id])).rows[0].n,0)
+    assert.equal(externalCalls,0)
+  })
+  await t.test('legacy scope UI/action cannot promote even when a team relation or active Linear team exists',async()=>{
+    const id=randomUUID()
+    await app.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Legacy scope action\',$3,\'todo\',\'normal\',\'personal\')',[id,owner,JSON.stringify(content)])
+    // An existing association is context, not proof that this call explicitly
+    // selected and authorized a destination.
+    await workspace.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,teamId,workspaceId,owner])
+    assert.deepEqual(await actAs(owner,()=>setIssueScope({id,revision:1,scope:'workspace'})),{error:'issueScopeTeamRequired'})
+    assert.deepEqual((await app.query('select scope,"linearSyncBlocked" from issues where id=$1',[id])).rows[0],{scope:'personal',linearSyncBlocked:false})
+    assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
+    assert.equal((await app.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,0)
+    // Reproduce an old application instance attempting the former DB write.
+    await assert.rejects(app.query('update issues set scope=\'workspace\',"scopeSetBy"=\'user\' where id=$1',[id]),(error:unknown)=>(error as {code:string}).code==='23514')
+    // A blocked but incomplete team create is also not sufficient: only the
+    // verified transaction holding current team locks can promote it.
+    await app.query('update issues set "linearSyncBlocked"=true where id=$1',[id])
+    await assert.rejects(app.query('update issues set scope=\'workspace\',"scopeSetBy"=\'user\' where id=$1',[id]),(error:unknown)=>(error as {code:string}).code==='23514')
+    const forged=await app.connect()
+    try {
+      await forged.query('begin')
+      await forged.query("select set_config('mikka.team_scope_verified',$1,true),set_config('mikka.team_scope_team',$2,true)",[id,teamId])
+      // A marker alone is insufficient without the matching pending request.
+      await assert.rejects(forged.query('update issues set scope=\'workspace\',"scopeSetBy"=\'user\' where id=$1',[id]),(error:unknown)=>(error as {code:string}).code==='23514')
+    } finally {await forged.query('rollback');forged.release()}
+    assert.equal((await app.query('select scope from issues where id=$1',[id])).rows[0].scope,'personal')
+    assert.equal(externalCalls,0)
+  })
+  await t.test('an unlinked legacy workspace task never infers the owner active Linear team',async()=>{
+    const id=randomUUID()
+    await app.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Unlinked legacy workspace\',$3,\'todo\',\'normal\',\'workspace\')',[id,owner,JSON.stringify(content)])
+    await app.query('update issues set title=\'Unlinked legacy update\' where id=$1',[id])
+    await app.query('insert into issue_documents ("issueId","userId",state) values ($1,$2,\'synthetic\')',[id,owner])
+    await app.query('insert into linear_sync_outbox (id,"issueId","scopeVersion") values ($1,$2,1)',[randomUUID(),id])
+    assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
+    assert.deepEqual(await actAs(owner,()=>retryLinearIssue(id)),{error:'linearIssueInvalid'})
+    await assert.rejects(syncAppIssueToLinear(id),/No verified Linear issue link/)
+    assert.equal((await app.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,0)
+    assert.equal((await app.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,0)
+    assert.equal(externalCalls,0)
+    // An unacknowledged old reservation is preserved, not treated as explicit
+    // consent and not removed or used to infer a provider destination.
+    const team=(await app.query('select id from linear_team_syncs where "ownerId"=$1',[owner])).rows[0].id
+    const publication=randomUUID(),remote=randomUUID()
+    await app.query('insert into linear_issue_publications (id,"issueId","ownerId","teamSyncId","scopeVersion","linearIssueId") values ($1,$2,$3,$4,1,$5)',[publication,id,owner,team,remote])
+    await assert.rejects(syncAppIssueToLinear(id),/No verified Linear issue link/)
+    await assert.rejects(app.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier","externalTargetVerified") values ($1,$2,$3,$4,$5,\'EXT-2\',true)',[randomUUID(),id,owner,team,remote]),(error:unknown)=>(error as {code:string}).code==='23514')
+    await app.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") values ($1,$2,$3,$4,$5,\'EXT-2\')',[randomUUID(),id,owner,team,remote])
+    assert.equal((await app.query('select "externalTargetVerified" from linear_issue_links where "issueId"=$1',[id])).rows[0].externalTargetVerified,false)
+    await assert.rejects(syncAppIssueToLinear(id),/No verified Linear issue link/)
+    await app.query('update issues set title=\'Unverified linked update\' where id=$1',[id])
+    assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
+    assert.equal((await app.query('select count(*)::int n from linear_issue_publications where id=$1',[publication])).rows[0].n,1)
+    assert.equal(externalCalls,0)
+  })
+  await t.test('an explicitly imported external task retains its verified link and can enqueue',async()=>{
+    const remoteId=randomUUID()
+    const {linearTeamSyncs}=await import('../lib/db/schema')
+    const {eq}=await import('drizzle-orm')
+    const [team]=await db.select().from(linearTeamSyncs).where(eq(linearTeamSyncs.ownerId,owner)).limit(1)
+    const remote={id:remoteId,identifier:'EXT-1',title:'Existing imported workspace',description:'Synthetic',dueDate:null,priority:0,url:'https://example.invalid/synthetic',updatedAt:new Date().toISOString(),state:null,team:{id:team.linearTeamId,key:team.linearTeamKey,name:team.linearTeamName},assignee:null,labels:[]}
+    const {createAppIssueFromLinear}=await import('../lib/linear-sync/issue-sync')
+    const imported=await createAppIssueFromLinear(team,remote);assert.ok(imported)
+    const id=imported.id
+    assert.equal((await app.query('select "externalTargetVerified" from linear_issue_links where "issueId"=$1',[id])).rows[0].externalTargetVerified,true)
+    await app.query('update issues set title=\'Authorized linked update\' where id=$1',[id])
+    assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status=\'queued\'',[id])).rows[0].n,1)
+    const {reserveLinearPublication}=await import('../lib/linear-sync/publication')
+    const reserved=await reserveLinearPublication(id)
+    assert.ok(reserved);assert.equal(reserved.publication.linearIssueId,remoteId);assert.equal(reserved.team.id,team.id)
+    // Emulate a link losing verification while an old queued worker exists.
+    // The DB claim fence keeps the row as failed and never releases a token.
+    await app.query('update linear_issue_links set "externalTargetVerified"=false where "issueId"=$1',[id])
+    await processLinearIssueOutbox(id)
+    const pending=(await app.query('select status,"claimToken","lastError" from linear_sync_outbox where "issueId"=$1',[id])).rows[0]
+    assert.equal(pending.status,'failed');assert.equal(pending.claimToken,null);assert.match(pending.lastError,/No active verified Linear/)
+    assert.equal((await app.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,1)
+    assert.equal(externalCalls,0)
+  })
   await t.test('explicit authorized team succeeds once with durable provider gate and no outbox',async()=>{
     const value=input(teamId), result=await query(owner,value)
     assert.ok('issue' in result && result.issue);assert.equal(result.issue.scope,'workspace');assert.deepEqual(result.linearSync,{enabled:false,reason:'no_explicit_target'});assert.equal(result.issue.linearSyncBlocked,true)
@@ -156,6 +282,72 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.deepEqual(await query(owner,value),{error:'teamIssueChanged',requestId:value.requestId})
     assert.equal((await workspace.query('select "teamId" from mikka_team_issues where "issueId"=$1',[row.id])).rows[0].teamId,badTeam)
     assert.equal((await app.query('select scope from issues where id=$1',[row.id])).rows[0].scope,'personal')
+  })
+  await t.test('lost workspace commit response retries one request and preserves private visibility until promotion',async()=>{
+    const value=input(teamId)
+    const target=workspaceDb as unknown as {transaction:(...args:unknown[])=>Promise<unknown>}
+    const original=target.transaction
+    let mode:'lost'|'unavailable'|'normal'='lost'
+    // Throw only after the real first workspace transaction has committed.
+    // The next attempt simulates an unavailable workspace recheck without
+    // changing or deleting a fixture; restoring the method permits recovery.
+    target.transaction=async (...args:unknown[])=>{
+      if(mode==='unavailable') throw new Error('synthetic workspace recheck unavailable')
+      const result=await original.apply(workspaceDb,args)
+      if(mode==='lost') {mode='unavailable';throw new Error('synthetic lost commit response')}
+      return result
+    }
+    try {
+      assert.deepEqual(await query(owner,value),{error:'teamIssueRetry',requestId:value.requestId})
+      const row=(await app.query('select i.id,i.scope,i."linearSyncBlocked" from issues i join team_issue_create_requests r on r."issueId"=i.id where r."requestId"=$1',[value.requestId])).rows[0]
+      assert.equal(row.scope,'personal');assert.equal(row.linearSyncBlocked,true)
+      assert.equal((await workspace.query('select count(*)::int n from team_issue_create_receipts where "requestId"=$1',[value.requestId])).rows[0].n,1)
+      assert.equal((await workspace.query('select count(*)::int n from mikka_team_issues where "issueId"=$1',[row.id])).rows[0].n,1)
+      assert.ok(await issueForUser(owner,row.id));assert.equal(await issueForUser(racer,row.id),null)
+      assert.deepEqual(await query(owner,value),{error:'teamIssueRetry',requestId:value.requestId})
+      assert.equal((await app.query('select scope from issues where id=$1',[row.id])).rows[0].scope,'personal')
+      assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[row.id])).rows[0].n,0)
+      mode='normal'
+      const recovered=await query(owner,value);assert.ok('issue' in recovered && recovered.issue);assert.equal(recovered.issue.id,row.id);assert.equal(recovered.issue.scope,'workspace')
+      assert.equal((await app.query('select count(*)::int n from team_issue_create_requests where "requestId"=$1',[value.requestId])).rows[0].n,1)
+      assert.equal((await workspace.query('select count(*)::int n from team_issue_create_receipts where "requestId"=$1',[value.requestId])).rows[0].n,1)
+    } finally {target.transaction=original}
+  })
+  await t.test('a durable receipt with an absent relation is not restored on retry',async()=>{
+    // Construct the state after a later removal without deleting any fixture.
+    const value=input(teamId), {requestId,teamId:selectedTeam,...fields}=value
+    const fingerprint=createHash('sha256').update(JSON.stringify({teamId:selectedTeam,...fields})).digest('hex')
+    const id=randomUUID()
+    await db.transaction(async tx=>{
+      assert.ok(await createIssueForUserInTransaction(tx,owner,fields,userActor(owner),{id,linearSyncBlocked:true}))
+      await tx.insert(teamIssueCreateRequests).values({requestId,issueId:id,ownerId:owner,teamId:selectedTeam,fingerprint})
+    })
+    await workspace.query('insert into team_issue_create_receipts ("requestId","issueId","ownerId","teamId","workspaceId") values ($1,$2,$3,$4,$5)',[requestId,id,owner,selectedTeam,workspaceId])
+    assert.deepEqual(await query(owner,value),{error:'teamIssueChanged',requestId})
+    assert.equal((await workspace.query('select count(*)::int n from mikka_team_issues where "issueId"=$1',[id])).rows[0].n,0)
+    assert.equal((await app.query('select scope from issues where id=$1',[id])).rows[0].scope,'personal')
+    assert.ok(await issueForUser(owner,id));assert.equal(await issueForUser(racer,id),null)
+  })
+  await t.test('membership revoked after a lost association commit cannot promote on retry',async()=>{
+    const lostOwner=`team-lost-owner-${randomUUID()}`,value=input(teamId)
+    await app.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Synthetic\',$2,true,now(),now())',[lostOwner,`${lostOwner}@example.invalid`])
+    await workspace.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Synthetic\',$3,\'member\',\'active\')',[workspaceId,lostOwner,`${lostOwner}@example.invalid`])
+    const target=workspaceDb as unknown as {transaction:(...args:unknown[])=>Promise<unknown>},original=target.transaction
+    let once=true
+    target.transaction=async (...args:unknown[])=>{
+      const result=await original.apply(workspaceDb,args)
+      if(once) {once=false;throw new Error('synthetic lost commit response')}
+      return result
+    }
+    try {
+      assert.deepEqual(await query(lostOwner,value),{error:'teamIssueRetry',requestId:value.requestId})
+      const row=(await app.query('select i.id,i.scope from issues i join team_issue_create_requests r on r."issueId"=i.id where r."requestId"=$1',[value.requestId])).rows[0]
+      await workspace.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,lostOwner])
+      assert.deepEqual(await query(lostOwner,value),{error:'teamIssueAccessDenied',requestId:value.requestId})
+      assert.equal((await app.query('select scope from issues where id=$1',[row.id])).rows[0].scope,'personal')
+      assert.ok(await issueForUser(lostOwner,row.id));assert.equal(await issueForUser(racer,row.id),null)
+      assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[row.id])).rows[0].n,0)
+    } finally {target.transaction=original}
   })
   await t.test('revocation between association and promotion leaves the task personal',async()=>{
     await workspace.query('insert into team184_controls ("teamId",pause) values ($1,true)',[raceTeam])

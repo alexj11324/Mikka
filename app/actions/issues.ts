@@ -25,14 +25,13 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { issueDoneEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { after } from 'next/server'
-import { judgeIssueScope } from '@/lib/issue-scope-judge'
 import { changeIssueScopeLocally, previewPersonalScope } from '@/lib/issue-scope-store'
 import { TASK_SCOPES } from '@/lib/task-identifier'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
-import { activityActor } from '@/lib/activity-actor'
+import { actingContext, activityActor } from '@/lib/activity-actor'
 
 type IssueRow = typeof issues.$inferSelect
-type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null }
+type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null; linearTargetVerified: boolean }
 
 async function getUserId() {
   const user = await currentUser()
@@ -119,8 +118,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
         return { issue: await issueView(issue, tx) }
       })
-      if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
-      if (!id && 'issue' in result && result.issue) { const created = result.issue.id; after(() => judgeIssueScope(created, 'the Mikka app')) }
+      if ('issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) dispatchLinearIssueSync(result.issue.id)
       if (doneEvent && 'issue' in result) after(() => wakeCoordinator(ownerId))
       return result
     } catch (error) {
@@ -134,9 +132,13 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
 /** Explicit local team choice. Use a stable requestId on retries. No Linear
  * destination is inferred; the returned task is blocked from provider sync. */
 export async function createIssueForTeam(input: { requestId: string; teamId: string; title: string; content: JSONContent; status: string; priority: string }) {
-  const userId = await getUserId()
-  if (activityActor(userId).actorType !== 'user') return { error: 'teamIssueAccessDenied' as const }
-  return createTeamIssueForUser(userId, input)
+  return runAction(async () => {
+    // An actAs context can represent an agent or a trusted internal caller;
+    // neither is evidence of a signed-in human choosing this team.
+    if (actingContext.getStore()) return { error: 'teamIssueAccessDenied' as const }
+    const userId = await getUserId()
+    return createTeamIssueForUser(userId, input)
+  })
 }
 
 export async function moveIssue(input: { id: string; status: string; revision: number }): Promise<ActionResult<{ issue: IssueView }>> {
@@ -164,17 +166,21 @@ export async function changeIssuePriority(input: { id: string; priority: string;
 /** Preview is owner-only and does not make a provider request. A positive
  * externalCopyPossible means an old remote copy may still be team-visible. */
 export async function previewIssuePersonalScope(id: string) {
-  const userId = await getUserId()
-  if (!z.uuid().safeParse(id).success) return { error: 'issueScopeInvalid' as const }
-  return previewPersonalScope(userId, id)
+  return runAction(async () => {
+    const userId = await getUserId()
+    if (!z.uuid().safeParse(id).success) return { error: 'issueScopeInvalid' as const }
+    return previewPersonalScope(userId, id)
+  })
 }
 
 /** The linked case remains closed until the archive/unlink policy is chosen. */
 export async function confirmIssuePersonalScope(input: { id: string; revision: number; confirmation: string }) {
-  const userId = await getUserId()
-  const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), confirmation: z.string().regex(/^[a-f0-9]{64}$/) }).safeParse(input)
-  if (!parsed.success) return { error: 'issueScopeInvalid' as const }
-  return changeIssueScopeLocally(userId, { id: parsed.data.id, revision: parsed.data.revision, scope: 'personal' }, { allowLinkedPersonal: false, confirmation: parsed.data.confirmation })
+  return runAction(async () => {
+    const userId = await getUserId()
+    const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), confirmation: z.string().regex(/^[a-f0-9]{64}$/) }).safeParse(input)
+    if (!parsed.success) return { error: 'issueScopeInvalid' as const }
+    return changeIssueScopeLocally(userId, { id: parsed.data.id, revision: parsed.data.revision, scope: 'personal' }, { allowLinkedPersonal: false, confirmation: parsed.data.confirmation })
+  })
 }
 
 export async function listIssueVersions(id: string) {
@@ -196,10 +202,11 @@ export async function setIssueScope(input: { id: string; revision: number; scope
     const userId = await getUserId()
     const { issue } = await requireIssueAccess(parsed.data.id)
     if (issue.userId !== userId) return { error: 'issueScopeOwnerOnly' }
+    // This legacy action has no team target or team permission check. It must
+    // not infer the owner's active Linear team or publish an unassigned task.
+    if (parsed.data.scope === 'workspace') return { error: 'issueScopeTeamRequired' }
     // #184 leaves archive vs unlink open. Keep linked transitions closed until
     // the provider disposition is confirmed and reviewed.
-    const result = await changeIssueScopeLocally(userId, parsed.data, { allowLinkedPersonal: false })
-    if ('issue' in result && parsed.data.scope === 'workspace') dispatchLinearIssueSync(issue.id)
-    return result
+    return changeIssueScopeLocally(userId, parsed.data, { allowLinkedPersonal: false })
   })
 }

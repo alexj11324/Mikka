@@ -52,6 +52,8 @@ async function changeScopeTransaction(userId: string, input: { id: string; revis
     const [latest] = await tx.select().from(issues).where(eq(issues.id, input.id)).for('update')
     if (!latest || latest.userId !== userId) return { error: 'issueScopeOwnerOnly' as const }
     if (latest.revision !== input.revision) return { error: 'issueStale' as const }
+    // Scope alone is not proof of a user-selected, authorized Mikka team.
+    if (input.scope === 'workspace') return { error: 'issueScopeTeamRequired' as const }
     if (input.scope === 'personal' && options.confirmation && (await personalPreview(tx, latest)).confirmation !== options.confirmation) return { error: 'issueStale' as const }
     if (input.scope === 'personal' && !options.allowLinkedPersonal) {
       const [currentLink] = await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(eq(linearIssueLinks.issueId, input.id)).limit(1)

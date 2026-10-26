@@ -959,6 +959,7 @@
     "issueUnavailable": "任务已不可用。",
     "issuePreferenceLimit": "已达到此任务的关注人数上限。",
     "issueScopeInvalid": "归属只能是工作区或个人。",
+    "issueScopeTeamRequired": "转到工作区前，请先明确选择 Mikka 团队。",
     "issueScopeOwnerOnly": "只有任务所有者可以修改归属。",
     "issueScopeInLinear": "请先确认如何处理 Linear 中的任务，再转为个人任务。",
     "issueScopeConfirmationRequired": "转为个人任务前，请确认外部平台的副本可能仍然可见。",

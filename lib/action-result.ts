@@ -53,6 +53,7 @@ export const ACTION_ERROR_CODES = [
   'issueUnavailable',
   'issuePreferenceLimit',
   'issueScopeInvalid',
+  'issueScopeTeamRequired',
   'issueScopeOwnerOnly',
   'issueScopeInLinear',
   'issueScopeConfirmationRequired',

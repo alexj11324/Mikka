@@ -97,6 +97,7 @@ export const linearIssuePublications = pgTable('linear_issue_publications', {
   retiredAt: timestamp('retiredAt', { withTimezone: true }),
 }, table => [uniqueIndex('linear_issue_publications_scope_key').on(table.issueId, table.scopeVersion), uniqueIndex('linear_issue_publications_active_key').on(table.issueId).where(sql`${table.retiredAt} is null`)])
 export const linearIssueLinks = pgTable('linear_issue_links', {
+  externalTargetVerified: boolean('externalTargetVerified').notNull().default(false),
   publicationId: uuid('publicationId').references(() => linearIssuePublications.id, { onDelete: 'set null' }),
   id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().unique().references(() => issues.id, { onDelete: 'cascade' }),
   ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),

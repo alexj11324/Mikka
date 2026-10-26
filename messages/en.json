@@ -959,6 +959,7 @@
     "issueUnavailable": "This task is no longer available.",
     "issuePreferenceLimit": "This task has reached its follower limit.",
     "issueScopeInvalid": "Scope must be workspace or personal.",
+    "issueScopeTeamRequired": "Choose a Mikka team before moving this task to the workspace.",
     "issueScopeOwnerOnly": "Only the task owner can change its scope.",
     "issueScopeInLinear": "Confirm how to handle the Linear issue before moving this task to personal.",
     "issueScopeConfirmationRequired": "Confirm that external copies may remain visible before moving this task to personal.",

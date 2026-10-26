@@ -80,6 +80,9 @@ export async function retryLinearIssue(issueId: string) {
     const [latest] = await tx.select().from(issues).where(eq(issues.id, issue.id)).for('update')
     if (!latest || latest.userId !== user.id) return { error: 'issueOwnerOnly' as const }
     if (latest.linearSyncBlocked || latest.scope !== 'workspace' || readIssueMetadata(latest.content).deletedAt) return { error: 'linearIssueInvalid' as const }
+    const [verifiedLink] = await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId))
+      .where(and(eq(linearIssueLinks.issueId, issue.id), eq(linearIssueLinks.ownerId, user.id), eq(linearIssueLinks.externalTargetVerified, true), eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.active, true))).limit(1)
+    if (!verifiedLink) return { error: 'linearIssueInvalid' as const }
     // Never relabel a retired claim as current work. Supersede any stale open
     // row before inserting into the issue-wide partial unique index.
     await tx.update(linearSyncOutbox).set({ status: 'done', claimToken: null, updatedAt: new Date() })

@@ -8,6 +8,9 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 export interface OutboxFence { id: string; claimToken: string; scopeVersion: number }
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Reader = Pick<typeof db, 'select'>
+export class LinearTargetNotVerifiedError extends Error {
+  constructor() { super('No verified Linear issue link for this task'); this.name = 'LinearTargetNotVerifiedError' }
+}
 export class RetiredPublicationError extends Error {
   constructor() { super('Linear publication is no longer current'); this.name = 'RetiredPublicationError' }
 }
@@ -20,10 +23,13 @@ export async function reserveLinearPublication(issueId: string, fence?: OutboxFe
     if (!issue || issue.linearSyncBlocked || issue.scope !== 'workspace' || readIssueMetadata(issue.content).deletedAt || (expectedScopeVersion !== undefined && issue.scopeVersion !== expectedScopeVersion)) return null
     if (fence && !await claimCurrent(fence, tx)) return null
     const [linked] = await tx.select({ link: linearIssueLinks, team: linearTeamSyncs }).from(linearIssueLinks)
-      .innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId)).where(eq(linearIssueLinks.issueId, issue.id)).limit(1)
-    const team = linked?.team ?? (await tx.select().from(linearTeamSyncs).where(and(eq(linearTeamSyncs.ownerId, issue.userId), eq(linearTeamSyncs.active, true))).limit(1))[0]
-    if (!team) throw new Error('Connect and enable a Linear team before syncing this issue')
-    if (!team.active || linked?.link.remoteRemovedAt) return null
+      .innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId)).where(and(eq(linearIssueLinks.issueId, issue.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1)
+    // A current link is the existing per-task external destination. An active
+    // team on the owner account or an unacknowledged reservation alone does
+    // not prove the user selected that external destination for this task.
+    if (!linked) throw new LinearTargetNotVerifiedError()
+    const team = linked.team
+    if (!team.active || linked.link.remoteRemovedAt) return null
     let [publication] = await tx.select().from(linearIssuePublications).where(and(eq(linearIssuePublications.issueId, issue.id), eq(linearIssuePublications.scopeVersion, issue.scopeVersion))).limit(1)
     if (!publication) {
       ;[publication] = await tx.insert(linearIssuePublications).values({
@@ -51,7 +57,8 @@ export async function requireCurrentPublication(snapshot: Publication, executor:
     .innerJoin(linearIssuePublications, eq(linearIssuePublications.issueId, issues.id))
     .where(and(eq(issues.id, snapshot.issue.id), eq(issues.userId, snapshot.issue.userId), eq(issues.scope, 'workspace'), eq(issues.linearSyncBlocked, false), eq(issues.scopeVersion, snapshot.publication.scopeVersion),
       eq(linearIssuePublications.id, snapshot.publication.id), isNull(linearIssuePublications.retiredAt))).limit(1)
-  if (!row || (snapshot.fence && !await claimCurrent(snapshot.fence, executor))) throw new RetiredPublicationError()
+  const [verified] = await executor.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, snapshot.issue.id), eq(linearIssueLinks.ownerId, snapshot.issue.userId), eq(linearIssueLinks.linearIssueId, snapshot.publication.linearIssueId), eq(linearIssueLinks.teamSyncId, snapshot.publication.teamSyncId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1)
+  if (!row || !verified || (snapshot.fence && !await claimCurrent(snapshot.fence, executor))) throw new RetiredPublicationError()
 }
 
 /** DB-only effects hold the scope row lock; no provider IO is allowed here. */

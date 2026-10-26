@@ -6,6 +6,7 @@ import { LinearApiError, sanitizeLinearError } from './graphql'
 import { applyLinearCommentToApp } from './comment-sync'
 import { createAppIssueFromLinear, applyLinearIssueToApp, LinearSyncConflictError, syncAppIssueToLinear } from './issue-sync'
 import { linearAccessToken } from './tokens'
+import { LinearTargetNotVerifiedError } from './publication'
 import { linearComment, linearIssue } from './client'
 
 type InboxRow = typeof linearSyncInbox.$inferSelect
@@ -71,7 +72,7 @@ async function failOutbox(job: OutboxJob, error: unknown) {
     const current = issue?.scope === 'workspace' && issue.scopeVersion === job.scopeVersion
     await tx.update(linearSyncOutbox).set({ status: current ? status : 'done', claimToken: null,
       availableAt: new Date(Date.now() + retryDelay(job.attempts) * 1000), lastError: current ? message : null, updatedAt: new Date() }).where(eq(linearSyncOutbox.id, job.id))
-    if (!current) return
+    if (!current || error instanceof LinearTargetNotVerifiedError) return
     await tx.update(linearIssueLinks).set({ syncStatus: 'error', lastError: message, updatedAt: new Date() }).where(eq(linearIssueLinks.issueId, job.issueId))
     await tx.update(linearTeamSyncs).set({ lastError: message, lastErrorAt: new Date(), updatedAt: new Date() }).where(and(eq(linearTeamSyncs.ownerId, issue.userId), eq(linearTeamSyncs.active, true)))
   })

@@ -210,6 +210,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
     await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: team.ownerId, revision: 1, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...systemActor('linear') })
     await tx.insert(linearIssueLinks).values({
       id: crypto.randomUUID(), issueId: id, ownerId: team.ownerId, teamSyncId: team.id,
+      externalTargetVerified: true,
       linearIssueId: remote.id, linearIdentifier: remote.identifier, linearDescriptionHash: hashValue(remote.description ?? ''), syncStatus: 'synced',
       appSyncedAt: now, linearUpdatedAt: new Date(remote.updatedAt), updatedAt: now,
     })

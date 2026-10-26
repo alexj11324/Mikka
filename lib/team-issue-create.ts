@@ -73,10 +73,13 @@ export async function createTeamIssueForUser(userId: string, input: unknown) {
       return db.transaction(async tx => {
         const [request] = await tx.select().from(teamIssueCreateRequests).where(eq(teamIssueCreateRequests.requestId, requestId)).for('update')
         const [issue] = await tx.select().from(issues).where(eq(issues.id, issueId)).for('update')
-        if (!request || request.ownerId !== userId || request.fingerprint !== fingerprint || !issue || issue.userId !== userId || !issue.linearSyncBlocked) throw new TeamCreateError('teamIssueChanged')
+        if (!request || request.ownerId !== userId || request.issueId !== issueId || request.teamId !== teamId || request.fingerprint !== fingerprint || !issue || issue.userId !== userId || !issue.linearSyncBlocked) throw new TeamCreateError('teamIssueChanged')
         if (request.status === 'complete') return { issue: await issueView(issue, tx), linearSync: { enabled: false as const, reason: 'no_explicit_target' as const } }
         if (issue.scope !== 'personal' || issue.revision !== 1) throw new TeamCreateError('teamIssueChanged')
-        const [saved] = await tx.update(issues).set({ scope: 'workspace', scopeSetBy: 'user', scopeConfidence: null, revision: 2, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
+        // The workspace transaction still holds membership and relation locks.
+        // Bind the transaction-local database fence to exactly this task.
+        await tx.execute(sql`select set_config('mikka.team_scope_verified', ${issueId}, true), set_config('mikka.team_scope_team', ${teamId}, true)`)
+        const [saved] = await tx.update(issues).set({ scope: 'workspace', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: 2, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...userActor(userId) })
         await tx.update(teamIssueCreateRequests).set({ status: 'complete' }).where(eq(teamIssueCreateRequests.requestId, requestId))
         return { issue: await issueView(saved, tx), linearSync: { enabled: false as const, reason: 'no_explicit_target' as const } }
