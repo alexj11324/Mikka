@@ -731,7 +731,7 @@
       ],
       "profile": "factory-question-http",
       "phase": "postbuild",
-      "status": "ready",
+      "status": "pending",
       "prerequisites": [
         "completed Next production build",
         "running synthetic loopback Next server",
@@ -742,7 +742,8 @@
       ],
       "expectedCount": 1,
       "packageScript": "test:factory-question-http",
-      "runner": "scripts/test-factory-question-http.mjs"
+      "runner": "scripts/test-factory-question-http.mjs",
+      "pendingReason": "Independent review: retained mode repeats anonymous 401 but does not invalidate the existing owner cookie; awaiting group-owner retained session revocation regression."
     },
     {
       "id": "group-native",
@@ -975,11 +976,40 @@
       ],
       "profile": "mailboxes",
       "phase": "external",
-      "status": "pending",
+      "status": "ready",
       "packageScript": "test:mailboxes",
-      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "Coordinator strategies match actual tools and preserve event/citation protocol",
+        "clear work skips planning; ambiguity needs approval without inventing plan dispatch support",
+        "revised goals, duplicate avoidance, resume limits and stop semantics are explicit",
+        "worker adaptations preserve finish, permission, foreground, skills and publication ownership contracts",
+        "source attribution includes full upstream MIT license and immutable pin",
+        "claim initializes mailboxes before the queued-to-preparing compare-and-set",
+        "Bot turns advertise messaging only when mailbox setup succeeds",
+        "device discovery and the final claim predicate both reject disabled mailboxes",
+        "Coordinator advances actionable goals and events through evidence-backed acceptance",
+        "Coordinator limits questions to essential decisions and preserves scope and human authority",
+        "Coordinator diagnoses transient failures without unsafe retries or terminal claims",
+        "proactive policy remains in the actual Coordinator instruction composition with memory and mailbox rules",
+        "ordinary recovery has evidence and budget bounds; the conditional one-retry rule applies only to actual denials",
+        "two independent same-role sessions send, reply, read, ACK and reconnect without duplicate envelopes",
+        "one sender/key racing across recipients produces one envelope and an explicit 409 conflict",
+        "an inbox read waiting on an ACK row lock does not return the newly acknowledged envelope",
+        "owner/workspace/revocation boundaries and discovery do not expose another inbox",
+        "actual worker-token authentication rejects revoked/expired/stopped/disabled and forged-owner credentials",
+        "Bot and Coordinator are addressable; peer events retain provenance and are not user messages",
+        "completion persists result before notification atomically and duplicate completion is harmless",
+        "late messages queue by default, bounded policy resumes the exact prior session, concurrent late sends share one attempt",
+        "owner cancellation fences racing continuations, disables automatic wakes and exposes failure",
+        "human gates require explicit owner resume; peers cannot forge owner provenance or change wake policy",
+        "concurrent late send and owner stop cannot leave a runnable continuation; harness changes prevent wrong-session resume",
+        "failed mailbox setup rolls back while an unclaimed attempt stays queued and retryable",
+        "disabling a mailbox blocks an already queued continuation until the owner explicitly re-enables it",
+        "Factory-bound mailbox cannot dispatch an unadopted continuation, including owner resume",
+        "result/terminal update roll back together if event persistence fails",
+        "isolated PostgreSQL mailbox vertical slice"
+      ],
+      "expectedCount": 29
     },
     {
       "id": "migration-session",
