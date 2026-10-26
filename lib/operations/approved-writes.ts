@@ -59,15 +59,18 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
   }
   return {
     async propose(owner: string, raw: unknown, intentKey: string) {
-      z.uuid().parse(intentKey)
+      const canonicalIntentKey = z.uuid().parse(intentKey).toLowerCase()
       const input = parseWriteInput(action, raw)
       if (!input) throw new OperationError('invalidIntegrationInput')
       const hash = digest(input)
       // Serialize by trusted durable step identity before resolving account. Replay
       // returns original proposal even if accounts changed; execution rechecks it.
       return transaction(async tx => {
-        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['approved-write-intent', owner, intentKey])])
-        const prior = await tx.query<Proposal>('SELECT * FROM pending_actions WHERE "userId"=$1 AND "intentKey"=$2', [owner, intentKey])
+        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['approved-write-intent', owner, canonicalIntentKey])])
+        const prior = await tx.query<Proposal>('SELECT * FROM pending_actions WHERE "userId"=$1 AND lower("intentKey")=$2', [owner, canonicalIntentKey])
+        // Preserve legacy uppercase UUID rows without rewriting/deleting evidence.
+        // Existing case-duplicate rows require reconciliation; never choose one.
+        if (prior.rows.length > 1) throw new OperationError('operationIntentAmbiguous')
         if (prior.rows[0]) {
           const p = prior.rows[0]
           if (p.action !== action || p.operationBinding?.payloadDigest !== hash) throw new OperationError('operationBindingConflict')
@@ -78,7 +81,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         const selected = await bounded(() => provider.prepare(owner, input))
         const binding = bindingSchema.parse({ accountId: selected.accountId, version: selected.version, provider: provider.name, payloadDigest: hash, contextDigest: digest(selected.context ?? null) })
         const id = randomUUID()
-        await tx.query('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding",context) VALUES ($1,$2,$6,$3,$4,$5,$7)', [id, owner, input, intentKey, binding, action, selected.context ?? null])
+        await tx.query('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding",context) VALUES ($1,$2,$6,$3,$4,$5,$7)', [id, owner, input, canonicalIntentKey, binding, action, selected.context ?? null])
         return { status: 'awaiting_approval', actionId: id }
       })
     },

@@ -49,6 +49,47 @@ test('three approved writes: real PG, auth HTTP, loopback effects and durable re
       const outcomes=await Promise.all(Array.from({length:10},()=>call('/decide',{action,id,approve:true})));assert.ok(outcomes.every(r=>r.status===200));assert.equal(writes,before+1);assert.equal((await(await call('/decide',{action,id,approve:true})).json()).status,'done');assert.equal(writes,before+1)
       assert.equal((await(await call('/propose',{action,intent,input:action==='cancel_calendar_event'?{...input,send_updates:'all'}:{...input,text:'changed'}})).json()).error,'operationBindingConflict')
     })
+    await t.test(action+' canonical intent UUID serial/concurrent replay and unknown result cannot fork',async()=>{
+      const intent='a'+randomUUID().slice(1), before=writes
+      const first=await propose(intent.toUpperCase()), id=first.actionId
+      assert.equal((await propose(intent)).actionId,id)
+      const concurrent='b'+randomUUID().slice(1)
+      const proposals=await Promise.all(Array.from({length:10},(_,i)=>propose(i%2?concurrent.toUpperCase():concurrent)))
+      assert.equal(new Set(proposals.map(p=>p.actionId)).size,1)
+      for(const key of [intent,concurrent]){
+        const rows=(await pool.query('SELECT id,"intentKey" FROM pending_actions WHERE "userId"=$1 AND lower("intentKey")=$2',[owner,key])).rows
+        assert.equal(rows.length,1);assert.equal(rows[0].intentKey,key)
+      }
+      const changed=action==='cancel_calendar_event'?{...input,send_updates:'all'}:{...input,text:'Changed but valid'}
+      for(const key of [intent,intent.toUpperCase()]){
+        assert.equal((await(await call('/propose',{action,intent:key,input:changed})).json()).error,'operationBindingConflict')
+        const other=action==='cancel_calendar_event'?'send_slack_message':'cancel_calendar_event'
+        const otherInput=other==='send_slack_message'?{channel:'C12345678',text:'Fixture'}:{event_id:'fixture',send_updates:'none'}
+        assert.equal((await(await call('/propose',{action:other,intent:key,input:otherInput})).json()).error,'operationBindingConflict')
+      }
+      const other=action==='cancel_calendar_event'?'send_slack_message':'cancel_calendar_event'
+      const otherInput=other==='send_slack_message'?{channel:'C12345678',text:'Race fixture'}:{event_id:'race-fixture',send_updates:'none'}
+      for(const conflict of [{action,input:changed},{action:other,input:otherInput}]){
+        const raceIntent='d'+randomUUID().slice(1)
+        const requests=[{action,input,intent:raceIntent.toUpperCase()},{...conflict,intent:raceIntent}]
+        const responses=await Promise.all(requests.map(r=>call('/propose',r)))
+        assert.deepEqual(responses.map(r=>r.status).sort(),[200,409])
+        const winner=responses.findIndex(r=>r.status===200), rejected=1-winner
+        assert.equal((await responses[rejected].json()).error,'operationBindingConflict')
+        const proposal=await responses[winner].json()
+        assert.equal((await pool.query('SELECT count(*) FROM pending_actions WHERE "userId"=$1 AND lower("intentKey")=$2',[owner,raceIntent])).rows[0].count,'1')
+        await call('/decide',{action:requests[winner].action,id:proposal.actionId,approve:false})
+      }
+      assert.equal(writes,before)
+      drop=true
+      try{assert.equal((await(await call('/decide',{action,id,approve:true})).json()).status,'running')}finally{drop=false}
+      assert.equal(writes,before+1)
+      const replays=await Promise.all(Array.from({length:10},(_,i)=>propose(i%2?intent.toUpperCase():intent)))
+      assert.ok(replays.every(p=>p.actionId===id&&p.status==='running'))
+      assert.equal((await(await call('/decide',{action,id,approve:true})).json()).status,'running');assert.equal(writes,before+1)
+      assert.equal((await pool.query('SELECT count(*) FROM operation_ledger WHERE "operationId"=$1',[id])).rows[0].count,'1')
+      await call('/decide',{action,id:proposals[0].actionId,approve:false})
+    })
     await t.test(action+' rejects another action under the same logical intent',async()=>{
       const intent=randomUUID();await propose(intent)
       const other=action==='cancel_calendar_event'?'send_slack_message':'cancel_calendar_event'
@@ -73,6 +114,18 @@ test('three approved writes: real PG, auth HTTP, loopback effects and durable re
       p=await propose();await pool.query('UPDATE session SET "expiresAt"=clock_timestamp()-interval \'1 second\' WHERE "userId"=$1',[owner]);assert.equal((await call('/decide',{action,id:p.actionId,approve:true})).status,401);await pool.query('UPDATE session SET "expiresAt"=clock_timestamp()+interval \'1 hour\' WHERE "userId"=$1',[owner]);assert.equal(writes,before)
     })
   }
+  await t.test('legacy uppercase intents replay; existing case duplicates fail closed without cleanup',async()=>{
+    const action='send_slack_message',input={channel:'C12345678',text:'Legacy case fixture'},intent='c'+randomUUID().slice(1)
+    const first=await(await call('/propose',{action,input,intent})).json()
+    await pool.query('UPDATE pending_actions SET "intentKey"=$2 WHERE id=$1',[first.actionId,intent.toUpperCase()])
+    assert.equal((await(await call('/propose',{action,input,intent})).json()).actionId,first.actionId)
+    const duplicate=randomUUID()
+    await pool.query('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding",context) SELECT $2,"userId",action,input,$3,"operationBinding",context FROM pending_actions WHERE id=$1',[first.actionId,duplicate,intent])
+    const before=writes
+    for(const key of [intent,intent.toUpperCase()])assert.equal((await(await call('/propose',{action,input,intent:key})).json()).error,'operationIntentAmbiguous')
+    assert.equal(writes,before)
+    for(const id of [first.actionId,duplicate])await call('/decide',{action,id,approve:false})
+  })
   await t.test('decline sees absent ledger, pauses, and serializes a concurrent approval',async()=>{
     const actor={userId:owner,sessionId:(await pool.query('SELECT id FROM session WHERE "userId"=$1',[owner])).rows[0].id}
     let observed!:()=>void, resume!:()=>void
