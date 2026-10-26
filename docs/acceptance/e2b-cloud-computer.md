@@ -11,6 +11,9 @@ Date: 2026-10-26. Tracks #172. Branch: `codex/e2b-cloud-computer-172`.
   Separate bot IDs, no reinterpretation of an agent/run ID as a bot ID.
 - Session/active-workspace routes: bot create/list, computer state, wake,
   viewer, takeover and handback. Mutations require matching Origin.
+- Shared `@mikka/protocol/computer` Zod schemas now validate route inputs and
+  real browser state/viewer responses. Handler tests cover session denial,
+  Origin checks, owner injection, malformed inputs and provider-error redaction.
 - One machine per workspace, currently restricted to one account owner.
   Multi-owner execution is rejected, not silently treated as isolated.
 - Two-minute signed viewer grants, server-enforced view-only VNC, five-minute

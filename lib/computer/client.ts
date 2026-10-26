@@ -1,8 +1,9 @@
+import { computerStateSchema, viewerGrantSchema, computerEventSchema } from '@mikka/protocol/computer'
 import { withBasePath } from '@/lib/base-path'
 import { MOCK_HOSTS, mockComputer, mockSetup } from './mock'
 import type { ApprovalDecision, ApprovalView, ComputerEvent, ComputerState, KnownHost, SetupStep, SetupStepState, ViewerGrant, ViewerMode } from './types'
 
-/** The backend is still being built (#172); this flag plays it in the page instead. */
+/** Explicit demo mode; real Bot IDs use the authenticated E2B routes by default. */
 export const computerMock = process.env.NEXT_PUBLIC_COMPUTER_MOCK === '1'
 /** The component library's demo bots (ids start with "demo-") always play the mock. */
 export const isMockedComputer = (botId: string) => computerMock || botId.startsWith('demo-')
@@ -26,10 +27,10 @@ async function call<T>(path: string, init?: RequestInit & { json?: unknown }): P
 const botPath = (botId: string, rest = '') => `/api/bots/${encodeURIComponent(botId)}/computer${rest}`
 
 export const computerApi = {
-  state: (botId: string) => isMockedComputer(botId) ? mockComputer.state(botId) : call<ComputerState>(botPath(botId)),
+  state: (botId: string) => isMockedComputer(botId) ? mockComputer.state(botId) : call<ComputerState>(botPath(botId)).then(value => computerStateSchema.parse(value)),
   wake: (botId: string) => isMockedComputer(botId) ? mockComputer.wake(botId) : call<null>(botPath(botId, '/wake'), { method: 'POST' }),
-  viewer: (botId: string, mode: ViewerMode) => isMockedComputer(botId) ? mockComputer.viewer(botId, mode) : call<ViewerGrant>(botPath(botId, '/viewer'), { method: 'POST', json: { mode } }),
-  takeover: (botId: string, userId: string) => isMockedComputer(botId) ? mockComputer.takeover(botId, userId) : call<ViewerGrant>(botPath(botId, '/takeover'), { method: 'POST' }),
+  viewer: (botId: string, mode: ViewerMode) => isMockedComputer(botId) ? mockComputer.viewer(botId, mode) : call<ViewerGrant>(botPath(botId, '/viewer'), { method: 'POST', json: { mode } }).then(value => viewerGrantSchema.parse(value)),
+  takeover: (botId: string, userId: string) => isMockedComputer(botId) ? mockComputer.takeover(botId, userId) : call<ViewerGrant>(botPath(botId, '/takeover'), { method: 'POST' }).then(value => viewerGrantSchema.parse(value)),
   handback: (botId: string) => isMockedComputer(botId) ? mockComputer.handback(botId) : call<null>(botPath(botId, '/handback'), { method: 'POST' }),
   /** Answers "queued", never an invented success: the agent goes on when the daemon picks it up. */
   decide: (approval: ApprovalView, decision: ApprovalDecision) => isMockedComputer(approval.botId)
@@ -48,7 +49,7 @@ export function subscribeComputerEvents(listener: (event: ComputerEvent) => void
   const source = new EventSource(withBasePath('/api/computer/events'), { withCredentials: true })
   const types: ComputerEvent['type'][] = ['computer.machine', 'computer.control', 'computer.action', 'computer.approval']
   for (const type of types) source.addEventListener(type, message => {
-    try { listener({ type, ...JSON.parse((message as MessageEvent<string>).data) } as ComputerEvent) } catch { /* a malformed push; the next poll corrects it */ }
+    try { listener(computerEventSchema.parse({ ...JSON.parse((message as MessageEvent<string>).data), type })) } catch { /* a malformed push; the next poll corrects it */ }
   })
   source.onerror = () => { if (source.readyState === EventSource.CLOSED) source.close() }
   return () => source.close()
