@@ -1,6 +1,7 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
+import type { ComputerState } from '@mikka/protocol/computer'
 import * as provider from './e2b-provider'
 
 export class ComputerError extends Error {
@@ -27,15 +28,28 @@ export class ComputerStore {
     if (!rows[0]) throw new ComputerError(404, 'Computer not found')
     return rows[0]
   }
-  async state(actor: Actor, botId: string) {
+  async state(actor: Actor, botId: string): Promise<ComputerState> {
     await this.bot(actor, botId)
     const { rows } = await this.pool.query('SELECT m.state AS machine,m."sandboxId",d.control,d."controlledBy",d."controlUntil",d."lastAction" FROM bot_desktops d JOIN cloud_machines m USING ("workspaceId") WHERE d."botId"=$1 AND d."ownerId"=$2', [botId, actor.userId])
     const row = rows[0]
     if (!row) return { machine: 'sleeping', control: 'idle' }
     if (row.sandboxId && row.machine !== 'error') row.machine = await this.runtime.computerState(row.sandboxId)
     const held = row.control === 'user' && new Date(row.controlUntil).getTime() > Date.now()
+    const review = (await this.pool.query(`SELECT v.id,v.digest,v."runId",v.call,v."expiresAt"
+      FROM local_computer_reviews v JOIN agent_runs r ON r.id=v."runId" AND r."userId"=v."userId" AND r."deviceId"=v."deviceId"
+      JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
+      WHERE b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3 AND v.decision IS NULL
+        AND v."expiresAt">now() AND v."seenAt">now()-interval '10 seconds' AND r."stopRequestedAt" IS NULL
+        AND r.status=ANY($4::text[]) ORDER BY v."seenAt",v.id LIMIT 1`, [botId, actor.workspaceId, actor.userId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows[0]
+    const call = review?.call
+    const pendingApproval: ComputerState['pendingApproval'] = call && (call.name === 'click' || call.name === 'type_text' || call.name === 'get_desktop_state')
+      ? { id: review.id, digest: review.digest, runId: review.runId, botId,
+          action: call.name === 'click' ? { tool: 'click', x: call.arguments.x, y: call.arguments.y }
+            : call.name === 'type_text' ? { tool: 'type', text: call.arguments.text } : { tool: 'screenshot' },
+          summary: call.name === 'click' ? '点击屏幕' : call.name === 'type_text' ? '输入文字' : '查看屏幕',
+          expiresAt: new Date(review.expiresAt).toISOString() } : undefined
     return { machine: row.machine, control: held ? 'user' : row.control === 'user' ? 'agent' : row.control,
-      ...(held ? { controlledBy: { userId: row.controlledBy } } : {}), ...(row.lastAction ? { lastAction: row.lastAction } : {}) }
+      ...(held ? { controlledBy: { userId: row.controlledBy } } : {}), ...(row.lastAction ? { lastAction: row.lastAction } : {}), ...(pendingApproval ? { pendingApproval } : {}) }
   }
   private lease(d: Desktop): provider.DesktopLease {
     return { botId: d.botId, ownerId: d.ownerId, display: d.display, epoch: d.epoch, controlledBy: d.controlledBy, controlUntil: d.controlUntil ? new Date(d.controlUntil).getTime() / 1000 : 0 }
