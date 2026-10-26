@@ -46,4 +46,7 @@ test('automatic mailbox workflow cannot reuse a previous native deletion approva
  assert.doesNotMatch(workflow.split('  mailboxes:')[0],/services:/)
  assert.match(workflow,/MIKKA_TEST_NATIVE_GROUPS: '1'/)
  assert.match(workflow,/pnpm test:group-native/)
+ const native=JSON.parse(readFileSync('scripts/backend-acceptance-profiles.json','utf8')).profiles[0]
+ assert.equal(native.requiredEnvironment.MIKKA_NATIVE_DISPOSAL_AUTHORIZED,undefined)
+ assert.equal(native.authorizationPrerequisite.automaticGrant,false)
 })
