@@ -4,6 +4,10 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq xvfb openbox x11vnc x11-utils x11-apps xdotool libxdo3 chromium python3-aiohttp docker.io bubblewrap
+# The hosted control process is distinct from the desktop/task account.
+# Docker socket access is restricted to its dedicated infrastructure group.
+groupadd --system mikka-runner
+useradd --system --create-home --gid mikka-runner --shell /usr/sbin/nologin mikka-runner
 mkdir -p /opt/mikka/computer /workspace
 curl -fsSL https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-linux-x86_64-binary.tar.gz -o /tmp/cua-driver.tar.gz
 echo '31ab9709dd91ce73677e49b9f3e75c6f0d3e4d9625c286c9e58262bfbea698dd  /tmp/cua-driver.tar.gz' | sha256sum --check --strict

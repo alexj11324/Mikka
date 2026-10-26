@@ -37,9 +37,11 @@ async function main() {
     if (process.env.E2B_TEST_CONTAINERS === '1') {
       await ensureContainerRuntime(sandbox)
       await ensureContainerRuntime(sandbox)
+      const runner = await sandbox.commands.run('docker --host=unix:///run/mikka-container/docker.sock info >/dev/null 2>&1', { user: 'mikka-runner' })
+      assert.equal(runner.exitCode, 0)
       const access = await sandbox.commands.run('if test -r /run/mikka-container/docker.sock || test -w /run/mikka-container/docker.sock; then exit 1; fi', { user: 'user' })
       assert.equal(access.exitCode, 0)
-      console.log('live stage: root-only container runtime available')
+      console.log('live stage: trusted non-root runner and isolated task account verified')
     }
     const rawCDP = await fetch(`https://${sandbox.getHost(9201)}/json/version`, { signal: AbortSignal.timeout(15_000) })
     assert.ok([502, 503].includes(rawCDP.status), 'no public CDP listener')

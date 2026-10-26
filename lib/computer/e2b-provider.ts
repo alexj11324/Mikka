@@ -41,7 +41,7 @@ export async function installComputerRuntime(sandbox: Sandbox) {
   await sandbox.commands.run('for i in $(seq 1 30); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401 ] && exit 0; sleep .2; done; exit 1', { user: 'root', timeoutMs: 10_000 })
 }
 
-/** Start the root-only container service for a trusted hosted worker. The
+/** Start the container service for a dedicated trusted hosted worker. The
  * task account never receives its socket or E2B control-plane credentials. */
 export async function ensureContainerRuntime(sandbox: Sandbox) {
   const script = await readFile(join(process.cwd(), 'scripts/e2b/start-container-runtime.sh'), 'utf8')
