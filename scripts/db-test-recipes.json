@@ -406,10 +406,24 @@
       ],
       "profile": "shared",
       "phase": "prebuild",
-      "status": "pending",
-      "pendingReason": "New main harness contains physical DELETE cleanup; retained-mode acceptance and full result contract required.",
-      "expectedTests": null,
-      "expectedCount": null,
+      "status": "ready",
+      "expectedTests": [
+        "active readers share main claimed-only lease states; queued is only in flight",
+        "401 without a session, private no-store",
+        "empty list is 200 {agents: []}",
+        "any parameter (conversationId) is 400",
+        "a database error is 503, private no-store",
+        "a non-empty list carries polledAt and only the public fields",
+        "merge: earliest start, working wins over waiting_input",
+        "coordinator lease needs a holder and an unexpired lease",
+        "active agents on the database",
+        "ties order by id",
+        "heartbeats keep a claimed run active past the first 90s lease",
+        "heartbeat renews only claimed runs; queued, foreign and invalid IDs are revoked",
+        "unauthorized access: each owner filter hides another user's rows on its own",
+        "coordinator listed while it holds an unexpired lease"
+      ],
+      "expectedCount": 14,
       "packageScript": "test:active-agents"
     },
     {

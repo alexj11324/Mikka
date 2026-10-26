@@ -132,19 +132,8 @@ dbTest('active agents on the database', async t => {
     run(mine.id, 'running', {}, other),
   ]
   await db.insert(agentRuns).values(runs)
-  t.after(async () => {
-    try {
-      await cleanup()
-    } finally {
-      await close()
-    }
-  })
-  const cleanup = async () => {
-    await db.delete(agentRuns).where(inArray(agentRuns.userId, [me, other]))
-    await db.delete(agents).where(inArray(agents.userId, [me, other]))
-    await db.delete(devices).where(eq(devices.ownerId, me))
-    await db.delete(coordinatorSessions).where(inArray(coordinatorSessions.userId, [me, other]))
-  }
+  // UUID owners isolate this fixture. Preserve all rows on success and failure.
+  t.after(close)
 
   const list = await listActiveAgents(db, me, now)
   assert.deepEqual(list.map(x => x.name), ['B', 'A', 'C'], 'status inclusion, stale/offline excluded, ordered by start')
@@ -192,9 +181,7 @@ dbTest('active agents on the database', async t => {
     assert.ok(isDeviceOnline(row.lastSeenAt, at120.getTime()), 'device still online at +120s')
     assert.ok((await listActiveAgents(db, me, at120)).some(x => x.runId === claimed.id), 'run still active at +120s')
     assert.ok(!(await listActiveAgents(db, me, new Date(at120.getTime() + RUN_LEASE_MS + 61_000))).some(x => x.runId === claimed.id), 'expires once heartbeats stop')
-    await db.delete(agentRuns).where(eq(agentRuns.agentId, worker.id))
-    await db.delete(agents).where(eq(agents.id, worker.id))
-    await db.delete(devices).where(eq(devices.id, device))
+    await db.update(agentRuns).set({ status: 'cancelled' }).where(eq(agentRuns.agentId, worker.id))
   })
 
   await t.test('heartbeat renews only claimed runs; queued, foreign and invalid IDs are revoked', async () => {
@@ -225,9 +212,7 @@ dbTest('active agents on the database', async t => {
       assert.equal(lease(elsewhere.id), old.getTime(), 'a run on another device is not renewed even if reported')
       assert.equal(lease(unreported.id), old.getTime(), 'a run the daemon did not report is left to expire')
     } finally {
-      await db.delete(agentRuns).where(eq(agentRuns.agentId, worker.id))
-      await db.delete(agents).where(eq(agents.id, worker.id))
-      await db.delete(devices).where(inArray(devices.id, [device, otherDevice]))
+      await db.update(agentRuns).set({ status: 'cancelled' }).where(eq(agentRuns.agentId, worker.id))
     }
   })
 
@@ -263,9 +248,7 @@ dbTest('active agents on the database', async t => {
       const [row] = await db.select({ leaseExpiresAt: agentRuns.leaseExpiresAt }).from(agentRuns).where(eq(agentRuns.id, onTheirDevice.id))
       assert.equal(row.leaseExpiresAt!.getTime(), old.getTime())
     } finally {
-      await db.delete(agentRuns).where(inArray(agentRuns.id, [control.id, viaTheirAgent.id, theirRunMyAgent.id, onTheirDevice.id]))
-      await db.delete(agents).where(inArray(agents.id, [myAgent.id, theirAgent.id, myAgentA.id, myAgentB.id, myAgentC.id]))
-      await db.delete(devices).where(inArray(devices.id, [myDevice, theirDevice]))
+      await db.update(agentRuns).set({ status: 'cancelled' }).where(inArray(agentRuns.id, [control.id, viaTheirAgent.id, theirRunMyAgent.id, onTheirDevice.id]))
     }
   })
 
