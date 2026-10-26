@@ -1302,11 +1302,12 @@
       ],
       "profile": "shared",
       "phase": "prebuild",
-      "status": "pending",
+      "status": "ready",
       "packageScript": "test:workspace-migration-db",
-      "pendingReason": "Retained fixture acceptance required: existing cleanup deletes rows or rolls back the synthetic fixture.",
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "legacy workspaces upgrade twice without losing data or team constraints"
+      ],
+      "expectedCount": 1
     }
   ]
 }
