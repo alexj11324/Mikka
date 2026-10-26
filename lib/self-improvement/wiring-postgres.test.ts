@@ -157,7 +157,10 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databa
     assert.equal(proposal.proposal.status,'awaiting_model_candidate')
     assert.equal(proposal.proposal.result.kind,'not_evaluated')
     assert.equal(proposal.proposal.candidate.baseline,BASELINE_MARKDOWN)
-    assert.ok(run.prompt.includes(JSON.stringify(proposal.proposal.candidate.signals)));assert.ok(!run.prompt.includes('UNTRUSTED'))
+    // jsonb may reorder object keys; compare every dispatched signal as structured data.
+    const dispatchedSignals=run.prompt.match(/^\{.*\}$/m)?.[0]
+    assert.ok(dispatchedSignals)
+    assert.deepEqual(JSON.parse(dispatchedSignals),proposal.proposal.candidate.signals);assert.ok(!run.prompt.includes('UNTRUSTED'))
     assert.ok(run.prompt.includes('name: Run report'));assert.ok(run.prompt.length<=10000)
     assert.equal(proposal.proposal.candidate.diff,undefined)
     assert.equal((await factory.read(userId,task.id)).task.stage,'execute')
