@@ -97,6 +97,10 @@ jobs:
           path: ${{ runner.temp }}/mikka-worker-build/receipt.json
           if-no-files-found: error
       - run: pnpm test:coordinator-events
+      - run: pnpm test:active-agents
+        env:
+          # Database regressions run against ephemeral Postgres in browser-tests below.
+          MIKKA_DATABASE_URL: ""
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
       - run: pnpm test:integrations
@@ -189,6 +193,6 @@ jobs:
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:activity-actor-db,test:conversation-reads,test:groups,test:relation-cycle,test:workspace-migration-db,test:credential-cleanup-db
+          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:conversation-reads,test:groups,test:relation-cycle,test:workspace-migration-db,test:credential-cleanup-db
           CLEANER_TEST_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       - run: pnpm build
