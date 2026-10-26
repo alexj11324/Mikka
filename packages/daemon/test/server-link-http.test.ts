@@ -25,7 +25,7 @@ interface Call {
   auth: string | null
   version: string | null
   body: unknown
-  redirect: RequestRedirect | undefined
+  redirect: RequestInit["redirect"]
 }
 
 function scripted(respond: (call: Call) => Response | Promise<Response>): {
