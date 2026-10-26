@@ -55,6 +55,7 @@ export const ACTION_ERROR_CODES = [
   'issueScopeInvalid',
   'issueScopeOwnerOnly',
   'issueScopeInLinear',
+  'issueScopeConfirmationRequired',
   'issueOwnerOnly',
   'issueRestoreWindow',
   'issueDeleteFailed',

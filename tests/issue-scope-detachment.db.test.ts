@@ -331,7 +331,10 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       const report={summary:'Synthetic verified completion',filesChanged:[],verify:{status:'passed'},openQuestions:[],nextStep:null}
       responsePromise=fetch(`${origin}/complete`,{method:'POST',headers:{authorization:`Bearer ${deviceToken}`,'content-type':'application/json'},body:JSON.stringify({stopReason:'submitted',report})})
       await prepared.promise
-      const changed=await actAs(localOwner,()=>setIssueScope({id,revision:1,scope:'personal'}))
+      assert.deepEqual(await actAs(localOwner,()=>setIssueScope({id,revision:1,scope:'personal'})),{error:'issueScopeConfirmationRequired'})
+      const preview=await actAs(localOwner,()=>previewIssuePersonalScope(id))
+      assert.ok('preview' in preview && preview.preview)
+      const changed=await actAs(localOwner,()=>confirmIssuePersonalScope({id,revision:1,confirmation:preview.preview.confirmation}))
       assert.ok('issue' in changed)
       release.resolve()
       assert.equal((await responsePromise).status,204)
@@ -367,7 +370,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
         if(waiting.rows[0]) {completionPid=waiting.rows[0].pid;break}
         if(n===199) assert.fail('completion did not acquire the task before waiting for the run')
       }
-      privatizing=changeIssueScopeLocally(member,{id:fixture.id,revision:1,scope:'personal'},{allowLinkedPersonal:false})
+      privatizing=changeIssueScopeLocally(member,{id:fixture.id,revision:1,scope:'personal'},{allowLinkedPersonal:true})
       for(let n=0;n<200;n++) {
         const waiting=await pool.query('select exists(select 1 from pg_stat_activity where $1=any(pg_blocking_pids(pid))) waiting',[completionPid])
         if(waiting.rows[0].waiting) break

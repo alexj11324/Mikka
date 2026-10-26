@@ -56,7 +56,7 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
   const { users, issues, issueVersions, issueMembers, linearTeamSyncs, linearIssueLinks, issueDocuments, telegramLinks, telegramConversations } = tables
   const { actAs } = await import('../lib/acting-user')
   const { agentActor } = await import('../lib/activity-actor')
-  const { saveIssue, listIssueVersions, setIssueScope } = await import('../app/actions/issues')
+  const { saveIssue, listIssueVersions, setIssueScope, previewIssuePersonalScope, confirmIssuePersonalScope } = await import('../app/actions/issues')
   const { updateIssueMetadata } = await import('../app/actions/issue-metadata')
   const { createLinkedIssue, updateIssueRelation } = await import('../app/actions/issue-operations')
   const { removeMember } = await import('../app/actions/collaboration')
@@ -123,7 +123,9 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     await history(root.id, 'user', owner)
     // Root was shared above; flipping it back to personal is the scope writer
     // under test here, and it immediately gates the former viewer's history read.
-    saved = expectIssue(await actAs(owner, async () => setIssueScope({ id: root.id, revision: (await latest(root.id)).revision, scope: 'personal' })))
+    const personalPreview = await actAs(owner, () => previewIssuePersonalScope(root.id))
+    assert.ok('preview' in personalPreview && personalPreview.preview)
+    saved = expectIssue(await actAs(owner, async () => confirmIssuePersonalScope({ id: root.id, revision: (await latest(root.id)).revision, confirmation: personalPreview.preview.confirmation })))
     await history(root.id, 'user', owner)
     await assert.rejects(actAs(member, () => listIssueVersions(root.id)), { code: 'issueNotFound' })
     const agentId = randomUUID()
