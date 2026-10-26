@@ -154,7 +154,7 @@ test('reservation entry rejects registry root, traversal, reused inode and symli
 
 test('an unfrozen actual runner is rejected even with a resource-contract approval', async () => {
   const f = await fixture(); await f.approve()
-  assert.throws(() => admitRun({ ...f.plan, kind: 'executor-positive-once' }, f.binding), /runner and scenario are not frozen/)
+  assert.throws(() => admitRun({ ...f.plan, kind: 'executor-positive-once' }, f.binding), /runner not frozen/)
   await assert.rejects(stat(join(f.root, 'run-consumed.json')), /ENOENT/)
 })
 
@@ -175,4 +175,38 @@ test('path replacement during close is refused before the removal callback', asy
   assert.equal(checks, 2); assert.equal(removals, 0)
   assert.ok((await stat(s.directory)).isDirectory())
   assert.ok((await stat(s.directory + '.retained')).isDirectory())
+})
+
+test('fixed positive cycle calls open/execute/end once and asserts restored state without browser or removal', async () => {
+  const { positiveCycle } = await import('./credential-positive-once')
+  const calls: string[] = []; let ended = false
+  const binding = { ownerId: 'synthetic', workspaceId: 'w', taskId: 't', runId: 'r', executionSession: 'e', authSessionId: 'a' }
+  await positiveCycle({
+    async open(actual) { assert.deepEqual(actual, binding); calls.push('open') },
+    async readDOM(actual) { assert.notEqual(actual.ownerId, binding.ownerId); throw Object.assign(Error('wrong binding'), { code: 'browser_session_not_found' }) },
+    async execute(actual, service, capability) {
+      assert.deepEqual(actual, binding); assert.equal(service, 'fixture')
+      assert.equal(await capability.resolveAndAdmit(), 'synthetic-only'); assert.equal(await capability.stillAuthorized(), true)
+      calls.push('execute'); return { phase: 'restored', result: 'site_policy_verified', cleanup: 'isolated_context_destroyed' }
+    },
+    state() { if (ended) throw Object.assign(Error('closed'), { code: 'browser_session_not_found' }); return { phase: 'restored', fenced: false } },
+    async end() { calls.push('end'); ended = true },
+  }, binding, { serviceId: 'fixture', syntheticPassword: 'synthetic-only' })
+  assert.deepEqual(calls, ['open', 'execute', 'end'])
+})
+
+test('fixed scenario and actual entry identity must both match before admission', async () => {
+  const { fileURLToPath } = await import('node:url')
+  const { assertScenario, fixedRunnerCommand } = await import('./credential-admission.mjs')
+  const runner = fileURLToPath(new URL('./credential-positive-once.ts', import.meta.url))
+  const scenario = JSON.parse(await readFile(new URL('./credential-positive-scenario.json', import.meta.url), 'utf8'))
+  const plan = { kind: 'executor-positive-once', runner, scenario }
+  assert.doesNotThrow(() => assertScenario(plan, fixedRunnerCommand()))
+  assert.throws(() => assertScenario(plan, [process.execPath, '/foreign/runner.ts', runner]))
+  assert.throws(() => assertScenario(plan, [...fixedRunnerCommand(), '--require', '/foreign.js']))
+  assert.throws(() => assertScenario(plan, fixedRunnerCommand(), {}, '/foreign/check-out'))
+  assert.throws(() => assertScenario(plan, fixedRunnerCommand(), { NODE_OPTIONS: '--import=/foreign.js' }))
+  assert.throws(() => assertScenario(plan, fixedRunnerCommand(), { ESBUILD_BINARY_PATH: '/foreign' }))
+  assert.throws(() => assertScenario({ ...plan, scenario: { ...scenario, maxApiCalls: 3 } }, [runner]))
+  assert.throws(() => assertScenario({ ...plan, scenario: { ...scenario, origin: 'https://example.test' } }, [runner]))
 })

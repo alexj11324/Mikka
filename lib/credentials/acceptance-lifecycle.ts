@@ -17,7 +17,7 @@ export async function prepareAcceptanceLifecycle(parent: string, binding: Bindin
   return { root: registry.root, manifestHash: prepared.manifestHash, plan: structuredClone(prepared.plan), resources }
 }
 
-export function bindAcceptanceLifecycle(base: AcceptanceResources, profiles: AcceptanceProfile[], preparedPlan: ReturnType<typeof prepareAdmission>['plan'], binding: Binding): AcceptanceResources {
+export function bindAcceptanceLifecycle(base: AcceptanceResources, profiles: AcceptanceProfile[], preparedPlan: ReturnType<typeof prepareAdmission>['plan'], binding: Binding): AcceptanceResources & { authorize(): void } {
   const plan = structuredClone(preparedPlan), expectedBinding = structuredClone(binding)
   let admitted = false, next = 0
   const indexOf = (profile: AcceptanceProfile) => {
@@ -26,7 +26,8 @@ export function bindAcceptanceLifecycle(base: AcceptanceResources, profiles: Acc
     assert.deepEqual(profile, profiles[index])
     return index
   }
-  const resources: AcceptanceResources = {
+  const resources: AcceptanceResources & { authorize(): void } = {
+    authorize() { if (!admitted) { admitRun(plan, expectedBinding); admitted = true } },
     async prepareProfile(actual) {
       assert.deepEqual(actual, expectedBinding, 'binding changed')
       assert.ok(next < 2, 'executor call budget exhausted')
@@ -36,7 +37,7 @@ export function bindAcceptanceLifecycle(base: AcceptanceResources, profiles: Acc
       assert.deepEqual(actual, expectedBinding)
       const index = indexOf(profile); assert.equal(index, next, 'out of order executor call')
       await base.beforeCleanup(profile, 'launch-blocked') // directory/owner checks before any admission
-      if (!admitted) { admitRun(plan, actual); admitted = true }
+      resources.authorize()
       const result = admitCall(plan, plan.sessions[index].role, actual)
       next++
       return result

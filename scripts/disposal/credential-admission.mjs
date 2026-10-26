@@ -9,10 +9,16 @@ const require = createRequire(import.meta.url)
 const project = fileURLToPath(new URL('../../', import.meta.url))
 const modulePath = fileURLToPath(import.meta.url)
 const pwRoot = dirname(require.resolve('playwright-core/package.json'))
+const tsxPackage = require.resolve('tsx/package.json')
+const esbuildPackage = createRequire(tsxPackage).resolve('esbuild/package.json')
+const runtimeRoots = [pwRoot, dirname(tsxPackage), dirname(esbuildPackage), dirname(createRequire(esbuildPackage).resolve('@esbuild/linux-x64/package.json')), dirname(require.resolve('zod/package.json'))]
+const loaderPath = require.resolve('tsx')
 const sha = value => createHash('sha256').update(value).digest('hex')
 const json = path => JSON.parse(readFileSync(path, 'utf8'))
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'"
-const frozenFiles = ['scripts/disposal/credential-admission.mjs', 'lib/credentials/acceptance-lifecycle.ts', 'lib/credentials/owned-chromium.ts', 'lib/credentials/contracts.ts', 'lib/credentials/browser-protocol.ts', 'lib/credentials/acceptance-resource-registry.ts', 'package.json', 'pnpm-lock.yaml']
+const runnerPath = join(project, 'scripts/disposal/credential-positive-once.ts')
+const scenarioPath = join(project, 'scripts/disposal/credential-positive-scenario.json')
+const frozenFiles = ['scripts/disposal/credential-positive-once.ts', 'scripts/disposal/credential-positive-scenario.json', 'scripts/disposal/credential-admission.mjs', 'lib/credentials/acceptance-lifecycle.ts', 'lib/credentials/owned-chromium.ts', 'lib/credentials/contracts.ts', 'lib/credentials/browser-protocol.ts', 'lib/credentials/acceptance-resource-registry.ts', 'package.json', 'pnpm-lock.yaml', 'tsconfig.json']
 export function runtimeSourceDigest(root) {
   const files = []
   const visit = (relative = '') => {
@@ -27,8 +33,9 @@ export function runtimeSourceDigest(root) {
   return sha(JSON.stringify(files))
 }
 export function sourceIdentity() {
+  assert.equal(process.platform, 'linux'); assert.equal(process.arch, 'x64')
   assert.equal(json(join(pwRoot, 'package.json')).version, '1.64.1')
-  return sha(JSON.stringify({ runtime: process.version, files: frozenFiles.map(path => [path, sha(readFileSync(join(project, path)))]), playwright: runtimeSourceDigest(pwRoot), node: sha(readFileSync(process.execPath)) }))
+  return sha(JSON.stringify({ runtime: process.version, files: frozenFiles.map(path => [path, sha(readFileSync(join(project, path)))]), runtimePackages: runtimeRoots.map(root => [root, runtimeSourceDigest(root)]), node: sha(readFileSync(process.execPath)) }))
 }
 export function procIdentity(pid) {
   const text = readFileSync(`/proc/${pid}/stat`, 'utf8'), f = text.slice(text.lastIndexOf(')') + 2).split(/\s+/)
@@ -73,6 +80,20 @@ function reservationScope(root, registry, reservations) {
     }
   }
 }
+export function fixedRunnerCommand() { return [process.execPath, '--import', loaderPath, runnerPath, '--prepare'] }
+export function assertScenario(plan, command, environment = {}, cwd = realpathSync(project)) {
+  if (plan.kind === 'contract-fixture') return
+  assert.equal(plan.runner, runnerPath, 'actual lifecycle runner not frozen')
+  assert.deepEqual(plan.scenario, json(scenarioPath), 'scenario changed')
+  assert.deepEqual(command, fixedRunnerCommand(), 'actual lifecycle requires exact frozen launch command')
+  assert.equal(cwd, realpathSync(project), 'actual lifecycle requires frozen project cwd')
+  for (const key of ['NODE_OPTIONS', 'NODE_PATH', 'TSX_TSCONFIG_PATH', 'ESBUILD_BINARY_PATH']) assert.ok(!environment[key], `unsupported loader environment: ${key}`)
+}
+function runnerScope(plan) {
+  const command = plan.kind === 'contract-fixture' ? [] : readFileSync(`/proc/${plan.host.pid}/cmdline`, 'utf8').split('\0').filter(Boolean)
+  const environment = plan.kind === 'contract-fixture' ? {} : Object.fromEntries(readFileSync(`/proc/${plan.host.pid}/environ`, 'utf8').split('\0').filter(Boolean).map(item => { const i = item.indexOf('='); return [item.slice(0, i), item.slice(i + 1)] }))
+  assertScenario(plan, command, environment, plan.kind === 'contract-fixture' ? realpathSync(project) : realpathSync(`/proc/${plan.host.pid}/cwd`))
+}
 function checkPlan(plan) {
   assert.ok(['executor-positive-once', 'contract-fixture'].includes(plan.kind))
   assert.equal(plan.registry.path, plan.root)
@@ -111,7 +132,7 @@ export function prepareAdmission(root, binding, reservations, executable, kind =
     writeFileSync(wrapper, code, { flag: 'wx', mode: 0o700 })
     return { ...r, role, wrapper, wrapperHash: sha(code) }
   })
-  const plan = { version: 1, kind, nonce: randomUUID(), root, uid: process.getuid(), host: procIdentity(process.pid), binding: structuredClone(binding), registry: { path: root, dev: String(st.dev), ino: String(st.ino) }, ownerHash: sha(readFileSync(join(root, 'owner.json'))), source: sourceIdentity(), executable, executableHash: sha(readFileSync(executable)), calls: 2, startsPerCall: 2, maxStarts: 4, sessions }
+  const plan = { version: 1, kind, runner: kind === 'contract-fixture' ? null : runnerPath, scenario: kind === 'contract-fixture' ? null : json(scenarioPath), nonce: randomUUID(), root, uid: process.getuid(), host: procIdentity(process.pid), binding: structuredClone(binding), registry: { path: root, dev: String(st.dev), ino: String(st.ino) }, ownerHash: sha(readFileSync(join(root, 'owner.json'))), source: sourceIdentity(), executable, executableHash: sha(readFileSync(executable)), calls: 2, startsPerCall: 2, maxStarts: 4, sessions }
   checkPlan(plan)
   save(join(root, 'lifecycle-manifest.json'), plan)
   return { plan, manifestHash: sha(readFileSync(join(root, 'lifecycle-manifest.json'))) }
@@ -130,9 +151,7 @@ function approval(plan) {
   return { a, hash: sha(readFileSync(path)) }
 }
 export function admitRun(plan, binding) {
-  // Resource-contract setup alone does not freeze the executing scenario. Until
-  // a reviewed entry/config is implemented and pinned, real execution is refused.
-  assert.equal(plan.kind, 'contract-fixture', 'actual lifecycle runner and scenario are not frozen; setup-only')
+  runnerScope(plan)
   checkPlan(plan); exactHost(plan); assert.deepEqual(binding, plan.binding)
   const { a, hash } = approval(plan)
   assert.ok(Number.isFinite(Date.parse(a.launchExpiresAt)) && Date.parse(a.launchExpiresAt) > Date.now(), 'approval expired')
@@ -140,7 +159,7 @@ export function admitRun(plan, binding) {
   save(join(plan.root, 'run-consumed.json'), { nonce: plan.nonce, approvalHash: hash, source: plan.source, host: plan.host })
 }
 function grant(plan, launching) {
-  assert.equal(plan.kind, 'contract-fixture', 'actual lifecycle runner and scenario are not frozen; setup-only')
+  runnerScope(plan)
   checkPlan(plan)
   const { a, hash } = approval(plan), receipt = evidence(join(plan.root, 'run-consumed.json'))
   assert.equal(receipt.nonce, plan.nonce); assert.equal(receipt.approvalHash, hash); assert.equal(receipt.source, plan.source); assert.deepEqual(receipt.host, plan.host)
