@@ -224,6 +224,7 @@ export class Daemon {
       (runId, _item, error) => this.supervisor.markUndeliverable(runId, error)
     )
     this.worktrees = new WorktreeManager(paths.worktrees)
+    this.sandbox = await this.createAgentSandbox()
     const adapters = (this.adapters = new Map<Harness, AgentAdapter>([
       [
         "mock",
@@ -473,21 +474,33 @@ export class Daemon {
     return acted
   }
 
-  private sandbox: AgentSandbox | null | undefined
+  private sandbox: AgentSandbox | null = null
 
   /** The agent sandbox (one per daemon), or null where there is none. */
   private agentSandbox(): AgentSandbox | null {
-    this.sandbox ??=
-      this.options.agentSandbox === undefined
-        ? SandboxRuntime.supported()
-          ? new SandboxRuntime(async ({ host }) => {
-              // Approval cards come later; an unlisted host is denied.
-              this.log.warn({ host }, "agent network request denied")
-              return false
-            })
-          : null
-        : this.options.agentSandbox
     return this.sandbox
+  }
+
+  private async createAgentSandbox(): Promise<AgentSandbox | null> {
+    if (this.options.agentSandbox !== undefined) return this.options.agentSandbox
+    if (!SandboxRuntime.supported()) {
+      this.log.warn("agent sandbox unavailable: platform or dependencies unsupported")
+      return null
+    }
+    const sandbox = new SandboxRuntime(async ({ host }) => {
+      this.log.warn({ host }, "agent network request denied")
+      return false
+    })
+    try {
+      await sandbox.probe()
+      return sandbox
+    } catch (err) {
+      this.log.warn({ err }, "agent sandbox unavailable")
+      await sandbox.reset().catch((resetError: unknown) => {
+        this.log.warn({ err: resetError }, "agent sandbox cleanup failed")
+      })
+      return null
+    }
   }
 
   /** Verify inside the agent's sandbox; without one, only mock runs exist. */

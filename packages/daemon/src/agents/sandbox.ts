@@ -17,6 +17,7 @@
 import { randomBytes } from "node:crypto"
 
 import { SandboxManager } from "@anthropic-ai/sandbox-runtime"
+import { execa } from "execa"
 
 export interface SandboxPolicy {
   /** Absolute paths the command may write (and create files under). */
@@ -71,6 +72,27 @@ export class SandboxRuntime implements AgentSandbox {
       SandboxManager.isSupportedPlatform() &&
       SandboxManager.checkDependencies().errors.length === 0
     )
+  }
+
+  /** Check that the runtime can actually start isolation on this host. */
+  async probe(): Promise<void> {
+    const wrapped = await this.wrap(["/bin/sh", "-c", ":"], {
+      allowWrite: [],
+      allowDomains: [],
+    })
+    try {
+      const result = await execa("/bin/sh", ["-c", wrapped.command], {
+        reject: false,
+        timeout: 10_000,
+      })
+      if (result.failed) {
+        throw new Error(
+          `sandbox probe failed: ${result.timedOut ? "timed out" : result.stderr.trim() || `exit ${result.exitCode}`}`
+        )
+      }
+    } finally {
+      wrapped.release()
+    }
   }
 
   private init() {

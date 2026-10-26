@@ -12,11 +12,12 @@ import {
 } from "node:fs"
 import { join } from "node:path"
 
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { HarnessInfo } from "@mikka/protocol"
 
 import { InvalidIdError } from "../src/errors"
+import { SandboxRuntime } from "../src/agents/sandbox"
 import { acquireLock, DaemonAlreadyRunningError } from "../src/lock"
 import { Daemon } from "../src/main"
 import { daemonPaths } from "../src/paths"
@@ -176,6 +177,28 @@ describe("stopping never waits on an adapter", () => {
 })
 
 describe("claimed runs without an adapter", () => {
+  it("does not advertise real harnesses when sandbox startup fails", async () => {
+    const supported = vi.spyOn(SandboxRuntime, "supported").mockReturnValue(true)
+    const probe = vi.spyOn(SandboxRuntime.prototype, "probe").mockRejectedValue(new Error("bwrap: uid map failed"))
+    const reset = vi.spyOn(SandboxRuntime.prototype, "reset").mockResolvedValue()
+    try {
+      const { server, dataDir } = await setup()
+      const daemon = await boot(server, dataDir, {
+        harnesses: [
+          { harness: "mock", installed: true, version: "test" },
+          { harness: "codex", installed: true, version: "1.0.0" },
+        ],
+      })
+      expect(daemon.status().harnesses.map((h) => h.harness)).toEqual(["mock"])
+      expect(server.devices.get(DEVICE)?.info.harnesses.map((h) => h.harness)).toEqual(["mock"])
+      expect(reset).toHaveBeenCalledOnce()
+    } finally {
+      supported.mockRestore()
+      probe.mockRestore()
+      reset.mockRestore()
+    }
+  })
+
   it("advertises only wired harnesses and fails an unsupported run with a completion", async () => {
     const { server, dataDir } = await setup()
     const detected: HarnessInfo[] = [
