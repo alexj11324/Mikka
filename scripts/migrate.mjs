@@ -47,7 +47,7 @@ for (const [target, pending] of byTarget) {
     const { rows } = await pool.query('select name from schema_migrations')
     const applied = new Set(rows.map((row) => row.name))
     for (const { name, sql } of pending) {
-      if (alreadyApplied(name, applied)) continue
+      if (alreadyApplied(name, applied, sql)) continue
       const client = await pool.connect()
       try {
         // Files may manage their own transaction; the record is written after.

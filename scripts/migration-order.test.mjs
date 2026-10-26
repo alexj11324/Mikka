@@ -13,10 +13,13 @@ test('missing baseline fails before connecting to any database', () => {
 
 test('BYOS migration aliases recognize both recorded branch histories without replay', async () => {
   const { alreadyApplied, MIGRATION_EQUIVALENTS } = await import('./migration-order.mjs')
+  const { readFileSync } = await import('node:fs')
   for (const [canonical, historical] of Object.entries(MIGRATION_EQUIVALENTS)) {
-    assert.equal(alreadyApplied(canonical, new Set()), false)
-    assert.equal(alreadyApplied(canonical, new Set([canonical])), true)
-    for (const name of historical) assert.equal(alreadyApplied(canonical, new Set([name])), true)
-    assert.equal(alreadyApplied(canonical, new Set(['unrelated.sql'])), false)
+    const sql = readFileSync(new URL(`../drizzle/${canonical}`, import.meta.url), 'utf8')
+    assert.equal(alreadyApplied(canonical, new Set(), sql), false)
+    assert.equal(alreadyApplied(canonical, new Set([canonical]), sql), true)
+    for (const name of historical) assert.equal(alreadyApplied(canonical, new Set([name]), sql), true)
+    assert.equal(alreadyApplied(canonical, new Set(['unrelated.sql']), sql), false)
+    assert.throws(() => alreadyApplied(canonical, new Set([historical[0]]), sql + ' '), /content changed/)
   }
 })
