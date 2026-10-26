@@ -171,6 +171,10 @@ jobs:
       R0_GROUP_APP_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_review
       R0_WORKSPACE_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_workspace_review
       FACTORY_QUESTION_DATABASE_URL: postgresql://factoryquestions192:synthetic-question-only@127.0.0.1:5432/mikka_e2e
+      FACTORY_CYCLE_TEST_URL: postgresql://factorycycle192:synthetic-cycle-only@127.0.0.1:5432/mikka_e2e
+      FACTORY_QUERY_DATABASE_URL: postgresql://factory192:synthetic-query-only@127.0.0.1:5432/mikka_e2e
+      FACTORY_CYCLE_HTTP_ORIGIN: http://localhost:3100
+      FACTORY_QUERY_HTTP_ORIGIN: http://localhost:3100
       FACTORY_QUESTION_HTTP_ORIGIN: http://localhost:3100
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
@@ -204,6 +208,9 @@ jobs:
           psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE mikka_review'
           psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE mikka_workspace_review'
           psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE factoryquestions192 LOGIN SUPERUSER PASSWORD 'synthetic-question-only'"
+          psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE factorycycle192 LOGIN PASSWORD 'synthetic-cycle-only'"
+          psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE factory192 LOGIN PASSWORD 'synthetic-query-only'"
+          psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'GRANT USAGE ON SCHEMA public TO factorycycle192, factory192; GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO factorycycle192, factory192; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO factorycycle192, factory192'
       - name: R0 prebuild DB recipes (pending contracts remain failures)
         id: r0-prebuild
         continue-on-error: true

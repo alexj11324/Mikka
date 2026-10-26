@@ -715,16 +715,17 @@
       ],
       "profile": "factory-monitor-http",
       "phase": "postbuild",
-      "status": "pending",
+      "status": "ready",
       "packageScript": "test:factory-monitor-http",
-      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
       "prerequisites": [
         "completed Next production build",
         "running synthetic loopback Next server",
-        "owner-provided restricted fixture identity"
+        "dedicated CI synthetic role without DELETE privileges"
       ],
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "real isolated HTTP: passed monitor retry, replay, owner/candidate/stop/access boundaries"
+      ],
+      "expectedCount": 1
     },
     {
       "id": "factory-query-http",
@@ -743,16 +744,17 @@
       ],
       "profile": "factory-query-http",
       "phase": "postbuild",
-      "status": "pending",
+      "status": "ready",
       "packageScript": "test:factory-query-http",
-      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
       "prerequisites": [
         "completed Next production build",
         "running synthetic loopback Next server",
-        "owner-provided restricted fixture identity"
+        "dedicated CI synthetic role without DELETE privileges"
       ],
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "real local HTTP: issue discovery survives lost task ids and enforces owner, absence and revocation boundaries"
+      ],
+      "expectedCount": 1
     },
     {
       "id": "factory-question-http",

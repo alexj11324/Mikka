@@ -1,3 +1,4 @@
+import { executePoolMigration } from '../scripts/search-migrations.mjs'
 import assert from 'node:assert/strict'
 import {createHash,randomUUID} from 'node:crypto'
 import {createServer} from 'node:http'
@@ -46,7 +47,7 @@ test('trusted issue-less group HTTP assignment and commit-time workspace authori
   const workspaceDatabase=(await wa.query('SELECT current_database() AS name')).rows[0].name
   console.log(JSON.stringify({layer:'actual PG topology',appDatabase,workspaceDatabase,splitDatabase:appDatabase!==workspaceDatabase}))
   for(const name of orderMigrations((await readdir(new URL('../drizzle/',import.meta.url))).filter(n=>n.endsWith('.sql')))){
-   const sql=await readFile(new URL('../drizzle/'+name,import.meta.url),'utf8');await(/^--\s*target:\s*DATABASE_URL/m.test(sql)?ws:pool).query(sql)
+   const sql=await readFile(new URL('../drizzle/'+name,import.meta.url),'utf8');await executePoolMigration(/^--\s*target:\s*DATABASE_URL/m.test(sql)?ws:pool,name,sql)
   }
   for(const u of ['owner','member'])await ws.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')',[workspaceId,u,u+'@example.invalid'])
   await pool.query('INSERT INTO devices(id,"ownerId",name,enabled) VALUES($1,\'owner\',\'fixture\',true)',[deviceId])

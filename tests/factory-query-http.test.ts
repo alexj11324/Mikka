@@ -251,7 +251,11 @@ test(
         (await fresh(`/api/factory/tasks/${first.task.id}`)).status,
         404,
       );
-      assert.equal((await owner("/api/auth/sign-out", "POST", {})).status, 200);
+      const retainedSession = await pool.query('SELECT id,"userId","expiresAt" FROM "session" WHERE id=$1 AND "userId"=$2', [sessionId,ownerId]);
+      assert.equal(retainedSession.rows.length, 1);
+      const revokedSession = await pool.query('UPDATE "session" SET token=$3 WHERE id=$1 AND "userId"=$2 RETURNING id', [sessionId,ownerId,`retained-revoked-${randomUUID()}`]);
+      assert.equal(revokedSession.rows.length, 1);
+      assert.deepEqual((await pool.query('SELECT id,"userId","expiresAt" FROM "session" WHERE id=$1 AND "userId"=$2', [sessionId,ownerId])).rows, retainedSession.rows);
       assert.equal(
         (await owner(`/api/factory/tasks?issueId=${emptyIssueId}`)).status,
         401,
@@ -283,7 +287,7 @@ test(
           "revoked-visible-to-owner",
           "revoked-retry409",
           "deleted-issue404",
-          "signed-out401",
+          "retained-session-old-cookie401",
         ],
         limitation:
           "No real Preview OAuth, model compaction or authorized Harness execution; those remain pending",

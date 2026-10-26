@@ -97,6 +97,9 @@ test(
       });
       assert.equal(otherSignup.status, 200);
       const ownerId = signup.body.user.id as string;
+      const currentSession = await owner("/api/auth/get-session");
+      assert.equal(currentSession.status, 200);
+      const sessionId = currentSession.body.session.id as string;
       const agentId = randomUUID();
       await pool.query(
         `INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,'HTTP cycle fixture','codex')`,
@@ -253,7 +256,11 @@ test(
         409,
       );
       assert.equal((await owner(path(task))).status, 200);
-      assert.equal((await owner("/api/auth/sign-out", "POST", {})).status, 200);
+      const retainedSession = await pool.query('SELECT id,"userId","expiresAt" FROM "session" WHERE id=$1 AND "userId"=$2', [sessionId,ownerId]);
+      assert.equal(retainedSession.rows.length, 1);
+      const revokedSession = await pool.query('UPDATE "session" SET token=$3 WHERE id=$1 AND "userId"=$2 RETURNING id', [sessionId,ownerId,`retained-revoked-${randomUUID()}`]);
+      assert.equal(revokedSession.rows.length, 1);
+      assert.deepEqual((await pool.query('SELECT id,"userId","expiresAt" FROM "session" WHERE id=$1 AND "userId"=$2', [sessionId,ownerId])).rows, retainedSession.rows);
       assert.equal((await owner(path(task))).status, 401);
       const evidenceDir = process.env.FACTORY_CYCLE_EVIDENCE_DIR;
       if (evidenceDir) {
@@ -278,7 +285,7 @@ test(
                 "live access revoked",
                 "deleted",
                 "other passed stage",
-                "signout",
+                "retained session old cookie rejected",
               ],
             },
             null,
