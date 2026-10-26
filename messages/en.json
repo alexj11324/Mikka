@@ -2337,6 +2337,7 @@
       "handbackFailed": "Couldn't hand back. Try again."
     },
     "approval": {
+      "action": { "click": "Click the screen", "type": "Type text", "key": "Press a key", "scroll": "Scroll", "screenshot": "View the screen" },
       "allowRun": "Allow for this task",
       "deny": "Deny",
       "allow": "Allow",

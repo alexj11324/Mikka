@@ -113,7 +113,7 @@ async function main() {
       await sandbox.commands.run('/usr/bin/python3 /opt/mikka/computer/viewer-probe.py', { user: 'root', timeoutMs: 30_000 })
     } catch (error) {
       const stderr = String((error as { stderr?: unknown }).stderr ?? '')
-      const lines = stderr.split('\n').filter(line => /^\s*File .*line \d+/.test(line) || /^AssertionError/.test(line) || /^TimeoutError/.test(line))
+      const lines = stderr.split('\n').filter(line => /^\s*File .*line \d+/.test(line) || line.startsWith('AssertionError') || line.startsWith('TimeoutError'))
       console.error('resumed viewer diagnostic:', lines.join(' | '))
       throw error
     }

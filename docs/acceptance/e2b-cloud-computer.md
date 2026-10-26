@@ -76,6 +76,12 @@ Build from the repository root with the Python E2B SDK:
 python scripts/e2b/build-template.py --name mikka-cloud-desktop-NEW_VERSION
 ```
 
+The build packages the daemon and protocol from the selected committed Git
+revision (`--source-ref`, default `HEAD`), records its full SHA in the template,
+and installs the locked dependencies. It does not copy the working tree or
+local environment files. Use a new versioned name so an existing alias is not
+silently replaced.
+
 Provide `E2B_API_KEY` only to the control-plane process. Configure the resulting
 `E2B_COMPUTER_TEMPLATE` in that deployment's Infisical scope. The test build
 created template `wt4zieke417b086z059d`; template aliases are mutable, so rebuild

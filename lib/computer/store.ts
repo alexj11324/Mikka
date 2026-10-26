@@ -46,7 +46,7 @@ export class ComputerStore {
       ? { id: review.id, digest: review.digest, runId: review.runId, botId,
           action: call.name === 'click' ? { tool: 'click', x: call.arguments.x, y: call.arguments.y }
             : call.name === 'type_text' ? { tool: 'type', text: call.arguments.text } : { tool: 'screenshot' },
-          summary: call.name === 'click' ? '点击屏幕' : call.name === 'type_text' ? '输入文字' : '查看屏幕',
+          summary: call.name,
           expiresAt: new Date(review.expiresAt).toISOString() } : undefined
     return { machine: row.machine, control: held ? 'user' : row.control === 'user' ? 'agent' : row.control,
       ...(held ? { controlledBy: { userId: row.controlledBy } } : {}), ...(row.lastAction ? { lastAction: row.lastAction } : {}), ...(pendingApproval ? { pendingApproval } : {}) }
