@@ -19,6 +19,8 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       MAILBOX_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/mikka_mailbox_e2e
+      KEEP_GROUP_TEST_FIXTURES: '1'
+      KEEP_NATIVE_TEST_FIXTURES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -30,12 +32,28 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Group review disposable database
-        run: psql postgres://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE mikka_review'
+        run: |
+          psql postgres://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE mikka_review'
+          psql postgres://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE mikka_workspace_review'
       - run: pnpm test:mailboxes
       - name: Group API, HTTP and offline native adapters
         run: pnpm test:groups
         env:
           MIKKA_DISPOSABLE_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/mikka_review
-          MIKKA_TEST_NATIVE_GROUPS: '1'
+          MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/mikka_workspace_review
+      - name: Required native profile count and retained receipt
+        run: pnpm test:group-native
+        env:
+          MIKKA_DISPOSABLE_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/mikka_review
+          MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/mikka_workspace_review
       - run: pnpm --filter @mikka/daemon exec vitest run test/mailbox.test.ts test/skills.test.ts test/adapters.test.ts test/runs.test.ts test/group-review-worker.test.ts test/server-link-http.test.ts
       - run: pnpm --filter @mikka/daemon typecheck
+      - name: Preserve native resource receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-resource-receipts
+          path: |
+            /tmp/mgn-img-*/resource-receipts.jsonl
+            /tmp/mgn-img-*/retained-resources.json
+          if-no-files-found: error

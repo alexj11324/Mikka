@@ -169,7 +169,8 @@
       },
       "env": {
         "FACTORY_QUESTION_LOCAL_HTTP": "1",
-        "RETAIN_SYNTHETIC_RECORDS": "1"
+        "RETAIN_SYNTHETIC_RECORDS": "1",
+        "FACTORY_QUESTION_RETAIN_FIXTURES": "1"
       }
     },
     "factory-query-http": {
@@ -264,7 +265,8 @@
         "CONVERSATION_READS_REQUIRE_DB": "1",
         "MIKKA_TEST_DB_PORT": "5432",
         "RETAIN_SYNTHETIC_RECORDS": "1",
-        "KEEP_GROUP_TEST_FIXTURES": "1"
+        "KEEP_GROUP_TEST_FIXTURES": "1",
+        "KEEP_NATIVE_TEST_FIXTURES": "1"
       },
       "distinct": [
         "R0_GROUP_APP_DATABASE_URL",
@@ -344,6 +346,44 @@
         "RETAIN_SYNTHETIC_RECORDS": "1",
         "KEEP_GROUP_TEST_FIXTURES": "1"
       }
+    },
+    "group-native": {
+      "targets": [
+        {
+          "key": "R0_GROUP_APP_DATABASE_URL",
+          "database": "mikka_review",
+          "host": "127.0.0.1",
+          "port": "5432"
+        },
+        {
+          "key": "R0_WORKSPACE_DATABASE_URL",
+          "host": "127.0.0.1",
+          "port": "5432",
+          "database": "mikka_workspace_review"
+        }
+      ],
+      "bindings": {
+        "E2E_DATABASE_URL": "R0_GROUP_APP_DATABASE_URL",
+        "MIKKA_DATABASE_URL": "R0_GROUP_APP_DATABASE_URL",
+        "DATABASE_URL": "R0_GROUP_APP_DATABASE_URL",
+        "BETTER_AUTH_SECRET": "BETTER_AUTH_SECRET",
+        "MIKKA_DISPOSABLE_POSTGRES_URL": "R0_GROUP_APP_DATABASE_URL",
+        "MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL": "R0_WORKSPACE_DATABASE_URL",
+        "MIKKA_NATIVE_DISPOSAL_AUTHORIZED": "MIKKA_NATIVE_DISPOSAL_AUTHORIZED"
+      },
+      "env": {
+        "REQUIRE_DB": "1",
+        "CONVERSATION_READS_REQUIRE_DB": "1",
+        "MIKKA_TEST_DB_PORT": "5432",
+        "RETAIN_SYNTHETIC_RECORDS": "1",
+        "KEEP_GROUP_TEST_FIXTURES": "1",
+        "KEEP_NATIVE_TEST_FIXTURES": "1",
+        "MIKKA_TEST_NATIVE_GROUPS": "1"
+      },
+      "distinct": [
+        "R0_GROUP_APP_DATABASE_URL",
+        "R0_WORKSPACE_DATABASE_URL"
+      ]
     }
   },
   "recipes": [
@@ -685,23 +725,24 @@
         }
       ],
       "command": [
-        "node",
-        "--import",
-        "tsx",
-        "--test",
-        "tests/factory-question-http.test.ts"
+        "pnpm",
+        "-s",
+        "test:factory-question-http"
       ],
       "profile": "factory-question-http",
       "phase": "postbuild",
-      "status": "pending",
-      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "status": "ready",
       "prerequisites": [
         "completed Next production build",
         "running synthetic loopback Next server",
         "owner-provided restricted fixture identity"
       ],
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "real local question HTTP: owner, origin, replay, cancellation and isolation"
+      ],
+      "expectedCount": 1,
+      "packageScript": "test:factory-question-http",
+      "runner": "scripts/test-factory-question-http.mjs"
     },
     {
       "id": "group-native",
@@ -720,16 +761,28 @@
         "test:group-native"
       ],
       "packageScript": "test:group-native",
-      "profile": "groups",
+      "profile": "group-native",
       "phase": "postbuild",
       "status": "pending",
-      "pendingReason": "Group owner will provide retained native harness and runtime preparation.",
+      "pendingReason": "One-run native disposal approval was exhausted; new runtime deletion requires explicit scope authorization.",
       "prerequisites": [
         "group owner retained CLI harness",
         "pinned native runtime image"
       ],
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "real app handlers persist request, worker HTTP dispatches once, Docker-isolated fake proposes revision and completion ACKs atomically",
+        "concurrent claims are exclusive; lease replay fences old output and completion deduplicates",
+        "cross-owner/browser spoofing and private mailbox routes cannot enter a group mailbox",
+        "a concurrent human revision retains losing immutable proposal without accepting it",
+        "cancellation, revoked grants and workspace suspension block delivery and late completion",
+        "reply, proposed version, mailbox ACK and terminal state roll back together and retry safely",
+        "additive group mailbox backfill preserves identity and hides old group runs from private discovery",
+        "running worker aborts on revocation without posting late output",
+        "actual daemon startup routes BOTH CC/Codex CLI adapters with isolated fake binaries",
+        "actual HTTP dispatch → group mailbox → isolated fake worker → trusted revision"
+      ],
+      "expectedCount": 10,
+      "runner": "scripts/test-group-native-required.mjs"
     },
     {
       "id": "groups",
@@ -772,14 +825,59 @@
       ],
       "profile": "groups",
       "phase": "prebuild",
-      "status": "pending",
+      "status": "ready",
       "packageScript": "test:groups",
-      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
       "aliases": [
         "test:group-native"
       ],
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "source anchors never migrate to another version; HTML identity fails closed",
+        "migration replay/concurrency preserves existing history and does not retroactively share Agents",
+        "ownership checks reuse transaction clients under a two-connection application pool",
+        "member may address shared Agent, but cannot enumerate or grant another owner’s private Agent",
+        "cross-group, workspace, private Artifact and forged authors are rejected",
+        "client retry and concurrent dispatch create one work intent and one transport input",
+        "save comment does not dispatch; explicit send snapshots exact version and thread",
+        "Agent proposal persists immutable version; completion is not human acceptance",
+        "stale/orphaned anchors never silently move or become sendable",
+        "concurrent proposals preserve loser as visible conflict without overwriting head",
+        "runtime enqueue rolls back completely on failure, then safely replays",
+        "cancellation, stop, grant revocation/regrant and member suspension reject late writes",
+        "revocation and removal commit while dispatch/reply wait on the group lock",
+        "a stop committed while reply validation waits prevents the late write",
+        "pending work revoked before dispatch never wakes runtime; Agent replies cannot forge browser approval",
+        "disposable Postgres: mixed groups → durable isolated runtime → Artifact revision → human acceptance",
+        "directory rejects foreign/suspended users and private or malformed agents",
+        "GET conversations: authentication, write Origin/Host before DB",
+        "POST conversations: authentication, write Origin/Host before DB",
+        "GET messages: authentication, write Origin/Host before DB",
+        "POST messages: authentication, write Origin/Host before DB",
+        "POST members: authentication, write Origin/Host before DB",
+        "DELETE members: authentication, write Origin/Host before DB",
+        "Postgres17 migration, atomic history, pagination, unread counts, membership and privacy",
+        "real app handlers persist request, worker HTTP dispatches once, Docker-isolated fake proposes revision and completion ACKs atomically",
+        "concurrent claims are exclusive; lease replay fences old output and completion deduplicates",
+        "cross-owner/browser spoofing and private mailbox routes cannot enter a group mailbox",
+        "a concurrent human revision retains losing immutable proposal without accepting it",
+        "cancellation, revoked grants and workspace suspension block delivery and late completion",
+        "reply, proposed version, mailbox ACK and terminal state roll back together and retry safely",
+        "additive group mailbox backfill preserves identity and hides old group runs from private discovery",
+        "running worker aborts on revocation without posting late output",
+        "actual HTTP dispatch → group mailbox → isolated fake worker → trusted revision",
+        "concurrent human retries create one root; one worker claims and one completion publishes",
+        "three bounded serial rounds dedupe mentions and suppress no-add",
+        "lost lease is uncertain, never re-executed; human reconciliation is authorized and audited",
+        "lead and correction persistence; nonmember/workspace denial; revoke prevents late and queued replies",
+        "single durable group executor: concurrency, replay, rounds and uncertainty",
+        "group message HTTP never imports the retired direct-provider dispatcher",
+        "persisted group assignment executes without issue; anonymous/non-owner/forged body denied",
+        "orphan and cross-workspace mailbox identity cannot authorize an issue-less run",
+        "queued suspension and running removal/revocation/stop/lease fences admit no late reply",
+        "workspace and token revocation wait for authorized commit; subsequent writes denied",
+        "application insert failure rolls back reply and permits one explicit same-epoch retry",
+        "trusted issue-less group HTTP assignment and commit-time workspace authority"
+      ],
+      "expectedCount": 45
     },
     {
       "id": "historical-upgrade-db",

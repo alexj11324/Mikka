@@ -56,7 +56,7 @@
     "daemon": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon --server http://localhost:3000",
     "daemon:login": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon login --server http://localhost:3000",
     "test:groups": "node --import tsx --test lib/group-conversations.test.ts lib/group-artifact-review.test.ts lib/group-mailbox-runtime.test.ts lib/group-worker-authority.test.ts lib/group-mailbox-turns.test.ts",
-    "test:group-native": "MIKKA_TEST_NATIVE_GROUPS=1 node --import tsx --test lib/group-mailbox-runtime.test.ts",
+    "test:group-native": "node scripts/test-group-native-required.mjs lib/group-mailbox-runtime.test.ts",
     "test:mailboxes": "node --import tsx --test tests/session-mailbox.test.ts tests/orchestration-prompts.test.ts",
     "test:run-dispatch": "node --import tsx --test tests/run-dispatch.test.ts",
     "test:byos-claim": "node scripts/test-byos-claim.mjs",
@@ -69,7 +69,9 @@
     "test:db": "node scripts/run-db-tests.mjs",
     "test:db-runner": "node --test scripts/run-db-tests.test.mjs",
     "test:workspace-migration-db": "node --test tests/workspace-migration.test.mjs",
-    "test:visibility-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/team-visibility.db.test.ts"
+    "test:visibility-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/team-visibility.db.test.ts",
+    "test:factory-question-http": "node scripts/test-factory-question-http.mjs tests/factory-question-http.test.ts",
+    "test:backend-recipes": "node --test scripts/backend-recipes.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

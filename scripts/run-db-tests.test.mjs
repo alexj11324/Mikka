@@ -90,7 +90,7 @@ test('actual tree has exact complete R0 inventory, all previously missing suites
  assert.equal(p.files.length,41);assert.equal(p.recipes.length,23);assert.deepEqual(p.expected,c.expected)
  for(const id of ['credentials','groups','group-native','operations','migration-session','improvement','byos-claim','byos-worker','factory-question-http'])assert.ok(p.expected.includes(id))
  assert.ok(p.contractErrors.length>0,'unverified result contracts remain failed, not excluded');
- assert.deepEqual(p.selfManaged,['lib/auth-email.test.ts']);assert.ok(p.recipes.filter(r=>r.phase==='postbuild').every(r=>r.status==='pending'))
+ assert.deepEqual(p.selfManaged,['lib/auth-email.test.ts']);assert.equal(p.recipes.find(r=>r.id==='group-native').status,'pending');assert.equal(p.recipes.find(r=>r.id==='factory-question-http').phase,'postbuild')
  let calls=0;assert.equal(main({env:{},run(){calls++}}),1);assert.equal(calls,0)
 })
 
@@ -136,7 +136,7 @@ test('groups profile uses the exact common harness database pair, never an arbit
  assert.deepEqual(p.distinct,['R0_GROUP_APP_DATABASE_URL','R0_WORKSPACE_DATABASE_URL'])
  for(const database of ['another_e2e','mikka_e2e','mikka_review'])assert.throws(()=>profileEnvironment(p,{...local,R0_WORKSPACE_DATABASE_URL:`postgres://fixture@127.0.0.1:5432/${database}`},'prebuild'),/Invalid isolated target/)
  assert.throws(()=>profileEnvironment(p,{...local,R0_GROUP_APP_DATABASE_URL:target},'prebuild'),/Invalid isolated target/)
- for(const id of ['groups','group-native'])assert.equal(c.recipes.find(r=>r.id===id).status,'pending')
+ assert.equal(c.recipes.find(r=>r.id==='groups').status,'ready');assert.equal(c.recipes.find(r=>r.id==='group-native').status,'pending')
 })
 
 test('Factory uses existing CI paths without incompatible local fixture overrides', () => {
@@ -153,3 +153,21 @@ test('Factory uses existing CI paths without incompatible local fixture override
  assert.throws(()=>profileEnvironment(p,{...supplied,E2E_DATABASE_URL:target.replace('postgresql:','postgres:')},'prebuild'),/Invalid isolated target/)
  assert.equal(c.recipes.find(r=>r.id==='factory').status,'pending')
 })
+
+ test('296 contracts separate retained groups, blocked native and actual postbuild HTTP',()=>{
+ const c=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8'))
+ const groups=c.recipes.find(r=>r.id==='groups'),native=c.recipes.find(r=>r.id==='group-native'),http=c.recipes.find(r=>r.id==='factory-question-http')
+ assert.equal(groups.expectedCount,45);assert.equal(native.expectedCount,10)
+ assert.ok(!groups.expectedTests.includes(native.files[0].requiredNames[0]));assert.ok(native.expectedTests.includes(native.files[0].requiredNames[0]))
+ assert.equal(c.profiles.groups.env.MIKKA_TEST_NATIVE_GROUPS,undefined)
+ assert.equal(c.profiles['group-native'].env.MIKKA_NATIVE_DISPOSAL_AUTHORIZED,undefined)
+ assert.equal(c.profiles['group-native'].bindings.MIKKA_NATIVE_DISPOSAL_AUTHORIZED,'MIKKA_NATIVE_DISPOSAL_AUTHORIZED')
+ const p=inventory(readTree(),JSON.parse(readFileSync('package.json','utf8')).scripts)
+ let nativeCalls=0
+ const result=executePhase(p,'postbuild',sha,{...env,R0_BUILD_SUCCEEDED:'success'},()=>{nativeCalls++;return success()})
+ assert.equal(result.results.find(r=>r.id==='group-native').state,'blocked');assert.equal(nativeCalls,0)
+ assert.equal(http.runner,'scripts/test-factory-question-http.mjs');assert.equal(http.phase,'postbuild');assert.equal(http.expectedCount,1)
+ assert.equal(c.profiles[http.profile].env.FACTORY_QUESTION_RETAIN_FIXTURES,'1')
+ const workflow=readFileSync('.github/workflows/mailboxes.yml','utf8')
+ assert.ok(!/MIKKA_NATIVE_DISPOSAL_AUTHORIZED:.*1/.test(workflow))
+ })

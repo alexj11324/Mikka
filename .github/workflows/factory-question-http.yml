@@ -1,0 +1,63 @@
+name: Factory question post-build HTTP
+on:
+  workflow_dispatch:
+  push:
+    branches: ['fix/291-native-question-recipes']
+  pull_request:
+    paths: ['tests/factory-question-http.test.ts', 'scripts/test-factory-question-http.mjs', '.github/workflows/factory-question-http.yml']
+permissions:
+  contents: read
+jobs:
+  questions:
+    if: github.event_name != 'pull_request' || github.head_ref != 'fix/291-native-question-recipes' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: factoryquestions192
+          POSTGRES_DB: mikka_e2e
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U factoryquestions192 -d mikka_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      MIKKA_DATABASE_URL: postgresql://factoryquestions192@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://factoryquestions192@127.0.0.1:5432/mikka_e2e
+      E2E_DATABASE_URL: postgresql://factoryquestions192@127.0.0.1:5432/mikka_e2e
+      FACTORY_QUESTION_DATABASE_URL: postgresql://factoryquestions192@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_SECRET: synthetic-question-http-no-live-access-0123456789
+      BETTER_AUTH_URL: http://localhost:3120
+      NEXT_TELEMETRY_DISABLED: '1'
+      FACTORY_QUESTION_LOCAL_HTTP: '1'
+      FACTORY_QUESTION_HTTP_ORIGIN: http://localhost:3120
+      FACTORY_QUESTION_RETAIN_FIXTURES: '1'
+      FACTORY_QUESTION_HTTP_EVIDENCE: question-evidence/http.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: mkdir -p question-evidence
+      - run: pnpm test:e2e:setup > question-evidence/setup.log
+      - run: pnpm build > question-evidence/build.log 2>&1
+      - name: Actual compiled Next HTTP, retained fixtures
+        run: |
+          NODE_OPTIONS=--dns-result-order=ipv4first pnpm start --hostname localhost --port 3120 > question-evidence/next.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://localhost:3120/mikka/api/auth/get-session > /dev/null; then break; fi
+            sleep 1
+          done
+          pnpm test:factory-question-http > question-evidence/tests.log 2>&1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: factory-question-http-evidence
+          path: question-evidence/

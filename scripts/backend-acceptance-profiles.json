@@ -1,0 +1,28 @@
+{
+  "profiles": [
+    {
+      "name": "group-native-required",
+      "phase": "database",
+      "appDatabases": ["mikka_review"],
+      "appBinding": "R0_GROUP_APP_DATABASE_URL",
+      "workspaceDatabase": "mikka_workspace_review",
+      "requireDistinctWorkspaceDatabase": true,
+      "script": "test:group-native",
+      "file": "lib/group-mailbox-runtime.test.ts",
+      "requiredEnvironment": {"MIKKA_TEST_NATIVE_GROUPS": "1", "KEEP_GROUP_TEST_FIXTURES": "1", "KEEP_NATIVE_TEST_FIXTURES": "1", "MIKKA_NATIVE_DISPOSAL_AUTHORIZED": "1"},
+      "tests": 10,
+      "requiredTestName": "actual daemon startup routes BOTH CC/Codex CLI adapters with isolated fake binaries",
+      "note": "Also occurs in test:groups; that profile without native flag does not register this test. Retention does not disable production runtime container disposal."
+    },
+    {
+      "name": "factory-question-http",
+      "phase": "post-build-http",
+      "script": "test:factory-question-http",
+      "file": "tests/factory-question-http.test.ts",
+      "requiredEnvironment": {"FACTORY_QUESTION_LOCAL_HTTP": "1", "FACTORY_QUESTION_RETAIN_FIXTURES": "1"},
+      "tests": 1,
+      "requiredTestName": "real local question HTTP: owner, origin, replay, cancellation and isolation",
+      "note": "Actual compiled Next at http://localhost; isolated mikka_e2e database and factoryquestions192 role. Never run in the pre-build DB phase."
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import {mkdtemp,mkdir,writeFile,readFile,copyFile,rm,readdir} from 'node:fs/promises'
+import {mkdtemp,mkdir,writeFile,readFile,copyFile,rm,rename,readdir} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {execFile} from 'node:child_process'
@@ -10,24 +10,38 @@ import {HttpServerLink} from '../src/server-link-http'
 import {createNativeGroupProcessor} from '../src/adapters/group-review'
 interface Fixtures {pool:Pool;command:(id:string,user:string,input:unknown)=>Promise<unknown>;port:number;agentId:string;ccAgentId:string;newRequest:(target?:string,comment?:string)=>Promise<{path:string;group:{id:string};base:{artifactId:string;baseVersionId:string;baseHash:string};work:{workId:string}}>;post:(path:string,input:unknown,user?:string)=>Promise<any>;worker:(input:unknown,user?:string)=>Promise<any>}
 export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId,newRequest,post,worker}:Fixtures){
+   assert.equal(process.env.MIKKA_NATIVE_DISPOSAL_AUTHORIZED,'1','Native acceptance requires explicit authorization for task-owned container and runtime-directory deletion (ordinary test-process stop is not blocked)')
 
    const exec=promisify(execFile),build=await mkdtemp(join(tmpdir(),'mgn-img-'))
-   let image='',badImage='',badCapImage='',missingCapImage=''
+   let image='',badImage='',badCapImage='',missingCapImage='',dataDir=''
    const dockerKeys=['DOCKER_HOST','DOCKER_CONTEXT','DOCKER_CONFIG'] as const
    const oldDocker=Object.fromEntries(dockerKeys.map(key=>[key,process.env[key]]))
    const configsBefore=(await readdir(tmpdir())).filter(name=>name.startsWith('mikka-group-docker-')).sort()
+   const originalPath=process.env.PATH,realDockerPath=(await exec('which',['docker'])).stdout.trim()
+   const registry=join(build,'resource-receipts.jsonl'),auditBin=join(build,'audit-bin')
+   await mkdir(auditBin)
+   await writeFile(join(auditBin,'docker'),`#!/usr/bin/env node
+const {spawnSync}=require('node:child_process');const {appendFileSync}=require('node:fs');const args=process.argv.slice(2),config=args[args.indexOf('--config')+1],name=args.includes('--name')?args[args.indexOf('--name')+1]:null;
+if(config&&config.includes('mikka-group-docker-'))appendFileSync(${JSON.stringify(registry)},JSON.stringify({action:'runtime-config',path:config})+'\\n');
+if(name)appendFileSync(${JSON.stringify(registry)},JSON.stringify({action:'create-request',name})+'\\n');
+const child=spawnSync(${JSON.stringify(realDockerPath)},args,{stdio:args.includes('create')?['inherit','pipe','inherit']:'inherit'});
+if(child.stdout){process.stdout.write(child.stdout);if(name)appendFileSync(${JSON.stringify(registry)},JSON.stringify({action:'created',name,id:child.stdout.toString().trim(),status:child.status})+'\\n')}
+if(args.includes('rm'))appendFileSync(${JSON.stringify(registry)},JSON.stringify({action:'remove-result',names:args.slice(args.indexOf('rm')+1).filter(x=>!x.startsWith('-')),status:child.status})+'\\n');
+process.exit(child.status??1)
+`,{mode:0o700})
+   process.env.PATH=auditBin+':'+originalPath
    const previous=process.env.PRIVATE_HOST_SENTINEL
    process.env.PRIVATE_HOST_SENTINEL='PRIVATE_HOST_SENTINEL'
    try{
     await copyFile(new URL('./fakes/group-review-native.mjs',import.meta.url),join(build,'fake.mjs'))
     await writeFile(join(build,'Dockerfile'),'FROM node:24-bookworm-slim\nCOPY fake.mjs /usr/local/bin/claude\nCOPY fake.mjs /usr/local/bin/codex\nRUN chmod 755 /usr/local/bin/claude /usr/local/bin/codex\n')
     await mkdir(join(build,'docker-config'),{mode:0o700})
-    image=(await exec('docker',['build','--network=none','--quiet',build],{timeout:60000,env:{PATH:process.env.PATH,NODE_ENV:'test',DOCKER_CONFIG:join(build,'docker-config'),DOCKER_BUILDKIT:'0'}})).stdout.trim()
+    image=(await exec('docker',['build',...(process.env.KEEP_NATIVE_TEST_FIXTURES?['--rm=false','--force-rm=false']:[]),'--network=none','--quiet',build],{timeout:60000,env:{PATH:process.env.PATH,NODE_ENV:'test',DOCKER_CONFIG:join(build,'docker-config'),DOCKER_BUILDKIT:'0'}})).stdout.trim()
     assert.match(image,/^sha256:[a-f0-9]{64}$/)
     process.env.DOCKER_HOST='tcp://127.0.0.1:1'
     process.env.DOCKER_CONTEXT='must-not-be-inherited'
     process.env.DOCKER_CONFIG=join(build,'poisoned-docker-config')
-    const dataDir=await mkdtemp(join(tmpdir(),'mgn-')),link=new HttpServerLink(`http://127.0.0.1:${port}`)
+    dataDir=await mkdtemp(join(tmpdir(),'mgn-'));const link=new HttpServerLink(`http://127.0.0.1:${port}`)
     const daemon=await new Daemon({dataDir,flavor:'dev',link,credential:'controlled-device-fixture',harnesses:[],quotaSource:null,agentSandbox:null,heartbeatMs:100,groupReviewImages:{claude_code:image,codex:image}}).start()
     const awaitWork=async(id:string,predicate:(w:Record<string,unknown>)=>boolean)=>{for(let i=0;i<200;i++){const w=(await pool.query('SELECT * FROM conversation_work WHERE id=$1',[id])).rows[0];if(predicate(w))return w;await new Promise(r=>setTimeout(r,50))}throw Error('Native daemon fixture timed out')}
     try{
@@ -92,20 +106,20 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
      const limit=await newRequest();await worker({action:'poll'})
      await pool.query('UPDATE conversation_work SET "claimEpoch"=3 WHERE id=$1',[limit.work.workId])
      assert.equal((await worker({action:'claim',runId:limit.work.workId})).status,'uncertain')
-    }finally{await daemon.stop();await rm(dataDir,{recursive:true,force:true})}
+    }finally{await daemon.stop();if(!process.env.KEEP_NATIVE_TEST_FIXTURES)await rm(dataDir,{recursive:true,force:true})}
     // Missing compatibility/isolation capability fails closed before execution.
     await assert.rejects(createNativeGroupProcessor({codex:'latest'}))
     await assert.rejects(createNativeGroupProcessor({codex:'sha256:'+'0'.repeat(64)}))
     const fake=await readFile(join(build,'fake.mjs'),'utf8')
     await writeFile(join(build,'fake.mjs'),fake.replace('codex-cli 0.162.1','codex-cli 0.1.0'))
-    badImage=(await exec('docker',['build','--network=none','--quiet',build],{timeout:60000,env:{PATH:process.env.PATH,NODE_ENV:'test',DOCKER_CONFIG:join(build,'docker-config'),DOCKER_BUILDKIT:'0'}})).stdout.trim()
+    badImage=(await exec('docker',['build',...(process.env.KEEP_NATIVE_TEST_FIXTURES?['--rm=false','--force-rm=false']:[]),'--network=none','--quiet',build],{timeout:60000,env:{PATH:process.env.PATH,NODE_ENV:'test',DOCKER_CONFIG:join(build,'docker-config'),DOCKER_BUILDKIT:'0'}})).stdout.trim()
     await assert.rejects(createNativeGroupProcessor({codex:badImage}),/Unsupported Codex/)
     await writeFile(join(build,'fake.mjs'),fake.replace('multi_agent_v2 stable false','multi_agent_v2 stable true').replace('--bare --restricted --tools','--bare --tools'))
-    badCapImage=(await exec('docker',['build','--network=none','--quiet',build],{timeout:60000,env:{PATH:process.env.PATH,NODE_ENV:'test',DOCKER_CONFIG:join(build,'docker-config'),DOCKER_BUILDKIT:'0'}})).stdout.trim()
+    badCapImage=(await exec('docker',['build',...(process.env.KEEP_NATIVE_TEST_FIXTURES?['--rm=false','--force-rm=false']:[]),'--network=none','--quiet',build],{timeout:60000,env:{PATH:process.env.PATH,NODE_ENV:'test',DOCKER_CONFIG:join(build,'docker-config'),DOCKER_BUILDKIT:'0'}})).stdout.trim()
     await assert.rejects(createNativeGroupProcessor({codex:badCapImage}),/tool-disable capability/)
     await assert.rejects(createNativeGroupProcessor({claude_code:badCapImage}),/Required Claude/)
     await writeFile(join(build,'fake.mjs'),fake.replace('multi_agent_v2 stable false','unavailable_feature stable false'))
-    missingCapImage=(await exec('docker',['build','--network=none','--quiet',build],{timeout:60000,env:{PATH:process.env.PATH,NODE_ENV:'test',DOCKER_CONFIG:join(build,'docker-config'),DOCKER_BUILDKIT:'0'}})).stdout.trim()
+    missingCapImage=(await exec('docker',['build',...(process.env.KEEP_NATIVE_TEST_FIXTURES?['--rm=false','--force-rm=false']:[]),'--network=none','--quiet',build],{timeout:60000,env:{PATH:process.env.PATH,NODE_ENV:'test',DOCKER_CONFIG:join(build,'docker-config'),DOCKER_BUILDKIT:'0'}})).stdout.trim()
     await assert.rejects(createNativeGroupProcessor({codex:missingCapImage}),/tool-disable capability/)
     const processor=await createNativeGroupProcessor({claude_code:image})
     try{
@@ -131,8 +145,8 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
     let lateCreate=''
     for(let i=0;i<40;i++){try{lateCreate=await readFile(marker,'utf8');break}catch{await new Promise(resolve=>setTimeout(resolve,25))}}
     assert.equal(lateCreate,'0','timeout regression must actually create its delayed disposable container: '+await readFile(shimLog,'utf8'))
-    const blockRm=join(build,'block-rm')
-    await writeFile(join(shim,'docker'),`#!/usr/bin/env node\nconst {spawnSync}=require('node:child_process');const {existsSync}=require('node:fs');const args=process.argv.slice(2);if(args.includes('rm')&&existsSync(${JSON.stringify(blockRm)})){process.stderr.write('controlled cleanup unavailable');process.exit(1)}process.exit(spawnSync(${JSON.stringify(realDocker)},args,{stdio:'inherit'}).status??1)\n`,{mode:0o700})
+    const blockRm=join(build,'block-rm'),ownedNames=join(build,'cleanup-owned-names')
+    await writeFile(join(shim,'docker'),`#!/usr/bin/env node\nconst {spawnSync}=require('node:child_process');const {existsSync,appendFileSync}=require('node:fs');const args=process.argv.slice(2);if(args.includes('create')&&args.includes('--name'))appendFileSync(${JSON.stringify(ownedNames)},args[args.indexOf('--name')+1]+'\\n');if(args.includes('rm')&&existsSync(${JSON.stringify(blockRm)})){process.stderr.write('controlled cleanup unavailable');process.exit(1)}process.exit(spawnSync(${JSON.stringify(realDocker)},args,{stdio:'inherit'}).status??1)\n`,{mode:0o700})
     const localDocker=(args:string[])=>exec(realDocker,['--host','unix:///var/run/docker.sock','--config',join(build,'docker-config'),...args],{env:{PATH:pathBefore,NODE_ENV:'test'},timeout:5000})
     try{
      process.env.PATH=shim+':'+pathBefore
@@ -153,8 +167,9 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
       await rejected
       await assert.rejects(failingCleanup(assignment,new AbortController().signal),/disposed/)
      }finally{
-      controller.abort();await rm(blockRm,{force:true})
-      const names=(await localDocker(['ps','--all','--filter','name=mikka-group-cli-','--format','{{.Names}}'])).stdout.trim().split('\n').filter(Boolean)
+      controller.abort();if(process.env.KEEP_NATIVE_TEST_FIXTURES)await rename(blockRm,blockRm+'.retained').catch(error=>{if(error.code!=='ENOENT')throw error});else await rm(blockRm,{force:true})
+      const owned=new Set((await readFile(ownedNames,'utf8')).trim().split('\n').filter(Boolean))
+      const names=(await localDocker(['ps','--all','--format','{{.Names}}'])).stdout.trim().split('\n').filter(name=>owned.has(name))
       if(names.length)await localDocker(['rm','--force',...names])
       await failingCleanup.dispose().catch(()=>{})
       await command(r.group.id,'member',{action:'cancel',workId:r.work.workId})
@@ -164,9 +179,11 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
     const running=await exec('docker',['--host','unix:///var/run/docker.sock','--config',join(build,'docker-config'),'ps','--all','--filter','name=mikka-group-cli-','--format','{{.Names}}'],{env:{PATH:process.env.PATH,NODE_ENV:'test'},timeout:5000})
     assert.equal(running.stdout.trim(),'','poisoned Docker context must not strand a running OR unstarted cancelled worker container')
    }finally{
+    if(originalPath===undefined)delete process.env.PATH;else process.env.PATH=originalPath
     if(previous===undefined)delete process.env.PRIVATE_HOST_SENTINEL;else process.env.PRIVATE_HOST_SENTINEL=previous
     for(const key of dockerKeys){if(oldDocker[key]===undefined)delete process.env[key];else process.env[key]=oldDocker[key]}
-    await rm(build,{recursive:true,force:true});for(const id of [image,badImage,badCapImage,missingCapImage])if(id)await exec('docker',['image','rm',id]).catch(()=>{})
+    if(process.env.KEEP_NATIVE_TEST_FIXTURES){const receipt={build,dataDir,registry,images:[image,badImage,badCapImage,missingCapImage].filter(Boolean),retained:true,runtimeContainerDeletionStillRequired:true};await writeFile(join(build,'retained-resources.json'),JSON.stringify(receipt,null,2));console.log('Native retained resources: '+JSON.stringify(receipt))}
+    if(!process.env.KEEP_NATIVE_TEST_FIXTURES)await rm(build,{recursive:true,force:true});for(const id of [image,badImage,badCapImage,missingCapImage])if(id&&!process.env.KEEP_NATIVE_TEST_FIXTURES)await exec('docker',['image','rm',id]).catch(()=>{})
    }
 
 }

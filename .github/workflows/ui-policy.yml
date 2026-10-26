@@ -161,6 +161,10 @@ jobs:
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3100
+      R0_GROUP_APP_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_review
+      R0_WORKSPACE_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_workspace_review
+      FACTORY_QUESTION_DATABASE_URL: postgresql://factoryquestions192:synthetic-question-only@127.0.0.1:5432/mikka_e2e
+      FACTORY_QUESTION_HTTP_ORIGIN: http://localhost:3100
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
@@ -184,6 +188,11 @@ jobs:
           MIGRATE: '1'
       - name: Populate disposable application fixture
         run: node --experimental-strip-types scripts/setup-e2e-db.mjs
+      - name: Create exact retained group databases and synthetic HTTP role
+        run: |
+          psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE mikka_review'
+          psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE mikka_workspace_review'
+          psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE factoryquestions192 LOGIN SUPERUSER PASSWORD 'synthetic-question-only'"
       - name: R0 prebuild DB recipes (pending contracts remain failures)
         id: r0-prebuild
         continue-on-error: true
@@ -192,6 +201,15 @@ jobs:
           HISTORY_PG_CONTAINER: ${{ job.services.postgres.id }}
       - run: pnpm build
         id: r0-build
+      - name: Start compiled Next for retained HTTP recipe
+        if: steps.r0-build.outcome == 'success'
+        run: |
+          NODE_OPTIONS=--dns-result-order=ipv4first pnpm start --hostname localhost --port 3100 > test-results/r0/next.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://localhost:3100/mikka/api/auth/get-session > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
       - name: R0 postbuild contracts
         if: always()
         continue-on-error: true

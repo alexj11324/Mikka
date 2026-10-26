@@ -56,7 +56,8 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     await scoped.query(await readFile(new URL('../drizzle/20261025082237_group_turn_mailbox_policy.sql', import.meta.url), 'utf8'))
     const reads = await readFile(new URL('../tests/fixtures/conversation-reads-69.sql', import.meta.url), 'utf8')
     await scoped.query(reads) // this migration first, then #69
-    await scoped.query('DROP TABLE conversation_reads')
+    if(process.env.KEEP_GROUP_TEST_FIXTURES){await scoped.query('ALTER TABLE conversation_reads RENAME TO conversation_reads_retained; ALTER INDEX conversation_reads_pkey RENAME TO conversation_reads_retained_pkey')}
+    else await scoped.query('DROP TABLE conversation_reads')
     await scoped.query(reads) // #69 first, then this migration
     await scoped.query(migration)
     const run = (changes: Partial<GroupRequest>) => handleGroup(scoped, directory, { ...base, ...changes })
