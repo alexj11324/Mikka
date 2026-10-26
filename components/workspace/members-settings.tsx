@@ -134,7 +134,7 @@ export function MembersSettings({
     choices: [],
     currentUserId: "",
     role: "member" as const,
-    currentUser: { email: "", image: null },
+    currentUser: { name: "", email: "", image: null },
     members: [],
     invitations: [],
   };

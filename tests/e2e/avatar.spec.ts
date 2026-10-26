@@ -1,15 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { test, expect, register, app } from "./fixtures";
 
-test("中文姓名不参与头像，账号图片优先，加载失败回退邮箱首字母", async ({ page }) => {
+test("没有账号图片用默认渐变头像，账号图片优先，加载失败回退邮箱首字母（中文姓名不参与）", async ({ page }) => {
   const email = `alex-${randomUUID()}@example.com`;
   await register(page, "/settings/members", email);
   const label = `${email} 的头像`;
   const memberAvatar = page.getByRole("table").getByRole("row").filter({ hasText: email }).getByRole("img", { name: label, exact: true });
-  await expect(memberAvatar).toHaveText("A");
+  // No account image: one of the default avatars, the same one wherever this person appears.
+  const defaultAvatar = /\/avatars\/(blue|green|purple|orange|red)\.webp$/;
+  await expect(memberAvatar.locator("img")).toHaveAttribute("src", defaultAvatar);
+  await expect(memberAvatar.locator("img")).toBeVisible();
+  const defaultSrc = await memberAvatar.locator("img").getAttribute("src");
   await page.getByRole("button", { name: "邀请成员", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "邀请成员", exact: true });
-  await expect(dialog.getByRole("img", { name: label, exact: true })).toHaveText("A");
+  await expect(dialog.getByRole("img", { name: label, exact: true }).locator("img")).toHaveAttribute("src", defaultSrc!);
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
 
   const image = "https://avatars.githubusercontent.com/avatar-regression.png";

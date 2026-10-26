@@ -1,10 +1,10 @@
 'use client'
 
+import { PersonAvatar } from '@/components/person-avatar'
 import { useRef, useState, type ReactNode } from 'react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowUp, Check } from 'lucide-react'
 import type { CommentAnchor, ThreadRecord } from '@/components/blocks/rich-text-editor-4/components/rich-text-comments'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -47,7 +47,7 @@ export function IssueActivity({ author, threads, anchors, events, runs, onCommen
     {[...threads].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(thread => <article key={thread.id} aria-label={t('comment', { author: thread.author })} className={card}>
       {thread.messages.map((message, index) => <div key={message.id} className={cn('flex flex-col gap-1.5 px-4 py-3', index > 0 && 'border-t border-rule')}>
         <div className="flex min-w-0 items-center gap-2">
-          <Avatar className="size-5 shrink-0"><AvatarFallback className="text-xs">{message.author.slice(0, 1)}</AvatarFallback></Avatar>
+          <PersonAvatar name={message.author} size="comment" />
           <span className="truncate text-sm font-medium">{message.author}</span>
           <time className="shrink-0 text-xs text-muted-foreground" dateTime={message.at}>{time(message.at)}</time>
           {index === 0 && thread.resolved && <Badge variant="outline">{t('resolved')}</Badge>}
@@ -57,7 +57,7 @@ export function IssueActivity({ author, threads, anchors, events, runs, onCommen
         <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.body}</p>
       </div>)}
       {!thread.resolved && <form className="flex items-center gap-2 border-t border-rule px-4 py-2.5" onPointerDown={() => { if (replyTo !== thread.id) { setReplyTo(thread.id); setReply('') } }} onSubmit={event => { event.preventDefault(); sendReply(thread.id) }} onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); sendReply(thread.id) } }}>
-        <Avatar className="size-5 shrink-0"><AvatarFallback className="text-xs">{author.slice(0, 1)}</AvatarFallback></Avatar>
+        <PersonAvatar name={author} size="comment" />
         <FieldGroup className="min-w-0 flex-1"><Field><FieldLabel htmlFor={`reply-${thread.id}`} className="sr-only">{t('replyLabel')}</FieldLabel><Textarea id={`reply-${thread.id}`} rows={1} value={replyTo === thread.id ? reply : ''} onFocus={() => { if (replyTo !== thread.id) { setReplyTo(thread.id); setReply('') } }} onChange={event => { setReplyTo(thread.id); setReply(event.target.value) }} maxLength={2000} placeholder={t('replyPlaceholder')} className={bare} /></Field></FieldGroup>
         {replyTo === thread.id && reply.trim() && <Button type="submit" size="icon-xs" className="rounded-full" aria-label={t('sendReply')}><ArrowUp data-icon="inline-start" /></Button>}
       </form>}

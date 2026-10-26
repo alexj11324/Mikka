@@ -3,13 +3,14 @@
 import { UserRound } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { defaultAvatarSrc } from "@/lib/default-avatar";
 import { useTranslations } from "next-intl";
 
 export function UserAvatar({
   user,
   size = "default",
 }: {
-  user: { email: string; image?: string | null };
+  user: { email: string; name?: string | null; image?: string | null };
   size?: "default" | "sm" | "md";
 }) {
   const t = useTranslations('Common')
@@ -22,9 +23,7 @@ export function UserAvatar({
       role="img"
       aria-label={t('avatarLabel', { email: user.email })}
     >
-      {user.image && (
-        <AvatarImage src={user.image} alt="" referrerPolicy="no-referrer" />
-      )}
+      <AvatarImage src={user.image || defaultAvatarSrc(user.name || user.email)} alt="" referrerPolicy="no-referrer" />
       <AvatarFallback>
         {initial || <UserRound aria-hidden="true" />}
       </AvatarFallback>
