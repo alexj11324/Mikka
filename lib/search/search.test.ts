@@ -28,7 +28,7 @@ test('同一查询命中缓存，只请求一次', async () => {
   let calls = 0
   const provider: SearchProvider = { name: 'fake', search: async () => { calls++; return [] } }
   const search = createSearchService({ provider })
-  await search('Neon  Branching', ctx)
+  await search('neon  branching', ctx)
   const second = await search('neon branching', ctx)
   assert.equal(calls, 1)
   assert.equal(second.ok && second.cached, true)

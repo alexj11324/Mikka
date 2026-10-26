@@ -1289,7 +1289,7 @@
         {
           "path": "tests/issue-threads.integration.ts",
           "requiredNames": [
-            "real actions share threads on workspace issues only, with current members, and keep run controls with the owner"
+            "real actions keep thread content with its owner; current members see only whose threads exist and their status"
           ]
         }
       ],
@@ -1307,7 +1307,7 @@
       "phase": "prebuild",
       "status": "ready",
       "expectedTests": [
-        "real actions share threads on workspace issues only, with current members, and keep run controls with the owner"
+        "real actions keep thread content with its owner; current members see only whose threads exist and their status"
       ],
       "expectedCount": 1
     },

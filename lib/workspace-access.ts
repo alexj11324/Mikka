@@ -93,7 +93,7 @@ const readWorkspaceContext = cache(async (userId: string, email: string, name: s
     choices: choices.map(({ id, name }) => ({ id, name })),
     currentUserId: user.id,
     role: selected.role,
-    currentUser: { email: user.email, image: user.image ?? null },
+    currentUser: { name: user.name, email: user.email, image: user.image ?? null },
   }
 })
 

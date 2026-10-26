@@ -11,7 +11,7 @@ const owner = randomUUID(), viewer = randomUUID(), outsider = randomUUID(), remo
 const issue = randomUUID(), other = randomUUID(), workspace = randomUUID(), team = randomUUID(), agent = randomUUID()
 const run = randomUUID(), removedRun = randomUUID(), otherRun = randomUUID()
 const excessRuns = Array.from({ length: 21 }, () => randomUUID())
-test('real actions share threads on workspace issues only, with current members, and keep run controls with the owner', async () => {
+test('real actions keep thread content with its owner; current members see only whose threads exist and their status', async () => {
   const { listIssueThreads, getIssueThread, sendIssueThreadMessage } = await import('../app/actions/agents')
   const { actAs } = await import('../lib/acting-user')
   const { requestRunStop } = await import('../lib/agent-runs')
@@ -34,22 +34,25 @@ test('real actions share threads on workspace issues only, with current members,
     assert.equal(own.thread.detail?.name, 'Route group replies')
     await assert.rejects(actAs(owner, () => getIssueThread(other, run)))
 
-    // A workspace issue: current members read and join every collaborator's thread.
+    // Workspace collaboration exposes thread metadata; contents remain owner-only.
     await pool.query('UPDATE issues SET scope=$2 WHERE id=$1', [issue, 'workspace'])
     await pool.query('INSERT INTO mikka_workspaces (id,"userId",name) VALUES ($1,$2,$3)',[workspace,owner,'Isolated run workspace'])
     await pool.query('INSERT INTO mikka_teams (id,"workspaceId","userId",name,identifier) VALUES ($1,$2,$3,$4,$5)',[team,workspace,owner,'Run test','RUNTEST'])
     await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)',[issue,team,workspace,owner])
     for (const id of [owner,viewer,removed]) await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$3,$4,$5,$6)',[workspace,id,'Member',`${id}@example.com`,'member','active'])
-    const shared = await actAs(viewer, () => listIssueThreads(issue))
-    assert.deepEqual(shared.map(row => row.detail?.agentName), ['Mikka Backend', 'Mikka Backend'])
-    const thread = await actAs(viewer, () => getIssueThread(issue, run))
-    assert.equal(thread.chunks.length, 1)
-    assert.ok(!JSON.stringify(thread).includes('PRIVATE INSTRUCTIONS'))
-    await actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' }))
+    // A workspace issue: teammates see whose threads exist and their status, never their content.
+    const listed = await actAs(viewer, () => listIssueThreads(issue))
+    assert.deepEqual(listed.map(row => [row.detail, row.ownerName, row.ownedByCurrentUser]).sort(), [[null, 'Isolated run test', false], [null, 'Isolated run test', false]])
+    assert.ok(!/Route|Mikka Backend|Routed|PRIVATE/.test(JSON.stringify(listed)))
+    await assert.rejects(actAs(viewer, () => getIssueThread(issue, run)))
+    await assert.rejects(actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' })))
+    // The owner still reads and talks in their own thread.
+    await actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' }))
     const after = await actAs(owner, () => getIssueThread(issue, run))
-    assert.deepEqual(after.messages.map(message => [message.text, message.author, message.mine]), [['Check the fallback', 'Lin', false]])
-    await assert.rejects(actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: removedRun, text: 'Finished threads take no messages' })))
-    await assert.rejects(actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: '   ' })))
+    assert.equal(after.chunks.length, 1)
+    assert.deepEqual(after.messages.map(message => [message.text, message.mine]), [['Check the fallback', true]])
+    await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: otherRun, text: 'Wrong issue' })))
+    await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: '   ' })))
     // Stopping stays with the owner.
     await assert.rejects(requestRunStop(viewer, run), { code: 'runNotFound' })
     const {rows:[unchanged]} = await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1',[run])
@@ -62,6 +65,13 @@ test('real actions share threads on workspace issues only, with current members,
     await assert.rejects(actAs(viewer,()=>listIssueThreads(issue)))
     await assert.rejects(actAs(viewer,()=>getIssueThread(issue, run)))
     for (const id of excessRuns) await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId",status) VALUES ($1,$2,$3,$4,$5)', [id,owner,issue,agent,'succeeded'])
+    // Ownership permits reading a finished thread, but cannot reopen its message channel.
+    const finishedRun = excessRuns[0]
+    const finished = await actAs(owner, () => getIssueThread(issue, finishedRun))
+    assert.equal(finished.thread.ownedByCurrentUser, true)
+    const messagesBefore = (await pool.query('SELECT * FROM run_messages WHERE "runId"=$1 ORDER BY id', [finishedRun])).rows
+    await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: finishedRun, text: 'Must not reopen a finished thread' })), { code: 'runNotFound' })
+    assert.deepEqual((await pool.query('SELECT * FROM run_messages WHERE "runId"=$1 ORDER BY id', [finishedRun])).rows, messagesBefore)
     const bounded = await actAs(owner, () => listIssueThreads(issue))
     assert.equal(bounded.length, 20)
     assert.ok(bounded.every(row => row.ownedByCurrentUser && row.id !== otherRun && row.id !== removedRun))

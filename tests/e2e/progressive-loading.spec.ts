@@ -15,13 +15,13 @@ test('聊天历史未返回时壳子已可导航，恢复后显示真实会话',
     await expect.poll(() => requested).toBe(true)
     await expect(page).not.toHaveURL(/section=agent/)
     await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeVisible()
-    await page.getByRole('button', { name: '新对话', exact: true }).click()
-    await expect(page.getByRole('region', { name: 'Agent 对话工作区', exact: true })).toHaveAttribute('aria-busy', 'true')
+    await page.getByRole('button', { name: '打开 Bot 对话', exact: true }).click()
+    await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
     await rail(page, '看板').click()
     await expect(page).not.toHaveURL(/section=agent/)
     await rail(page, '主页').click()
     release()
-    await expect(page.getByRole('textbox', { name: '向 Agent 提问', exact: true })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
   } finally {
     release()
   }
@@ -41,9 +41,9 @@ test('任务与项目请求未返回时聊天可独立加载', async ({ page }) 
     await route.continue()
   })
   try {
-    await page.goto(app('/?section=agent'), { waitUntil: 'domcontentloaded' })
+    await page.goto(app('/?section=coordinator'), { waitUntil: 'domcontentloaded' })
     await expect.poll(() => blocked).toBe(true)
-    await expect(page.getByRole('textbox', { name: '向 Agent 提问', exact: true })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeVisible()
   } finally {
     release()
