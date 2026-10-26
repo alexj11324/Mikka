@@ -14,6 +14,7 @@ import { auth } from '@/lib/auth'
 import systemPrompt from '@/lib/agent-system-prompt.json'
 import { validateAgentStream } from '@/lib/agent-fetch'
 import { agentStatusStream } from '@/lib/agent-status'
+import { AGENT_MAX_ROUNDS, roundStep } from '@/lib/agent-rounds'
 import { persistAgentStream } from '@/lib/agent-history'
 import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
 import { createCredentialAITools } from '@/lib/credentials/ai-tools'
@@ -139,10 +140,11 @@ async function handlePOST(request: Request) {
     return null
   })
   const generationError = modelSource ? () => 'Subscription connection unavailable.' : agentErrorMessage
+  const instructions = `${systemPrompt}\n\n${agentWebInstructions()}\n\n${mailboxActor ? MAILBOX_INSTRUCTIONS : ''}`
   const result = streamText({
     model,
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
-    system: `${systemPrompt}\n\n${agentWebInstructions()}\n\n${mailboxActor ? MAILBOX_INSTRUCTIONS : ''}`,
+    system: instructions,
     messages,
     tools: {
       ...createCredentialAITools((name, input) => executeSystemCredentialTool({ userId: session.user.id }, name, input)),
@@ -150,8 +152,8 @@ async function handlePOST(request: Request) {
       ...createAgentWebTools({ signal: request.signal }),
       ...createComposioAITools((action, input) => runComposioAction(session.user.id, action, input)),
     },
-    stopWhen: isStepCount(5),
-    prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
+    stopWhen: isStepCount(AGENT_MAX_ROUNDS),
+    prepareStep: ({ stepNumber }) => roundStep(stepNumber, instructions),
     maxRetries: modelSource ? 0 : 1,
     timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
     abortSignal: request.signal,

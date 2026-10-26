@@ -1,3 +1,4 @@
+import { executeMigration, executePoolMigration } from '../scripts/search-migrations.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -22,10 +23,10 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
   const params = (query: Record<string,string>) => parseSearchParams(new URLSearchParams(query))
   const search = (query: Record<string,string>, userId = owner, workspaceId = workspace) => searchIssues(db,{userId,workspaceId,params:params(query)})
   try {
-    for (const file of ['20261025200100_issue_search_pg_trgm.sql','20261025200200_issue_search_title_idx.sql','20261025200300_issue_search_recent_idx.sql','20261025200400_issue_search_number_idx.sql']) {
+    for (const file of ['20261026013000_issue_search_pg_trgm.sql','20261026013001_issue_search_title_idx.sql','20261026013002_issue_search_recent_idx.sql','20261026013003_issue_search_number_idx.sql']) {
       const text = await readFile(new URL(`../drizzle/${file}`,import.meta.url),'utf8')
-      await pool.query(text)
-      await pool.query(text) // idempotent migration replay, outside transactions
+      await executePoolMigration(pool,file,text)
+      await executePoolMigration(pool,file,text) // idempotent migration replay, outside transactions
     }
     // Shared pg_trgm is installed once; each retained isolated schema must
     // still resolve its operator class when public is absent from search_path.
@@ -36,8 +37,8 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
         await client.query(`CREATE SCHEMA "${schema}"`)
         await client.query(`SET search_path TO "${schema}"`)
         await client.query('CREATE TABLE issues(id uuid PRIMARY KEY,title text)')
-        await client.query(await readFile(new URL('../drizzle/20261025200100_issue_search_pg_trgm.sql',import.meta.url),'utf8'))
-        await client.query(await readFile(new URL('../drizzle/20261025200200_issue_search_title_idx.sql',import.meta.url),'utf8'))
+        await executeMigration(client,'20261026013000_issue_search_pg_trgm.sql',await readFile(new URL('../drizzle/20261026013000_issue_search_pg_trgm.sql',import.meta.url),'utf8'))
+        await executeMigration(client,'20261026013001_issue_search_title_idx.sql',await readFile(new URL('../drizzle/20261026013001_issue_search_title_idx.sql',import.meta.url),'utf8'))
         const valid=await client.query('SELECT indisvalid FROM pg_index WHERE indexrelid=$1::regclass',[`${schema}.issues_title_search_trgm_idx`])
         assert.equal(valid.rows[0].indisvalid,true)
       }

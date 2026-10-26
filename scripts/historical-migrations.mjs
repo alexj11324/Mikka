@@ -2,7 +2,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-export const HISTORICAL_MANIFEST_SHA256 = '5e6d89181b8b78295f3b17d70915726da6e9844943a40e2d5722f192a46c1d9f'
+export const HISTORICAL_MANIFEST_SHA256 = '950423a0229ad79ddb2378865db55f51274fbeea60951ef39fa07b1f62099d0d'
 export const fullHash = bytes => createHash('sha256').update(bytes).digest('hex')
 const manifestURL = new URL('../drizzle/historical-imports.json', import.meta.url)
 
@@ -10,7 +10,7 @@ const manifestURL = new URL('../drizzle/historical-imports.json', import.meta.ur
 export function historicalImports(files, manifestBytes = readFileSync(manifestURL)) {
   if (fullHash(manifestBytes) !== HISTORICAL_MANIFEST_SHA256) throw new Error('Historical migration manifest digest mismatch')
   const manifest = JSON.parse(manifestBytes.toString())
-  if (manifest.version !== 1 || !Array.isArray(manifest.entries) || manifest.entries.length !== 32) throw new Error('Invalid historical migration manifest')
+  if (manifest.version !== 1 || !Array.isArray(manifest.entries) || manifest.entries.length !== 28) throw new Error('Invalid historical migration manifest')
   const seen = new Set()
   for (const entry of manifest.entries) {
     if (!/^drizzle\/\d{14}_[a-z0-9_]+\.sql$/.test(entry.path) || !/^[a-f0-9]{64}$/.test(entry.sha256) || !/^[a-f0-9]{40}$/.test(entry.sourceCommit) || seen.has(entry.path)) throw new Error('Invalid historical migration entry')

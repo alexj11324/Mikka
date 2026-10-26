@@ -10,6 +10,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
 import { orderMigrations } from './migration-order.mjs'
 import { historicalImports } from './historical-migrations.mjs'
+import { searchSupersessions, executeMigration, validateSearchObject, aliasSearchMigration } from './search-migrations.mjs'
 import { configureMigrationSession } from './migration-session.mjs'
 
 const shouldRun = process.env.MIGRATE !== '0' && (process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production')
@@ -32,6 +33,7 @@ if (unknown.length) throw new Error(`migrate: 无法识别的迁移文件名：$
 // Fail before opening either DB, including when imported files are already in main.
 const contents = new Map(sqlFiles.map(name => [name, readFileSync(new URL(name, dir))]))
 historicalImports([...contents].map(([name, content]) => ({ name, content })))
+const supersessions = searchSupersessions([...contents].map(([name, content]) => ({ name, content })))
 const files = orderMigrations(sqlFiles)
 
 const byTarget = new Map()
@@ -52,14 +54,26 @@ for (const [target, pending] of byTarget) {
     client = await pool.connect()
     // Includes ledger DDL and reads, not only the individual migration files.
     await configureMigrationSession(client)
+    await client.query("SELECT pg_advisory_lock(hashtextextended('mikka-schema-migrations',0))")
     await client.query('create table if not exists schema_migrations (name text primary key, "appliedAt" timestamptz not null default now())')
     const { rows } = await client.query('select name from schema_migrations')
     const applied = new Set(rows.map((row) => row.name))
     for (const { name, sql } of pending) {
-      if (applied.has(name)) continue
+      const entry = supersessions.find(e => e.canonicalName === name && e.target === target)
+      if (applied.has(name)) {
+        if (entry) await validateSearchObject(client, entry)
+        continue
+      }
+      if (entry && applied.has(entry.legacyName)) {
+        await aliasSearchMigration(client, entry)
+        applied.add(name)
+        console.log(`migrate: aliased ${entry.legacyName} as ${name} to ${target}`)
+        continue
+      }
       // Files may manage their own transaction; the record is written after.
       // A timeout throws, stops this build and never marks the file applied.
-      await client.query(sql)
+      await executeMigration(client, name, sql)
+      if (entry) await validateSearchObject(client, entry)
       await client.query('insert into schema_migrations (name) values ($1)', [name])
       console.log(`migrate: applied ${name} to ${target}`)
     }

@@ -1,3 +1,4 @@
+import { searchSupersessions } from './search-migrations.mjs'
 // MIK-2：迁移文件名检查（时间戳命名）。
 // scripts/migrate.mjs 以文件名为主键记录已执行的迁移，所以：
 // - 旧的 NNNN_*.sql 已经在生产执行过，冻结：不许新增、改名或修改（含 0004–0008 的历史重号）。
@@ -77,6 +78,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const dir = new URL('../drizzle/', import.meta.url)
   const files = readdirSync(dir).filter((n) => n.endsWith('.sql')).map((name) => ({ name, content: readFileSync(new URL(name, dir), 'utf8') }))
   const entries = historicalImports(files)
+  const search = searchSupersessions(files)
+  const sources = search.flatMap(e => [{path:'drizzle/'+e.legacyName,sha256:e.legacySha256,sourceCommit:e.legacySource},{path:'drizzle/'+e.canonicalName,sha256:e.canonicalSha256,sourceCommit:e.canonicalSource}])
+  fetchHistoricalSources(sources)
+  verifyHistoricalSources(sources)
   const main = currentMainMigrations()
   fetchHistoricalSources(entries)
   verifyHistoricalSources(entries)

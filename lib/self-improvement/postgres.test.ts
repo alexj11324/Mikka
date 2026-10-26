@@ -1,3 +1,4 @@
+import { executePoolMigration } from '../../scripts/search-migrations.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -26,7 +27,7 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
   t.after(async () => { await pool.end(); await admin.end() })
   const dir = new URL('../../drizzle/', import.meta.url)
   const files = orderMigrations((await readdir(dir)).filter(name => name.endsWith('.sql')))
-  for (const name of files) await pool.query(await readFile(new URL(name, dir), 'utf8'))
+  for (const name of files) await executePoolMigration(pool, name, await readFile(new URL(name, dir), 'utf8'))
   await pool.query(await readFile(new URL('20261025070600_self_improvement.sql', dir), 'utf8'))
   assert.equal((await pool.query(`SELECT count(*) FROM pg_constraint c
     JOIN pg_class child ON child.oid=c.conrelid JOIN pg_namespace n ON n.oid=child.relnamespace

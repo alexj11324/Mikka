@@ -6,10 +6,10 @@ import { checkMigrations } from './check-migrations.mjs'
 const files=()=>readdirSync('drizzle').filter(n=>n.endsWith('.sql')).map(name=>({name,content:readFileSync('drizzle/'+name)}))
 const textFiles=()=>files().map(f=>({...f,content:f.content.toString()}))
 const manifest=readFileSync('drizzle/historical-imports.json')
-test('exact reviewed manifest, all 32 byte hashes and source provenance',()=>{
- const entries=historicalImports(files());assert.equal(entries.length,32)
+test('exact reviewed manifest, all 28 byte hashes and source provenance',()=>{
+ const entries=historicalImports(files());assert.equal(entries.length,28)
  verifyHistoricalSources(entries,(_sha,path)=>readFileSync(path))
- assert.equal(new Set(entries.map(e=>e.sourceCommit)).size,2)
+ assert.equal(new Set(entries.map(e=>e.sourceCommit)).size,1)
 })
 test('manifest bytes cannot add/remove/relabel an import',()=>{
  for(const change of [m=>m.entries.pop(),m=>m.entries.push(m.entries[0]),m=>m.entries[0].sourceCommit='0'.repeat(40),m=>m.entries[0].path='drizzle/20261025235959_other.sql',m=>m.entries[0].sha256='0'.repeat(64)]){

@@ -1,3 +1,4 @@
+import { executePoolMigration } from '../../scripts/search-migrations.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { fork, spawn } from 'node:child_process'
@@ -28,7 +29,7 @@ test('trusted submission -> durable batch -> new workflow -> run retry -> daemon
   const admin = new Pool({ connectionString: url.toString() }); await admin.query(`CREATE SCHEMA ${schema}`)
   url.searchParams.set('options', `-c search_path=${schema}`)
   const pool = new Pool({ connectionString: url.toString() })
-  for (const name of orderMigrations((await readdir(new URL('../../drizzle/', import.meta.url))).filter(n => n.endsWith('.sql')))) await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
+  for (const name of orderMigrations((await readdir(new URL('../../drizzle/', import.meta.url))).filter(n => n.endsWith('.sql')))) await executePoolMigration(pool, name, await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
   process.env.MIKKA_DATABASE_URL = url.toString(); process.env.DATABASE_URL = url.toString(); process.env.CI = 'true'; process.env.BETTER_AUTH_URL = 'http://127.0.0.1:3000'; process.env.BETTER_AUTH_SECRET = randomUUID() + randomUUID()
   const hooks = registerHooks({ resolve(specifier, context, next) { return specifier === 'server-only' ? { url: 'data:text/javascript,export{}', shortCircuit: true } : next(specifier, context) } })
   const database = await import('../db/request-scope'), scope = database.createRequestDatabaseScope(url.toString())

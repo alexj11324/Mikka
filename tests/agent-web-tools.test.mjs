@@ -16,8 +16,8 @@ test('联网工具只暴露搜索和网页读取，保留 DS 聊天及认证', a
   assert.ok(toolBlock, 'streamText tool block must exist')
   assert.match(toolBlock, /\.\.\.createAgentWebTools\(\{ signal: request\.signal \}\),/)
   assert.match(source, /\.\.\.createComposioAITools\(\(action, input\) => runComposioAction\(session\.user\.id, action, input\)\)/)
-  assert.match(source, /stopWhen: isStepCount\(5\)/)
-  assert.match(source, /stepNumber >= 4 \? \{ toolChoice: 'none' \}/)
+  assert.match(source, /stopWhen: isStepCount\(AGENT_MAX_ROUNDS\)/)
+  assert.match(source, /prepareStep: \(\{ stepNumber \}\) => roundStep\(stepNumber, instructions\)/)
   const instructions = agentWebInstructions(new Date('2026-10-21T00:00:00Z'))
   assert.match(instructions, /2026-10-21/)
   assert.match(instructions, /时区/)
@@ -85,15 +85,15 @@ test('计费验证未完成时说明具体原因且不重复调用上游', async
   assert.equal(calls, 1)
 })
 
-test('上游失败不泄漏错误详情，限制每轮费用，取消传播', async () => {
+test('上游失败不泄漏错误详情，搜索次数不单独设限（算在每条消息的轮数里），取消传播', async () => {
   let calls = 0
   const tools = createAgentWebTools({ signal, run: async () => { calls++; throw new Error('secret upstream error') } })
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 6; i++) {
     const result = await tools.web_search.execute({ query: '天气' }, context)
     assert.equal(result.ok, false)
     assert.doesNotMatch(JSON.stringify(result), /secret/)
   }
-  assert.equal(calls, 4)
+  assert.equal(calls, 6)
   const controller = new AbortController()
   controller.abort()
   const cancelled = createAgentWebTools({ signal: controller.signal, run: async () => { throw new Error('不应调用') } })

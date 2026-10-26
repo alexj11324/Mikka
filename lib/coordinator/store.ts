@@ -6,13 +6,15 @@ import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql } 
 import type { ActionContext, ActionBatch } from '../operations/action-intents'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
-import { coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, type CoordinatorEventTier } from '@/lib/db/schema'
+import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { telegramReplyTargets, type TelegramReplyTarget } from '@/lib/coordinator-events'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
+import { runSummaryText } from '@/lib/issue-run-conversation'
+import { threadName } from '@/lib/issue-threads'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
@@ -168,9 +170,11 @@ export interface ChatView {
   sources: Record<string, CitationSource>
 }
 
-/** Looks up the issues and runs cited in `texts`, keeping only what `userId` may see. */
-export async function citationSources(userId: string, texts: readonly string[]): Promise<Record<string, CitationSource>> {
-  const { issueIds, runIds } = citedIds(texts)
+/** Looks up the issues and runs cited in `texts`, and the `threads` dispatched, keeping only what `userId` may see. */
+export async function citationSources(userId: string, texts: readonly string[], threads: readonly string[] = []): Promise<Record<string, CitationSource>> {
+  const cited = citedIds(texts)
+  const issueIds = cited.issueIds
+  const runIds = [...new Set([...cited.runIds, ...threads])]
   const sources: Record<string, CitationSource> = {}
   if (issueIds.length) {
     const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content })
@@ -184,11 +188,20 @@ export async function citationSources(userId: string, texts: readonly string[]):
   }
   if (runIds.length) {
     const rows = await visibleRuns(userId, { runIds, limit: runIds.length })
+    // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
+    const ownIds = rows.filter(row => row.agentId).map(row => row.id)
+    const prompts = new Map((ownIds.length ? await db.select({ id: agentRuns.id, prompt: agentRuns.prompt }).from(agentRuns)
+      .where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))) : []).map(row => [row.id, row.prompt]))
+    const steps = new Map((ownIds.length ? await db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
+      .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId) : [])
+      .map(row => [row.runId, Number(row.count)]))
     for (const row of rows) {
       const task = row.issueId ? await issueForUser(userId, row.issueId) : null
       const identifiers = task ? await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }]) : new Map<string, string>()
       const issue = task ? { id: task.id, title: task.title, number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null } : null
-      sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
+      sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue,
+        name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
+        createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
     }
   }
   return sources
@@ -214,7 +227,7 @@ export async function chatView(userId: string, limit = 200): Promise<ChatView> {
     items,
     working: leased || waiting.some(event => event.tier !== 'background'),
     error: session?.lastError ?? null,
-    sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text)),
+    sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text), items.flatMap(item => item.threads)),
   }
 }
 

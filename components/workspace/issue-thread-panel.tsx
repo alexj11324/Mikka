@@ -3,7 +3,7 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ArrowUp, ChevronRight, X } from 'lucide-react'
+import { ArrowUp, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { getIssueThread, sendIssueThreadMessage } from '@/app/actions/agents'
 import { runIsActive, threadItems } from '@/lib/issue-run-conversation'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
@@ -17,8 +17,12 @@ import { cn } from '@/lib/utils'
 
 const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm whitespace-pre-wrap break-words'
 
-/** An open thread on the right: a conversation between people and the agent running it (R-62, R-10). */
-export function IssueThreadPanel({ issueId, runId, onClose }: { issueId: string; runId: string; onClose: () => void }) {
+/**
+ * An open thread: a conversation between people and the agent running it (R-62, R-10).
+ * On the issue page it sits on the right with a close button; opened from a chat's thread
+ * card it fills the centre column and `back` names the chat it returns to (R-66).
+ */
+export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: string; runId: string; onClose: () => void; back?: string }) {
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
   const { data, error, mutate } = useSWR(['issue-thread', issueId, runId], () => getIssueThread(issueId, runId), {
@@ -45,11 +49,15 @@ export function IssueThreadPanel({ issueId, runId, onClose }: { issueId: string;
   }
   return <section aria-label={detail?.name ?? t('title')} className="flex h-full min-h-0 flex-col">
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4">
+      {back && <>
+        <Button variant="ghost" size="sm" className="shrink-0" aria-label={t('back', { name: back })} onClick={onClose}><ChevronLeft data-icon="inline-start" />{back}</Button>
+        <span aria-hidden="true" className="text-muted-foreground">/</span>
+      </>}
       {detail && <LetterAvatar name={detail.agentName} size="pill" />}
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{detail?.name ?? t('title')}</h2>
-      <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
+      {!back && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
     </header>
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+    <div className={cn('flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4', back && 'mx-auto w-full max-w-3xl')}>
       {error ? <div role="alert" className="flex items-center gap-2 text-xs"><span className="text-destructive">{t('loadFailed')}</span><Button variant="ghost" size="xs" onClick={() => { void mutate() }}>{t('retry')}</Button></div>
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
@@ -75,7 +83,7 @@ export function IssueThreadPanel({ issueId, runId, onClose }: { issueId: string;
           </ol>
         </>}
     </div>
-    {active && detail && <form className="flex shrink-0 flex-col gap-1 p-3" onSubmit={event => { void send(event) }}>
+    {active && detail && <form className={cn('flex shrink-0 flex-col gap-1 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')} onSubmit={event => { void send(event) }}>
       <InputGroup className="min-h-12 rounded-3xl bg-background shadow-xs">
         <InputGroupTextarea aria-label={t('composer', { agent: detail.agentName })} placeholder={t('composer', { agent: detail.agentName })} className="max-h-40 min-h-12 py-3.5" value={draft} maxLength={10_000} rows={1} disabled={sending} onChange={event => setDraft(event.target.value)} onKeyDown={onKeyDown} />
         <InputGroupAddon align="inline-end" className="self-end pb-2">

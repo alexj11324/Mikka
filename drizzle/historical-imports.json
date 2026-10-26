@@ -140,26 +140,6 @@
       "path": "drizzle/20261025185500_daemon_revocation.sql",
       "sha256": "ac9d240918b4929c196585fddc60d96337127c8cdc2773afa2ddfdda3b021190",
       "sourceCommit": "26bb41c34f0c29f1ba7f71a6d9e7bce46bd00098"
-    },
-    {
-      "path": "drizzle/20261025200100_issue_search_pg_trgm.sql",
-      "sha256": "60d81808007e41f18fbcf0e174d776906c0fdc0e8fe2cf67b41a1d088f78ba09",
-      "sourceCommit": "c8029512f6d445ac9a3434eb69cb36796a1e7581"
-    },
-    {
-      "path": "drizzle/20261025200200_issue_search_title_idx.sql",
-      "sha256": "2add0c5a755a6f33062116ec959d9b7e3785498ac6b044141fe28ef6c8731828",
-      "sourceCommit": "c8029512f6d445ac9a3434eb69cb36796a1e7581"
-    },
-    {
-      "path": "drizzle/20261025200300_issue_search_recent_idx.sql",
-      "sha256": "5a1983521da8486d9ad538d4d2fd61b8a40398dff4cc48d276f5ea5f5e9b5b28",
-      "sourceCommit": "c8029512f6d445ac9a3434eb69cb36796a1e7581"
-    },
-    {
-      "path": "drizzle/20261025200400_issue_search_number_idx.sql",
-      "sha256": "f91c53d5e410ded8aa777192b243ac2fab4e1e9dee6031ca88cc4ff1ddc058d3",
-      "sourceCommit": "c8029512f6d445ac9a3434eb69cb36796a1e7581"
     }
   ]
 }

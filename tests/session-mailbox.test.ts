@@ -1,3 +1,4 @@
+import { executePoolMigration } from '../scripts/search-migrations.mjs'
 import { createFactoryStore } from '../lib/factory/store'
 import { createExecutionClaim } from '../lib/factory/execution-claim'
 import assert from 'node:assert/strict'
@@ -30,7 +31,7 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
       if (['20261025052031_session_mailboxes.sql','20261025052033_group_review_mailboxes.sql','20261025170000_security_audit_application.sql'].includes(name)) continue
       const sql = await readFile(new URL(name, dir), 'utf8')
       if (/^--\s*target:\s*DATABASE_URL/m.test(sql)) continue
-      await pool.query(sql)
+      await executePoolMigration(pool, name, sql)
     }
     // The new migration is idempotent and preserves legacy person-to-run rows.
     await pool.query('insert into devices (id,"ownerId",name,platform,arch,enabled) values ($1,$2,\'test\',\'linux\',\'x64\',true)', [device, owner])

@@ -1,3 +1,4 @@
+import { executePoolMigration } from '../../scripts/search-migrations.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -29,7 +30,7 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!proces
   const pool=new Pool({connectionString:target.toString(),max:12})
   t.after(async()=>{await pool.end();await admin.end()})
   const dir=new URL('../../drizzle/',import.meta.url)
-  for(const name of orderMigrations((await readdir(dir)).filter(n=>n.endsWith('.sql')))) await pool.query(await readFile(new URL(name,dir),'utf8'))
+  for(const name of orderMigrations((await readdir(dir)).filter(n=>n.endsWith('.sql')))) await executePoolMigration(pool, name, await readFile(new URL(name,dir),'utf8'))
   await pool.query(await readFile(new URL('20261025083303_improvement_skill_assignments.sql',dir),'utf8'))
   const userId=`synthetic-${randomUUID()}`,issueId=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID()
   await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Synthetic rehearsal','{}','todo','normal')`,[issueId,userId])

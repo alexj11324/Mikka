@@ -1,3 +1,4 @@
+import { executePoolMigration } from '../scripts/search-migrations.mjs'
 import assert from 'node:assert/strict'
 import {randomUUID} from 'node:crypto'
 import {readFile,readdir} from 'node:fs/promises'
@@ -67,7 +68,7 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
  const complete=(c:GroupReviewAssignment,o=output(c))=>worker({action:'complete',runId:c.runId,reply:{...o,workId:c.envelope.workId,triggerMessageId:c.envelope.triggerMessageId,claimEpoch:c.claimEpoch}})
  try{
   for(const name of orderMigrations((await readdir(new URL('../drizzle/',import.meta.url))).filter(n=>n.endsWith('.sql')))){
-   const sql=await readFile(new URL('../drizzle/'+name,import.meta.url),'utf8');await(/^--\s*target:\s*DATABASE_URL/m.test(sql)?ws:pool).query(sql)
+   const sql=await readFile(new URL('../drizzle/'+name,import.meta.url),'utf8');await executePoolMigration(/^--\s*target:\s*DATABASE_URL/m.test(sql)?ws:pool,name,sql)
   }
   await pool.query(await readFile(new URL('../drizzle/20261025052033_group_review_mailboxes.sql',import.meta.url),'utf8'))
   for(const u of ['owner','member','outsider'])await ws.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')',[workspaceId,u,u+'@example.invalid'])

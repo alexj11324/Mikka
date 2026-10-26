@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "legacyName": "20261025200100_issue_search_pg_trgm.sql",
+      "archivePath": "drizzle/archive/issue-search/20261025200100_issue_search_pg_trgm.sql",
+      "legacySha256": "60d81808007e41f18fbcf0e174d776906c0fdc0e8fe2cf67b41a1d088f78ba09",
+      "legacySource": "c8029512f6d445ac9a3434eb69cb36796a1e7581",
+      "canonicalName": "20261026013000_issue_search_pg_trgm.sql",
+      "canonicalSha256": "11e77074b66e1cdf3da7fd7f4390812ed67c49b386661d7acc119a99e3d5b1d3",
+      "canonicalSource": "56635047d2ddf9c076417e43ffe23dfdaf220cd4",
+      "target": "MIKKA_DATABASE_URL"
+    },
+    {
+      "legacyName": "20261025200200_issue_search_title_idx.sql",
+      "archivePath": "drizzle/archive/issue-search/20261025200200_issue_search_title_idx.sql",
+      "legacySha256": "2add0c5a755a6f33062116ec959d9b7e3785498ac6b044141fe28ef6c8731828",
+      "legacySource": "c8029512f6d445ac9a3434eb69cb36796a1e7581",
+      "canonicalName": "20261026013001_issue_search_title_idx.sql",
+      "canonicalSha256": "6998628c74b1d6a9e601e08b627c2b83ba02bf22e6514fd3750e7722c23b77e5",
+      "canonicalSource": "56635047d2ddf9c076417e43ffe23dfdaf220cd4",
+      "target": "MIKKA_DATABASE_URL"
+    },
+    {
+      "legacyName": "20261025200300_issue_search_recent_idx.sql",
+      "archivePath": "drizzle/archive/issue-search/20261025200300_issue_search_recent_idx.sql",
+      "legacySha256": "5a1983521da8486d9ad538d4d2fd61b8a40398dff4cc48d276f5ea5f5e9b5b28",
+      "legacySource": "c8029512f6d445ac9a3434eb69cb36796a1e7581",
+      "canonicalName": "20261026013002_issue_search_recent_idx.sql",
+      "canonicalSha256": "5a1983521da8486d9ad538d4d2fd61b8a40398dff4cc48d276f5ea5f5e9b5b28",
+      "canonicalSource": "56635047d2ddf9c076417e43ffe23dfdaf220cd4",
+      "target": "MIKKA_DATABASE_URL"
+    },
+    {
+      "legacyName": "20261025200400_issue_search_number_idx.sql",
+      "archivePath": "drizzle/archive/issue-search/20261025200400_issue_search_number_idx.sql",
+      "legacySha256": "f91c53d5e410ded8aa777192b243ac2fab4e1e9dee6031ca88cc4ff1ddc058d3",
+      "legacySource": "c8029512f6d445ac9a3434eb69cb36796a1e7581",
+      "canonicalName": "20261026013003_issue_search_number_idx.sql",
+      "canonicalSha256": "f91c53d5e410ded8aa777192b243ac2fab4e1e9dee6031ca88cc4ff1ddc058d3",
+      "canonicalSource": "56635047d2ddf9c076417e43ffe23dfdaf220cd4",
+      "target": "MIKKA_DATABASE_URL"
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import { resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Pool } from 'pg'
 import { currentMainMigrations,fullHash } from '../scripts/historical-migrations.mjs'
+import { verifySearchCompatibility } from '../scripts/search-migration-fixture.mjs'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 const enabled=process.env.GITHUB_ACTIONS==='true'||process.env.MIKKA_ISOLATED_HISTORY_TEST==='1'
 if(process.env.REQUIRE_DB==='1'&&!enabled)throw Error('Explicit isolated migration acceptance required')
@@ -28,7 +29,7 @@ test('retained dual DB: fresh candidate equals current-main ledger upgrade; repl
  const make=async kind=>{
   const name=`history_${suffix}_${kind}_e2e`;assert.match(name,/^[a-z0-9_]+$/)
   await admin.query(`CREATE DATABASE "${name}"`)
-  const u=new URL(target);u.pathname='/'+name;const pool=new Pool({connectionString:u.toString(),max:1});pools.push(pool)
+  const u=new URL(target);u.pathname='/'+name;const pool=new Pool({connectionString:u.toString(),max:4});pools.push(pool)
   evidence.databases.push(name);return {url:u.toString(),pool,name}
  }
  const migrate=(dir,app,workspace)=>run(process.execPath,[resolve(dir,'scripts/migrate.mjs')],{cwd:dir,env:{...process.env,MIGRATE:'1',MIKKA_DATABASE_URL:app.url,DATABASE_URL:workspace.url}})
@@ -37,6 +38,8 @@ test('retained dual DB: fresh candidate equals current-main ledger upgrade; repl
   // Keep all SQL, ACLs, constraints, RLS, functions and triggers. Only pg_dump's
   // random psql restrict token and nonsemantic comments/blank lines are removed.
   const container=process.env.HISTORY_PG_CONTAINER
+  const version=container?run('docker',['exec',container,'pg_dump','--version']):run('pg_dump',['--version'])
+  assert.match(version,/PostgreSQL\) 17\./,'historical comparison requires the PG17 client')
   const sql=container?run('docker',['exec',container,'pg_dump','-U',target.username,'--schema-only',db.name]):run('pg_dump',['--schema-only',db.url])
   return sql.split('\n').filter(l=>!l.startsWith('--')&&!/^\\(?:un)?restrict /.test(l)&&l.trim()).join('\n')
  }
@@ -81,6 +84,28 @@ test('retained dual DB: fresh candidate equals current-main ledger upgrade; repl
   assert.deepEqual(await Promise.all([freshApp,freshWs,upApp,upWs].map(ledger)),snapshots)
   assert.deepEqual(await business(),beforeData)
   evidence.concurrentIndexes=await validIndexes(upApp);await validIndexes(freshApp)
+  const legacySource='c8029512f6d445ac9a3434eb69cb36796a1e7581'
+  try{git('cat-file','-e',legacySource+'^{commit}')}catch{git('fetch','--no-tags','--depth=1','origin',legacySource)}
+  const legacyDir=mkdtempSync(resolve(tmpdir(),'mikka-history-legacy-'))
+  const legacyExtraction=spawnSync('tar',['-xf','-','-C',legacyDir],{input:git('archive','--format=tar',legacySource,'scripts','drizzle')});assert.equal(legacyExtraction.status,0)
+  symlinkSync(resolve('node_modules'),resolve(legacyDir,'node_modules'),'dir')
+  const legacyApp=await make('legacy_app'),legacyWs=await make('legacy_ws')
+  migrate(legacyDir,legacyApp,legacyWs)
+  const oldApp=await ledger(legacyApp),oldWs=await ledger(legacyWs)
+  const legacyOutput=migrate('.',legacyApp,legacyWs)
+  const supersessions=JSON.parse(readFileSync('drizzle/search-supersessions.json')).entries
+  assert.equal([...legacyOutput.matchAll(/migrate: aliased /g)].length,4)
+  for(const entry of supersessions)assert.ok(!legacyOutput.includes('migrate: applied '+entry.canonicalName),'renamed SQL must not execute for existing old ledger')
+  for(const [db,fresh,targetName,before]of [[legacyApp,freshApp,'MIKKA_DATABASE_URL',oldApp],[legacyWs,freshWs,'DATABASE_URL',oldWs]]){
+    const after=await ledger(db)
+    for(const row of before)assert.deepEqual(after.find(r=>r.name===row.name),row)
+    const extras=supersessions.filter(e=>e.target===targetName).map(e=>e.legacyName)
+    assert.deepEqual(after.map(r=>r.name),[...expected(targetName),...extras].sort())
+    assert.equal(dump(db),dump(fresh),'legacy runner upgrade schema equals fresh candidate')
+  }
+  assert.equal(migrate('.',legacyApp,legacyWs).trim(),'')
+  evidence.legacyRunner={source:legacySource,aliases:4,oldLedgerUnchanged:true,noRenamedSQLExecuted:true,schemaEquivalent:true}
+  evidence.searchCompatibility=await verifySearchCompatibility(freshApp.pool)
   evidence.finishedAt=new Date().toISOString();writeFileSync(resolve(root,'evidence.json'),JSON.stringify(evidence,null,2));console.log(JSON.stringify(evidence))
  }finally{await Promise.all(pools.map(p=>p.end()));await admin.end()}
 })

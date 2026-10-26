@@ -108,6 +108,23 @@ test('uncertain and unknown action events tolerate missing input without declari
     assert.doesNotMatch(prompt, /person declined|It did not happen|and it is done/)
   }
 })
+test('a reply that dispatches a run carries it as a thread, once', () => {
+  const at = new Date('2026-10-22T00:00:00Z')
+  const dispatch = (id: string, value: unknown): ModelMessage[] => [
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: id, toolName: 'dispatch_run', input: {} }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: id, toolName: 'dispatch_run', output: { type: 'json', value } }] },
+  ] as ModelMessage[]
+  const rows = [
+    { role: 'user', content: 'speed up the home page' },
+    ...dispatch('c1', { runId: 'r1', status: 'queued' }),
+    ...dispatch('c2', { error: 'runInvalid' }),
+    ...dispatch('c3', { runId: 'r1', status: 'queued' }),
+    { role: 'assistant', content: [{ type: 'text', text: 'On it.' }] },
+  ] as ModelMessage[]
+  const items = chatItems(rows.map((message, index) => ({ position: index + 1, message, createdAt: at })))
+  assert.deepEqual(items.map(item => [item.from, item.threads]), [['person', []], ['coordinator', ['r1']]])
+})
+
 test('chatItems marks inbox (pending) user messages so they are never reported as read', () => {
   const at = new Date()
   const items = chatItems([
