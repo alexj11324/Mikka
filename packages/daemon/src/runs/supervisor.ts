@@ -57,6 +57,7 @@ import type {
   AgentEvent,
   AgentReport,
   AgentSession,
+  StartOptions,
   ExitEvent,
 } from "../adapters/types"
 import { runStateChunk, type RunChunk } from "../chunks"
@@ -85,6 +86,9 @@ export interface SupervisorDeps {
   outbox: Outbox
   worktrees: WorktreeManager
   adapters: ReadonlyMap<Harness, AgentAdapter>
+  /** Hosted subscription runs never fall back to local CLI authentication. */
+  startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
+  bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
   /** The device's current allow-list (`device_repo`). */
   repos: () => DeviceRepo[]
   log: Logger
@@ -944,7 +948,7 @@ export class RunSupervisor {
       }
       const setup = continued
         ? "continued"
-        : await this.deps.worktrees.bootstrap(worktree, repo.path, repo.setup)
+        : this.deps.bootstrap ? await this.deps.bootstrap(worktree,repo) : await this.deps.worktrees.bootstrap(worktree, repo.path, repo.setup)
       log.info({ worktree, setup }, "worktree ready")
       this.deps.journal.update(runId, { worktree, baseCommit })
     }
@@ -988,7 +992,11 @@ export class RunSupervisor {
             message: assignment.followUp ?? assignment.prompt,
           }
         : undefined
-    const session = resuming
+    const session = assignment.subscriptionBinding
+      ? this.deps.startSubscription
+        ? await this.deps.startSubscription(assignment,{...options,prompt:assignment.prompt})
+        : (()=>{throw new Error('subscription_hosted_runtime_unavailable')})()
+      : resuming
       ? await adapter.resume(entry.sessionId as string, options)
       : await adapter.start({
           ...options,

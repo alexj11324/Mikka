@@ -14,6 +14,7 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 // `RunNotPinnedHereError`; any other 4xx is a refusal (`DaemonError`) that
 // retrying cannot fix.
 import type { z } from "zod"
+import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 
 import {
   CLIENT_VERSION_HEADER,
@@ -238,6 +239,18 @@ export class HttpServerLink implements ServerLink {
       devicePaths.claim(checkId(deviceId), checkId(runId)),
       { schema: runAssignmentSchema, claimOf: runId }
     )
+  }
+  async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
+    return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})
+  }
+  async nativeRequest(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal) {
+    const response=await this.send('POST',`${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`,{action:'request',payload},this.credential,{signal,timeoutMs:275_000})
+    const contentType=response.headers.get('content-type')?.split(';')[0]
+    if(!response.ok || !response.body || (contentType!=='text/event-stream' && contentType!=='application/json')) {
+      await response.body?.cancel()
+      throw new Error('subscription_native_unavailable')
+    }
+    return {contentType,body:response.body}
   }
 
   async appendRunChunks(runId: string, batch: ChunkBatch) {

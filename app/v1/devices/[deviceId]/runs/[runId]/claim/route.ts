@@ -10,6 +10,7 @@ import { issueRunToken } from '@/lib/mcp/worker'
 import { latestCheckpoint } from '@/lib/run-leases'
 import { retryNote } from '@/lib/run-retry'
 import { claimLocalRun } from '@/lib/computer/claim'
+import { subscriptionRuntime } from '@/lib/subscription-runtime'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,8 +42,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       .where(eq(agentRuns.id, runId))
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
+  const subscription = process.env.MIKKA_BYOS_ENABLED === '1'
+    ? await subscriptionRuntime().repository.nativeBinding(caller.userId, agent.id, agent.harness) : null
+  if (subscription && (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId)) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
+  if (subscription && !device.harnesses.some(harness => harness.harness === agent.harness && harness.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
-  const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt))
+  const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id)
   if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
@@ -70,6 +75,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     kind: run.kind, leaseExpiresAt,
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
+    ...(subscription ? { model: subscription.modelId, subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
     ...retry,
   })
 }

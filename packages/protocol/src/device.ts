@@ -254,6 +254,11 @@ export const runAssignmentSchema = z.object({
    * (zod strips unknown keys), so this needs no version gate.
    */
   model: modelNameSchema.optional(),
+  /** Owner-bound selection only; no subscription credential enters the assignment. */
+  subscriptionBinding: z.object({
+    bindingId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
+    consumerId: z.uuid(), route: z.enum(['codex_cli', 'claude_code_cli']),
+  }).strict().optional(),
   /** Mock harness only: fixture name under `packages/daemon/fixtures`. */
   fixture: z.string().max(200).optional(),
   /**

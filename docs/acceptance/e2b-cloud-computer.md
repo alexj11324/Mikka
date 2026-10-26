@@ -161,3 +161,13 @@ three-way merged with current main instead of replacing its existing adapter
 behavior. Local adapter regressions and subscription protocol/adapter tests
 passed with fixtures. Real provider consent, hosted native CLI inference,
 computer tool execution and the complete product flow remain unverified.
+
+The subscription broker's hosted-runner transport was adapted without removing
+mainline run checkpoints or native Coordinator support. Device claim and native
+binding publication are one database transaction; cloud-desktop-bound runs still
+fail closed until the E2B worker and computer approval tools are wired. Codex's
+synthetic hosted-container test passed locally; the Claude test timed out during
+the separate verification container on this vfs-backed host, including on a
+standalone retry. No timeout or assertion was relaxed, and leaked disposable
+containers from those failed tests were removed. Neither result is real-provider
+acceptance.
