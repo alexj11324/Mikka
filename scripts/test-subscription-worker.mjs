@@ -1,13 +1,16 @@
-// Linux-only deterministic CPA acceptance. No cloud credentials or E2B calls.
+// Pending physical-disposal acceptance. Source-complete; run only after explicit scoped authorization.
 import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { existsSync, mkdirSync, realpathSync } from "node:fs"
+import { existsSync, mkdirSync, realpathSync, readFileSync } from "node:fs"
 import { createServer } from "node:net"
 import { fileURLToPath } from "node:url"
 import { Pool } from "pg"
+import { retainedGoPattern, retainedGoTap } from "../tests/byos-go-evidence.mjs"
 
-if (process.env.BYOS_FULL_DISPOSAL_AUTHORIZED !== "1") throw new Error("Pending scoped approval: full BYOS worker harness includes physical database, file and container disposal; use test-byos-retained.mjs")
-
+if (process.env.BYOS_FULL_DISPOSAL_AUTHORIZED !== "1" || process.env.RETAIN_SYNTHETIC_RECORDS !== "1")
+  throw new Error("Pending scoped approval: BYOS full disposal requires BYOS_FULL_DISPOSAL_AUTHORIZED=1 and RETAIN_SYNTHETIC_RECORDS=1")
+if (process.env.MIKKA_BYOS_BACKEND_ONLY === "1")
+  throw new Error("Full BYOS disposal acceptance cannot omit browser assertions")
 if (process.platform !== "linux")
   throw new Error("Run BYOS acceptance on the cloud Agent's Linux environment")
 const root = fileURLToPath(new URL("../", import.meta.url))
@@ -46,10 +49,24 @@ await new Promise((resolve) => reserve.listen(0, "127.0.0.1", resolve))
 const port = reserve.address().port
 await new Promise((resolve) => reserve.close(resolve))
 const suffix = randomUUID()
-const name = `mikka-cpa-test-${suffix}`
+const name = `mikka-cpa-disposal-${suffix}`
+const compilerName = `mikka-cpa-disposal-build-${suffix}`
+const sourceContract = JSON.parse(readFileSync(`${worker}retained-test-contract.json`, "utf8"))
+const goContract = {
+  retainedTests: sourceContract.pendingTests.map(item => item.name),
+  retainedCount: sourceContract.pendingCount,
+  pendingTests: sourceContract.retainedTests.map(name => ({ name })),
+  separateApplicationIntegration: sourceContract.separateApplicationIntegration
+}
+if (goContract.retainedCount !== 21) throw new Error("Pending BYOS contract must explicitly cover 21 Go cases")
+const goPattern = retainedGoPattern(goContract)
+const goEvidenceRelative = `.cache/disposal-${suffix}.go.jsonl`
+const goEvidence = `${worker}${goEvidenceRelative}`
 const password = `fixture-${suffix}`
-const database = `mikka_cpa_e2e`
+const database = `mikka_byos_disposal_app_e2e`
+const workspaceDatabase = `mikka_byos_disposal_workspace_e2e`
 const url = `postgresql://mikka_test:${password}@127.0.0.1:${port}/${database}`
+const workspaceURL = new URL(url); workspaceURL.pathname = `/${workspaceDatabase}`
 const pool = new Pool({
   connectionString: url,
   max: 1,
@@ -65,7 +82,6 @@ try {
   await run("docker", [
     "run",
     "-d",
-    "--rm",
     "--name",
     name,
     "--memory=256m",
@@ -92,11 +108,12 @@ try {
     }
   }
   if (!ready) throw new Error("Disposable BYOS Postgres did not become ready")
+  await pool.query(`CREATE DATABASE "${workspaceDatabase}"`)
   const migrationEnv = {
     ...baseEnv,
     MIGRATE: "1",
     MIKKA_DATABASE_URL: url,
-    DATABASE_URL: url
+    DATABASE_URL: workspaceURL.toString()
   }
   await run(process.execPath, ["scripts/migrate.mjs"], migrationEnv)
   mkdirSync(`${worker}.cache/build`, { recursive: true })
@@ -104,7 +121,7 @@ try {
   const ca = "/etc/ssl/certs/ca-certificates.crt"
   const dockerArgs = [
     "run",
-    "--rm",
+    "--name",compilerName,
     "--memory=6g",
     "--cpus=4",
     "--user",
@@ -124,6 +141,14 @@ try {
     "-e",
     "GOTOOLCHAIN=local",
     "-e",
+    "RETAIN_SYNTHETIC_RECORDS=1",
+    "-e",
+    "BYOS_FULL_DISPOSAL_AUTHORIZED=1",
+    "-e",
+    `MIKKA_BYOS_DISPOSAL_PATTERN=${goPattern}`,
+    "-e",
+    `MIKKA_BYOS_GO_EVIDENCE=/work/${goEvidenceRelative}`,
+    "-e",
     `MIKKA_BYOS_TEST_DATABASE_URL=${url}`,
     "-e",
     "MIKKA_BYOS_WORKER_BINARY=/work/bin/mikka-subscription-worker"
@@ -139,21 +164,36 @@ try {
     "golang:1.26.10-bookworm@sha256:632dff7351799a5a9954a48dc06670ade72ee44e8c351cdc0e5a57af2fea21af",
     "sh",
     "-c",
-    "CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-worker ./cmd/mikka-subscription-worker && CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-enrollment ./cmd/mikka-subscription-enrollment && CGO_ENABLED=0 go build -mod=readonly -tags mikka_byos_fixture -o bin/mikka-subscription-fixture ./testfixture && go test -mod=readonly -race -timeout 90s -count=1 -v ./... && go vet -mod=readonly ./... && ./bin/mikka-subscription-worker --version"
+    'CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-enrollment ./cmd/mikka-subscription-enrollment && CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-worker ./cmd/mikka-subscription-worker && CGO_ENABLED=0 go build -mod=readonly -trimpath -tags mikka_byos_fixture -o bin/mikka-subscription-fixture ./testfixture && CGO_ENABLED=1 go test -mod=readonly -json -race -timeout 180s -count=1 -run "$MIKKA_BYOS_DISPOSAL_PATTERN" . > "$MIKKA_BYOS_GO_EVIDENCE" 2> "$MIKKA_BYOS_GO_EVIDENCE.stderr"'
   )
-  await run("docker", dockerArgs)
-  await run(process.execPath, ["--import", "tsx", "--test", "tests/byos-application.test.mjs", "tests/byos-enrollment-binding.test.mjs"], {
-    ...baseEnv, NODE_ENV: "test", MIKKA_BYOS_BACKEND_ONLY: process.env.MIKKA_BYOS_BACKEND_ONLY ?? "", MIKKA_BYOS_TEST_DATABASE_URL: url,
-    MIKKA_BYOS_FIXTURE_BINARY: `${worker}bin/mikka-subscription-fixture`
+  try {
+    await run("docker", dockerArgs)
+  } catch (error) {
+    if (existsSync(goEvidence)) {
+      const allowed = new Set(goContract.retainedTests)
+      for (const line of readFileSync(goEvidence, "utf8").split("\n")) {
+        let event
+        try { event = JSON.parse(line) } catch { continue }
+        const name = typeof event.Test === "string" ? event.Test.split("/")[0] : ""
+        if (event.Action === "fail" && allowed.has(name)) console.error(`R0_FAILED_CASE: ${name}`)
+      }
+    }
+    throw error
+  }
+  // Docker exit 0 is required above; raw output stays in the retained log, never stdout.
+  console.log(retainedGoTap(readFileSync(goEvidence, "utf8"), goContract))
+  await run(process.execPath, ["--import", "tsx", "--test", "--test-reporter=tap", "tests/byos-application.test.mjs", "tests/byos-enrollment-binding.test.mjs"], {
+    ...baseEnv, NODE_ENV:"test", RETAIN_SYNTHETIC_RECORDS:"1", BYOS_FULL_DISPOSAL_AUTHORIZED:"1", MIKKA_BYOS_FIXTURE_BINARY:`${worker}bin/mikka-subscription-fixture`, MIKKA_BYOS_TEST_DATABASE_URL:url, MIKKA_BYOS_WORKSPACE_TEST_DATABASE_URL:workspaceURL.toString()
   })
   await run(process.execPath, ["scripts/migrate.mjs"], migrationEnv)
   const { rows } = await pool.query(
     "select count(*)::int as migrations from schema_migrations"
   )
   console.log(
-    `BYOS acceptance passed: ${rows[0].migrations} migrations; repeat migration passed; disposable Postgres + TLS fakes only`
+    `BYOS authorized disposal acceptance passed: ${rows[0].migrations} migrations; repeat migration passed; retained distinct Postgres databases + TLS fakes only`
   )
 } finally {
   await pool.end()
   if (started) await run("docker", ["stop", "--timeout", "2", name])
+  console.log(JSON.stringify({fixture:"byos-disposal",postgresContainer:name,compilerContainer:compilerName,databases:[database,workspaceDatabase],goEvidence,disposition:"retained"}))
 }

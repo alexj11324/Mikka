@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, readFile, rm, chmod, mkdir } from 'node:fs/promises'
+import { mkdtemp, readFile, chmod, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createServer as httpsServer } from 'node:https'
@@ -29,6 +29,8 @@ const workspaceId = '20000000-0000-4000-8000-000000000001'
 const root = resolve(import.meta.dirname, '..')
 export function registerByosApplication(mode) {
   if (!['retained', 'disposal'].includes(mode)) throw new Error('Unknown BYOS application test mode')
+  if (mode === 'disposal' && (process.env.BYOS_FULL_DISPOSAL_AUTHORIZED !== '1' || process.env.RETAIN_SYNTHETIC_RECORDS !== '1')) throw new Error('Pending scoped approval: physical BYOS disposal')
+  if (mode === 'disposal' && process.env.MIKKA_BYOS_BACKEND_ONLY === '1') throw new Error('Full BYOS disposal acceptance cannot omit browser assertions')
   if (mode === 'retained' && process.env.RETAIN_SYNTHETIC_RECORDS !== '1') throw new Error('Retained BYOS application requires retained fixtures')
   test(mode === 'retained' ? 'retained OAuth: owner/session-bound device and callback consent, replay refusal and durable binding' : 'new OAuth consent, owner-bound streaming/tool use and native launches reuse one durable connection', { timeout: 90000 }, async () => {
   assert.equal(process.platform, 'linux')
@@ -385,7 +387,7 @@ export function registerByosApplication(mode) {
     await page.getByRole('button', { name: 'Check authorization' }).click()
     await page.getByText('Connected', { exact: true }).waitFor()
     assert.equal(authorizations, 2); assert.deepEqual(errors, [])
-    await page.screenshot({ path: '/tmp/mikka-byos-oauth-review-browser.png', fullPage: true })
+    await page.screenshot({ path: join(directory, 'mikka-byos-oauth-review-browser.png'), fullPage: true })
     await page.getByRole('button', { name: 'Disconnect', exact: true }).click()
     console.log('BYOS browser acceptance: actual Settings -> CPA device pending/complete + registered Claude callback URL handoff -> owner-bound persistence -> disconnect; synthetic providers only')
 
@@ -395,8 +397,7 @@ export function registerByosApplication(mode) {
     if (browserServer) await new Promise(resolve => browserServer.close(resolve))
     await new Promise(resolve => infisical.close(resolve))
     await pool.end()
-    if (mode === 'disposal') await rm(directory, { recursive: true, force: true })
-    else console.log(JSON.stringify({ fixture: 'byos-oauth-retained', directory, disposition: 'retained' }))
+    console.log(JSON.stringify({ fixture: `byos-application-${mode}`, directory, disposition: 'retained' }))
   }
 })
 

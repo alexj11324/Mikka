@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
@@ -259,4 +260,22 @@ test('retained partitions preserve pending physical contracts and bind Go allowl
  const before=inventory(tree,pkg).digest
  const changed={...tree,'packages/subscription-worker/integration_test.go':tree['packages/subscription-worker/integration_test.go']+'\n'}
  assert.notEqual(inventory(changed,pkg).digest,before)
+})
+
+test('full BYOS disposal is a separate exact pending partition and refuses unapproved startup',()=>{
+ const c=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8')),r=c.recipes.find(r=>r.id==='byos-worker'),g=JSON.parse(readFileSync('packages/subscription-worker/retained-test-contract.json','utf8'))
+ assert.equal(r.status,'pending');assert.equal(r.expectedCount,23)
+ for(const name of g.retainedTests)assert.ok(!r.expectedTests.includes(name))
+ for(const item of g.pendingTests)assert.ok(r.expectedTests.includes(item.name))
+ const source=readFileSync('scripts/test-subscription-worker.mjs','utf8')
+ assert.ok(source.indexOf('BYOS_FULL_DISPOSAL_AUTHORIZED') < source.indexOf('const reserve = createServer'))
+ assert.ok(!source.includes('"--rm"'));assert.ok(!source.includes('go test -mod=readonly -race -timeout 90s'))
+ assert.equal(c.profiles['byos-worker'].env.BYOS_FULL_DISPOSAL_AUTHORIZED,undefined)
+ const shared=readFileSync('tests/byos-application-harness.mjs','utf8')
+ const guard=shared.slice(shared.indexOf('export function registerByosApplication(mode) {')+'export function registerByosApplication(mode) {'.length,shared.indexOf("  test(mode ==="))
+ const check=new Function('mode','process',guard)
+ assert.throws(()=>check('disposal',{env:{BYOS_FULL_DISPOSAL_AUTHORIZED:'1',RETAIN_SYNTHETIC_RECORDS:'1',MIKKA_BYOS_BACKEND_ONLY:'1'}}),/cannot omit browser/)
+
+ const execution=spawnSync(process.execPath,['scripts/test-subscription-worker.mjs'],{encoding:'utf8',env:{PATH:process.env.PATH,RETAIN_SYNTHETIC_RECORDS:'1'}})
+ assert.notEqual(execution.status,0);assert.match(execution.stderr,/Pending scoped approval/);assert.equal(execution.stdout,'')
 })

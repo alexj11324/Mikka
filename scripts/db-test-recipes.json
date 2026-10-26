@@ -153,9 +153,10 @@
       },
       "provisionedTarget": {
         "host": "127.0.0.1",
-        "database": "mikka_cpa_e2e",
+        "database": "mikka_byos_disposal_app_e2e",
         "port": "ephemeral",
-        "retention": "pending"
+        "retention": "stopped-and-retained",
+        "workspaceDatabase": "mikka_byos_disposal_workspace_e2e"
       }
     },
     "factory-question-http": {
@@ -561,58 +562,13 @@
       "status": "pending",
       "packageScript": "test:byos-worker",
       "runner": "scripts/test-subscription-worker.mjs",
-      "pendingReason": "Full worker contract preserves 66 Go top-level and 2 Node cases; 21 Go and the two Node tails require physical cleanup scope. Legacy full launcher and disposal entrypoints remain blocked and their evidence adapter must be completed before approval/execution; tagged daemon revoke is exercised separately by metadata CI.",
+      "pendingReason": "Source-complete 21 physical-cleanup Go cases plus 2 original Node disposal cases require separately scoped authorization. No retained Go case is repeated; containers, dual DBs, external TLS/evidence directories and logs remain retained.",
       "prerequisites": [
         "Go worker build",
         "local synthetic TLS fixture",
         "retained container lifecycle"
       ],
       "expectedTests": [
-        "TestInitialActualCPAStorageCanonicalization",
-        "TestActualCodexRefreshPatchMergesPartitions",
-        "TestUnknownStorageAndCredentialConfigurationNeverExecute",
-        "TestClaudePlainOAuthAndRefreshExcludeNativeIdentityAndFingerprintPaths",
-        "TestEnrollmentBindingPublishesOneOwnedConnectionAndReusesRefresh",
-        "TestEnrollmentBindingLatePublicationCannotUndoDisconnect",
-        "TestEnrollmentBindingResumesExpiredOriginalReservationWithoutNewEpoch",
-        "TestEnrollmentBindingRecoversExactStagedGrantAndProjection",
-        "TestEnrollmentBindingRefusesReconnectAndIndependentTargetDatabase",
-        "TestEnrollmentBindingConcurrentRequestsNeverCreateTwoConnections",
-        "TestEnrollmentSourceDenialSurvivesOpaqueStatusAndProofBoundaries",
-        "TestEnrollmentNonDenialFailuresRemainOpaque",
-        "TestEnrollmentHandoffBindsFullCeremonyAndRetainsGlobalCredentials",
-        "TestEnrollmentHandoffAndLegacyCompletionShareOneUseLatch",
-        "TestEnrollmentHandoffRefusesLegacyAttemptsWithoutWeakeningLegacyOperator",
-        "TestEnrollmentHandoffUncertainClaimNeverRetriesProvider",
-        "TestEnrollmentActualPlainClaudeAdapterWithoutSQL",
-        "TestEnrollmentPersistsStateAndFullCPAStorageWithoutDatabaseOrExecution",
-        "TestEnrollmentRefusesMalformedForeignExpiredAndConcurrentCallbacks",
-        "TestEnrollmentPersistenceFailuresNeverRepeatConsumedCode",
-        "TestEnrollmentRetriesOnlyCapturedUncertainWriteAndFencesUncertainClaim",
-        "TestEnvironmentTransferHTTPStoresJournalRetryRefreshAndDisconnect",
-        "TestEnvironmentTransferRejectsWrongApprovalBeforeSecretAccess",
-        "TestEnvironmentTransferRecoversHTTPFailuresWithoutSourceDeletion",
-        "TestEnvironmentTransferSourceMutationCannotPublish",
-        "TestSingleRefreshAuthorityAndReconnectRejectsLateResult",
-        "TestAcceptedSecretLostResponseRecoversAfterRestartWithoutLogin",
-        "TestRejectedStoreAndRawProviderErrorsFailClosed",
-        "TestPrivateIPCDoesNotExposeCredentialsOrAcceptTenantOverrides",
-        "TestExpiredAccessRefreshesOnceAndTasksReuseConnection",
-        "TestExpiredLeaseCannotReplayRotatingGrant",
-        "TestInfisicalRedirectAndIntegrityFailuresDoNotPublish",
-        "TestStoreCannotChangeConnectionScopeOrRunImportedHelpers",
-        "TestWorkerExecutableHasPrivateScopeAndNoLiveRegistry",
-        "TestPrivateFramingRejectsTrailingObjectsAndOversizedFrames",
-        "TestNativeBrokerUsesAccessOnlyCredentialsWithoutExportOrEndpointSelection",
-        "TestNativeRunLedgerAndLeaseRefuseUseBeforeVaultReads",
-        "TestLegacyProjectionPreStageFailureIsDurableAndReconnectable",
-        "TestLegacyProjectionCancellationStillPersistsFailure",
-        "TestProductionWorkerRefusesNativeExportWithoutAConfigurableBypass",
-        "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding",
-        "TestQuotaProjectionDropsEchoedSecretsWithoutDroppingExhaustedWindows",
-        "TestAccessPublicationFailureRecoversWithoutAnotherProviderRefresh",
-        "TestAccessProjectionRejectsFullAndNestedRefreshCopies",
-        "TestVaultDenialSurvivesEnrollmentStart",
         "TestEnrollmentBindingGlobalClaimSurvivesMetadataLoss",
         "TestEnrollmentCleanupPreservesOnlyRecoveryCopyUntilPublicationOrExplicitDisconnect",
         "TestEnrollmentCleanupFailureRetriesAllCopiesAfterImmediateDisconnectFence",
@@ -637,7 +593,7 @@
         "new OAuth consent, owner-bound streaming/tool use and native launches reuse one durable connection",
         "authenticated binding migrates one escrow through actual canonical publication and recovers projection failure"
       ],
-      "expectedCount": 68,
+      "expectedCount": 23,
       "supportFiles": [
         "tests/byos-application-harness.mjs",
         "tests/byos-enrollment-binding-harness.mjs",
@@ -657,7 +613,9 @@
         "packages/subscription-worker/oauth_test.go",
         "packages/subscription-worker/projection_failure_test.go",
         "packages/subscription-worker/security_boundary_test.go",
-        "packages/subscription-worker/vault_denial_test.go"
+        "packages/subscription-worker/vault_denial_test.go",
+        "tests/byos-go-evidence.mjs",
+        "packages/subscription-worker/bootstrap.mjs"
       ]
     },
     {
@@ -1738,7 +1696,8 @@
         "packages/subscription-worker/oauth_test.go",
         "packages/subscription-worker/projection_failure_test.go",
         "packages/subscription-worker/security_boundary_test.go",
-        "packages/subscription-worker/vault_denial_test.go"
+        "packages/subscription-worker/vault_denial_test.go",
+        "packages/subscription-worker/bootstrap.mjs"
       ]
     },
     {

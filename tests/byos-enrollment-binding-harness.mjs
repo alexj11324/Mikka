@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { randomUUID, createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createServer } from 'node:https'
@@ -18,14 +18,15 @@ import { enrollmentBindHTTP } from '../lib/subscription-enrollment-bind.ts'
 
 export function registerByosEnrollmentBinding(mode) {
   if (!['retained', 'disposal'].includes(mode)) throw new Error('Unknown BYOS binding test mode')
+  if (mode === 'disposal' && (process.env.BYOS_FULL_DISPOSAL_AUTHORIZED !== '1' || process.env.RETAIN_SYNTHETIC_RECORDS !== '1')) throw new Error('Pending scoped approval: physical BYOS disposal')
   if (mode === 'retained' && process.env.RETAIN_SYNTHETIC_RECORDS !== '1') throw new Error('Retained BYOS binding requires retained fixtures')
   test(mode === 'retained' ? 'retained enrollment binding: authenticated publication, projection recovery, replay and cleanup configuration status' : 'authenticated binding migrates one escrow through actual canonical publication and recovers projection failure', { timeout: 30000 }, async () => {
   const databaseUrl = process.env.MIKKA_BYOS_TEST_DATABASE_URL
   assert.ok(databaseUrl && new URL(databaseUrl).hostname === '127.0.0.1' && new URL(databaseUrl).pathname.endsWith('_e2e'))
   const pool = new Pool({ connectionString: databaseUrl, max: 2 })
-  const workspaceUrl = mode === 'retained' ? process.env.MIKKA_BYOS_WORKSPACE_TEST_DATABASE_URL : databaseUrl
+  const workspaceUrl = process.env.MIKKA_BYOS_WORKSPACE_TEST_DATABASE_URL
   assert.ok(workspaceUrl && new URL(workspaceUrl).hostname === '127.0.0.1' && new URL(workspaceUrl).pathname.endsWith('_e2e'))
-  if (mode === 'retained') assert.notEqual(new URL(workspaceUrl).pathname, new URL(databaseUrl).pathname)
+  assert.notEqual(new URL(workspaceUrl).pathname, new URL(databaseUrl).pathname)
   const workspacePool = new Pool({ connectionString: workspaceUrl, max: 2 })
   const directory = await mkdtemp(join(tmpdir(), 'mikka-enrollment-bind-'))
   const certificate = join(directory, 'cert.pem'), key = join(directory, 'key.pem')
@@ -115,8 +116,7 @@ export function registerByosEnrollmentBinding(mode) {
     if (oldCA === undefined) delete process.env.SSL_CERT_FILE; else process.env.SSL_CERT_FILE = oldCA
     if (oldNoProxy === undefined) delete process.env.NO_PROXY; else process.env.NO_PROXY = oldNoProxy
     vault.closeAllConnections(); await new Promise(resolve => vault.close(resolve)); await pool.end(); await workspacePool.end()
-    if (mode === 'disposal') await rm(directory, { recursive: true, force: true })
-    else console.log(JSON.stringify({ fixture: 'byos-binding-retained', directory, disposition: 'retained' }))
+    console.log(JSON.stringify({ fixture: `byos-binding-${mode}`, directory, disposition: 'retained' }))
   }
 })
 
