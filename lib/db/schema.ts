@@ -88,6 +88,15 @@ export const linearIssueLinks = pgTable('linear_issue_links', {
   remoteRemovedAt: timestamp('remoteRemovedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('linear_issue_links_team_idx').on(table.teamSyncId)])
+/** A durable deny-list for detached remote identities. Kept separately from
+ * active links so delayed webhooks and imports cannot publish a personal task. */
+export const linearIssueDetachments = pgTable('linear_issue_detachments', {
+  linearIssueId: text('linearIssueId').primaryKey(),
+  issueId: uuid('issueId').notNull(), ownerId: text('ownerId').notNull(),
+  teamSyncId: uuid('teamSyncId').notNull(), linearIdentifier: text('linearIdentifier').notNull(),
+  sourceLinkId: uuid('sourceLinkId').notNull().unique(),
+  detachedAt: timestamp('detachedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('linear_issue_detachments_issue_idx').on(table.issueId)])
 export const linearCommentLinks = pgTable('linear_comment_links', {
   id: uuid('id').primaryKey(), issueLinkId: uuid('issueLinkId').notNull().references(() => linearIssueLinks.id, { onDelete: 'cascade' }),
   threadId: text('threadId').notNull(), messageId: text('messageId').notNull(), authorUserId: text('authorUserId'), linearCommentId: text('linearCommentId').notNull().unique(),

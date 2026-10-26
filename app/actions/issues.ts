@@ -10,7 +10,7 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
-import { issues, issueVersions, issueMembers, linearIssueLinks, users } from '@/lib/db/schema'
+import { issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { issueChecklist } from '@/lib/issue-checklist'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
@@ -25,6 +25,7 @@ import { issueDoneEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { after } from 'next/server'
 import { judgeIssueScope } from '@/lib/issue-scope-judge'
+import { changeIssueScopeLocally } from '@/lib/issue-scope-store'
 import { TASK_SCOPES } from '@/lib/task-identifier'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { activityActor } from '@/lib/activity-actor'
@@ -160,8 +161,8 @@ export async function listIssueVersions(id: string) {
 
 /**
  * The one-click scope change (MIK-47). The person's choice wins over the
- * agent's and becomes an example for its next judgment. A task already in
- * Linear stays a workspace task: it cannot be taken back out.
+ * agent's and becomes an example for its next judgment. Linked transitions
+ * await the archive/unlink decision in #184.
  */
 export async function setIssueScope(input: { id: string; revision: number; scope: string }): Promise<ActionResult<{ issue: IssueView }>> {
   return runAction(async () => {
@@ -170,17 +171,9 @@ export async function setIssueScope(input: { id: string; revision: number; scope
     const userId = await getUserId()
     const { issue } = await requireIssueAccess(parsed.data.id)
     if (issue.userId !== userId) return { error: 'issueScopeOwnerOnly' }
-    if (parsed.data.scope === 'personal') {
-      const [link] = await db.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(eq(linearIssueLinks.issueId, issue.id)).limit(1)
-      if (link) return { error: 'issueScopeInLinear' }
-    }
-    const result = await db.transaction(async tx => {
-      const [saved] = await tx.update(issues).set({ scope: parsed.data.scope, scopeSetBy: 'user', scopeConfidence: null, revision: parsed.data.revision + 1, updatedAt: new Date() })
-        .where(and(eq(issues.id, issue.id), eq(issues.userId, userId), eq(issues.revision, parsed.data.revision))).returning()
-      if (!saved) return { error: 'issueStale' as const }
-      await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(userId) })
-      return { issue: await issueView(saved, tx) }
-    })
+    // #184 leaves archive vs unlink open. Keep linked transitions closed until
+    // the disposition and the external writer fence have been reviewed.
+    const result = await changeIssueScopeLocally(userId, parsed.data, { allowLinkedPersonal: false })
     if ('issue' in result && parsed.data.scope === 'workspace') dispatchLinearIssueSync(issue.id)
     return result
   })

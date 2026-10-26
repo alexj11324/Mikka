@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db } from '@/lib/db'
@@ -87,7 +87,7 @@ export async function visibleRuns(userId: string, input: { issueId?: string; run
   const rows = await db.select({ ...runViewColumns, ownerId: agentRuns.userId }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
     .where(and(
-      or(eq(agentRuns.userId, userId), and(visibility.predicate, shared)),
+      or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), visibility.predicate)), and(visibility.predicate, shared)),
       input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined,
       input.runIds ? inArray(agentRuns.id, input.runIds) : undefined,
       input.activeOnly ? inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]) : undefined,

@@ -1,7 +1,7 @@
 import 'server-only'
 import { and, eq, inArray } from 'drizzle-orm'
 import { pool, db } from '@/lib/db'
-import { issues, linearCommentLinks, linearConnections, linearIssueLinks, linearSyncInbox, linearSyncOutbox, linearTeamSyncs } from '@/lib/db/schema'
+import { issues, linearCommentLinks, linearConnections, linearIssueDetachments, linearIssueLinks, linearSyncInbox, linearSyncOutbox, linearTeamSyncs } from '@/lib/db/schema'
 import { LinearApiError, sanitizeLinearError } from './graphql'
 import { applyLinearCommentToApp } from './comment-sync'
 import { createAppIssueFromLinear, applyLinearIssueToApp, LinearSyncConflictError, syncAppIssueToLinear } from './issue-sync'
@@ -103,6 +103,8 @@ async function processIssueEvent(event: WebhookEvent) {
   const data = event.data
   const remoteId = stringField(data, 'id')
   if (!remoteId) return
+  const [detached] = await db.select({ id: linearIssueDetachments.linearIssueId }).from(linearIssueDetachments).where(eq(linearIssueDetachments.linearIssueId, remoteId)).limit(1)
+  if (detached) return
   const [link] = await db.select().from(linearIssueLinks).where(eq(linearIssueLinks.linearIssueId, remoteId)).limit(1)
   if (event.action === 'remove') {
     if (link && event.organizationId) {
@@ -154,6 +156,11 @@ async function processCommentEvent(event: WebhookEvent) {
   if (!data) return
   const commentId = stringField(data, 'id')
   if (!commentId) return
+  const remoteIssueId = stringField(data, 'issueId') ?? stringField(data.issue as Record<string, unknown> | undefined, 'id')
+  if (remoteIssueId) {
+    const [detached] = await db.select({ id: linearIssueDetachments.linearIssueId }).from(linearIssueDetachments).where(eq(linearIssueDetachments.linearIssueId, remoteIssueId)).limit(1)
+    if (detached) return
+  }
   const [existingComment] = await db.select().from(linearCommentLinks).where(eq(linearCommentLinks.linearCommentId, commentId)).limit(1)
   if (event.action === 'remove') {
     if (existingComment && event.organizationId) {

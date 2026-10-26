@@ -2,7 +2,7 @@ import 'server-only'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import { issueDocuments, issueMembers, issueVersions, issues, linearConnections, linearIssueLinks, linearTeamSyncs, users } from '@/lib/db/schema'
+import { issueDocuments, issueMembers, issueVersions, issues, linearConnections, linearIssueDetachments, linearIssueLinks, linearTeamSyncs, users } from '@/lib/db/schema'
 import { issuePriorityForLinear, issueStatusForLinearType, labelColorForLinear, linearPriorityForIssue, linearStateForIssue } from './mapping'
 import type { LinearStateOption } from './mapping'
 import { linearMarkdownToIssueContent, issueContentToMarkdown } from './markdown'
@@ -98,7 +98,7 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
   const saved = await db.transaction(async tx => {
     await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
     const [latest] = await tx.select().from(issues).where(and(eq(issues.id, link.issue.id), eq(issues.userId, team.ownerId))).for('update')
-    if (!latest) return null
+    if (!latest || latest.scope !== 'workspace') return null
     const [currentLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.id, link.link.id)).for('update')
     if (!currentLink || currentLink.teamSyncId !== team.id || currentLink.linearIssueId !== remote.id || !shouldApplyLinearSnapshot({ remoteUpdatedAt: new Date(remote.updatedAt), localUpdatedAt: latest.updatedAt, appSyncedAt: currentLink.appSyncedAt, linearUpdatedAt: currentLink.linearUpdatedAt, force })) return latest
     const latestMetadata = readIssueMetadata(latest.content)
@@ -155,8 +155,12 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
   const created = await db.transaction(async tx => {
     await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${linearId.data}, 0))`)
+    const [detached] = await tx.select({ id: linearIssueDetachments.linearIssueId }).from(linearIssueDetachments).where(eq(linearIssueDetachments.linearIssueId, remote.id)).limit(1)
+    if (detached) return null
     const [sameId] = await tx.select().from(issues).where(and(eq(issues.id, linearId.data), eq(issues.userId, team.ownerId))).for('update').limit(1)
     if (sameId) {
+      // Import never overrides a person's scope choice, including a detached UUID.
+      if (sameId.scope !== 'workspace') return null
       const [existingLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.issueId, sameId.id)).limit(1)
       if (existingLink && existingLink.linearIssueId !== remote.id) throw new LinearSyncConflictError('The issue is already linked to another Linear issue')
       const [remoteLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.linearIssueId, remote.id)).limit(1)
@@ -164,7 +168,6 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
       const syncRemote = existingLink
         ? !existingLink.linearUpdatedAt || remote.updatedAt > existingLink.linearUpdatedAt.toISOString()
         : remote.updatedAt > sameId.updatedAt.toISOString()
-      if (sameId.scope !== 'workspace') await tx.update(issues).set({ scope: 'workspace' }).where(eq(issues.id, sameId.id))
       if (!existingLink) await tx.insert(linearIssueLinks).values({
         id: crypto.randomUUID(), issueId: sameId.id, ownerId: team.ownerId, teamSyncId: team.id,
         linearIssueId: remote.id, linearIdentifier: remote.identifier, linearDescriptionHash: syncRemote ? null : hashValue(remote.description ?? ''), syncStatus: 'synced',
@@ -203,6 +206,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
     })
     return { issue, syncRemote: false }
   })
+  if (!created) return null
   if (created.syncRemote) return await applyLinearIssueToApp(team, remote) ?? created.issue
   return created.issue
 }

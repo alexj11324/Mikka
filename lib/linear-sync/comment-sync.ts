@@ -128,9 +128,9 @@ export async function applyLinearCommentToApp(input: {
   if (body.length > 2000) throw new Error('Linear comment is larger than Mikka supports')
   await db.transaction(async tx => {
     await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
-    const [latestIssue] = await tx.select({ updatedAt: issues.updatedAt }).from(issues).where(eq(issues.id, input.issue.id)).for('update').limit(1)
+    const [latestIssue] = await tx.select({ updatedAt: issues.updatedAt, scope: issues.scope }).from(issues).where(eq(issues.id, input.issue.id)).for('update').limit(1)
     const [currentLink] = await tx.select({ appSyncedAt: linearIssueLinks.appSyncedAt }).from(linearIssueLinks).where(eq(linearIssueLinks.id, input.issueLink.id)).for('update').limit(1)
-    if (!latestIssue || !currentLink) return
+    if (!latestIssue || latestIssue.scope !== 'workspace' || !currentLink) return
     const nextUpdatedAt = new Date()
     const [stored] = await tx.select({ state: issueDocuments.state }).from(issueDocuments).where(eq(issueDocuments.issueId, input.issue.id)).for('update').limit(1)
     const doc = loadIssueDocument(stored?.state ?? null, input.issue.content)

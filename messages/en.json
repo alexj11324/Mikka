@@ -958,7 +958,7 @@
     "issuePreferenceLimit": "This task has reached its follower limit.",
     "issueScopeInvalid": "Scope must be workspace or personal.",
     "issueScopeOwnerOnly": "Only the task owner can change its scope.",
-    "issueScopeInLinear": "This task is already in Linear, so it can't become personal again.",
+    "issueScopeInLinear": "Confirm how to handle the Linear issue before moving this task to personal.",
     "issueOwnerOnly": "Only the task owner can delete or restore the task.",
     "issueRestoreWindow": "The 30-day restore window for this task has passed.",
     "issueDeleteFailed": "Could not delete or restore the task. Please try again shortly.",
