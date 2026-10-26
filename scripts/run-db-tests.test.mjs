@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { SELF_MANAGED, inventory, main, readTree, validateTarget } from './run-db-tests.mjs'
-import { coveragePlan, databaseIdentity, profileEnvironment, parseEvidence, executePhase, aggregate, resultError } from './db-test-plan.mjs'
+import { failureDiagnostics, coveragePlan, databaseIdentity, profileEnvironment, parseEvidence, executePhase, aggregate, resultError } from './db-test-plan.mjs'
 const sha = 'a'.repeat(40), file = 'tests/example.db.test.ts'
 const files = { [file]: "import { Pool } from 'pg'; test('actual DB exercise',()=>{})" }
 const scripts = { 'test:example': `node --test ${file}` }
@@ -230,4 +230,12 @@ test('credential retained and disposal contracts cover every shared-harness scen
  for(const r of [retained,disposal])assert.ok(r.supportFiles.includes('lib/credentials/acceptance-harness.ts'))
  assert.match(readFileSync('lib/credentials/disposal.db.test.ts','utf8'),/throw new Error\('Pending scoped approval/)
  assert.doesNotMatch(readFileSync('scripts/test-credential-backend.mjs','utf8'),/DROP DATABASE/)
+})
+
+
+test('failure diagnostics retain status/assertion locations but never credential strings or bodies',()=>{
+ const raw = "code: 'ERR_ASSERTION'\nexpected: 200\nactual: 429\nerror: secret-token-DO-NOT-RETAIN\nactual: 'secret-cookie-DO-NOT-RETAIN'\n at signup (/home/runner/work/project/tests/factory-question-http.test.ts:66:14)\nhttps://private.example/secret?token=DO-NOT-RETAIN"
+ const result=failureDiagnostics(raw)
+ assert.deepEqual(result,{codes:['ERR_ASSERTION'],assertions:[{kind:'expected',value:200},{kind:'actual',value:429}],locations:['tests/factory-question-http.test.ts:66:14']})
+ assert.doesNotMatch(JSON.stringify(result),/secret|cookie|private|token|DO-NOT/)
 })

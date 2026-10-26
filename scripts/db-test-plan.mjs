@@ -112,6 +112,13 @@ export function resultError(recipe, result) {
   if (!Array.isArray(result.names) || JSON.stringify(sorted(result.names)) !== JSON.stringify(sorted(recipe.expectedTests))) return `${recipe.id}: test name multiset mismatch`
   return null
 }
+/** Keep only scalar failure facts and source locations; never retain bodies/tokens/URLs. */
+export function failureDiagnostics(output) {
+  const codes = [...output.matchAll(/^\s*code:\s*['"]?(ERR_[A-Z0-9_]+|[0-9A-Z]{5})['"]?\s*$/gm)].map(m=>m[1])
+  const assertions = [...output.matchAll(/^\s*(expected|actual):\s*(-?\d+(?:\.\d+)?|true|false|null)\s*$/gm)].map(m=>({kind:m[1],value:JSON.parse(m[2])}))
+  const locations = [...output.matchAll(/(?:^|[\s/(])((?:tests|lib|scripts)\/[a-zA-Z0-9_./-]+\.(?:ts|mjs|js):\d+(?::\d+)?)/gm)].map(m=>m[1])
+  return {codes:[...new Set(codes)].slice(0,12),assertions:assertions.slice(0,24),locations:[...new Set(locations)].slice(0,20)}
+}
 export function executePhase(plan, phase, sha, env, run) {
   if (!PHASES.includes(phase) || !/^[a-f0-9]{40}$/.test(sha)) throw Error('Exact SHA and explicit phase required')
   const results = []
@@ -124,7 +131,7 @@ export function executePhase(plan, phase, sha, env, run) {
       const execution = run(recipe.command[0], recipe.command.slice(1), { encoding: 'utf8', env: child, shell: false, maxBuffer: 64 << 20 })
       Object.assign(result, parseEvidence(`${execution.stdout ?? ''}\n${execution.stderr ?? ''}`), { state: 'passed', exitCode: execution.status })
       const error = resultError(recipe, result)
-      if (error) { result.state = 'failed'; result.reason = error }
+      if (error) { result.state = 'failed'; result.reason = error; result.diagnostics = failureDiagnostics(`${execution.stdout ?? ''}\n${execution.stderr ?? ''}`) }
     } catch (e) { result.state = 'failed'; result.reason = e.message }
     results.push(result)
   }

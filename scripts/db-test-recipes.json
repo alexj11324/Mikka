@@ -647,7 +647,8 @@
       ],
       "expectedCount": 26,
       "supportFiles": [
-        "lib/credentials/acceptance-harness.ts"
+        "lib/credentials/acceptance-harness.ts",
+        "lib/credentials/universal-auth.test.ts"
       ]
     },
     {
