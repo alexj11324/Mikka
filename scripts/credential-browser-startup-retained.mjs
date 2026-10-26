@@ -23,7 +23,7 @@ try {
     '--disable-sync', '--disable-background-networking', '--disable-component-update',
     '--no-first-run', '--no-default-browser-check', '--disable-breakpad',
     '--host-resolver-rules=MAP * ~NOTFOUND', `--user-data-dir=${profile.profile}`, 'about:blank',
-  ], { env: { PATH: '/usr/bin:/bin', HOME: registry.root, TMPDIR: registry.root, LANG: 'C.UTF-8' }, stdio: ['ignore', output.fd, output.fd] })
+  ], { env: { PATH: '/usr/bin:/bin', HOME: profile.directory, TMPDIR: profile.directory, LANG: 'C.UTF-8' }, stdio: ['ignore', output.fd, output.fd] })
   browser.on('exit', (code, signal) => { void writeRetainedReceipt(join(root, 'browser-exit.json'), { code, signal, requestedByHarness: false }) })
   await new Promise((resolve, reject) => { browser.once('spawn', resolve); browser.once('error', reject) })
   await new Promise(resolve => setTimeout(resolve, 2000))

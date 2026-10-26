@@ -7,7 +7,8 @@ import { join } from 'node:path'
 import type { AcceptanceResources, AcceptanceProfile } from './owned-chromium'
 
 export type ProcessIdentity = { pid: number; starttime: string; uid: number; profile: string }
-type Reservation = { id: string; profile: string; dev: string; ino: string }
+type DirectoryIdentity = { path: string; dev: string; ino: string }
+type Reservation = { id: string; directory: string; artifacts: string; profile: string; dev: string; ino: string; directories: readonly Readonly<DirectoryIdentity>[] }
 type Registration = Reservation & { process: ProcessIdentity }
 class NoBrowserProfile extends Error {}
 
@@ -141,7 +142,7 @@ export async function readLinuxProcess(pid: number): Promise<ProcessIdentity> {
   return { pid, starttime: fields[19], uid: Number(uid[1]), profile: profiles[0].slice(16) }
 }
 
-export async function createAcceptanceResourceRegistry(parent: string, budget: { profiles: number; launches: number }, inspect = readLinuxProcess, children = ownNodeChildren) {
+export async function createAcceptanceResourceRegistry(parent: string, budget: { profiles: number; launches: number }, inspect = readLinuxProcess, children = ownNodeChildren, createDirectory = (path: string) => mkdir(path, { mode: 0o700 })) {
   for (const n of [budget.profiles, budget.launches]) assert.ok(Number.isSafeInteger(n) && n > 0)
   const limits = { ...budget }
   const root = await realpath(await mkdtemp(join(parent, 'credential-resources-')))
@@ -166,12 +167,19 @@ export async function createAcceptanceResourceRegistry(parent: string, budget: {
   }
   async function profileMatches(r: Reservation) {
     await owned()
-    assert.equal(await realpath(r.profile), r.profile)
-    const st = await lstat(r.profile, { bigint: true })
-    assert.ok(st.isDirectory() && !st.isSymbolicLink())
-    assert.equal(Number(st.uid), uid)
-    assert.equal(Number(st.mode & BigInt(0o077)), 0, 'private browser profile required')
-    assert.equal(st.dev.toString(), r.dev); assert.equal(st.ino.toString(), r.ino)
+    assert.equal(r.directory, join(root, r.id))
+    assert.equal(r.profile, join(r.directory, 'profile'))
+    assert.equal(r.artifacts, join(r.directory, 'artifacts'))
+    assert.deepEqual(r.directories.map(item => item.path), [r.directory, r.profile, r.artifacts])
+    for (const item of r.directories) {
+      assert.equal(await realpath(item.path), item.path)
+      const st = await lstat(item.path, { bigint: true })
+      assert.ok(st.isDirectory() && !st.isSymbolicLink())
+      assert.equal(Number(st.uid), uid)
+      assert.equal(Number(st.mode & BigInt(0o077)), 0, 'private session directory required')
+      assert.equal(st.dev.toString(), item.dev); assert.equal(st.ino.toString(), item.ino)
+    }
+
   }
   const registry = {
     root, runId,
@@ -180,13 +188,21 @@ export async function createAcceptanceResourceRegistry(parent: string, budget: {
       assert.ok(profiles < limits.profiles && launches < limits.launches, 'resource budget exhausted')
       profiles++; launches++
       await owned()
-      const id = randomUUID(), profile = join(root, id)
-      await mkdir(profile, { mode: 0o700 })
-      const st = await lstat(profile, { bigint: true })
-      const r = { id, profile, dev: st.dev.toString(), ino: st.ino.toString() }
+      const id = randomUUID(), directory = join(root, id)
+      const profile = join(directory, 'profile'), artifacts = join(directory, 'artifacts')
+      // Durable names/budget precede filesystem creation; partial failures retain evidence.
+      await writeFile(join(root, `${id}.reservation-plan.json`), JSON.stringify({ version: 2, runId, id, directory, profile, artifacts, maxDirectories: 3, maxBrowserLaunches: 1 }), { flag: 'wx', mode: 0o600 })
+      const directories: DirectoryIdentity[] = []
+      for (const path of [directory, profile, artifacts]) {
+        await createDirectory(path)
+        const st = await lstat(path, { bigint: true })
+        directories.push({ path, dev: st.dev.toString(), ino: st.ino.toString() })
+      }
+      const r = { id, directory, profile, artifacts, dev: directories[1].dev, ino: directories[1].ino, directories: Object.freeze(directories.map(item => Object.freeze({ ...item }))) }
       reservations.set(id, r)
       await writeFile(join(root, `${id}.reservation.json`), JSON.stringify(r), { flag: 'wx', mode: 0o600 })
-      return { ...r, env: { TMPDIR: root } }
+      return { ...r, directories: r.directories.map(item => ({ ...item })), env: { TMPDIR: directory } }
+
     },
     async registerStarted(id: string, pid: number) {
       assert.ok(Number.isSafeInteger(pid) && pid > 1)
@@ -214,14 +230,14 @@ export async function createAcceptanceResourceRegistry(parent: string, budget: {
       const check = async (profile: AcceptanceProfile) => {
         const r = reservations.get(profile.id)
         assert.ok(r, 'unknown acceptance reservation')
-        assert.equal(profile.directory, root); assert.equal(profile.profile, r.profile)
+        assert.equal(profile.directory, r.directory); assert.equal(profile.profile, r.profile); assert.equal(profile.artifacts, r.artifacts)
         await profileMatches(r)
         return r
       }
       return {
         async prepareProfile() {
           const r = await registry.reserveLaunch()
-          return Object.freeze({ id: r.id, directory: root, profile: r.profile })
+          return Object.freeze({ id: r.id, directory: r.directory, profile: r.profile, artifacts: r.artifacts })
         },
         async started(profile) {
           const r = await check(profile)

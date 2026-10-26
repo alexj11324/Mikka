@@ -1,6 +1,6 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, isAbsolute } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { chromium, type Browser, type BrowserContext, type Page, type ElementHandle } from 'playwright-core'
 import { CredentialError, type Binding, type BrowserTaskAction } from './contracts'
@@ -12,7 +12,7 @@ export type OwnedBrowserPolicy = {
   continuation?: { accountURL: string; accountSelector: string; cookieName: string; pages?: OwnedTaskPage[] }
 }
 export type OwnedTaskPage = { id: string; url: string; regions: { id: string; selector: string }[]; links?: { id: string; selector: string; pageId: string }[] }
-export type AcceptanceProfile = Readonly<{ id: string; directory: string; profile: string }>
+export type AcceptanceProfile = Readonly<{ id: string; directory: string; profile: string; artifacts: string }>
 export type AcceptanceCleanupStage = 'launch-blocked' | 'launch-failed' | 'setup-failed' | 'destroy'
 // Trusted synthetic Linux fixture observation only; never receives browser/page
 // handles and cannot authorize disposal. All cleanup with this hook stays pending.
@@ -22,11 +22,21 @@ export type AcceptanceResources = {
   beforeCleanup(profile: AcceptanceProfile, stage: AcceptanceCleanupStage): Promise<void>
   recordFailure?(profile: AcceptanceProfile, stage: 'launch-failed' | 'setup-failed', cause: unknown): Promise<void>
 }
+// Shared by the real launch call and prepare-only validation; ordinary launches
+// retain their existing options. Acceptance artifacts never use host os.tmpdir().
+export function acceptanceArtifactOptions(profile?: AcceptanceProfile) {
+  if (!profile) return {}
+  if (!isAbsolute(profile.directory) || profile.profile !== join(profile.directory, 'profile') || profile.artifacts !== join(profile.directory, 'artifacts')) {
+    throw new CredentialError('browser_acceptance_profile_invalid', 503)
+  }
+  return { artifactsDir: profile.artifacts, downloadsPath: profile.artifacts, tracesDir: profile.artifacts }
+}
 // Playwright owns additional failure/exit cleanup outside this executor. Until
 // that lifecycle has separately approved control, acceptance is setup-only.
 export async function guardAcceptanceLaunch(resources?: AcceptanceResources, profile?: AcceptanceProfile): Promise<void> {
   if (!resources) return
   if (!profile) throw new CredentialError('browser_acceptance_profile_missing', 503)
+  acceptanceArtifactOptions(profile)
   await resources.beforeCleanup(profile, 'launch-blocked')
   throw new CredentialError('browser_acceptance_setup_only', 503)
 }
@@ -137,6 +147,8 @@ export class OwnedChromiumExecutor {
       const context = await chromium.launchPersistentContext(acceptanceProfile?.profile ?? join(directory, 'profile'), {
         executablePath: this.config.executablePath, headless: true,
         timeout: 5000,
+        // Explicit host-side path: browser env TMPDIR alone does not contain Playwright artifacts.
+        ...acceptanceArtifactOptions(acceptanceProfile),
         acceptDownloads: false, serviceWorkers: 'block', javaScriptEnabled: false,
         chromiumSandbox: !this.config.loopbackFixture,
         env: { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: directory, TMPDIR: directory, LANG: 'C.UTF-8' },

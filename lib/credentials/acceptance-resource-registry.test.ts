@@ -1,15 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { tmpdir } from 'node:os'
-import { writeFile, symlink, rename, readFile, readdir, lstat } from 'node:fs/promises'
+import { writeFile, symlink, rename, readFile, readdir, lstat, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createAcceptanceResourceRegistry, uniqueChildForProfile, safeLaunchFailure, ownNodeChildren, procChildren, processSnapshot, writeRetainedReceipt, type ProcessIdentity } from './acceptance-resource-registry'
-import { OwnedChromiumExecutor, rejectAcceptanceDisposal, guardAcceptanceLaunch, type AcceptanceResources } from './owned-chromium'
+import { OwnedChromiumExecutor, rejectAcceptanceDisposal, guardAcceptanceLaunch, acceptanceArtifactOptions, type AcceptanceResources } from './owned-chromium'
 
 test('registry reserves explicit budgets before creation and retains a private per-run root', async () => {
   const registry = await createAcceptanceResourceRegistry(tmpdir(), { profiles: 1, launches: 1 })
   const r = await registry.reserveLaunch()
-  assert.equal(r.env.TMPDIR, registry.root)
+  assert.equal(r.env.TMPDIR, r.directory)
   await assert.rejects(registry.reserveLaunch(), /budget exhausted/)
   await assert.rejects(registry.matchesRegistered(r.id), /no registered resource/)
 })
@@ -122,7 +122,9 @@ test('executor acceptance is setup-only even with valid reservation; no browser 
   assert.equal(reservations.length, 1)
   const reservation = JSON.parse(await readFile(join(registry.root, reservations[0]), 'utf8'))
   assert.equal(reservation.id, pending.id)
-  assert.equal(reservation.profile, join(registry.root, pending.id))
+  assert.equal(reservation.directory, join(registry.root, pending.id))
+  assert.equal(reservation.profile, join(reservation.directory, 'profile'))
+  assert.equal(reservation.artifacts, join(reservation.directory, 'artifacts'))
   const profileBefore = await lstat(reservation.profile, { bigint: true })
   assert.ok(profileBefore.isDirectory() && !profileBefore.isSymbolicLink())
   assert.equal(Number(profileBefore.mode & BigInt(0o777)), 0o700)
@@ -204,4 +206,68 @@ test('retained receipt failures preserve existing evidence and never escape thro
   assert.equal(writes, 0)
   assert.equal(await writeRetainedReceipt('unused', { ok: true }, () => {}, async () => { writes++ }), true)
   assert.equal(writes, 1)
+})
+
+
+test('two reservations isolate session, profile and host artifacts; mixed paths and failed stages retain all evidence', async () => {
+  const registry = await createAcceptanceResourceRegistry(tmpdir(), { profiles: 2, launches: 2 })
+  const hook = registry.acceptanceResources(), first = await hook.prepareProfile(), second = await hook.prepareProfile()
+  assert.notEqual(first.directory, registry.root); assert.notEqual(first.directory, second.directory)
+  const secondBefore = await Promise.all([second.directory, second.profile, second.artifacts].map(path => lstat(path, { bigint: true })))
+  const rootBefore = await readFile(join(registry.root, 'owner.json'), 'utf8')
+  for (const key of ['directory', 'profile', 'artifacts'] as const) {
+    await assert.rejects(hook.beforeCleanup({ ...first, [key]: second[key] }, 'launch-failed'))
+  }
+  for (const stage of ['launch-failed', 'setup-failed', 'destroy'] as const) {
+    await assert.rejects(rejectAcceptanceDisposal(hook, first, stage), { code: 'browser_acceptance_disposal_pending' })
+  }
+  await hook.recordFailure!(first, 'launch-failed', new Error('synthetic browser launch timed out'))
+  const failureName = (await readdir(registry.root)).find(file => file.endsWith('.failure.json'))!
+  const failure = JSON.parse(await readFile(join(registry.root, failureName), 'utf8'))
+  assert.equal(failure.id, first.id)
+  assert.equal(failure.diagnostic.chain[0].code, 'launch-timeout')
+  await assert.rejects(guardAcceptanceLaunch(hook, first), { code: 'browser_acceptance_setup_only' })
+  await assert.rejects(hook.prepareProfile(), /budget exhausted/)
+  assert.deepEqual(await Promise.all([second.directory, second.profile, second.artifacts].map(path => lstat(path, { bigint: true }))), secondBefore)
+  assert.equal(await readFile(join(registry.root, 'owner.json'), 'utf8'), rootBefore)
+  const plan = JSON.parse(await readFile(join(registry.root, first.id + '.reservation-plan.json'), 'utf8'))
+  assert.equal(plan.maxDirectories, 3); assert.equal(plan.maxBrowserLaunches, 1)
+  await rename(first.artifacts, first.artifacts + '.retained')
+  await symlink(second.artifacts, first.artifacts)
+  await assert.rejects(hook.beforeCleanup(first, 'destroy'))
+})
+
+
+test('real launch options pin host artifacts; partial directory failure consumes budget and keeps its plan', async () => {
+  assert.deepEqual(acceptanceArtifactOptions(), {})
+  const registry = await createAcceptanceResourceRegistry(tmpdir(), { profiles: 1, launches: 1 }, undefined, undefined, async path => {
+    if (path.endsWith('/profile')) throw Object.assign(new Error('synthetic mkdir failure'), { code: 'EIO' })
+    await mkdir(path, { mode: 0o700 })
+  })
+  await assert.rejects(registry.reserveLaunch(), /synthetic mkdir failure/)
+  await assert.rejects(registry.reserveLaunch(), /budget exhausted/)
+  const files = await readdir(registry.root), planName = files.find(file => file.endsWith('.reservation-plan.json'))!
+  const plan = JSON.parse(await readFile(join(registry.root, planName), 'utf8'))
+  assert.ok((await lstat(plan.directory)).isDirectory())
+  assert.equal(files.filter(file => file.endsWith('.reservation.json')).length, 0)
+  assert.deepEqual(acceptanceArtifactOptions(plan), { artifactsDir: plan.artifacts, downloadsPath: plan.artifacts, tracesDir: plan.artifacts })
+  assert.throws(() => acceptanceArtifactOptions({ ...plan, artifacts: registry.root }), { code: 'browser_acceptance_profile_invalid' })
+  assert.throws(() => acceptanceArtifactOptions({ ...plan, profile: join(registry.root, 'another-reservation') }), { code: 'browser_acceptance_profile_invalid' })
+})
+
+
+test('mutating returned directory identities cannot bless a replacement session tree', async () => {
+  let inspected = false
+  const registry = await createAcceptanceResourceRegistry(tmpdir(), { profiles: 1, launches: 1 }, async () => { inspected = true; throw Error('must reject directory first') })
+  const r = await registry.reserveLaunch()
+  await rename(r.directory, r.directory + '.retained')
+  for (const item of r.directories) {
+    await mkdir(item.path, { mode: 0o700 })
+    const st = await lstat(item.path, { bigint: true })
+    item.dev = st.dev.toString(); item.ino = st.ino.toString()
+  }
+  r.dev = r.directories[1].dev; r.ino = r.directories[1].ino
+  await assert.rejects(registry.registerStarted(r.id, 12345))
+  assert.equal(inspected, false)
+  assert.ok((await lstat(r.directory + '.retained')).isDirectory())
 })
