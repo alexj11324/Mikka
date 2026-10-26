@@ -1,3 +1,6 @@
+import { physicalAbsenceCase } from "./retained-test-support";
+import { retainFaultTrigger } from "./retained-test-support";
+import { executePoolMigration } from "../../scripts/search-migrations.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -52,7 +55,7 @@ const rejects = (fn: () => Promise<unknown>, code: string) =>
 test(
   "PG17: routing, 10-way replay/CAS, actual SQL rollback/reconnect, attempts, candidate fences and API isolation",
   { skip: !dbURL, timeout: 120000 },
-  async () => {
+  async (t) => {
     const schema = `factory_192_${randomUUID().replaceAll("-", "")}`;
     const admin = new Pool({ connectionString: dbURL, max: 1 });
     await admin.query(`CREATE SCHEMA "${schema}"`);
@@ -84,7 +87,7 @@ test(
       for (const file of orderMigrations(
         (await readdir(dir)).filter((n) => n.endsWith(".sql")),
       )) {
-        await pool.query(await readFile(new URL(file, dir), "utf8"));
+        await executePoolMigration(pool, file, await readFile(new URL(file, dir), "utf8"));
       }
       const migration = await readFile(
         new URL("20261025051202_factory_192_stages.sql", dir),
@@ -452,9 +455,7 @@ test(
           }),
         /injected dispatch/,
       );
-      await pool.query(
-        "DROP TRIGGER factory_inject_dispatch ON factory_events",
-      );
+      await retainFaultTrigger(pool, "factory_events", "factory_inject_dispatch");
       assert.equal(
         (
           await pool.query('SELECT id FROM agent_runs WHERE "dispatchKey"=$1', [
@@ -646,7 +647,7 @@ test(
           store.apply("owner", binding(state.task), rollbackEventId, blocked),
         /injected precommit/,
       );
-      await pool.query("DROP TRIGGER factory_inject ON factory_events");
+      await retainFaultTrigger(pool, "factory_events", "factory_inject");
       assert.deepEqual(await store.read("owner", state.task.id), before);
       state = await store.apply(
         "owner",
@@ -900,7 +901,7 @@ test(
           () => store.apply("owner", phaseBinding, phaseEvent, wait),
           /injected precommit/,
         );
-        await pool.query("DROP TRIGGER factory_inject ON factory_events");
+        await retainFaultTrigger(pool, "factory_events", "factory_inject");
         assert.deepEqual(await store.read("owner", phase.task.id), beforePhase);
         phase = await store.apply("owner", phaseBinding, phaseEvent, wait);
         const reconnect = new Pool({
@@ -933,6 +934,7 @@ test(
           eventId: phaseEvent,
         });
       }
+      await physicalAbsenceCase(t, "deleted agent cascades its run and blocks reconciliation", async () => {
       const deletedAgent = randomUUID(),
         deletedRun = randomUUID();
       await pool.query(
@@ -962,6 +964,7 @@ test(
       assert.equal(missingRun.task.status, "blocked");
       assert.equal(missingRun.attempts[0].runId, deletedRun);
       assert.match(missingRun.task.reason, /unavailable/);
+      });
       const removed = await route();
       await pool.query(
         'UPDATE issues SET content=\'{"attrs":{"mikka":{"deletedAt":"2026-10-25T00:00:00Z"}}}\'::jsonb WHERE id=$1',
@@ -993,7 +996,7 @@ test(
       );
     } finally {
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      console.log("Retained Factory schema:", schema);
       await admin.end();
     }
   },

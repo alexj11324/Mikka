@@ -1,3 +1,5 @@
+import { physicalAbsenceCase } from "./retained-test-support";
+import { executePoolMigration } from "../../scripts/search-migrations.mjs";
 import { createFactoryDispatch } from "./dispatch";
 import { factoryDispatchDatabase } from "./transaction";
 import { insertRunOnce } from "../run-dispatch";
@@ -8,7 +10,6 @@ import {
   readdir,
   mkdtemp,
   mkdir,
-  rm,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -671,7 +672,7 @@ test(
       for (const name of orderMigrations(
         (await readdir(dir)).filter((n) => n.endsWith(".sql")),
       ))
-        await pool.query(await readFile(new URL(name, dir), "utf8"));
+        await executePoolMigration(pool, name, await readFile(new URL(name, dir), "utf8"));
       await pool.query(
         await readFile(
           new URL("20261025051204_factory_195_monitor.sql", dir),
@@ -951,7 +952,7 @@ test(
       );
       await t.test(
         "same candidate recovery requires all independent and approved publication evidence",
-        async () => {
+        async (recoveryTest) => {
           const good = await toMonitor("owner", issueId, null);
           await pool.query(
             "UPDATE factory_attempts SET status='blocked' WHERE \"taskId\"=$1 AND stage='verify'",
@@ -976,7 +977,6 @@ test(
           for (const tamper of [
             "sha",
             "session",
-            "missing-verification-run",
           ] as const) {
             const invalid = await toMonitor("owner", issueId, null);
             if (tamper === "sha")
@@ -986,17 +986,20 @@ test(
                 'UPDATE agent_runs SET "sessionId"=(SELECT "sessionId" FROM factory_attempts WHERE "taskId"=$2 AND stage=\'verify\') WHERE id=$1',
                 [invalid.runId, invalid.task.id],
               );
-            if (tamper === "missing-verification-run")
-              await pool.query(
-                'DELETE FROM agent_runs WHERE id=(SELECT "runId" FROM factory_attempts WHERE "taskId"=$1 AND stage=\'verify\')',
-                [invalid.task.id],
-              );
             assert.equal(
               (await monitor.consume("owner", invalid.input)).outcome,
               "blocked",
               tamper,
             );
           }
+          await physicalAbsenceCase(recoveryTest, "missing verification run blocks candidate recovery", async () => {
+            const invalid = await toMonitor("owner", issueId, null);
+              await pool.query(
+                'DELETE FROM agent_runs WHERE id=(SELECT "runId" FROM factory_attempts WHERE "taskId"=$1 AND stage=\'verify\')',
+                [invalid.task.id],
+              );
+            assert.equal((await monitor.consume("owner", invalid.input)).outcome, "blocked");
+          });
           const failedTask = (await store.read("owner", first.task.id)).task;
           const repair = await store.apply(
             "owner",
@@ -1178,7 +1181,7 @@ test(
           );
         },
       );
-      await t.test(
+      await physicalAbsenceCase(t,
         "reuse across issues preserves the original mapping and existing issue deletion cascade",
         async () => {
           const originalIssue = await issue(
@@ -1546,9 +1549,9 @@ test(
       );
     } finally {
       await cloud.close();
-      await rm(targetRoot, { recursive: true, force: true });
+      console.log("Retained Factory directory:", targetRoot);
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      console.log("Retained Factory schema:", schema);
       await admin.end();
     }
   },

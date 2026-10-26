@@ -4,6 +4,7 @@
     "active-agents",
     "activity-actor-db",
     "audit",
+    "audit-deletion",
     "byos-claim",
     "byos-retained",
     "byos-worker",
@@ -13,6 +14,7 @@
     "e2e:setup",
     "factory",
     "factory-monitor-http",
+    "factory-physical-absence",
     "factory-query-http",
     "factory-question-http",
     "group-native",
@@ -89,15 +91,15 @@
       "targets": [
         {
           "key": "AUDIT_APP_TEST_URL",
-          "suffix": "_e2e",
           "host": "127.0.0.1",
-          "port": "5432"
+          "port": "5432",
+          "database": "mikka_audit_app_e2e"
         },
         {
           "key": "AUDIT_WORKSPACE_TEST_URL",
-          "suffix": "_e2e",
           "host": "127.0.0.1",
-          "port": "5432"
+          "port": "5432",
+          "database": "mikka_audit_workspace_e2e"
         }
       ],
       "distinct": [
@@ -480,7 +482,7 @@
         {
           "path": "lib/audit/postgres.test.ts",
           "requiredNames": [
-            "PostgreSQL audit: tenant isolation, role matrix, retries, immutable export, failure and retention"
+            "PostgreSQL audit: tenant isolation, role matrix, retries, immutable export and retained failure evidence"
           ]
         }
       ],
@@ -491,11 +493,22 @@
       ],
       "profile": "audit",
       "phase": "external",
-      "status": "pending",
+      "status": "ready",
       "packageScript": "test:audit",
-      "pendingReason": "Audit retention regression invokes pruneAudit to delete aged synthetic audit rows; full recipe requires separately approved deletion scope or retained equivalent.",
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "PostgreSQL audit: tenant isolation, role matrix, retries, immutable export and retained failure evidence",
+        "concurrent retry is one event; conflicting duplicate rejected; secret fields rejected",
+        "admin/member/suspended/foreign/bearer/current revocation matrix and filters",
+        "configured origin survives internal proxy URL without trusting foreign origins",
+        "paged snapshot resumes after new events and fresh connection; no gaps/count/hash mismatch",
+        "two-store export resumes partial creation without replacing application snapshot",
+        "run, credential, account approval and uncertain operation transitions are atomic and contain references only",
+        "ordinary mailbox continuation inherits workspace; forged parent chains are rejected",
+        "automatic auth lifecycle is durable, sanitised, and rolls back when audit cannot persist",
+        "unauthorised update blocked and controlled privileged hash corruption/reorder detected",
+        "real PG: coordinated stop versus complete preserves audit and mailbox lock order"
+      ],
+      "expectedCount": 11
     },
     {
       "id": "byos-claim",
@@ -548,14 +561,104 @@
       "status": "pending",
       "packageScript": "test:byos-worker",
       "runner": "scripts/test-subscription-worker.mjs",
-      "pendingReason": "Full application/native and enrollment binding call physical worker SQL cleanup and PID/profile removal; Go fixtures also delete rows. Retained transfer/migration coverage is separate, not a substitute.",
+      "pendingReason": "Full worker contract preserves 66 Go top-level and 2 Node cases; 21 Go and the two Node tails require physical cleanup scope. Legacy full launcher and disposal entrypoints remain blocked and their evidence adapter must be completed before approval/execution; tagged daemon revoke is exercised separately by metadata CI.",
       "prerequisites": [
         "Go worker build",
         "local synthetic TLS fixture",
         "retained container lifecycle"
       ],
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "TestInitialActualCPAStorageCanonicalization",
+        "TestActualCodexRefreshPatchMergesPartitions",
+        "TestUnknownStorageAndCredentialConfigurationNeverExecute",
+        "TestClaudePlainOAuthAndRefreshExcludeNativeIdentityAndFingerprintPaths",
+        "TestEnrollmentBindingPublishesOneOwnedConnectionAndReusesRefresh",
+        "TestEnrollmentBindingLatePublicationCannotUndoDisconnect",
+        "TestEnrollmentBindingResumesExpiredOriginalReservationWithoutNewEpoch",
+        "TestEnrollmentBindingRecoversExactStagedGrantAndProjection",
+        "TestEnrollmentBindingRefusesReconnectAndIndependentTargetDatabase",
+        "TestEnrollmentBindingConcurrentRequestsNeverCreateTwoConnections",
+        "TestEnrollmentSourceDenialSurvivesOpaqueStatusAndProofBoundaries",
+        "TestEnrollmentNonDenialFailuresRemainOpaque",
+        "TestEnrollmentHandoffBindsFullCeremonyAndRetainsGlobalCredentials",
+        "TestEnrollmentHandoffAndLegacyCompletionShareOneUseLatch",
+        "TestEnrollmentHandoffRefusesLegacyAttemptsWithoutWeakeningLegacyOperator",
+        "TestEnrollmentHandoffUncertainClaimNeverRetriesProvider",
+        "TestEnrollmentActualPlainClaudeAdapterWithoutSQL",
+        "TestEnrollmentPersistsStateAndFullCPAStorageWithoutDatabaseOrExecution",
+        "TestEnrollmentRefusesMalformedForeignExpiredAndConcurrentCallbacks",
+        "TestEnrollmentPersistenceFailuresNeverRepeatConsumedCode",
+        "TestEnrollmentRetriesOnlyCapturedUncertainWriteAndFencesUncertainClaim",
+        "TestEnvironmentTransferHTTPStoresJournalRetryRefreshAndDisconnect",
+        "TestEnvironmentTransferRejectsWrongApprovalBeforeSecretAccess",
+        "TestEnvironmentTransferRecoversHTTPFailuresWithoutSourceDeletion",
+        "TestEnvironmentTransferSourceMutationCannotPublish",
+        "TestSingleRefreshAuthorityAndReconnectRejectsLateResult",
+        "TestAcceptedSecretLostResponseRecoversAfterRestartWithoutLogin",
+        "TestRejectedStoreAndRawProviderErrorsFailClosed",
+        "TestPrivateIPCDoesNotExposeCredentialsOrAcceptTenantOverrides",
+        "TestExpiredAccessRefreshesOnceAndTasksReuseConnection",
+        "TestExpiredLeaseCannotReplayRotatingGrant",
+        "TestInfisicalRedirectAndIntegrityFailuresDoNotPublish",
+        "TestStoreCannotChangeConnectionScopeOrRunImportedHelpers",
+        "TestWorkerExecutableHasPrivateScopeAndNoLiveRegistry",
+        "TestPrivateFramingRejectsTrailingObjectsAndOversizedFrames",
+        "TestNativeBrokerUsesAccessOnlyCredentialsWithoutExportOrEndpointSelection",
+        "TestNativeRunLedgerAndLeaseRefuseUseBeforeVaultReads",
+        "TestLegacyProjectionPreStageFailureIsDurableAndReconnectable",
+        "TestLegacyProjectionCancellationStillPersistsFailure",
+        "TestProductionWorkerRefusesNativeExportWithoutAConfigurableBypass",
+        "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding",
+        "TestQuotaProjectionDropsEchoedSecretsWithoutDroppingExhaustedWindows",
+        "TestAccessPublicationFailureRecoversWithoutAnotherProviderRefresh",
+        "TestAccessProjectionRejectsFullAndNestedRefreshCopies",
+        "TestVaultDenialSurvivesEnrollmentStart",
+        "TestEnrollmentBindingGlobalClaimSurvivesMetadataLoss",
+        "TestEnrollmentCleanupPreservesOnlyRecoveryCopyUntilPublicationOrExplicitDisconnect",
+        "TestEnrollmentCleanupFailureRetriesAllCopiesAfterImmediateDisconnectFence",
+        "TestEnrollmentCleanupRequiresGlobalClaimAndConfiguredDatabaseIdentity",
+        "TestEnrollmentCleanupPublicationProofSurvivesDisconnectBeforeBoundMarker",
+        "TestEnrollmentCleanupUnknownAndLateCreatesNeverReportFullyDeleted",
+        "TestEnrollmentRetentionBlocksImplicitBindingAndCleanupDeletion",
+        "TestEnvironmentTransferJournalFailureAndConcurrentRetries",
+        "TestCPAInitialSaveRestartRefreshAndRepeatedUse",
+        "TestPostgresPublishFailureRecoversStoredBundle",
+        "TestClaudeNativeAccessLeaseReusesCPARotationAuthority",
+        "TestDisconnectDuringRefreshRejectsItsLatePublication",
+        "TestNativeBrokerFencesSilentRequestsOnDisconnectAndRefusesEchoedBearer",
+        "TestCodexDeviceCPAProtocolOwnerSessionIntervalPKCEOneUseAndExpiry",
+        "TestLegacyProjectionFailurePersistenceErrorIsNotHidden",
+        "TestTrustedLegacyProjectionMigrationDoesNotLoginOrRefresh",
+        "TestDisconnectFencesBeforeDeletionAndRetriesWithoutClaimingProviderRevocation",
+        "TestDisconnectTracksLateCreateAndNeverResurrectsDeletedArtifacts",
+        "TestConcurrentRotationPreservesStreamButDisconnectStopsIt",
+        "TestUnknownRemoteCreateRemainsQueuedAfter404AndLateCommit",
+        "TestCleanupFailuresCannotStarveLaterArtifacts",
+        "new OAuth consent, owner-bound streaming/tool use and native launches reuse one durable connection",
+        "authenticated binding migrates one escrow through actual canonical publication and recovers projection failure"
+      ],
+      "expectedCount": 68,
+      "supportFiles": [
+        "tests/byos-application-harness.mjs",
+        "tests/byos-enrollment-binding-harness.mjs",
+        "packages/subscription-worker/retained-test-contract.json",
+        "packages/subscription-worker/bundle_test.go",
+        "packages/subscription-worker/claude_oauth_test.go",
+        "packages/subscription-worker/daemon_revocation_test.go",
+        "packages/subscription-worker/enrollment_binding_test.go",
+        "packages/subscription-worker/enrollment_cleanup_test.go",
+        "packages/subscription-worker/enrollment_denial_test.go",
+        "packages/subscription-worker/enrollment_handoff_test.go",
+        "packages/subscription-worker/enrollment_test.go",
+        "packages/subscription-worker/environment_transfer_test.go",
+        "packages/subscription-worker/integration_test.go",
+        "packages/subscription-worker/lifecycle_more_test.go",
+        "packages/subscription-worker/native_broker_test.go",
+        "packages/subscription-worker/oauth_test.go",
+        "packages/subscription-worker/projection_failure_test.go",
+        "packages/subscription-worker/security_boundary_test.go",
+        "packages/subscription-worker/vault_denial_test.go"
+      ]
     },
     {
       "id": "conversation-reads",
@@ -563,7 +666,7 @@
         {
           "path": "lib/conversation-reads-route.test.ts",
           "requiredNames": [
-            "route: same-origin via x-forwarded-host → 200; missing Origin → 200"
+            "route: same-origin via x-forwarded-host \u2192 200; missing Origin \u2192 200"
           ]
         },
         {
@@ -583,9 +686,9 @@
       "status": "ready",
       "packageScript": "test:conversation-reads",
       "expectedTests": [
-        "route: no session → 401",
-        "route: cross-site Origin against x-forwarded-host → 403",
-        "route: same-origin via x-forwarded-host → 200; missing Origin → 200",
+        "route: no session \u2192 401",
+        "route: cross-site Origin against x-forwarded-host \u2192 403",
+        "route: same-origin via x-forwarded-host \u2192 200; missing Origin \u2192 200",
         "request host: first x-forwarded-host value wins, Host is the fallback",
         "origin: missing allowed, same host allowed, cross host and garbage rejected",
         "positions outside PostgreSQL integer bounds are rejected before a query",
@@ -729,15 +832,136 @@
       "command": [
         "pnpm",
         "-s",
-        "test:factory"
+        "test:factory-db-retained"
       ],
       "profile": "factory",
       "phase": "prebuild",
-      "status": "pending",
-      "packageScript": "test:factory",
-      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
-      "expectedTests": null,
-      "expectedCount": null
+      "status": "ready",
+      "packageScript": "test:factory-db-retained",
+      "expectedTests": [
+        "approval schema cannot accept a client-supplied human identity",
+        "PG17 approval/publish contract: real SQL, HTTP handler, isolated filesystem effect; upstream identities/results are fixtures",
+        "missing review/verify and absent gates stay closed",
+        "cookie-only HTTP, owner, read receipt, exact candidate/scope and expiry",
+        "#193-shaped device provenance and a separately approved local destination remain distinct",
+        "10 concurrent identical approvals produce one ledger and one advance; altered replay rejects",
+        "raw artifact readback and missing/changed provenance",
+        "no approval, wrong action/target, expiration, revocation and session sign-out cause no effect",
+        "failed attempt/retry, replacement candidate and task revocation invalidate old approval",
+        "approval + stage transitions roll back atomically on event write failure",
+        "10 concurrent publication requests perform exactly one actual local effect",
+        "unknown adapter outcome is durable and never retried across reconnect",
+        "effect followed by failed SQL commit remains uncertain, with no automatic duplicate",
+        "Vercel HTTP protocol + PG17 durable pending/uncertain reconciliation (not cloud deployment)",
+        "queued",
+        "lost-response",
+        "sql-rollback",
+        "approval/session expiration during provider preflight prevents POST",
+        "revoked/expired/stale grants cannot inspect or complete an operation",
+        "real HTTP + Better Auth + PG cookie authentication (synthetic account, no human OAuth acceptance)",
+        "PG17 check question ancestry (synthetic provider reports, real store/dispatch/gates)",
+        "review pass advances through two exact question ancestors",
+        "review finding retains failed evidence and opens repair through two exact question ancestors",
+        "verify pass advances through two exact question ancestors",
+        "verify finding retains failed evidence and opens repair through two exact question ancestors",
+        "reject question owner (passed report)",
+        "reject question owner (failed report)",
+        "reject question issue (passed report)",
+        "reject question issue (failed report)",
+        "reject question phase (passed report)",
+        "reject question phase (failed report)",
+        "reject question candidate (passed report)",
+        "reject question candidate (failed report)",
+        "reject result task fence (passed report)",
+        "reject result task fence (failed report)",
+        "reject result candidate fence (passed report)",
+        "reject result candidate fence (failed report)",
+        "reject metadata permits fresh session (passed report)",
+        "reject metadata permits fresh session (failed report)",
+        "reject unrelated same-phase session reuse (passed report)",
+        "reject unrelated same-phase session reuse (failed report)",
+        "reject origin attempt phase (passed report)",
+        "reject origin attempt phase (failed report)",
+        "reject origin attempt candidate (passed report)",
+        "reject origin attempt candidate (failed report)",
+        "reject origin owner (passed report)",
+        "reject origin owner (failed report)",
+        "reject origin session (passed report)",
+        "reject origin session (failed report)",
+        "reject origin run edge (passed report)",
+        "reject origin run edge (failed report)",
+        "reject origin cancellation (passed report)",
+        "reject origin cancellation (failed report)",
+        "reject question cancelled (passed report)",
+        "reject question cancelled (failed report)",
+        "reject question revoked ancestor (passed report)",
+        "reject question revoked ancestor (failed report)",
+        "reject result attempt fence (passed report)",
+        "reject result attempt fence (failed report)",
+        "reject waiting revision fence (passed report)",
+        "reject waiting revision fence (failed report)",
+        "reject ordinary retry edge (passed report)",
+        "reject ordinary retry edge (failed report)",
+        "reject missing metadata (passed report)",
+        "reject missing metadata (failed report)",
+        "reject metadata different question (passed report)",
+        "reject metadata different question (failed report)",
+        "reject new session with metadata removed (passed report)",
+        "reject new session with metadata removed (failed report)",
+        "reject cross-phase session reuse outside ancestors (passed report)",
+        "reject cross-phase session reuse outside ancestors (failed report)",
+        "cancel stops a resolved continuation",
+        "revoke stops a resolved continuation",
+        "current authorization is rechecked before any continuation finish",
+        "PG17 check integration: atomic dispatch, frozen commands, independent provenance, repair/new SHA, restart and closed downstream gates (fixture run reports)",
+        "PG17 monitor cycles: immutable history, CAS/replay, rollback, owner/candidate/stop fences",
+        "same candidate, new clean attempt; old passed row unchanged; no new run",
+        "10 identical retries replay once, new event CAS once; mismatched replay rejected",
+        "wrong owner/issue/candidate and inconsistent candidate never write",
+        "cancel/revoke before or after cycle block replay; live issue revocation blocks access",
+        "other passed stages, passed repair, active observation and inconsistent attempt rejected",
+        "real precommit interruption and caller rollback leave no new attempt; reconnect replay survives",
+        "existing control API exposes retry with session, origin and status fences",
+        "PG17 normal monitor dispatch: actual local publication receipt, readonly claim, queue replay/rollback and closed boundaries",
+        "normal pending dispatch and ten replays create one receipt-bound readonly run; real probe consumes and next cycle dispatches",
+        "missing/uncertain/revoked/changed receipt and malformed publish evidence fail before queue",
+        "wrong owner/candidate, cancel/revoke, terminal stages and current authorization remain closed",
+        "wrong repository/agent, replaced candidate and tampered claim metadata cannot execute",
+        "claim and replay recheck approval revocation; consumed approval expiry does not invent a new grant",
+        "real SQL interruption rolls queue/metadata/binding back; reconnect replay returns same committed run",
+        "legacy and unlinked workspace issues never collapse into a personal-owner partition",
+        "fingerprints strip volatile IDs and secret output; owner/workspace/component/candidate environment isolate failures",
+        "PG17 monitor: real transactions, concurrent dedupe, original issue, restart/rollback, fences, repair and recovery",
+        "ten concurrent replays retain one observation and one original logical issue",
+        "ten distinct failures reuse original issue, despite originating from other tasks",
+        "owner, workspace, stale candidate, echo, cancellation and authorization fail closed",
+        "crash before commit rolls back observation, issue count, stage and notice; reconnect replays committed result",
+        "same candidate recovery requires all independent and approved publication evidence",
+        "passed monitor opens a clean fenced cycle and actual monitorGate rejects old evidence before a fresh failure/repair",
+        "Coordinator reconciliation consumes durable pending records without a new dispatch or wake",
+        "actual 194 publication reader and target readback reject wrong target/environment/SHA/operation/reference",
+        "publication timing, uncertain status and actual approval revocation block recovery",
+        "local artifact recovery cannot close an incident qualified as a cloud target",
+        "same-run raw probe evidence is mandatory and cached probe replay stays immutable",
+        "V2 production publisher/reader/normal dispatch/probe: actual HTTP fixture health and alias failure, replay and recovery",
+        "PG17: routing, 10-way replay/CAS, actual SQL rollback/reconnect, attempts, candidate fences and API isolation",
+        "keyset reconciliation passes 50 still-running tasks across repeated wakes",
+        "execution claim fences cancelled, revoked, stale and unadopted retry bindings",
+        "PG17 execution questions: durable waiting, exact facts/human source, one continuation, rollback and stop fences",
+        "ten hand-in replays persist one question and waiting instead of cancellation",
+        "known context facts answer ten times creates one strict original-session continuation",
+        "permission/decision require a real human source; fabricated facts and identity fail",
+        "human-event answers require live attestation, exact text and question binding",
+        "cancel/revoke, expiration, deleted issue and conflicting answers never reopen work",
+        "real bind interruption rolls answer, attempt, queue and ledger back; reconnect replay is stable",
+        "wrong actual resume session blocks the original task and preserves the answer",
+        "lost continuation settles durably without generic replay on Coordinator recovery",
+        "claim guard blocks historical retry descendants but preserves normal and strict original runs"
+      ],
+      "expectedCount": 118,
+      "supportFiles": [
+        "lib/factory/retained-test-support.ts"
+      ]
     },
     {
       "id": "factory-monitor-http",
@@ -862,7 +1086,7 @@
         "additive group mailbox backfill preserves identity and hides old group runs from private discovery",
         "running worker aborts on revocation without posting late output",
         "actual daemon startup routes BOTH CC/Codex CLI adapters with isolated fake binaries",
-        "actual HTTP dispatch → group mailbox → isolated fake worker → trusted revision"
+        "actual HTTP dispatch \u2192 group mailbox \u2192 isolated fake worker \u2192 trusted revision"
       ],
       "expectedCount": 10,
       "runner": "scripts/test-group-native-required.mjs"
@@ -873,7 +1097,7 @@
         {
           "path": "lib/group-artifact-review.test.ts",
           "requiredNames": [
-            "disposable Postgres: mixed groups → durable isolated runtime → Artifact revision → human acceptance"
+            "disposable Postgres: mixed groups \u2192 durable isolated runtime \u2192 Artifact revision \u2192 human acceptance"
           ]
         },
         {
@@ -885,7 +1109,7 @@
         {
           "path": "lib/group-mailbox-runtime.test.ts",
           "requiredNames": [
-            "actual HTTP dispatch → group mailbox → isolated fake worker → trusted revision"
+            "actual HTTP dispatch \u2192 group mailbox \u2192 isolated fake worker \u2192 trusted revision"
           ]
         },
         {
@@ -917,7 +1141,7 @@
         "source anchors never migrate to another version; HTML identity fails closed",
         "migration replay/concurrency preserves existing history and does not retroactively share Agents",
         "ownership checks reuse transaction clients under a two-connection application pool",
-        "member may address shared Agent, but cannot enumerate or grant another owner’s private Agent",
+        "member may address shared Agent, but cannot enumerate or grant another owner\u2019s private Agent",
         "cross-group, workspace, private Artifact and forged authors are rejected",
         "client retry and concurrent dispatch create one work intent and one transport input",
         "save comment does not dispatch; explicit send snapshots exact version and thread",
@@ -929,7 +1153,7 @@
         "revocation and removal commit while dispatch/reply wait on the group lock",
         "a stop committed while reply validation waits prevents the late write",
         "pending work revoked before dispatch never wakes runtime; Agent replies cannot forge browser approval",
-        "disposable Postgres: mixed groups → durable isolated runtime → Artifact revision → human acceptance",
+        "disposable Postgres: mixed groups \u2192 durable isolated runtime \u2192 Artifact revision \u2192 human acceptance",
         "directory rejects foreign/suspended users and private or malformed agents",
         "GET conversations: authentication, write Origin/Host before DB",
         "POST conversations: authentication, write Origin/Host before DB",
@@ -946,7 +1170,7 @@
         "reply, proposed version, mailbox ACK and terminal state roll back together and retry safely",
         "additive group mailbox backfill preserves identity and hides old group runs from private discovery",
         "running worker aborts on revocation without posting late output",
-        "actual HTTP dispatch → group mailbox → isolated fake worker → trusted revision",
+        "actual HTTP dispatch \u2192 group mailbox \u2192 isolated fake worker \u2192 trusted revision",
         "concurrent human retries create one root; one worker claims and one completion publishes",
         "three bounded serial rounds dedupe mentions and suppress no-add",
         "lost lease is uncertain, never re-executed; human reconciliation is authorized and audited",
@@ -992,7 +1216,7 @@
         {
           "path": "lib/self-improvement/postgres.test.ts",
           "requiredNames": [
-            "actual PG17 and HTTP: immutable feedback → scores → aggregate → candidate → fixed synthetic comparison"
+            "actual PG17 and HTTP: immutable feedback \u2192 scores \u2192 aggregate \u2192 candidate \u2192 fixed synthetic comparison"
           ]
         },
         {
@@ -1023,7 +1247,7 @@
         "feedback on later-cancelled source runs cannot supply the failure trigger",
         "moving a run cannot expose its historical issue score through read or feedback replay",
         "a legitimate scorer/baseline upgrade preserves prior score reads and exact event replay",
-        "actual PG17 and HTTP: immutable feedback → scores → aggregate → candidate → fixed synthetic comparison",
+        "actual PG17 and HTTP: immutable feedback \u2192 scores \u2192 aggregate \u2192 candidate \u2192 fixed synthetic comparison",
         "atomic real queue/selection and immutable claim receipt; old worker denied",
         "25 distinct assigned failures feed one proposal and existing Factory dispatch atomically",
         "current access, receipt source binding and cancellation are checked again",
@@ -1420,6 +1644,18 @@
           "requiredNames": [
             "authenticated transfer route carries separate leases through production worker and preserves source"
           ]
+        },
+        {
+          "path": "tests/byos-oauth-retained.db.test.mjs",
+          "requiredNames": [
+            "retained OAuth: owner/session-bound device and callback consent, replay refusal and durable binding"
+          ]
+        },
+        {
+          "path": "tests/byos-binding-retained.db.test.mjs",
+          "requiredNames": [
+            "retained enrollment binding: authenticated publication, projection recovery, replay and cleanup configuration status"
+          ]
         }
       ],
       "command": [
@@ -1431,10 +1667,174 @@
       "status": "ready",
       "runner": "scripts/test-byos-retained.mjs",
       "expectedTests": [
+        "TestInitialActualCPAStorageCanonicalization",
+        "TestActualCodexRefreshPatchMergesPartitions",
+        "TestUnknownStorageAndCredentialConfigurationNeverExecute",
+        "TestClaudePlainOAuthAndRefreshExcludeNativeIdentityAndFingerprintPaths",
+        "TestEnrollmentBindingPublishesOneOwnedConnectionAndReusesRefresh",
+        "TestEnrollmentBindingLatePublicationCannotUndoDisconnect",
+        "TestEnrollmentBindingResumesExpiredOriginalReservationWithoutNewEpoch",
+        "TestEnrollmentBindingRecoversExactStagedGrantAndProjection",
+        "TestEnrollmentBindingRefusesReconnectAndIndependentTargetDatabase",
+        "TestEnrollmentBindingConcurrentRequestsNeverCreateTwoConnections",
+        "TestEnrollmentSourceDenialSurvivesOpaqueStatusAndProofBoundaries",
+        "TestEnrollmentNonDenialFailuresRemainOpaque",
+        "TestEnrollmentHandoffBindsFullCeremonyAndRetainsGlobalCredentials",
+        "TestEnrollmentHandoffAndLegacyCompletionShareOneUseLatch",
+        "TestEnrollmentHandoffRefusesLegacyAttemptsWithoutWeakeningLegacyOperator",
+        "TestEnrollmentHandoffUncertainClaimNeverRetriesProvider",
+        "TestEnrollmentActualPlainClaudeAdapterWithoutSQL",
+        "TestEnrollmentPersistsStateAndFullCPAStorageWithoutDatabaseOrExecution",
+        "TestEnrollmentRefusesMalformedForeignExpiredAndConcurrentCallbacks",
+        "TestEnrollmentPersistenceFailuresNeverRepeatConsumedCode",
+        "TestEnrollmentRetriesOnlyCapturedUncertainWriteAndFencesUncertainClaim",
+        "TestEnvironmentTransferHTTPStoresJournalRetryRefreshAndDisconnect",
+        "TestEnvironmentTransferRejectsWrongApprovalBeforeSecretAccess",
+        "TestEnvironmentTransferRecoversHTTPFailuresWithoutSourceDeletion",
+        "TestEnvironmentTransferSourceMutationCannotPublish",
+        "TestSingleRefreshAuthorityAndReconnectRejectsLateResult",
+        "TestAcceptedSecretLostResponseRecoversAfterRestartWithoutLogin",
+        "TestRejectedStoreAndRawProviderErrorsFailClosed",
+        "TestPrivateIPCDoesNotExposeCredentialsOrAcceptTenantOverrides",
+        "TestExpiredAccessRefreshesOnceAndTasksReuseConnection",
+        "TestExpiredLeaseCannotReplayRotatingGrant",
+        "TestInfisicalRedirectAndIntegrityFailuresDoNotPublish",
+        "TestStoreCannotChangeConnectionScopeOrRunImportedHelpers",
+        "TestWorkerExecutableHasPrivateScopeAndNoLiveRegistry",
+        "TestPrivateFramingRejectsTrailingObjectsAndOversizedFrames",
+        "TestNativeBrokerUsesAccessOnlyCredentialsWithoutExportOrEndpointSelection",
+        "TestNativeRunLedgerAndLeaseRefuseUseBeforeVaultReads",
+        "TestLegacyProjectionPreStageFailureIsDurableAndReconnectable",
+        "TestLegacyProjectionCancellationStillPersistsFailure",
+        "TestProductionWorkerRefusesNativeExportWithoutAConfigurableBypass",
+        "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding",
+        "TestQuotaProjectionDropsEchoedSecretsWithoutDroppingExhaustedWindows",
+        "TestAccessPublicationFailureRecoversWithoutAnotherProviderRefresh",
+        "TestAccessProjectionRejectsFullAndNestedRefreshCopies",
+        "TestVaultDenialSurvivesEnrollmentStart",
         "source cleanup migration backfills legacy published transfers and replays without erasing history",
-        "authenticated transfer route carries separate leases through production worker and preserves source"
+        "authenticated transfer route carries separate leases through production worker and preserves source",
+        "retained OAuth: owner/session-bound device and callback consent, replay refusal and durable binding",
+        "retained enrollment binding: authenticated publication, projection recovery, replay and cleanup configuration status"
       ],
-      "expectedCount": 2
+      "expectedCount": 49,
+      "supportFiles": [
+        "tests/byos-application-harness.mjs",
+        "tests/byos-enrollment-binding-harness.mjs",
+        "tests/byos-go-evidence.mjs",
+        "packages/subscription-worker/retained-test-contract.json",
+        "packages/subscription-worker/bundle_test.go",
+        "packages/subscription-worker/claude_oauth_test.go",
+        "packages/subscription-worker/daemon_revocation_test.go",
+        "packages/subscription-worker/enrollment_binding_test.go",
+        "packages/subscription-worker/enrollment_cleanup_test.go",
+        "packages/subscription-worker/enrollment_denial_test.go",
+        "packages/subscription-worker/enrollment_handoff_test.go",
+        "packages/subscription-worker/enrollment_test.go",
+        "packages/subscription-worker/environment_transfer_test.go",
+        "packages/subscription-worker/integration_test.go",
+        "packages/subscription-worker/lifecycle_more_test.go",
+        "packages/subscription-worker/native_broker_test.go",
+        "packages/subscription-worker/oauth_test.go",
+        "packages/subscription-worker/projection_failure_test.go",
+        "packages/subscription-worker/security_boundary_test.go",
+        "packages/subscription-worker/vault_denial_test.go"
+      ]
+    },
+    {
+      "id": "audit-deletion",
+      "files": [
+        {
+          "path": "lib/audit/postgres-deletion.pending.test.ts",
+          "requiredNames": [
+            "pending PostgreSQL audit: immutable deletion refusal, privileged deletion detection and retention prune"
+          ]
+        }
+      ],
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/audit/postgres-deletion.pending.test.ts"
+      ],
+      "profile": "audit",
+      "phase": "external",
+      "status": "pending",
+      "pendingReason": "Scoped approval required for newly created UUID audit tenants: privileged deletion-detection transaction and one expired event prune; all fixtures retained otherwise.",
+      "expectedTests": [
+        "pending PostgreSQL audit: immutable deletion refusal, privileged deletion detection and retention prune",
+        "unauthorised mutation blocked and controlled privileged corruption/deletion/reorder detected",
+        "legal hold, export lease, checkpoint prune and tombstone replay after expiry"
+      ],
+      "expectedCount": 3
+    },
+    {
+      "id": "factory-physical-absence",
+      "files": [
+        {
+          "path": "lib/factory/physical-absence.pending.db.test.ts",
+          "requiredNames": [
+            "deleted agent cascades its run and blocks reconciliation",
+            "missing verification run blocks candidate recovery",
+            "reuse across issues preserves the original mapping and existing issue deletion cascade",
+            "missing continuation blocks durably and retains its answer"
+          ]
+        }
+      ],
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/factory/physical-absence.pending.db.test.ts"
+      ],
+      "profile": "factory",
+      "phase": "prebuild",
+      "status": "pending",
+      "pendingReason": "Scoped approval required for exact newly created synthetic agent (cascaded run), verification run, issue (cascaded observations), and continuation run; retained suite registers none as skipped.",
+      "expectedTests": [
+        "pending Factory physical absence with original retained setup",
+        "legacy and unlinked workspace issues never collapse into a personal-owner partition",
+        "fingerprints strip volatile IDs and secret output; owner/workspace/component/candidate environment isolate failures",
+        "PG17 monitor: real transactions, concurrent dedupe, original issue, restart/rollback, fences, repair and recovery",
+        "ten concurrent replays retain one observation and one original logical issue",
+        "ten distinct failures reuse original issue, despite originating from other tasks",
+        "owner, workspace, stale candidate, echo, cancellation and authorization fail closed",
+        "crash before commit rolls back observation, issue count, stage and notice; reconnect replays committed result",
+        "same candidate recovery requires all independent and approved publication evidence",
+        "missing verification run blocks candidate recovery",
+        "passed monitor opens a clean fenced cycle and actual monitorGate rejects old evidence before a fresh failure/repair",
+        "Coordinator reconciliation consumes durable pending records without a new dispatch or wake",
+        "reuse across issues preserves the original mapping and existing issue deletion cascade",
+        "actual 194 publication reader and target readback reject wrong target/environment/SHA/operation/reference",
+        "publication timing, uncertain status and actual approval revocation block recovery",
+        "local artifact recovery cannot close an incident qualified as a cloud target",
+        "same-run raw probe evidence is mandatory and cached probe replay stays immutable",
+        "V2 production publisher/reader/normal dispatch/probe: actual HTTP fixture health and alias failure, replay and recovery",
+        "PG17: routing, 10-way replay/CAS, actual SQL rollback/reconnect, attempts, candidate fences and API isolation",
+        "keyset reconciliation passes 50 still-running tasks across repeated wakes",
+        "execution claim fences cancelled, revoked, stale and unadopted retry bindings",
+        "deleted agent cascades its run and blocks reconciliation",
+        "PG17 execution questions: durable waiting, exact facts/human source, one continuation, rollback and stop fences",
+        "ten hand-in replays persist one question and waiting instead of cancellation",
+        "known context facts answer ten times creates one strict original-session continuation",
+        "permission/decision require a real human source; fabricated facts and identity fail",
+        "human-event answers require live attestation, exact text and question binding",
+        "cancel/revoke, expiration, deleted issue and conflicting answers never reopen work",
+        "real bind interruption rolls answer, attempt, queue and ledger back; reconnect replay is stable",
+        "wrong actual resume session blocks the original task and preserves the answer",
+        "lost continuation settles durably without generic replay on Coordinator recovery",
+        "missing continuation blocks durably and retains its answer",
+        "claim guard blocks historical retry descendants but preserves normal and strict original runs"
+      ],
+      "expectedCount": 33,
+      "supportFiles": [
+        "lib/factory/monitor.test.ts",
+        "lib/factory/postgres.test.ts",
+        "lib/factory/questions/postgres.test.ts",
+        "lib/factory/retained-test-support.ts"
+      ]
     }
   ]
 }

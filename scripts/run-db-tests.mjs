@@ -66,6 +66,14 @@ export function readTree(root = '.') {
     }
   }
   walk('lib'); walk('tests'); walk('scripts')
+  // Bind the retained Go allowlist and its actual top-level test sources.
+  const worker = 'packages/subscription-worker'
+  for (const entry of existsSync(resolve(root, worker)) ? readdirSync(resolve(root, worker), { withFileTypes: true }) : []) {
+    if (entry.isFile() && (entry.name.endsWith('_test.go') || entry.name === 'retained-test-contract.json')) {
+      const file = `${worker}/${entry.name}`
+      files[file] = readFileSync(resolve(root, file), 'utf8')
+    }
+  }
   return files
 }
 

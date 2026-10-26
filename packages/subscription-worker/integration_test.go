@@ -28,6 +28,9 @@ import (
 
 func testDB(t *testing.T) *sql.DB {
 	t.Helper()
+	if os.Getenv("RETAIN_SYNTHETIC_RECORDS") != "1" {
+		t.Fatal("explicit retained synthetic database fixtures required")
+	}
 	raw := os.Getenv("MIKKA_BYOS_TEST_DATABASE_URL")
 	u, err := url.Parse(raw)
 	if err != nil || u == nil || u.Hostname() != "127.0.0.1" || !strings.HasSuffix(u.Path, "_e2e") {
@@ -300,11 +303,7 @@ func fixtureWorker(t *testing.T, provider string) (*Worker, *fakeInfisical, *fak
 	if err := repo.Create(context.Background(), s); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		_, _ = db.Exec(`delete from byos_bindings where "connectionId"=$1`, s.ConnectionID)
-		_, _ = db.Exec(`delete from byos_oauth_attempts where "connectionId"=$1`, s.ConnectionID)
-		_, _ = db.Exec(`delete from byos_connections where id=$1`, s.ConnectionID)
-	})
+	t.Cleanup(func() { t.Logf("retained BYOS fixture connection: %s", s.ConnectionID) })
 	inf, secrets := newFakeInfisical(t)
 	issuer := newFakeProvider(t, provider)
 	return &Worker{Repo: repo, Secrets: secrets, AccessSecrets: secrets, AllowNativeAuth: true, Scope: s, Authenticator: fakeAuthenticator{issuer}, Executor: fakeExecutor{issuer}}, inf, issuer

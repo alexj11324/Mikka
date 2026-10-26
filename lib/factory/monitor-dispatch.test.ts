@@ -1,7 +1,9 @@
+import { retainFaultTrigger } from "./retained-test-support";
+import { executePoolMigration } from "../../scripts/search-migrations.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -125,7 +127,7 @@ test(
       for (const file of orderMigrations(
         (await readdir(dir)).filter((n) => n.endsWith(".sql")),
       ))
-        await pool.query(await readFile(new URL(file, dir), "utf8"));
+        await executePoolMigration(pool, file, await readFile(new URL(file, dir), "utf8"));
       await pool.query(
         `INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture owner','monitor-dispatch@example.invalid',true,now(),now())`,
       );
@@ -628,9 +630,7 @@ test(
             state.attempts.find((a) => a.id === f.task.attemptId)!.output,
             {},
           );
-          await pool.query(
-            "DROP TRIGGER reject_monitor_dispatch ON factory_events",
-          );
+          await retainFaultTrigger(pool, "factory_events", "reject_monitor_dispatch");
           const result = await dispatch("owner", input(f.task));
           const other = new Pool({
             connectionString: dbURL,
@@ -664,9 +664,9 @@ test(
       );
     } finally {
       await pool.end();
-      if (process.env.RETAIN_SYNTHETIC_RECORDS !== "1") await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      console.log("Retained Factory schema:", schema);
       await admin.end();
-      if (process.env.RETAIN_SYNTHETIC_RECORDS !== "1") await rm(root, { recursive: true, force: true });
+      console.log("Retained Factory directory:", root);
     }
   },
 );

@@ -1,3 +1,4 @@
+import { executePoolMigration } from "../../scripts/search-migrations.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir, mkdir, writeFile } from "node:fs/promises";
@@ -60,7 +61,7 @@ test(
       for (const file of orderMigrations(
         (await readdir(dir)).filter((n) => n.endsWith(".sql")),
       ))
-        await pool.query(await readFile(new URL(file, dir), "utf8"));
+        await executePoolMigration(pool, file, await readFile(new URL(file, dir), "utf8"));
       const issueId = randomUUID(),
         agentId = randomUUID(),
         deviceId = randomUUID(),
@@ -557,7 +558,7 @@ test(
       }
     } finally {
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      console.log("Retained Factory schema:", schema);
       await admin.end();
     }
   },

@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "environment": {
+    "RETAIN_SYNTHETIC_RECORDS": "1"
+  },
+  "retainedTests": [
+    "TestInitialActualCPAStorageCanonicalization",
+    "TestActualCodexRefreshPatchMergesPartitions",
+    "TestUnknownStorageAndCredentialConfigurationNeverExecute",
+    "TestClaudePlainOAuthAndRefreshExcludeNativeIdentityAndFingerprintPaths",
+    "TestEnrollmentBindingPublishesOneOwnedConnectionAndReusesRefresh",
+    "TestEnrollmentBindingLatePublicationCannotUndoDisconnect",
+    "TestEnrollmentBindingResumesExpiredOriginalReservationWithoutNewEpoch",
+    "TestEnrollmentBindingRecoversExactStagedGrantAndProjection",
+    "TestEnrollmentBindingRefusesReconnectAndIndependentTargetDatabase",
+    "TestEnrollmentBindingConcurrentRequestsNeverCreateTwoConnections",
+    "TestEnrollmentSourceDenialSurvivesOpaqueStatusAndProofBoundaries",
+    "TestEnrollmentNonDenialFailuresRemainOpaque",
+    "TestEnrollmentHandoffBindsFullCeremonyAndRetainsGlobalCredentials",
+    "TestEnrollmentHandoffAndLegacyCompletionShareOneUseLatch",
+    "TestEnrollmentHandoffRefusesLegacyAttemptsWithoutWeakeningLegacyOperator",
+    "TestEnrollmentHandoffUncertainClaimNeverRetriesProvider",
+    "TestEnrollmentActualPlainClaudeAdapterWithoutSQL",
+    "TestEnrollmentPersistsStateAndFullCPAStorageWithoutDatabaseOrExecution",
+    "TestEnrollmentRefusesMalformedForeignExpiredAndConcurrentCallbacks",
+    "TestEnrollmentPersistenceFailuresNeverRepeatConsumedCode",
+    "TestEnrollmentRetriesOnlyCapturedUncertainWriteAndFencesUncertainClaim",
+    "TestEnvironmentTransferHTTPStoresJournalRetryRefreshAndDisconnect",
+    "TestEnvironmentTransferRejectsWrongApprovalBeforeSecretAccess",
+    "TestEnvironmentTransferRecoversHTTPFailuresWithoutSourceDeletion",
+    "TestEnvironmentTransferSourceMutationCannotPublish",
+    "TestSingleRefreshAuthorityAndReconnectRejectsLateResult",
+    "TestAcceptedSecretLostResponseRecoversAfterRestartWithoutLogin",
+    "TestRejectedStoreAndRawProviderErrorsFailClosed",
+    "TestPrivateIPCDoesNotExposeCredentialsOrAcceptTenantOverrides",
+    "TestExpiredAccessRefreshesOnceAndTasksReuseConnection",
+    "TestExpiredLeaseCannotReplayRotatingGrant",
+    "TestInfisicalRedirectAndIntegrityFailuresDoNotPublish",
+    "TestStoreCannotChangeConnectionScopeOrRunImportedHelpers",
+    "TestWorkerExecutableHasPrivateScopeAndNoLiveRegistry",
+    "TestPrivateFramingRejectsTrailingObjectsAndOversizedFrames",
+    "TestNativeBrokerUsesAccessOnlyCredentialsWithoutExportOrEndpointSelection",
+    "TestNativeRunLedgerAndLeaseRefuseUseBeforeVaultReads",
+    "TestLegacyProjectionPreStageFailureIsDurableAndReconnectable",
+    "TestLegacyProjectionCancellationStillPersistsFailure",
+    "TestProductionWorkerRefusesNativeExportWithoutAConfigurableBypass",
+    "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding",
+    "TestQuotaProjectionDropsEchoedSecretsWithoutDroppingExhaustedWindows",
+    "TestAccessPublicationFailureRecoversWithoutAnotherProviderRefresh",
+    "TestAccessProjectionRejectsFullAndNestedRefreshCopies",
+    "TestVaultDenialSurvivesEnrollmentStart"
+  ],
+  "retainedCount": 45,
+  "pendingTests": [
+    {
+      "name": "TestEnrollmentBindingGlobalClaimSurvivesMetadataLoss",
+      "reason": "Deletes transfer metadata to exercise actual physical absence."
+    },
+    {
+      "name": "TestEnrollmentCleanupPreservesOnlyRecoveryCopyUntilPublicationOrExplicitDisconnect",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestEnrollmentCleanupFailureRetriesAllCopiesAfterImmediateDisconnectFence",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestEnrollmentCleanupRequiresGlobalClaimAndConfiguredDatabaseIdentity",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestEnrollmentCleanupPublicationProofSurvivesDisconnectBeforeBoundMarker",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestEnrollmentCleanupUnknownAndLateCreatesNeverReportFullyDeleted",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestEnrollmentRetentionBlocksImplicitBindingAndCleanupDeletion",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestEnvironmentTransferJournalFailureAndConcurrentRetries",
+      "reason": "Drops fault trigger/function before recovery and on teardown."
+    },
+    {
+      "name": "TestCPAInitialSaveRestartRefreshAndRepeatedUse",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestPostgresPublishFailureRecoversStoredBundle",
+      "reason": "Drops fault trigger/function before recovery and on teardown."
+    },
+    {
+      "name": "TestClaudeNativeAccessLeaseReusesCPARotationAuthority",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestDisconnectDuringRefreshRejectsItsLatePublication",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestNativeBrokerFencesSilentRequestsOnDisconnectAndRefusesEchoedBearer",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestCodexDeviceCPAProtocolOwnerSessionIntervalPKCEOneUseAndExpiry",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestLegacyProjectionFailurePersistenceErrorIsNotHidden",
+      "reason": "Drops fault trigger/function on teardown."
+    },
+    {
+      "name": "TestTrustedLegacyProjectionMigrationDoesNotLoginOrRefresh",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestDisconnectFencesBeforeDeletionAndRetriesWithoutClaimingProviderRevocation",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestDisconnectTracksLateCreateAndNeverResurrectsDeletedArtifacts",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestConcurrentRotationPreservesStreamButDisconnectStopsIt",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestUnknownRemoteCreateRemainsQueuedAfter404AndLateCommit",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    },
+    {
+      "name": "TestCleanupFailuresCannotStarveLaterArtifacts",
+      "reason": "Calls Worker.Cleanup directly or through successful Disconnect/PrepareRuntime; physical OAuth-attempt SQL DELETE remains."
+    }
+  ],
+  "pendingCount": 21,
+  "separateApplicationIntegration": [
+    "TestDaemonCredentialRevokeCancelsSilentNativeStream"
+  ],
+  "notes": [
+    "Run only exact anchored retainedTests alternation, never go test ./... without -run.",
+    "Count top-level go test -json pass names separately from nested subtests; fail on missing, extra, skipped or failed cases.",
+    "Common fixture teardown retains database rows. Original pending test bodies are preserved.",
+    "Repo.Disconnect is UPDATE-only; ExecutionOnly Disconnect and failed PrepareRuntime reject before Cleanup. These retained cases do not exercise successful physical cleanup."
+  ]
+}

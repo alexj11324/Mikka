@@ -37,11 +37,7 @@ func bindNativeRunFixture(t *testing.T, w *Worker, revision int64, route string)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		_, _ = db.Exec(`delete from agent_runs where id=$1`, run)
-		_, _ = db.Exec(`delete from agents where id=$1`, agent)
-		_, _ = db.Exec(`delete from devices where id=$1`, device)
-	})
+	t.Cleanup(func() { t.Logf("retained native fixture run=%s agent=%s device=%s", run, agent, device) })
 	_, err = db.Exec(`update byos_bindings set "consumerId"=$2 where id=$1`, w.Use.BindingID, agent)
 	if err != nil {
 		t.Fatal(err)

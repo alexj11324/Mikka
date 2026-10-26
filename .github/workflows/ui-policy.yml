@@ -160,7 +160,7 @@ jobs:
     env:
       CI: 'true'
       REQUIRE_DB: '1'
-      DB_TEST_EXPECTED: active-agents,activity-actor-db,audit,byos-claim,byos-retained,byos-worker,conversation-reads,credentials,credentials-disposal,e2e:setup,factory,factory-monitor-http,factory-query-http,factory-question-http,group-native,groups,historical-upgrade-db,improvement,issue-search-db,issue-threads-db,mailboxes,migration-session,operations,relation-cycle,run-dispatch,visibility-db,workspace-migration-db
+      DB_TEST_EXPECTED: active-agents,activity-actor-db,audit,audit-deletion,byos-claim,byos-retained,byos-worker,conversation-reads,credentials,credentials-disposal,e2e:setup,factory,factory-monitor-http,factory-physical-absence,factory-query-http,factory-question-http,group-native,groups,historical-upgrade-db,improvement,issue-search-db,issue-threads-db,mailboxes,migration-session,operations,relation-cycle,run-dispatch,visibility-db,workspace-migration-db
       MIKKA_TEST_DB_PORT: '5432'
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       CREDENTIAL_TEST_ADMIN_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/postgres
@@ -168,6 +168,8 @@ jobs:
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3100
       OPERATION_TEST_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_208_test
+      AUDIT_APP_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_audit_app_e2e
+      AUDIT_WORKSPACE_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_audit_workspace_e2e
       IMPROVEMENT_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_improvement
       R0_GROUP_APP_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_review
       R0_WORKSPACE_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_workspace_review
@@ -212,6 +214,11 @@ jobs:
           psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE factorycycle192 LOGIN PASSWORD 'synthetic-cycle-only'"
           psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE factory192 LOGIN PASSWORD 'synthetic-query-only'"
           psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'GRANT USAGE ON SCHEMA public TO factorycycle192, factory192; GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO factorycycle192, factory192; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO factorycycle192, factory192'
+      - name: Create and migrate isolated retained audit databases
+        run: |
+          psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE mikka_audit_app_e2e'
+          psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE mikka_audit_workspace_e2e'
+          MIGRATE=1 MIKKA_DATABASE_URL="$AUDIT_APP_TEST_URL" DATABASE_URL="$AUDIT_WORKSPACE_TEST_URL" node scripts/migrate.mjs
       - name: R0 prebuild DB recipes (pending contracts remain failures)
         id: r0-prebuild
         continue-on-error: true

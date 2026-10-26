@@ -1,6 +1,8 @@
+import { retainFaultTrigger } from "./retained-test-support";
+import { executePoolMigration } from "../../scripts/search-migrations.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readFile, readdir, mkdtemp, rm } from "node:fs/promises";
+import { readFile, readdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -140,14 +142,14 @@ test(
       for (const file of orderMigrations(
         (await readdir(dir)).filter((n) => n.endsWith(".sql")),
       ))
-        await pool.query(await readFile(new URL(file, dir), "utf8"));
+        await executePoolMigration(pool, file, await readFile(new URL(file, dir), "utf8"));
       await pool.query(
         await readFile(
           new URL("20261025051203_factory_194_approvals.sql", dir),
           "utf8",
         ),
       );
-      if (process.env.RETAIN_SYNTHETIC_RECORDS === "1") await pool.query(`CREATE RULE retain_auth_fixture_sessions AS ON DELETE TO "session" DO INSTEAD UPDATE "session" SET "expiresAt"=clock_timestamp()-interval '1 second' WHERE id=OLD.id`);
+      await pool.query(`CREATE RULE retain_auth_fixture_sessions AS ON DELETE TO "session" DO INSTEAD UPDATE "session" SET "expiresAt"=clock_timestamp()-interval '1 second' WHERE id=OLD.id`);
       await pool.query(
         `INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('fixture-owner','Fixture','fixture@example.invalid',true,now(),now())`,
       );
@@ -780,7 +782,7 @@ test(
             () => service.approve(actor, req),
             /injected rollback/,
           );
-          await pool.query("DROP TRIGGER reject_194 ON factory_events");
+          await retainFaultTrigger(pool, "factory_events", "reject_194");
           assert.equal(
             (await store.read(actor.userId, s.task.id)).task.stage,
             "approval",
@@ -1045,7 +1047,7 @@ test(
               /injected rollback/,
             );
           } finally {
-            await pool.query("DROP TRIGGER reject_194 ON factory_events");
+            await retainFaultTrigger(pool, "factory_events", "reject_194");
           }
           assert.equal(
             (
@@ -1139,9 +1141,7 @@ test(
                   assert.match(String(e), /injected rollback/);
                 } finally {
                   if (window === "sql-rollback")
-                    await pool.query(
-                      "DROP TRIGGER reject_194 ON factory_events",
-                    );
+                    await retainFaultTrigger(pool, "factory_events", "reject_194");
                 }
                 assert.equal(f.posts(), 1);
                 assert.equal(
@@ -1555,7 +1555,9 @@ test(
               ).candidate,
               input.candidate,
             );
-            // Actual sign-out invalidates this session, not the unrelated fixture session.
+            const attestedSession = await sessionAuth.api.getSession({ headers: new Headers(headers), query: { disableCookieCache: true } });
+            assert.ok(attestedSession);
+            // Actual sign-out invalidates this session; the synthetic SQL rule retains its row.
             assert.equal(
               (
                 await fetch(`${origin}/api/auth/sign-out`, {
@@ -1567,6 +1569,7 @@ test(
               200,
             );
             assert.equal((await fetch(endpoint, { headers })).status, 401);
+            assert.equal((await pool.query('SELECT id FROM "session" WHERE id=$1 AND "userId"=$2', [attestedSession.session.id, attestedSession.user.id])).rowCount, 1);
             sources.push({
               taskId: s.task.id,
               approvalId: approval.approvalId,
@@ -1596,9 +1599,9 @@ test(
       );
     } finally {
       await pool.end();
-      if (process.env.RETAIN_SYNTHETIC_RECORDS !== "1") await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      console.log("Retained Factory schema:", schema);
       await admin.end();
-      if (process.env.RETAIN_SYNTHETIC_RECORDS !== "1") await rm(directory, { recursive: true, force: true });
+      console.log("Retained Factory directory:", directory);
     }
   },
 );

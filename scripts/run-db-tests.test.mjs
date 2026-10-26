@@ -87,9 +87,9 @@ test('aggregation binds exact SHA/plan/profile/command/phase and every result on
 })
 test('actual tree has exact complete R0 inventory, all previously missing suites and no new exclusions', () => {
  const pkg=JSON.parse(readFileSync('package.json','utf8')).scripts,c=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8')),p=inventory(readTree(),pkg)
- assert.equal(p.files.length,45);assert.equal(p.recipes.length,27);assert.deepEqual(p.expected,c.expected)
+ assert.equal(p.files.length,49);assert.equal(p.recipes.length,29);assert.deepEqual(p.expected,c.expected)
  for(const id of ['credentials','groups','group-native','operations','migration-session','improvement','byos-claim','byos-worker','factory-question-http'])assert.ok(p.expected.includes(id))
- assert.ok(p.contractErrors.length>0,'unverified result contracts remain failed, not excluded');
+ assert.equal(p.contractErrors.length,0,'every retained and pending contract has explicit names/counts');
  assert.deepEqual(p.selfManaged,['lib/auth-email.test.ts']);assert.equal(p.recipes.find(r=>r.id==='group-native').status,'pending');assert.equal(p.recipes.find(r=>r.id==='factory-question-http').phase,'postbuild')
  let calls=0;assert.equal(main({env:{},run(){calls++}}),1);assert.equal(calls,0)
 })
@@ -151,7 +151,7 @@ test('Factory uses existing CI paths without incompatible local fixture override
  assert.equal(child.CI,'true');assert.equal(child.GITHUB_ACTIONS,'true')
  assert.throws(()=>profileEnvironment(p,{...supplied,GITHUB_ACTIONS:undefined,MIKKA_ISOLATED_R0:'1'},'prebuild'),/GitHub CI service/)
  assert.throws(()=>profileEnvironment(p,{...supplied,E2E_DATABASE_URL:target.replace('postgresql:','postgres:')},'prebuild'),/Invalid isolated target/)
- assert.equal(c.recipes.find(r=>r.id==='factory').status,'pending')
+ assert.equal(c.recipes.find(r=>r.id==='factory').status,'ready')
 })
 
  test('296 contracts separate retained groups, blocked native and actual postbuild HTTP',()=>{
@@ -238,4 +238,24 @@ test('failure diagnostics retain status/assertion locations but never credential
  const result=failureDiagnostics(raw)
  assert.deepEqual(result,{codes:['ERR_ASSERTION'],assertions:[{kind:'expected',value:200},{kind:'actual',value:429}],locations:['tests/factory-question-http.test.ts:66:14']})
  assert.doesNotMatch(JSON.stringify(result),/secret|cookie|private|token|DO-NOT/)
+})
+
+test('retained partitions preserve pending physical contracts and bind Go allowlist sources', () => {
+ const c=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8')), tree=readTree()
+ const r=id=>c.recipes.find(r=>r.id===id)
+ assert.equal(r('audit').expectedCount,11);assert.equal(r('audit-deletion').status,'pending');assert.equal(r('audit-deletion').expectedCount,3)
+ assert.equal(r('factory').expectedCount,118);assert.equal(r('factory-physical-absence').status,'pending')
+ for(const name of ['deleted agent cascades its run and blocks reconciliation','missing verification run blocks candidate recovery','reuse across issues preserves the original mapping and existing issue deletion cascade','missing continuation blocks durably and retains its answer']) {
+  assert.ok(r('factory-physical-absence').expectedTests.includes(name));assert.ok(!r('factory').expectedTests.includes(name))
+ }
+ const go=JSON.parse(tree['packages/subscription-worker/retained-test-contract.json'])
+ const sources=Object.entries(tree).filter(([p])=>p.startsWith('packages/subscription-worker/')&&p.endsWith('_test.go')).flatMap(([,s])=>[...s.matchAll(/func (Test\w+)\(t \*testing.T\)/g)].map(m=>m[1]))
+ const registered=[...go.retainedTests,...go.pendingTests.map(t=>t.name),...go.separateApplicationIntegration]
+ assert.deepEqual([...sources].sort(),[...registered].sort());assert.equal(new Set(registered).size,registered.length)
+ assert.equal(r('byos-retained').expectedCount,49)
+ for(const name of go.pendingTests.map(t=>t.name))assert.ok(!r('byos-retained').expectedTests.includes(name))
+ const pkg=JSON.parse(readFileSync('package.json','utf8')).scripts
+ const before=inventory(tree,pkg).digest
+ const changed={...tree,'packages/subscription-worker/integration_test.go':tree['packages/subscription-worker/integration_test.go']+'\n'}
+ assert.notEqual(inventory(changed,pkg).digest,before)
 })

@@ -1,3 +1,5 @@
+import { retainFaultTrigger } from "./retained-test-support";
+import { executePoolMigration } from "../../scripts/search-migrations.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -83,7 +85,7 @@ test(
       for (const file of orderMigrations(
         (await readdir(dir)).filter((name) => name.endsWith(".sql")),
       ))
-        await pool.query(await readFile(new URL(file, dir), "utf8"));
+        await executePoolMigration(pool, file, await readFile(new URL(file, dir), "utf8"));
       const agentId = randomUUID();
       await pool.query(
         `INSERT INTO agents (id,"userId",name,harness) VALUES ($1,'owner','Monitor state fixture','codex')`,
@@ -425,7 +427,7 @@ test(
           );
           assert.deepEqual(await counts(task.id), before);
           assert.deepEqual(await attemptRow(task.attemptId), old);
-          await pool.query("DROP TRIGGER reject_cycle_event ON factory_events");
+          await retainFaultTrigger(pool, "factory_events", "reject_cycle_event");
           const tx = await pool.connect();
           try {
             await tx.query("BEGIN");
@@ -510,7 +512,7 @@ test(
       );
     } finally {
       await pool.end();
-      if (process.env.RETAIN_SYNTHETIC_RECORDS !== "1") await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      console.log("Retained Factory schema:", schema);
       await admin.end();
     }
   },

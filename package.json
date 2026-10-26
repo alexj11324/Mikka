@@ -74,7 +74,8 @@
     "test:issue-search-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/issue-search.db.test.ts",
     "test:historical-upgrade-db": "node --test tests/historical-upgrade.db.test.mjs",
     "test:factory-question-http": "node scripts/test-factory-question-http.mjs tests/factory-question-http.test.ts",
-    "test:backend-recipes": "node --test scripts/backend-recipes.test.mjs"
+    "test:backend-recipes": "node --test scripts/backend-recipes.test.mjs",
+    "test:factory-db-retained": "node --import tsx --test --test-concurrency=1 lib/factory/approval.test.ts lib/factory/check-independence.test.ts lib/factory/checks.test.ts lib/factory/monitor-cycle.test.ts lib/factory/monitor-dispatch.test.ts lib/factory/monitor.test.ts lib/factory/postgres.test.ts lib/factory/questions/postgres.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

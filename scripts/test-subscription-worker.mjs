@@ -6,6 +6,8 @@ import { createServer } from "node:net"
 import { fileURLToPath } from "node:url"
 import { Pool } from "pg"
 
+if (process.env.BYOS_FULL_DISPOSAL_AUTHORIZED !== "1") throw new Error("Pending scoped approval: full BYOS worker harness includes physical database, file and container disposal; use test-byos-retained.mjs")
+
 if (process.platform !== "linux")
   throw new Error("Run BYOS acceptance on the cloud Agent's Linux environment")
 const root = fileURLToPath(new URL("../", import.meta.url))

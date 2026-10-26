@@ -1,3 +1,6 @@
+import { physicalAbsenceCase } from "../retained-test-support";
+import { retainFaultTrigger } from "../retained-test-support";
+import { executePoolMigration } from "../../../scripts/search-migrations.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -75,7 +78,7 @@ test(
       for (const name of orderMigrations(
         (await readdir(dir)).filter((n) => n.endsWith(".sql")),
       ))
-        await pool.query(await readFile(new URL(name, dir), "utf8"));
+        await executePoolMigration(pool, name, await readFile(new URL(name, dir), "utf8"));
       await pool.query(
         await readFile(
           new URL("20261025051205_factory_192_questions.sql", dir),
@@ -491,7 +494,7 @@ test(
             (await store.read(userId, f.task.id)).attempts.length,
             1,
           );
-          await pool.query("DROP TRIGGER fail_question_bind ON factory_events");
+          await retainFaultTrigger(pool, "factory_events", "fail_question_bind");
           const result = await questions.answer(orchestrator, request);
           const reconnect = new Pool({
             connectionString: dbURL,
@@ -582,7 +585,7 @@ test(
           );
         },
       );
-      await t.test(
+      await physicalAbsenceCase(t,
         "missing continuation blocks durably and retains its answer",
         async () => {
           const f = await fixture();
@@ -672,7 +675,7 @@ test(
       );
     } finally {
       await pool.end();
-      if (process.env.RETAIN_SYNTHETIC_RECORDS !== "1") await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      console.log("Retained Factory schema:", schema);
       await admin.end();
     }
   },

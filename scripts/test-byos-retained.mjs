@@ -1,10 +1,11 @@
 // Retained-only acceptance; original worker/native/Go disposal remains pending.
 import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { existsSync, mkdirSync, realpathSync } from "node:fs"
+import { existsSync, mkdirSync, realpathSync, readFileSync } from "node:fs"
 import { createServer } from "node:net"
 import { fileURLToPath } from "node:url"
 import { Pool } from "pg"
+import { retainedGoPattern, retainedGoTap } from "../tests/byos-go-evidence.mjs"
 
 if(process.env.RETAIN_SYNTHETIC_RECORDS!=="1")throw Error("BYOS retained acceptance requires retained synthetic fixtures")
 if (process.platform !== "linux")
@@ -47,6 +48,10 @@ await new Promise((resolve) => reserve.close(resolve))
 const suffix = randomUUID()
 const name = `mikka-cpa-retained-${suffix}`
 const compilerName = `mikka-cpa-retained-build-${suffix}`
+const goContract = JSON.parse(readFileSync(`${worker}retained-test-contract.json`, "utf8"))
+const goPattern = retainedGoPattern(goContract)
+const goEvidenceRelative = `.cache/retained-${suffix}.go.jsonl`
+const goEvidence = `${worker}${goEvidenceRelative}`
 const password = `fixture-${suffix}`
 const database = `mikka_byos_retained_app_e2e`
 const workspaceDatabase = `mikka_byos_retained_workspace_e2e`
@@ -126,6 +131,12 @@ try {
     "-e",
     "GOTOOLCHAIN=local",
     "-e",
+    "RETAIN_SYNTHETIC_RECORDS=1",
+    "-e",
+    `MIKKA_BYOS_RETAINED_PATTERN=${goPattern}`,
+    "-e",
+    `MIKKA_BYOS_GO_EVIDENCE=/work/${goEvidenceRelative}`,
+    "-e",
     `MIKKA_BYOS_TEST_DATABASE_URL=${url}`,
     "-e",
     "MIKKA_BYOS_WORKER_BINARY=/work/bin/mikka-subscription-worker"
@@ -141,11 +152,13 @@ try {
     "golang:1.26.10-bookworm@sha256:632dff7351799a5a9954a48dc06670ade72ee44e8c351cdc0e5a57af2fea21af",
     "sh",
     "-c",
-    "CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-enrollment ./cmd/mikka-subscription-enrollment"
+    'CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-enrollment ./cmd/mikka-subscription-enrollment && CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-worker ./cmd/mikka-subscription-worker && CGO_ENABLED=0 go build -mod=readonly -trimpath -tags mikka_byos_fixture -o bin/mikka-subscription-fixture ./testfixture && CGO_ENABLED=1 go test -mod=readonly -json -race -timeout 180s -count=1 -run "$MIKKA_BYOS_RETAINED_PATTERN" . > "$MIKKA_BYOS_GO_EVIDENCE" 2> "$MIKKA_BYOS_GO_EVIDENCE.stderr"'
   )
   await run("docker", dockerArgs)
-  await run(process.execPath, ["--import", "tsx", "--test", "--test-reporter=tap", "tests/byos-enrollment-migration.db.test.mjs", "tests/byos-environment-transfer.test.mjs"], {
-    ...baseEnv, NODE_ENV:"test", RETAIN_SYNTHETIC_RECORDS:"1", MIKKA_BYOS_TEST_DATABASE_URL:url, MIKKA_BYOS_WORKSPACE_TEST_DATABASE_URL:workspaceURL.toString()
+  // Docker exit 0 is required above; raw output stays in the retained log, never stdout.
+  console.log(retainedGoTap(readFileSync(goEvidence, "utf8"), goContract))
+  await run(process.execPath, ["--import", "tsx", "--test", "--test-reporter=tap", "tests/byos-enrollment-migration.db.test.mjs", "tests/byos-environment-transfer.test.mjs", "tests/byos-oauth-retained.db.test.mjs", "tests/byos-binding-retained.db.test.mjs"], {
+    ...baseEnv, NODE_ENV:"test", RETAIN_SYNTHETIC_RECORDS:"1", MIKKA_BYOS_FIXTURE_BINARY:`${worker}bin/mikka-subscription-fixture`, MIKKA_BYOS_TEST_DATABASE_URL:url, MIKKA_BYOS_WORKSPACE_TEST_DATABASE_URL:workspaceURL.toString()
   })
   await run(process.execPath, ["scripts/migrate.mjs"], migrationEnv)
   const { rows } = await pool.query(
@@ -157,5 +170,5 @@ try {
 } finally {
   await pool.end()
   if (started) await run("docker", ["stop", "--timeout", "2", name])
-  console.log(JSON.stringify({fixture:"byos-retained",postgresContainer:name,compilerContainer:compilerName,databases:[database,workspaceDatabase],disposition:"retained"}))
+  console.log(JSON.stringify({fixture:"byos-retained",postgresContainer:name,compilerContainer:compilerName,databases:[database,workspaceDatabase],goEvidence,disposition:"retained"}))
 }

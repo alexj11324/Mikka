@@ -1,3 +1,4 @@
+import { executePoolMigration } from "../../scripts/search-migrations.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
@@ -52,7 +53,7 @@ test(
       for (const name of orderMigrations(
         (await readdir(dir)).filter((n) => n.endsWith(".sql")),
       ))
-        await pool.query(await readFile(new URL(name, dir), "utf8"));
+        await executePoolMigration(pool, name, await readFile(new URL(name, dir), "utf8"));
       const device = randomUUID(),
         agent = randomUUID(),
         a = randomUUID(),
