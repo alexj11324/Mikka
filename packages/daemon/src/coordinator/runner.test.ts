@@ -29,6 +29,16 @@ describe("native Coordinator runner",()=>{
     expect(command).toHaveBeenCalledWith("device",job.id,{type:"failed"},options.signal)
     expect(readdirSync(options.stateDir)).toEqual([])
   })
+  it("starts Codex with a supported policy, denies built-in approvals and roundtrips host tools",async()=>{
+    const {command,options}=setup()
+    const result=vi.fn(async()=>({status:"done" as const,output:{pendingApproval:true}}))
+    const tools=[{name:"propose_reply",description:"Propose a draft",inputSchema:{type:"object",properties:{text:{type:"string"}},required:["text"],additionalProperties:false}}]
+    await runNativeCoordinatorJob({...job,harness:"codex",tools},{...options,codexBinary:resolve("test/fakes/fake-coordinator-codex.mjs"),link:{...options.link,coordinatorToolResult:result}})
+    expect(command).toHaveBeenCalledWith("device",job.id,{type:"tool",callId:"call-1",name:"propose_reply",input:{text:"draft"}},expect.any(AbortSignal))
+    expect(result).toHaveBeenCalledWith("device",job.id,"call-1",expect.any(AbortSignal))
+    expect(command).toHaveBeenCalledWith("device",job.id,{type:"complete",text:job.context},options.signal)
+    expect(readdirSync(options.stateDir)).toEqual([])
+  })
   it("advertises only installed compatible harnesses",()=>{
     expect(coordinatorCapable({harness:"codex",installed:true,version:"codex-cli 0.162.1"})).toBe(true)
     expect(coordinatorCapable({harness:"codex",installed:true,version:"0.100.0"})).toBe(false)

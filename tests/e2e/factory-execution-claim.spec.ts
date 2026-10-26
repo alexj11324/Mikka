@@ -6,6 +6,9 @@ import { createFactoryDispatch } from "../../lib/factory/dispatch";
 import { factoryCheckGates } from "../../lib/factory/checks";
 import { factoryDispatchDatabase } from "../../lib/factory/transaction";
 import { insertRunOnce } from "../../lib/run-dispatch";
+import { createSkillAssignments } from "../../lib/self-improvement/assignments";
+import { BASELINE_ARTIFACT } from "../../lib/self-improvement/builtin-skill";
+import { SKILL_ARTIFACT_HEADER, skillAssignmentReceiptSchema } from "@mikka/protocol/skill";
 
 // Real HTTP + PG, explicit synthetic daemon reports. Not real Harness acceptance.
 test("Factory execution claims reject stopped tasks and unadopted retry children before token issuance", async ({
@@ -39,6 +42,7 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
     revision: t.revision,
     candidateId: t.candidateId,
   });
+  const fixtureIssues = [issueId];
   try {
     await pool.query(
       `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Check HTTP fixture','{}','todo','normal')`,
@@ -73,9 +77,13 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
       "race",
       "allowed",
       "ordinary-stop",
+      "access-revoked",
+      "selected-allowed",
+      "selected-cancel",
     ]) {
       const fixtureIssue = randomUUID(),
         event = randomUUID();
+      fixtureIssues.push(fixtureIssue);
       await pool.query(
         `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Execution HTTP fixture','{}','todo','normal')`,
         [fixtureIssue, userId],
@@ -101,7 +109,7 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
         sourceEventId: event,
         eventId: randomUUID(),
         rationale: "Claim regression",
-        needsSpec: mode !== "revoke",
+        needsSpec: !["revoke", "selected-allowed", "selected-cancel"].includes(mode),
       });
       const queued = await dispatcher(userId, {
         binding: bind(initial.task),
@@ -109,6 +117,10 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
         deviceRepoId: repoId,
       });
       const state = await store.read(userId, initial.task.id);
+      if (mode.startsWith("selected-")) {
+        const assignments = createSkillAssignments(pool, async (u, issue) => u === userId && issue === fixtureIssue);
+        await assignments.selectBaseline(userId, queued.runId);
+      }
       let runId = queued.runId;
       if (mode === "retry") {
         runId = randomUUID();
@@ -129,7 +141,7 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
           ],
         );
       }
-      if (["cancel", "revoke", "retry"].includes(mode))
+      if (["cancel", "revoke", "selected-cancel"].includes(mode))
         await store.apply(userId, bind(state.task), randomUUID(), {
           action: mode === "revoke" ? "revoke" : "cancel",
           reason: "Before claim",
@@ -142,6 +154,8 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
           evidence: [],
           output: {},
         });
+      if (mode === "access-revoked")
+        await pool.query(`UPDATE issues SET "userId"=$2 WHERE id=$1`, [fixtureIssue, `removed-${randomUUID()}`]);
       if (mode === "ordinary-stop") {
         runId = randomUUID();
         await pool.query(
@@ -149,7 +163,14 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
           [runId, userId, fixtureIssue, agentId, deviceId, repoId],
         );
       }
+      if (mode === "retry") {
+        const live = await store.read(userId, initial.task.id);
+        expect(live.task.status).toBe("running");
+        expect(live.task.attemptId).toBe(state.task.attemptId);
+        expect(live.attempts.find(attempt => attempt.id === live.task.attemptId)?.runId).toBe(queued.runId);
+      }
       const path = app(`/v1/devices/${deviceId}/runs/${runId}/claim`);
+      const claimOptions = { headers: { [SKILL_ARTIFACT_HEADER]: "1" } };
       let response;
       if (mode === "race") {
         const tx = await pool.connect();
@@ -165,7 +186,7 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
             },
             tx,
           );
-          const pending = client.post(path);
+          const pending = client.post(path, claimOptions);
           const blocker = (await tx.query("SELECT pg_backend_pid() AS pid"))
             .rows[0].pid;
           let blocked = false;
@@ -185,16 +206,21 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
         } finally {
           tx.release();
         }
-      } else response = await client.post(path);
-      expect(response.status()).toBe(mode === "allowed" ? 200 : 409);
+      } else response = await client.post(path, claimOptions);
+      const allowed = ["allowed", "selected-allowed"].includes(mode);
+      expect(response.status()).toBe(allowed ? 200 : 409);
+      const body = await response.json();
+      const receipts = (await pool.query(`SELECT receipt FROM improvement_skill_receipts WHERE "runId"=$1`, [runId])).rows;
       const tokens = (
         await pool.query(
           `SELECT count(*)::int AS n FROM run_tokens WHERE "runId"=$1`,
           [runId],
         )
       ).rows[0].n;
-      if (mode !== "allowed") {
-        const body = await response.json();
+      if (!allowed) {
+        expect(body.skillReceipt).toBeUndefined();
+        expect(body.skills).toBeUndefined();
+        expect(receipts).toHaveLength(0);
         expect(body.mcp).toBeUndefined();
         expect(body.prompt).toBeUndefined();
         expect(tokens).toBe(0);
@@ -205,8 +231,20 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
             ])
           ).rows[0].status,
         ).toBe("queued");
-      } else expect(tokens).toBe(1);
-      evidence.push({ mode, status: response.status(), tokens });
+      } else {
+        expect(tokens).toBe(1);
+        if (mode === "selected-allowed") {
+          const receipt = skillAssignmentReceiptSchema.parse(body.skillReceipt);
+          expect(receipts).toHaveLength(1);
+          expect(receipt).toEqual(receipts[0].receipt);
+          expect(receipt).toMatchObject({ runId, issueId: fixtureIssue, agentId, repoId, deviceId, leaseExpiresAt: body.leaseExpiresAt, artifact: BASELINE_ARTIFACT });
+          expect(body.skills).toHaveLength(1);
+        } else {
+          expect(receipts).toHaveLength(0);
+          expect(body.skillReceipt).toBeUndefined();
+        }
+      }
+      evidence.push({ mode, status: response.status(), tokens, receipts: receipts.length });
     }
     await testInfo.attach("factory-execution-claim-evidence.json", {
       body: JSON.stringify({
@@ -218,7 +256,7 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
     });
   } finally {
     await client.dispose();
-    await pool.query(`DELETE FROM issues WHERE "userId"=$1`, [userId]);
+    await pool.query(`DELETE FROM issues WHERE id=ANY($1::uuid[])`, [fixtureIssues]);
     await pool.query(`DELETE FROM agents WHERE id=$1`, [agentId]);
     await pool.query(`DELETE FROM device_tokens WHERE id=$1`, [tokenId]);
     await pool.query(`DELETE FROM devices WHERE id=$1`, [deviceId]);
