@@ -12,7 +12,7 @@ export async function seedLegacyHistory(email: string) {
   const pool = new Pool({ connectionString, max: 1 })
   const id = randomUUID()
   const title = `saved-${id.slice(0, 8)}`
-  const completion = 'root = Stack([TextContent("已保存的公开测试历史正文"), BeButton("继续细化", "不得执行历史动作", "outline")])'
+  const completion = 'root = Stack([TextContent("已保存的公开测试历史正文"), BeButton("继续细化", "不得执行历史动作", "outline"), ShadcnAccordion([{title:"第一折叠项",content:"第一项历史详情"},{title:"第二折叠项",content:"第二项历史详情"}]), ShadcnTabs([{title:"第一页签",children:[TextContent("第一页历史正文")]},{title:"第二页签",children:[TextContent("第二页历史正文")]}]), ComputerCard("archived-static-bot", "archived-static-run", "历史电脑任务快照", "approval", "历史 Bot 名称", "历史工作线程")])'
   const library = createAgentLibrary()
   const parsed = createParser(library.toJSONSchema(), library.root).parse(completion)
   expect(parsed.meta.errors).toEqual([])

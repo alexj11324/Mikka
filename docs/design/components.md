@@ -46,8 +46,10 @@ them when their last caller goes.
 ## Historical chat compatibility
 
 `legacy-chat-archive.tsx` displays saved pre-retirement chat records read-only.
-It has no composer, generation request, retry execution or actionable historical
-cards. The standalone `agent-panel`, `agent-chat`, `agent-composer`, `agent-welcome`
+It has no composer, generation request or retry execution. Historical replies
+use an accessible static projection: every saved Accordion item and Tab is
+expanded as readable text; live ComputerCard and action components are never
+mounted. The body is selectable and remains in the accessibility tree. The standalone `agent-panel`, `agent-chat`, `agent-composer`, `agent-welcome`
 and `agent-response` generation host components are retired. Shared `agent-*`
 rendering primitives used by the current Bot are retained; their internal names
 are not a separate product entity.

@@ -13,7 +13,9 @@ test('历史仅可读取，原始数据保留，新对话动作进入当前 Bot'
   const { email } = await register(page)
   const saved = await seedLegacyHistory(email)
   const generationRequests: string[] = []
+  const computerRequests: string[] = []
   page.on('request', request => {
+    if (/\/api\/(?:bots\/.*\/computer|computer\/)/.test(new URL(request.url()).pathname)) computerRequests.push(request.url())
     if (new URL(request.url()).pathname === app('/api/agent') && request.method() === 'POST') generationRequests.push(request.url())
   })
   await page.reload()
@@ -27,9 +29,32 @@ test('历史仅可读取，原始数据保留，新对话动作进入当前 Bot'
   await expect(archive.locator('form, textarea')).toHaveCount(0)
   await expect(archive.getByText('受控历史失败信息', { exact: true })).toBeVisible()
   await expect(archive.getByText('此历史回复未完成。', { exact: true })).toBeVisible()
-  const historicalAction = archive.locator('[inert] button').first()
-  await expect(historicalAction).toHaveText('继续细化')
-  await historicalAction.evaluate(button => (button as HTMLButtonElement).click())
+  const body = archive.getByTestId('archived-reply').first()
+  await expect(body.locator('button, input, select, textarea, iframe, canvas, [inert], [role="button"], [tabindex]')).toHaveCount(0)
+  await expect(body.getByText('继续细化', { exact: true })).toBeVisible()
+  for (const text of ['第一项历史详情', '第二项历史详情', '第一页历史正文', '第二页历史正文', '历史电脑任务快照']) {
+    await expect(body.getByText(text, { exact: true })).toBeVisible()
+  }
+  const accessibility = await archive.ariaSnapshot()
+  for (const text of ['已保存的公开测试历史正文', '第二项历史详情', '第二页历史正文', '历史电脑任务快照', '受控历史失败信息', '此历史回复未完成。']) expect(accessibility).toContain(text)
+  const answer = body.getByText('已保存的公开测试历史正文', { exact: true })
+  const selectedText = await answer.evaluate(element => {
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    const selection = window.getSelection()!
+    selection.removeAllRanges(); selection.addRange(range)
+    const selected = selection.toString()
+    selection.removeAllRanges()
+    return selected
+  })
+  expect(selectedText).toBe('已保存的公开测试历史正文')
+  // Pointer and keyboard interaction with static historical action text must remain harmless.
+  await body.getByText('继续细化', { exact: true }).click()
+  await body.getByText('继续细化', { exact: true }).dispatchEvent('keydown', { key: 'Enter', code: 'Enter' })
+  expect(generationRequests).toEqual([])
+  expect(computerRequests).toEqual([])
+  await info.attach('archive-accessibility-tree', { body: accessibility, contentType: 'text/yaml' })
+  await info.attach('archive-accessible-static-reply', { body: await archive.screenshot(), contentType: 'image/png' })
   const stored = await page.request.get(app(`/api/agent/sessions?sessionId=${saved.id}`))
   expect(stored.status()).toBe(200)
   expect((await stored.json()).turns[0].completion).toBe(saved.completion)
@@ -38,7 +63,7 @@ test('历史仅可读取，原始数据保留，新对话动作进入当前 Bot'
   await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
   await expect(page).toHaveURL(/section=coordinator/)
   expect(generationRequests).toEqual([])
-  await info.attach('retirement-http-evidence', { body: JSON.stringify({ retiredPost: 405, ownerHistory: stored.status(), noGenerationRequests: generationRequests.length, botInputVisible: true }), contentType: 'application/json' })
+  await info.attach('retirement-http-evidence', { body: JSON.stringify({ retiredPost: 405, ownerHistory: stored.status(), noGenerationRequests: generationRequests.length, computerRequests: computerRequests.length, archivedTextSelectable: true, allPanelsReadable: true, botInputVisible: true }), contentType: 'application/json' })
 })
 
 test('归档历史仍拒绝另一个账号读取', async ({ page, browser, baseURL }) => {
