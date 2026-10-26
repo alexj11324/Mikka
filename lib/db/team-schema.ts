@@ -21,6 +21,11 @@ export const teamIssueCreateReceipts = pgTable('team_issue_create_receipts', {
   teamId: uuid('teamId').notNull(), workspaceId: uuid('workspaceId').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
+export const teamIssuePromotionReceipts = pgTable('team_issue_promotion_receipts', {
+  requestId: uuid('requestId').primaryKey(), issueId: uuid('issueId').notNull(), ownerId: text('ownerId').notNull(),
+  teamId: uuid('teamId').notNull(), workspaceId: uuid('workspaceId').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
 export const teamProjects = pgTable('mikka_team_projects', {
   projectId: uuid('projectId').notNull(), teamId: uuid('teamId').notNull(), workspaceId: uuid('workspaceId').notNull(), userId: text('userId').notNull(),
   isPrimary: boolean('isPrimary').notNull().default(false),

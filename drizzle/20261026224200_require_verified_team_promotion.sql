@@ -142,4 +142,15 @@ begin
   return new;
 end;
 $$;
+-- Preserve old jobs while revoking claims whose target cannot be proven.
+-- Old worker processes and already-sent HTTP requests must be drained before
+-- deploying this migration; a database update cannot recall a request in flight.
+update linear_sync_outbox o set status='failed', "claimToken"=null,
+  "lastError"='No active verified Linear issue link for this task', "updatedAt"=now()
+where o.status in ('queued','processing') and not exists (
+  select 1 from linear_issue_links l
+  join issues i on i.id=l."issueId" and i."userId"=l."ownerId"
+  join linear_team_syncs t on t.id=l."teamSyncId" and t."ownerId"=l."ownerId" and t.active
+  where l."issueId"=o."issueId" and l."externalTargetVerified" and not i."linearSyncBlocked"
+);
 commit;

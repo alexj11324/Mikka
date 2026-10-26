@@ -20,6 +20,7 @@ import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
 import { ensureIssueNumbers } from '@/lib/issue-numbering'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { createTeamIssueForUser } from '@/lib/team-issue-create'
+import { promoteExistingIssueForUser } from '@/lib/team-issue-promotion'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { issueDoneEvent } from '@/lib/coordinator-events'
@@ -138,6 +139,14 @@ export async function createIssueForTeam(input: { requestId: string; teamId: str
     if (actingContext.getStore()) return { error: 'teamIssueAccessDenied' as const }
     const userId = await getUserId()
     return createTeamIssueForUser(userId, input)
+  })
+}
+
+/** Explicitly move an existing personal issue to a Mikka team. */
+export async function promoteIssueToTeam(input: { requestId: string; issueId: string; revision: number; teamId: string; expectedTeamId: string | null }) {
+  return runAction(async () => {
+    if (actingContext.getStore()) return { error: 'teamIssueAccessDenied' as const }
+    return promoteExistingIssueForUser(await getUserId(), input)
   })
 }
 

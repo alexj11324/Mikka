@@ -37,6 +37,12 @@ export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
   fingerprint: text('fingerprint').notNull(), status: text('status').$type<'preparing' | 'complete'>().notNull().default('preparing'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
+export const teamIssuePromotions = pgTable('team_issue_promotions', {
+  requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(), issueId: uuid('issueId').notNull(),
+  teamId: uuid('teamId').notNull(), expectedTeamId: uuid('expectedTeamId'), expectedRevision: integer('expectedRevision').notNull(),
+  status: text('status').$type<'preparing' | 'complete' | 'stale'>().notNull().default('preparing'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
 // The personal issue prefix someone chose; without a row it comes from their email (MIK-46).
 export const issuePrefixes = pgTable('issue_prefixes', {
   userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),

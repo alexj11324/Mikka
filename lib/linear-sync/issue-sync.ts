@@ -88,7 +88,7 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
     .leftJoin(issueDocuments, and(eq(issueDocuments.issueId, issues.id), eq(issueDocuments.userId, issues.userId)))
     .where(eq(linearIssueLinks.linearIssueId, remote.id)).limit(1)
   if (!link) return null
-  if (link.link.teamSyncId !== team.id) return null
+  if (link.link.teamSyncId !== team.id || !link.link.externalTargetVerified) return null
   if (!shouldApplyLinearSnapshot({ remoteUpdatedAt: new Date(remote.updatedAt), localUpdatedAt: link.issue.updatedAt, appSyncedAt: link.link.appSyncedAt, linearUpdatedAt: link.link.linearUpdatedAt, force })) return link.issue
   if (remote.title.length > 200) throw new LinearSyncConflictError('Linear issue title is longer than Mikka supports')
 
@@ -101,9 +101,9 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
   const saved = await db.transaction(async tx => {
     await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
     const [latest] = await tx.select().from(issues).where(and(eq(issues.id, link.issue.id), eq(issues.userId, team.ownerId))).for('update')
-    if (!latest || latest.scope !== 'workspace') return null
+    if (!latest || latest.scope !== 'workspace' || latest.linearSyncBlocked) return null
     const [currentLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.id, link.link.id)).for('update')
-    if (!currentLink || currentLink.teamSyncId !== team.id || currentLink.linearIssueId !== remote.id || !shouldApplyLinearSnapshot({ remoteUpdatedAt: new Date(remote.updatedAt), localUpdatedAt: latest.updatedAt, appSyncedAt: currentLink.appSyncedAt, linearUpdatedAt: currentLink.linearUpdatedAt, force })) return latest
+    if (!currentLink || !currentLink.externalTargetVerified || currentLink.ownerId !== team.ownerId || currentLink.teamSyncId !== team.id || currentLink.linearIssueId !== remote.id || !shouldApplyLinearSnapshot({ remoteUpdatedAt: new Date(remote.updatedAt), localUpdatedAt: latest.updatedAt, appSyncedAt: currentLink.appSyncedAt, linearUpdatedAt: currentLink.linearUpdatedAt, force })) return latest
     const latestMetadata = readIssueMetadata(latest.content)
     const nextStatus = issueStatusForLinearType(remote.state?.type ?? '', latest.status as Parameters<typeof issueStatusForLinearType>[1], remote.state?.name)
     const descriptionChanged = linearDescriptionChanged(remote.description, currentLink.linearDescriptionHash, issueContentToMarkdown(latest.content))

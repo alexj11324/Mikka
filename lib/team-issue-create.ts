@@ -78,7 +78,7 @@ export async function createTeamIssueForUser(userId: string, input: unknown) {
         if (issue.scope !== 'personal' || issue.revision !== 1) throw new TeamCreateError('teamIssueChanged')
         // The workspace transaction still holds membership and relation locks.
         // Bind the transaction-local database fence to exactly this task.
-        await tx.execute(sql`select set_config('mikka.team_scope_verified', ${issueId}, true), set_config('mikka.team_scope_team', ${teamId}, true)`)
+        await tx.execute(sql`select set_config('mikka.team_scope_verified', ${issueId}, true), set_config('mikka.team_scope_team', ${teamId}, true), set_config('mikka.team_scope_request', ${requestId}, true)`)
         const [saved] = await tx.update(issues).set({ scope: 'workspace', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: 2, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...userActor(userId) })
         await tx.update(teamIssueCreateRequests).set({ status: 'complete' }).where(eq(teamIssueCreateRequests.requestId, requestId))
