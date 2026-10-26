@@ -85,11 +85,14 @@ function checkUtility(token, policy, report, options = {}) {
   if (/(?:^|:)dark:/.test(token) && /^(?:bg|text|border|ring|fill|stroke|outline)-/.test(base) && !base.endsWith('-transparent')) report('style/no-dark-color-override', `用语义 token 处理明暗主题，不单独覆盖 ${token}。`)
 }
 
+// MIK-8: the 「新」 unread divider is the only chat file allowed to draw a horizontal rule.
+export const HORIZONTAL_RULE_EXEMPT_FILES = ['components/chat/unread-divider.tsx']
 const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx']
 
 export function auditSource(file, text, policy) {
+  const ruleExempt = HORIZONTAL_RULE_EXEMPT_FILES.includes(file)
   // R-61/R-63 (Alex 2026-10-25): the issue page's header line and the lines inside a comment card.
-  const allowHorizontalRule = file.startsWith('components/settings/') || ISSUE_PAGE_RULES.includes(file)
+  const allowHorizontalRule = file.startsWith('components/settings/') || ISSUE_PAGE_RULES.includes(file) || ruleExempt
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), variables = new Map(), seen = new Set()
   const add = (node, rule, message) => {
@@ -257,7 +260,7 @@ export function auditSource(file, text, policy) {
         const expression = orientation?.initializer && (ts.isJsxExpression(orientation.initializer) ? orientation.initializer.expression : orientation.initializer)
         const value = expression ? resolve(expression) : { strings: [], known: true }
         const vertical = value.known && value.strings.length > 0 && value.strings.every(item => item === 'vertical')
-        if (!vertical) add(node, 'style/no-horizontal-rule', '禁止水平 <Separator />；用间距或背景分组，只保留竖线分隔。')
+        if (!vertical && !ruleExempt) add(node, 'style/no-horizontal-rule', '禁止水平 <Separator />；用间距或背景分组，只保留竖线分隔。')
       }
       if (name === 'Button' && (attr(node, 'isLoading') || attr(node, 'isPending'))) add(node, 'composition/button-loading', 'Button 使用 Spinner + disabled，不存在 isLoading/isPending。')
       if (['Input', 'Textarea'].includes(name) && parents.includes('InputGroup')) add(node, 'forms/input-group', 'InputGroup 内使用 InputGroupInput/InputGroupTextarea。')

@@ -1,8 +1,11 @@
+import { visibleRuns } from '@/lib/agent-runs'
+import { issueForUser } from '@/lib/issue-access'
+import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
-import { agentRuns, agents, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, type CoordinatorEventTier } from '@/lib/db/schema'
+import { coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, type CoordinatorEventTier } from '@/lib/db/schema'
 import { telegramReplyTargets, type TelegramReplyTarget } from '@/lib/coordinator-events'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox } from '@/lib/coordinator/triage'
@@ -162,7 +165,7 @@ export async function citationSources(userId: string, texts: readonly string[]):
   if (issueIds.length) {
     const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content })
       .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-      .where(and(inArray(issues.id, issueIds), or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))))
+      .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId)).predicate))
     const identifiers = await taskIdentifiers(rows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
     for (const { content, ownerId: _owner, scope: _scope, ...row } of rows) {
       const metadata = readIssueMetadata(content)
@@ -170,13 +173,11 @@ export async function citationSources(userId: string, texts: readonly string[]):
     }
   }
   if (runIds.length) {
-    const rows = await db.select({ id: agentRuns.id, agentName: agents.name, harness: agents.harness, status: agentRuns.status, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, issueId: issues.id, issueOwnerId: issues.userId, issueScope: issues.scope, issueTitle: issues.title, issueContent: issues.content })
-      .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
-      .where(and(inArray(agentRuns.id, runIds), eq(agentRuns.userId, userId)))
-    const identifiers = await taskIdentifiers(rows.flatMap(row => row.issueId && row.issueOwnerId && row.issueScope && row.issueContent ? [{ id: row.issueId, ownerId: row.issueOwnerId, scope: row.issueScope, number: readIssueMetadata(row.issueContent).number }] : []))
+    const rows = await visibleRuns(userId, { runIds, limit: runIds.length })
     for (const row of rows) {
-      const issue = row.issueId && row.issueTitle && row.issueContent && !readIssueMetadata(row.issueContent).deletedAt
-        ? { id: row.issueId, title: row.issueTitle, number: readIssueMetadata(row.issueContent).number ?? null, identifier: identifiers.get(row.issueId) ?? null } : null
+      const task = row.issueId ? await issueForUser(userId, row.issueId) : null
+      const identifiers = task ? await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }]) : new Map<string, string>()
+      const issue = task ? { id: task.id, title: task.title, number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null } : null
       sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
     }
   }
@@ -195,7 +196,7 @@ export async function chatView(userId: string, limit = 200): Promise<ChatView> {
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const last = rows[0]?.position ?? 0
   const pending = waiting.filter(event => event.kind === 'user_message').map((event, index) => ({
-    position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage,
+    position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage, pending: true as const,
   }))
   const leased = coordinatorLeaseActive(session)
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])

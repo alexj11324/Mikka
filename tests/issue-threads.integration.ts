@@ -26,11 +26,8 @@ test('real actions share threads on workspace issues only, with current members,
     await assert.rejects(actAs(viewer, () => listIssueThreads(other)))
     await assert.rejects(actAs(viewer, () => listIssueThreads('invalid')))
 
-    // A personal issue: a collaborator sees that the owner's thread exists, nothing more.
-    const personal = await actAs(viewer, () => listIssueThreads(issue))
-    assert.equal(personal.length, 2)
-    assert.ok(personal.every(row => row.id !== otherRun && !row.ownedByCurrentUser && row.detail === null))
-    assert.ok(!JSON.stringify(personal).includes('Route') && !JSON.stringify(personal).includes('Mikka Backend'))
+    // A personal issue is the owner's alone (R-26): a legacy invitation grants nothing.
+    await assert.rejects(actAs(viewer, () => listIssueThreads(issue)))
     await assert.rejects(actAs(viewer, () => getIssueThread(issue, run)))
     await assert.rejects(actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Must not reach the agent' })))
     const own = await actAs(owner, () => getIssueThread(issue, run))
@@ -38,6 +35,7 @@ test('real actions share threads on workspace issues only, with current members,
     await assert.rejects(actAs(owner, () => getIssueThread(other, run)))
 
     // A workspace issue: current members read and join every collaborator's thread.
+    await pool.query('UPDATE issues SET scope=$2 WHERE id=$1', [issue, 'workspace'])
     await pool.query('INSERT INTO mikka_workspaces (id,"userId",name) VALUES ($1,$2,$3)',[workspace,owner,'Isolated run workspace'])
     await pool.query('INSERT INTO mikka_teams (id,"workspaceId","userId",name,identifier) VALUES ($1,$2,$3,$4,$5)',[team,workspace,owner,'Run test','RUNTEST'])
     await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)',[issue,team,workspace,owner])
