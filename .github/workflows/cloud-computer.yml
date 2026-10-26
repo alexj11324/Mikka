@@ -1,0 +1,35 @@
+name: Cloud computer backend
+on:
+  push:
+    branches: ['codex/e2b-cloud-computer-172']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: isolated-ci
+          POSTGRES_DB: computer_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm exec oxlint --deny-warnings lib/computer app/api/bots
+      - run: node --test packages/daemon/src/computer/broker.test.mjs
+      - run: node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts
+        env:
+          COMPUTER_TEST_DATABASE_URL: postgresql://postgres:isolated-ci@localhost:5432/computer_test

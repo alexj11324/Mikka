@@ -9,6 +9,9 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingIncludes: {
+    '/api/bots/*/computer/*': ['./scripts/e2b/start-desktop.sh', './scripts/e2b/viewer-gateway.py'],
+  },
   turbopack: {
     resolveAlias: {
       'react-syntax-highlighter': './components/workspace/agent-syntax-highlighter.tsx',
