@@ -1,0 +1,83 @@
+/** Disposable synthetic app + isolated loopback Postgres + real E2B worker.
+ * This verifies startup and credential delivery, not product/provider login. */
+import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
+import { Pool } from 'pg'
+import { Sandbox } from 'e2b'
+import { ComputerStore } from '../../lib/computer/store'
+import { startCloudWorker } from '../../lib/computer/cloud-worker'
+
+let stage = 'initialize'
+async function main() {
+  const url = new URL(process.env.COMPUTER_TEST_DATABASE_URL ?? '')
+  assert.ok(['127.0.0.1', 'localhost'].includes(url.hostname))
+  assert.ok(process.env.E2B_API_KEY && process.env.E2B_COMPUTER_TEMPLATE && /^[a-f0-9]{40}$/.test(process.env.E2B_WORKER_SHA ?? ''))
+  const schema = `worker_live_${randomUUID().replaceAll('-', '')}`
+  const connection = { apiKey: process.env.E2B_API_KEY, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
+  const admin = new Pool({ connectionString: url.toString() })
+  await admin.query(`CREATE SCHEMA ${schema}`)
+  const pool = new Pool({ connectionString: url.toString(), options: `-c search_path=${schema}` })
+  let sandbox: Sandbox | undefined
+  try {
+    await pool.query('CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES (\'synthetic-owner\')')
+    await pool.query(await readFile(new URL('../../drizzle/20261026235901_cloud_computers.sql', import.meta.url), 'utf8'))
+    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL, "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz)')
+    await pool.query(await readFile(new URL('../../drizzle/20261027000300_cloud_device_scope.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261027000400_cloud_worker_leases.sql', import.meta.url), 'utf8'))
+    const actor = { userId: 'synthetic-owner', workspaceId: randomUUID() }
+    const store = new ComputerStore(pool)
+    const bot = await store.createBot(actor, 'Synthetic Bot')
+    stage = 'provision'
+    await store.operate(actor, bot.id, 'wake')
+    stage = 'connect'
+    const id = (await pool.query('SELECT "sandboxId" FROM cloud_machines')).rows[0].sandboxId as string
+    sandbox = await Sandbox.connect(id, connection)
+    stage = 'start mock service'
+    await sandbox.files.write('/tmp/mikka-mock-device-server.py', await readFile(new URL('./mock-device-server.py', import.meta.url), 'utf8'), { user: 'user' })
+    await sandbox.commands.run(`MIKKA_TEST_WORKSPACE=${actor.workspaceId} /usr/bin/python3 /tmp/mikka-mock-device-server.py > /tmp/mikka-mock-server.log 2>&1`, { user: 'user', background: true, timeoutMs: 0 })
+    stage = 'check mock service'
+    await sandbox.commands.run('for i in $(seq 1 30); do curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8765/ | grep -q 401 && exit 0; sleep .2; done; exit 1', { user: 'user', timeoutMs: 10_000 })
+    let done = false
+    const active = sandbox
+    const observe = (async () => {
+      while (!done) {
+        const marker = await active.files.read('/tmp/mikka-worker-registration.json', { user: 'root' }).catch(() => null)
+        if (marker) {
+          const item = JSON.parse(marker) as { deviceId: string; hash: string }
+          const verified = await pool.query('UPDATE device_tokens SET "lastUsedAt"=now() WHERE "tokenHash"=$1 AND "userId"=$2 AND "boundDeviceId"=$3 AND "boundWorkspaceId"=$4 AND "revokedAt" IS NULL RETURNING id', [item.hash, actor.userId, item.deviceId, actor.workspaceId])
+          if (verified.rowCount) await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1 AND "ownerId"=$2', [item.deviceId, actor.userId])
+        }
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+    })()
+    try {
+      const server = `https://${sandbox.getHost(8765)}/mikka`
+      stage = 'start cloud worker'
+      const worker = await startCloudWorker(pool, actor, sandbox, server, process.env.E2B_WORKER_SHA!)
+      stage = 'reuse cloud worker'
+      const again = await startCloudWorker(pool, actor, sandbox, server, process.env.E2B_WORKER_SHA!)
+      assert.equal(again.deviceId, worker.deviceId)
+      assert.equal(Number((await pool.query('SELECT count(*) FROM device_tokens WHERE "boundDeviceId"=$1', [worker.deviceId])).rows[0].count), 1)
+      await sandbox.commands.run('if test -r /home/mikka-runner/.mikka/worker/device.json; then exit 1; fi', { user: 'user' })
+      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, pinnedSource: true }))
+    } finally { done = true; await observe }
+  } catch (error) {
+    if (sandbox && stage === 'check mock service') {
+      const log = await sandbox.files.read('/tmp/mikka-mock-server.log', { user: 'root' }).catch(() => '')
+      if (log.includes('ModuleNotFoundError')) console.error('mock service Python dependency unavailable')
+      else if (log.includes('PermissionError')) console.error('mock service permission denied')
+      else if (log.includes('Address already in use')) console.error('mock service port unavailable')
+    }
+    if (sandbox && stage === 'start cloud worker') {
+      const log = await sandbox.files.read('/home/mikka-runner/.mikka/worker-bootstrap.log', { user: 'root' }).catch(() => '')
+      if (log.includes('Cloud worker unavailable')) console.error('cloud worker bootstrap failed')
+    }
+    throw error
+  } finally {
+    const ids = await pool.query('SELECT "sandboxId" FROM cloud_machines WHERE "sandboxId" IS NOT NULL').catch(() => ({ rows: [] }))
+    for (const { sandboxId } of ids.rows) await Sandbox.kill(sandboxId, connection)
+    await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end()
+  }
+}
+void main().catch(error => { console.error(`stage=${stage}`, error instanceof assert.AssertionError ? error.message : error instanceof Error ? error.name : 'Worker acceptance failed'); process.exitCode = 1 })

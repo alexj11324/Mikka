@@ -213,6 +213,15 @@ reached online state against an in-memory server, and hosted-runtime preflight
 detected both Codex and Claude Code. These tests do not use provider credentials
 or establish inference; both sandboxes were deleted.
 
+The template `76a65pofcj9rwthrbam3` packaged commit `eef59af`. A separate live
+test started its hosted worker through the control-plane handoff, registered it
+against a synthetic HTTPS device service, confirmed that a second start reused
+the same device, and verified the task account could not read the credential.
+The device service and local PostgreSQL observer were synthetic; no deployed
+application authentication or real task was exercised. The sandbox and schema
+were deleted. The worker-provisioning lease migration is recorded in dev and
+production databases.
+
 Development and production databases also have the additive cloud-device-scope
 migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
 expiry validation, rotation and the Bot's pending-review state. The worker
