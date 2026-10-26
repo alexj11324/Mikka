@@ -10,6 +10,7 @@ import { auth } from '@/lib/auth'
 import systemPrompt from '@/lib/agent-system-prompt.json'
 import { validateAgentStream } from '@/lib/agent-fetch'
 import { agentStatusStream } from '@/lib/agent-status'
+import { AGENT_MAX_ROUNDS, roundStep } from '@/lib/agent-rounds'
 import { persistAgentStream } from '@/lib/agent-history'
 import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
 
@@ -105,17 +106,18 @@ async function handlePOST(request: Request) {
     baseURL: 'https://opencode.ai/zen/go/v1',
     headers: { 'User-Agent': 'Mikka-UI-Agent/1.0', 'x-opencode-session': sessionId },
   })
+  const instructions = `${systemPrompt}\n\n${agentWebInstructions()}`
   const result = streamText({
     model: opencode('deepseek-v4.1-flash'),
     providerOptions: { opencode: { reasoningEffort: 'medium' } },
-    system: `${systemPrompt}\n\n${agentWebInstructions()}`,
+    system: instructions,
     messages,
     tools: {
       ...createAgentWebTools({ signal: request.signal }),
       ...createComposioAITools((action, input) => runComposioAction(session.user.id, action, input)),
     },
-    stopWhen: isStepCount(5),
-    prepareStep: ({ stepNumber }) => stepNumber >= 4 ? { toolChoice: 'none' } : {},
+    stopWhen: isStepCount(AGENT_MAX_ROUNDS),
+    prepareStep: ({ stepNumber }) => roundStep(stepNumber, instructions),
     maxRetries: 1,
     timeout: { totalMs: 270000, firstChunkMs: 120000, chunkMs: 90000 },
     abortSignal: request.signal,
