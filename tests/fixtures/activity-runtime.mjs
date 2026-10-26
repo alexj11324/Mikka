@@ -11,7 +11,7 @@ const files = new Map([
   ['/lib/auth.ts', 'export const auth={api:{async getSession(){return null}}}'],
   ['/lib/linear-sync/dispatch.ts', 'export function dispatchLinearIssueSync(){} export function dispatchLinearWork(){}'],
   ['/lib/issue-scope-judge.ts', 'export async function judgeIssueScope(){}'],
-  ['/lib/coordinator/wake.ts', 'export async function wakeCoordinator(){}'],
+  ['/lib/coordinator/wake.ts', 'export async function wakeCoordinator(){} export function coordinatorEnabled(){return false}'],
 ])
 registerHooks({
   resolve(specifier, context, next) {

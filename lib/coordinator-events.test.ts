@@ -1,8 +1,31 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { issueDoneEvent, runBlockedEvent, runFinishedEvent, runQuestionEvent, runReportEvent, runRetriedEvent } from './coordinator-events'
+import { issueDoneEvent, runBlockedEvent, runFinishedEvent, runQuestionEvent, runReportEvent, runRetriedEvent, telegramReplyTargets, userMessageEvent } from './coordinator-events'
 
 const issue = { id: 'issue-1', userId: 'user-1', title: 'Fix login', status: 'done', revision: 4 }
+
+test('Telegram messages keep their linked issue and dedupe by source message', () => {
+  const telegram = { threadId: 'telegram:thread-1', telegramUserId: 'telegram-user-1', messageId: 42 }
+  const first = userMessageEvent('user-1', 'Please check this', { issueId: 'issue-1', telegram })
+  const duplicate = userMessageEvent('user-1', 'Please check this', { issueId: 'issue-1', telegram })
+
+  assert.equal(first.dedupeKey, 'telegram:telegram:thread-1:42')
+  assert.equal(duplicate.dedupeKey, first.dedupeKey)
+  assert.equal(first.issueId, 'issue-1')
+  assert.deepEqual(first.payload, { text: 'Please check this', telegram })
+})
+
+test('Telegram reply targets are validated and unique per chat', () => {
+  const target = { threadId: 'telegram:thread-1', telegramUserId: 'telegram-user-1' }
+  const event = (telegram: unknown) => ({ kind: 'user_message' as const, payload: { telegram } })
+  assert.deepEqual(telegramReplyTargets([
+    event({ ...target, messageId: 42 }),
+    event({ ...target, messageId: 43 }),
+    event({ threadId: '', telegramUserId: 'telegram-user-2', messageId: 44 }),
+    event({ ...target, messageId: Number.MAX_SAFE_INTEGER + 1 }),
+    { kind: 'run_finished' as const, payload: { telegram: { ...target, messageId: 45 } } },
+  ]), [target])
+})
 
 test('a move to done is an event, keyed by the revision that made it', () => {
   const event = issueDoneEvent({ status: 'review' }, issue)
