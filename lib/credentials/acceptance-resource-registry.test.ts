@@ -191,7 +191,7 @@ test('retained receipt failures preserve existing evidence and never escape thro
   const registry = await createAcceptanceResourceRegistry(tmpdir(), { profiles: 1, launches: 1 })
   const marker = join(registry.root, 'owner.json'), before = await readFile(marker, 'utf8')
   const reports: string[] = []
-  assert.equal(await writeRetainedReceipt(marker, { overwrite: 'forbidden' }, message => reports.push(message)), false)
+  assert.equal(await writeRetainedReceipt(marker, { overwrite: 'forbidden' }, message => { reports.push(message) }), false)
   assert.equal(await readFile(marker, 'utf8'), before)
   assert.deepEqual(reports, ['retained receipt write failed; process retained'])
   for (const code of ['EIO', 'EACCES', 'ENOSPC']) {
