@@ -29,13 +29,18 @@ test(
     }[] = [];
     function client() {
       const cookies = new Map<string, string>();
+      // Separate synthetic clients from other HTTP recipes sharing this Next process.
+      const ip = `198.19.${randomBytes(1)[0]}.${1 + (randomBytes(1)[0] % 254)}`;
       return async (
         path: string,
         method = "GET",
         body?: unknown,
         extra: Record<string, string> = {},
       ) => {
-        const headers: Record<string, string> = { ...extra };
+        const headers: Record<string, string> = {
+          "x-forwarded-for": ip,
+          ...extra,
+        };
         if (cookies.size)
           headers.cookie = [...cookies].map(([k, v]) => `${k}=${v}`).join("; ");
         if (body !== undefined) {
