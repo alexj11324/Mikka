@@ -13,7 +13,7 @@ export class ComputerBroker {
     driver: ComputerDriver | null;
     socketPath: string;
     permitted: (runId: string) => boolean;
-    execute?: (driver: ComputerDriver, input: unknown, display?: string) => Promise<unknown>;
+    execute?: (driver: ComputerDriver, input: unknown, display: string | undefined, runId: string) => Promise<unknown>;
     now?: () => number;
     ttl?: number;
   });

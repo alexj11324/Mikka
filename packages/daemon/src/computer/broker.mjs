@@ -15,7 +15,7 @@ export class ComputerBroker {
     driver,
     socketPath,
     permitted,
-    execute = executeDriver,
+    execute = (driver, call, display) => executeDriver(driver, call, display),
     now = Date.now,
     ttl = 300000,
   }) {
@@ -140,7 +140,7 @@ export class ComputerBroker {
       return { ok: true };
     }
     try {
-      row.resolve(await this.execute(this.driver, call, display));
+      row.resolve(await this.execute(this.driver, call, display, runId));
     } catch (error) {
       row.reject(error);
     }

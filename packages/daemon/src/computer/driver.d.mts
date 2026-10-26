@@ -15,4 +15,6 @@ export function normalizeCall(value: unknown): ComputerCall;
 export function executeDriver(
   driver: ComputerDriver,
   input: unknown,
+  display?: string,
+  leaseGuard?: { botId: string; ownerId: string },
 ): Promise<unknown>;

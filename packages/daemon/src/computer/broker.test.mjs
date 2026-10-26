@@ -204,8 +204,8 @@ test("pinned platform click schemas preserve desktop coordinates without unsuppo
 
 test("concurrent approved runs execute on their own trusted display", async (t) => {
   const executions = [];
-  const b = await fixture(t, { execute: async (_, call, display) => {
-    executions.push({ call, display });
+  const b = await fixture(t, { execute: async (_, call, display, runId) => {
+    executions.push({ call, display, runId });
     return { ok: true };
   } });
   assert.throws(() => b.spec("bad", "ask", { display: ":0;touch /tmp/owned" }));
@@ -218,5 +218,6 @@ test("concurrent approved runs execute on their own trusted display", async (t) 
   await Promise.all(rows.map(row => b.decide(row.id, row.digest, true)));
   await Promise.all([a, c]);
   assert.deepEqual(executions.map(row => row.display), [":1", ":2"]);
+  assert.deepEqual(executions.map(row => row.runId), ["run-a", "run-b"]);
   assert.throws(() => normalizeCall({ name: "click", arguments: { x: 1, y: 2, display: ":2" } }));
 });

@@ -222,6 +222,13 @@ application authentication or real task was exercised. The sandbox and schema
 were deleted. The worker-provisioning lease migration is recorded in dev and
 production databases.
 
+The same synthetic registration test now exercises a guarded real CUA driver:
+another Bot is rejected, the task account cannot read or alter the desktop lease,
+person-controlled desktops deny agent input, and handback permits it again.
+A shared process lock held across exec also makes takeover wait for an active
+operation before granting the person control. The E2B sandbox was deleted. The
+guard is infrastructure-tested but is not yet injected into a real model run.
+
 Development and production databases also have the additive cloud-device-scope
 migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
 expiry validation, rotation and the Bot's pending-review state. The worker

@@ -60,7 +60,31 @@ async function main() {
       assert.equal(again.deviceId, worker.deviceId)
       assert.equal(Number((await pool.query('SELECT count(*) FROM device_tokens WHERE "boundDeviceId"=$1', [worker.deviceId])).rows[0].count), 1)
       await sandbox.commands.run('if test -r /home/mikka-runner/.mikka/worker/device.json; then exit 1; fi', { user: 'user' })
-      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, pinnedSource: true }))
+      stage = 'install guarded driver probe'
+      await sandbox.files.write('/home/mikka-runner/.mikka/driver-probe.mjs', await readFile(new URL('../../packages/daemon/src/computer/driver.mjs', import.meta.url), 'utf8'), { user: 'mikka-runner' })
+      await sandbox.files.write('/home/mikka-runner/.mikka/guard-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(bot.id)},ownerId:${JSON.stringify(actor.userId)}});\n`, { user: 'mikka-runner' })
+      const probe = () => sandbox!.commands.run('node /home/mikka-runner/.mikka/guard-probe.mjs', { user: 'mikka-runner', timeoutMs: 30_000 })
+      stage = 'deny agent while person controls'
+      await store.operate(actor, bot.id, 'takeover')
+      const before = await sandbox.commands.run('DISPLAY=:1 xdotool getmouselocation --shell', { user: 'mikka-runner' })
+      await assert.rejects(probe())
+      const after = await sandbox.commands.run('DISPLAY=:1 xdotool getmouselocation --shell', { user: 'mikka-runner' })
+      assert.equal(after.stdout, before.stdout)
+      await store.operate(actor, bot.id, 'handback')
+      stage = 'deny another Bot and task user'
+      await sandbox.files.write('/home/mikka-runner/.mikka/wrong-bot-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(randomUUID())},ownerId:${JSON.stringify(actor.userId)}});\n`, { user: 'mikka-runner' })
+      await assert.rejects(sandbox.commands.run('node /home/mikka-runner/.mikka/wrong-bot-probe.mjs', { user: 'mikka-runner', timeoutMs: 30_000 }))
+      await sandbox.commands.run('if test -r /run/mikka-viewer/1.json || test -w /run/mikka-viewer/1.lock; then exit 1; fi', { user: 'user' })
+      stage = 'allow agent after handback'
+      await probe()
+      stage = 'serialize takeover with an active operation'
+      await sandbox.commands.run("flock -F -s /run/mikka-viewer/1.lock sh -c 'touch /home/mikka-runner/.mikka/lock-held; exec sleep 2'", { user: 'mikka-runner', background: true, timeoutMs: 0 })
+      await sandbox.commands.run('for i in $(seq 1 50); do test -f /home/mikka-runner/.mikka/lock-held && exit 0; sleep .1; done; exit 1', { user: 'mikka-runner', timeoutMs: 7_000 })
+      const began = Date.now()
+      await store.operate(actor, bot.id, 'takeover')
+      assert.ok(Date.now() - began >= 800, 'takeover waits for the operation lock')
+      await store.operate(actor, bot.id, 'handback')
+      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, pinnedSource: true, otherBotDenied: true, taskLeasePrivate: true, takeoverDeniesAgent: true, handbackAllowsAgent: true, takeoverWaitsForOperation: true }))
     } finally { done = true; await observe }
   } catch (error) {
     if (sandbox && stage === 'check mock service') {

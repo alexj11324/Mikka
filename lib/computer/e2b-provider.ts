@@ -33,11 +33,12 @@ export async function createComputer(workspaceId: string, operationId: string) {
 
 export async function installComputerRuntime(sandbox: Sandbox) {
   // Created per instance, never baked into a shared template.
-  await sandbox.commands.run("install -d -m 700 /run/mikka-viewer; umask 077; head -c 32 /dev/urandom > /run/mikka-viewer/key", { user: 'root' })
-  for (const name of ['start-desktop.sh', 'viewer-gateway.py']) {
+  await sandbox.commands.run("if getent group mikka-runner >/dev/null; then install -d -m 710 -o root -g mikka-runner /run/mikka-viewer; else install -d -m 700 /run/mikka-viewer; fi; umask 077; head -c 32 /dev/urandom > /run/mikka-viewer/key", { user: 'root' })
+  for (const name of ['start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py']) {
     const content = await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8')
     await sandbox.files.write(`/opt/mikka/computer/${name}`, content, { user: 'root' })
   }
+  await sandbox.commands.run('chmod 0755 /opt/mikka/computer/lease-driver.py', { user: 'root', timeoutMs: 10_000 })
   await sandbox.commands.run('flock -n /run/mikka-viewer/gateway.lock /usr/bin/python3 /opt/mikka/computer/viewer-gateway.py', { user: 'root', background: true, timeoutMs: 0 })
   await sandbox.commands.run('for i in $(seq 1 30); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401 ] && exit 0; sleep .2; done; exit 1', { user: 'root', timeoutMs: 10_000 })
 }
@@ -66,9 +67,12 @@ export async function startDesktop(sandbox: Sandbox, display: number) {
 
 export async function syncDesktopLease(sandbox: Sandbox, lease: DesktopLease) {
   // Atomic rename: readers never observe a truncated revocation/control state.
+  if (!Number.isInteger(lease.display) || lease.display < 1 || lease.display > 999) throw new Error('Invalid display')
   const path = `/run/mikka-viewer/${lease.display}`
   await sandbox.files.write(`${path}.next`, JSON.stringify(lease), { user: 'root' })
-  await sandbox.commands.run(`mv ${path}.next ${path}.json`, { user: 'root', timeoutMs: 10_000 })
+  // A shared lock is held for the whole CUA driver process. Takeover waits
+  // until it exits, then publishes the new lease before granting control.
+  await sandbox.commands.run(`touch ${path}.lock; if getent group mikka-runner >/dev/null; then chown root:mikka-runner ${path}.lock ${path}.next; chmod 660 ${path}.lock; chmod 640 ${path}.next; else chmod 600 ${path}.lock ${path}.next; fi; flock -x ${path}.lock mv ${path}.next ${path}.json`, { user: 'root', timeoutMs: 45_000 })
 }
 
 export async function viewerGrant(sandbox: Sandbox, lease: DesktopLease, userId: string, mode: 'view' | 'control') {
