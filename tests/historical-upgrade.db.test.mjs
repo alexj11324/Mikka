@@ -72,6 +72,8 @@ test('retained dual DB: fresh candidate equals current-main ledger upgrade; repl
    const actualNames=(await ledger(db)).map(r=>r.name),expectedNames=[...names].sort()
    const diagnostic={candidateSha:evidence.sha,mainSha:main.sha,target:targetName,missing:expectedNames.filter(n=>!actualNames.includes(n)),extra:actualNames.filter(n=>!expectedNames.includes(n))}
    writeFileSync(resolve(root,`${targetName}-ledger-diagnostic.json`),JSON.stringify(diagnostic,null,2));console.log(JSON.stringify(diagnostic))
+   mkdirSync(resolve('test-results/r0'),{recursive:true})
+   writeFileSync(resolve('test-results/r0',`history-ledger-${suffix}-${targetName}.json`),JSON.stringify(diagnostic,null,2))
    assert.deepEqual(applied(upgradeOutput),names.filter(n=>!old.has(n)))
    assert.deepEqual(applied(freshOutput),names)
    assert.deepEqual(actualNames,expectedNames)
