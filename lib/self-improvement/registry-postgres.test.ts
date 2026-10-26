@@ -1,3 +1,4 @@
+import { isolatedPostgresURL } from '../../tests/helpers/isolated-postgres.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readdir, readFile } from 'node:fs/promises'
@@ -16,7 +17,7 @@ import { skillMarkdown } from '@mikka/protocol/skill'
 const databaseURL = improvementTestDatabase(process.env)
 test('PG candidate registration, immutable replay and exact-version claim/resume/withdrawal boundaries',
   { skip: !databaseURL, timeout: 120000 }, async t => {
-    const target = new URL(databaseURL!), schema = `skill_registry_${randomUUID().replaceAll('-', '')}`
+    const target = new URL(await isolatedPostgresURL(databaseURL!)), schema = `skill_registry_${randomUUID().replaceAll('-', '')}`
     const admin = new Pool({ connectionString: target.toString(), max: 1 })
     await admin.query(`CREATE SCHEMA "${schema}"`)
     target.searchParams.set('options', `-c search_path=${schema}`)

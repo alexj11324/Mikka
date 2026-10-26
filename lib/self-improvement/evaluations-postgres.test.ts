@@ -1,3 +1,4 @@
+import { isolatedPostgresURL } from '../../tests/helpers/isolated-postgres.mjs'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { readdir, readFile } from 'node:fs/promises'
@@ -17,7 +18,7 @@ import { REPORT_BENCHMARK, freezeBenchmarkInstance } from './report-benchmark'
 const databaseURL=improvementTestDatabase(process.env)
 test('PG frozen benchmark queues actual owned assignments atomically and keeps seeds internal',
   {skip:!databaseURL,timeout:120000},async t=>{
-    const target=new URL(databaseURL!),schema=`skill_evaluation_${randomUUID().replaceAll('-','')}`
+    const target=new URL(await isolatedPostgresURL(databaseURL!)),schema=`skill_evaluation_${randomUUID().replaceAll('-','')}`
     const admin=new Pool({connectionString:target.toString(),max:1})
     await admin.query(`CREATE SCHEMA "${schema}"`)
     target.searchParams.set('options',`-c search_path=${schema}`)
