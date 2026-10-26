@@ -112,3 +112,33 @@ test('self-improvement DB suite stays mandatory when its feature exists', () => 
   assert.throws(() => inventory({ [required[0].marker]: '' }, scripts, [], required), /Expected DB suite missing/)
   assert.throws(() => inventory(tree, {}, [], required), /Required script/)
 })
+
+test('isolated fixture databases reject application targets before I/O', async () => {
+  const { isolatedPostgresURL } = await import('../tests/helpers/isolated-postgres.mjs')
+  for (const target of ['postgresql://business.invalid/mikka_e2e', 'postgresql://localhost/mikka',
+    'https://localhost/mikka_e2e', 'postgresql://localhost/mikka_e2e?options=-c%20search_path=public',
+    'postgresql://localhost/mikka_e2e#fragment']) {
+    await assert.rejects(isolatedPostgresURL(target), /disposable test database/)
+  }
+})
+
+test('isolated fixture databases create distinct empty databases and close admin pools on success or failure', async t => {
+  const { Pool } = await import('pg')
+  const { isolatedPostgresURL } = await import('../tests/helpers/isolated-postgres.mjs')
+  const queries = []
+  let ended = 0
+  t.mock.method(Pool.prototype, 'query', async sql => { queries.push(sql) })
+  t.mock.method(Pool.prototype, 'end', async () => { ended++ })
+  const first = new URL(await isolatedPostgresURL(target))
+  const second = new URL(await isolatedPostgresURL(target))
+  assert.notEqual(first.pathname, second.pathname)
+  assert.match(first.pathname, /^\/mikka_fixture_[a-f0-9]{32}$/)
+  assert.equal(first.origin, new URL(target).origin)
+  assert.equal(first.username, new URL(target).username)
+  assert.equal(first.password, new URL(target).password)
+  assert.deepEqual(queries, [first, second].map(url => `CREATE DATABASE "${url.pathname.slice(1)}" TEMPLATE template0`))
+  assert.equal(ended, 2)
+  t.mock.method(Pool.prototype, 'query', async () => { throw new Error('no createdb permission') })
+  await assert.rejects(isolatedPostgresURL(target), /no createdb permission/)
+  assert.equal(ended, 3)
+})

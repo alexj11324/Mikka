@@ -1,3 +1,4 @@
+import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir, mkdir, writeFile } from "node:fs/promises";
@@ -47,11 +48,12 @@ test(
   "PG17 check integration: atomic dispatch, frozen commands, independent provenance, repair/new SHA, restart and closed downstream gates (fixture run reports)",
   { skip: !dbURL, timeout: 120000 },
   async () => {
+    const fixtureURL = await isolatedPostgresURL(dbURL!);
     const schema = `factory_193_${randomUUID().replaceAll("-", "")}`;
-    const admin = new Pool({ connectionString: dbURL, max: 1 });
+    const admin = new Pool({ connectionString: fixtureURL, max: 1 });
     await admin.query(`CREATE SCHEMA "${schema}"`);
     const pool = new Pool({
-      connectionString: dbURL,
+      connectionString: fixtureURL,
       max: 12,
       options: `-c search_path=${schema}`,
     });

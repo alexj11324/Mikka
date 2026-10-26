@@ -1,3 +1,4 @@
+import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -53,11 +54,12 @@ test(
   "PG17: routing, 10-way replay/CAS, actual SQL rollback/reconnect, attempts, candidate fences and API isolation",
   { skip: !dbURL, timeout: 120000 },
   async () => {
+    const fixtureURL = await isolatedPostgresURL(dbURL!);
     const schema = `factory_192_${randomUUID().replaceAll("-", "")}`;
-    const admin = new Pool({ connectionString: dbURL, max: 1 });
+    const admin = new Pool({ connectionString: fixtureURL, max: 1 });
     await admin.query(`CREATE SCHEMA "${schema}"`);
     const pool = new Pool({
-      connectionString: dbURL,
+      connectionString: fixtureURL,
       max: 12,
       options: `-c search_path=${schema}`,
     });
@@ -608,7 +610,7 @@ test(
       );
       // After-commit interruption: close all connections; another store replays durable result.
       const reopened = new Pool({
-        connectionString: dbURL,
+        connectionString: fixtureURL,
         max: 2,
         options: `-c search_path=${schema}`,
       });
@@ -856,7 +858,7 @@ test(
         assert.deepEqual(await store.read("owner", phase.task.id), beforePhase);
         phase = await store.apply("owner", phaseBinding, phaseEvent, wait);
         const reconnect = new Pool({
-          connectionString: dbURL,
+          connectionString: fixtureURL,
           max: 1,
           options: `-c search_path=${schema}`,
         });

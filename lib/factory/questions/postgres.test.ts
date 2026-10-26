@@ -1,3 +1,4 @@
+import { isolatedPostgresURL } from "../../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -35,11 +36,12 @@ test(
   "PG17 execution questions: durable waiting, exact facts/human source, one continuation, rollback and stop fences",
   { skip: !dbURL, timeout: 120000 },
   async (t) => {
+    const fixtureURL = await isolatedPostgresURL(dbURL!);
     const schema = `questions_${randomUUID().replaceAll("-", "")}`;
-    const admin = new Pool({ connectionString: dbURL, max: 1 });
+    const admin = new Pool({ connectionString: fixtureURL, max: 1 });
     await admin.query(`CREATE SCHEMA "${schema}"`);
     const pool = new Pool({
-      connectionString: dbURL,
+      connectionString: fixtureURL,
       max: 12,
       options: `-c search_path=${schema}`,
     });
@@ -494,7 +496,7 @@ test(
           await pool.query("DROP TRIGGER fail_question_bind ON factory_events");
           const result = await questions.answer(orchestrator, request);
           const reconnect = new Pool({
-            connectionString: dbURL,
+            connectionString: fixtureURL,
             options: `-c search_path=${schema}`,
           });
           try {

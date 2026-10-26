@@ -1,3 +1,4 @@
+import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import { createFactoryDispatch } from "./dispatch";
 import { factoryDispatchDatabase } from "./transaction";
 import { insertRunOnce } from "../run-dispatch";
@@ -166,11 +167,12 @@ test(
     const { loadIssueDocument, readIssueThreads } =
       await import("../linear-sync/document");
     marker.deregister();
+    const fixtureURL = await isolatedPostgresURL(target!);
     const schema = `monitor_195_${randomUUID().replaceAll("-", "")}`;
-    const admin = new Pool({ connectionString: target, max: 1 });
+    const admin = new Pool({ connectionString: fixtureURL, max: 1 });
     await admin.query(`CREATE SCHEMA "${schema}"`);
     let pool = new Pool({
-      connectionString: target,
+      connectionString: fixtureURL,
       max: 16,
       options: `-c search_path=${schema}`,
     });
@@ -937,7 +939,7 @@ test(
           const committed = await monitor.consume("owner", sample.input);
           await pool.end();
           pool = new Pool({
-            connectionString: target,
+            connectionString: fixtureURL,
             max: 16,
             options: `-c search_path=${schema}`,
           });

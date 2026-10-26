@@ -1,3 +1,4 @@
+import { isolatedPostgresURL } from './helpers/isolated-postgres.mjs'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -27,8 +28,8 @@ test('real Postgres dispatch transactions and recovery', {
   assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname))
   assert.equal(target.pathname, '/mikka_e2e')
   const schema = `dispatch_${randomUUID().replaceAll('-', '')}`
-  const admin = new Pool({ connectionString: target.toString(), max: 1 })
-  const scoped = new URL(target)
+  const scoped = new URL(await isolatedPostgresURL(target.toString()))
+  const admin = new Pool({ connectionString: scoped.toString(), max: 1 })
   scoped.searchParams.set('options', `-c search_path=${schema}`)
   const connectionString = scoped.toString()
   const client = new Pool({ connectionString, max: 12 })

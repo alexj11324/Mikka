@@ -1,3 +1,4 @@
+import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir, mkdtemp, rm } from "node:fs/promises";
@@ -81,11 +82,12 @@ test(
   "PG17 approval/publish contract: real SQL, HTTP handler, isolated filesystem effect; upstream identities/results are fixtures",
   { skip: !dbURL, timeout: 120000 },
   async (t) => {
+    const fixtureURL = await isolatedPostgresURL(dbURL!);
     const schema = `factory_194_${randomUUID().replaceAll("-", "")}`;
-    const admin = new Pool({ connectionString: dbURL, max: 1 });
+    const admin = new Pool({ connectionString: fixtureURL, max: 1 });
     await admin.query(`CREATE SCHEMA "${schema}"`);
     const pool = new Pool({
-      connectionString: dbURL,
+      connectionString: fixtureURL,
       max: 14,
       options: `-c search_path=${schema}`,
     });
@@ -979,7 +981,7 @@ test(
             /uncertain local outcome/,
           );
           const reconnected = new Pool({
-            connectionString: dbURL,
+            connectionString: fixtureURL,
             max: 1,
             options: `-c search_path=${schema}`,
           });
