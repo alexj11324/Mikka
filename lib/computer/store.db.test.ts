@@ -14,12 +14,12 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
   const admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
-  let created = 0, failSync = false, epoch = 0
+  let created = 0, failSync = false, failStart = false, epoch = 0
   const runtime = {
     async createComputer() { created++; return { sandboxId: 'sandbox-test' } },
     async connectComputer() { return { sandboxId: 'sandbox-test' } },
     async computerState() { return 'sleeping' },
-    async installComputerRuntime() {}, async startDesktop() {},
+    async installComputerRuntime() {}, async startDesktop() { if (failStart) throw new Error('start response lost') },
     async syncDesktopLease(_sandbox: unknown, lease: { epoch: number }) { epoch = lease.epoch; if (failSync) throw new Error('transport failed') },
     async viewerGrant() { return { url: 'wss://test.invalid', expiresAt: new Date().toISOString() } },
   } as unknown as typeof provider
@@ -54,6 +54,14 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.ok(epoch > failedEpoch, 'failed synchronization cannot reuse an old generation')
     assert.equal((await restarted.state(actor, bot.id)).machine, 'sleeping', 'provider pause is reflected')
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM bot_desktops')).rows[0].n, 1)
+    const interrupted = await store.createBot(actor, 'Interrupted start')
+    failStart = true
+    await assert.rejects(store.operate(actor, interrupted.id, 'wake'))
+    failStart = false
+    const later = await store.createBot(actor, 'Later bot')
+    await store.operate(actor, later.id, 'wake')
+    const displays = (await pool.query('SELECT display FROM bot_desktops ORDER BY display')).rows.map(row => row.display)
+    assert.deepEqual(displays, [1, 2, 3], 'uncertain start keeps its binding rather than leaking its desktop to a later bot')
   } finally {
     await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end()
   }

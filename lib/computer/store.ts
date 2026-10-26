@@ -72,6 +72,9 @@ export class ComputerStore {
         if (next > 999) throw new ComputerError(409, 'Desktop limit reached')
         desktop = (await client.query<Desktop>('INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,$4) RETURNING *', [botId, actor.workspaceId, actor.userId, next])).rows[0]
       }
+      // Starting a display can succeed even if the response is lost. Retain its
+      // bot binding so a later bot cannot inherit an orphaned live desktop.
+      persistProgress = true
       await this.runtime.startDesktop(sandbox, desktop.display)
       const held = desktop.control === 'user' && desktop.controlUntil && new Date(desktop.controlUntil).getTime() > Date.now()
       if (action === 'takeover') {
