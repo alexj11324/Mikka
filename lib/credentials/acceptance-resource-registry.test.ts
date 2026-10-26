@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { tmpdir } from 'node:os'
 import { writeFile, symlink, rename, readFile, readdir, lstat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createAcceptanceResourceRegistry, uniqueChildForProfile, safeLaunchFailure, ownNodeChildren, procChildren, processSnapshot, type ProcessIdentity } from './acceptance-resource-registry'
+import { createAcceptanceResourceRegistry, uniqueChildForProfile, safeLaunchFailure, ownNodeChildren, procChildren, processSnapshot, writeRetainedReceipt, type ProcessIdentity } from './acceptance-resource-registry'
 import { OwnedChromiumExecutor, rejectAcceptanceDisposal, guardAcceptanceLaunch, type AcceptanceResources } from './owned-chromium'
 
 test('registry reserves explicit budgets before creation and retains a private per-run root', async () => {
@@ -184,4 +184,24 @@ test('process snapshots reject PID reuse and malformed identity before associati
   await assert.rejects(processSnapshot(51, { ...io, stat: async () => stat(String(++reads)) }), /process changed/)
   await assert.rejects(processSnapshot(51, { ...io, stat: async () => 'bad' }), /invalid proc stat/)
   await assert.rejects(processSnapshot(51, { ...io, status: async () => '' }), /UID required/)
+})
+
+
+test('retained receipt failures preserve existing evidence and never escape through failed logging', async () => {
+  const registry = await createAcceptanceResourceRegistry(tmpdir(), { profiles: 1, launches: 1 })
+  const marker = join(registry.root, 'owner.json'), before = await readFile(marker, 'utf8')
+  const reports: string[] = []
+  assert.equal(await writeRetainedReceipt(marker, { overwrite: 'forbidden' }, message => reports.push(message)), false)
+  assert.equal(await readFile(marker, 'utf8'), before)
+  assert.deepEqual(reports, ['retained receipt write failed; process retained'])
+  for (const code of ['EIO', 'EACCES', 'ENOSPC']) {
+    assert.equal(await writeRetainedReceipt('unused', {}, () => { throw Error('logger failed') }, async () => { throw Object.assign(new Error('private diagnostic'), { code }) }), false)
+  }
+  assert.equal(await writeRetainedReceipt('unused', {}, async () => { throw Error('async logger failed') }, async () => { throw Error('write failed') }), false)
+  const circular: { self?: unknown } = {}; circular.self = circular
+  let writes = 0
+  assert.equal(await writeRetainedReceipt('unused', circular, () => {}, async () => { writes++ }), false)
+  assert.equal(writes, 0)
+  assert.equal(await writeRetainedReceipt('unused', { ok: true }, () => {}, async () => { writes++ }), true)
+  assert.equal(writes, 1)
 })

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { open, lstat, realpath, writeFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createAcceptanceResourceRegistry, ownNodeChildren, readLinuxProcess, processSnapshot } from '../lib/credentials/acceptance-resource-registry.ts'
+import { createAcceptanceResourceRegistry, ownNodeChildren, readLinuxProcess, processSnapshot, writeRetainedReceipt } from '../lib/credentials/acceptance-resource-registry.ts'
 const root = process.env.MIKKA_CREDENTIAL_STARTUP_ROOT
 assert.match(root ?? '', /^\/tmp\/credential-startup-[A-Za-z0-9]+$/)
 assert.equal(await realpath(root), root)
@@ -24,7 +24,7 @@ try {
     '--no-first-run', '--no-default-browser-check', '--disable-breakpad',
     '--host-resolver-rules=MAP * ~NOTFOUND', `--user-data-dir=${profile.profile}`, 'about:blank',
   ], { env: { PATH: '/usr/bin:/bin', HOME: registry.root, TMPDIR: registry.root, LANG: 'C.UTF-8' }, stdio: ['ignore', output.fd, output.fd] })
-  browser.on('exit', (code, signal) => { void writeFile(join(root, 'browser-exit.json'), JSON.stringify({ code, signal, requestedByHarness: false }), { flag: 'wx', mode: 0o600 }).catch(() => console.error('exit receipt write failed; host retained')) })
+  browser.on('exit', (code, signal) => { void writeRetainedReceipt(join(root, 'browser-exit.json'), { code, signal, requestedByHarness: false }) })
   await new Promise((resolve, reject) => { browser.once('spawn', resolve); browser.once('error', reject) })
   await new Promise(resolve => setTimeout(resolve, 2000))
   assert.equal(browser.exitCode, null, 'browser exited before registration')
@@ -57,6 +57,6 @@ try {
   await writeFile(join(root, 'result.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 })
   console.log(JSON.stringify({ pass: true, scope: result.scope, retained: true }))
 } catch (error) {
-  await writeFile(join(root, 'failure.json'), JSON.stringify({ error: String(error), stack: error.stack, browserPid: browser?.pid, exitCode: browser?.exitCode, signalCode: browser?.signalCode, cleanupExecuted: false }), { flag: 'wx', mode: 0o600 }).catch(() => console.error('failure receipt write failed; host retained'))
+  await writeRetainedReceipt(join(root, 'failure.json'), { error: String(error), stack: error.stack, browserPid: browser?.pid, exitCode: browser?.exitCode, signalCode: browser?.signalCode, cleanupExecuted: false })
   console.log(JSON.stringify({ pass: false, retained: true, diagnosis: 'inspect private failure and chromium logs; do not relaunch blindly' }))
 }

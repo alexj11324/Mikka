@@ -33,6 +33,21 @@ export function safeLaunchFailure(cause: unknown) {
   return { version: 1, chain, rawMessageRetained: false, causeChainBound: 4 }
 }
 
+// Receipt errors must never turn a retained browser host into an implicit exit.
+// No overwrite or disposal is permitted, including when diagnosis itself fails.
+export async function writeRetainedReceipt(path: string, payload: unknown,
+  report: (message: string) => void | Promise<void> = console.error,
+  writer: (path: string, content: string) => Promise<void> = (target, content) => writeFile(target, content, { flag: 'wx', mode: 0o600 }),
+): Promise<boolean> {
+  try {
+    await writer(path, JSON.stringify(payload))
+    return true
+  } catch {
+    try { await report('retained receipt write failed; process retained') } catch { /* logging is also non-fatal */ }
+    return false
+  }
+}
+
 export function parseProcStat(text: string) {
   const end = text.lastIndexOf(')')
   assert.ok(end > 0, 'invalid proc stat')
