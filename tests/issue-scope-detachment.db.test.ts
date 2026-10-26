@@ -557,7 +557,9 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.deepEqual((await pool.query('select status,attempts from linear_sync_outbox where "issueId"=$1',[id])).rows[0],{status:'done',attempts:2})
     } finally {hold.release();await Promise.allSettled([old,reclaimed].filter(Boolean))}
   })
-  t.diagnostic(`Synthetic provider boundary: ${provider.requests.length} GraphQL calls redirected to loopback HTTP; no real Linear acceptance`)
+  await pool.query('create table scope184_provider_evidence (payload jsonb not null)')
+  await pool.query('insert into scope184_provider_evidence values ($1)',[JSON.stringify({requests:provider.requests,issues:[...provider.issues.values()],comments:[...provider.comments.values()]})])
+  t.diagnostic(`Synthetic provider boundary: ${provider.requests.length} GraphQL calls redirected to loopback HTTP; retained in scope184_provider_evidence; no real Linear acceptance`)
   assert.equal(rejectedExternalRequests,0,'no real provider request is permitted or required')
   await pool.query(await readFile(new URL('../drizzle/20261026033440_linear_publications.sql', import.meta.url), 'utf8'))
   assert.equal((await pool.query('select scope from issues where id=$1',[issue])).rows[0].scope,'personal')
