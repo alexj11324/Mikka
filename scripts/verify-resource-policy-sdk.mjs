@@ -18,7 +18,8 @@ if(process.env.CI!=='true'||process.env.WORKFLOW_TARGET_WORLD!=='local'||process
 if(!baseline)assert.equal(compiledSource,source)
 const app=new Pool({connectionString:urls.app}),workspace=new Pool({connectionString:urls.workspace}),plans=new Map(),observed=new Map(),runs=[]
 const markers={history:'SYNTHETIC_WORKSPACE_A_HISTORY',summary:'SYNTHETIC_WORKSPACE_A_SUMMARY',memory:'SYNTHETIC_WORKSPACE_A_MEMORY'}
-const log=x=>console.log(JSON.stringify({at:new Date().toISOString(),source,compiledSource,baseline,...x}))
+const trackedChanges=execFileSync('git',['diff','HEAD','--name-only'],{encoding:'utf8'}).trim().split('\n').filter(Boolean)
+const log=x=>console.log(JSON.stringify({at:new Date().toISOString(),source,compiledSource,baseline,trackedChanges,...x}))
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 async function wait(fn,label){const end=Date.now()+45000;while(Date.now()<end){if(await fn())return;await sleep(100)}throw Error('timeout '+label)}
 const server=createServer(async(req,res)=>{
@@ -93,8 +94,8 @@ try{
   for(const decision of [false,true]){
    const f=await resourceFixture(app,workspace,[],false),issueId=randomUUID(),id=randomUUID()
    await app.query('INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,\'SYNTHETIC local withdrawal fixture\',$3,\'todo\',\'normal\')',[issueId,f.owner,{type:'doc',content:[]}])
-   plans.set(id,{issueId})
-   await app.query('INSERT INTO coordinator_events(id,"userId",kind,"issueId","dedupeKey",payload,tier,wake_workspace_id,wake_next_at) VALUES($1,$2,$3,$4,$1::text,$5,$6,$7,clock_timestamp()-interval \'1 second\')',[id,f.owner,decision?'run_report':'user_message',issueId,{text:'Controlled provider success followed by local source withdrawal',workspaceId:f.workspaceId},decision?null:'attention',f.workspaceId])
+   plans.set(id,{issueId,decision})
+   await app.query('INSERT INTO coordinator_events(id,"userId",kind,"issueId","dedupeKey",payload,tier,wake_workspace_id,wake_next_at) VALUES($1::uuid,$2,$3,$4,$1::text,$5,$6,$7,clock_timestamp()-interval \'1 second\')',[id,f.owner,decision?'run_report':'user_message',issueId,{text:'Controlled provider success followed by local source withdrawal',workspaceId:f.workspaceId},decision?null:'attention',f.workspaceId])
    let run
    if(decision){
     assert.ok(process.env.CRON_SECRET,'only the disposable CI runtime sweep token')
@@ -116,8 +117,9 @@ try{
    const calls=observed.get(id);assert.equal(decision?calls.decisionRequests:calls.webRequests,1)
    if(!decision)assert.equal(calls.requests,1,'no next generation after source withdrawal')
    assert.equal((await app.query("SELECT 1 FROM coordinator_messages WHERE source_event_id=$1 AND message->>'role'='assistant'",[id])).rowCount,0)
-   log({phase:'actual production '+resource+' HTTP200 → issue soft-delete → local commit403: no publication/refund/resend',eventId:id,workflowStatus:run?await run.status:null,calls,quota,event})
+   log({phase:'actual formal-runtime '+resource+' HTTP200 → issue soft-delete → local commit403: no publication/refund/resend',eventId:id,workflowStatus:run?await run.status:null,calls,quota,event})
   }
  }
+ for(const [id,plan]of plans)if(plan.issueId){const c=observed.get(id);assert.equal(c.webRequests,plan.decision?0:1);assert.equal(c.decisionRequests,plan.decision?1:0);assert.equal(c.requests,plan.decision?0:1)}
  log({result:baseline?'REPRODUCED actual compiled shared-context policy bypass with synthetic markers only':'PASS actual authenticated dual-workspace SDK prompt-policy boundary; all model transport loopback',buildId:readFileSync('.next/BUILD_ID','utf8').trim()})
 }finally{for(const r of runs)try{if(['pending','running'].includes(await r.status))await r.cancel()}catch{}server.closeAllConnections();await new Promise(r=>server.close(()=>r()));await Promise.all([app.end(),workspace.end()])}

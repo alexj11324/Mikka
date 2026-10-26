@@ -1,0 +1,36 @@
+{"at":"2026-10-26T03:31:25.875Z","source":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","compiledSource":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","baseline":false,"phase":"A-deny/B-selected refuses shared prompt before actual provider/quota","managedB":true,"eventId":"a5f0a0c3-1abf-4626-8c7b-d4e77916df2e","workspaceB":"4e389e7b-a851-4d18-967d-c52ea15ce808","workspaceA":"9da6ec74-9ff6-4db2-b741-e9cf9e57b229","event":{"wake_status":"pending","wake_error":"wakeAdmissionDeferred","wake_workspace_id":"4e389e7b-a851-4d18-967d-c52ea15ce808"},"observed":{"requests":0,"history":false,"summary":false,"memory":false},"quota":[]}
+{"at":"2026-10-26T03:31:26.041Z","source":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","compiledSource":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","baseline":false,"phase":"A-deny/B-selected refuses shared prompt before actual provider/quota","managedB":false,"eventId":"28540e60-386c-43a5-a098-5d9f9fcaaa60","workspaceB":"2785f068-7dca-4e05-a0a3-e07da6895bbe","workspaceA":"b5f56a4d-39b3-4243-92d2-aacf548cbb9b","event":{"wake_status":"pending","wake_error":"wakeAdmissionDeferred","wake_workspace_id":"2785f068-7dca-4e05-a0a3-e07da6895bbe"},"observed":{"requests":0,"history":false,"summary":false,"memory":false},"quota":[]}
+{"at":"2026-10-26T03:31:26.222Z","source":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","compiledSource":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","baseline":false,"phase":"legacy unscoped context representation cannot bypass A policy","seed":"summary","eventId":"4b65dcc4-edc5-49a9-8f4d-6ebc9279c4ae","requests":0}
+{"at":"2026-10-26T03:31:26.386Z","source":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","compiledSource":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","baseline":false,"phase":"legacy unscoped context representation cannot bypass A policy","seed":"memory","eventId":"9203f3c2-be2c-43a2-985b-f90d84e24f88","requests":0}
+{"at":"2026-10-26T03:31:26.549Z","source":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","compiledSource":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","baseline":false,"phase":"legacy unscoped context representation cannot bypass A policy","seed":"history","eventId":"559d70b1-8e37-47c8-87e6-4f88282ade35","requests":0}
+{"at":"2026-10-26T03:31:26.709Z","source":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","compiledSource":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","baseline":false,"phase":"retained managed A suspension cannot drop its global memory policy dependency","eventId":"207eeca5-db53-4a23-8f19-782ec94acf7a","requests":0}
+{"at":"2026-10-26T03:31:27.479Z","source":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","compiledSource":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","baseline":false,"phase":"legitimate shared-context admission retains global context and charges only captured B","secondWorkspace":true,"eventId":"9998d1bd-8203-4ce7-8016-13d4d897f678","observed":{"requests":1,"webRequests":0,"decisionRequests":0,"history":true,"summary":true,"memory":true},"quota":[{"workspace_id":"da4ba100-c416-443e-9be1-76795be3b568","resource":"coordinator.model","state":"settled","settled_units":"2"}]}
+{"at":"2026-10-26T03:31:28.155Z","source":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","compiledSource":"ce2281c2b48fd89ef181bc46508f74c81f08ef67","baseline":false,"phase":"legitimate shared-context admission retains global context and charges only captured B","secondWorkspace":false,"eventId":"b5f3397b-12b1-41c2-afc3-04d6ed8f532f","observed":{"requests":1,"webRequests":0,"decisionRequests":0,"history":true,"summary":true,"memory":true},"quota":[{"workspace_id":"7f728adb-0f89-45b4-a2b8-8d0fa73d184f","resource":"coordinator.model","state":"settled","settled_units":"2"}]}
+/workspace/Mikka-294/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45
+    Error.captureStackTrace(err)
+          ^
+
+error: inconsistent types deduced for parameter $1
+    at /workspace/Mikka-294/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///workspace/Mikka-294/scripts/verify-resource-policy-sdk.mjs:97:4 {
+  length: 142,
+  severity: 'ERROR',
+  code: '42P08',
+  detail: 'text versus uuid',
+  hint: undefined,
+  position: '123',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_param.c',
+  line: '219',
+  routine: 'variable_coerce_param_hook'
+}
+
+Node.js v24.19.0
