@@ -15,6 +15,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { AgentMarkdown } from './agent-markdown'
 import { ThreadStatus, harnessLabel } from './issue-threads'
 import { cn } from '@/lib/utils'
+import { ThreadFeedback } from './self-improvement'
 
 const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm whitespace-pre-wrap break-words'
 
@@ -82,6 +83,7 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
                 </>)}
             </li>)}
           </ol>
+          {data.thread.ownedByCurrentUser && ['succeeded', 'failed'].includes(data.thread.status) && <ThreadFeedback runId={runId} />}
         </>}
     </div>
     {active && detail && <form className={cn('flex shrink-0 flex-col gap-1 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')} onSubmit={event => { void send(event) }}>

@@ -1,4 +1,26 @@
 {
+  "SelfImprovement": {
+    "resume": "继续启用",
+    "activate": "启用已批准的 Skill",
+    "activated": "已记录启用",
+    "feedback": "反馈",
+    "feedbackNote": "补充说明（可选）",
+    "positive": "有帮助",
+    "negative": "需要改进",
+    "saved": "反馈已保存",
+    "error": "操作未完成，请重试。",
+    "candidates": "Skill 候选版本",
+    "review": "查看候选版本",
+    "candidate": "候选指令",
+    "evaluation": "评估",
+    "evidence": "审查和验证证据",
+    "environment": "启用环境",
+    "chooseEnvironment": "选择环境",
+    "preview": "预览",
+    "production": "生产",
+    "approve": "批准启用",
+    "approved": "已记录批准"
+  },
   "Common": {
     "close": "关闭",
     "cancel": "取消",

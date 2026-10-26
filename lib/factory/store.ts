@@ -68,7 +68,7 @@ export type FactoryTaskSummary = Pick<
   | "attemptId"
   | "candidateId"
   | "reason"
->;
+> & { isSkillCandidate: boolean };
 export type FactoryAuthorize = (
   userId: string,
   issueId: string,
@@ -275,7 +275,7 @@ export function createFactoryStore(
       return transaction(async (tx) => {
         if (!(await authorize(userId, issueId, tx))) fail("factoryNotFound");
         const { rows: tasks } = await tx.query<FactoryTaskSummary>(
-          'SELECT id,"issueId",stage,status,revision,"attemptId","candidateId",reason FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2 ORDER BY "updatedAt" DESC,id DESC LIMIT 50',
+          'SELECT t.id,t."issueId",t.stage,t.status,t.revision,t."attemptId",t."candidateId",t.reason, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t WHERE t."userId"=$1 AND t."issueId"=$2 ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
           [userId, issueId],
         );
         return { contractVersion: 1 as const, issueId, tasks };
