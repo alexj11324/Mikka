@@ -127,12 +127,12 @@ test('配图检索通过固定来源查询，并正确处理无结果及上游�
   await assert.rejects(findAgentImage('Victoria Harbour'), /暂时不可用/)
 })
 
-test('图片复用正文入口并共享 SWR 预加载，回复缩略图不懒加载', async () => {
+test('图片使用共享 GET 并保留 SWR 预加载，回复缩略图不懒加载', async () => {
   const loader = await readFile(new URL('../lib/agent-image-loader.ts', import.meta.url), 'utf8')
   const route = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
   const image = await readFile(new URL('../components/workspace/agent-image.tsx', import.meta.url), 'utf8')
   const panel = await readFile(new URL('../components/workspace/agent-panel.tsx', import.meta.url), 'utf8')
-  assert.match(loader, /\/api\/agent\?q=/)
+  assert.match(loader, /\/api\/agent\/images\?q=/)
   assert.match(loader, /preload\(agentImageKey\(query\), loadAgentImage\)/)
   assert.match(route, /export \{ GET \} from '\.\/images\/route'/)
   assert.match(image, /useSWR\(previewImage \? null : agentImageKey\(query\), loadAgentImage/)

@@ -13,7 +13,7 @@ test('shared Bot image lookup uses the canonical GET path and encodes the comple
 test('image loader sends same-origin credentials and returns the saved source metadata', async t => {
   const image = { src: 'https://upload.wikimedia.org/example.jpg', width: 500, height: 300, title: 'Public fixture', source: 'https://commons.wikimedia.org/wiki/File:Fixture.jpg', author: 'Fixture', license: 'CC0' }
   const key = agentImageKey('Public fixture')
-  const fetch = mock.method(globalThis, 'fetch', async (input, init) => {
+  const fetch = mock.method(globalThis, 'fetch', async (input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) => {
     assert.equal(input, key)
     assert.deepEqual(init, { credentials: 'same-origin' })
     return Response.json({ image })
