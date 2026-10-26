@@ -54,6 +54,7 @@
     "test:active-agents": "node --import ./tests/support/server-only.mjs --import tsx --test lib/active-agents.test.ts",
     "test:request-log": "node --import tsx --test lib/request-log.test.ts",
     "test:conversation-reads": "node --import tsx --experimental-test-module-mocks --test lib/conversation-reads-store.test.ts lib/conversation-reads-route.test.ts",
+    "test:approved-writes": "node --import tsx --test lib/operations/approved-writes.test.ts lib/operations/write-provider.test.ts",
     "test:db": "node scripts/run-db-tests.mjs",
     "test:db-runner": "node --test scripts/run-db-tests.test.mjs",
     "test:workspace-migration-db": "node --test tests/workspace-migration.test.mjs",

@@ -9,6 +9,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/operations/approved-writes.ts', file: 'lib/operations/approved-writes.test.ts', script: 'test:approved-writes' },
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-conversations.test.ts', script: 'test:groups' },
   { marker: 'lib/active-agents.ts', file: 'lib/active-agents.test.ts', script: 'test:active-agents' },
   { marker: 'lib/coordinator/group-turns.ts', file: 'lib/coordinator/group-turns.test.ts', script: 'test:group-turns' },
