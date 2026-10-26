@@ -170,6 +170,8 @@ jobs:
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
       - run: pnpm test:e2e:setup
+      - name: Verify thread sharing, membership and privacy against isolated database
+        run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-threads.integration.ts
       - name: Required DB suites (temporary Postgres 17, no skips)
         run: pnpm test:db
         env:
