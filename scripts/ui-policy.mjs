@@ -87,10 +87,12 @@ function checkUtility(token, policy, report, options = {}) {
 
 // MIK-8: the 「新」 unread divider is the only chat file allowed to draw a horizontal rule.
 export const HORIZONTAL_RULE_EXEMPT_FILES = ['components/chat/unread-divider.tsx']
+const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx']
 
 export function auditSource(file, text, policy) {
   const ruleExempt = HORIZONTAL_RULE_EXEMPT_FILES.includes(file)
-  const allowHorizontalRule = file.startsWith('components/settings/') || ruleExempt
+  // R-61/R-63 (Alex 2026-10-25): the issue page's header line and the lines inside a comment card.
+  const allowHorizontalRule = file.startsWith('components/settings/') || ISSUE_PAGE_RULES.includes(file) || ruleExempt
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), variables = new Map(), seen = new Set()
   const add = (node, rule, message) => {

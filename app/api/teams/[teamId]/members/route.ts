@@ -1,3 +1,4 @@
+import { withRequestLog } from '@/lib/request-log'
 import { getTranslations } from 'next-intl/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -5,7 +6,7 @@ import { getSession } from '@/lib/session'
 import { listTeamMembers } from '@/app/actions/teams'
 import { WorkspaceError } from '@/lib/workspace-access'
 
-export async function GET(_request: Request, { params }: { params: Promise<{ teamId: string }> }) {
+async function handleGET(_request: Request, { params }: { params: Promise<{ teamId: string }> }) {
   const i18nText = await getTranslations();
   const headers = { 'Cache-Control': 'private, no-store' }
   if (!(await getSession())?.user) return NextResponse.json({ error: i18nText("Errors.authRequired") }, { status: 401, headers })
@@ -17,3 +18,5 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tea
     return NextResponse.json({ error: error instanceof WorkspaceError ? (i18nText.has(`Errors.${error.code}` as never) ? i18nText(`Errors.${error.code}` as never) : error.message) : i18nText("FeatureCopy.c_411f8090") }, { status: error instanceof WorkspaceError ? 403 : 500, headers })
   }
 }
+
+export const GET = withRequestLog('/api/teams/[teamId]/members', handleGET)
