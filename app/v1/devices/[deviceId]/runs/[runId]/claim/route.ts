@@ -14,7 +14,7 @@ import { isFactoryCheckRun } from '@/lib/factory/checks'
 import { claimFactoryCheckRun, claimExecutionRun, factoryQuestions } from '@/lib/factory/server'
 import { blockQuestionRetry } from '@/lib/factory/questions/retry'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
-import { skillAssignments } from '@/lib/self-improvement/server'
+import { claimBenchmarkAssignment, skillAssignments } from '@/lib/self-improvement/server'
 import { FactoryError } from '@/lib/factory/contract'
 import { ImprovementError } from '@/lib/self-improvement/contract'
 
@@ -170,8 +170,10 @@ export async function POST(
       { status: 409 },
     )
   let skillAssignment
+  let benchmarkAssignment
   try {
     skillAssignment = await skillAssignments.recordClaim(caller.userId, deviceId, runId, leaseExpiresAt, supportsSkillArtifacts)
+    benchmarkAssignment = await claimBenchmarkAssignment(caller.userId,deviceId,runId,leaseExpiresAt)
   } catch (error) {
     // No assignment bytes are returned when provenance cannot be recorded.
     await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Skill assignment provenance unavailable.', finishedAt: new Date(), updatedAt: new Date() })
@@ -232,5 +234,6 @@ export async function POST(
     ...retry,
     ...checkAssignment,
     ...skillAssignment,
+    ...benchmarkAssignment,
   })
 }
