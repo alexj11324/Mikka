@@ -11,15 +11,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { cn } from '@/lib/utils'
-import { sessionPreview, type SavedAgentSession } from '@/lib/agent-history'
+import { sessionPreview } from '@/lib/agent-history'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { LetterAvatar } from './letter-avatar'
 
-/** What the center column shows: the Coordinator, or one agent session. */
+/** Current Bot chat or a read-only historical chat. `agent` is a legacy URL discriminator only. */
 export type Conversation = { kind: 'coordinator' } | { kind: 'agent'; sessionId: string | null }
 
 type ListProps = {
-  sessions: SavedAgentSession[]
   active: Conversation | null
   onOpen: (conversation: Conversation) => void
   rail: RailDestination | null
@@ -87,18 +86,16 @@ function Row({ name, preview, avatar, status, current, unread, onClick, label }:
  * The conversation list beside the icon rail (Figma 48:3): Coordinator first, then agent sessions by latest activity, each a name over a one-line
  * preview. It collapses off canvas; the rail stays.
  */
-export function ConversationList({ sessions, active, onOpen, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: ListProps) {
+export function ConversationList({ active, onOpen, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: ListProps) {
   const i18nText = useTranslations()
   const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
   const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => getCoordinatorChat(), { revalidateOnFocus: false })
-  const recent = [...sessions].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   const lastReply = coordinator?.items.findLast(item => item.from !== 'event')
-  const latest: Record<string, string> = Object.fromEntries(recent.map(session => [session.id, session.updatedAt]))
+  const latest: Record<string, string> = {}
   if (lastReply?.from === 'coordinator') latest.coordinator = lastReply.createdAt
   const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.sessionId ?? null
   const unread = useUnread(activeId, latest)
   function choose(conversation: Conversation) { onOpen(conversation); setOpenMobile(false) }
-  const untitled = i18nText('Nav.untitledConversation')
   const body = <>
     <SidebarHeader className="px-3 pt-3 pb-1">
       <div className="flex h-8 items-center gap-1 pl-1">
@@ -106,7 +103,7 @@ export function ConversationList({ sessions, active, onOpen, rail, onRail, user,
         <span className="sr-only">Mikka</span>
         <div className="ml-auto flex items-center gap-1">
           {!isMobile && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText('Nav.collapseList')} aria-expanded={isMobile ? openMobile : open} onClick={toggleSidebar} />}><PanelLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Nav.collapseList')}</TooltipContent></Tooltip>}
-          <Tooltip><TooltipTrigger render={<Button variant="secondary" size="icon-sm" aria-label={i18nText('Nav.newConversation')} onClick={() => choose({ kind: 'agent', sessionId: null })} />}><Plus data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Nav.newConversation')}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger render={<Button variant="secondary" size="icon-sm" aria-label={i18nText('Nav.openBotChat')} onClick={() => choose({ kind: 'coordinator' })} />}><Plus data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Nav.openBotChat')}</TooltipContent></Tooltip>
         </div>
       </div>
     </SidebarHeader>
@@ -116,12 +113,7 @@ export function ConversationList({ sessions, active, onOpen, rail, onRail, user,
           avatar={<LetterAvatar name="Coordinator" tone="coordinator" />}
           status={coordinator?.working ? 'working' : undefined}
           preview={lastReply ? <span className="truncate">{coordinatorLine(lastReply.text)}</span> : null} />
-        {recent.map(session => {
-          const name = session.title || untitled
-          return <Row key={session.id} name={name} label={name} current={active?.kind === 'agent' && active.sessionId === session.id} unread={unread(session.id)} onClick={() => choose({ kind: 'agent', sessionId: session.id })}
-            avatar={<LetterAvatar name={name} />}
-            preview={session.preview && session.preview !== name ? <span className="truncate">{session.preview}</span> : null} />
-        })}
+
       </SidebarMenu></SidebarGroup>
     </SidebarContent>
     {/* Phones have no rail; its destinations and the account menu move here. */}

@@ -62,7 +62,7 @@ export function GlobalSearch({ open, onOpenChange, sessions, coordinatorLine, is
               <span className="flex min-w-0 flex-col"><span className="truncate font-medium">{tNav('coordinator')}</span>{coordinatorLine && <span className="truncate text-xs text-muted-foreground">{coordinatorLine}</span>}</span>
             </CommandItem>
             {sessions.map(session => {
-              const name = session.title || tNav('untitledConversation')
+              const name = tNav('archivedConversation', { title: session.title || tNav('untitledConversation') })
               return <CommandItem key={session.id} value={`session ${session.id} ${name} ${session.preview ?? ''}`} onSelect={() => pick(() => onConversation({ kind: 'agent', sessionId: session.id }))} className="gap-3 py-2">
                 <LetterAvatar name={name} size="search" />
                 <span className="flex min-w-0 flex-col"><span className="truncate font-medium">{name}</span>{session.preview && session.preview !== name && <span className="truncate text-xs text-muted-foreground">{session.preview}</span>}</span>
@@ -90,7 +90,7 @@ export function GlobalSearch({ open, onOpenChange, sessions, coordinatorLine, is
             {/* i18n-ignore: bilingual search keywords */}
             <CommandItem value="新建任务 create issue new task" onSelect={() => pick(onCreateIssue)}><Plus />{t('newTask')}</CommandItem>
             {/* i18n-ignore: bilingual search keywords */}
-            <CommandItem value="新对话 new conversation chat" onSelect={() => pick(() => onConversation({ kind: 'agent', sessionId: null }))}><SquarePen />{t('newConversation')}</CommandItem>
+            <CommandItem value="Bot coordinator chat" onSelect={() => pick(() => onConversation({ kind: 'coordinator' }))}><SquarePen />{tNav('openBotChat')}</CommandItem>
           </CommandGroup>
         </CommandList>
       </Command>
