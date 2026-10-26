@@ -131,8 +131,9 @@ export class HttpServerLink implements ServerLink {
     }: { timeoutMs?: number; signal?: AbortSignal } = {}
   ): Promise<Response> {
     try {
-      return await this.fetchImpl(serverUrl(this.baseUrl, path), {
+      const response = await this.fetchImpl(serverUrl(this.baseUrl, path), {
         method,
+        redirect: "manual",
         headers: {
           "content-type": "application/json",
           [CLIENT_VERSION_HEADER]: this.clientVersion,
@@ -144,6 +145,10 @@ export class HttpServerLink implements ServerLink {
           ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
           : AbortSignal.timeout(timeoutMs),
       })
+      // Deployment protection is not device-session rejection; never follow it with credentials.
+      if (response.redirected || (response.status >= 300 && response.status < 400))
+        throw new Error(`Unexpected server redirect (${response.status})`)
+      return response
     } catch (error) {
       throw new ServerUnreachableError(error)
     }

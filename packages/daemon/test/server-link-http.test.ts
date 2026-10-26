@@ -1,7 +1,7 @@
 // HttpServerLink and `mikka daemon login` against a scripted fetch: paths,
 // headers, credentials (the device session everywhere), status handling and response
 // decoding with the packages/protocol schemas.
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 
 import { CLIENT_VERSION_HEADER, emptyRunReport } from "@mikka/protocol"
 
@@ -12,6 +12,12 @@ import {
 } from "../src/errors"
 import { deviceLogin, LoginError } from "../src/login"
 import { HttpServerLink, SessionRejectedError } from "../src/server-link-http"
+import { Daemon } from "../src/main"
+import { readJson, writeJsonAtomic } from "../src/fs-util"
+import { createLogger } from "../src/log"
+import { cleanupTempDirs, tempDir } from "./helpers"
+
+afterEach(cleanupTempDirs)
 
 interface Call {
   method: string
@@ -19,6 +25,7 @@ interface Call {
   auth: string | null
   version: string | null
   body: unknown
+  redirect: RequestRedirect | undefined
 }
 
 function scripted(respond: (call: Call) => Response | Promise<Response>): {
@@ -34,6 +41,7 @@ function scripted(respond: (call: Call) => Response | Promise<Response>): {
       auth: headers.get("authorization"),
       version: headers.get(CLIENT_VERSION_HEADER),
       body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      redirect: init?.redirect,
     }
     calls.push(call)
     return respond(call)
@@ -148,6 +156,52 @@ describe("HttpServerLink", () => {
     await expect(offline.listRepos("d")).rejects.toBeInstanceOf(
       ServerUnreachableError
     )
+  })
+
+  it("does not follow deployment SSO redirects or mistake their 401 for device rejection", async () => {
+    let directRejection = false
+    const { fetch, calls } = scripted(call => directRejection
+      ? json({ error: "Unauthorized" }, 401)
+      : call.redirect === "manual"
+        ? Response.redirect("https://sso.example.test/login", 302)
+        : json({ error: "Deployment SSO required" }, 401))
+    const link = new HttpServerLink("https://preview.example.test/mikka", fetch)
+    const redirected = await link.registerDevice("valid-device-session", INFO).catch((error: unknown) => error)
+    expect(redirected).toBeInstanceOf(ServerUnreachableError)
+    expect(redirected).not.toBeInstanceOf(SessionRejectedError)
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toMatchObject({ path: "/mikka/v1/devices/register", redirect: "manual" })
+    await expect(link.claimCoordinator("dev-1", new AbortController().signal)).rejects.toBeInstanceOf(ServerUnreachableError)
+    directRejection = true
+    await expect(link.registerDevice("valid-device-session", INFO)).rejects.toBeInstanceOf(SessionRejectedError)
+    expect(calls.every(call => call.auth === "Bearer valid-device-session")).toBe(true)
+    const ssoResponse = json({ error: "Deployment SSO required" }, 401)
+    Object.defineProperty(ssoResponse, "redirected", { value: true })
+    const followed = new HttpServerLink("https://preview.example.test/mikka", scripted(() => ssoResponse).fetch)
+    await expect(followed.registerDevice("valid-device-session", INFO)).rejects.toBeInstanceOf(ServerUnreachableError)
+  })
+
+  it("preserves the saved credential on a protection redirect and removes it only for a direct 401", async () => {
+    let directRejection = false
+    // Default Fetch follows the deployment's 302 and receives the SSO endpoint's 401.
+    const { fetch } = scripted(call => directRejection
+      ? json({ error: "Unauthorized" }, 401)
+      : call.redirect === "manual"
+        ? Response.redirect("https://sso.example.test/login", 302)
+        : json({ error: "Deployment SSO required" }, 401))
+    const link = new HttpServerLink("https://preview.example.test/mikka", fetch)
+    const daemon = new Daemon({ dataDir: tempDir(), flavor: "dev", link, log: createLogger({ level: "silent" }) })
+    const device = { credential: "valid-device-session" }
+    // Exercise the sync boundary without starting the daemon's local RPC server.
+    Reflect.set(daemon, "device", device)
+    writeJsonAtomic(daemon.paths.device, device)
+    await daemon.syncWithServer()
+    expect(readJson(daemon.paths.device)).toEqual(device)
+    expect(Reflect.get(daemon, "device").credential).toBe(device.credential)
+    directRejection = true
+    await daemon.syncWithServer()
+    expect(readJson(daemon.paths.device)).toEqual({})
+    expect(Reflect.get(daemon, "device").credential).toBeUndefined()
   })
 
   it("refuses a response that does not match the protocol", async () => {
