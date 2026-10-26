@@ -110,10 +110,22 @@ for all users:
   work. No real provider inference or subscription-connection acceptance ran.
 - No cross-profile authentication cookies are copied. Multi-owner isolation and
   authorized same-owner session reuse need their own acceptance.
-- No production database migration, feature-flag enablement or production
-  deployment was performed. A frozen Preview URL is not available yet.
+- Both additive computer migrations were applied and recorded in the production
+  application database after its target was verified against Infisical and Neon.
+  The production template configuration is present; application deployment,
+  feature enablement and authenticated product acceptance remain outstanding.
 
 Keep the cloud-computer feature flag off until those product-level paths are
 integrated and exercised. A successful SDK/desktop probe alone is insufficient.
 
 A subsequent disposable real E2B test reran two-display screenshots, an approved click and replay denial using the broker’s display-bound grants. The sandbox was deleted after the test. The run binding migration and owner/workspace/queued-state tests passed against isolated PostgreSQL 17. Neither test establishes hosted daemon dispatch or model-run integration.
+
+## Production-scoped infrastructure check
+
+Using the E2B configuration from Infisical `prod:/vercel`, the actual store and
+provider created a disposable E2B sandbox, obtained real framebuffer pixels,
+verified unauthorized control denial without marking the machine as failed,
+performed takeover and handback, paused and resumed the machine, and checked
+the retained file. The temporary sandbox was deleted. This used an isolated
+local PostgreSQL schema: it does not establish that a deployed production app,
+a model run or a subscription connection has passed acceptance.
