@@ -23,6 +23,8 @@ async def request_handler(request):
         return web.json_response({'deviceId': body['deviceId'], 'workspaceId': workspace})
     if path.endswith('/heartbeat'):
         return web.json_response({'leases': {}})
+    if path.endswith('/computer'):
+        return web.json_response({'decisions': []})
     if path.endswith('/repos'):
         return web.json_response({'repos': []})
     if path.endswith('/runs'):

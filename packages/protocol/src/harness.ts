@@ -14,6 +14,8 @@ export const harnessInfoSchema = z.object({
   coordinator: z.boolean().optional(),
   /** Set only by a runner with an isolated, owner-bound subscription broker. */
   subscriptionBroker: z.literal(true).optional(),
+  /** Set only by an E2B worker with the guarded Bot computer broker. */
+  computerBroker: z.literal(true).optional(),
   /** Version string reported by the CLI, null when not installed. */
   version: z.string().nullable(),
 })

@@ -25,9 +25,11 @@ import {
 import { jsonlConnection } from "../agents/jsonl-rpc"
 import {
   MCP_SERVER_NAME,
+  COMPUTER_MCP_SERVER_NAME,
   RESUME_MESSAGE,
   RunContext,
   runPaths,
+  type McpServerSpec,
 } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import type { RunChunk } from "../chunks"
@@ -61,6 +63,8 @@ export interface CodexAdapterOptions {
   spawnCli?: typeof spawnCli
   /** Persist an owner-bound session before any prompt can execute. */
   onHostedSession?(sessionId:string):Promise<void>
+  /** Supplied only by trusted hosted infrastructure for this run. */
+  computerMcp?: McpServerSpec
   /** The user's own `CODEX_HOME` (for the auth link); `~/.codex` by default. */
   userHome?: string
   /** Trusted, owner-bound broker only; never a task/model-supplied credential. */
@@ -318,6 +322,11 @@ export class CodexAdapter implements AgentAdapter {
         "-c",
         `mcp_servers.${MCP_SERVER_NAME}.env.${key}=${toml(value)}`,
       ]),
+      ...(this.options.computerMcp ? [
+        "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.command=${toml(this.options.computerMcp.command)}`,
+        "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.args=${toml(this.options.computerMcp.args)}`,
+        ...Object.entries(this.options.computerMcp.env).flatMap(([key, value]) => ["-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env.${key}=${toml(value)}`]),
+      ] : []),
       // Its shells get a filtered env; give them writable temp dirs.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [
         "-c",

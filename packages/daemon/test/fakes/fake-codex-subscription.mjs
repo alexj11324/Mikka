@@ -3,6 +3,7 @@
 import { existsSync, lstatSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
+import { spawn } from "node:child_process"
 
 const send = (value) =>
   process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...value })}\n`)
@@ -69,6 +70,22 @@ lines.on("line", async (line) => {
     const turnId = `fixture-turn-${++turn}`
     send({ id, result: { turn: { id: turnId } } })
     const prompt = params.input[0].text
+    if (prompt === 'COMPUTER') {
+      const prefix = 'mcp_servers.mikka_computer.args='
+      const configured = process.argv.find(value => value.startsWith(prefix))
+      if (!configured) process.exit(2)
+      const proxy = spawn('node', JSON.parse(configured.slice(prefix.length)), { stdio: ['pipe', 'pipe', 'ignore'] })
+      const reply = new Promise((resolve, reject) => {
+        const reader = createInterface({ input: proxy.stdout })
+        reader.once('line', line => { reader.close(); resolve(JSON.parse(line)) })
+        proxy.once('error', reject)
+        proxy.once('exit', code => { if (code) reject(new Error('computer proxy failed')) })
+      })
+      proxy.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'click', arguments: { x: 3, y: 4 } } }) + '\n')
+      const answer = await reply
+      proxy.kill()
+      if (answer.result?.isError) process.exit(2)
+    }
     if(prompt==='PROBE_GIT') {
       const target=lstatSync('.git').isFile()?'.git':'.git/guard'
       try{writeFileSync(target,'synthetic metadata mutation');process.exit(2)}catch(error){if(!['EROFS','EBUSY','EACCES'].includes(error.code))process.exit(2)}

@@ -405,6 +405,13 @@ export class RunSupervisor {
     return [...this.active.keys()]
   }
 
+  /** Computer operations require a live run and a current server lease. */
+  computerRunAllowed(runId: string): boolean {
+    const run = this.active.get(runId)
+    const lease = this.leases.get(runId)
+    return !this.stopping && Boolean(run && !run.cancelRequested && lease !== undefined && lease > Date.now())
+  }
+
   /**
    * Starts a claimed run. The allow-list is checked before any worktree or
    * process exists; a refused run is reported failed with the reason.

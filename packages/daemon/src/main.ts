@@ -76,7 +76,8 @@ import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
 import { createHostedBotRunner } from "./subscription-hosted-runner"
-import type { ComputerBroker } from "./computer/broker.mjs"
+import { ComputerBroker } from "./computer/broker.mjs"
+import { detectComputerDriver, executeDriver } from "./computer/driver.mjs"
 import { pollWebComputerReviews } from "./computer/web-review"
 
 export * from "./server-link"
@@ -120,6 +121,8 @@ export interface DaemonOptions {
   e2bContainerRuntime?: boolean
   /** Trusted infrastructure supplies its already-listening review broker. */
   computerBroker?: ComputerBroker
+  /** Trusted E2B mode: create a guarded broker tied to the run journal. */
+  cloudComputer?: boolean
   /** Long-poll wait for run commands, seconds (default 25; tests shorten). */
   commandsWaitSeconds?: number
   /** Called once the daemon stopped after `daemon.drain`. */
@@ -194,6 +197,7 @@ export class Daemon {
   private fsLoop: Promise<void> = Promise.resolve()
   private reviewAbort: AbortController | null = null
   private reviewLoop: Promise<void> = Promise.resolve()
+  private cloudComputerBroker: ComputerBroker | null = null
   /** Messages handed to an agent whose delivery the server has not taken yet. */
   private unacked = new Set<string>()
   /** Runs this daemon already started cancelling for a stop request. */
@@ -235,14 +239,33 @@ export class Daemon {
       (runId, _item, error) => this.supervisor.markUndeliverable(runId, error)
     )
     this.worktrees = new WorktreeManager(paths.worktrees)
+    if (this.options.cloudComputer) {
+      if (!this.options.hostedSubscriptions || !this.options.e2bContainerRuntime || this.options.computerBroker) throw new Error("Cloud computer runtime unavailable")
+      const driver = await detectComputerDriver('/opt/mikka/computer/cua-driver')
+      if (!driver) throw new Error("Cloud computer driver unavailable")
+      this.cloudComputerBroker = new ComputerBroker({ driver, socketPath: join(paths.dataDir, 'computer.sock'),
+        permitted: runId => {
+          const entry = this.journal.get(runId)
+          return Boolean(!this.stopped && this.registered && entry?.assignment.computer && this.supervisor?.computerRunAllowed(runId))
+        },
+        execute: async (current, call, display, runId) => {
+          const entry = this.journal.get(runId)
+          const computer = entry?.assignment.computer
+          if (!computer || computer.display !== display || computer.ownerId !== entry?.assignment.subscriptionBinding?.ownerId || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
+          return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId })
+        },
+      })
+    }
     const hosted = this.options.hostedSubscriptions
       ? await createHostedBotRunner({
           stateDir: paths.adapterState,
           link: this.options.link,
           binaries: this.options.harnessBinaries,
           ...(this.options.e2bContainerRuntime ? { dockerSocket: "unix:///run/mikka-container/docker.sock" as const } : {}),
+          computerBroker: this.cloudComputerBroker ?? this.options.computerBroker,
         })
       : undefined
+    await this.cloudComputerBroker?.listen()
     const adapters = (this.adapters = new Map<Harness, AgentAdapter>([
       [
         "mock",
@@ -365,7 +388,7 @@ export class Daemon {
     // never pin a run here that no adapter would take. (A detected CLI
     // without an adapter yet is left out; the schema has no "unsupported".)
     const detected = hosted
-      ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const }))
+      ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const, ...(this.cloudComputerBroker ? { computerBroker: true as const } : {}) }))
       : (this.options.harnesses ?? (await detectHarnesses()))
     this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({ ...info, coordinator: hosted ? false : coordinatorCapable(info) }))
     // Runs survive restarts: pick up what the journal says was active.
@@ -669,13 +692,14 @@ export class Daemon {
       this.saveDevice({ deviceId })
       this.log.info({ device_id: deviceId }, "device registered")
     }
-    if (this.options.computerBroker && !this.options.link.syncComputerReviews) throw new Error("Computer review transport unavailable")
+    const computerBroker = this.cloudComputerBroker ?? this.options.computerBroker
+    if (computerBroker && !this.options.link.syncComputerReviews) throw new Error("Computer review transport unavailable")
     this.registered = true
-    if (this.options.computerBroker && !this.stopped) {
+    if (computerBroker && !this.stopped) {
       this.reviewAbort?.abort()
       const abort = new AbortController()
       this.reviewAbort = abort
-      this.reviewLoop = pollWebComputerReviews(this.options.computerBroker, deviceId, this.options.link, abort.signal)
+      this.reviewLoop = pollWebComputerReviews(computerBroker, deviceId, this.options.link, abort.signal)
     }
     this.wakeCommands?.()
   }
@@ -761,6 +785,7 @@ export class Daemon {
     if (existing) return this.supervisor.summary(existing)
     const assignment = await this.options.link.claimRun(deviceId, runId)
     if (assignment.runId !== runId) return this.refuseRun(runId)
+    if (assignment.computer && (!this.cloudComputerBroker || !assignment.subscriptionBinding || assignment.computer.ownerId !== assignment.subscriptionBinding.ownerId)) throw new Error('Cloud computer runtime unavailable')
     return this.supervisor.start(assignment)
   }
 
@@ -1005,6 +1030,7 @@ export class Daemon {
     await this.tick
     await this.rpc?.close()
     await this.supervisor?.stop()
+    await this.cloudComputerBroker?.close()
     await this.outbox?.close()
     const release = this.releaseLock
     this.releaseLock = null

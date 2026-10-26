@@ -5,7 +5,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { ComputerStore } from './store'
 import { bindComputerRun } from './run-binding'
-import { claimLocalRun } from './claim'
+import { claimCloudRun, claimLocalRun } from './claim'
 import { syncComputerReviews, decideComputerReview } from './reviews'
 import { provisionCloudDevice } from './cloud-device'
 import { claimWorkerLease, renewWorkerLease, releaseWorkerLease } from './worker-lease'
@@ -38,17 +38,17 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES (\'alice\'),(\'bob\')')
     const migration = await readFile(new URL('../../drizzle/20261026235901_cloud_computers.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
-    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, status text NOT NULL, "deviceId" uuid, "startedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
+    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "agentId" uuid, status text NOT NULL, "deviceId" uuid, "startedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
     const bindingMigration = await readFile(new URL('../../drizzle/20261027000000_computer_run_bindings.sql', import.meta.url), 'utf8')
     await pool.query(bindingMigration); await pool.query(bindingMigration)
-    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz)')
+    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', enabled boolean NOT NULL DEFAULT true, "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz)')
     const scopeMigration = await readFile(new URL('../../drizzle/20261027000300_cloud_device_scope.sql', import.meta.url), 'utf8')
     await pool.query(scopeMigration); await pool.query(scopeMigration)
     const workerLeaseMigration = await readFile(new URL('../../drizzle/20261027000400_cloud_worker_leases.sql', import.meta.url), 'utf8')
     await pool.query(workerLeaseMigration); await pool.query(workerLeaseMigration)
     const reviewMigration = await readFile(new URL('../../drizzle/20261027000200_local_computer_reviews.sql', import.meta.url), 'utf8')
     await pool.query(reviewMigration); await pool.query(reviewMigration)
-    await pool.query('CREATE TABLE byos_bindings (id uuid PRIMARY KEY); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id))')
+    await pool.query('CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id))')
     const store = new ComputerStore(pool, runtime)
     const bot = await store.createBot(actor, 'Desktop')
     assert.deepEqual(await store.state(actor, bot.id), { machine: 'sleeping', control: 'idle' })
@@ -105,6 +105,20 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.ok(credentials.rows[0].revokedAt)
     assert.equal(credentials.rows[1].revokedAt, null)
     const bobBot = await store.createBot(bob, 'Other owner')
+    const cloudRun = randomUUID(), consumer = randomUUID(), cloudSubscription = randomUUID(), wrongSubscription = randomUUID()
+    await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"deviceId") VALUES ($1,$2,$3,$4,$5)', [cloudRun, actor.userId, consumer, 'queued', worker.deviceId])
+    await bindComputerRun(pool, actor, cloudRun, bot.id)
+    await pool.query('INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId") VALUES ($1,$2,$3,$4),($5,$6,$3,$4)', [cloudSubscription, actor.userId, actor.workspaceId, consumer, wrongSubscription, bob.userId])
+    const deadline = new Date(Date.now() + 30000)
+    assert.equal(await claimCloudRun(pool, otherWorkspace, cloudRun, worker.deviceId, deadline, cloudSubscription), null)
+    assert.equal(await claimCloudRun(pool, actor, cloudRun, worker.deviceId, deadline, wrongSubscription), null)
+    assert.equal(await claimCloudRun(pool, actor, cloudRun, randomUUID(), deadline, cloudSubscription), null)
+    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [worker.deviceId])
+    assert.equal(await claimCloudRun(pool, actor, cloudRun, worker.deviceId, deadline, cloudSubscription), null)
+    await pool.query('UPDATE devices SET enabled=true WHERE id=$1', [worker.deviceId])
+    const cloudClaims = await Promise.all([claimCloudRun(pool, actor, cloudRun, worker.deviceId, deadline, cloudSubscription), claimCloudRun(pool, actor, cloudRun, worker.deviceId, deadline, cloudSubscription)])
+    assert.equal(cloudClaims.filter(Boolean).length, 1)
+    assert.deepEqual(cloudClaims.find(Boolean), { botId: bot.id, ownerId: actor.userId, display: ':1' })
     const runId = randomUUID()
     await pool.query('INSERT INTO agent_runs (id,"userId",status) VALUES ($1,$2,$3)', [runId, actor.userId, 'queued'])
     await assert.rejects(bindComputerRun(pool, bob, runId, bobBot.id), { status: 404 })

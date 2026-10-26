@@ -8,7 +8,7 @@ async function main() {
   const config = consumeCloudBootstrap(`${root}/bootstrap.json`)
   const dataDir = `${root}/worker`
   if (await installCloudCredential(dataDir, config) === 'updated') return
-  const code = await runCli(['daemon', '--data-dir', dataDir, '--server', config.server, '--hosted-subscriptions', '--e2b-container-runtime'])
+  const code = await runCli(['daemon', '--data-dir', dataDir, '--server', config.server, '--hosted-subscriptions', '--e2b-container-runtime', '--e2b-computer'])
   if (code !== null && code !== 0) throw new Error('Cloud worker failed')
 }
 void main().catch(() => { process.stderr.write('Cloud worker unavailable\n'); process.exitCode = 1 })

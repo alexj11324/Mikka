@@ -229,6 +229,11 @@ A shared process lock held across exec also makes takeover wait for an active
 operation before granting the person control. The E2B sandbox was deleted. The
 guard is infrastructure-tested but is not yet injected into a real model run.
 
+The request-only computer MCP has also been injected into hosted Codex and
+Claude Code fixture sessions in real E2B containers. Both synthetic CLIs held
+their click until the matching Bot/display review was approved, then continued.
+No real model inference or deployed product session was involved.
+
 Development and production databases also have the additive cloud-device-scope
 migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
 expiry validation, rotation and the Bot's pending-review state. The worker

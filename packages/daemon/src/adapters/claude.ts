@@ -54,9 +54,11 @@ import {
 } from "../agents/child"
 import {
   MCP_SERVER_NAME,
+  COMPUTER_MCP_SERVER_NAME,
   RESUME_MESSAGE,
   RunContext,
   runPaths,
+  type McpServerSpec,
 } from "../agents/run-context"
 import type { SandboxPolicy } from "../agents/sandbox"
 import { ownDir } from "../agents/harness-home"
@@ -87,6 +89,8 @@ export interface ClaudeAdapterOptions {
   /** Trusted hosted transport; ordinary local sessions retain SDK spawning. */
   spawnHosted?: (options: SpawnOptions, oauthPlaceholder: string) => SpawnedProcess
   onHostedSession?(sessionId:string):Promise<void>
+  /** Supplied only by trusted hosted infrastructure for this run. */
+  computerMcp?: McpServerSpec
   /** `~/.claude` of the user whose login the CLI uses. */
   configDir?: string
   /** Trusted owner-bound broker; the CLI receives no refresh grant. */
@@ -516,6 +520,7 @@ export class ClaudeAdapter implements AgentAdapter {
         },
         mcpServers: {
           [MCP_SERVER_NAME]: { type: "stdio", ...ctx.mcpServer() },
+          ...(this.options.computerMcp ? { [COMPUTER_MCP_SERVER_NAME]: { type: "stdio" as const, ...this.options.computerMcp } } : {}),
         },
         strictMcpConfig: true,
         systemPrompt: {

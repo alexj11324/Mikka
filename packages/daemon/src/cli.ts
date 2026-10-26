@@ -53,6 +53,7 @@ export async function runCli(
       "stall-minutes": { type: "string" },
       "hosted-subscriptions": { type: "boolean", default: false },
       "e2b-container-runtime": { type: "boolean", default: false },
+      "e2b-computer": { type: "boolean", default: false },
       token: { type: "string" },
       workspace: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
@@ -170,6 +171,7 @@ export async function runCli(
       fixturesDir: values["fixtures-dir"],
       hostedSubscriptions: values["hosted-subscriptions"],
       e2bContainerRuntime: values["e2b-container-runtime"],
+      cloudComputer: values["e2b-computer"],
       stallMs: values["stall-minutes"]
         ? Number(values["stall-minutes"]) * 60_000
         : undefined,

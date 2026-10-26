@@ -29,6 +29,7 @@ import type { AgentSandbox } from "./agents/sandbox";
 import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import type { ServerLink } from "./server-link";
 import { readJson, writeJsonAtomic } from "./fs-util";
+import type { ComputerBroker } from "./computer/broker.mjs";
 
 const exec = promisify(execFile);
 const image = HOSTED_NATIVE_IMAGE;
@@ -50,6 +51,8 @@ export async function createHostedBotRunner(host: {
   binaries?: Partial<Record<"codex" | "claude_code", string>>;
   /** Passed only by trusted E2B infrastructure, never by a task. */
   dockerSocket?: "unix:///run/mikka-container/docker.sock";
+  /** Optional trusted request-only desktop broker owned by the cloud daemon. */
+  computerBroker?: ComputerBroker;
 }) {
   if (
     process.platform !== "linux" ||
@@ -459,6 +462,16 @@ export async function createHostedBotRunner(host: {
         await close();
         throw unavailable();
       }
+      const computer = assignment.computer;
+      if (computer && (!host.computerBroker || computer.ownerId !== selected.ownerId)) {
+        await close();
+        throw unavailable();
+      }
+      const computerGrant = computer ? host.computerBroker!.spec(assignment.runId, "ask", { display: computer.display }) : undefined;
+      if (computer && !computerGrant) { await close(); throw unavailable(); }
+      const computerMcp = computerGrant ? {
+        command: "node", args: ["/mikka-computer/proxy.mjs", "/run/mikka-computer.sock", computerGrant.token], env: {},
+      } : undefined;
       const containerArgs = [
         "create",
         "--pull=never",
@@ -490,6 +503,11 @@ export async function createHostedBotRunner(host: {
         `${MCP_SERVER_SCRIPT}:${MCP_SERVER_SCRIPT}:ro`,
         "-v",
         `${broker.socket}:/run/mikka-native.sock:ro`,
+        ...(computerGrant ? [
+          "-v", `${computerGrant.socketPath}:/run/mikka-computer.sock:ro`,
+          "-v", `${fileURLToPath(new URL("./computer/proxy.mjs", import.meta.url))}:/mikka-computer/proxy.mjs:ro`,
+          "-v", `${fileURLToPath(new URL("./computer/driver.mjs", import.meta.url))}:/mikka-computer/driver.mjs:ro`,
+        ] : []),
         "-v",
         `${cwd}:${cwd}${options.policy?.readOnly ? ":ro" : ""}`,
         "-v",
@@ -583,6 +601,7 @@ export async function createHostedBotRunner(host: {
                 sandbox: blockedSandbox,
                 spawnCli: codexSpawn,
                 onHostedSession: record,
+                computerMcp,
                 subscriptionAuth: {
                   accountId: first.accountId,
                   verify: async () => {
@@ -601,6 +620,7 @@ export async function createHostedBotRunner(host: {
             : new ClaudeAdapter({
                 stateDir: host.stateDir,
                 onHostedSession: record,
+                computerMcp,
                 spawnHosted: (config, token) => {
                   if (token !== placeholder) throw unavailable();
                   return spawnHosted(config);
