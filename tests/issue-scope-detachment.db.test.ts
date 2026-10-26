@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 // Only the dedicated cloud-Linux test DB or Actions' ephemeral service. Never
@@ -93,6 +94,32 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   for (const id of [owner,member]) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Synthetic\',$3,\'member\',\'active\')', [workspace,id,`${id}@example.invalid`])
   await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Scope\',\'MIK\')', [team,workspace,owner])
   await pool.query('insert into linear_team_syncs (id,"ownerId","linearTeamId","linearTeamKey","linearTeamName") values ($1,$2,$3,\'MIK\',\'Synthetic\')', [sync,owner,team])
+  // Recreate the pre-verification migration state in this fresh synthetic DB
+  // so an unlinked terminal job can exist exactly as it could before 2242.
+  // Later replays restore 2242 and 2243 before any application assertions.
+  await pool.query(await readFile(new URL('../drizzle/20261026224000_team_issue_creation_gate.sql',import.meta.url),'utf8'))
+  const legacyFailed=randomUUID()
+  await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Legacy failed-only task\',$3,\'todo\',\'normal\',\'workspace\')',[legacyFailed,owner,doc])
+  await pool.query('update linear_sync_outbox set status=\'failed\',attempts=8 where "issueId"=$1',[legacyFailed])
+  assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status=\'failed\'',[legacyFailed])).rows[0].n,1)
+  fixtureIds.push(legacyFailed)
+  // A synthetic legacy Linear-origin task imported before verified-target
+  // migration, now on generation 2. The trusted migration derives the flag
+  // from its immutable revision-1 Linear history; no fixture sets it directly.
+  const legacyImported=randomUUID(), legacyLink=randomUUID()
+  await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"scopeVersion",revision) values ($1,$2,\'Legacy imported task\',$3,\'todo\',\'normal\',\'workspace\',2,1)',[legacyImported,owner,doc])
+  await pool.query('insert into issue_versions (id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id) values ($1,$2,$3,1,\'Legacy imported task\',$4,\'todo\',\'normal\',\'system\',\'linear\')',[randomUUID(),legacyImported,owner,doc])
+  await pool.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") values ($1,$2,$3,$4,$2::uuid::text,\'MIK-legacy\')',[legacyLink,legacyImported,owner,sync])
+  await pool.query('update linear_sync_outbox set status=\'done\' where "issueId"=$1',[legacyImported])
+  assert.equal((await pool.query('select "externalTargetVerified" from linear_issue_links where id=$1',[legacyLink])).rows[0].externalTargetVerified,false)
+  // Replay the tracked migration's legacy backfill while the isolated DB has
+  // only this synthetic legacy fixture. It includes its normal trigger DDL.
+  await pool.query(await readFile(new URL('../drizzle/20261026224200_require_verified_team_promotion.sql',import.meta.url),'utf8'))
+  // Restore the subsequent tracked scope gate; the older migration replaces
+  // its function body. This leaves the suite on the exact final policy.
+  await pool.query(await readFile(new URL('../drizzle/20261026224300_team_issue_promotions.sql',import.meta.url),'utf8'))
+  assert.equal((await pool.query('select "externalTargetVerified" from linear_issue_links where id=$1',[legacyLink])).rows[0].externalTargetVerified,true)
+  fixtureIds.push(legacyImported)
   await pool.query('insert into devices (id,"ownerId",name) values ($1,$2,\'Synthetic\')', [device,member])
   await pool.query('insert into agents (id,"userId",harness,name,"deviceId") values ($1,$2,\'codex\',\'Synthetic\',$3)', [agent,member,device])
   await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","baseBranch") values ($1,$2,$3,\'/synthetic/issue184\',\'main\')', [repo,device,member])
@@ -627,16 +654,23 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.equal(provider.requests.length,calls)
   })
   await t.test('retained failed outbox alone gates retirement without a link or publication',async()=>{
-    const id=randomUUID();await seed(id)
-    // The job is produced by a verified import and its ordinary update. Scope
-    // retirement removes that fixture link and marks the job done; synthesise
-    // the retained historical failed state without bypassing any insert gate.
-    await privatize(id);await republish(id)
-    await pool.query('update linear_sync_outbox set status=\'failed\',attempts=8 where "issueId"=$1',[id])
-    assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,0)
-    assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,0)
-    const row=(await pool.query('select revision from issues where id=$1',[id])).rows[0]
-    assert.deepEqual(await actAs(owner,()=>setIssueScope({id,revision:row.revision,scope:'personal'})),{error:'issueScopeInLinear'})
+    assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[legacyFailed])).rows[0].n,0)
+    assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[legacyFailed])).rows[0].n,0)
+    assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status=\'failed\'',[legacyFailed])).rows[0].n,1)
+    assert.deepEqual(await actAs(owner,()=>setIssueScope({id:legacyFailed,revision:1,scope:'personal'})),{error:'issueScopeInLinear'})
+  })
+  await t.test('legacy generation 2 verified import is retried by the public action with generation 2',async()=>{
+    provider.issues.set(legacyImported,{...remote(legacyImported),title:'Legacy imported task',updatedAt:'2020-01-01T00:00:00.000Z'})
+    assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status in (\'queued\',\'processing\',\'failed\')',[legacyImported])).rows[0].n,0)
+    const calls=provider.requests.length
+    assert.deepEqual(await action(()=>retryLinearIssue(legacyImported),async()=>{
+      const job=(await pool.query('select "scopeVersion" from linear_sync_outbox where "issueId"=$1 and status=\'queued\'',[legacyImported])).rows[0]
+      assert.equal(job.scopeVersion,2)
+    }),{success:true})
+    assert.ok(provider.requests.length>calls)
+    const link=(await pool.query('select "linearIssueId","externalTargetVerified","syncStatus" from linear_issue_links where "issueId"=$1',[legacyImported])).rows[0]
+    assert.deepEqual(link,{linearIssueId:legacyImported,externalTargetVerified:true,syncStatus:'synced'})
+    assert.equal((await pool.query('select "scopeVersion" from linear_issue_publications where "issueId"=$1',[legacyImported])).rows[0].scopeVersion,2)
   })
   await t.test('manual retry reaches the explicitly imported verified target and retains its generation',async()=>{
     const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
