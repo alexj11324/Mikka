@@ -15,8 +15,25 @@ export function webComputerSnapshots(broker: ComputerBroker): LocalComputerReque
 }
 
 /** One authenticated sync; failures leave the broker pending and never approve. */
-export async function syncWebComputerReviews(broker: ComputerBroker, deviceId: string, link: { syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[]): Promise<LocalComputerDecision[]> }) {
+export async function syncWebComputerReviews(broker: ComputerBroker, deviceId: string, link: { syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]> }, signal?: AbortSignal) {
   if (!link.syncComputerReviews) throw new Error('Computer review transport unavailable')
-  const decisions = await link.syncComputerReviews(deviceId, webComputerSnapshots(broker))
+  const decisions = await link.syncComputerReviews(deviceId, webComputerSnapshots(broker), signal)
+  if (signal?.aborted) return
   await applyWebComputerDecisions(broker, decisions)
+}
+
+/** A worker owns this loop for its lifetime. A failed upload cannot approve a
+ * call; retrying preserves the original pending request and digest. */
+export async function pollWebComputerReviews(broker: ComputerBroker, deviceId: string, link: { syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]> }, signal: AbortSignal, intervalMs = 1000) {
+  if (!link.syncComputerReviews) throw new Error('Computer review transport unavailable')
+  while (!signal.aborted) {
+    try { await syncWebComputerReviews(broker, deviceId, link, signal) } catch { /* pending calls remain unapproved */ }
+    if (signal.aborted) break
+    await new Promise<void>(resolve => {
+      const done = () => { clearTimeout(timer); signal.removeEventListener('abort', done); resolve() }
+      const timer = setTimeout(done, intervalMs)
+      signal.addEventListener('abort', done, { once: true })
+      if (signal.aborted) done()
+    })
+  }
 }

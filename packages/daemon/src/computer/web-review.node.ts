@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { ComputerBroker } from './broker.mjs'
-import { applyWebComputerDecisions, syncWebComputerReviews, webComputerSnapshots } from './web-review'
+import { applyWebComputerDecisions, pollWebComputerReviews, syncWebComputerReviews, webComputerSnapshots } from './web-review'
 import { computerSyncBody } from '@mikka/protocol/computer'
 
 test('web decision releases original MCP call and scripted model continues screenshot -> click; no raw driver or repeated execution', async t => {
@@ -56,4 +56,27 @@ test('web decision releases original MCP call and scripted model continues scree
   await applyWebComputerDecisions(broker, [{ id: row.id, digest: row.digest, approve: true }])
   await rejected
   assert.equal(calls, 2)
+})
+
+test('review polling retries transport failures without granting and stops on abort', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'cua-poll-'))
+  let executed = 0, attempts = 0
+  const broker = new ComputerBroker({ socketPath: join(dir, 'socket'),
+    driver: { installed: true, path: '/fake', version: 'test', fingerprint: 'f'.repeat(64) }, permitted: () => true,
+    execute: async () => { executed++; return 'ok' },
+  })
+  t.after(async () => { await broker.close(); await rm(dir, { recursive: true, force: true }) })
+  const grant = broker.spec(randomUUID(), 'ask', { display: ':1' })!
+  const result = broker.request(grant.token, { name: 'click', arguments: { x: 1, y: 2 } })
+  const abort = new AbortController()
+  const polling = pollWebComputerReviews(broker, 'device', { async syncComputerReviews(_id, requests) {
+    attempts++
+    if (attempts === 1) { assert.equal(executed, 0); throw new Error('offline') }
+    return [{ id: requests[0].id, digest: requests[0].digest, approve: true }]
+  } }, abort.signal, 5)
+  assert.equal(await result, 'ok')
+  abort.abort()
+  await polling
+  assert.equal(attempts, 2)
+  assert.equal(executed, 1)
 })

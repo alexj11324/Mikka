@@ -83,7 +83,7 @@ export interface ServerLink {
   /** Fails with `RunNotPinnedHereError` for runs pinned elsewhere. */
   claimRun(deviceId: string, runId: string): Promise<RunAssignment>
   /** Owner-reviewed computer requests; responses carry decisions only. */
-  syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[]): Promise<LocalComputerDecision[]>
+  syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]>
   /** Private hosted-run channel; these methods never return provider tokens. */
   nativeContext?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeBrokerContext>
   nativeRequest?(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal):Promise<{contentType:string;body:ReadableStream<Uint8Array>}>

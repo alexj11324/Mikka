@@ -241,8 +241,8 @@ export class HttpServerLink implements ServerLink {
       { schema: runAssignmentSchema, claimOf: runId }
     )
   }
-  async syncComputerReviews(deviceId: string, requests: LocalComputerRequest[]) {
-    const result = await this.call("POST", computerSyncPath(checkId(deviceId)), { body: { requests }, schema: computerSyncResponse })
+  async syncComputerReviews(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal) {
+    const result = await this.call("POST", computerSyncPath(checkId(deviceId)), { body: { requests }, schema: computerSyncResponse, signal })
     return result.decisions
   }
   async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
