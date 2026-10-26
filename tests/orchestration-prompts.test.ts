@@ -64,11 +64,13 @@ test('claim initializes mailboxes before the queued-to-preparing compare-and-set
   assert.match(claim, /Run is already claimed/)
 })
 
-test('Bot turns advertise messaging only when mailbox setup succeeds', () => {
-  const route = source('app/api/agent/route.ts')
-  assert.match(route, /mailboxes.conversation\([\s\S]*?\.catch\(/)
-  assert.match(route, /mailboxActor \? mailboxTools\(mailboxes, mailboxActor, \(\) => authorizePolicyTool\(session.user.id\)\) : \{\}/)
-  assert.match(route, /mailboxActor \? MAILBOX_INSTRUCTIONS : ''/)
+test('retired standalone chat cannot dispatch; Bot mailbox effects require the durable consumer receipt', () => {
+  assert.doesNotMatch(source('app/api/agent/route.ts'), /export async function POST|mailboxTools|generateText/)
+  const steps=source('workflows/coordinator/steps.ts')
+  assert.match(steps,/if\(!execution\)throw new WakeError\('wakeReceiptRequired'\)/)
+  assert.match(steps,/coordinatorInbox\(\).effect\(userId,execution,async tx=>/)
+  assert.match(steps,/mailboxes.conversation\(userId, 'coordinator','coordinator',tx\)/)
+  assert.match(steps,/mailboxes.send\(actor,[\s\S]*?,tx\)/)
 })
 
 test('device discovery and the final claim predicate both reject disabled mailboxes', () => {

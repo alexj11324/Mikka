@@ -121,7 +121,7 @@ const webProvider=createFirecrawlProvider((input,init)=>{
   return scope.send(input,init)
 },{resolve:async hostname=>{
   if(controlledOrigin()){
-    if(hostname!=='fixture.public.invalid')throw new Error('resourceControlledHostInvalid')
+    if(hostname!=='fixture.public.example.org')throw new Error('resourceControlledHostInvalid')
     return [{address:'8.8.8.8'}]
   }
   const {lookup}=await import('node:dns/promises')

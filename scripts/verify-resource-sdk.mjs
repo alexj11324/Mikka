@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {createServer} from 'node:http'
 import {once} from 'node:events'
+import {createHmac,randomUUID} from 'node:crypto'
 import {execFileSync} from 'node:child_process'
 import {Pool} from 'pg'
 import {start} from 'workflow/api'
@@ -21,10 +22,25 @@ const inbox=new CoordinatorInbox(app,isolatedInboxOptions(app,workspace,()=>new 
 const manifest=JSON.parse(readFileSync('.next/diagnostics/workflows-manifest.json'))
 const entry=manifest.workflows['workflows/coordinator/workflow.ts'].coordinatorTurn
 let currentOperation,calls=0
+const plans=new Map(),counts=new Map()
+const answer=(text)=>({content:[{type:'text',text}],finishReason:{unified:'stop',raw:'stop'},usage:{inputTokens:{total:5,noCache:5,cacheRead:0,cacheWrite:0},outputTokens:{total:7,text:7,reasoning:0}},warnings:[]})
 const server=createServer(async(req,res)=>{
- for await(const _d of req){}
- calls++
- res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify({content:[{type:'text',text:'CONTROLLED compiled WorkflowAgent response; no real provider'}],finishReason:{unified:'stop',raw:'stop'},usage:{inputTokens:{total:5,noCache:5,cacheRead:0,cacheWrite:0},outputTokens:{total:7,text:7,reasoning:0}},warnings:[]}))
+ let body='';for await(const d of req)body+=d
+ const id=req.headers['x-controlled-operation-id'],logical=req.headers['x-controlled-logical-endpoint']
+ let plan=plans.get(id)
+ if(!plan&&id){const event=(await app.query('SELECT payload FROM coordinator_events WHERE id=$1',[id])).rows[0];const text=event?.payload?.text;if(text?.startsWith('CONTROLLED_TOOL ')){plan=JSON.parse(text.slice(16));plans.set(id,plan)}}
+ const c=counts.get(id)??{model:0,search:0,scrape:0};counts.set(id,c)
+ if(logical?.startsWith('https://api.firecrawl.dev/v2/')){
+  const op=logical.endsWith('/scrape')?'scrape':'search';c[op]++
+  if(plan?.reject){res.writeHead(plan.reject,{'content-type':'application/json','retry-after':'1'}).end('{}');return}
+  const input=JSON.parse(body)
+  res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify(op==='scrape'?{success:true,data:{markdown:'Controlled public page evidence. '+('x'.repeat(14000)),metadata:{statusCode:200,sourceURL:input.url,url:input.url}}}:{success:true,data:{web:[{url:'https://fixture.public.example.org/page',title:'controlled title',description:'controlled snippet'}]}}));return
+ }
+ c.model++;calls++
+ if(plan?.operation&&c.model===1){
+  res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify({...answer(''),content:[{type:'tool-call',toolCallId:'controlled-tool-one',toolName:plan.operation==='scrape'?'read_webpage':'web_search',input:JSON.stringify(plan.operation==='scrape'?{url:plan.url??'https://fixture.public.example.org/page'}:{query:'controlled public evidence',limit:2})}],finishReason:{unified:'tool-calls',raw:'tool_calls'}}));return
+ }
+ res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify(answer('CONTROLLED compiled WorkflowAgent response; no real provider')))
 })
 server.listen(6183,'127.0.0.1');await once(server,'listening')
 const log=x=>console.log(JSON.stringify({at:new Date().toISOString(),...x}))
@@ -52,7 +68,44 @@ try{
  assert.deepEqual(quota.map(r=>[r.resource,r.state,r.settled_units]),[['coordinator.model','settled','2']])
  assert.equal((await app.query("SELECT count(*)::int n FROM coordinator_messages WHERE source_event_id=$1 AND message->>'role'='assistant'",[f.operationId])).rows[0].n,1)
  assert.ok(stepLists.some(r=>r.steps.some(s=>s.name.includes('doGenerateStep')&&s.status==='completed')))
- log({result:'PASS actual compiled WorkflowAgent generation, canonical quota/source fence and original chat publication; controlled provider HTTP',source:sha,diagnosticBuild:diagnostic})
+ const origin='http://127.0.0.1:3180'
+ async function cookie(owner){
+  const token=randomUUID()
+  await app.query('INSERT INTO session(id,token,"userId","expiresAt","createdAt","updatedAt") VALUES($1,$2,$3,now()+interval \'1 hour\',now(),now())',[randomUUID(),token,owner])
+  return `better-auth.session_token=${encodeURIComponent(token+'.'+createHmac('sha256','isolated-resource-proof-no-production-authorization-123456789').update(token).digest('base64'))}`
+ }
+ for(const plan of [{operation:'scrape'},{operation:'search'},{operation:'scrape',reject:429},{operation:'scrape',url:'https://127.0.0.1/private'}]){
+  // Community scope has no managed tool executor. Managed policy is verified
+  // separately below and must keep its existing denial.
+  const actor=await resourceFixture(app,workspace,[coordinatorRoute(COORDINATOR_MODEL)],false),authCookie=await cookie(actor.owner),submissionId=randomUUID()
+  // The event ID is server-derived, so register the plan before asynchronous wake.
+  // Resolve the canonical id from recordUserSubmission rather than guessing it.
+  const post=()=>fetch(origin+'/mikka/api/coordinator/messages',{method:'POST',headers:{cookie:authCookie,origin,'content-type':'application/json'},body:JSON.stringify({text:'CONTROLLED_TOOL '+JSON.stringify(plan),submissionId})})
+  // The transport chooses the controlled fixture plan from the persisted text.
+  plans.set(actor.owner,plan)
+  const responses=await Promise.all(Array.from({length:10},post)),bodies=await Promise.all(responses.map(r=>r.json()))
+  assert.ok(responses.every(r=>r.status===202),JSON.stringify(bodies))
+  assert.equal(new Set(bodies.map(b=>b.sourceEventId)).size,1)
+  const operationId=bodies[0].sourceEventId
+  plans.set(operationId,plan)
+  await wait(async()=>['completed','failed','cancelled'].includes((await app.query('SELECT wake_status FROM coordinator_events WHERE id=$1',[operationId])).rows[0]?.wake_status),'HTTP Bot tool completion')
+  const row=(await app.query('SELECT wake_status,wake_error,wake_workspace_id,wake_transport_run_id FROM coordinator_events WHERE id=$1',[operationId])).rows[0]
+  const quota=(await app.query('SELECT resource,state,settled_units FROM quota_reservations WHERE owner_id=$1 ORDER BY created_at',[actor.owner])).rows
+  const stepData=row.wake_transport_run_id?(await world.steps.list({runId:row.wake_transport_run_id,resolveData:'none'})).data.map(s=>({name:s.stepName,status:s.status})):[]
+  log({phase:'actual authenticated HTTP → durable Bot → WorkflowAgent tool loop',operationId,plan,row,counts:counts.get(operationId),quota,steps:stepData})
+  assert.equal(row.wake_status,'completed');assert.equal(row.wake_workspace_id,actor.workspaceId)
+  assert.equal(counts.get(operationId)?.model,2)
+  assert.equal(counts.get(operationId)?.scrape??0,plan.operation==='scrape'&&!plan.url?1:0)
+  assert.equal(counts.get(operationId)?.search??0,plan.operation==='search'?1:0)
+  assert.equal(quota.filter(r=>r.resource==='coordinator.model'&&r.state==='settled').length,2)
+  if(plan.reject)assert.ok(quota.some(r=>r.resource==='web.scrape'&&r.state==='refunded'&&r.settled_units==='0'))
+  if(!plan.reject&&!plan.url)assert.ok(quota.some(r=>r.resource==='web.'+plan.operation&&r.state==='settled'&&r.settled_units==='1'))
+  if(!plan.url)assert.ok(stepData.some(s=>s.name.includes('executeWakeTool')&&s.status==='completed'))
+  else assert.equal(stepData.filter(s=>s.name.includes('executeWakeTool')).length,0)
+  const chat=(await app.query("SELECT message FROM coordinator_messages WHERE source_event_id=$1 AND message->>'role'='assistant'",[operationId])).rows
+  assert.ok(chat.length)
+ }
+ log({result:'PASS actual compiled WorkflowAgent generation, canonical quota/source fence, authenticated Bot search/scrape and original chat publication; controlled provider HTTP',source:sha,diagnosticBuild:diagnostic})
 }finally{
  for(const r of runs)try{if(['pending','running'].includes(await r.status))await r.cancel()}catch{}
  server.closeAllConnections();await new Promise(r=>server.close(()=>r()));await Promise.all([app.end(),workspace.end()])
