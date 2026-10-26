@@ -533,6 +533,82 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     }
     assert.equal(provider.requests.length,calls)
   })
+  async function inbound(type:'Issue'|'Comment',action:string,data:Record<string,unknown>) {
+    const deliveryId=`scope-inbound-${randomUUID()}`
+    await pool.query('insert into linear_sync_inbox ("deliveryId","organizationId","eventType",payload) values ($1,\'synthetic\',$2,$3)',[deliveryId,type,JSON.stringify({type,action,organizationId:'synthetic',data})])
+    await processLinearInboxDelivery(deliveryId)
+    assert.equal((await pool.query('select status from linear_sync_inbox where "deliveryId"=$1',[deliveryId])).rows[0].status,'done')
+  }
+  await t.test('verified issue and comment removal events preserve links and acknowledge the remote removal',async()=>{
+    const id=randomUUID();await seed(id)
+    const link=(await pool.query('select id from linear_issue_links where "issueId"=$1',[id])).rows[0]
+    const commentId=randomUUID(),commentLinkId=randomUUID()
+    await pool.query('insert into linear_comment_links (id,"issueLinkId","threadId","messageId","linearCommentId","bodyHash") values ($1,$2,\'remove-thread\',\'remove-message\',$3,\'synthetic\')',[commentLinkId,link.id,commentId])
+    const calls=provider.requests.length
+    await inbound('Comment','remove',{id:commentId,issueId:id})
+    assert.equal((await pool.query('select "syncStatus" from linear_comment_links where id=$1',[commentLinkId])).rows[0].syncStatus,'remote_removed')
+    await inbound('Issue','remove',{id,teamId:team})
+    const current=(await pool.query('select "externalTargetVerified","syncStatus","remoteRemovedAt" is not null removed from linear_issue_links where id=$1',[link.id])).rows[0]
+    assert.deepEqual(current,{externalTargetVerified:true,syncStatus:'remote_removed',removed:true})
+    assert.equal(provider.requests.length,calls)
+  })
+  await t.test('removal waiting for the issue lock cannot write after retirement commits',async()=>{
+    const id=randomUUID();await seed(id)
+    const locker=await pool.connect();let delivery:Promise<void>|undefined
+    const beforeCalls=provider.requests.length
+    try {
+      await locker.query('begin');await locker.query('select id from issues where id=$1 for update',[id])
+      delivery=inbound('Issue','remove',{id,teamId:team})
+      await waitFor(async()=>Boolean((await pool.query("select 1 from pg_stat_activity where datname=current_database() and wait_event_type='Lock' and query like '%issues%for update%' and pid<>pg_backend_pid()")).rows[0]),'remove did not wait for the issue lock')
+      await locker.query('update issues set scope=\'personal\',revision=revision+1 where id=$1',[id])
+      await locker.query('commit')
+      const snapshot=(await pool.query('select title,status,scope,revision,"updatedAt" from issues where id=$1',[id])).rows[0]
+      await delivery
+      assert.deepEqual((await pool.query('select title,status,scope,revision,"updatedAt" from issues where id=$1',[id])).rows[0],snapshot)
+      assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,0)
+      assert.equal(provider.requests.length,beforeCalls)
+    } finally {await locker.query('rollback');locker.release();if(delivery) await Promise.allSettled([delivery])}
+  })
+  await t.test('external UUID collision with personal task cannot clear diagnostics or change personal data',async()=>{
+    const result=await action(()=>saveIssue({title:'Personal external collision',content:JSON.parse(doc),status:'todo',priority:'normal'}))
+    assert.ok('issue' in result && result.issue);const id=result.issue.id;fixtureIds.push(id)
+    provider.issues.set(id,remote(id))
+    await pool.query('update linear_team_syncs set "lastError"=\'preserved-personal-diagnostic\' where id=$1',[sync])
+    const snapshot=(await pool.query('select title,status,scope,revision,"updatedAt" from issues where id=$1',[id])).rows[0]
+    const calls=provider.requests.length
+    await inbound('Issue','update',{id,teamId:team})
+    assert.deepEqual((await pool.query('select title,status,scope,revision,"updatedAt" from issues where id=$1',[id])).rows[0],snapshot)
+    assert.equal((await pool.query('select "lastError" from linear_team_syncs where id=$1',[sync])).rows[0].lastError,'preserved-personal-diagnostic')
+    assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,0)
+    assert.ok(provider.requests.length>calls)
+    assert.ok(provider.requests.slice(calls).every(call=>call.operation==='MikkaLinearIssue'))
+  })
+  await t.test('blocked workspace reservation cannot let an incoming snapshot clear later diagnostics',async()=>{
+    const id=randomUUID();await seed(id,id,false);await privatize(id);const promoted=await republish(id)
+    const remoteId=randomUUID()
+    await pool.query('insert into linear_issue_publications (id,"issueId","ownerId","teamSyncId","scopeVersion","linearIssueId") values ($1,$2,$3,$4,$5,$6)',[randomUUID(),id,owner,sync,promoted.scopeVersion,remoteId])
+    provider.issues.set(remoteId,remote(remoteId))
+    await pool.query('update linear_team_syncs set "lastError"=\'preserved-blocked-diagnostic\' where id=$1',[sync])
+    const snapshot=(await pool.query('select title,status,scope,revision,"updatedAt" from issues where id=$1',[id])).rows[0]
+    const calls=provider.requests.length
+    await inbound('Issue','update',{id:remoteId,teamId:team})
+    assert.deepEqual((await pool.query('select title,status,scope,revision,"updatedAt" from issues where id=$1',[id])).rows[0],snapshot)
+    assert.equal((await pool.query('select "lastError" from linear_team_syncs where id=$1',[sync])).rows[0].lastError,'preserved-blocked-diagnostic')
+    assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,0)
+    assert.ok(provider.requests.length>calls)
+    assert.ok(provider.requests.slice(calls).every(call=>call.operation==='MikkaLinearIssue'))
+  })
+  await t.test('a genuinely new remote task still imports through the authorized team and clears its diagnostic',async()=>{
+    const id=randomUUID();fixtureIds.push(id);provider.issues.set(id,remote(id))
+    await pool.query('update linear_team_syncs set "lastError"=\'new-remote-control\' where id=$1',[sync])
+    const calls=provider.requests.length
+    await inbound('Issue','update',{id,teamId:team})
+    const current=(await pool.query('select i.scope,i."linearSyncBlocked",l."externalTargetVerified" from issues i join linear_issue_links l on l."issueId"=i.id where i.id=$1',[id])).rows[0]
+    assert.deepEqual(current,{scope:'workspace',linearSyncBlocked:false,externalTargetVerified:true})
+    assert.equal((await pool.query('select "lastError" from linear_team_syncs where id=$1',[sync])).rows[0].lastError,null)
+    assert.ok(provider.requests.length>calls)
+    assert.ok(provider.requests.slice(calls).every(call=>call.operation==='MikkaLinearIssue'))
+  })
   await t.test('an in-flight old update cannot write personal state or upload its captured comments',async()=>{
     const id=randomUUID();await seed(id)
     provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
