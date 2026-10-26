@@ -19,6 +19,7 @@ const workspaceURL=process.env.MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL ?? url
 for(const value of [url,workspaceURL])if(value){const u=new URL(value);assert.equal(u.hostname,'127.0.0.1');assert.ok(['/mikka_review','/mikka_e2e','/mikka_workspace_review'].includes(u.pathname))}
 if(process.env.MIKKA_TEST_NATIVE_GROUPS==='1')assert.equal(process.env.MIKKA_NATIVE_DISPOSAL_AUTHORIZED,'1','Native profile requires explicit runtime disposal authorization before any fixture executes')
 test('actual HTTP dispatch → group mailbox → isolated fake worker → trusted revision', {skip:!url},async t=>{
+ const fixtureContainer='mikka-group-fixture-'+randomUUID()
  const schema='bridge_'+randomUUID().replaceAll('-',''),admin=new Pool({connectionString:url})
  const wsAdmin=new Pool({connectionString:workspaceURL})
  await admin.query(`CREATE SCHEMA "${schema}"`);await wsAdmin.query(`CREATE SCHEMA "${schema}_ws"`)
@@ -81,7 +82,7 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
     assert.ok(!JSON.stringify(assignment).includes('PRIVATE_INSTRUCTIONS_SENTINEL'))
     assert.deepEqual(assignment.capabilities,{tools:[],history:[],repository:null,credentials:null})
     // No host mounts, network, inherited environment, writable root or privileges.
-    const child=spawn('docker',['run',...(process.env.KEEP_GROUP_TEST_FIXTURES?[]:['--rm']),'--interactive','--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--user','65534','--pids-limit','32','node:24-bookworm-slim','node','-e',`let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{let a=JSON.parse(s).envelope.untrustedData.artifact;console.log(JSON.stringify({body:'Proposed a revision for review.',proposal:{artifactId:a.artifactId,baseVersionId:a.baseVersionId,baseHash:a.hash,content:'hello improved world!'}}))})`],{env:{PATH:process.env.PATH,NODE_ENV:'test'},signal})
+    const child=spawn('docker',['run','--name',fixtureContainer,...(process.env.KEEP_GROUP_TEST_FIXTURES?[]:['--rm']),'--interactive','--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--user','65534','--pids-limit','32','node:24-bookworm-slim','node','-e',`let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{let a=JSON.parse(s).envelope.untrustedData.artifact;console.log(JSON.stringify({body:'Proposed a revision for review.',proposal:{artifactId:a.artifactId,baseVersionId:a.baseVersionId,baseHash:a.hash,content:'hello improved world!'}}))})`],{env:{PATH:process.env.PATH,NODE_ENV:'test'},signal})
     let text='',err='';child.stdout.on('data',d=>text+=d);child.stderr.on('data',d=>err+=d);child.stdin.end(JSON.stringify(assignment))
     await new Promise<void>((resolve,reject)=>{child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(new Error(err)))})
     return JSON.parse(text)
@@ -174,5 +175,5 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
    await t.test('actual daemon startup routes BOTH CC/Codex CLI adapters with isolated fake binaries',()=>nativeGroupAcceptance({pool,command:(id:string,user:string,input:unknown)=>groupReviewCommand(pool,directory,id,user,input),port,agentId,ccAgentId,newRequest,post,worker}))
   }
   for(const table of ['session','account','device_tokens','run_tokens'])assert.equal((await pool.query(`SELECT count(*) FROM "${table}"`)).rows[0].count,'0')
- }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));await pool.end();await ws.end();if(!process.env.KEEP_GROUP_TEST_FIXTURES)await admin.query(`DROP SCHEMA "${schema}" CASCADE`);if(!process.env.KEEP_GROUP_TEST_FIXTURES)await wsAdmin.query(`DROP SCHEMA "${schema}_ws" CASCADE`);await admin.end();await wsAdmin.end()}
+ }finally{if(process.env.KEEP_GROUP_TEST_FIXTURES)console.log('Group retained fixtures: '+JSON.stringify({appSchema:schema,workspaceSchema:schema+'_ws',container:fixtureContainer}));await new Promise<void>(resolve=>server.close(()=>resolve()));await pool.end();await ws.end();if(!process.env.KEEP_GROUP_TEST_FIXTURES)await admin.query(`DROP SCHEMA "${schema}" CASCADE`);if(!process.env.KEEP_GROUP_TEST_FIXTURES)await wsAdmin.query(`DROP SCHEMA "${schema}_ws" CASCADE`);await admin.end();await wsAdmin.end()}
 })

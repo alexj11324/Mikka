@@ -5,7 +5,7 @@ if(process.argv.includes('--describe')){console.log(JSON.stringify(profile,null,
 assert.equal(process.argv[2],profile.file,'Required native test file must remain explicit')
 // Retained DB/build fixtures do not disable the real adapter cancellation and
 // container disposal contract. Never silently omit the native subtest.
-assert.equal(process.env.MIKKA_NATIVE_DISPOSAL_AUTHORIZED,'1','Native profile requires explicit authorization for its task-owned runtime container/process disposal; KEEP_GROUP_TEST_FIXTURES is insufficient')
+assert.equal(process.env.MIKKA_NATIVE_DISPOSAL_AUTHORIZED,'1','Native profile requires explicit authorization for its task-owned runtime container and directory deletion; KEEP_GROUP_TEST_FIXTURES is insufficient')
 assert.ok(process.env.MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL,'Native integration requires an explicit separate workspace database URL')
 assert.equal(new URL(process.env.MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL).pathname,'/mikka_workspace_review','Workspace database must be exactly mikka_workspace_review')
 assert.equal(new URL(process.env.MIKKA_DISPOSABLE_POSTGRES_URL).pathname,'/mikka_review','App database must be exactly mikka_review, distinct from workspace')
