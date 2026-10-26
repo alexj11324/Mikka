@@ -238,8 +238,8 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
       await pool.query('create trigger reject_mailbox_setup before insert on session_mailboxes for each row execute function reject_mailbox_setup()')
       await assert.rejects(store.run(owner, next), /injected mailbox setup/)
       assert.deepEqual((await pool.query('select status,"mailboxId" from agent_runs where id=$1', [next])).rows[0], { status: 'queued', mailboxId: null })
-      await pool.query('drop trigger reject_mailbox_setup on session_mailboxes')
-      await pool.query('drop function reject_mailbox_setup()')
+      if(process.env.KEEP_GROUP_TEST_FIXTURES)await pool.query('alter table session_mailboxes disable trigger reject_mailbox_setup')
+      else {await pool.query('drop trigger reject_mailbox_setup on session_mailboxes');await pool.query('drop function reject_mailbox_setup()')}
       assert.ok((await store.run(owner, next)).mailboxId)
     })
     await t.test('disabling a mailbox blocks an already queued continuation until the owner explicitly re-enables it', async () => {
@@ -291,7 +291,7 @@ test('isolated PostgreSQL mailbox vertical slice', async t => {
     })
   } finally {
     await pool.end()
-    await admin.query(`drop schema "${schema}" cascade`)
+    if(!process.env.KEEP_GROUP_TEST_FIXTURES)await admin.query(`drop schema "${schema}" cascade`)
     await admin.end()
   }
 })

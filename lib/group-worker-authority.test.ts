@@ -103,7 +103,8 @@ test('trusted issue-less group HTTP assignment and commit-time workspace authori
      await blocker.query('SELECT pg_advisory_unlock(936236)');blocker.release()
      await Promise.allSettled([writing,...(revoking?[revoking]:[])])
      await ws.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='member'`,[workspaceId]);await pool.query('UPDATE device_tokens SET "revokedAt"=NULL WHERE id=$1',[tokenId])
-     await pool.query('DROP TRIGGER authority_pause ON conversation_messages; DROP FUNCTION authority_pause()')
+     if(process.env.KEEP_GROUP_TEST_FIXTURES)await pool.query(`ALTER TABLE conversation_messages DISABLE TRIGGER authority_pause; ALTER TRIGGER authority_pause ON conversation_messages RENAME TO authority_pause_${fence}; ALTER FUNCTION authority_pause() RENAME TO authority_pause_${fence}`)
+     else await pool.query('DROP TRIGGER authority_pause ON conversation_messages; DROP FUNCTION authority_pause()')
     }
    }
   })
@@ -114,7 +115,7 @@ test('trusted issue-less group HTTP assignment and commit-time workspace authori
     assert.equal((await finish(r,c.body.claimEpoch)).status,500)
     assert.equal((await pool.query(`SELECT count(*) FROM conversation_messages WHERE "conversationId"=$1 AND "authorType"='agent'`,[r.conversationId])).rows[0].count,'0')
     assert.equal((await pool.query('SELECT status FROM conversation_work WHERE id=$1',[r.work.id])).rows[0].status,'dispatched')
-   }finally{await pool.query('DROP TRIGGER authority_reject_insert ON conversation_messages; DROP FUNCTION authority_reject_insert()')}
+   }finally{if(process.env.KEEP_GROUP_TEST_FIXTURES)await pool.query('ALTER TABLE conversation_messages DISABLE TRIGGER authority_reject_insert');else await pool.query('DROP TRIGGER authority_reject_insert ON conversation_messages; DROP FUNCTION authority_reject_insert()')}
    assert.equal((await finish(r,c.body.claimEpoch)).body.status,'completed')
    assert.equal((await finish(r,c.body.claimEpoch)).body.status,'completed')
    assert.equal((await pool.query(`SELECT count(*) FROM conversation_messages WHERE "conversationId"=$1 AND "authorType"='agent'`,[r.conversationId])).rows[0].count,'1')

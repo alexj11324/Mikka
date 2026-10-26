@@ -17,6 +17,19 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
    const dockerKeys=['DOCKER_HOST','DOCKER_CONTEXT','DOCKER_CONFIG'] as const
    const oldDocker=Object.fromEntries(dockerKeys.map(key=>[key,process.env[key]]))
    const configsBefore=(await readdir(tmpdir())).filter(name=>name.startsWith('mikka-group-docker-')).sort()
+   const originalPath=process.env.PATH,realDockerPath=(await exec('which',['docker'])).stdout.trim()
+   const registry=join(build,'resource-receipts.jsonl'),auditBin=join(build,'audit-bin')
+   await mkdir(auditBin)
+   await writeFile(join(auditBin,'docker'),`#!/usr/bin/env node
+const {spawnSync}=require('node:child_process');const {appendFileSync}=require('node:fs');const args=process.argv.slice(2),config=args[args.indexOf('--config')+1],name=args.includes('--name')?args[args.indexOf('--name')+1]:null;
+if(config&&config.includes('mikka-group-docker-'))appendFileSync(${JSON.stringify(registry)},JSON.stringify({action:'runtime-config',path:config})+'\\n');
+if(name)appendFileSync(${JSON.stringify(registry)},JSON.stringify({action:'create-request',name})+'\\n');
+const child=spawnSync(${JSON.stringify(realDockerPath)},args,{stdio:args.includes('create')?['inherit','pipe','inherit']:'inherit'});
+if(child.stdout){process.stdout.write(child.stdout);if(name)appendFileSync(${JSON.stringify(registry)},JSON.stringify({action:'created',name,id:child.stdout.toString().trim(),status:child.status})+'\\n')}
+if(args.includes('rm'))appendFileSync(${JSON.stringify(registry)},JSON.stringify({action:'remove-result',names:args.slice(args.indexOf('rm')+1).filter(x=>!x.startsWith('-')),status:child.status})+'\\n');
+process.exit(child.status??1)
+`,{mode:0o700})
+   process.env.PATH=auditBin+':'+originalPath
    const previous=process.env.PRIVATE_HOST_SENTINEL
    process.env.PRIVATE_HOST_SENTINEL='PRIVATE_HOST_SENTINEL'
    try{
@@ -166,9 +179,10 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
     const running=await exec('docker',['--host','unix:///var/run/docker.sock','--config',join(build,'docker-config'),'ps','--all','--filter','name=mikka-group-cli-','--format','{{.Names}}'],{env:{PATH:process.env.PATH,NODE_ENV:'test'},timeout:5000})
     assert.equal(running.stdout.trim(),'','poisoned Docker context must not strand a running OR unstarted cancelled worker container')
    }finally{
+    if(originalPath===undefined)delete process.env.PATH;else process.env.PATH=originalPath
     if(previous===undefined)delete process.env.PRIVATE_HOST_SENTINEL;else process.env.PRIVATE_HOST_SENTINEL=previous
     for(const key of dockerKeys){if(oldDocker[key]===undefined)delete process.env[key];else process.env[key]=oldDocker[key]}
-    if(process.env.KEEP_NATIVE_TEST_FIXTURES){const receipt={build,dataDir,images:[image,badImage,badCapImage,missingCapImage].filter(Boolean),retained:true,runtimeContainerDeletionStillRequired:true};await writeFile(join(build,'retained-resources.json'),JSON.stringify(receipt,null,2));console.log('Native retained resources: '+JSON.stringify(receipt))}
+    if(process.env.KEEP_NATIVE_TEST_FIXTURES){const receipt={build,dataDir,registry,images:[image,badImage,badCapImage,missingCapImage].filter(Boolean),retained:true,runtimeContainerDeletionStillRequired:true};await writeFile(join(build,'retained-resources.json'),JSON.stringify(receipt,null,2));console.log('Native retained resources: '+JSON.stringify(receipt))}
     if(!process.env.KEEP_NATIVE_TEST_FIXTURES)await rm(build,{recursive:true,force:true});for(const id of [image,badImage,badCapImage,missingCapImage])if(id&&!process.env.KEEP_NATIVE_TEST_FIXTURES)await exec('docker',['image','rm',id]).catch(()=>{})
    }
 
