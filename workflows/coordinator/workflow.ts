@@ -6,7 +6,8 @@ import { WorkflowAgent } from '@ai-sdk/workflow'
 import { isStepCount, tool } from 'ai'
 import { getWorkflowMetadata } from 'workflow'
 import { z } from 'zod'
-import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
+import { COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
+import {AGENT_MAX_ROUNDS} from '@/lib/agent-rounds'
 import { createComposioAITools, createGoogleAITools } from '@/lib/composio-actions'
 import { bindingSchema, routeSchema } from '@/lib/factory/contract'
 import { factoryDispatchSchema } from '@/lib/factory/dispatch'
@@ -49,7 +50,7 @@ export async function coordinatorTurn(userId: string, delivery: WakeDelivery) {
       if(!generation.generate)return
       const { instructions, messages } = await steps.preparePrompt(userId,source)
       messages.push(...recovered)
-      const result = await agent.generate({ instructions, messages, timeout:45000, maxOutputTokens:8192, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep })
+      const result = await agent.generate({ instructions, messages, timeout:45000, maxOutputTokens:8192, stopWhen: isStepCount(AGENT_MAX_ROUNDS), prepareStep: coordinatorStep })
       replyText=result.text.trim()?result.text:'没有生成回复，请再试一次'
       const output=result.text.trim()?result.responseMessages:[...result.responseMessages,{role:'assistant' as const,content:replyText}]
       await steps.appendMessages(userId,holder,[...recovered,...output],turnWarning(result.finishReason,result.text),inbox.actionContext,delivery)
