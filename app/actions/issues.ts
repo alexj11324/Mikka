@@ -19,6 +19,7 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
 import { ensureIssueNumbers } from '@/lib/issue-numbering'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
+import { createTeamIssueForUser } from '@/lib/team-issue-create'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { issueDoneEvent } from '@/lib/coordinator-events'
@@ -128,6 +129,14 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
       return { error: 'issueSaveFailed' }
     }
   })
+}
+
+/** Explicit local team choice. Use a stable requestId on retries. No Linear
+ * destination is inferred; the returned task is blocked from provider sync. */
+export async function createIssueForTeam(input: { requestId: string; teamId: string; title: string; content: JSONContent; status: string; priority: string }) {
+  const userId = await getUserId()
+  if (activityActor(userId).actorType !== 'user') return { error: 'teamIssueAccessDenied' as const }
+  return createTeamIssueForUser(userId, input)
 }
 
 export async function moveIssue(input: { id: string; status: string; revision: number }): Promise<ActionResult<{ issue: IssueView }>> {

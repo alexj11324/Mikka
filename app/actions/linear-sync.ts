@@ -79,7 +79,7 @@ export async function retryLinearIssue(issueId: string) {
     // snapshot above may predate retirement or another publication generation.
     const [latest] = await tx.select().from(issues).where(eq(issues.id, issue.id)).for('update')
     if (!latest || latest.userId !== user.id) return { error: 'issueOwnerOnly' as const }
-    if (latest.scope !== 'workspace' || readIssueMetadata(latest.content).deletedAt) return { error: 'linearIssueInvalid' as const }
+    if (latest.linearSyncBlocked || latest.scope !== 'workspace' || readIssueMetadata(latest.content).deletedAt) return { error: 'linearIssueInvalid' as const }
     // Never relabel a retired claim as current work. Supersede any stale open
     // row before inserting into the issue-wide partial unique index.
     await tx.update(linearSyncOutbox).set({ status: 'done', claimToken: null, updatedAt: new Date() })

@@ -18,10 +18,10 @@ const createIssueSchema = z.object({
 })
 
 /** `actor` is who issue history records as creating it, decided by the caller on the server. */
-export async function createIssueForUserInTransaction(tx: Transaction, userId: string, input: unknown, actor: ActivityActor) {
+export async function createIssueForUserInTransaction(tx: Transaction, userId: string, input: unknown, actor: ActivityActor, options?: { id: string; linearSyncBlocked: boolean }) {
   const parsed = createIssueSchema.safeParse(input)
   if (!parsed.success) return null
-  const id = crypto.randomUUID()
+  const id = options?.id ?? crypto.randomUUID()
   const number = await allocateIssueNumbers(tx, userId)
   const metadata = { ...readIssueMetadata({ type: 'doc' }), number }
   const [issue] = await tx.insert(issues).values({
@@ -30,6 +30,7 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
     id,
     userId,
     revision: 1,
+    linearSyncBlocked: options?.linearSyncBlocked ?? false,
   }).returning()
   await tx.insert(issueVersions).values({
     id: crypto.randomUUID(),

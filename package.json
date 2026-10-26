@@ -51,7 +51,7 @@
     "test:issue-search": "node --import ./scripts/server-test.mjs --import tsx --test lib/issue-search.test.ts",
     "test:issue-search-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/issue-search.db.test.ts",
     "test:visibility-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/team-visibility.db.test.ts",
-    "test:scope-detachment-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/issue-scope-detachment.db.test.ts",
+    "test:scope-detachment-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/issue-scope-detachment.db.test.ts tests/team-issue-create.db.test.ts",
     "test:active-agents": "node --import ./tests/support/server-only.mjs --import tsx --test lib/active-agents.test.ts",
     "test:request-log": "node --import tsx --test lib/request-log.test.ts",
     "test:legacy-reads": "node --import tsx --experimental-test-module-mocks --test lib/agent-image-loader.test.ts tests/legacy-read-routes.test.ts",

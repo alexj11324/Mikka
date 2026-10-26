@@ -17,7 +17,7 @@ export class RetiredPublicationError extends Error {
 export async function reserveLinearPublication(issueId: string, fence?: OutboxFence, expectedScopeVersion = fence?.scopeVersion) {
   return db.transaction(async tx => {
     const [issue] = await tx.select().from(issues).where(eq(issues.id, issueId)).for('update')
-    if (!issue || issue.scope !== 'workspace' || readIssueMetadata(issue.content).deletedAt || (expectedScopeVersion !== undefined && issue.scopeVersion !== expectedScopeVersion)) return null
+    if (!issue || issue.linearSyncBlocked || issue.scope !== 'workspace' || readIssueMetadata(issue.content).deletedAt || (expectedScopeVersion !== undefined && issue.scopeVersion !== expectedScopeVersion)) return null
     if (fence && !await claimCurrent(fence, tx)) return null
     const [linked] = await tx.select({ link: linearIssueLinks, team: linearTeamSyncs }).from(linearIssueLinks)
       .innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId)).where(eq(linearIssueLinks.issueId, issue.id)).limit(1)
@@ -49,7 +49,7 @@ async function claimCurrent(fence: OutboxFence, executor: Reader) {
 export async function requireCurrentPublication(snapshot: Publication, executor: Reader = db) {
   const [row] = await executor.select({ id: issues.id }).from(issues)
     .innerJoin(linearIssuePublications, eq(linearIssuePublications.issueId, issues.id))
-    .where(and(eq(issues.id, snapshot.issue.id), eq(issues.userId, snapshot.issue.userId), eq(issues.scope, 'workspace'), eq(issues.scopeVersion, snapshot.publication.scopeVersion),
+    .where(and(eq(issues.id, snapshot.issue.id), eq(issues.userId, snapshot.issue.userId), eq(issues.scope, 'workspace'), eq(issues.linearSyncBlocked, false), eq(issues.scopeVersion, snapshot.publication.scopeVersion),
       eq(linearIssuePublications.id, snapshot.publication.id), isNull(linearIssuePublications.retiredAt))).limit(1)
   if (!row || (snapshot.fence && !await claimCurrent(snapshot.fence, executor))) throw new RetiredPublicationError()
 }

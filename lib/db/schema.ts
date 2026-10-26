@@ -23,6 +23,7 @@ export const issues = pgTable('issues', {
   // Workspace issues sync with Linear; personal ones never leave Mikka (MIK-46).
   scope: text('scope').$type<'workspace' | 'personal'>().notNull().default('personal'),
   scopeVersion: integer('scopeVersion').notNull().default(1),
+  linearSyncBlocked: boolean('linearSyncBlocked').notNull().default(false),
   // The agent judges scope at creation; a person's change wins and teaches the next judgment (MIK-47).
   scopeSetBy: text('scopeSetBy').$type<'agent' | 'user'>().notNull().default('agent'),
   scopeConfidence: real('scopeConfidence'),
@@ -30,6 +31,12 @@ export const issues = pgTable('issues', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc())])
+export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
+  requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(),
+  issueId: uuid('issueId').notNull().unique(), teamId: uuid('teamId').notNull(),
+  fingerprint: text('fingerprint').notNull(), status: text('status').$type<'preparing' | 'complete'>().notNull().default('preparing'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
 // The personal issue prefix someone chose; without a row it comes from their email (MIK-46).
 export const issuePrefixes = pgTable('issue_prefixes', {
   userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
