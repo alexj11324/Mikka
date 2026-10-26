@@ -1,11 +1,13 @@
+import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { auth } from '@/lib/auth'
 import { agentImageQuery, findAgentImage } from '@/lib/agent-images'
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const headers = { 'Cache-Control': 'private, no-store' }
   if (request.headers.get('sec-fetch-site') === 'cross-site') return Response.json({ error: agentCopy.crosssiteRequestsAreNotAllowed }, { status: 403, headers })
   const session = await auth.api.getSession({ headers: request.headers })
+  noteLogUser(session?.user?.id)
   if (!session?.user) return Response.json({ error: agentCopy.pleaseSignInFirst }, { status: 401, headers })
   const query = agentImageQuery.safeParse(new URL(request.url).searchParams.get('q'))
   if (!query.success) return Response.json({ error: agentCopy.imageKeywordsMustBe2160CharactersAnd }, { status: 400, headers })
@@ -15,3 +17,5 @@ export async function GET(request: Request) {
     return Response.json({ error: agentCopy.imageSourcesAreTemporarilyUnavailableTheResponse }, { status: 502, headers })
   }
 }
+
+export const GET = withRequestLog('/api/agent/images', handleGET)

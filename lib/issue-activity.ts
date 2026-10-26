@@ -30,6 +30,12 @@ export type IssueActivityEvent = {
   priority?: string
   title?: string
   assigneeName?: string
+  /** `type:id` of whoever made the change; null for rows from before MIK-17 and for subtasks. */
+  actorKey?: string | null
+}
+
+function actorKeyOf(version: ActivityVersion) {
+  return version.actorType ? `${version.actorType}:${version.actorId ?? ''}` : null
 }
 
 function timestamp(value: Date | string) {
@@ -49,27 +55,28 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
   const ordered = [...versions].sort((a, b) => a.revision - b.revision)
   const events: IssueActivityEvent[] = []
   const created = ordered.find(version => version.revision === 1) ?? ordered[0]
-  if (created) events.push({ id: `created-${created.id}`, at: timestamp(created.createdAt), kind: 'created' })
+  if (created) events.push({ id: `created-${created.id}`, at: timestamp(created.createdAt), kind: 'created', actorKey: actorKeyOf(created) })
   for (let index = 1; index < ordered.length; index += 1) {
     const previous = ordered[index - 1]
     const current = ordered[index]
     const at = timestamp(current.createdAt)
-    if (current.status !== previous.status) events.push({ id: `status-${current.id}`, at, kind: 'status', status: current.status })
-    if (current.priority !== previous.priority) events.push({ id: `priority-${current.id}`, at, kind: 'priority', priority: current.priority })
-    if (current.title !== previous.title) events.push({ id: `title-${current.id}`, at, kind: 'title', title: current.title })
+    const actorKey = actorKeyOf(current)
+    if (current.status !== previous.status) events.push({ id: `status-${current.id}`, at, actorKey, kind: 'status', status: current.status })
+    if (current.priority !== previous.priority) events.push({ id: `priority-${current.id}`, at, actorKey, kind: 'priority', priority: current.priority })
+    if (current.title !== previous.title) events.push({ id: `title-${current.id}`, at, actorKey, kind: 'title', title: current.title })
     const before = assigneeOf(previous.content)
     const after = assigneeOf(current.content)
     if ((before?.id ?? null) !== (after?.id ?? null)) {
-      if (after) events.push({ id: `assign-${current.id}`, at, kind: 'assigned', assigneeName: after.name })
-      else events.push({ id: `unassign-${current.id}`, at, kind: 'unassigned' })
+      if (after) events.push({ id: `assign-${current.id}`, at, actorKey, kind: 'assigned', assigneeName: after.name })
+      else events.push({ id: `unassign-${current.id}`, at, actorKey, kind: 'unassigned' })
     }
     const beforeLabels = new Set(labelNames(previous.content))
     const afterLabels = new Set(labelNames(current.content))
     for (const name of afterLabels) {
-      if (!beforeLabels.has(name)) events.push({ id: `label-add-${current.id}-${name}`, at, kind: 'labelAdded', title: name })
+      if (!beforeLabels.has(name)) events.push({ id: `label-add-${current.id}-${name}`, at, actorKey, kind: 'labelAdded', title: name })
     }
     for (const name of beforeLabels) {
-      if (!afterLabels.has(name)) events.push({ id: `label-remove-${current.id}-${name}`, at, kind: 'labelRemoved', title: name })
+      if (!afterLabels.has(name)) events.push({ id: `label-remove-${current.id}-${name}`, at, actorKey, kind: 'labelRemoved', title: name })
     }
   }
   const createdAt = created ? Date.parse(timestamp(created.createdAt)) : Number.NEGATIVE_INFINITY
@@ -81,4 +88,19 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
   const createdEvent = events.find(event => event.kind === 'created')
   const rest = events.filter(event => event.kind !== 'created').sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id)).slice(0, limit)
   return [...(createdEvent ? [createdEvent] : []), ...rest].sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
+}
+
+/**
+ * R-63: one person's events in the same minute read as one row
+ * (「创建了任务，指派给 Ada」). Rows from before MIK-17 have no actor and
+ * group by minute alone; events must already be in time order.
+ */
+export function groupActivityByMinute(events: IssueActivityEvent[]): IssueActivityEvent[][] {
+  const groups: IssueActivityEvent[][] = []
+  for (const event of events) {
+    const last = groups.at(-1)
+    if (last && last[0].at.slice(0, 16) === event.at.slice(0, 16) && (last[0].actorKey ?? null) === (event.actorKey ?? null)) last.push(event)
+    else groups.push([event])
+  }
+  return groups
 }

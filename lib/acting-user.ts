@@ -1,5 +1,6 @@
 import 'server-only'
 import { cache } from 'react'
+import { noteLogUser } from '@/lib/request-log'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
@@ -27,6 +28,11 @@ const userById = cache(async (userId: string) => {
 /** The user the current action acts for, or null when nobody is signed in. */
 export async function currentUser(): Promise<{ id: string; name: string; email: string; image?: string | null } | null> {
   const userId = actingContext.getStore()?.userId
-  if (userId) return userById(userId)
-  return (await getSession())?.user ?? null
+  if (userId) {
+    noteLogUser(userId)
+    return userById(userId)
+  }
+  const user = (await getSession())?.user ?? null
+  noteLogUser(user?.id)
+  return user
 }

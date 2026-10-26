@@ -37,6 +37,8 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 1280, height: 900
     await testInfo.attach('status-menu', { body: await page.screenshot(), contentType: 'image/png' })
     await page.keyboard.press('Escape')
     await expect(submenu).not.toBeVisible()
+    // Keyboard from here on: a pointer left over 设置状态 would reopen its submenu once Home scrolls it back under the pointer.
+    await page.mouse.move(viewport.width - 1, viewport.height - 1)
     await status.focus()
     await page.keyboard.press('End')
     const last = page.getByRole('menuitem', { name: '删除任务…', exact: true })
