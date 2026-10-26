@@ -10,10 +10,11 @@ if (process.env.REQUIRE_DB === '1' && !authorized) throw new Error('Visibility d
 
 test('real API/core visibility: owner, teammate, outsider, scope flip and suspension', { skip: !authorized }, async () => {
   const { Pool } = await import('pg')
+  const { drizzle } = await import('drizzle-orm/node-postgres')
   const pool = new Pool({ connectionString: url, max: 2 })
   const { issueForUser } = await import('../lib/issue-access')
   const { issueVisibility } = await import('../lib/issue-visibility')
-  const { db } = await import('../lib/db')
+  const { db, pool: appPool, createRequestDatabaseScope } = await import('../lib/db')
   const { issues } = await import('../lib/db/schema')
   const { readRun, visibleRuns, addRunMessage, requestRunStop } = await import('../lib/agent-runs')
   const tools = await import('../lib/mcp/tools')
@@ -50,6 +51,25 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     assert.equal((await issueForUser(member,shared))?.id,shared)
     assert.equal(await issueForUser(member,foreignIssue),null)
     assert.equal(await issueForUser(member,unlinked),null)
+    // Exhaust the application pool as concurrent Factory transactions do.
+    const scope = createRequestDatabaseScope(url!)
+    await scope.run(async () => {
+      const clients = await Promise.all(Array.from({ length: 5 }, () => appPool.connect()))
+      await Promise.all(clients.map(client => client.query('BEGIN')))
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const reads = Promise.all(clients.map(client => issueForUser(member,shared,false,drizzle(client))))
+      try {
+        const result = await Promise.race([reads, new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('visibility requested another application connection')), 5000)
+        })])
+        assert.ok(result.every(issue => issue?.id === shared))
+      } finally {
+        clearTimeout(timer)
+        await Promise.all(clients.map(client => client.query('ROLLBACK')))
+        clients.forEach(client => client.release())
+        await reads.catch(() => undefined)
+      }
+    }).finally(() => scope.close())
     const list = await db.select({id:issues.id}).from(issues).where((await issueVisibility(member)).predicate)
     assert.deepEqual(list.map(x=>x.id).filter(id=>new Set<string>([shared,personal,foreignIssue,unlinked]).has(id)).sort(),[shared])
     for (const user of [member,foreign]) {

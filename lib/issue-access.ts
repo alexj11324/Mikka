@@ -25,7 +25,7 @@ export async function requireIssueAccess(id: string, includeDeleted = false) {
 async function findIssueForUser(userId: string, id: string, includeDeleted: boolean, executor: Pick<typeof db, 'select'> = db) {
   if (!z.uuid().safeParse(id).success) return null
   const access = await issueTeamAccess(id, userId)
-  const visibility = await issueVisibility(userId, includeDeleted)
+  const visibility = await issueVisibility(userId, includeDeleted, undefined, executor)
   const [row] = await executor.select({ issue: issues }).from(issues)
     .where(and(eq(issues.id, id), visibility.predicate)).limit(1)
   if (!row || (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt)) return null
