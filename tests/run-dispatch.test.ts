@@ -128,7 +128,7 @@ test('real Postgres dispatch transactions and recovery', {
     })
   } finally {
     await client.end()
-    await admin.query(`drop schema if exists "${schema}" cascade`)
+    // Preserve the uniquely named synthetic schema on success and failure.
     await admin.end()
   }
 })

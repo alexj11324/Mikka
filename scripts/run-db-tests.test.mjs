@@ -180,3 +180,11 @@ test('merged workflow cannot resurrect implicit DB runner or direct destructive 
  assert.ok(!job.includes('pnpm test:e2e:setup'))
  for(const recipe of c.recipes)for(const file of recipe.files)assert.ok(!job.includes(file.path),`DB file must execute only through its explicit phase/profile: ${file.path}`)
 })
+
+test('pending BYOS recipes cannot escape R0 via the legacy independent workflow',()=>{
+ const workflow=readFileSync('.github/workflows/byos.yml','utf8')
+ assert.ok(workflow.includes('needs: retention-authorization'))
+ const gate=workflow.slice(workflow.indexOf('  retention-authorization:'),workflow.indexOf('  backend:'))
+ assert.ok(gate.includes('fix/168-170-data-integration'));assert.ok(gate.includes('exit 1'))
+ assert.ok(!gate.includes('services:'));assert.ok(!gate.includes('actions/checkout'))
+})

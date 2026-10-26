@@ -17,7 +17,19 @@ on:
 permissions:
   contents: read
 jobs:
+  retention-authorization:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prevent legacy cleanup from bypassing pending R0 recipes
+        env:
+          R0_RETENTION_REQUIRED: ${{ github.head_ref == 'fix/168-170-data-integration' || github.ref == 'refs/heads/fix/168-170-data-integration' }}
+        run: |
+          if [ "$R0_RETENTION_REQUIRED" = true ]; then
+            echo '::error::BLOCKED: BYOS recipes require retained harness acceptance; automatic container deletion is not authorized for this R0 run'
+            exit 1
+          fi
   backend:
+    needs: retention-authorization
     if: github.ref != 'refs/heads/fix/169-metadata-integration' && github.ref != 'refs/heads/fix/178-daemon-revocation' && github.ref != 'refs/heads/fix/178-transaction-fence' && github.head_ref != 'fix/169-metadata-integration' && github.head_ref != 'fix/178-daemon-revocation' && github.head_ref != 'fix/178-transaction-fence'
     runs-on: ubuntu-latest
     timeout-minutes: 25

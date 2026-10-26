@@ -20,8 +20,8 @@ if (!hasDb && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 but 
 
 test('updateIssueRelation rejects a parent cycle on the server', { skip: !hasDb && 'no MIKKA_DATABASE_URL / DATABASE_URL' }, async () => {
   const { eq, inArray, sql } = await import('drizzle-orm')
-  const { db } = await import('./db')
-  const { issues, issueVersions, users } = await import('./db/schema')
+  const { db, pool } = await import('./db')
+  const { issues } = await import('./db/schema')
   const { actAs } = await import('./acting-user')
   const { updateIssueRelation } = await import('../app/actions/issue-operations')
   const owner = `cycle-test-${randomUUID()}`
@@ -64,8 +64,7 @@ test('updateIssueRelation rejects a parent cycle on the server', { skip: !hasDb 
     assert.equal(moved.revision, revisionOf(c) + 1)
     assert.equal((moved.content as { attrs: { mikka: { parentId: string } } }).attrs.mikka.parentId, a)
   } finally {
-    await db.delete(issueVersions).where(inArray(issueVersions.issueId, [a, b, c]))
-    await db.delete(issues).where(inArray(issues.id, [a, b, c]))
-    await db.delete(users).where(eq(users.id, owner))
+    // Keep all UUID-scoped fixtures for inspection; close only this test process pool.
+    await pool.end()
   }
 })

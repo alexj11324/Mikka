@@ -1026,10 +1026,11 @@
       ],
       "profile": "shared",
       "phase": "prebuild",
-      "status": "pending",
-      "pendingReason": "New main harness contains physical DELETE cleanup; retained-mode acceptance and full result contract required.",
-      "expectedTests": null,
-      "expectedCount": null
+      "status": "ready",
+      "expectedTests": [
+        "real actions share threads on workspace issues only, with current members, and keep run controls with the owner"
+      ],
+      "expectedCount": 1
     },
     {
       "id": "mailboxes",
@@ -1221,11 +1222,12 @@
       ],
       "profile": "shared",
       "phase": "prebuild",
-      "status": "pending",
+      "status": "ready",
       "packageScript": "test:relation-cycle",
-      "pendingReason": "Retained fixture acceptance required: existing cleanup deletes rows or rolls back the synthetic fixture.",
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "updateIssueRelation rejects a parent cycle on the server"
+      ],
+      "expectedCount": 1
     },
     {
       "id": "run-dispatch",
@@ -1244,11 +1246,20 @@
       ],
       "profile": "run-dispatch",
       "phase": "external",
-      "status": "pending",
+      "status": "ready",
       "packageScript": "test:run-dispatch",
-      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "dispatch keys are optional, bounded and normalized with caller parameters",
+        "real Postgres dispatch transactions and recovery",
+        "10 same-key calls create one run; completed replays retain real state",
+        "keys cannot be rebound to a different issue, agent, repo or note",
+        "10 different-key and legacy calls create at most one live run",
+        "every live state blocks; terminal unkeyed runs allow new work",
+        "the same key is independent across owners",
+        "a real FK rejection rolls back both locks and the request record",
+        "a fresh Node process replays a committed key after losing the response"
+      ],
+      "expectedCount": 9
     },
     {
       "id": "visibility-db",
