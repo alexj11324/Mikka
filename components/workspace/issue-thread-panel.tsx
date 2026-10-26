@@ -1,5 +1,6 @@
 'use client'
 
+import { PersonAvatar } from '@/components/person-avatar'
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
@@ -76,7 +77,7 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
                 ? <p className={cn(BUBBLE, 'self-end bg-sidebar-primary text-sidebar-primary-foreground')}>{item.text}</p>
                 // A teammate speaks from the left under their name, as in a group chat (R-13).
                 : <>
-                  <span className="flex items-center gap-1.5 text-xs"><LetterAvatar name={item.author} size="pill" /><span className="font-medium">{item.author}</span><span className="text-muted-foreground">{format.dateTime(new Date(item.at), { hour: '2-digit', minute: '2-digit' })}</span></span>
+                  <span className="flex items-center gap-1.5 text-xs"><PersonAvatar name={item.author} /><span className="font-medium">{item.author}</span><span className="text-muted-foreground">{format.dateTime(new Date(item.at), { hour: '2-digit', minute: '2-digit' })}</span></span>
                   <p className={cn(BUBBLE, 'self-start')}>{item.text}</p>
                 </>)}
             </li>)}
