@@ -432,3 +432,23 @@ export const pendingActions = pgTable('pending_actions', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   decidedAt: timestamp('decidedAt', { withTimezone: true }),
 }, table => [index('pending_actions_user_status_idx').on(table.userId, table.status, table.createdAt)])
+
+// Optional native Coordinator bridge (#312). Existing users default to AI SDK.
+export const coordinatorRuntimeSettings = pgTable('coordinator_runtime_settings', {
+  userId: text('userId').primaryKey(), runtime: jsonb('runtime').notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+export const nativeCoordinatorTurns = pgTable('native_coordinator_turns', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  deviceId: uuid('deviceId').notNull().references(() => devices.id, { onDelete: 'cascade' }),
+  holder: text('holder').notNull(), round: integer('round').notNull(), payload: jsonb('payload').notNull(),
+  status: text('status').notNull().default('queued'), reply: text('reply'),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique().on(table.userId, table.holder, table.round), index('native_coordinator_pending_idx').on(table.deviceId, table.status, table.createdAt)])
+export const nativeCoordinatorTools = pgTable('native_coordinator_tools', {
+  turnId: uuid('turnId').notNull().references(() => nativeCoordinatorTurns.id, { onDelete: 'cascade' }),
+  callId: text('callId').notNull(), name: text('name').notNull(), input: jsonb('input').notNull(),
+  status: text('status').notNull().default('pending'), output: jsonb('output'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.turnId, table.callId] })])

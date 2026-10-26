@@ -66,13 +66,15 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(plan.scripts.includes('test:groups'))
   assert.ok(plan.scripts.includes('test:workspace-migration-db'))
   assert.ok(plan.scripts.includes('test:relation-cycle'))
+  assert.ok(plan.scripts.includes('test:coordinator-native'))
+  assert.ok(plan.files.includes('lib/coordinator/native-relay.db.test.ts'))
   assert.ok(plan.selfManaged.includes('lib/auth-email.test.ts'))
   const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
   const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
   // Pure gates also run without a database in the fast job; their DB run is still only through pnpm test:db.
   const pureGates = ['test:groups', 'test:active-agents', 'test:group-turns', 'test:issue-search']
   for (const script of plan.scripts) {
-    if (!pureGates.includes(script)) assert.ok(!workflow.includes(`pnpm ${script}`), `${script} runs once, through pnpm test:db`)
+    if (!pureGates.includes(script)) assert.ok(!new RegExp(`pnpm ${script}(?:\\s|$)`).test(workflow), `${script} runs once, through pnpm test:db`)
   }
   assert.ok(!/node --test tests\/workspace-migration\.test\.mjs/.test(workflow), 'workspace migration runs once, through pnpm test:db')
   const pinned = workflow.match(/DB_TEST_EXPECTED: ([^\n]+)/)?.[1].split(',').sort()
