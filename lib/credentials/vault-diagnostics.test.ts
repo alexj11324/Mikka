@@ -40,5 +40,5 @@ test('auth diagnostics preserve numeric denial and discard private response/erro
   })
   await assert.rejects(provider.getAccessToken(), { code: 'vault_auth_unavailable' })
   await assert.rejects(provider.getAccessToken(), { code: 'vault_auth_unavailable' })
-  assert.deepEqual(observations, [{ kind: 'http', status: 403 }])
+  assert.deepEqual(observations, [{ kind: 'http', status: 403, reason: 'unknown' }])
 })

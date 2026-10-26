@@ -1,0 +1,13 @@
+# Universal Auth rejection diagnostics
+
+This is an incremental candidate on PR284, not a restoration of its older application tree to current main. Main470c5cd4 does not contain the cleaner module. Preserve its SSR/unread fixes during any later integration. This patch does not change routes, credentials, configuration, migrations, deletion scope or scheduling.
+
+On HTTP rejection, only exact known Infisical messages map to fixed categories: invalid_credentials (includes some revoked-secret cases), client_secret_expired, client_secret_usage_limit, temporarily_locked, ip_denied, or unknown. Matching requires the expected HTTP status and error class. Public Infisical source reference: ba7a42ba727614e8a970c35ef9b938f52b72761c; this does not prove the running Cloud service uses that version.
+
+The body is bounded to4KiB/64chunks/250ms. Malformed, oversized, non-JSON and timed-out bodies become unknown. No raw message, response body, headers, URL, credential, identity or user data is emitted. A request identifier is accepted only in constrained Fastify/UUID syntax; known credential matches are dropped. Even an accepted identifier is logged only as SHA256 requestIdHash. It cannot be directly searched as the original provider request ID; correlation requires hashing an independently obtained ID. This tradeoff prevents arbitrary upstream text entering logs.
+
+The existing401/403 latch is set before reading diagnostics; there are no added authentication retries. Existing cooldown, single-flight, token cache clearing, credential-rotation behavior and generic caller error remain. Exceptions in diagnostics callbacks cannot alter fail-closed behavior. Diagnostics do not authorize any action.
+
+Verification uses response fixtures, hostile streams and a real loopback HTTP server with synthetic credentials, not real Infisical login. Tests cover known classifications, unknown/malicious/oversized bodies, request-ID validation, credential collisions, bounded streams and one-request401 latching. Existing credential tests remain enabled by the inherited CI workflow.
+
+Next real verification, NOT executed by this candidate: integrate with current main in a separately reviewed compatible cleaner candidate, then only if authorized perform one controlled login using the unchanged intended configuration and record fixed category/requestIdHash. Do not invoke the cleanup sweep or delete fixtures merely to test authentication. On401/403 stop; do not change identity, IP policy, TTL or credentials or retry. Unknown remains unknown; never print a body to diagnose it. Current source/runtime-value equality and the actual upstream401 category remain unproven.
