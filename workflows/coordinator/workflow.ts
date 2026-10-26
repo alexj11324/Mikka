@@ -7,6 +7,8 @@ import { AGENT_MAX_ROUNDS } from '@/lib/agent-rounds'
 import { createComposioAITools, createGoogleAITools } from '@/lib/composio-actions'
 import { splitTelegramText } from '@/lib/telegram/messages'
 import * as steps from './steps'
+import * as native from './native-steps'
+import { nativeCoordinatorTurn } from './native-turn'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
 const MAX_ROUNDS = 10
@@ -32,8 +34,10 @@ export async function coordinatorTurn(userId: string) {
       return
     }
     try {
-      const { instructions, messages } = await steps.preparePrompt(userId)
-      const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(AGENT_MAX_ROUNDS), prepareStep: coordinatorStep })
+      const selected = await native.runtime(userId)
+      const result = selected.harness === 'ai_sdk'
+        ? await agent.generate({ ...(await steps.preparePrompt(userId)), stopWhen: isStepCount(AGENT_MAX_ROUNDS), prepareStep: coordinatorStep })
+        : await nativeCoordinatorTurn(userId, holder, round, selected, coordinatorTools(userId))
       await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text))
       if (inbox.telegramTargets.length && result.text.trim()) {
         // The reply is saved and shows on the web; a Telegram failure (a

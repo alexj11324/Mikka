@@ -58,7 +58,9 @@
     "test:db": "node scripts/run-db-tests.mjs",
     "test:db-runner": "node --test scripts/run-db-tests.test.mjs",
     "test:workspace-migration-db": "node --test tests/workspace-migration.test.mjs",
-    "test:activity-actor-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/activity-actor-db.test.ts"
+    "test:activity-actor-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/activity-actor-db.test.ts",
+    "test:coordinator-native": "node --import tsx --test lib/coordinator/native-store.test.ts lib/coordinator/native-prompt.test.ts",
+    "test:coordinator-native-relay": "pnpm --filter @mikka/daemon exec vitest run --root ../.. tests/native-coordinator-relay.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",
