@@ -69,9 +69,12 @@ test('retained dual DB: fresh candidate equals current-main ledger upgrade; repl
   for(const [db,fresh,targetName,before]of [[upApp,freshApp,'MIKKA_DATABASE_URL',beforeApp],[upWs,freshWs,'DATABASE_URL',beforeWs]]){
    const names=expected(targetName),old=new Set(before.map(r=>r.name))
    const applied=output=>[...output.matchAll(/migrate: applied (\S+) to (\S+)/g)].filter(m=>m[2]===targetName).map(m=>m[1])
+   const actualNames=(await ledger(db)).map(r=>r.name),expectedNames=[...names].sort()
+   const diagnostic={candidateSha:evidence.sha,mainSha:main.sha,target:targetName,missing:expectedNames.filter(n=>!actualNames.includes(n)),extra:actualNames.filter(n=>!expectedNames.includes(n))}
+   writeFileSync(resolve(root,`${targetName}-ledger-diagnostic.json`),JSON.stringify(diagnostic,null,2));console.log(JSON.stringify(diagnostic))
    assert.deepEqual(applied(upgradeOutput),names.filter(n=>!old.has(n)))
    assert.deepEqual(applied(freshOutput),names)
-   assert.deepEqual((await ledger(db)).map(r=>r.name),[...names].sort())
+   assert.deepEqual(actualNames,expectedNames)
    assert.deepEqual((await ledger(fresh)).map(r=>r.name),[...names].sort())
    const freshSchema=dump(fresh),upSchema=dump(db);writeFileSync(resolve(root,`${targetName}-fresh.sql`),freshSchema);writeFileSync(resolve(root,`${targetName}-upgrade.sql`),upSchema)
    assert.equal(upSchema,freshSchema,'full schema including ACL/RLS/functions/triggers must match')
