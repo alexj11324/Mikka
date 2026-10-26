@@ -33,7 +33,7 @@ export type OperationAuthorize = (tx: PoolClient, binding: OperationIntent, runI
 /** Serialize even when no ledger row exists; common order is gate -> ledger
  * -> session -> proposal. Transaction-scoped locks consume no extra connection. */
 export async function lockOperation(tx: PoolClient, input: OperationIdentity) {
-  await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['operation', input.operationId, input.ownerId, input.workspaceId])])
+  await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['operation', z.uuid().parse(input.operationId).toLowerCase(), input.ownerId, input.workspaceId])])
 }
 export function createOperationLedger(pool: Pool, authorize: OperationAuthorize) {
   if (typeof authorize !== 'function') throw new OperationError('operationAuthorizationRequired')

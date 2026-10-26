@@ -80,7 +80,7 @@ test('three approved writes: real PG, auth HTTP, loopback effects and durable re
     let pause=true
     const wrapped=new Proxy(pool,{get(target,key){if(key==='connect')return async()=>{const client=await target.connect();return new Proxy(client,{get(c,k){if(k==='query')return async(...args:unknown[])=>{const result=await Reflect.apply(c.query,c,args);if(pause&&String(args[0]).startsWith('SELECT status,"invokedAt" FROM operation_ledger')&&!result.rows.length){pause=false;observed();await continued}return result};const v=Reflect.get(c,k);return typeof v==='function'?v.bind(c):v}})};const v=Reflect.get(target,key);return typeof v==='function'?v.bind(target):v}})
     const service=createApprovedWrites(wrapped,provider,'send_slack_message'),proposal=await service.propose(owner,{channel:'C12345678',text:'Race fixture'},randomUUID()),before=writes
-    const declining=service.decide(actor,proposal.actionId,false);await emptySeen
+    const declining=service.decide(actor,proposal.actionId.toUpperCase(),false);await emptySeen
     const application='approval_race_'+randomUUID(),otherPool=new Pool({connectionString:url.toString(),options:`-c search_path=${schema}`,application_name:application})
     const approving=createApprovedWrites(otherPool,provider,'send_slack_message').decide(actor,proposal.actionId,true).then(()=>false,()=>true)
     try {
