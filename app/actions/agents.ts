@@ -235,7 +235,7 @@ export async function listRuns(issueId: string): Promise<RunView[]> {
   return visibleRuns(userId, { issueId })
 }
 
-/** Who currently collaborates on the issue, and whether its threads are shared with them (R-26). */
+/** Who currently collaborates on the issue (R-26): they see that its threads exist. */
 async function issueThreadAccess(issueId: string) {
   const { issue, user } = await requireIssueAccess(issueId)
   // A team-linked issue follows the same active-workspace membership rule as requireIssueAccess.
@@ -251,31 +251,31 @@ async function issueThreadAccess(issueId: string) {
     const members = await db.select({ id: issueMembers.memberId }).from(issueMembers).where(eq(issueMembers.issueId, issue.id))
     memberIds = [issue.userId, ...members.map(member => member.id)]
   }
-  return { issue, user, memberIds: new Set(memberIds), shared: issue.scope === 'workspace' || !!link }
+  return { issue, user, memberIds: new Set(memberIds) }
 }
 
 const threadColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt,
   report: agentRuns.report, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
-  agentName: agents.name, harness: agents.harness,
+  agentName: agents.name, harness: agents.harness, ownerName: users.name,
 }
 
 /** The issue's threads, as much of each as this viewer may see (R-62). */
 export async function listIssueThreads(issueId: string): Promise<IssueThread[]> {
-  const { issue, user, memberIds, shared } = await issueThreadAccess(issueId)
+  const { issue, user, memberIds } = await issueThreadAccess(issueId)
   if (!memberIds.has(user.id)) return []
-  const rows = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
+  const rows = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
     .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds])))
     .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_THREAD_LIMIT)
-  return projectIssueThreads(rows, issue.id, user.id, memberIds, shared)
+  return projectIssueThreads(rows, issue.id, user.id, memberIds)
 }
 
 async function readableThread(issueId: string, runId: string) {
   const access = await issueThreadAccess(issueId)
   if (!z.uuid().safeParse(runId).success) throw new ActionFailureError('runNotFound')
-  const [row] = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
+  const [row] = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.issueId, access.issue.id))).limit(1)
-  if (!row || !canReadThread(row.userId, access.user.id, access.memberIds, access.shared)) throw new ActionFailureError('runNotFound')
+  if (!row || !canReadThread(row.userId, access.user.id, access.memberIds)) throw new ActionFailureError('runNotFound')
   return { row, user: access.user }
 }
 
@@ -293,7 +293,7 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
-  const [thread] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id, row.userId]), true)
+  const [thread] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id]))
   return {
     thread: { ...thread, prompt: row.prompt },
     chunks,
