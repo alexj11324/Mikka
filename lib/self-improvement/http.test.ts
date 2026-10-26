@@ -38,3 +38,38 @@ test('active selection resolves version on the server; arbitrary version and pur
   assert.equal((await handleImprovement(store, request(command), 'owner', assignments)).status, 200)
   assert.deepEqual(calls, [['owner', runId]])
 })
+
+test('evaluation HTTP commands use authenticated identity and server-owned settings only', async () => {
+  const calls: { method: string; args: unknown[] }[] = []
+  const result = { source: 'persisted_evaluation', productionEligible: false }
+  const callback = (method: string) => async (...args: unknown[]) => { calls.push({ method, args }); return result }
+  const evaluations = { freezeBenchmark: callback('freezeBenchmark'), dispatchNext: callback('dispatchNext'),
+    beginEvaluation: callback('beginEvaluation'), compare: callback('compare') } as unknown as Parameters<typeof handleImprovement>[6]
+  const store = {} as Parameters<typeof handleImprovement>[0]
+  const sourceRunId = randomUUID(), instanceId = randomUUID(), proposalId = randomUUID(), candidateVersionId = randomUUID(), evaluationId = randomUUID()
+  const commands = [
+    { body: { action: 'freeze_benchmark', sourceRunId }, method: 'freezeBenchmark', args: ['owner', sourceRunId] },
+    { body: { action: 'dispatch_training', instanceId }, method: 'dispatchNext', args: ['owner', instanceId, true] },
+    { body: { action: 'begin_evaluation', instanceId, proposalId, candidateVersionId }, method: 'beginEvaluation', args: ['owner', instanceId, proposalId, candidateVersionId] },
+    { body: { action: 'dispatch_evaluation', evaluationId }, method: 'dispatchNext', args: ['owner', evaluationId, false] },
+    { body: { action: 'compare_evaluation', evaluationId }, method: 'compare', args: ['owner', evaluationId] },
+  ]
+  for (const command of commands) {
+    assert.equal((await handleImprovement(store, request(command.body), null, undefined, undefined, undefined, evaluations)).status, 401)
+    assert.equal((await handleImprovement(store, request(command.body, 'https://other.test'), 'owner', undefined, undefined, undefined, evaluations)).status, 403)
+    assert.equal((await handleImprovement(store, request(command.body), 'owner')).status, 409)
+    const before = calls.length
+    for (const extra of [{ userId: 'other' }, { model: 'replacement' }, { policy: {} }, { threshold: 0 }, { caseId: 'injected' },
+      { actualOutput: 'passed' }, { passed: true }, { markdown: 'injected' }, { arm: 'candidate' }])
+      assert.equal((await handleImprovement(store, request({ ...command.body, ...extra }), 'owner', undefined, undefined, undefined, evaluations)).status, 422)
+    assert.equal(calls.length, before)
+    const response = await handleImprovement(store, request(command.body), 'owner', undefined, undefined, undefined, evaluations)
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), result)
+    assert.equal(response.headers.get('cache-control'), 'private, no-store')
+    assert.deepEqual(calls.at(-1), { method: command.method, args: command.args })
+  }
+  assert.equal(calls.length, commands.length)
+  const rejected = { ...evaluations, compare: async () => { throw new ImprovementError('notFound') } } as Parameters<typeof handleImprovement>[6]
+  assert.equal((await handleImprovement(store, request({ action: 'compare_evaluation', evaluationId }), 'owner', undefined, undefined, undefined, rejected)).status, 404)
+})

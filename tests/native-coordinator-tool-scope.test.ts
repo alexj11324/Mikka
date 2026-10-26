@@ -20,7 +20,7 @@ stub('../lib/issue-access.ts',{issueForUser:effect})
 stub('../lib/telegram/client.ts',{postTelegramText:effect})
 stub('../lib/factory/server.ts',{dispatchFactoryRun:effect,factoryMonitor:{reconcile:effect},factoryStore:{},factoryQuestions:{},reconcileFactoryRuns:effect})
 stub('../lib/self-improvement/source.ts',{readCommittedSkill:async()=>{revoked=true;return 'source bytes'}})
-stub('../lib/self-improvement/server.ts',{improvementStore:{},skillAssignments:{},improvementFactory:{},skillRegistry:{
+stub('../lib/self-improvement/server.ts',{improvementStore:{},skillAssignments:{},improvementFactory:{},skillEvaluations:{freezeBenchmark:effect,dispatchNext:effect,beginEvaluation:effect,compare:effect},skillRegistry:{
   registerCandidate:async(_user:unknown,_input:unknown,readSource:(source:unknown)=>Promise<string>)=>{
     await readSource({repository:'https://github.com/example/public',sha:'a'.repeat(40),baseSha:'b'.repeat(40)})
     return effect()
@@ -36,6 +36,11 @@ beforeEach(()=>{revoked=false;uncertain=false;checks.mock.resetCalls();effect.mo
 const binding={taskId:'task',issueId:'issue',attemptId:'attempt',revision:1,candidateId:null}
 const reference={questionId:'question',questionRevision:1,binding,originRunId:'run',originSessionId:'session'}
 const calls = {
+  freezeSkillBenchmark:()=>steps.skillEvaluation(user,{action:'freeze_benchmark',sourceRunId:'run'},scope),
+  dispatchSkillTraining:()=>steps.skillEvaluation(user,{action:'dispatch_training',instanceId:'instance'},scope),
+  beginSkillEvaluation:()=>steps.skillEvaluation(user,{action:'begin_evaluation',instanceId:'instance',proposalId:'proposal',candidateVersionId:'version'},scope),
+  dispatchSkillEvaluation:()=>steps.skillEvaluation(user,{action:'dispatch_evaluation',evaluationId:'evaluation'},scope),
+  compareSkillEvaluation:()=>steps.skillEvaluation(user,{action:'compare_evaluation',evaluationId:'evaluation'},scope),
   selectActiveSkill:()=>steps.selectActiveSkill(user,{runId:'run'},scope),
   registerSkillCandidate:()=>steps.registerSkillCandidate(user,{proposalId:'proposal',binding},scope),
   selectBaselineSkill:()=>steps.selectBaselineSkill(user,{runId:'run'},scope),
@@ -98,4 +103,15 @@ test('candidate registration rechecks native authorization after source fetching
   await assert.rejects(steps.registerSkillCandidate(user,{proposalId:'proposal',binding},scope),/coordinatorExpiredOrLeaseLost/)
   assert.equal(checks.mock.callCount(),2)
   assert.equal(effect.mock.callCount(),0)
+})
+
+test('evaluation Coordinator actions preserve host-owned identity and fixed training/evaluation routing',async()=>{
+  await steps.skillEvaluation(user,{action:'freeze_benchmark',sourceRunId:'source'})
+  await steps.skillEvaluation(user,{action:'dispatch_training',instanceId:'instance'})
+  await steps.skillEvaluation(user,{action:'begin_evaluation',instanceId:'instance',proposalId:'proposal',candidateVersionId:'candidate'})
+  await steps.skillEvaluation(user,{action:'dispatch_evaluation',evaluationId:'evaluation'})
+  await steps.skillEvaluation(user,{action:'compare_evaluation',evaluationId:'evaluation'})
+  assert.deepEqual(effect.mock.calls.map(call=>call.arguments),[
+    [user,'source'],[user,'instance',true],[user,'instance','proposal','candidate'],[user,'evaluation',false],[user,'evaluation'],
+  ])
 })

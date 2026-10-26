@@ -24,9 +24,9 @@ import type { FactoryDispatchInput } from '@/lib/factory/dispatch'
 import { factoryEventId } from '@/lib/factory/event-id'
 import { dispatchFactoryRun, factoryMonitor, factoryStore, factoryQuestions, reconcileFactoryRuns } from '@/lib/factory/server'
 import type { QuestionReference, ContextQuestionAnswer } from '@/lib/factory/questions/contract'
-import { improvementStore, skillAssignments, improvementFactory, skillRegistry } from '@/lib/self-improvement/server'
+import { improvementStore, skillAssignments, improvementFactory, skillRegistry, skillEvaluations } from '@/lib/self-improvement/server'
 import { readCommittedSkill } from '@/lib/self-improvement/source'
-import { ImprovementError, type Feedback, type ImprovementHandoff, type ImprovementRehearsal, type ImprovementRegistration } from '@/lib/self-improvement/contract'
+import { ImprovementError, type Feedback, type ImprovementHandoff, type ImprovementRehearsal, type ImprovementRegistration, type SkillEvaluationCommand } from '@/lib/self-improvement/contract'
 import type { TelegramReplyTarget } from '@/lib/coordinator-events'
 import { postTelegramText } from '@/lib/telegram/client'
 
@@ -208,6 +208,19 @@ export async function registerSkillCandidate(userId: string, input: Omit<Improve
     await assertNativeToolScope(userId,scope)
     return markdown
   }))
+}
+export async function skillEvaluation(userId: string, input: SkillEvaluationCommand, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async () => {
+    switch (input.action) {
+      case 'freeze_benchmark': return skillEvaluations.freezeBenchmark(userId,input.sourceRunId)
+      case 'dispatch_training': return skillEvaluations.dispatchNext(userId,input.instanceId,true)
+      case 'begin_evaluation': return skillEvaluations.beginEvaluation(userId,input.instanceId,input.proposalId,input.candidateVersionId)
+      case 'dispatch_evaluation': return skillEvaluations.dispatchNext(userId,input.evaluationId,false)
+      case 'compare_evaluation': return skillEvaluations.compare(userId,input.evaluationId)
+    }
+  })
 }
 export async function dispatchBaselineRehearsal(userId:string,input:Omit<ImprovementRehearsal,'action'>, scope?: NativeToolScope) {
   'use step'

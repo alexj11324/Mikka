@@ -12,7 +12,7 @@ import {
   questionReferenceSchema,
   questionEscalationSchema,
 } from '@/lib/factory/questions/contract'
-import { commandSchema } from '@/lib/self-improvement/contract'
+import { commandSchema, skillEvaluationCommandSchema } from '@/lib/self-improvement/contract'
 import { splitTelegramText } from '@/lib/telegram/messages'
 import * as steps from './steps'
 import * as native from './native-steps'
@@ -174,6 +174,10 @@ function coordinatorTools(userId: string, scope?: NativeToolScope) {
     register_skill_candidate: tool({
       description:'Register canonical Skill bytes from the exact committed Factory candidate linked to a failure-derived proposal. Supply only the existing current binding and proposal ID. Registration does not activate or approve the Skill.',
       inputSchema:commandSchema.options[5].omit({action:true}), execute:input=>steps.registerSkillCandidate(userId, input, scope),
+    }),
+    skill_evaluation: tool({
+      description:'Freeze the server-owned report benchmark from an actual baseline run; dispatch one pending training run, bind evaluation to a registered candidate, dispatch one pending heldout run, or compare real persisted results. Settings and cases stay server-owned; comparison cannot activate a Skill or grant approval.',
+      inputSchema:skillEvaluationCommandSchema, execute:input=>steps.skillEvaluation(userId,input,scope),
     }),
     dispatch_baseline_rehearsal: tool({
       description:'For an explicitly requested controlled Skill rehearsal, atomically dispatch an existing authorized pending Factory execute task with the built-in baseline selected before any worker can claim it. Does not activate a candidate or grant permissions.',

@@ -4,10 +4,11 @@ import type { createImprovementStore } from './store'
 import type { createSkillAssignments } from './assignments'
 import type { createImprovementFactoryBridge } from './factory-bridge'
 import type { createSkillRegistry } from './registry'
+import type { createSkillEvaluations } from './evaluations'
 import { FactoryError } from '../factory/contract'
 
 export async function handleImprovement(store: ReturnType<typeof createImprovementStore>, request: Request, userId: string | null,
-  assignments?: ReturnType<typeof createSkillAssignments>, bridge?: ReturnType<typeof createImprovementFactoryBridge>, registry?: ReturnType<typeof createSkillRegistry>): Promise<Response> {
+  assignments?: ReturnType<typeof createSkillAssignments>, bridge?: ReturnType<typeof createImprovementFactoryBridge>, registry?: ReturnType<typeof createSkillRegistry>, evaluations?: Pick<ReturnType<typeof createSkillEvaluations>, 'freezeBenchmark' | 'dispatchNext' | 'beginEvaluation' | 'compare'>): Promise<Response> {
   const respond = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })
   if (!userId) return respond({ error: 'authRequired' }, 401)
   if (!['GET', 'POST'].includes(request.method)) return respond({ error: 'methodNotAllowed' }, 405)
@@ -39,6 +40,17 @@ export async function handleImprovement(store: ReturnType<typeof createImproveme
     try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch { return respond({ error: 'invalid' }, 422) }
     const parsed = commandSchema.safeParse(body)
     if (!parsed.success) return respond({ error: 'invalid' }, 422)
+    if (parsed.data.action === 'freeze_benchmark' || parsed.data.action === 'dispatch_training' || parsed.data.action === 'begin_evaluation' ||
+      parsed.data.action === 'dispatch_evaluation' || parsed.data.action === 'compare_evaluation') {
+      if (!evaluations) return respond({ error: 'sourceRequired' }, 409)
+      switch (parsed.data.action) {
+        case 'freeze_benchmark': return respond(await evaluations.freezeBenchmark(userId, parsed.data.sourceRunId))
+        case 'dispatch_training': return respond(await evaluations.dispatchNext(userId, parsed.data.instanceId, true))
+        case 'begin_evaluation': return respond(await evaluations.beginEvaluation(userId, parsed.data.instanceId, parsed.data.proposalId, parsed.data.candidateVersionId))
+        case 'dispatch_evaluation': return respond(await evaluations.dispatchNext(userId, parsed.data.evaluationId, false))
+        case 'compare_evaluation': return respond(await evaluations.compare(userId, parsed.data.evaluationId))
+      }
+    }
     if (parsed.data.action === 'select_baseline') {
       if (!assignments) return respond({ error: 'sourceRequired' }, 409)
       return respond(await assignments.selectBaseline(userId, parsed.data.runId))
