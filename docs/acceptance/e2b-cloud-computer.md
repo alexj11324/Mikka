@@ -199,3 +199,13 @@ migration recorded. Isolated PostgreSQL tests exercised scoped worker credential
 expiry validation, rotation and the Bot's pending-review state. The worker
 credential provisioning and review polling still need to be connected to an
 actual Bot task before product acceptance.
+
+The production-scoped infrastructure test was extended to create a disposable
+Bot/run binding in local PostgreSQL, approve the broker's exact request, and
+execute a real CUA click in that Bot's E2B desktop. After pausing and resuming,
+the test verifies a control viewer can move the pointer to its previous client
+coordinate even though CUA moved it in between. This exposed x11vnc's duplicate
+coordinate optimization, which can otherwise leave a subsequent click at the
+wrong position. Starting the control server with `-always_inject` fixed the
+repeated-coordinate regression in the live test. The run was synthetic and does
+not establish production application or model acceptance.

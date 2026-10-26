@@ -10,6 +10,10 @@ import { Pool } from 'pg'
 import { Sandbox } from 'e2b'
 import { ComputerStore } from '../../lib/computer/store'
 import { ensureContainerRuntime } from '../../lib/computer/e2b-provider'
+import { bindComputerRun } from '../../lib/computer/run-binding'
+import { decideComputerReview, syncComputerReviews } from '../../lib/computer/reviews'
+import { ComputerBroker } from '../../packages/daemon/src/computer/broker.mjs'
+import { applyWebComputerDecisions, webComputerSnapshots } from '../../packages/daemon/src/computer/web-review'
 
 async function main() {
   const url = new URL(process.env.COMPUTER_TEST_DATABASE_URL ?? '')
@@ -24,6 +28,10 @@ async function main() {
   try {
     await pool.query('CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES (\'acceptance-owner\')')
     await pool.query(await readFile(new URL('../../drizzle/20261026235901_cloud_computers.sql', import.meta.url), 'utf8'))
+    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, status text NOT NULL, "deviceId" uuid, "stopRequestedAt" timestamptz)')
+    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL)')
+    await pool.query(await readFile(new URL('../../drizzle/20261027000000_computer_run_bindings.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261027000200_local_computer_reviews.sql', import.meta.url), 'utf8'))
     const store = new ComputerStore(pool)
     const actor = { userId: 'acceptance-owner', workspaceId: randomUUID() }
     const bot = await store.createBot(actor, 'E2B acceptance')
@@ -62,14 +70,54 @@ async function main() {
     assert.equal((await store.state(actor, bot.id)).control, 'user')
     await store.operate(actor, bot.id, 'handback')
     assert.equal((await store.state(actor, bot.id)).control, 'agent')
+    // Real database decision -> broker -> pinned CUA driver in the E2B desktop.
+    // The click is a fixed test action on a disposable blank desktop.
+    const runId = randomUUID(), deviceId = randomUUID()
+    await pool.query('INSERT INTO devices (id,"ownerId") VALUES ($1,$2)', [deviceId, actor.userId])
+    await pool.query('INSERT INTO agent_runs (id,"userId",status,"deviceId") VALUES ($1,$2,$3,$4)', [runId, actor.userId, 'queued', deviceId])
+    await bindComputerRun(pool, actor, runId, bot.id)
+    await pool.query('UPDATE agent_runs SET status=$2 WHERE id=$1', [runId, 'running'])
+    await sandbox.files.write('/tmp/mikka-cua-driver.mjs', await readFile(new URL('../../packages/daemon/src/computer/driver.mjs', import.meta.url), 'utf8'), { user: 'user' })
+    await sandbox.files.write('/tmp/mikka-cua-live.mjs', `import { detectComputerDriver, executeDriver } from './mikka-cua-driver.mjs';\nconst driver = await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif (!driver) throw new Error('driver unavailable');\nawait executeDriver(driver, { name: 'click', arguments: { x: 500, y: 500 } }, ':1');\n`, { user: 'user' })
+    const activeSandbox = sandbox
+    let executed = 0
+    const broker = new ComputerBroker({ socketPath: `/tmp/unused-e2b-${randomUUID()}`,
+      driver: { installed: true, path: '/fixture', version: 'fixture', fingerprint: 'f'.repeat(64) }, permitted: value => value === runId,
+      execute: async () => { await activeSandbox.commands.run('node /tmp/mikka-cua-live.mjs', { user: 'user', timeoutMs: 30_000 }); executed++; return 'clicked' },
+    })
+    try {
+      const grant = broker.spec(runId, 'ask', { display: ':1' })!
+      const operation = broker.request(grant.token, { name: 'click', arguments: { x: 500, y: 500 } })
+      const snapshots = webComputerSnapshots(broker)
+      await syncComputerReviews(pool, deviceId, actor.userId, snapshots)
+      const pending = (await store.state(actor, bot.id)).pendingApproval!
+      assert.equal(pending.id, snapshots[0].id)
+      assert.equal(executed, 0)
+      assert.equal(await decideComputerReview(pool, actor, pending.id, pending.digest, true), true)
+      await applyWebComputerDecisions(broker, await syncComputerReviews(pool, deviceId, actor.userId, snapshots))
+      assert.equal(await operation, 'clicked')
+      assert.equal(executed, 1)
+      console.log('live stage: database approval drove the Bot desktop via CUA')
+    } finally { await broker.close() }
     await sandbox.files.write('/workspace/acceptance-marker', 'preserved')
     await sandbox.betaPause()
+    console.log('live stage: paused')
     assert.equal((await store.state(actor, bot.id)).machine, 'sleeping')
     await new ComputerStore(pool).operate(actor, bot.id, 'wake')
+    console.log('live stage: resumed through store')
     sandbox = await Sandbox.connect(id, connection)
     if (process.env.E2B_TEST_CONTAINERS === '1') { await ensureContainerRuntime(sandbox); console.log('live stage: container runtime survives pause/resume') }
     assert.equal(await sandbox.files.read('/workspace/acceptance-marker'), 'preserved')
-    await sandbox.commands.run('/usr/bin/python3 /opt/mikka/computer/viewer-probe.py', { user: 'root', timeoutMs: 30_000 })
+    console.log('live stage: persisted file verified')
+    try {
+      await sandbox.commands.run('/usr/bin/python3 /opt/mikka/computer/viewer-probe.py', { user: 'root', timeoutMs: 30_000 })
+    } catch (error) {
+      const stderr = String((error as { stderr?: unknown }).stderr ?? '')
+      const lines = stderr.split('\n').filter(line => /^\s*File .*line \d+/.test(line) || /^AssertionError/.test(line) || /^TimeoutError/.test(line))
+      console.error('resumed viewer diagnostic:', lines.join(' | '))
+      throw error
+    }
+    console.log('live stage: resumed viewer verified')
     const privilege = await sandbox.commands.run('if sudo -n true >/dev/null 2>&1; then exit 1; fi; if cat /run/mikka-viewer/key >/dev/null 2>&1; then exit 1; fi', { user: 'user' })
     assert.equal(privilege.exitCode, 0)
     console.log(JSON.stringify({ provision: true, persistentBot: true, viewer: true, publicIngressProtected: true, unixVncPixels: true, takeover: true, handback: true, ownerDenial: true, sleepResume: true, diskPreserved: true, keyIsolated: true }))

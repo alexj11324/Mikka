@@ -78,8 +78,10 @@ async def main():
             after=mouse(); assert (before['X'],before['Y'])==(after['X'],after['Y'])
         async with session.ws_connect('http://127.0.0.1:6080/vnc?token='+sign(mode='control'),protocols=['binary']) as ws:
             rfb=RFB(ws); await rfb.handshake()
+            # Reusing the same coordinate after a CUA move must still move the
+            # real pointer, even when x11vnc cached the previous client input.
             await rfb.pointer(121,123); await asyncio.sleep(.3)
-            after=mouse(); assert (after['X'],after['Y'])==('121','123')
+            after=mouse(); assert (after['X'],after['Y'])==('121','123'), f"pointer stayed at {after['X']},{after['Y']}"
             state['epoch']+=1; state['controlledBy']=None; publish()
             await asyncio.sleep(.7)
             message=await ws.receive(timeout=3)
