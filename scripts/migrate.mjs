@@ -8,7 +8,7 @@
 // `-- target: DATABASE_URL` (the workspace database).
 import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
-import { orderMigrations } from './migration-order.mjs'
+import { alreadyApplied, orderMigrations } from './migration-order.mjs'
 
 const shouldRun = process.env.MIGRATE !== '0' && (process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production')
 if (!shouldRun) {
@@ -47,7 +47,7 @@ for (const [target, pending] of byTarget) {
     const { rows } = await pool.query('select name from schema_migrations')
     const applied = new Set(rows.map((row) => row.name))
     for (const { name, sql } of pending) {
-      if (applied.has(name)) continue
+      if (alreadyApplied(name, applied)) continue
       const client = await pool.connect()
       try {
         // Files may manage their own transaction; the record is written after.

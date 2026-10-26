@@ -24,6 +24,8 @@ export const REQUIRED_SUITES = [
 // Each entry names its dedicated runner; the runner must exist and still invoke the file.
 export const SELF_MANAGED = [
   { file: 'lib/auth-email.test.ts', runner: 'scripts/test-auth-email.mjs', reason: 'starts its own Docker Postgres and refuses any application database' },
+  { file: 'tests/byos-application.test.mjs', runner: 'scripts/test-subscription-worker.mjs', reason: 'starts an isolated BYOS Postgres and worker fixture' },
+  { file: 'tests/byos-enrollment-binding.test.mjs', runner: 'scripts/test-subscription-worker.mjs', reason: 'starts an isolated BYOS Postgres and worker fixture' },
 ]
 // This destructive empty-database bootstrap must stay BEFORE test:e2e:setup.
 // Its workflow invocation is independently checked, not silently omitted.

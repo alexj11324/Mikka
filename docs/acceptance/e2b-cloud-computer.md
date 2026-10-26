@@ -139,3 +139,11 @@ remain disabled pending worker build, integration with the current Bot harness,
 provider-specific validation and real user OAuth consent. The local model and
 enrollment tests use synthetic providers; they do not establish production
 subscription inference, hosted CLI operation, or computer-task execution.
+
+The production E2B template was also tested in a disposable sandbox with Docker
+and bubblewrap installed: a root-only Unix Docker socket launched a read-only,
+network-disabled, capability-dropped container, and the task OS user could not
+access that socket. This proves the runtime prerequisite only; it does not
+prove hosted CLI, provider inference or E2B task dispatch. Fresh migrations and
+both historical BYOS migration-name sets were tested on disposable PostgreSQL;
+existing database ledger entries are preserved and equivalent SQL is not replayed.

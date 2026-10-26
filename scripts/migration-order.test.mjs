@@ -10,3 +10,13 @@ test('only the explicit baseline precedes legacy migrations, without changing th
 test('missing baseline fails before connecting to any database', () => {
   assert.throws(() => orderMigrations(['0001_a.sql']), /missing required baseline/)
 })
+
+test('BYOS migration aliases recognize both recorded branch histories without replay', async () => {
+  const { alreadyApplied, MIGRATION_EQUIVALENTS } = await import('./migration-order.mjs')
+  for (const [canonical, historical] of Object.entries(MIGRATION_EQUIVALENTS)) {
+    assert.equal(alreadyApplied(canonical, new Set()), false)
+    assert.equal(alreadyApplied(canonical, new Set([canonical])), true)
+    for (const name of historical) assert.equal(alreadyApplied(canonical, new Set([name])), true)
+    assert.equal(alreadyApplied(canonical, new Set(['unrelated.sql'])), false)
+  }
+})
