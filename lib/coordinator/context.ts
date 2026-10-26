@@ -168,6 +168,8 @@ export interface ChatItem {
   /** Runs this reply dispatched, each shown once as a thread card under it (R-66). */
   threads: string[]
   createdAt: string
+  /** Still in the inbox: its position is inferred, not a coordinator_messages row, so it can't be marked read. */
+  pending?: true
 }
 
 /** The run id a dispatch_run result carries, if it succeeded. */
@@ -183,14 +185,14 @@ function dispatchedRun(part: { type: string; toolName?: string; output?: unknown
  * The conversation as the person sees it: their messages, Mikka's events, and
  * one entry per Coordinator reply, with the tools it called folded in.
  */
-export function chatItems(rows: readonly (StoredMessage & { createdAt: Date })[]): ChatItem[] {
+export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pending?: true })[]): ChatItem[] {
   const items: ChatItem[] = []
-  for (const { id, position, message, createdAt } of rows) {
+  for (const { id, position, message, createdAt, pending } of rows) {
     if (message.role === 'user') {
       const text = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
       const event = text.startsWith('[Event]')
       // The triage line is for the Coordinator, not the person.
-      items.push({ ...(id ? { id } : {}), position, from: event ? 'event' : 'person', text: event ? text.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') : text, tools: [], threads: [], createdAt: createdAt.toISOString() })
+      items.push({ ...(id ? { id } : {}), position, from: event ? 'event' : 'person', text: event ? text.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') : text, tools: [], threads: [], createdAt: createdAt.toISOString(), ...(pending ? { pending } : {}) })
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
       const text = parts.flatMap(part => part.type === 'text' && part.text.trim() ? [part.text.trim()] : []).join('\n\n')

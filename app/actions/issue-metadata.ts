@@ -1,10 +1,11 @@
 'use server'
 
-import { and, eq, or } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { agents, issues, issueMembers, issueVersions, users } from '@/lib/db/schema'
+import { issuePropertyChoices } from '@/lib/issue-property-choices'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { listProjects } from '@/app/actions/projects'
 import { issueView } from '@/lib/task-identifier-server'
@@ -26,17 +27,15 @@ export async function getIssuePropertyOptions(id: string) {
   const { issue, user } = await requireIssueAccess(id)
   const [owner] = await db.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, issue.userId))
   const members = await db.select({ id: users.id, name: users.name, image: users.image }).from(issueMembers).innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId)))
-  const availableAgents = await db.select({ id: agents.id, name: agents.name, harness: agents.harness }).from(agents).where(eq(agents.userId, issue.userId))
-  const ownedIssues = await db.select({ content: issues.content }).from(issues).where(user.id === issue.userId ? eq(issues.userId, issue.userId) : or(eq(issues.userId, user.id), eq(issues.userId, issue.userId)))
-  const metadata = ownedIssues.map(row => readIssueMetadata(row.content))
+  const choices = await issuePropertyChoices(user.id)
   const projectRecords = await listProjects()
   return {
     members: owner ? [owner, ...members.filter(member => member.id !== owner.id)] : members,
-    agents: availableAgents,
+    agents: choices.agents,
     projects: [...new Set(projectRecords.map(item => item.name))].sort(),
     projectRecords: projectRecords.map(item => ({ id: item.id, name: item.name })),
 
-    labels: [...new Map(metadata.flatMap(item => item.labels).map(label => [label.name, label])).values()],
+    labels: choices.labels,
     isOwner: user.id === issue.userId,
   }
 }

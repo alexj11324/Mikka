@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { Fragment, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { ArrowUp, Plus } from 'lucide-react'
@@ -24,6 +24,9 @@ import { IssueThreadPanel } from '@/components/workspace/issue-thread-panel'
 import { CoordinatorReply } from './coordinator-reply'
 import { ThreadCard } from './thread-card'
 import { PendingActions } from './pending-actions'
+import { UnreadDivider } from '@/components/chat/unread-divider'
+import { UnreadPill } from '@/components/chat/unread-pill'
+import { MESSAGE_POSITION_ATTR, useUnreadIndicators } from '@/lib/hooks/use-unread-indicators'
 
 /** The tools a reply used, less a dispatch that already shows as its thread card. */
 function footerTools(item: Chat['items'][number]) {
@@ -53,7 +56,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     const input = inputRef.current
     if (input) { input.focus(); input.setSelectionRange(prefill.text.length, prefill.text.length) }
   }, [prefill])
-  const items = data?.items ?? []
+  const items = useMemo(() => data?.items ?? [], [data])
+  const rootRef = useRef<HTMLElement>(null)
+  // Events are system lines, not messages; the person's own messages never count as unread.
+  const unreadItems = useMemo(() => items.filter(item => item.from !== 'event').map(item => ({ position: item.position, messageId: item.id ?? String(item.position), own: item.from === 'person', reportable: !item.pending })), [items])
+  const unread = useUnreadIndicators({ conversationId: 'coordinator', items: unreadItems, rootRef })
   const previews = useLinkPreviews(items.filter(item => item.from === 'coordinator').map(item => item.text))
   const sources = data?.sources
   const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue }), [sources, previews, onOpenIssue])
@@ -97,12 +104,14 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   </section>
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
-  <section aria-label={t('label')} className="mikka-agent flex min-h-0 flex-1 flex-col">
+  <section ref={rootRef} aria-label={t('label')} className="mikka-agent flex min-h-0 flex-1 flex-col">
     <MessageScrollerProvider defaultScrollPosition="end">
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={t('conversation')}>
           <MessageScrollerContent className={cn('mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 pb-6', compact ? 'pt-4' : 'pt-18')}>
-            {items.map(item => <MessageScrollerItem key={item.position} messageId={String(item.position)} scrollAnchor={item.from === 'person'}>
+            {items.map(item => <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
+              {unread.divider === item.position && <UnreadDivider />}
+              <MessageScrollerItem messageId={String(item.position)} scrollAnchor={item.from === 'person'} {...(item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
               {item.from === 'event'
                 ? <p className="text-center text-xs text-muted-foreground">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
@@ -115,11 +124,13 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     })}
                     {footerTools(item).length > 0 && <MessageFooter>{t('usedTools', { tools: footerTools(item).join(', ') })}</MessageFooter>}
                   </MessageContent></Message>}
-            </MessageScrollerItem>)}
+            </MessageScrollerItem>
+            </Fragment>)}
             {data?.working && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />{t('working')}</p>}
           </MessageScrollerContent>
         </MessageScrollerViewport>
-        <MessageScrollerButton />
+        {unread.showTop && <UnreadPill direction="up" count={unread.topCount} onJump={unread.jumpToDivider} onDismiss={unread.dismissTop} />}
+        {unread.showBottom ? <UnreadPill direction="down" count={unread.bottomCount} onJump={unread.jumpToLatest} onDismiss={unread.dismissBottom} /> : <MessageScrollerButton />}
       </MessageScroller>
     </MessageScrollerProvider>
     <div className={cn('mx-auto flex w-full max-w-3xl flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4')}>
