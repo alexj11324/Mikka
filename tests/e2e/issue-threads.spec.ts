@@ -121,7 +121,7 @@ test('eligible completed thread records the person’s feedback', async ({ page 
     await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"sessionId","startedAt","finishedAt",report)
       VALUES ($1,$2,$3,$4,$5,$6,'succeeded','Review feedback fixture','fixture-session',now(),now(),$7)`, [runId, user.id, issue.id, agentId, deviceId, repoId, JSON.stringify({ summary: 'Fixture report' })])
     await openIssueFromSearch(page, title)
-    await page.getByRole('button', { name: '打开线程 Review feedback fixture' }).click()
+    await page.getByRole('region', { name: /^线程/ }).getByRole('button', { name: '打开线程 Review feedback fixture', exact: true }).click()
     const panel = page.getByRole('region', { name: 'Review feedback fixture', exact: true })
     await panel.getByRole('textbox', { name: '补充说明（可选）' }).fill('Please include the verification result')
     const feedback = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/api/self-improvement') && response.request().method() === 'POST')

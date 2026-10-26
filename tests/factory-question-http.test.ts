@@ -24,6 +24,7 @@ test(
     assert.equal(target.pathname, "/mikka_e2e");
     const events: unknown[] = [];
     function client() {
+      const ip = `198.18.${randomBytes(1)[0]}.${1 + (randomBytes(1)[0] % 254)}`;
       let cookie = "";
       return async (
         path: string,
@@ -34,6 +35,7 @@ test(
         const options: RequestInit = {
           method,
           headers: {
+            "x-forwarded-for": ip,
             ...(cookie ? { cookie } : {}),
             ...(body ? { "content-type": "application/json", origin } : {}),
             ...extra,
