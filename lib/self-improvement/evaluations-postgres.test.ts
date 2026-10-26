@@ -136,7 +136,7 @@ test('PG frozen benchmark queues actual owned assignments atomically and keeps s
     await pool.query(`INSERT INTO improvement_scorers(digest,id,version,definition) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,[SCORER_DIGEST,SCORER.id,SCORER.version,JSON.stringify(SCORER)])
     await pool.query(`INSERT INTO improvement_proposals(id,"userId",bucket,fingerprint,"issueId","scorerDigest",candidate,result,status)
       VALUES($1,$2,'synthetic-eval',$3,$4,$5,$6,'{}','awaiting_model_candidate')`,[proposalId,userId,randomUUID(),issueId,SCORER_DIGEST,JSON.stringify({signals:{reportQuality:quality}})])
-    await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES($1,$2,'user_message',$1::text,'{}')`,[eventId,userId])
+    await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES($1,$2,'user_message',$3,'{}')`,[eventId,userId,eventId])
     const factoryTx=await pool.connect()
     try {
       await factoryTx.query('BEGIN')

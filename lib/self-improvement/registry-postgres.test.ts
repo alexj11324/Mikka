@@ -66,7 +66,7 @@ test('PG candidate registration, immutable replay and exact-version claim/resume
       JSON.stringify({kind:'feedback_candidate_request_v1',path:SKILL_PATH,baseline:BASELINE_MARKDOWN,baselineDigest:BASELINE_ARTIFACT.sha256,baselineArtifact:BASELINE_ARTIFACT,sourceIds:[feedback.id]}),
       JSON.stringify({kind:'not_evaluated',state:'not_evaluated',productionEligible:false})])
     await pool.query(`INSERT INTO improvement_proposal_sources("proposalId","scoreId","userId",bucket,"runId") VALUES($1,$2,$3,$4,$5)`,[proposalId,feedback.id,userId,feedback.bucket,sourceRunId])
-    await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES($1,$2,'user_message',$1::text,'{}')`,[eventId,userId])
+    await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES($1,$2,'user_message',$3,'{}')`,[eventId,userId,eventId])
     const tx=await pool.connect()
     try {
       await tx.query('BEGIN')
