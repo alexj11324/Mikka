@@ -339,7 +339,7 @@ test(
       if (retain) assert.ok(sessions.rows[0].count > 0, "retained mode must preserve its synthetic sessions");
       events.push({ retained: retain, owner: userId, questionRows: retained.rows[0].count, sessionRows: sessions.rows[0].count });
       console.log(
-        `PASS ${events.length} actual HTTP requests; concurrent answer = one strict continuation`,
+        `PASS ${events.filter(event => event !== null && typeof event === "object" && "path" in event).length} actual HTTP requests; concurrent answer = one strict continuation`,
       );
     } finally {
       if (process.env.FACTORY_QUESTION_HTTP_EVIDENCE)

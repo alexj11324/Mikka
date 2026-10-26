@@ -3,6 +3,9 @@
     {
       "name": "group-native-required",
       "phase": "database",
+      "appDatabases": ["mikka_review", "mikka_e2e"],
+      "workspaceDatabase": "mikka_workspace_review",
+      "requireDistinctWorkspaceDatabase": true,
       "script": "test:group-native",
       "file": "lib/group-mailbox-runtime.test.ts",
       "requiredEnvironment": {"MIKKA_TEST_NATIVE_GROUPS": "1", "KEEP_GROUP_TEST_FIXTURES": "1", "KEEP_NATIVE_TEST_FIXTURES": "1", "MIKKA_NATIVE_DISPOSAL_AUTHORIZED": "1"},
