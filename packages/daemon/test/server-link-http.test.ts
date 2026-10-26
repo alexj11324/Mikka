@@ -55,6 +55,12 @@ const json = (body: unknown, status = 200) =>
     headers: { "content-type": "application/json" },
   })
 
+// Safe shape captured from the deployment-protection response; no credentials or access links.
+const PROTECTION_401 = {
+  access: "protected", error: { message: "Protected deployment", code: "401" },
+  mcp: {}, message: "Protected deployment", protection: {},
+}
+
 const INFO = {
   name: "mac",
   platform: "darwin",
@@ -132,7 +138,10 @@ describe("HttpServerLink", () => {
   it("maps statuses: 5xx/429/network retry later, 409 on claim, 401 needs login", async () => {
     const statuses = [503, 429, 409, 401, 400]
     let i = 0
-    const { fetch } = scripted(() => json({ error: "x" }, statuses[i++]!))
+    const { fetch } = scripted(() => {
+      const status = statuses[i++]!
+      return json({ error: status === 401 ? "Unauthorized" : "x" }, status)
+    })
     const link = new HttpServerLink("http://server.test", fetch)
     await expect(link.pendingRuns("d")).rejects.toBeInstanceOf(
       ServerUnreachableError
@@ -181,11 +190,12 @@ describe("HttpServerLink", () => {
     await expect(followed.registerDevice("valid-device-session", INFO)).rejects.toBeInstanceOf(ServerUnreachableError)
   })
 
-  it("preserves the saved credential on a protection redirect and removes it only for a direct 401", async () => {
+  it.each(["redirect", "protection401"] as const)("preserves the saved credential on %s and removes it only for the app's 401", async protection => {
     let directRejection = false
     // Default Fetch follows the deployment's 302 and receives the SSO endpoint's 401.
     const { fetch } = scripted(call => directRejection
       ? json({ error: "Unauthorized" }, 401)
+      : protection === "protection401" ? json(PROTECTION_401, 401)
       : call.redirect === "manual"
         ? Response.redirect("https://sso.example.test/login", 302)
         : json({ error: "Deployment SSO required" }, 401))
@@ -202,6 +212,24 @@ describe("HttpServerLink", () => {
     await daemon.syncWithServer()
     expect(readJson(daemon.paths.device)).toEqual({})
     expect(Reflect.get(daemon, "device").credential).toBeUndefined()
+  })
+
+  it.each([PROTECTION_401, { error: "Unauthorized", protection: {} }, { error: "Unknown gateway failure" }])(
+    "does not revoke a session for an unrecognized direct 401 body %j", async body => {
+      const { fetch } = scripted(() => json(body, 401))
+      const link = new HttpServerLink("https://preview.example.test/mikka", fetch)
+      await expect(link.registerDevice("valid-device-session", INFO)).rejects.toBeInstanceOf(ServerUnreachableError)
+      await expect(link.claimCoordinator("dev-1", new AbortController().signal)).rejects.toBeInstanceOf(ServerUnreachableError)
+    },
+  )
+
+  it.each(["Unauthorized", "authRequired"])("recognizes the app's exact %s 401 without consuming its response", async error => {
+    const response = json({ error }, 401)
+    const link = new HttpServerLink("https://preview.example.test/mikka", scripted(() => response).fetch)
+    const call = error === "authRequired" ? link.validateSkillReceipt("run", "receipt") : link.registerDevice("revoked-session", INFO)
+    await expect(call).rejects.toBeInstanceOf(SessionRejectedError)
+    expect(response.bodyUsed).toBe(false)
+    expect(await response.json()).toEqual({ error })
   })
 
   it("refuses a response that does not match the protocol", async () => {

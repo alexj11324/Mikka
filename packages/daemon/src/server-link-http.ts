@@ -13,7 +13,7 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 // (`ServerUnreachableError`, the outbox keeps the item); 409 on a claim is
 // `RunNotPinnedHereError`; any other 4xx is a refusal (`DaemonError`) that
 // retrying cannot fix.
-import type { z } from "zod"
+import { z } from "zod"
 import { SKILL_ARTIFACT_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
 
 import {
@@ -51,6 +51,8 @@ import type {
   RunAssignment,
   ServerLink,
 } from "./server-link"
+
+const deviceSessionRejection = z.object({ error: z.enum(["Unauthorized", "authRequired"]) }).strict()
 
 /**
  * Ids go into the path as one escaped segment each. `.` and `..` survive
@@ -148,6 +150,12 @@ export class HttpServerLink implements ServerLink {
       // Deployment protection is not device-session rejection; never follow it with credentials.
       if (response.redirected || (response.status >= 300 && response.status < 400))
         throw new Error(`Unexpected server redirect (${response.status})`)
+      if (response.status === 401) {
+        // Only the device API's exact rejection contracts can revoke a saved credential.
+        const body: unknown = await response.clone().json().catch(() => null)
+        if (!deviceSessionRejection.safeParse(body).success)
+          throw new Error("Unexpected device authentication response")
+      }
       return response
     } catch (error) {
       throw new ServerUnreachableError(error)
