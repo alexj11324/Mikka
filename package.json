@@ -62,6 +62,7 @@
     "test:db-runner": "node --test scripts/run-db-tests.test.mjs",
     "test:workspace-migration-db": "node --test tests/workspace-migration.test.mjs",
     "test:activity-actor-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/activity-actor-db.test.ts",
+    "test:coordinator-issue-create-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/coordinator-issue-create.db.test.ts",
     "test:coordinator-native": "node --experimental-test-module-mocks --import tsx --test lib/coordinator/native-store.test.ts lib/coordinator/native-prompt.test.ts lib/coordinator/native-relay.db.test.ts",
     "test:coordinator-native-scope": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/native-coordinator-tool-scope.test.ts",
     "test:coordinator-native-relay": "pnpm --filter @mikka/daemon exec vitest run --root ../.. tests/native-coordinator-relay.test.mjs",

@@ -193,5 +193,5 @@ jobs:
           REQUIRE_DB: '1'
           RUN_DISPATCH_DB_TESTS: '1'
           FACTORY_MONITOR_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
-          DB_TEST_EXPECTED: test:factory,test:active-agents,test:activity-actor-db,test:conversation-reads,test:coordinator-native,test:groups,test:issue-search-db,test:relation-cycle,test:run-dispatch,test:self-improvement-db,test:self-improvement-unit,test:visibility-db,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:factory,test:active-agents,test:activity-actor-db,test:conversation-reads,test:coordinator-issue-create-db,test:coordinator-native,test:groups,test:issue-search-db,test:relation-cycle,test:run-dispatch,test:self-improvement-db,test:self-improvement-unit,test:visibility-db,test:workspace-migration-db
       - run: pnpm build

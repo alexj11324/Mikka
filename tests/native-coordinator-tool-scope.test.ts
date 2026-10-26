@@ -9,6 +9,7 @@ const effect = mock.fn(async () => { if (uncertain) throw new Error('retryable t
 const stub = (path: string, namedExports: Record<string,unknown>) => mock.module(new URL(path,import.meta.url).href,{namedExports})
 stub('../lib/coordinator/native.ts',{nativeCoordinatorStore:{assertToolActive:checks}})
 stub('../lib/coordinator/store.ts',{editMemory:effect})
+stub('../lib/coordinator/issue-create.ts',{createIssueFromRequest:effect})
 stub('../lib/issue-visibility.ts',{issueVisibility:effect})
 stub('../lib/agent-runs.ts',{addRunMessage:effect,queueRun:effect,readRun:effect,requestRunStop:effect,visibleRuns:effect})
 stub('../lib/db/index.ts',{db:null})
@@ -51,6 +52,7 @@ const calls = {
   handoffSkillImprovement:()=>steps.handoffSkillImprovement(user,{proposalId:'proposal',binding,agentId:'agent',deviceRepoId:'repo'},scope),
   getSkillImprovementFactory:()=>steps.getSkillImprovementFactory(user,{proposalId:'proposal'},scope),
   listFactoryRequests:()=>steps.listFactoryRequests(user,scope),
+  createIssueFromRequestStep:()=>steps.createIssueFromRequestStep(user,{sourceEventId:'event',title:'Requested task'},scope),
   routeFactoryTask:()=>steps.routeFactoryTask(user,{issueId:'issue',sourceEventId:'event',rationale:'task',missingInformation:[],missingPermissions:[],needsSpec:false},scope),
   getFactoryTask:()=>steps.getFactoryTask(user,{taskId:'task'},scope),
   listFactoryQuestions:()=>steps.listFactoryQuestions(user,{},scope),
@@ -89,6 +91,11 @@ test('a retried business step rechecks authorization rather than reusing a prior
   await assert.rejects(steps.remember(user,{note:'preference'},scope),/coordinatorExpiredOrLeaseLost/)
   assert.equal(checks.mock.callCount(),2)
   assert.equal(effect.mock.callCount(),1)
+})
+test('issue creation passes only the host-owned user and request input to persistence',async()=>{
+  const input={sourceEventId:'event',title:'Requested task'}
+  await steps.createIssueFromRequestStep(user,input)
+  assert.deepEqual(effect.mock.calls.map(call=>call.arguments),[[user,input]])
 })
 test('unscoped AI SDK calls keep the existing business callbacks and account approval proposals',async()=>{
   revoked=true

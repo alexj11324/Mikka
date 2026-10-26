@@ -100,6 +100,11 @@ function coordinatorTools(userId: string, scope?: NativeToolScope) {
       description: 'Read recent authenticated requests to identify the source event for task routing.',
       inputSchema: z.object({}), execute: () => steps.listFactoryRequests(userId, scope),
     }),
+    create_issue_from_request: tool({
+      description: 'Create one personal issue from an actual authenticated user request when it needs a new task. Use the sourceEventId from list_factory_requests and a concise title; the server copies the original request into the description. Replaying the same source returns its existing accessible issue. Use the returned issueId for Factory routing.',
+      inputSchema: z.object({ sourceEventId: id, title: z.string().trim().min(1).max(200) }).strict(),
+      execute: input => steps.createIssueFromRequestStep(userId, input, scope),
+    }),
     route_factory_task: tool({
       description: 'Persist routing for the request and issue. Clear authorized work starts execute. Record only material missing information/permissions; spec is optional.',
       inputSchema: routeSchema.omit({ eventId: true }), execute: ( input) => steps.routeFactoryTask(userId, input, scope),

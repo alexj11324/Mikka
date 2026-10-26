@@ -6,6 +6,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
+import { createIssueFromRequest } from '@/lib/coordinator/issue-create'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db } from '@/lib/db'
@@ -259,6 +260,7 @@ export async function listFactoryRequests(userId: string, scope?: NativeToolScop
   const rows = await db
     .select({
       sourceEventId: coordinatorEvents.id,
+      issueId: coordinatorEvents.issueId,
       payload: coordinatorEvents.payload,
       createdAt: coordinatorEvents.createdAt,
     })
@@ -273,12 +275,19 @@ export async function listFactoryRequests(userId: string, scope?: NativeToolScop
     .limit(10)
   return rows.map((row) => ({
     sourceEventId: row.sourceEventId,
+    issueId: row.issueId,
     text: String(row.payload.text ?? ''),
     createdAt: row.createdAt,
     ...(typeof row.payload.questionId === 'string'
       ? { questionId: row.payload.questionId }
       : {}),
   }))
+}
+
+export async function createIssueFromRequestStep(userId: string, input: { sourceEventId: string; title: string }, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(() => createIssueFromRequest(userId, input))
 }
 
 export async function routeFactoryTask(userId: string, input: Omit<FactoryRoute,'eventId'>, scope?: NativeToolScope) {
