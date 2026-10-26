@@ -27,7 +27,7 @@ import { agentRuns, agents, coordinatorEvents, deviceRepos, devices, factoryAtte
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
-import { proposeCalendarBatch, recoverCalendarBatch, prepareAccountActionBatch } from '@/lib/operations/action-intent-runtime'
+import { actionIntents, proposeCalendarBatch, recoverCalendarBatch, prepareAccountActionBatch } from '@/lib/operations/action-intent-runtime'
 import { OperationError } from '@/lib/operations/ledger'
 import type { ActionContext } from '@/lib/operations/action-intents'
 import { proposeAction } from '@/lib/pending-action-store'
@@ -411,6 +411,9 @@ export async function stopRun(userId: string, input: { runId: string }) {
 
 export async function recoverAccountActions(userId: string, context: ActionContext) {
   'use step'
+  // Reading an empty persisted plan is not external tool execution. Preserve
+  // the existing policy gate whenever a proposal would be materialized.
+  if(!(await actionIntents().slots(userId,context)).length)return []
   await authorizePolicyTool(userId)
   return recoverCalendarBatch(userId, context)
 }

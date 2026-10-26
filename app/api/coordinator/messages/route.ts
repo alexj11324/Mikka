@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { scheduleOriginAllowed } from '@/lib/schedules/http'
+import {selectedScheduleWorkspace} from '@/lib/schedules/runtime'
 import { appOrigin } from '@/lib/mcp/resource'
 import { workspaceDb } from '@/lib/workspace-db'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
@@ -37,7 +38,11 @@ export async function POST(request: Request) {
   const userId = session.user.id
   const selected = parsed.data.workspaceId ?? (await cookies()).get('mikka-workspace')?.value
   if(selected&&!z.uuid().safeParse(selected).success)return NextResponse.json({error:'workspaceAccessDenied'},{status:403})
-  const workspaceId = selected
+  // Capture real request authority now. A sole active membership is an
+  // unambiguous server-owned default; never guess among several tenants or
+  // create a workspace/membership to make a background event executable.
+  const workspaceId = selected ?? await selectedScheduleWorkspace(userId)
+  if(!workspaceId)return NextResponse.json({error:'workspaceRequired'},{status:400})
   if(workspaceId){try{await workspaceDb.transaction(tx=>requireWorkspace(tx,workspaceId,userId))}catch(error){if(error instanceof WorkspaceError)return NextResponse.json({error:'workspaceAccessDenied'},{status:403});throw error}}
   let submission: { sourceEventId: string; replayed: boolean }
   try {

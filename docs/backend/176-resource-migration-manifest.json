@@ -1,0 +1,32 @@
+{
+  "frozenWakeHead": "90f66315b318efa0da2e14a01ea351882201caa7",
+  "base": "b7d7358a90cee9fde8e6c311159ce34b585c7374",
+  "productionExecution": "not authorized or executed",
+  "ownMigrations": [
+    {
+      "path": "drizzle/20261025180001_user_schedules.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "9d70757bf915f7bd8ea34e0b8159eb042be709828ad0bbc41aa9c257dee14b2d"
+    },
+    {
+      "path": "drizzle/20261025185701_schedule_recovery_decisions.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "e834575e37bd5ee42ce25aafb428bf2035b3516227737d7d58d2a1c2968475c1"
+    },
+    {
+      "path": "drizzle/20261025191001_coordinator_consumption_receipts.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "8d092371105428099f3b0e5187a94ea31428950f6afb82c4fd3a45ba7daec9ac"
+    },
+    {
+      "path": "drizzle/20261025213501_coordinator_effect_fences.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "43da1c3c9ba85a0523cb52981c0fc58060540d8216f97898ea673aaafc5c5af0"
+    }
+  ],
+  "quotaDependency": {
+    "sha": "50598846e592dbdb4b9419f96eb99b6cf5b9edbf",
+    "path": "drizzle/20261025165100_tenant_quotas.sql"
+  },
+  "policyDependency": "a04bf12b81e9f827e88c7ddf9b48c29d38ae19c7"
+}

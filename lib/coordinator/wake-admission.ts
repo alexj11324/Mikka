@@ -10,6 +10,7 @@ export function configureWakeAdmission(adapter: WakeAdmission) {
 }
 export const resourceWakeAdmission: WakeAdmission = async (scope, phase) => {
   if(installed)return installed(scope,phase)
+  if(!scope.workspaceId)return {admitted:false,retryAt:new Date(Date.now()+60000)}
   const {publicWakeAdmission}=await import('../resources/runtime')
   return publicWakeAdmission(scope,phase)
 }
