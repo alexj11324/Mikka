@@ -109,13 +109,13 @@ export async function telegramReplyThreads(userId: string, targets: PendingTeleg
 export async function sendTelegramChunk(userId:string,target:PendingTelegramTarget,chunk:string) {
   'use step'
   if(!target||typeof target!=='object'||typeof chunk!=='string')throw new WakeError('wakeTelegramReceiptRequired')
-  return coordinatorInbox().telegramReply(userId,target,async()=>{
+  return coordinatorInbox().telegramReply(userId,target,async tx=>{
     const controlled=resourceControlledOrigin()
     if(controlled){
       const response=await fetch(controlled+'/telegram',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({threadId:target.threadId,text:chunk}),signal:AbortSignal.timeout(8000),redirect:'error'})
       if(!response.ok)throw new Error('telegramReplyUnavailable')
       await response.body?.cancel()
-    }else await postTelegramText(target.threadId,chunk)
+    }else await postTelegramText(target.threadId,chunk,tx)
   })
 }
 export async function acknowledgeTelegramReply(userId:string,target:PendingTelegramTarget){

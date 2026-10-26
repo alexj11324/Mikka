@@ -1,7 +1,7 @@
 name: Coordinator durable consumption
 on:
   push:
-    branches: ['codex/176-durable-inbox-recovery', 'codex/176-public-resource-admission']
+    branches: ['codex/176-durable-inbox-recovery', 'codex/176-public-resource-admission', 'codex/294-durable-telegram-replies']
   pull_request:
     paths: ['lib/coordinator/**', 'workflows/coordinator/**', 'app/api/coordinator/**', 'drizzle/*coordinator_consumption_receipts.sql', 'drizzle/*coordinator_effect_fences.sql', '.github/workflows/coordinator-wake.yml']
 permissions:

@@ -3,6 +3,7 @@ import {test} from 'node:test'
 import {randomUUID} from 'node:crypto'
 import {Pool} from 'pg'
 import {CoordinatorInbox,isolatedInboxOptions} from './wake-test-helpers'
+import {createTelegramState} from '../telegram/state'
 import {telegramCoordinatorWorkspace} from '../telegram/coordinator-scope'
 import {resourceFixture,isolatedResourceUrls} from '../resources/test-fixtures'
 
@@ -61,6 +62,19 @@ test('Telegram pending destinations: real split PG retry, fresh authority and de
    await assert.rejects(inbox().telegramReply('different-owner',target,send),/wakeNotFound/)
    assert.equal(sent,0);assert.equal((await pending(f.owner)).length,1)
    await inbox().telegramReply(f.owner,target,send);assert.equal(sent,1)
+  })
+  await t.test('actual Chat SDK Postgres state reuses a held one-connection app transaction',async()=>{
+   const one=new Pool({connectionString:urls.app,max:1,connectionTimeoutMillis:500}),client=await one.connect(),state=createTelegramState(one),key='reply-state-'+randomUUID()
+   try{
+    await client.query('BEGIN')
+    await state.withClient(client,async()=>{
+     await state.adapter.connect()
+     await state.adapter.set(key,{owned:true})
+     assert.deepEqual(await state.adapter.get(key),{owned:true})
+     await state.adapter.delete(key)
+    })
+    await client.query('COMMIT')
+   }finally{client.release();await state.adapter.disconnect();await one.end()}
   })
   await t.test('authenticated Telegram ingress captures a real unambiguous workspace and rejects ambiguity/revocation',async()=>{
    const f=await fixture()

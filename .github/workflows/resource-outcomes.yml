@@ -1,7 +1,7 @@
 name: Public durable resource outcomes
 on:
   push:
-    branches: ['codex/176-public-resource-admission']
+    branches: ['codex/176-public-resource-admission', 'codex/294-durable-telegram-replies']
   pull_request:
     paths: ['lib/resources/**', 'lib/quota/**', 'lib/schedules/**', 'workflows/coordinator/**', '.github/workflows/resource-outcomes.yml']
 permissions:

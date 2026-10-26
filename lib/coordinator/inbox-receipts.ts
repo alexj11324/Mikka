@@ -524,7 +524,7 @@ export class CoordinatorInbox {
   }
   /** The actual chunk step checks current owner/workspace/source/link while
    * their read locks are held through delivery. A cached prior gate is useless. */
-  async telegramReply<T>(owner:string,target:PendingTelegramTarget,send:()=>Promise<T>){
+  async telegramReply<T>(owner:string,target:PendingTelegramTarget,send:(tx:PoolClient)=>Promise<T>){
     return this.scoped(owner,target.sourceEventId,'read',async tx=>{
       const session=await this.session(tx,owner)
       if(!hasTelegramPending(session.telegram_reply_pending??[],target))return {replayed:true as const}
@@ -534,7 +534,7 @@ export class CoordinatorInbox {
       if(event.kind!=='user_message'||raw?.threadId!==target.threadId||raw?.telegramUserId!==target.telegramUserId)throw new WakeError('wakeTelegramTargetChanged',403)
       await this.authorize(tx,event,'read')
       if(!(await tx.query('SELECT 1 FROM telegram_links WHERE "userId"=$1 AND "telegramUserId"=$2 FOR SHARE',[owner,target.telegramUserId])).rowCount)throw new WakeError('wakeTelegramLinkUnavailable',403)
-      return {replayed:false as const,value:await send()}
+      return {replayed:false as const,value:await send(tx)}
     })
   }
   /** Cleanup only after all chunks were acknowledged by the delivery step.
