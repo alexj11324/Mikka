@@ -106,8 +106,8 @@ for all users:
   injection into real model runs, takeover pausing those tool calls, run-scoped
   approvals and `data-computer` chat events remain to be integrated. The broker
   has been tested in the sandbox, not connected to the product approval ledger.
-- Subscription OAuth/CPA/native Codex/Claude paths from #172 are separate unmerged
-  work. No real provider inference or subscription-connection acceptance ran.
+- Subscription OAuth/CPA/native Codex/Claude foundations have been selectively
+  integrated, but no real provider inference or subscription-connection acceptance ran.
 - No cross-profile authentication cookies are copied. Multi-owner isolation and
   authorized same-owner session reuse need their own acceptance.
 - Both additive computer migrations were applied and recorded in the production
@@ -177,5 +177,24 @@ workspace, bound Bot and display before recording a review. A session-authentica
 owner can approve or deny a single operation; altered digests, cross-workspace
 decisions, stale/cancelled runs and replay are rejected. Run-wide approval is
 not implemented and fails explicitly. The daemon transport can sync snapshots and apply matching decisions, with a
-request-only MCP proxy regression test; automatic polling, hosted-run injection
-and chat events remain unwired, so this is not end-to-end approval acceptance.
+request-only MCP proxy regression test. A cancellable polling loop retries transport
+failures without approving calls, but is not yet attached to a hosted worker;
+hosted-run injection and chat events remain unwired, so this is not end-to-end
+approval acceptance.
+
+## Real E2B hosted-runner fixture
+
+On 2026-10-26, a disposable E2B sandbox created with the production-scoped E2B
+configuration ran both hosted-runner fixtures from commit `8419e15` successfully.
+The fixtures use synthetic Codex and Claude CLIs and a fake provider; they verify
+the actual container runtime and adapter plumbing, not provider OAuth or inference.
+The first 2 GB worker template ran out of free disk during the full test setup.
+The subsequent test used the separate template `27dk2k0wg8y19b3z91g7` (4 GB RAM,
+at least 16 GB free disk), pinned Node and the fixed container image. The test
+sandbox was deleted. This worker template is not selected for production.
+
+Development and production databases also have the additive cloud-device-scope
+migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
+expiry validation, rotation and the Bot's pending-review state. The worker
+credential provisioning and review polling still need to be connected to an
+actual Bot task before product acceptance.
