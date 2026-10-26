@@ -18,7 +18,9 @@ if (!url && process.env.REQUIRE_DB === '1') throw new Error('Team task DB tests 
 
 test('explicit team task creation across two real PostgreSQL databases', { skip: !url }, async t => {
   const { Pool } = await import('pg')
-  const suffix=randomUUID().replaceAll('-',''), appName=`team184_app_${suffix}_e2e`, workspaceName=`team184_workspace_${suffix}_e2e`
+  const suffix=randomUUID().replaceAll('-','')
+  const appName=process.env.ISSUE184_LOCAL_TEST === '1' ? 'team184_app_69649a2f38184d8b8edf1fe6a6524f31_e2e' : `team184_app_${suffix}_e2e`
+  const workspaceName=process.env.ISSUE184_LOCAL_TEST === '1' ? 'team184_workspace_1bf3cc4e4430443c841d27f4a5115dc9_e2e' : `team184_workspace_${suffix}_e2e`
   const admin=new Pool({connectionString:url,max:1})
   try { await admin.query(`create database "${appName}"`);await admin.query(`create database "${workspaceName}"`) } finally {await admin.end()}
   const appUrl=new URL(url!), workspaceUrl=new URL(url!);appUrl.pathname=`/${appName}`;workspaceUrl.pathname=`/${workspaceName}`
