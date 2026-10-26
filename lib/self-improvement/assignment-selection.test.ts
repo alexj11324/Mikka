@@ -93,3 +93,14 @@ test('candidate scope and evaluation verifier remain enforced before selection a
   f.metadata.agentId = randomUUID()
   await assert.rejects(f.assignments.preflight(f.userId, f.run.id, true), /sourceMismatch/)
 })
+
+test('heartbeat excludes malformed IDs from the UUID lookup and preserves them for legacy revocation', async () => {
+  const runId = randomUUID(), runIds = [runId, 'not-a-uuid']
+  const pool = { query: async (_sql: string, values: unknown[]) => {
+    assert.deepEqual(values[1], [runId])
+    return { rows: [] }
+  } } as unknown as Pool
+  const assignments = createSkillAssignments(pool, async () => false)
+  assert.deepEqual(await assignments.renewHeartbeat('owner', 'device', runIds, false),
+    { legacy: runIds, leases: {}, revoked: [] })
+})

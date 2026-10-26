@@ -145,9 +145,11 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
     })
   }
   async function renewHeartbeat(userId:string,deviceId:string,runIds:string[],supportsArtifacts:boolean) {
+    // Protocol IDs may be non-UUIDs; the legacy lease boundary revokes those after partitioning.
+    const validRunIds=runIds.filter(id=>z.uuid().safeParse(id).success)
     const {rows}=await pool.query(`SELECT s."runId",r.id FROM improvement_skill_selections s
       LEFT JOIN improvement_skill_receipts r ON r."runId"=s."runId" AND r."userId"=s."userId"
-      WHERE s."userId"=$1 AND s."runId"=ANY($2::uuid[])`,[userId,runIds])
+      WHERE s."userId"=$1 AND s."runId"=ANY($2::uuid[])`,[userId,validRunIds])
     const revoked:string[]=[],leases:Record<string,string>={}
     for(const row of rows) {
       try {
