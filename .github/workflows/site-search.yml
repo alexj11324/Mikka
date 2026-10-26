@@ -11,6 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   site-search:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:

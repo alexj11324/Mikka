@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from 'node:crypto'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { Pool } from 'pg'
 
@@ -45,7 +46,19 @@ test.beforeAll(async () => {
   await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,$4,$4,\'complete\',$5)', [randomUUID(), history, owner, `${prefix}-body-secret`, randomUUID()])
   for (const user of [owner, outsider]) await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'todo\',\'none\',\'personal\')', [randomUUID(), user, `${prefix}-task`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 131 } } })])
 })
-test.afterAll(async () => { await pool.end() })
+test.afterAll(async () => {
+  try {
+    const history = await pool.query('select id,"userId",title,"updatedAt" from agent_sessions where "userId"=any($1::text[])', [[owner, outsider]])
+    const groups = await pool.query('select id,"workspaceId",kind,title,"createdBy","createdAt" from conversations where "createdBy"=any($1::text[])', [[owner, outsider]])
+    const memberships = await pool.query('select "conversationId","memberType","memberId",role,"leftAt" from conversation_members where "memberId"=$1', [owner])
+    const workspaces = await pool.query('select "workspaceId","userId",status from mikka_workspace_members where "userId"=any($1::text[])', [[owner, outsider]])
+    const tasks = await pool.query('select id,"userId",title,status,scope from issues where "userId"=any($1::text[])', [[owner, outsider]])
+    const retainedSession = await pool.query('select id from session where id=$1', [sessionId])
+    await mkdir('test-results', { recursive: true })
+    // Retain only synthetic source rows and IDs; never export auth tokens/cookies.
+    await writeFile('test-results/site-search-fixtures.json', JSON.stringify({ sha: process.env.GITHUB_SHA, owner, outsider, history: history.rows, groups: groups.rows, memberships: memberships.rows, workspaces: workspaces.rows, tasks: tasks.rows, retainedSession: retainedSession.rows }, null, 2))
+  } finally { await pool.end() }
+})
 
 test('owner titles and authorized group titles page beyond 100 with exact projections', async ({ request }) => {
   for (const [source, count, q] of [['history', 130, `${prefix}-history-`], ['groups', 125, `${prefix}-group-`]] as const) {

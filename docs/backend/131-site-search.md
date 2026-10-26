@@ -61,7 +61,9 @@ private DMs/nonmembers, literal wildcard matching, body exclusion, exact result
 allowlists, task reuse, session revocation during a blocked real title SELECT, group exit and workspace suspension.
 The dedicated `site-search.yml` executes this profile, types and lint. This is a
 post-build Playwright API profile, not a stubbed handler or pre-build R0 recipe;
-it does not edit the R0 inventory/schema/permission helpers.
+it does not edit the R0 inventory/schema/permission helpers. The report artifact
+retains synthetic source rows and their tested SHA, excluding auth tokens/cookies;
+no fixture DELETE or schema DROP cleanup is performed.
 
 No deployed Preview/production, real-user, performance or frontend acceptance is
 claimed. Parent owns Auth composition, frontend wiring and fixed-version actual
