@@ -1,7 +1,8 @@
 import { createHmac, randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { createConnection, createServer, type Socket } from 'node:net'
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn, execFile, type ChildProcess } from 'node:child_process'
+import { promisify } from 'node:util'
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { Pool } from 'pg'
 
@@ -91,6 +92,8 @@ const cookie = `better-auth.session_token=${encodeURIComponent(`${token}.${creat
 const prefix = `title-${randomUUID()}`
 const archivedId = randomUUID(), foreignToken = randomUUID()
 const foreignCookie = `better-auth.session_token=${encodeURIComponent(`${foreignToken}.${createHmac('sha256', secret).update(foreignToken).digest('base64')}`)}`
+const boundary = { issue: randomUUID(), run: randomUUID(), agent: randomUUID(), history: randomUUID(), dm: randomUUID() }
+const execute = promisify(execFile)
 const archivedCompletion = 'root = TextContent("synthetic retained archive body")'
 let groupIds: string[] = []
 async function get(request: APIRequestContext, params: Record<string, string>, authenticated = true) {
@@ -118,6 +121,20 @@ test.beforeAll(async () => {
   }
   await pool.query('insert into agent_sessions (id,"userId",title,"updatedAt") values ($1,$2,$3,\'1999-01-01T00:00:00Z\')', [archivedId, owner, `${prefix}-archive-locator`])
   await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,\'synthetic archived question\',$4,\'complete\',$5)', [randomUUID(), archivedId, owner, archivedCompletion, randomUUID()])
+  // A searchable task never grants its owner access to a colleague's private thread/history/DM.
+  const boundaryTeam = randomUUID()
+  await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",email,name,role,status) values ($1,$2,$3,$2,\'member\',\'active\')', [workspace, outsider, `${outsider}@example.invalid`])
+  await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Search thread boundary\',\'STB\')', [boundaryTeam, workspace, owner])
+  await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'todo\',\'none\',\'workspace\')', [boundary.issue, owner, `${prefix}-thread-boundary`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 133 } } })])
+  await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [boundary.issue, boundaryTeam, workspace, owner])
+  await pool.query('insert into agents (id,"userId",harness,name,instructions) values ($1,$2,\'codex\',\'BOUNDARY_PRIVATE_AGENT\',\'BOUNDARY_PRIVATE_INSTRUCTIONS\')', [boundary.agent, outsider])
+  await pool.query('insert into agent_runs (id,"userId","issueId","agentId",status,prompt,report) values ($1,$2,$3,$4,\'running\',\'BOUNDARY_PRIVATE_PROMPT\',$5)', [boundary.run, outsider, boundary.issue, boundary.agent, JSON.stringify({ summary: 'BOUNDARY_PRIVATE_REPORT' })])
+  await pool.query('insert into run_chunks (id,"runId",seq,chunk) values ($1,$2,1,$3)', [randomUUID(), boundary.run, JSON.stringify({ type: 'text-delta', delta: 'BOUNDARY_PRIVATE_CHUNK' })])
+  await pool.query('insert into agent_sessions (id,"userId",title) values ($1,$2,$3)', [boundary.history, outsider, `${prefix}-thread-boundary`])
+  await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,\'private archive question\',\'BOUNDARY_PRIVATE_ARCHIVE\',\'complete\',$4)', [randomUUID(), boundary.history, outsider, randomUUID()])
+  await pool.query('insert into conversations (id,"workspaceId",kind,title,"createdBy") values ($1,$2,\'agent_dm\',$3,$4)', [boundary.dm, workspace, `${prefix}-thread-boundary`, outsider])
+  await pool.query('insert into conversation_members ("conversationId","memberType","memberId",role) values ($1,\'user\',$2,\'member\')', [boundary.dm, owner])
+  await pool.query('insert into conversation_messages (id,"conversationId",position,"authorType","authorId",body) values ($1,$2,1,\'user\',$3,\'BOUNDARY_PRIVATE_DM\')', [randomUUID(), boundary.dm, outsider])
   // Recent nonmatches and hidden matches cannot consume the page's visible LIMIT.
   for (const user of [owner, outsider]) await pool.query(`insert into agent_sessions (id,"userId",title,"updatedAt") select gen_random_uuid(),$1,$2||g,'2020-01-01T00:00:00.123456Z'::timestamptz + g * interval '1 microsecond' from generate_series(1,130) g`, [user, `${prefix}-history-`])
   await pool.query(`insert into agent_sessions (id,"userId",title,"updatedAt") select gen_random_uuid(),$1,'recent unrelated',now() from generate_series(1,130)`, [owner])
@@ -161,7 +178,7 @@ test.afterAll(async () => {
     const retainedSession = await pool.query('select id from session where id=$1', [sessionId])
     await mkdir('test-results', { recursive: true })
     // Retain only synthetic source rows and IDs; never export auth tokens/cookies.
-    await writeFile('test-results/site-search-fixtures.json', JSON.stringify({ sha: process.env.GITHUB_SHA, databaseIdentity, owner, outsider, history: history.rows, groups: groups.rows, memberships: memberships.rows, workspaces: workspaces.rows, tasks: tasks.rows, retainedSession: retainedSession.rows }, null, 2))
+    await writeFile('test-results/site-search-fixtures.json', JSON.stringify({ sha: process.env.GITHUB_SHA, databaseIdentity, boundary, owner, outsider, history: history.rows, groups: groups.rows, memberships: memberships.rows, workspaces: workspaces.rows, tasks: tasks.rows, retainedSession: retainedSession.rows }, null, 2))
   } finally {
     releaseGate()
     if (nextProcess && nextProcess.exitCode === null) {
@@ -241,6 +258,65 @@ test('retired archive title hit locates owner history beyond the latest 100 with
   const retained = await pool.query('select completion from agent_turns where "sessionId"=$1', [archivedId])
   expect(retained.rows.map(row => row.completion)).toEqual([archivedCompletion])
   console.log('search131 retired archive locator: title/id beyond recent100 -> owner GET 200, foreign/missing 404, unauthenticated 401, generation POST 405; selected title remains outside recent list')
+})
+
+test('searchable task grants no colleague thread content, old history or private DM authority', async ({ request }) => {
+  const input = { q: `${prefix}-thread-boundary`, workspaceId: workspace }
+  const task = await get(request, { ...input, source: 'tasks' })
+  expect(task.response.status()).toBe(200)
+  expect(task.body.items.map((row: { id: string }) => row.id)).toEqual([boundary.issue])
+  expect(JSON.stringify(task.body)).not.toContain('BOUNDARY_PRIVATE_')
+  for (const source of ['history', 'groups']) {
+    const result = await get(request, { source, q: input.q, ...(source === 'groups' ? { workspaceId: workspace } : {}) })
+    expect(result.response.status()).toBe(200)
+    expect(result.body.items).toEqual([])
+    expect(result.body.nextCursor).toBeNull()
+  }
+  const archive = `http://127.0.0.1:3210/mikka/api/agent/sessions?sessionId=${boundary.history}`
+  const deniedArchive = await request.get(archive, { headers: { cookie } })
+  expect(deniedArchive.status()).toBe(404)
+  expect(await deniedArchive.text()).not.toContain('BOUNDARY_PRIVATE_')
+  const ownedArchive = await request.get(archive, { headers: { cookie: foreignCookie } })
+  expect(ownedArchive.status()).toBe(200)
+  expect((await ownedArchive.json()).turns[0].completion).toBe('BOUNDARY_PRIVATE_ARCHIVE')
+  const dm = await request.get(`http://127.0.0.1:3210/mikka/api/conversations/${boundary.dm}/messages`, { headers: { cookie } })
+  expect(dm.status()).toBe(404)
+  expect(await dm.text()).not.toContain('BOUNDARY_PRIVATE_')
+
+  // Real server actions + separate PG stores via the existing internal actAs boundary.
+  // This is not an HTTP action claim and does not replace auth/permission implementations.
+  const script = `
+    import assert from 'node:assert/strict'
+    import { listIssueThreads, getIssueThread, sendIssueThreadMessage } from './app/actions/agents.ts'
+    import { actAs } from './lib/acting-user.ts'
+    import { pool as applicationPool } from './lib/db/index.ts'
+    import { workspaceDb } from './lib/workspace-db.ts'
+    const { owner, outsider, boundary } = JSON.parse(process.env.SEARCH_THREAD_FIXTURE)
+    try {
+      const rows = await actAs(owner, () => listIssueThreads(boundary.issue))
+      assert.equal(rows.length, 1)
+      assert.equal(rows[0].id, boundary.run)
+      assert.equal(rows[0].detail, null)
+      assert.equal(rows[0].ownedByCurrentUser, false)
+      assert.ok(rows[0].ownerName)
+      assert.ok(!JSON.stringify(rows).includes('BOUNDARY_PRIVATE_'))
+      const denied = error => error?.code === 'runNotFound'
+      await assert.rejects(actAs(owner, () => getIssueThread(boundary.issue, boundary.run)), denied)
+      await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: boundary.issue, runId: boundary.run, text: 'must not be written' })), denied)
+      const messages = await applicationPool.query('select count(*)::int n from run_messages where "runId"=$1', [boundary.run])
+      assert.equal(messages.rows[0].n, 0)
+      const own = await actAs(outsider, () => getIssueThread(boundary.issue, boundary.run))
+      assert.equal(own.thread.prompt, 'BOUNDARY_PRIVATE_PROMPT')
+      assert.ok(JSON.stringify(own.chunks).includes('BOUNDARY_PRIVATE_CHUNK'))
+      console.log('search131 merged311 real actions: task owner sees metadata only; colleague read/send runNotFound; zero messages; thread owner reads real chunks')
+    } finally { await Promise.all([applicationPool.end(), workspaceDb.$client.end()]) }
+  `
+  const result = await execute(process.execPath, ['--conditions=react-server', '--import', './tests/support/server-only-loader.mjs', '--import', 'tsx', '--input-type=module', '-e', script], {
+    env: { ...process.env, SEARCH_THREAD_FIXTURE: JSON.stringify({ owner, outsider, boundary }) }, timeout: 45000,
+  })
+  expect(result.stdout).toContain('zero messages; thread owner reads real chunks')
+  console.log(result.stdout.trim())
+  console.log('search131 merged311 Next HTTP: task hit 200, foreign history/group searches empty, foreign archive404/owner200, private DM404')
 })
 
 test('real query result rechecks group exit including the hidden lookahead before response', async ({ request }) => {

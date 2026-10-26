@@ -1,6 +1,6 @@
 # #131 independent title read contract
 
-Integration base: main 38efb919 (normal merge, preserving the complete latest tree). The current GlobalSearch filters supplied recent arrays;
+Integration base: main 975ee7a7 (#311 thread owner-only included) (normal merge, preserving the complete latest tree). The current GlobalSearch filters supplied recent arrays;
 this candidate supplies reads for a later frontend integration. Main now includes #307 code-only builds/legacy generation retirement and #306/#309
 avatar/auth behavior. All of those changes are retained without replacing their files. No layout changes.
 No Bot/harness tool registration, Agent generation/list product or knowledge store
@@ -143,3 +143,27 @@ workflow_dispatch on the frozen candidate to run the same full ready/before-merg
 suite without changing readiness or invoking a merge/deployment. Dedicated dual-PG
 HTTP remains separate from that single-DB browser fixture job. Browser plugin not
 available; browser validation uses the repository's regular Playwright CI workflow.
+
+
+## Merged #311 composition regression
+
+Main 975ee7a7f213a5be55e357cca7e592eec8b9c246 is now merged normally into the
+candidate. Its owner-only thread actions/projections, UI and rules are unchanged.
+The 38ef/b4ebb green runs are retained history, not this composition's evidence.
+
+A shared synthetic task contains a colleague-owned thread, same-title foreign
+legacy history and a private agent_dm (even with an explicit caller membership).
+New real Next HTTP checks show the task title can be found while foreign history/
+group searches stay empty, its old-history GET denies the task owner but permits
+the history owner, and the group messages API rejects the private DM. A child Node
+process calls the actual list/read/send server actions against the same application/
+workspace PG services through the existing actAs internal identity boundary: task
+owner gets only thread metadata, read/send fail specifically runNotFound, zero
+messages are written, and the thread owner reads the real saved prompt/chunks.
+These are real action/SQL calls, not HTTP server-action or real OAuth acceptance.
+The HTTP and action claims remain distinguished. Fixtures are retained without
+DELETE. The entire normal browser gate is rerun on the new exact SHA as well.
+
+A task search hit is still metadata authority, never thread content or private-DM
+permission. Do not widen #311 or change Auth's task visibility policy to compose
+these interfaces. No frontend layout, Auth/R0 helper or S runtime change is made.
