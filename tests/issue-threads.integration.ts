@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import { createHmac, randomUUID } from 'node:crypto'
+import test, { mock } from 'node:test'
+import { cookies, draftMode } from 'next/headers'
 import { Pool } from 'pg'
 
 // Explicitly refuse business databases. This executes the real server action and real SQL.
@@ -10,6 +11,9 @@ const pool = new Pool({ connectionString: target.href, max: 1 })
 const owner = randomUUID(), viewer = randomUUID(), outsider = randomUUID(), removed = randomUUID()
 const issue = randomUUID(), other = randomUUID(), workspace = randomUUID(), team = randomUUID(), agent = randomUUID()
 const run = randomUUID(), removedRun = randomUUID(), otherRun = randomUUID()
+// Supply the Next request boundary only; authentication still reads a real DB session.
+let requestHeaders = new Headers()
+mock.module('next/headers', { namedExports: { cookies, draftMode, headers: async () => requestHeaders } })
 const excessRuns = Array.from({ length: 21 }, () => randomUUID())
 test('real actions keep thread content with its owner; current members see only whose threads exist and their status', async () => {
   const { listIssueThreads, getIssueThread, sendIssueThreadMessage } = await import('../app/actions/agents')
@@ -46,7 +50,15 @@ test('real actions keep thread content with its owner; current members see only 
     assert.ok(!/Route|Mikka Backend|Routed|PRIVATE/.test(JSON.stringify(listed)))
     await assert.rejects(actAs(viewer, () => getIssueThread(issue, run)))
     await assert.rejects(actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' })))
-    // The owner still reads and talks in their own thread.
+    // An acting-user override cannot attest a browser's human/session provenance.
+    await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'No session' })), /authRequired/)
+    const { auth } = await import('../lib/auth')
+    const context = await auth.$context
+    const session = await context.internalAdapter.createSession(owner)
+    assert.ok(session)
+    const signature = createHmac('sha256', context.secret).update(session.token).digest('base64')
+    requestHeaders = new Headers({ cookie: `${context.authCookies.sessionToken.name}=${encodeURIComponent(`${session.token}.${signature}`)}` })
+    // The owner still reads and talks in their own thread through fresh cookie authentication.
     await actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' }))
     const after = await actAs(owner, () => getIssueThread(issue, run))
     assert.equal(after.chunks.length, 1)
@@ -79,6 +91,7 @@ test('real actions keep thread content with its owner; current members see only 
     await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1',[workspace])
     await pool.query('DELETE FROM mikka_workspaces WHERE id=$1',[workspace])
     await pool.query('DELETE FROM issues WHERE id=ANY($1::uuid[])',[[issue,other]])
+    await pool.query('DELETE FROM session WHERE "userId"=ANY($1::text[])',[[owner,viewer,outsider,removed]])
     await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])',[[owner,viewer,outsider,removed]])
     await pool.end()
   }
