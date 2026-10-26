@@ -29,7 +29,7 @@ export type ThreadItem =
   | { kind: 'agent'; id: string; text: string; at: number }
   | { kind: 'steps'; id: string; count: number; at: number }
   | { kind: 'error'; id: string; text: string; at: number }
-  | { kind: 'person'; id: string; text: string; author: string; mine: boolean; at: number }
+  | { kind: 'person'; id: string; text: string; author: string; image?: string | null; mine: boolean; at: number }
 
 /**
  * A thread as one conversation: the agent's replies from the durable chunk stream,
@@ -37,7 +37,7 @@ export type ThreadItem =
  */
 export function threadItems(
   chunks: readonly { chunk: Record<string, unknown>; at: Date | string }[],
-  messages: readonly { id: string; text: string; author: string; mine: boolean; at: Date | string }[],
+  messages: readonly { id: string; text: string; author: string; image?: string | null; mine: boolean; at: Date | string }[],
 ): ThreadItem[] {
   const items: ThreadItem[] = []
   const texts = new Map<string, Extract<ThreadItem, { kind: 'agent' }>>()
@@ -56,6 +56,6 @@ export function threadItems(
       items.push({ kind: 'error', id: `error:${index}`, text: chunk.errorText, at: time })
     }
   }
-  for (const message of messages) items.push({ kind: 'person', id: message.id, text: message.text, author: message.author, mine: message.mine, at: new Date(message.at).getTime() })
+  for (const message of messages) items.push({ kind: 'person', id: message.id, text: message.text, author: message.author, image: message.image, mine: message.mine, at: new Date(message.at).getTime() })
   return items.filter(item => item.kind !== 'agent' || item.text.trim()).sort((a, b) => a.at - b.at)
 }

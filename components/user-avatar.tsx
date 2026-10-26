@@ -3,7 +3,7 @@
 import { UserRound } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import { defaultAvatarSrc } from "@/lib/default-avatar";
+import { avatarImageSrc } from "@/lib/default-avatar";
 import { useTranslations } from "next-intl";
 
 export function UserAvatar({
@@ -23,7 +23,9 @@ export function UserAvatar({
       role="img"
       aria-label={t('avatarLabel', { email: user.email })}
     >
-      <AvatarImage src={user.image || defaultAvatarSrc(user.name || user.email)} alt="" referrerPolicy="no-referrer" />
+      {user.image && (
+        <AvatarImage src={avatarImageSrc(user.image)} alt="" referrerPolicy="no-referrer" />
+      )}
       <AvatarFallback>
         {initial || <UserRound aria-hidden="true" />}
       </AvatarFallback>

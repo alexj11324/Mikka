@@ -12,7 +12,7 @@ import { toneFor, type AvatarTone } from '@/components/nav/letter-avatar'
 import { cn } from '@/lib/utils'
 import { SPHERE_TONES } from '@/lib/status-appearance'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { defaultAvatarSrc } from '@/lib/default-avatar'
+import { avatarImageSrc } from '@/lib/default-avatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut } from '@/components/ui/command'
 import { ROW_VALUE } from './issue-property-row'
@@ -30,7 +30,7 @@ export function AssigneeAvatar({ assignee, compact = false }: { assignee: IssueM
   if (!assignee) return <CircleUserRound data-icon="inline-start" />
   // Agents are glossy spheres (Figma 77:2), people are photos or initials.
   if (assignee.kind === 'agent') return <AgentSphere name={assignee.name} compact={compact} />
-  return <Avatar size={compact ? 'xs' : 'sm'}><AvatarImage src={assignee.image || defaultAvatarSrc(assignee.name)} alt="" draggable={false} /><AvatarFallback>{assignee.name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+  return <Avatar size={compact ? 'xs' : 'sm'}><AvatarImage src={avatarImageSrc(assignee.image)} alt="" draggable={false} /><AvatarFallback>{assignee.name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
 }
 
 export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, onInvite, request }: {

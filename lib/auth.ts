@@ -11,6 +11,7 @@ import { authOAuthProxyOptions, authTrustedOrigins } from '@/lib/auth-config'
 import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
 import { after } from 'next/server'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
+import { newUserAvatar } from '@/lib/default-avatar'
 
 export const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
 export const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
@@ -35,6 +36,8 @@ export const auth = betterAuth({
   database: pool,
   account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [] } },
   databaseHooks: {
+    // A new account without a picture gets a default avatar now; older accounts are left as they are.
+    user: { create: { before: async user => ({ data: { ...user, image: user.image || newUserAvatar(user.name || user.email) } }) } },
     account: {
       create: { before: async account => ({ data: { ...account, idToken: null } }) },
       update: { before: async account => ({ data: { ...account, idToken: null } }) },
