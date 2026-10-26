@@ -83,7 +83,7 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
                 </>)}
             </li>)}
           </ol>
-          {data.thread.ownedByCurrentUser && ['succeeded', 'failed'].includes(data.thread.status) && <ThreadFeedback runId={runId} />}
+          {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}
         </>}
     </div>
     {active && detail && <form className={cn('flex shrink-0 flex-col gap-1 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')} onSubmit={event => { void send(event) }}>

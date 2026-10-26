@@ -42,11 +42,16 @@ test('Issue threads open on the right as a conversation; comments are cards with
   const activity = page.getByRole('region', { name: '任务活动', exact: true })
   await expect(activity.getByText('派出线程')).toHaveCount(2)
 
+  // This finished fixture lacks a repository and session, so it must not probe feedback eligibility.
+  const feedbackRequests: string[] = []
+  page.on('request', request => { if (new URL(request.url()).pathname.endsWith('/api/self-improvement')) feedbackRequests.push(request.url()) })
+  await page.route('**/api/self-improvement?runId=*', route => route.fulfill({ status: 500, body: 'Unexpected feedback probe' }))
   // A finished thread reads as a conversation and takes no message.
   await threads.getByRole('button', { name: '打开线程 Model the routing table', exact: true }).click()
   let panel = page.getByRole('region', { name: 'Model the routing table', exact: true })
   await expect(panel.getByRole('list', { name: '线程对话' })).toContainText('Agent reply for Model the routing table')
   await expect(panel.getByRole('textbox')).toHaveCount(0)
+  expect(feedbackRequests).toEqual([])
 
   // A running thread ends in the composer; what is said there goes to the agent and stays in the thread.
   await threads.getByRole('button', { name: '打开线程 Route group replies', exact: true }).click()
@@ -54,6 +59,7 @@ test('Issue threads open on the right as a conversation; comments are cards with
   await panel.getByRole('textbox', { name: '告诉 Thread agent 下一步做什么…' }).fill('Check the fallback timer')
   await panel.getByRole('button', { name: '发送', exact: true }).click()
   await expect(panel.getByRole('list', { name: '线程对话' })).toContainText('Check the fallback timer')
+  expect(feedbackRequests).toEqual([])
   await testInfo.attach('thread-open', { body: await page.screenshot(), contentType: 'image/png' })
   await panel.getByRole('button', { name: '关闭线程', exact: true }).click()
   await expect(panel).toHaveCount(0)
@@ -96,4 +102,33 @@ test('Issue threads open on the right as a conversation; comments are cards with
     await colleague.close()
     expect(colleagueErrors).toEqual([])
   }
+})
+
+// Synthetic completed run exercises feedback UI and its real authenticated route in disposable CI.
+test('eligible completed thread records the person’s feedback', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  const { email } = await register(page)
+  const title = `Feedback thread ${randomUUID()}`
+  await seedTask(page, title)
+  const pool = isolatedPool()
+  const runId = randomUUID(), deviceId = randomUUID(), repoId = randomUUID(), agentId = randomUUID()
+  try {
+    const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email=$1', [email])
+    const { rows: [issue] } = await pool.query<{ id: string }>('SELECT id FROM issues WHERE "userId"=$1 AND title=$2', [user.id, title])
+    await pool.query('INSERT INTO devices (id,"ownerId",name,enabled) VALUES ($1,$2,$3,true)', [deviceId, user.id, 'Feedback fixture'])
+    await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [repoId, deviceId, user.id, '/ci/feedback-fixture'])
+    await pool.query('INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,$3,$4,$5)', [agentId, user.id, 'codex', 'Feedback agent', deviceId])
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"sessionId","startedAt","finishedAt",report)
+      VALUES ($1,$2,$3,$4,$5,$6,'succeeded','Review feedback fixture','fixture-session',now(),now(),$7)`, [runId, user.id, issue.id, agentId, deviceId, repoId, JSON.stringify({ summary: 'Fixture report' })])
+    await openIssueFromSearch(page, title)
+    await page.getByRole('button', { name: '打开线程 Review feedback fixture' }).click()
+    const panel = page.getByRole('region', { name: 'Review feedback fixture', exact: true })
+    await panel.getByRole('textbox', { name: '补充说明（可选）' }).fill('Please include the verification result')
+    const feedback = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/api/self-improvement') && response.request().method() === 'POST')
+    await panel.getByRole('button', { name: '需要改进' }).click()
+    expect((await feedback).status()).toBe(200)
+    await expect(panel.getByText('反馈已保存')).toBeVisible()
+    const { rows } = await pool.query('SELECT verdict,note FROM improvement_feedback WHERE "userId"=$1 AND "runId"=$2', [user.id, runId])
+    expect(rows).toEqual([{ verdict: 'negative', note: 'Please include the verification result' }])
+  } finally { await pool.end() }
 })

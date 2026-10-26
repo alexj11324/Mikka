@@ -369,6 +369,7 @@ async function issueThreadAccess(issueId: string) {
 const threadColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt,
   report: agentRuns.report, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
+  sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, stopRequestedAt: agentRuns.stopRequestedAt,
   agentName: agents.name, harness: agents.harness, ownerName: users.name,
 }
 
@@ -392,7 +393,7 @@ async function readableThread(issueId: string, runId: string) {
 }
 
 export interface IssueThreadDetail {
-  thread: IssueThread & { prompt: string }
+  thread: IssueThread & { prompt: string; feedbackEligible: boolean }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
 }
@@ -406,8 +407,10 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
   const [thread] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id]))
+  const eligible = !!row.deviceRepoId && !!row.sessionId && !!row.finishedAt && !row.stopRequestedAt && ['succeeded', 'failed'].includes(row.status)
+  const repo = eligible ? await db.select({ id: deviceRepos.id }).from(deviceRepos).where(and(eq(deviceRepos.id, row.deviceRepoId!), eq(deviceRepos.userId, user.id))).limit(1) : []
   return {
-    thread: { ...thread, prompt: row.prompt },
+    thread: { ...thread, prompt: row.prompt, feedbackEligible: repo.length > 0 },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
   }
