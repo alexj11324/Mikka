@@ -6,13 +6,13 @@ import { COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinat
 import { AGENT_MAX_ROUNDS } from '@/lib/agent-rounds'
 import { createComposioAITools, createGoogleAITools } from '@/lib/composio-actions'
 import { bindingSchema, routeSchema } from '@/lib/factory/contract'
-import { factoryDispatchSchema } from '@/lib/factory/dispatch'
+import { factoryDispatchSchema } from '@/lib/factory/dispatch-schema'
 import {
   contextQuestionAnswerSchema,
   questionReferenceSchema,
   questionEscalationSchema,
-} from '@/lib/factory/questions/contract'
-import { commandSchema, skillEvaluationCommandSchema } from '@/lib/self-improvement/contract'
+} from '@/lib/factory/questions/schema'
+import { commandSchema, skillEvaluationCommandSchema } from '@/lib/self-improvement/schema'
 import { splitTelegramText } from '@/lib/telegram/messages'
 import * as steps from './steps'
 import * as native from './native-steps'

@@ -1,24 +1,16 @@
 import type { Pool, PoolClient } from "pg";
-import { z } from "zod";
+import { factoryDispatchSchema, type FactoryDispatchInput } from "./dispatch-schema";
 import { configureFactoryCheck, factoryRepairBrief } from "./checks";
 import {
   configureFactoryMonitorDispatch,
   readMonitorDispatchPublication,
 } from "./monitor-dispatch";
 import { factoryEventId } from "./event-id";
-import { bindingSchema, FactoryError } from "./contract";
+import { FactoryError } from "./contract";
 import type { createFactoryStore } from "./store";
 import type { DispatchInput, DispatchResult } from "../run-dispatch";
 
-export const factoryDispatchSchema = z
-  .object({
-    binding: bindingSchema,
-    agentId: z.uuid(),
-    deviceRepoId: z.uuid(),
-    note: z.string().trim().max(10000).optional(),
-  })
-  .strict();
-export type FactoryDispatchInput = z.infer<typeof factoryDispatchSchema>;
+export { factoryDispatchSchema, type FactoryDispatchInput } from "./dispatch-schema";
 export type QueueFactoryRun = (
   tx: PoolClient,
   userId: string,
