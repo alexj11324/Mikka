@@ -15,6 +15,7 @@
     "disposal-catalog",
     "e2e:setup",
     "factory",
+    "factory-agent-setup",
     "factory-monitor-http",
     "factory-physical-absence",
     "factory-query-http",
@@ -408,6 +409,34 @@
         "port": "ephemeral",
         "retention": "stopped-and-retained"
       }
+    },
+    "factory-agent-setup": {
+      "targets": [
+        {
+          "key": "E2E_DATABASE_URL",
+          "database": "mikka_e2e",
+          "host": "127.0.0.1",
+          "port": "5432",
+          "protocol": "postgresql:"
+        }
+      ],
+      "bindings": {
+        "E2E_DATABASE_URL": "E2E_DATABASE_URL",
+        "MIKKA_DATABASE_URL": "E2E_DATABASE_URL",
+        "DATABASE_URL": "E2E_DATABASE_URL",
+        "BETTER_AUTH_SECRET": "BETTER_AUTH_SECRET",
+        "FACTORY_MONITOR_TEST_URL": "E2E_DATABASE_URL",
+        "HISTORY_PG_CONTAINER": "HISTORY_PG_CONTAINER"
+      },
+      "env": {
+        "REQUIRE_DB": "1",
+        "CONVERSATION_READS_REQUIRE_DB": "1",
+        "MIKKA_TEST_DB_PORT": "5432",
+        "RETAIN_SYNTHETIC_RECORDS": "1",
+        "KEEP_GROUP_TEST_FIXTURES": "1",
+        "FACTORY_AGENT_SETUP_ONLY": "1"
+      },
+      "githubServiceOnly": true
     }
   },
   "recipes": [
@@ -920,7 +949,10 @@
       ],
       "expectedCount": 118,
       "supportFiles": [
-        "lib/factory/retained-test-support.ts"
+        "lib/factory/retained-test-support.ts",
+        "lib/factory/agent-absence-setup.ts",
+        "lib/factory/create-only-bootstrap.mjs",
+        "scripts/disposal/factory-effects.mjs"
       ]
     },
     {
@@ -1052,7 +1084,9 @@
       "runner": "scripts/test-group-native-required.mjs",
       "supportFiles": [
         "packages/daemon/test/group-native-acceptance.ts",
-        "packages/daemon/test/native-resource-registry.ts"
+        "packages/daemon/test/native-resource-registry.ts",
+        "packages/daemon/src/adapters/group-review.ts",
+        "packages/daemon/src/main.ts"
       ]
     },
     {
@@ -1676,12 +1710,16 @@
         "TestAccessPublicationFailureRecoversWithoutAnotherProviderRefresh",
         "TestAccessProjectionRejectsFullAndNestedRefreshCopies",
         "TestVaultDenialSurvivesEnrollmentStart",
+        "TestCleanupPauseRetainsArtifactsAndAttempts",
+        "TestCleanupPauseRejectsOwnershipAndBudget",
+        "TestCleanupPauseRejectsCrossScopeAttemptAlias",
+        "TestCleanupPauseFailsClosedBeforeDatabase",
         "source cleanup migration backfills legacy published transfers and replays without erasing history",
         "authenticated transfer route carries separate leases through production worker and preserves source",
         "retained OAuth: owner/session-bound device and callback consent, replay refusal and durable binding",
         "retained enrollment binding: authenticated publication, projection recovery, replay and cleanup configuration status"
       ],
-      "expectedCount": 49,
+      "expectedCount": 53,
       "supportFiles": [
         "tests/byos-application-harness.mjs",
         "tests/byos-enrollment-binding-harness.mjs",
@@ -1703,7 +1741,11 @@
         "packages/subscription-worker/projection_failure_test.go",
         "packages/subscription-worker/security_boundary_test.go",
         "packages/subscription-worker/vault_denial_test.go",
-        "packages/subscription-worker/bootstrap.mjs"
+        "packages/subscription-worker/bootstrap.mjs",
+        "packages/subscription-worker/cleanup-preview.go",
+        "packages/subscription-worker/cleanup_preview_test.go",
+        "packages/subscription-worker/worker.go",
+        "packages/subscription-worker/artifacts.go"
       ]
     },
     {
@@ -1872,6 +1914,35 @@
       "supportFiles": [
         "scripts/disposal/factory-effects.mjs",
         "scripts/disposal/byos-inventory.mjs"
+      ]
+    },
+    {
+      "id": "factory-agent-setup",
+      "files": [
+        {
+          "path": "tests/factory-agent-setup.db.test.mjs",
+          "requiredNames": [
+            "original Factory agent setup retains complete fixture PK registration without disposal"
+          ]
+        }
+      ],
+      "command": [
+        "node",
+        "--test",
+        "tests/factory-agent-setup.db.test.mjs"
+      ],
+      "profile": "factory-agent-setup",
+      "phase": "prebuild",
+      "status": "ready",
+      "expectedTests": [
+        "original Factory agent setup retains complete fixture PK registration without disposal"
+      ],
+      "expectedCount": 1,
+      "supportFiles": [
+        "lib/factory/postgres.test.ts",
+        "lib/factory/agent-absence-setup.ts",
+        "lib/factory/create-only-bootstrap.mjs",
+        "scripts/disposal/factory-effects.mjs"
       ]
     }
   ]

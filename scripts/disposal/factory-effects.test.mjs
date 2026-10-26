@@ -112,3 +112,21 @@ test('no reported enabled user effects permits FK inventory without weakening tr
  await assert.rejects(inventoryFactoryEffects(unsafe.db,unsafe.options))
  assert.equal(unsafe.queries.length,1)
 })
+
+test('full fixture register preserves exact PKs and trigger hashes without approving effects',async()=>{
+ const {registerFactoryFixtureRows}=await import('./factory-effects.mjs')
+ const schema='factory_192_'+'a'.repeat(32)
+ let maximum=1
+ const db={async query(sql){
+  if(sql.includes('transaction_read_only'))return {rows:[{read_only:'on',isolation:'repeatable read'}]}
+  if(sql.includes('LEFT JOIN pg_constraint'))return {rows:[{table_name:'agents',pk_columns:['id']}]}
+  if(sql.includes('to_jsonb'))return {rows:Array.from({length:maximum},(_,i)=>({row:{id:String(i),secret:'never-output'}}))}
+  if(sql.includes('pg_trigger'))return {rows:[{table_name:'agents',name:'guard',enabled:'O',definition:'synthetic trigger',function_definition:'synthetic function'}]}
+  throw Error('unexpected query')
+ }}
+ const result=await registerFactoryFixtureRows(db,{schema,maxRows:1})
+ assert.equal(result.registeredCount,1);assert.equal(result.approvalEligible,false);assert.equal(result.effectsComplete,false)
+ assert.deepEqual(result.rows[0].pk,{id:'0'});assert.match(result.triggers[0].functionHash,/^[a-f0-9]{64}$/)
+ assert.ok(!JSON.stringify(result).includes('never-output'))
+ maximum=2;await assert.rejects(registerFactoryFixtureRows(db,{schema,maxRows:1}),/budget/)
+})

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {createHash,randomBytes,randomUUID} from 'node:crypto'
-import {mkdirSync,openSync,writeFileSync,closeSync,fsyncSync,readFileSync,lstatSync,readdirSync,linkSync} from 'node:fs'
+import {mkdirSync,openSync,writeFileSync,closeSync,fsyncSync,readFileSync,lstatSync,readdirSync,linkSync,realpathSync} from 'node:fs'
 import {join,resolve,basename} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {spawnSync} from 'node:child_process'
@@ -34,10 +34,12 @@ export function createNativeRegistry(directory:string,configRoot:string,limits={
 export class NativeRegistry {
  readonly directory:string
  readonly owner:Owner
+ private readonly directoryIdentity:{dev:number;ino:number}
  constructor(directory:string){
   this.directory=resolve(directory)
   const stat=lstatSync(this.directory);assert.ok(stat.isDirectory()&&!stat.isSymbolicLink()&&(stat.mode&0o077)===0,'untrusted registry directory')
   assert.equal(stat.uid,process.getuid?.(),'foreign registry owner')
+  this.directoryIdentity={dev:stat.dev,ino:stat.ino}
   this.owner=read<Owner>(join(this.directory,'owner.json'))
   assert.match(this.owner.owner,fullId)
   assert.ok(Number.isInteger(this.owner.requests)&&this.owner.requests>0&&this.owner.requests<=30)
@@ -57,6 +59,7 @@ export class NativeRegistry {
  }
  registerConfig(path:string){
   path=resolve(path)
+  assert.equal(realpathSync(path),path,'runtime config path redirected')
   assert.ok(basename(path).startsWith('mikka-group-docker-'),'unknown runtime config')
   const stat=lstatSync(path);assert.ok(stat.isDirectory()&&!stat.isSymbolicLink()&&(stat.mode&0o077)===0,'untrusted runtime config')
   assert.equal(stat.uid,process.getuid?.())
@@ -88,6 +91,33 @@ export class NativeRegistry {
   }
   assert.deepEqual(read(complete),value)
   assert.deepEqual(read(join(path,'.mikka-native-fixture-owner')),value)
+ }
+ verifyConfig(path:string){
+  const registry=lstatSync(this.directory)
+  assert.ok(registry.isDirectory()&&!registry.isSymbolicLink()&&(registry.mode&0o077)===0)
+  assert.equal(registry.uid,process.getuid?.())
+  assert.deepEqual({dev:registry.dev,ino:registry.ino},this.directoryIdentity,'registry directory replaced')
+  assert.deepEqual(read(join(this.directory,'owner.json')),this.owner,'registry owner changed')
+  path=resolve(path)
+  const record=read<{path:string;dev:number;ino:number;owner:string;runId:string}>(join(this.directory,'config-records',hash(path)+'.json'))
+  assert.equal(record.path,path);assert.equal(record.owner,this.owner.owner);assert.equal(record.runId,this.owner.runId)
+  assert.equal(realpathSync(path),path,'runtime config path redirected')
+  const stat=lstatSync(path)
+  assert.ok(stat.isDirectory()&&!stat.isSymbolicLink()&&(stat.mode&0o077)===0,'untrusted runtime config')
+  assert.equal(stat.uid,process.getuid?.())
+  assert.deepEqual({dev:stat.dev,ino:stat.ino},{dev:record.dev,ino:record.ino},'runtime config directory replaced')
+  assert.deepEqual(read(join(path,'.mikka-native-fixture-owner')),record,'runtime config owner changed')
+ }
+ retainedConfigLifecycle(){
+  return {
+   beforeCreate:()=>{this.reserveConfigCreation()},
+   created:(path:string)=>{this.registerConfig(path)},
+   beforeDispose:(path:string):'retain'=>{
+    this.verifyConfig(path)
+    this.event({action:'config-retained',path,runId:this.owner.runId})
+    return 'retain'
+   },
+  }
  }
  reserveCreate(name:string,image:string){
   assert.match(name,/^mikka-group-cli-[a-f0-9-]{36}$/)

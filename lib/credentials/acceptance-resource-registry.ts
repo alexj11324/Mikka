@@ -1,13 +1,70 @@
 // Test-only inventory. Matching is evidence, NOT permission to kill/remove resources.
 // No signal, unlink, rm, browser launch or disposal capability is exposed here.
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
-import { lstat, mkdir, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises'
+import { randomUUID, createHash } from 'node:crypto'
+import { lstat, mkdir, mkdtemp, readFile, realpath, writeFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { AcceptanceResources, AcceptanceProfile } from './owned-chromium'
 
 export type ProcessIdentity = { pid: number; starttime: string; uid: number; profile: string }
 type Reservation = { id: string; profile: string; dev: string; ino: string }
 type Registration = Reservation & { process: ProcessIdentity }
+class NoBrowserProfile extends Error {}
+
+// Preserve bounded cause identity and controlled diagnosis, never raw Playwright
+// messages/stacks (which may contain command arguments, URLs or credentials).
+export function safeLaunchFailure(cause: unknown) {
+  const chain: { code: string; messageHash: string }[] = [], seen = new Set<object>()
+  let current = cause
+  for (let depth = 0; depth < 4 && current && typeof current === 'object' && !seen.has(current); depth++) {
+    seen.add(current)
+    const value = Object.getOwnPropertyDescriptor(current, 'message')?.value
+    const message = typeof value === 'string' ? value : ''
+    const code = /error while loading shared libraries/i.test(message) ? 'shared-library-missing'
+      : /executable doesn.t exist|spawn .*ENOENT|executable.*not found/i.test(message) ? 'executable-missing'
+      : /no usable sandbox|running as root without --no-sandbox/i.test(message) ? 'sandbox-unavailable'
+      : /EACCES|EPERM|permission denied/i.test(message) ? 'permission-denied'
+      : /timeout|timed out/i.test(message) ? 'launch-timeout'
+      : /target.*closed|process did exit|browser.*closed/i.test(message) ? 'process-or-target-closed'
+      : 'unclassified-launch-failure'
+    chain.push({ code, messageHash: createHash('sha256').update(message).digest('hex') })
+    current = Object.getOwnPropertyDescriptor(current, 'cause')?.value
+  }
+  return { version: 1, chain, rawMessageRetained: false, causeChainBound: 4 }
+}
+
+export async function ownNodeChildren(): Promise<number[]> {
+  const tasks = await readdir('/proc/self/task')
+  const children = new Set<number>()
+  for (const task of tasks) {
+    assert.match(task, /^\d+$/)
+    let text: string
+    try { text = await readFile(`/proc/self/task/${task}/children`, 'utf8') }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue; throw error }
+    for (const value of text.trim().split(/\s+/).filter(Boolean)) {
+      assert.match(value, /^\d+$/)
+      const pid = Number(value); assert.ok(Number.isSafeInteger(pid) && pid > 1)
+      children.add(pid)
+    }
+  }
+  assert.ok(children.size <= 1024, 'unexpected child process inventory')
+  return [...children]
+}
+
+export async function uniqueChildForProfile(profile: string, children = ownNodeChildren, inspect = readLinuxProcess) {
+  const matching: ProcessIdentity[] = []
+  for (const pid of new Set(await children())) {
+    assert.ok(Number.isSafeInteger(pid) && pid > 1)
+    let identity: ProcessIdentity
+    try { identity = await inspect(pid) }
+    catch (error) { if (error instanceof NoBrowserProfile || (error as NodeJS.ErrnoException).code === 'ENOENT') continue; throw error }
+    assert.equal(identity.pid, pid)
+    if (identity.profile === profile) matching.push(identity)
+  }
+  assert.equal(matching.length, 1, 'exactly one own Node child must match the reserved profile')
+  assert.equal(matching[0].uid, process.getuid!(), 'foreign browser process owner')
+  return matching[0]
+}
 
 export async function readLinuxProcess(pid: number): Promise<ProcessIdentity> {
   assert.ok(Number.isSafeInteger(pid) && pid > 1)
@@ -18,6 +75,7 @@ export async function readLinuxProcess(pid: number): Promise<ProcessIdentity> {
   const uid = /^Uid:\s+(\d+)/m.exec(status)
   const args = (await readFile(join(base, 'cmdline'), 'utf8')).split('\0')
   const profiles = args.filter(arg => arg.startsWith('--user-data-dir='))
+  if (!profiles.length) throw new NoBrowserProfile()
   assert.equal(profiles.length, 1, 'exact browser profile argument required')
   assert.ok(uid && /^\d+$/.test(fields[19]), 'Linux process identity required')
   // Detect process replacement during observation; callers still must not use
@@ -27,7 +85,7 @@ export async function readLinuxProcess(pid: number): Promise<ProcessIdentity> {
   return { pid, starttime: fields[19], uid: Number(uid[1]), profile: profiles[0].slice(16) }
 }
 
-export async function createAcceptanceResourceRegistry(parent: string, budget: { profiles: number; launches: number }, inspect = readLinuxProcess) {
+export async function createAcceptanceResourceRegistry(parent: string, budget: { profiles: number; launches: number }, inspect = readLinuxProcess, children = ownNodeChildren) {
   for (const n of [budget.profiles, budget.launches]) assert.ok(Number.isSafeInteger(n) && n > 0)
   const limits = { ...budget }
   const root = await realpath(await mkdtemp(join(parent, 'credential-resources-')))
@@ -56,9 +114,10 @@ export async function createAcceptanceResourceRegistry(parent: string, budget: {
     const st = await lstat(r.profile, { bigint: true })
     assert.ok(st.isDirectory() && !st.isSymbolicLink())
     assert.equal(Number(st.uid), uid)
+    assert.equal(Number(st.mode & BigInt(0o077)), 0, 'private browser profile required')
     assert.equal(st.dev.toString(), r.dev); assert.equal(st.ino.toString(), r.ino)
   }
-  return {
+  const registry = {
     root, runId,
     // Counts attempts before creating anything; failed attempts never refund a budget.
     async reserveLaunch() {
@@ -95,5 +154,46 @@ export async function createAcceptanceResourceRegistry(parent: string, budget: {
       assert.deepEqual(await inspect(r.process.pid), r.process, 'process identity changed')
       return { runId, id, profile: r.profile, pid: r.process.pid, starttime: r.process.starttime }
     },
+    acceptanceResources(): AcceptanceResources {
+      const check = async (profile: AcceptanceProfile) => {
+        const r = reservations.get(profile.id)
+        assert.ok(r, 'unknown acceptance reservation')
+        assert.equal(profile.directory, root); assert.equal(profile.profile, r.profile)
+        await profileMatches(r)
+        return r
+      }
+      return {
+        async prepareProfile() {
+          const r = await registry.reserveLaunch()
+          return Object.freeze({ id: r.id, directory: root, profile: r.profile })
+        },
+        async started(profile) {
+          const r = await check(profile)
+          const candidate = await uniqueChildForProfile(r.profile, children, inspect)
+          await registry.registerStarted(r.id, candidate.pid)
+          // Recheck both parent membership and identity after durable registration.
+          const current = await uniqueChildForProfile(r.profile, children, inspect)
+          assert.deepEqual(current, candidate, 'browser changed during registration')
+          await registry.matchesRegistered(r.id)
+        },
+        async beforeCleanup(profile, stage) {
+          await check(profile)
+          const registered = registrations.has(profile.id)
+          if (registered) {
+            const current = await uniqueChildForProfile(profile.profile, children, inspect)
+            const known = await registry.matchesRegistered(profile.id)
+            assert.equal(current.pid, known.pid); assert.equal(current.starttime, known.starttime)
+          }
+          // A failed/unconfirmed launch has no verified PID. Retain it and its
+          // evidence, never infer absence or authorize cleanup by name/prefix.
+          await writeFile(join(root, `${randomUUID()}.pending.json`), JSON.stringify({ runId, id: profile.id, stage, registered, disposition: 'pending-retained' }), { flag: 'wx', mode: 0o600 })
+        },
+        async recordFailure(profile, stage, cause) {
+          await check(profile)
+          await writeFile(join(root, `${randomUUID()}.failure.json`), JSON.stringify({ runId, id: profile.id, stage, diagnostic: safeLaunchFailure(cause) }), { flag: 'wx', mode: 0o600 })
+        },
+      }
+    },
   }
+  return registry
 }

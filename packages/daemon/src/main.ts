@@ -78,7 +78,7 @@ import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
 import { createHostedBotRunner } from "./subscription-hosted-runner"
 
-import { createNativeGroupProcessor, type GroupReviewImages } from './adapters/group-review'
+import { createNativeGroupProcessor, type GroupReviewImages, type NativeConfigLifecycle } from './adapters/group-review'
 import { runGroupReviewBatch, type GroupReviewAssignment, type GroupReviewOutput } from './runs/group-review-worker'
 
 export * from "./server-link"
@@ -88,6 +88,7 @@ export interface DaemonOptions {
   /** Explicit isolated processor only. Omitted: group work stays queued; no
    * inherited repository adapters, native CLI credentials or provider calls. */
   groupReviewImages?: GroupReviewImages
+  groupReviewConfigLifecycle?: NativeConfigLifecycle
   groupReviewProcessor?: (input: GroupReviewAssignment, signal: AbortSignal) => Promise<GroupReviewOutput>
 
   dataDir: string
@@ -219,7 +220,7 @@ export class Daemon {
     const { paths } = this
     if(this.options.groupReviewProcessor&&this.options.groupReviewImages)throw new Error('Choose an isolated group processor or native group images, not both')
     if(this.options.groupReviewImages){
-      const processor=await createNativeGroupProcessor(this.options.groupReviewImages)
+      const processor=await createNativeGroupProcessor(this.options.groupReviewImages,this.options.groupReviewConfigLifecycle)
       this.groupProcessor=processor;this.nativeGroupDispose=processor.dispose
     }else this.groupProcessor=this.options.groupReviewProcessor
     try {

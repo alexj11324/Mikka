@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdtempSync,mkdirSync,readdirSync} from 'node:fs'
+import {mkdtempSync,mkdirSync,readdirSync,renameSync,symlinkSync,writeFileSync,readFileSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {randomUUID} from 'node:crypto'
@@ -8,6 +8,7 @@ import {execFile} from 'node:child_process'
 import {promisify} from 'node:util'
 import {createNativeRegistry,NativeRegistry,auditedNativeDocker} from './native-resource-registry.ts'
 import type {DockerResult} from './native-resource-registry.ts'
+import {createNativeConfigDirectory,disposeNativeConfigDirectory} from '../src/adapters/group-review.ts'
 
 const exec=promisify(execFile),image='sha256:'+'1'.repeat(64),id='2'.repeat(64)
 function fixture(limits={requests:30,configs:9}){
@@ -167,4 +168,57 @@ test('start requires a completed receipt and matching identity, then uses full I
  assert.equal(start(name,autoRemove).status,0)
  assert.equal(auditedNativeDocker(f.registry,[...f.prefix,'rm','--force',name],f.execute).status,0)
  assert.ok(!f.calls.some(args=>args[4]==='rm'),'auto-removed full ID is recorded absent without another deletion')
+})
+
+test('actual runtime directory lifecycle reserves before creation and retention never calls disposal',async()=>{
+ const f=fixture({requests:1,configs:1}),lifecycle=f.registry.retainedConfigLifecycle()
+ const path=await createNativeConfigDirectory(lifecycle)
+ assert.equal(f.registry.configs().length,1);f.registry.verifyConfig(path)
+ let removed=0
+ await disposeNativeConfigDirectory(path,lifecycle,async()=>{removed++})
+ await disposeNativeConfigDirectory(path,lifecycle,async()=>{removed++})
+ assert.equal(removed,0);assert.ok(readdirSync(path).includes('.mikka-native-fixture-owner'))
+ let registered=0
+ await assert.rejects(createNativeConfigDirectory({...lifecycle,created:()=>{registered++}}),/budget/)
+ assert.equal(registered,0);assert.equal(f.registry.configs().length,1)
+})
+
+test('runtime disposal refuses directory replacement and symlink redirection without calling remover',async()=>{
+ for(const symlink of [false,true]){
+  const f=fixture(),lifecycle=f.registry.retainedConfigLifecycle(),path=await createNativeConfigDirectory(lifecycle)
+  renameSync(path,path+'.retained')
+  if(symlink)symlinkSync(path+'.retained',path)
+  else mkdirSync(path,{mode:0o700})
+  let removed=0
+  await assert.rejects(disposeNativeConfigDirectory(path,lifecycle,async()=>{removed++}),/replaced|redirected/)
+  assert.equal(removed,0);assert.ok(readdirSync(path+'.retained').includes('.mikka-native-fixture-owner'))
+ }
+})
+
+test('runtime disposal refuses changed profile marker or registry owner',async()=>{
+ for(const marker of [true,false]){
+  const f=fixture(),lifecycle=f.registry.retainedConfigLifecycle(),path=await createNativeConfigDirectory(lifecycle)
+  const target=marker?join(path,'.mikka-native-fixture-owner'):join(f.registry.directory,'owner.json')
+  const original=readFileSync(target,'utf8')
+  writeFileSync(target+'.retained',original,{flag:'wx',mode:0o600})
+  writeFileSync(target,JSON.stringify({...JSON.parse(original),owner:'f'.repeat(64)}))
+  let removed=0
+  await assert.rejects(disposeNativeConfigDirectory(path,lifecycle,async()=>{removed++}),/owner changed/)
+  assert.equal(removed,0)
+ }
+})
+
+test('registration failure retains newly created runtime directory and never invokes disposal',async()=>{
+ let created=''
+ await assert.rejects(createNativeConfigDirectory({beforeCreate(){},created(path){created=path;throw Error('fixture registration failed')},beforeDispose(){throw Error('must not dispose')}}),/registration failed/)
+ assert.ok(created);assert.deepEqual(readdirSync(created),[])
+})
+
+test('default product disposal still invokes its remover and invalid lifecycle decisions fail closed',async()=>{
+ // Fake callback only: no filesystem or container deletion.
+ let removed=0
+ await disposeNativeConfigDirectory('/unused-fake-path',undefined,async path=>{assert.equal(path,'/unused-fake-path');removed++})
+ assert.equal(removed,1)
+ await assert.rejects(disposeNativeConfigDirectory('/unused-fake-path',{beforeCreate(){},created(){},beforeDispose(){return undefined as never}},async()=>{removed++}),/Unknown/)
+ assert.equal(removed,1)
 })

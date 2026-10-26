@@ -98,6 +98,9 @@ func (w *Worker) CleanupStatus(ctx context.Context) (CleanupStatus, error) {
 	return result, nil
 }
 func (w *Worker) Cleanup(ctx context.Context) (CleanupStatus, error) {
+	if w.cleanupObserver != nil {
+		return w.pauseCleanup(ctx)
+	}
 	if w.Secrets == nil || w.AccessSecrets == nil {
 		return CleanupStatus{}, ErrUnsupported
 	}

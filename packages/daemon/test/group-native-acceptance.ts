@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import {mkdtemp,mkdir,writeFile,readFile,copyFile,rm,rename,readdir} from 'node:fs/promises'
+import {mkdtemp,mkdir,writeFile,readFile,copyFile,rename,readdir} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {fileURLToPath} from 'node:url'
@@ -21,7 +21,8 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
    const originalPath=process.env.PATH,realDockerPath=(await exec('which',['docker'])).stdout.trim()
    const registry=join(build,'resource-receipts'),auditBin=join(build,'audit-bin')
    const resources=createNativeRegistry(registry,join(build,'docker-config'),{requests:30,configs:9})
-   const newNativeProcessor=(value:unknown)=>{resources.reserveConfigCreation();return createNativeGroupProcessor(value)}
+   const configLifecycle=resources.retainedConfigLifecycle()
+   const newNativeProcessor=(value:unknown)=>createNativeGroupProcessor(value,configLifecycle)
    const registryHelper=fileURLToPath(new URL('./native-resource-registry.ts',import.meta.url))
    await mkdir(auditBin)
    await writeFile(join(auditBin,'docker'),`#!/usr/bin/env node\nconst {spawnSync}=require('node:child_process');const result=spawnSync(process.execPath,[${JSON.stringify(registryHelper)},${JSON.stringify(registry)},${JSON.stringify(realDockerPath)},...process.argv.slice(2)],{stdio:'inherit'});process.exit(result.status??1)\n`,{mode:0o700})
@@ -38,9 +39,7 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
     process.env.DOCKER_CONTEXT='must-not-be-inherited'
     process.env.DOCKER_CONFIG=join(build,'poisoned-docker-config')
     dataDir=await mkdtemp(join(tmpdir(),'mgn-'));const link=new HttpServerLink(`http://127.0.0.1:${port}`)
-    // Daemon.start currently constructs exactly one native group processor.
-    resources.reserveConfigCreation()
-    const daemon=await new Daemon({dataDir,flavor:'dev',link,credential:'controlled-device-fixture',harnesses:[],quotaSource:null,agentSandbox:null,heartbeatMs:100,groupReviewImages:{claude_code:image,codex:image}}).start()
+    const daemon=await new Daemon({dataDir,flavor:'dev',link,credential:'controlled-device-fixture',harnesses:[],quotaSource:null,agentSandbox:null,heartbeatMs:100,groupReviewImages:{claude_code:image,codex:image},groupReviewConfigLifecycle:configLifecycle}).start()
     const awaitWork=async(id:string,predicate:(w:Record<string,unknown>)=>boolean)=>{for(let i=0;i<200;i++){const w=(await pool.query('SELECT * FROM conversation_work WHERE id=$1',[id])).rows[0];if(predicate(w))return w;await new Promise(r=>setTimeout(r,50))}throw Error('Native daemon fixture timed out')}
     try{
      for(const target of [ccAgentId,agentId]){
@@ -104,7 +103,7 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
      const limit=await newRequest();await worker({action:'poll'})
      await pool.query('UPDATE conversation_work SET "claimEpoch"=3 WHERE id=$1',[limit.work.workId])
      assert.equal((await worker({action:'claim',runId:limit.work.workId})).status,'uncertain')
-    }finally{await daemon.stop();if(!process.env.KEEP_NATIVE_TEST_FIXTURES)await rm(dataDir,{recursive:true,force:true})}
+    }finally{await daemon.stop()} // Always retain the uniquely created task directory.
     // Missing compatibility/isolation capability fails closed before execution.
     await assert.rejects(createNativeGroupProcessor({codex:'latest'}))
     await assert.rejects(newNativeProcessor({codex:'sha256:'+'0'.repeat(64)}))
@@ -171,21 +170,21 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
       await rejected
       await assert.rejects(failingCleanup(assignment,new AbortController().signal),/disposed/)
      }finally{
-      controller.abort();if(process.env.KEEP_NATIVE_TEST_FIXTURES)await rename(blockRm,blockRm+'.retained').catch(error=>{if(error.code!=='ENOENT')throw error});else await rm(blockRm,{force:true})
+      controller.abort();await rename(blockRm,blockRm+'.retained').catch(error=>{if(error.code!=='ENOENT')throw error})
       const owned=new Set((await readFile(ownedNames,'utf8')).trim().split('\n').filter(Boolean))
       for(const entry of resources.created().filter(entry=>owned.has(entry.name)))await localDocker(['rm','--force',entry.id])
       await failingCleanup.dispose().catch(()=>{})
       await command(r.group.id,'member',{action:'cancel',workId:r.work.workId})
      }
     }finally{if(pathBefore===undefined)delete process.env.PATH;else process.env.PATH=pathBefore}
-    for(const config of resources.configs())await assert.rejects(readdir(config.path),(error:NodeJS.ErrnoException)=>error.code==='ENOENT','owned runtime config must be removed')
+    for(const config of resources.configs()){resources.verifyConfig(config.path);await readdir(config.path)}
     for(const entry of resources.created())await assert.rejects(localDocker(['inspect','--type','container','--format','{{.Id}}',entry.id]),(error:unknown)=>/No such (?:container|object)/.test(String((error as {stderr?:string}).stderr)),'owned full-ID container must not remain')
    }finally{
     if(originalPath===undefined)delete process.env.PATH;else process.env.PATH=originalPath
     if(previous===undefined)delete process.env.PRIVATE_HOST_SENTINEL;else process.env.PRIVATE_HOST_SENTINEL=previous
     for(const key of dockerKeys){if(oldDocker[key]===undefined)delete process.env[key];else process.env[key]=oldDocker[key]}
-    // Receipts, build intermediates and images always survive for review; KEEP_* still preserves task data.
-    const receipt={build,dataDir,registry,runId:resources.owner.runId,images:[image,badImage,badCapImage,missingCapImage].filter(Boolean),retained:true,runtimeContainerDeletionStillRequired:true};await writeFile(join(build,'retained-resources.json'),JSON.stringify(receipt,null,2));console.log('Native retained resources: '+JSON.stringify(receipt))
+    // All directories/receipts and images survive. Container deletion remains gated.
+    const receipt={build,dataDir,registry,runId:resources.owner.runId,images:[image,badImage,badCapImage,missingCapImage].filter(Boolean),retained:true,runtimeConfigsRetained:true,runtimeContainerDeletionStillRequired:true};await writeFile(join(build,'retained-resources.json'),JSON.stringify(receipt,null,2));console.log('Native retained resources: '+JSON.stringify(receipt))
    }
 
 }

@@ -87,3 +87,28 @@ export async function inventoryFactoryEffects(db,{schema,roots,fixtureRows,maxRo
  }
  return {schema,roots:normalizedRoots,count:effects.size,effects:[...effects.values()].sort((a,b)=>key(a).localeCompare(key(b))),constraints:edges,executedDeletion:false}
 }
+
+// Complete retained fixture PK register, NOT a deletion-effects authorization.
+// Only the freshly created isolated fixture schema is eligible. Unknown tables
+// without primary keys or any row budget overflow prevent a complete receipt.
+export async function registerFactoryFixtureRows(db,{schema,maxRows}) {
+ assert.match(schema,/^(factory_192|monitor_195|questions)_[a-f0-9]{32}$/)
+ assert.ok(Number.isSafeInteger(maxRows)&&maxRows>0&&maxRows<=1000)
+ const isolation=(await db.query("SELECT current_setting('transaction_read_only') AS read_only, current_setting('transaction_isolation') AS isolation")).rows
+ assert.equal(isolation.length,1);assert.equal(isolation[0].read_only,'on');assert.equal(isolation[0].isolation,'repeatable read')
+ const tables=(await db.query(`SELECT t.relname AS table_name,ARRAY(SELECT a.attname::text FROM unnest(p.conkey) WITH ORDINALITY k(n,o) JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=k.n ORDER BY k.o) AS pk_columns FROM pg_class t JOIN pg_namespace n ON n.oid=t.relnamespace LEFT JOIN pg_constraint p ON p.conrelid=t.oid AND p.contype='p' WHERE n.nspname=$1 AND t.relkind IN ('r','p') ORDER BY t.relname`,[schema])).rows
+ const rows=[];const counts=[]
+ for(const t of tables){
+  ident(t.table_name);assert.ok(Array.isArray(t.pk_columns)&&t.pk_columns.length,'fixture table has no primary key')
+  for(const c of t.pk_columns)ident(c)
+  const result=await db.query(`SELECT to_jsonb(t) AS row FROM ${ident(schema)}.${ident(t.table_name)} t LIMIT $1`,[maxRows-rows.length+1])
+  for(const {row} of result.rows){
+   const pk=Object.fromEntries(t.pk_columns.map(c=>[c,row[c]]));assert.ok(Object.values(pk).every(scalar),'unsupported fixture PK')
+   rows.push({table:t.table_name,pk,rowHash:createHash('sha256').update(stable(row)).digest('hex')});assert.ok(rows.length<=maxRows,'fixture registration budget exceeded')
+  }
+  counts.push({table:t.table_name,count:result.rows.length})
+ }
+ assert.equal(new Set(rows.map(key)).size,rows.length,'duplicate fixture registration')
+ const triggers=(await db.query(`SELECT c.relname AS table_name,t.tgname AS name,t.tgenabled AS enabled,pg_get_triggerdef(t.oid) AS definition,pg_get_functiondef(t.tgfoid) AS function_definition FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=$1 AND NOT t.tgisinternal ORDER BY c.relname,t.tgname`,[schema])).rows.map(t=>({table:t.table_name,name:t.name,enabled:t.enabled,definitionHash:createHash('sha256').update(t.definition).digest('hex'),functionHash:createHash('sha256').update(t.function_definition).digest('hex')}))
+ return {schema,registeredCount:rows.length,rows:rows.sort((a,b)=>key(a).localeCompare(key(b))),tables:counts,triggers,effectsComplete:false,approvalEligible:false,executedDeletion:false}
+}

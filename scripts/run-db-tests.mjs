@@ -69,12 +69,12 @@ export function readTree(root = '.') {
   // Bind the retained Go allowlist and its actual top-level test sources.
   const worker = 'packages/subscription-worker'
   for (const entry of existsSync(resolve(root, worker)) ? readdirSync(resolve(root, worker), { withFileTypes: true }) : []) {
-    if (entry.isFile() && (entry.name.endsWith('_test.go') || entry.name === 'retained-test-contract.json' || entry.name === 'bootstrap.mjs')) {
+    if (entry.isFile() && (entry.name.endsWith('.go') || entry.name === 'retained-test-contract.json' || entry.name === 'bootstrap.mjs')) {
       const file = `${worker}/${entry.name}`
       files[file] = readFileSync(resolve(root, file), 'utf8')
     }
   }
-  for (const file of ['packages/daemon/test/group-native-acceptance.ts','packages/daemon/test/native-resource-registry.ts']) {
+  for (const file of ['packages/daemon/test/group-native-acceptance.ts','packages/daemon/test/native-resource-registry.ts','packages/daemon/src/adapters/group-review.ts','packages/daemon/src/main.ts']) {
     if (existsSync(resolve(root,file))) files[file]=readFileSync(resolve(root,file),'utf8')
   }
   return files

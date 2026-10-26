@@ -13,6 +13,28 @@ import type {GroupReviewAssignment,GroupReviewOutput} from '../runs/group-review
 export const groupReviewImages=z.object({claude_code:z.string().regex(/^sha256:[a-f0-9]{64}$/).optional(),codex:z.string().regex(/^sha256:[a-f0-9]{64}$/).optional()}).strict().refine(x=>!!(x.claude_code||x.codex),'No group CLI image configured')
 export type GroupReviewImages=z.infer<typeof groupReviewImages>
 export type NativeGroupProcessor=((assignment:GroupReviewAssignment,signal:AbortSignal)=>Promise<GroupReviewOutput>)&{dispose:()=>Promise<void>}
+// Optional trusted host lifecycle; ordinary production callers retain the
+// existing create/remove behavior. A retention decision never invokes removal.
+export interface NativeConfigLifecycle {
+ beforeCreate():void|Promise<void>
+ created(directory:string):void|Promise<void>
+ beforeDispose(directory:string):'retain'|'remove'|Promise<'retain'|'remove'>
+}
+export async function createNativeConfigDirectory(lifecycle?:NativeConfigLifecycle){
+ await lifecycle?.beforeCreate()
+ const directory=await mkdtemp(join(tmpdir(),'mikka-group-docker-'))
+ // Failed registration deliberately retains the directory for investigation.
+ await lifecycle?.created(directory)
+ return directory
+}
+export async function disposeNativeConfigDirectory(directory:string,lifecycle?:NativeConfigLifecycle,remove:(path:string)=>Promise<void>=path=>rm(path,{recursive:true,force:true})){
+ if(lifecycle){
+  const decision=await lifecycle.beforeDispose(directory)
+  if(decision==='retain')return
+  if(decision!=='remove')throw Error('Unknown native config disposal decision')
+ }
+ await remove(directory)
+}
 const runnerPath=resolve(dirname(fileURLToPath(import.meta.url)),'../agents/group-review-cli.mjs')
 const exec=promisify(execFile)
 const output=z.object({body:z.string().trim().min(1).max(32000),content:z.string().max(1_000_000).nullable(),mentions:z.array(z.uuid()).max(100).optional()}).strict()
@@ -67,10 +89,10 @@ async function container(runtime:DockerRuntime,image:string,input:unknown,signal
   return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
  }finally{signal.removeEventListener('abort',abort);await stopTask?.catch(()=>{});await removeContainer(runtime,name)}
 }
-export async function createNativeGroupProcessor(value:unknown):Promise<NativeGroupProcessor>{
+export async function createNativeGroupProcessor(value:unknown,configLifecycle?:NativeConfigLifecycle):Promise<NativeGroupProcessor>{
  if(process.platform!=='linux')throw Error('Group CLI isolation requires Linux Docker')
  const images=groupReviewImages.parse(value)
- const configDir=await mkdtemp(join(tmpdir(),'mikka-group-docker-'))
+ const configDir=await createNativeConfigDirectory(configLifecycle)
  // Every command, including cancellation and readiness, targets the SAME
  // local socket and fresh config. Never inherit DOCKER_HOST/context/auth.
  const runtime:DockerRuntime={args:['--host','unix:///var/run/docker.sock','--config',configDir],env:{PATH:process.env.PATH,NODE_ENV:'production',DOCKER_CONFIG:configDir}}
@@ -89,7 +111,7 @@ export async function createNativeGroupProcessor(value:unknown):Promise<NativeGr
   return task
  }
  const dispose=async()=>{
-  disposed=true;await Promise.allSettled([...active]);await rm(configDir,{recursive:true,force:true})
+  disposed=true;await Promise.allSettled([...active]);await disposeNativeConfigDirectory(configDir,configLifecycle)
   if(cleanupFailures.length)throw new AggregateError(cleanupFailures,cleanupFailures.map(error=>error.message).join('; '))
  }
  try{

@@ -88,7 +88,7 @@ test('aggregation binds exact SHA/plan/profile/command/phase and every result on
 })
 test('actual tree has exact complete R0 inventory, all previously missing suites and no new exclusions', () => {
  const pkg=JSON.parse(readFileSync('package.json','utf8')).scripts,c=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8')),p=inventory(readTree(),pkg)
- assert.equal(p.files.length,51);assert.equal(p.recipes.length,31);assert.deepEqual(p.expected,c.expected)
+ assert.equal(p.files.length,52);assert.equal(p.recipes.length,32);assert.deepEqual(p.expected,c.expected)
  for(const id of ['credentials','groups','group-native','operations','migration-session','improvement','byos-claim','byos-worker','factory-question-http'])assert.ok(p.expected.includes(id))
  assert.equal(p.contractErrors.length,0,'every retained and pending contract has explicit names/counts');
  assert.deepEqual(p.selfManaged,['lib/auth-email.test.ts']);assert.equal(p.recipes.find(r=>r.id==='group-native').status,'pending');assert.equal(p.recipes.find(r=>r.id==='factory-question-http').phase,'postbuild')
@@ -254,7 +254,7 @@ test('retained partitions preserve pending physical contracts and bind Go allowl
  const sources=Object.entries(tree).filter(([p])=>p.startsWith('packages/subscription-worker/')&&p.endsWith('_test.go')).flatMap(([,s])=>[...s.matchAll(/func (Test\w+)\(t \*testing.T\)/g)].map(m=>m[1]))
  const registered=[...go.retainedTests,...go.pendingTests.map(t=>t.name),...go.separateApplicationIntegration]
  assert.deepEqual([...sources].sort(),[...registered].sort());assert.equal(new Set(registered).size,registered.length)
- assert.equal(r('byos-retained').expectedCount,49)
+ assert.equal(r('byos-retained').expectedCount,53)
  for(const name of go.pendingTests.map(t=>t.name))assert.ok(!r('byos-retained').expectedTests.includes(name))
  const pkg=JSON.parse(readFileSync('package.json','utf8')).scripts
  const before=inventory(tree,pkg).digest

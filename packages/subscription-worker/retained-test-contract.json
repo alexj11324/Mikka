@@ -48,9 +48,13 @@
     "TestQuotaProjectionDropsEchoedSecretsWithoutDroppingExhaustedWindows",
     "TestAccessPublicationFailureRecoversWithoutAnotherProviderRefresh",
     "TestAccessProjectionRejectsFullAndNestedRefreshCopies",
-    "TestVaultDenialSurvivesEnrollmentStart"
+    "TestVaultDenialSurvivesEnrollmentStart",
+    "TestCleanupPauseRetainsArtifactsAndAttempts",
+    "TestCleanupPauseRejectsOwnershipAndBudget",
+    "TestCleanupPauseRejectsCrossScopeAttemptAlias",
+    "TestCleanupPauseFailsClosedBeforeDatabase"
   ],
-  "retainedCount": 45,
+  "retainedCount": 49,
   "pendingTests": [
     {
       "name": "TestEnrollmentBindingGlobalClaimSurvivesMetadataLoss",

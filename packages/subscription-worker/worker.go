@@ -28,6 +28,8 @@ func public(r Record) Metadata {
 // Each worker is permanently bound to one authenticated owner's connection.
 // Registrations are trusted host objects, never input-supplied executables.
 type Worker struct {
+	// Private test-only observer: configured workers can preview but never resume cleanup.
+	cleanupObserver *cleanupPreviewObserver
 	Repo             *Repository
 	Secrets          SecretStore
 	AccessSecrets    SecretStore

@@ -12,6 +12,28 @@ export type OwnedBrowserPolicy = {
   continuation?: { accountURL: string; accountSelector: string; cookieName: string; pages?: OwnedTaskPage[] }
 }
 export type OwnedTaskPage = { id: string; url: string; regions: { id: string; selector: string }[]; links?: { id: string; selector: string; pageId: string }[] }
+export type AcceptanceProfile = Readonly<{ id: string; directory: string; profile: string }>
+export type AcceptanceCleanupStage = 'launch-blocked' | 'launch-failed' | 'setup-failed' | 'destroy'
+// Trusted synthetic Linux fixture observation only; never receives browser/page
+// handles and cannot authorize disposal. All cleanup with this hook stays pending.
+export type AcceptanceResources = {
+  prepareProfile(): Promise<AcceptanceProfile>
+  started(profile: AcceptanceProfile): Promise<void>
+  beforeCleanup(profile: AcceptanceProfile, stage: AcceptanceCleanupStage): Promise<void>
+  recordFailure?(profile: AcceptanceProfile, stage: 'launch-failed' | 'setup-failed', cause: unknown): Promise<void>
+}
+// Playwright owns additional failure/exit cleanup outside this executor. Until
+// that lifecycle has separately approved control, acceptance is setup-only.
+export async function guardAcceptanceLaunch(resources?: AcceptanceResources, profile?: AcceptanceProfile): Promise<void> {
+  if (!resources) return
+  if (!profile) throw new CredentialError('browser_acceptance_profile_missing', 503)
+  await resources.beforeCleanup(profile, 'launch-blocked')
+  throw new CredentialError('browser_acceptance_setup_only', 503)
+}
+export async function rejectAcceptanceDisposal(resources: AcceptanceResources, profile: AcceptanceProfile, stage: 'launch-failed' | 'setup-failed' | 'destroy'): Promise<never> {
+  await resources.beforeCleanup(profile, stage)
+  throw new CredentialError('browser_acceptance_disposal_pending', 503)
+}
 type Session = {
   binding: Binding; browser: Browser; context: BrowserContext; page: Page; directory: string
   contextIdentity: string
@@ -21,6 +43,7 @@ type Session = {
   expiryTimer?: ReturnType<typeof setTimeout>
   endedReference?: string; revoked?: boolean; executing: boolean
   permittedNavigation?: string
+  acceptanceProfile?: AcceptanceProfile
 }
 async function bounded<T>(operation: Promise<T>, milliseconds: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -48,6 +71,7 @@ export class OwnedChromiumExecutor {
   #sessions = new Map<string, Session>()
   #policies = new Map<string, Readonly<OwnedBrowserPolicy>>()
   #events: { session: string; phase: string }[] = []
+  #acceptanceResources?: AcceptanceResources
   describe(serviceId: string) {
     const policy = this.#policies.get(serviceId)
     return policy ? { serviceId, targetOrigin: new URL(policy.formURL).origin } : undefined
@@ -68,8 +92,14 @@ export class OwnedChromiumExecutor {
     executablePath: string; policies: OwnedBrowserPolicy[];
     // Only for synthetic loopback acceptance in this cloud Linux environment.
     loopbackFixture?: boolean
+    acceptanceResources?: AcceptanceResources
     sessionTTLms?: number
   }) {
+    if (config.acceptanceResources) {
+      if (config.loopbackFixture !== true || process.platform !== 'linux') throw new CredentialError('browser_acceptance_resources_forbidden', 503)
+      const resources = config.acceptanceResources
+      this.#acceptanceResources = Object.freeze({ prepareProfile: resources.prepareProfile.bind(resources), started: resources.started.bind(resources), beforeCleanup: resources.beforeCleanup.bind(resources), recordFailure: resources.recordFailure?.bind(resources) })
+    }
     if (process.env.PWDEBUG || /pw:|playwright/i.test(process.env.DEBUG ?? '')) throw new CredentialError('browser_debug_capture_forbidden', 503)
     if (config.sessionTTLms !== undefined && (!Number.isInteger(config.sessionTTLms) || config.sessionTTLms < 250 || config.sessionTTLms > 300_000)) throw new CredentialError('browser_policy_invalid', 503)
     for (const policy of config.policies) {
@@ -97,11 +127,14 @@ export class OwnedChromiumExecutor {
   }
 
   async #launch(binding: Binding): Promise<Session> {
-    const directory = await mkdtemp(join(tmpdir(), 'mikka-credential-browser-'))
+    const prepared = await this.#acceptanceResources?.prepareProfile()
+    const acceptanceProfile = prepared ? Object.freeze({ ...prepared }) : undefined
+    await guardAcceptanceLaunch(this.#acceptanceResources, acceptanceProfile)
+    const directory = acceptanceProfile?.directory ?? await mkdtemp(join(tmpdir(), 'mikka-credential-browser-'))
     try {
       // An anonymous debugging pipe, never a listening CDP port. The profile is fresh,
       // private and destroyed with the process; it is never attached to or reused.
-      const context = await chromium.launchPersistentContext(join(directory, 'profile'), {
+      const context = await chromium.launchPersistentContext(acceptanceProfile?.profile ?? join(directory, 'profile'), {
         executablePath: this.config.executablePath, headless: true,
         timeout: 5000,
         acceptDownloads: false, serviceWorkers: 'block', javaScriptEnabled: false,
@@ -111,16 +144,32 @@ export class OwnedChromiumExecutor {
       })
       const browser = context.browser()!
       try {
+        if (acceptanceProfile) await this.#acceptanceResources!.started(acceptanceProfile)
         await context.routeWebSocket('**', socket => socket.close())
         const page = context.pages()[0] ?? await context.newPage()
         page.setDefaultTimeout(1000)
-        context.on('page', other => { if (other !== page) void other.close().catch(() => {}) })
-        return { binding: { ...binding }, browser, context, page, directory, contextIdentity: randomUUID(), fenced: false, phase: 'idle', active: new Set(), executing: false }
-      } catch { await browser.close(); throw new Error() }
-    } catch {
+        const session: Session = { binding: { ...binding }, browser, context, page, directory, acceptanceProfile, contextIdentity: randomUUID(), fenced: false, phase: 'idle', active: new Set(), executing: false }
+        context.on('page', other => {
+          if (other === page) return
+          if (acceptanceProfile) { session.fenced = true; session.revoked = true; return }
+          void other.close().catch(() => {})
+        })
+        return session
+      } catch (cause) {
+        if (acceptanceProfile) await this.#acceptanceResources!.recordFailure?.(acceptanceProfile, 'setup-failed', cause)
+        if (acceptanceProfile) await this.#retainAcceptance(acceptanceProfile, 'setup-failed')
+        await browser.close(); throw new Error()
+      }
+    } catch (cause) {
+      if (acceptanceProfile) await this.#acceptanceResources!.recordFailure?.(acceptanceProfile, 'launch-failed', cause)
+      if (acceptanceProfile) await this.#retainAcceptance(acceptanceProfile, 'launch-failed')
       await rm(directory, { recursive: true, force: true })
       throw new CredentialError('browser_launch_unavailable', 503)
     }
+  }
+
+  async #retainAcceptance(profile: AcceptanceProfile, stage: 'launch-failed' | 'setup-failed' | 'destroy'): Promise<never> {
+    return rejectAcceptanceDisposal(this.#acceptanceResources!, profile, stage)
   }
 
   /** Trusted executor provisioning only. This starts a fresh blank process, never an agent browser. */
@@ -170,6 +219,10 @@ export class OwnedChromiumExecutor {
     // Join the same attempt; a failed attempt remains fenced and may be retried.
     if (session.destroying) return session.destroying
     const attempt = (async () => {
+      if (session.acceptanceProfile) {
+        session.fenced = true
+        await this.#retainAcceptance(session.acceptanceProfile, 'destroy')
+      }
       await bounded(session.browser.close(), 5000)
       await rm(session.directory, { recursive: true, force: true })
     })()
@@ -323,9 +376,10 @@ export class OwnedChromiumExecutor {
       await this.#destroy(session)
       if (!session.executing && this.#sessions.get(binding.executionSession) === session) this.#sessions.delete(binding.executionSession)
       this.#events.push({ session: binding.executionSession, phase: 'closed' })
-    } catch {
+    } catch (error) {
       if (!session.executing) session.phase = 'quarantined'
       this.#events.push({ session: binding.executionSession, phase: 'quarantined' })
+      if (session.acceptanceProfile && error instanceof CredentialError && error.code === 'browser_acceptance_disposal_pending') throw error
       throw new CredentialError('browser_cleanup_quarantined', 503)
     }
   }

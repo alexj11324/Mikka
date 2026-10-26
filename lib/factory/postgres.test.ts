@@ -1,3 +1,6 @@
+import { registerFactoryFixtureRows } from "../../scripts/disposal/factory-effects.mjs";
+import { bootstrapFactoryCreateOnly } from "./create-only-bootstrap.mjs";
+import { factoryAgentSetupOnly, pauseFactoryAgentSetup } from "./agent-absence-setup";
 import { physicalAbsenceCase } from "./retained-test-support";
 import { retainFaultTrigger } from "./retained-test-support";
 import { executePoolMigration } from "../../scripts/search-migrations.mjs";
@@ -39,6 +42,9 @@ if (dbURL && !localDB) {
   assert.equal(url.hostname, "127.0.0.1");
   assert.equal(url.pathname, "/mikka_e2e");
 }
+const agentSetupOnly = factoryAgentSetupOnly(process.env);
+if (agentSetupOnly && !dbURL) throw new Error("Factory setup-only requires the explicit isolated database target");
+
 const binding = (task: FactoryTask): FactoryBinding => ({
   taskId: task.id,
   issueId: task.issueId,
@@ -53,12 +59,14 @@ const rejects = (fn: () => Promise<unknown>, code: string) =>
   );
 
 test(
-  "PG17: routing, 10-way replay/CAS, actual SQL rollback/reconnect, attempts, candidate fences and API isolation",
+  agentSetupOnly
+    ? "Factory agent setup-only: retained exact PK candidates; effects blocked and incomplete"
+    : "PG17: routing, 10-way replay/CAS, actual SQL rollback/reconnect, attempts, candidate fences and API isolation",
   { skip: !dbURL, timeout: 120000 },
   async (t) => {
     const schema = `factory_192_${randomUUID().replaceAll("-", "")}`;
     const admin = new Pool({ connectionString: dbURL, max: 1 });
-    await admin.query(`CREATE SCHEMA "${schema}"`);
+    if (!agentSetupOnly) await admin.query(`CREATE SCHEMA "${schema}"`);
     const pool = new Pool({
       connectionString: dbURL,
       max: 12,
@@ -84,17 +92,21 @@ test(
         "17",
       );
       const dir = new URL("../../drizzle/", import.meta.url);
-      for (const file of orderMigrations(
-        (await readdir(dir)).filter((n) => n.endsWith(".sql")),
-      )) {
-        await executePoolMigration(pool, file, await readFile(new URL(file, dir), "utf8"));
+      if (agentSetupOnly) {
+        await bootstrapFactoryCreateOnly(pool, { databaseUrl: dbURL!, schema });
+      } else {
+        for (const file of orderMigrations(
+          (await readdir(dir)).filter((n) => n.endsWith(".sql")),
+        )) {
+          await executePoolMigration(pool, file, await readFile(new URL(file, dir), "utf8"));
+        }
+        const migration = await readFile(
+          new URL("20261025051202_factory_192_stages.sql", dir),
+          "utf8",
+        );
+        await pool.query(migration);
+        await pool.query(migration);
       }
-      const migration = await readFile(
-        new URL("20261025051202_factory_192_stages.sql", dir),
-        "utf8",
-      );
-      await pool.query(migration);
-      await pool.query(migration);
       const issueId = randomUUID(),
         otherIssueId = randomUUID(),
         agentId = randomUUID();
@@ -122,6 +134,45 @@ test(
           rationale: "Explicit fixture request",
           ...extra,
         });
+      const prepareDeletedAgent = async (ids: { agentId: string; runId: string } = { agentId: randomUUID(), runId: randomUUID() }) => {
+        const deletedAgent = ids.agentId, deletedRun = ids.runId;
+        await pool.query(
+          "INSERT INTO agents (id,\"userId\",name,harness) VALUES ($1,'owner','Deleted fixture agent','codex')",
+          [deletedAgent],
+        );
+        await pool.query(
+          'INSERT INTO agent_runs (id,"userId","issueId","agentId",status) VALUES ($1,\'owner\',$2,$3,\'running\')',
+          [deletedRun, issueId, deletedAgent],
+        );
+        const deletedRunTask = await route();
+        await store.apply("owner", binding(deletedRunTask.task), randomUUID(), {
+          action: "bind_run",
+          runId: deletedRun,
+        });
+        return { deletedAgent, deletedRun, deletedRunTask };
+      };
+      if (agentSetupOnly) {
+        const paused = await pauseFactoryAgentSetup({
+          schema, databaseUrl: dbURL!, ownerId: "owner", issueId,
+          prepare: async (ids) => {
+            const prepared = await prepareDeletedAgent(ids);
+            const agent = await pool.query('SELECT id,"userId" FROM agents WHERE id=$1', [ids.agentId]);
+            const run = await pool.query('SELECT id,"userId","agentId","issueId" FROM agent_runs WHERE id=$1', [ids.runId]);
+            assert.equal(agent.rows.length, 1); assert.equal(run.rows.length, 1);
+            const inventoryClient = await pool.connect();
+            let fixtureRegistry;
+            try {
+              await inventoryClient.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
+              fixtureRegistry = await registerFactoryFixtureRows(inventoryClient, { schema, maxRows: 500 });
+              await inventoryClient.query("COMMIT");
+            } catch (error) { await inventoryClient.query("ROLLBACK"); throw error; }
+            finally { inventoryClient.release(); }
+            return { agent: agent.rows[0], run: run.rows[0], taskId: prepared.deletedRunTask.task.id, attemptId: prepared.deletedRunTask.task.attemptId, fixtureRegistry };
+          },
+        });
+        console.log("Factory setup-only paused: " + JSON.stringify({ receiptPath: paused.receiptPath, status: paused.receipt.status, effectsComplete: false, approvalEligible: false, executedDeletion: false }));
+        return; // finally closes pools; neither physical callback nor later mutations run.
+      }
       let state = await route();
       assert.equal(state.task.stage, "execute");
       assert.equal(state.task.status, "pending");
@@ -935,21 +986,7 @@ test(
         });
       }
       await physicalAbsenceCase(t, "deleted agent cascades its run and blocks reconciliation", async () => {
-      const deletedAgent = randomUUID(),
-        deletedRun = randomUUID();
-      await pool.query(
-        "INSERT INTO agents (id,\"userId\",name,harness) VALUES ($1,'owner','Deleted fixture agent','codex')",
-        [deletedAgent],
-      );
-      await pool.query(
-        'INSERT INTO agent_runs (id,"userId","issueId","agentId",status) VALUES ($1,\'owner\',$2,$3,\'running\')',
-        [deletedRun, issueId, deletedAgent],
-      );
-      const deletedRunTask = await route();
-      await store.apply("owner", binding(deletedRunTask.task), randomUUID(), {
-        action: "bind_run",
-        runId: deletedRun,
-      });
+      const { deletedAgent, deletedRun, deletedRunTask } = await prepareDeletedAgent();
       await pool.query("DELETE FROM agents WHERE id=$1", [deletedAgent]);
       assert.equal(
         (
