@@ -114,9 +114,10 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     assert.ok(copiedChild, 'duplicate path actually copied its child')
     await history(copiedChild.id, 'user', owner)
     saved = expectIssue(await actAs(owner, () => updateIssueMetadata({ id: root.id, revision: saved.revision, patch: { assignee: { kind: 'member', id: member } } })))
-    // Member-removal writer is not executed: this acceptance retains all records.
-    saved = expectIssue(await actAs(owner, async () => setIssueScope({ id: root.id, revision: (await latest(root.id)).revision, scope: 'workspace' })))
+    // Retain the member row; switching to personal immediately revokes its visibility.
+    saved = expectIssue(await actAs(owner, async () => setIssueScope({ id: root.id, revision: (await latest(root.id)).revision, scope: 'personal' })))
     await history(root.id, 'user', owner)
+    await assert.rejects(actAs(member, () => listIssueVersions(root.id)), { code: 'issueNotFound' })
     const agentId = randomUUID()
     const agent = expectIssue(await actAs(owner, () => saveIssue({ ...input, actorType: 'user', actorId: 'spoof' } as Parameters<typeof saveIssue>[0]), agentActor(agentId)))
     await history(agent.id, 'agent', agentId)

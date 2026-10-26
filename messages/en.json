@@ -249,6 +249,9 @@
     "teamsTitle": "Team management · Mikka",
     "teamsDescription": "Browse public workspace teams and manage members, task ownership, and project associations.",
     "property": {
+      "estimate": "Estimate",
+      "dueDate": "Due date",
+      "addLabels": "Add labels",
       "setProject": "Set project",
       "editLabels": "Edit task labels",
       "managePullRequests": "Manage linked PRs",
@@ -807,6 +810,7 @@
       "newTask": "New task"
     },
     "activity": {
+      "comment": "Comment by {author}",
       "label": "Task activity",
       "title": "Activity",
       "subtitle": "Updates and discussion",
@@ -817,7 +821,7 @@
       "reopen": "Reopen",
       "resolve": "Resolve",
       "replyLabel": "Reply",
-      "replyPlaceholder": "Write a reply…",
+      "replyPlaceholder": "Leave a reply…",
       "sendReply": "Send reply",
       "commentLabel": "Comment",
       "commentPlaceholder": "Leave a comment…",
@@ -831,7 +835,8 @@
       "addedSubtask": "Added subtask {title}",
       "addedLabel": "Added label {name}",
       "removedLabel": "Removed label {name}",
-      "unknownAssignee": "someone"
+      "unknownAssignee": "someone",
+      "separator": ", "
     },
     "detail": {
       "readFailed": "Could not load this task. Please try again.",
@@ -1027,6 +1032,7 @@
     "viewProjects": "View projects"
   },
   "IssueDetail": {
+    "breadcrumbBoard": "Board",
     "connecting": "Connecting…",
     "deletedTitle": "This task was deleted",
     "unavailableTitle": "Task unavailable",
@@ -1454,7 +1460,12 @@
     "noResults": "No matching settings",
     "groups": {
       "personal": "Personal",
-      "workspace": "Workspace"
+      "workspace": "Workspace",
+      "administration": "Administration",
+      "yourTeams": "Your teams"
+    },
+    "nav": {
+      "createTeam": "Create a team"
     },
     "sections": {
       "members": {
@@ -2043,6 +2054,7 @@
     "pleaseSignInFirst": "Please sign in first.",
     "invalidConversationID": "Invalid conversation ID.",
     "unableToLoadChatHistoryPleaseTry": "Unable to load chat history. Please try again.",
+    "activeAgentsNoParameters": "This endpoint takes no parameters.",
     "conversationNotFound": "Conversation not found.",
     "aResponseIsStillGeneratingPleaseTry": "A response is still generating. Please try again shortly.",
     "thisMessageWasAlreadySubmittedPleaseAsk": "This message was already submitted. Please ask a new question.",
@@ -2274,6 +2286,23 @@
     "creating": "Creating…",
     "createWorkspace": "Create workspace"
   },
+  "IssueThreads": {
+    "title": "Threads",
+    "agent": "Agent",
+    "hidden": "An agent thread",
+    "open": "Open thread {name}",
+    "dispatched": "started a thread",
+    "close": "Close thread",
+    "conversation": "Thread conversation",
+    "loading": "Opening thread",
+    "loadFailed": "Couldn't load the thread",
+    "retry": "Retry",
+    "started": "started {time}",
+    "steps": "Handed to {harness} · {count, plural, one {# step} other {# steps}}",
+    "composer": "Tell {agent} what to do next…",
+    "send": "Send",
+    "sendFailed": "Not sent. Your draft is still here"
+  },
   "Computer": {
     "status": {
       "working": "Agent working",
@@ -2484,5 +2513,12 @@
       "expand": "Show conversation",
       "unassigned": "Unassigned"
     }
+  },
+  "Unread": {
+    "divider": "New messages start here",
+    "newLabel": "New",
+    "jumpToUnread": "{count, plural, one {{display} new message} other {{display} new messages}}",
+    "jumpToLatest": "{count, plural, one {{display} new message} other {{display} new messages}}",
+    "dismiss": "Dismiss"
   }
 }

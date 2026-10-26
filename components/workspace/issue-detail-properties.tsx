@@ -6,6 +6,7 @@ import { Calendar, ChartNoAxesColumnIncreasing, ChevronDown, CircleDashed, Signa
 import { IssueTeamControl } from '@/components/teams/issue-team-control'
 import { Button } from '@/components/ui/button'
 import { Field, FieldContent, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { PROPERTY_LABEL, ROW_VALUE } from './issue-property-row'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 import { IssueMetadataControls, type MetadataRequest, type MetadataSavedIssue } from './issue-metadata-controls'
@@ -33,21 +34,30 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
     <Button variant="ghost" className="min-h-11 w-full justify-between lg:hidden" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded(value => !value)}><SlidersHorizontal data-icon="inline-start" /><span className="flex-1 text-left">{tDetail('propertiesRelations')}</span><ChevronDown data-icon="inline-end" className={cn(expanded && 'rotate-180')} /></Button>
     <div id={contentId} className={cn('flex-col gap-6 lg:flex lg:py-0', expanded ? 'flex py-4' : 'hidden')}>
     <section className="flex flex-col gap-3 [&_button]:min-h-11 lg:[&_button]:min-h-0"><h2 className="hidden text-xs font-medium text-muted-foreground lg:block">{tDetail('propertiesHeading')}</h2>
-      <FieldGroup className="gap-3">
-        <Field orientation="horizontal" className="items-center gap-3"><FieldLabel className="w-20 shrink-0">{t('statusLabel')}</FieldLabel><FieldContent className="min-w-0"><IssuePropertyMenu label={t('statusLabel')} value={status} options={statusOptions} icon={CircleDashed} disabled={pending} onChange={onStatus} /></FieldContent></Field>
-        <Field orientation="horizontal" className="items-center gap-3"><FieldLabel className="w-20 shrink-0">{t('priorityLabel')}</FieldLabel><FieldContent className="min-w-0"><IssuePropertyMenu label={t('priorityLabel')} value={priority} options={priorityOptions} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} /></FieldContent></Field>
-        <Field orientation="horizontal" className="items-center gap-3"><FieldLabel className="w-20 shrink-0">{t('scope.label')}</FieldLabel><FieldContent className="min-w-0"><IssueScopeControl task={task} disabled={metadataDisabled} onSaved={onMetadataSaved} /></FieldContent></Field>
-        <Field orientation="horizontal" className="items-center gap-3"><FieldLabel className="w-20 shrink-0">{tMetadata('assignee')}</FieldLabel><FieldContent className="min-w-0"><IssueMetadataControls {...control} section="assignee" /></FieldContent></Field>
-        <Field orientation="horizontal" className="items-start gap-3"><FieldLabel className="w-20 shrink-0">{tMetadata('labels')}</FieldLabel><FieldContent className="min-w-0"><div className="flex flex-wrap gap-2"><IssueMetadataControls {...control} section="labels" /></div></FieldContent></Field>
-        <Field orientation="horizontal" className="items-center gap-3"><FieldLabel className="w-20 shrink-0">{tMetadata('project')}</FieldLabel><FieldContent className="min-w-0"><IssueMetadataControls {...control} section="project" /></FieldContent></Field>
+      <FieldGroup className="gap-1">
+        <PropertyRow label={t('statusLabel')}><IssuePropertyMenu variant="row" label={t('statusLabel')} value={status} options={statusOptions} icon={CircleDashed} disabled={pending} onChange={onStatus} /></PropertyRow>
+        <PropertyRow label={t('priorityLabel')}><IssuePropertyMenu variant="row" label={t('priorityLabel')} value={priority} options={priorityOptions} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} /></PropertyRow>
+        <PropertyRow label={t('scope.label')}><IssueScopeControl task={task} disabled={metadataDisabled} onSaved={onMetadataSaved} /></PropertyRow>
+        <PropertyRow label={tMetadata('assignee')}><IssueMetadataControls {...control} section="assignee" /></PropertyRow>
+        <PropertyRow label={tMetadata('labels')}><div className="flex min-h-7 flex-wrap items-center gap-1.5"><IssueMetadataControls {...control} section="labels" /></div></PropertyRow>
+        <PropertyRow label={tMetadata('project')}><IssueMetadataControls {...control} section="project" /></PropertyRow>
+        {task.metadata.estimate !== null && <PropertyRow label={tMetadata('estimate')}><Button variant="ghost" size="sm" className={ROW_VALUE} disabled={metadataDisabled} onClick={onEstimate}><Signal data-icon="inline-start" />{tMetadata('estimatePoints', { count: task.metadata.estimate })}</Button></PropertyRow>}
+        {task.metadata.dueDate && <PropertyRow label={tMetadata('dueDate')}><Button variant="ghost" size="sm" className={ROW_VALUE} disabled={metadataDisabled} onClick={onDate}><Calendar data-icon="inline-start" /><time dateTime={task.metadata.dueDate}>{task.metadata.dueDate}</time></Button></PropertyRow>}
+        {task.metadata.pullRequests.length > 0 && <PropertyRow label={tMetadata('pullRequests')}><div className="flex min-h-7 flex-wrap items-center gap-1.5"><IssueMetadataControls {...control} section="pullRequests" /></div></PropertyRow>}
+        <IssueTeamControl issueId={task.id} disabled={metadataDisabled} />
       </FieldGroup>
-      {task.metadata.estimate !== null && <Button variant="ghost" size="sm" disabled={metadataDisabled} onClick={onEstimate}><Signal data-icon="inline-start" />{tMetadata('estimatePoints', { count: task.metadata.estimate })}</Button>}
-      {task.metadata.dueDate && <Button variant="ghost" size="sm" disabled={metadataDisabled} onClick={onDate}><Calendar data-icon="inline-start" /><time dateTime={task.metadata.dueDate}>{task.metadata.dueDate}</time></Button>}
     </section>
-    {task.metadata.pullRequests.length > 0 && <section className="flex flex-col items-start gap-2"><h3 className="px-2 text-xs font-medium text-muted-foreground">{tMetadata('pullRequests')}</h3><div className="flex flex-wrap gap-2 px-2"><IssueMetadataControls {...control} section="pullRequests" /></div></section>}
     {task.metadata.pullRequests.length === 0 && request?.target === 'pullRequests' && <IssueMetadataControls {...control} section="pullRequests" />}
-    <IssueTeamControl issueId={task.id} disabled={metadataDisabled} />
-    <div className="flex min-w-0 flex-col gap-6 px-2">{relations}</div>
+    <div className="flex min-w-0 flex-col gap-6">{relations}</div>
     </div>
   </aside>
+}
+
+function PropertyLabel({ children }: { children: ReactNode }) {
+  return <FieldLabel className={PROPERTY_LABEL}>{children}</FieldLabel>
+}
+
+/** One property: a fixed label column, then a 28px value whose text starts on the same line as every other value. */
+function PropertyRow({ label, children }: { label: string; children: ReactNode }) {
+  return <FieldGroup className="gap-0"><Field orientation="horizontal" className="items-start gap-3"><PropertyLabel>{label}</PropertyLabel><FieldContent className="min-w-0">{children}</FieldContent></Field></FieldGroup>
 }

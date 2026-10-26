@@ -249,6 +249,9 @@
     "teamsTitle": "团队管理 · Mikka",
     "teamsDescription": "浏览工作区公开团队，管理团队成员、任务归属与项目关联。",
     "property": {
+      "estimate": "估算",
+      "dueDate": "截止日期",
+      "addLabels": "添加标签",
       "setProject": "设置所属项目",
       "editLabels": "编辑任务标签",
       "managePullRequests": "管理关联 PR",
@@ -807,6 +810,7 @@
       "newTask": "新建任务"
     },
     "activity": {
+      "comment": "{author} 的评论",
       "label": "任务活动",
       "title": "活动",
       "subtitle": "更新与讨论",
@@ -817,7 +821,7 @@
       "reopen": "重新打开",
       "resolve": "解决讨论",
       "replyLabel": "回复内容",
-      "replyPlaceholder": "写下回复…",
+      "replyPlaceholder": "留下回复…",
       "sendReply": "发送回复",
       "commentLabel": "评论内容",
       "commentPlaceholder": "留下评论…",
@@ -831,7 +835,8 @@
       "addedSubtask": "添加了子任务 {title}",
       "addedLabel": "添加了标签 {name}",
       "removedLabel": "移除了标签 {name}",
-      "unknownAssignee": "某人"
+      "unknownAssignee": "某人",
+      "separator": "，"
     },
     "detail": {
       "readFailed": "任务读取失败，请重试。",
@@ -1027,6 +1032,7 @@
     "viewProjects": "查看项目"
   },
   "IssueDetail": {
+    "breadcrumbBoard": "看板",
     "connecting": "正在连接…",
     "deletedTitle": "此任务已被删除",
     "unavailableTitle": "任务不可用",
@@ -1454,7 +1460,12 @@
     "noResults": "没有匹配的设置",
     "groups": {
       "personal": "个人",
-      "workspace": "工作区"
+      "workspace": "工作区",
+      "administration": "管理",
+      "yourTeams": "你的团队"
+    },
+    "nav": {
+      "createTeam": "创建团队"
     },
     "sections": {
       "members": {
@@ -2043,6 +2054,7 @@
     "pleaseSignInFirst": "请先登录。",
     "invalidConversationID": "会话标识无效。",
     "unableToLoadChatHistoryPleaseTry": "无法读取聊天历史，请稍后重试。",
+    "activeAgentsNoParameters": "此接口不接受任何参数。",
     "conversationNotFound": "找不到此会话。",
     "aResponseIsStillGeneratingPleaseTry": "此会话仍有回复正在生成，请稍后重试。",
     "thisMessageWasAlreadySubmittedPleaseAsk": "此轮消息不能重复提交，请新建一轮提问。",
@@ -2274,6 +2286,23 @@
     "creating": "正在创建…",
     "createWorkspace": "创建工作区"
   },
+  "IssueThreads": {
+    "title": "线程",
+    "agent": "Agent",
+    "hidden": "Agent 的线程",
+    "open": "打开线程 {name}",
+    "dispatched": "派出线程",
+    "close": "关闭线程",
+    "conversation": "线程对话",
+    "loading": "正在打开线程",
+    "loadFailed": "线程没加载出来",
+    "retry": "重试",
+    "started": "开始于 {time}",
+    "steps": "交给 {harness} · 执行了 {count} 步",
+    "composer": "告诉 {agent} 下一步做什么…",
+    "send": "发送",
+    "sendFailed": "没发出去，草稿还在"
+  },
   "Computer": {
     "status": {
       "working": "Agent 操作中",
@@ -2484,5 +2513,12 @@
       "expand": "展开对话",
       "unassigned": "未分配"
     }
+  },
+  "Unread": {
+    "divider": "以下是新消息",
+    "newLabel": "新",
+    "jumpToUnread": "{count, plural, other {{display} 条新消息}}",
+    "jumpToLatest": "{count, plural, other {{display} 条新消息}}",
+    "dismiss": "关闭"
   }
 }

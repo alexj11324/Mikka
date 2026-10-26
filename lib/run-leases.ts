@@ -10,6 +10,8 @@ import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { revokeRunTokens } from '@/lib/mcp/worker'
 import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATTEMPTS, pickTakeover, RETRY_QUEUE_WAIT_MS, retryPrompt, type TakeoverCandidate } from '@/lib/run-retry'
 
+const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 // Run leases on the server (ADR 0012). The heartbeat renews the lease of each
 // run the device reports; a run left out is not renewed, and the daemon stops
 // it once its lease runs out. `reclaimLostRuns` handles runs whose device
@@ -23,23 +25,24 @@ import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATT
  */
 export async function renewRunLeases(deviceId: string, runIds: readonly string[], now = new Date()): Promise<{ leases: Record<string, string>; revoked?: string[] }> {
   if (!runIds.length) return { leases: {} }
-  const {renewed,leaseExpiresAt} = await db.transaction(async tx => {
+  const validRunIds = runIds.filter(id => RUN_UUID.test(id))
+  const {renewed,leaseExpiresAt} = validRunIds.length ? await db.transaction(async tx => {
     // Lock before evaluating time. An UPDATE predicate can be evaluated before
     // a row-lock wait, even when it contains clock_timestamp(). Group claims
     // belong exclusively to the dedicated epoch-bound protocol.
     await tx.select({id:agentRuns.id}).from(agentRuns)
-      .where(and(eq(agentRuns.deviceId,deviceId),inArray(agentRuns.id,[...runIds]),ne(agentRuns.kind,'group_review')))
+      .where(and(eq(agentRuns.deviceId,deviceId),inArray(agentRuns.id,validRunIds),ne(agentRuns.kind,'group_review')))
       .orderBy(agentRuns.id).for('update')
     const renewedAt=new Date(Math.max(now.getTime(),Date.now()))
     const leaseExpiresAt=new Date(renewedAt.getTime()+RUN_LEASE_MS)
     const renewed=await tx.update(agentRuns)
       .set({leaseExpiresAt,updatedAt:renewedAt})
-      .where(and(eq(agentRuns.deviceId,deviceId),inArray(agentRuns.id,[...runIds]),
+      .where(and(eq(agentRuns.deviceId,deviceId),inArray(agentRuns.id,validRunIds),
         inArray(agentRuns.status,[...LEASED_RUN_STATUSES]),ne(agentRuns.kind,'group_review'),
         isNull(agentRuns.stopRequestedAt),gt(agentRuns.leaseExpiresAt,sql`clock_timestamp()`)))
       .returning({id:agentRuns.id})
     return {renewed,leaseExpiresAt}
-  })
+  }) : {renewed: [], leaseExpiresAt: new Date(now.getTime() + RUN_LEASE_MS)}
   const held = new Set(renewed.map(run => run.id))
   const revoked = runIds.filter(id => !held.has(id))
   return { leases: Object.fromEntries([...held].map(id => [id, leaseExpiresAt.toISOString()])), ...(revoked.length ? { revoked } : {}) }

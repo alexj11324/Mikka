@@ -108,3 +108,12 @@ test('uncertain and unknown action events tolerate missing input without declari
     assert.doesNotMatch(prompt, /person declined|It did not happen|and it is done/)
   }
 })
+test('chatItems marks inbox (pending) user messages so they are never reported as read', () => {
+  const at = new Date()
+  const items = chatItems([
+    { position: 1, createdAt: at, message: { role: 'user', content: 'hi' } },
+    { position: 2, createdAt: at, pending: true, message: { role: 'user', content: 'queued' } },
+  ])
+  assert.equal(items[0].pending, undefined)
+  assert.equal(items[1].pending, true)
+})

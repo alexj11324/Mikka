@@ -224,17 +224,17 @@ export interface ChatItem {
   /** Tools the Coordinator used for this reply, in order. */
   tools: string[]
   createdAt: string
+  /** Still in the inbox: its position is inferred, not a coordinator_messages row, so it can't be marked read. */
+  pending?: true
 }
 
 /**
  * The conversation as the person sees it: their messages, Mikka's events, and
  * one entry per Coordinator reply, with the tools it called folded in.
  */
-export function chatItems(
-  rows: readonly (StoredMessage & { createdAt: Date })[],
-): ChatItem[] {
+export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pending?: true })[]): ChatItem[] {
   const items: ChatItem[] = []
-  for (const { id, position, message, createdAt } of rows) {
+  for (const { id, position, message, createdAt, pending } of rows) {
     if (message.role === 'user') {
       const text =
         typeof message.content === 'string'
@@ -244,19 +244,7 @@ export function chatItems(
               .join('\n')
       const event = text.startsWith('[Event]')
       // The triage line is for the Coordinator, not the person.
-      items.push({
-        ...(id ? { id } : {}),
-        position,
-        from: event ? 'event' : 'person',
-        text: event
-          ? text
-              .split('\n')
-              .filter((line) => !line.startsWith('Triage:'))
-              .join('\n')
-          : text,
-        tools: [],
-        createdAt: createdAt.toISOString(),
-      })
+      items.push({ ...(id ? { id } : {}), position, from: event ? 'event' : 'person', text: event ? text.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') : text, tools: [], createdAt: createdAt.toISOString(), ...(pending ? { pending } : {}) })
     } else if (message.role === 'assistant') {
       const parts =
         typeof message.content === 'string'

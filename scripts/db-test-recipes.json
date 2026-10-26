@@ -1,6 +1,7 @@
 {
   "version": 1,
   "expected": [
+    "active-agents",
     "activity-actor-db",
     "audit",
     "byos-claim",
@@ -17,6 +18,7 @@
     "historical-upgrade-db",
     "improvement",
     "issue-search-db",
+    "issue-threads-db",
     "mailboxes",
     "migration-session",
     "operations",
@@ -387,6 +389,29 @@
     }
   },
   "recipes": [
+    {
+      "id": "active-agents",
+      "files": [
+        {
+          "path": "lib/active-agents.test.ts",
+          "requiredNames": [
+            "active readers share main claimed-only lease states; queued is only in flight"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:active-agents"
+      ],
+      "profile": "shared",
+      "phase": "prebuild",
+      "status": "pending",
+      "pendingReason": "New main harness contains physical DELETE cleanup; retained-mode acceptance and full result contract required.",
+      "expectedTests": null,
+      "expectedCount": null,
+      "packageScript": "test:active-agents"
+    },
     {
       "id": "activity-actor-db",
       "files": [
@@ -958,6 +983,33 @@
         "indexed, owner-safe relation search beyond 101 tasks, paging and graph visibility"
       ],
       "expectedCount": 1
+    },
+    {
+      "id": "issue-threads-db",
+      "files": [
+        {
+          "path": "tests/issue-threads.integration.ts",
+          "requiredNames": [
+            "real actions share threads on workspace issues only, with current members, and keep run controls with the owner"
+          ]
+        }
+      ],
+      "command": [
+        "node",
+        "--conditions=react-server",
+        "--import",
+        "./tests/support/server-only-loader.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "tests/issue-threads.integration.ts"
+      ],
+      "profile": "shared",
+      "phase": "prebuild",
+      "status": "pending",
+      "pendingReason": "New main harness contains physical DELETE cleanup; retained-mode acceptance and full result contract required.",
+      "expectedTests": null,
+      "expectedCount": null
     },
     {
       "id": "mailboxes",
