@@ -31,6 +31,7 @@ export async function coordinatorTurn(userId: string, delivery: WakeDelivery) {
   const inbox = await steps.takeInbox(userId, holder, delivery)
   if (!inbox.held || !inbox.added) return
   let replyText=''
+  let generationStarted:number|undefined
   try {
     if(inbox.hasCheckpoint){
       const checkpoint=await steps.wakeCheckpoint(userId,delivery)
@@ -50,6 +51,7 @@ export async function coordinatorTurn(userId: string, delivery: WakeDelivery) {
       if(!generation.generate)return
       const { instructions, messages } = await steps.preparePrompt(userId,source)
       messages.push(...recovered)
+      generationStarted=Date.now()
       const result = await agent.generate({ instructions, messages, timeout:45000, maxOutputTokens:8192, stopWhen: isStepCount(AGENT_MAX_ROUNDS), prepareStep: coordinatorStep })
       replyText=result.text.trim()?result.text:'没有生成回复，请再试一次'
       const output=result.text.trim()?result.responseMessages:[...result.responseMessages,{role:'assistant' as const,content:replyText}]
@@ -67,6 +69,10 @@ export async function coordinatorTurn(userId: string, delivery: WakeDelivery) {
     await steps.continueInbox(userId)
   }catch{
     await steps.failTurn(userId,holder,'coordinatorTurnUnavailable',delivery)
+    // A stable, non-sensitive transport diagnostic; the persisted event remains
+    // the consumption authority. No provider error or input is returned.
+    const generationElapsedMs=generationStarted===undefined?null:Date.now()-generationStarted
+    return {outcome:'failed' as const,generationElapsedMs,generationDeadlineReached:generationElapsedMs!==null&&generationElapsedMs>=45000}
   }
 }
 

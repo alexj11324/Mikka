@@ -1,0 +1,45 @@
+▶ formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoint, exhaustion and authority
+  ✔ legacy staged events require reconciliation; migration replay preserves decisions (2528.987787ms)
+  ✔ three transport failures persist; ten duplicate claims lead to one atomic response (1733.017641ms)
+  ✔ accepted start whose ACK is lost after consumption never reopens completed event (584.176093ms)
+{"evidence":"actual child SIGKILL","phase":"staged","eventId":"b2b23021-e95a-4601-a446-9114c3ccc19e","state":"completed","generation":"returned"}
+  ✔ actual SIGKILL after staged: fenced restart and no blind generation resend (2680.573855ms)
+{"evidence":"actual child SIGKILL","phase":"checkpoint","eventId":"5d6deed0-6646-4cd3-81e6-1ac350ab0ca5","state":"completed","generation":"returned"}
+  ✔ actual SIGKILL after checkpoint: fenced restart and no blind generation resend (2608.533618ms)
+{"evidence":"actual child SIGKILL","phase":"effect","eventId":"df9833ef-9681-446a-a2b3-af5b4f5b9402","state":"failed","generation":"uncertain"}
+  ✔ actual SIGKILL after effect: fenced restart and no blind generation resend (1399.899586ms)
+  ✔ publication PG failure keeps checkpoint; fresh lease ACK reuses result without effect (403.036618ms)
+  ✔ exhaustion and owner-scoped replay preserve operation ID and never grant new approval (775.599175ms)
+  ✔ current workspace revocation and scope mismatch prevent consumption and publication (231.113821ms)
+  ✔ persisted output publishes without a new resource admission or generation (262.831614ms)
+  ✔ stop committed after staging fences generation and recovered notice has zero effects (295.936421ms)
+  ✔ budget deferral neither sends nor burns retry; late start ACK preserves defer (145.827234ms)
+✔ formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoint, exhaustion and authority (13939.564395ms)
+▶ review: background terminal fairness, protocol scope, cached guard and quiet triage
+  ✔ follow-up migration upgrades the previous receipt schema without changing terminal scopes or granting membership (1320.391237ms)
+{"evidence":"actual PG + actual authority child SIGKILL","prefix":49,"parent":"3b45d4ae-f17f-47fd-a69a-5b998024351a","legal":"8fcdf794-3f56-4426-94ea-f3849c4dc04c","terminalRowsNotRevived":true}
+  ✔ 49 denied background rows cannot starve a later legal child across actual child SIGKILL (4953.759772ms)
+  ✔ failed, cancelled and legacy_review background rows remain terminal (131.437235ms)
+  ✔ protocol mailbox partition is not a real tenant grant (137.333573ms)
+  ✔ real tenant capture, mismatch, withdrawal and personal issue/device authority remain enforced (1199.54115ms)
+{"evidence":"controlled cached-guard substitute; real effect handler and PG","name":"remember","denied":true,"memoryUnchanged":true,"messageWrites":0}
+  ✔ cached successful guard cannot authorize a later stale remember effect (302.238913ms)
+{"evidence":"controlled cached-guard substitute; real effect handler and PG","name":"forget","denied":true,"memoryUnchanged":true,"messageWrites":0}
+  ✔ cached successful guard cannot authorize a later stale forget effect (260.277943ms)
+{"evidence":"controlled cached-guard substitute; real effect handler and PG","name":"mailboxAction","denied":true,"memoryUnchanged":true,"messageWrites":0}
+  ✔ cached successful guard cannot authorize a later stale mailboxAction effect (157.301289ms)
+{"evidence":"synthetic SDK metadata; actual getStepMetadata/effect handlers/PG transactions","eventId":"7f975686-075a-43f9-a9ff-6662c2753d2a","tenReplays":1,"mailboxWrites":1,"receiptFaultRolledMemoryBack":true}
+  ✔ fresh internal effects and SDK-step receipts commit together and replay without duplicate memory/message writes (966.047209ms)
+  ✔ quiet run_report triages before any transport start (119.942998ms)
+  ✔ quiet run_retried triages before any transport start (58.20626ms)
+{"evidence":"actual core delivery/positive controlled admission; no model called","held":false,"generationWouldStart":false}
+  ✔ late delivery whose tier became background never stages or starts generation (106.274335ms)
+✔ review: background terminal fairness, protocol scope, cached guard and quiet triage (15757.251331ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32196.29119

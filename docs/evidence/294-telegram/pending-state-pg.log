@@ -1,0 +1,16 @@
+▶ Telegram pending destinations: real split PG retry, fresh authority and delivery watermarks
+  ✔ failed turn keeps target in PG; a distinct successful turn and fresh store recover it (338.654552ms)
+  ✔ old delivery ACK cannot remove a newly staged message to the same destination (193.672267ms)
+  ✔ current link, owner, original source and workspace membership gate the actual effect (129.58099ms)
+  ✔ actual Chat SDK Postgres state reuses a held one-connection app transaction (23.625561ms)
+  ✔ authenticated Telegram ingress captures a real unambiguous workspace and rejects ambiguity/revocation (43.212656ms)
+  ✔ pending destinations from another workspace never ride a current turn (159.936759ms)
+✔ Telegram pending destinations: real split PG retry, fresh authority and delivery watermarks (895.650711ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1692.261745
