@@ -28,7 +28,7 @@ test('历史仅可读取，原始数据保留，新对话动作进入当前 Bot'
   await expect(archive.getByText('受控历史失败信息', { exact: true })).toBeVisible()
   await expect(archive.getByText('此历史回复未完成。', { exact: true })).toBeVisible()
   const historicalAction = archive.locator('[inert] button').first()
-  await expect(historicalAction).toHaveText('旧消息动作')
+  await expect(historicalAction).toHaveText('继续细化')
   await historicalAction.evaluate(button => (button as HTMLButtonElement).click())
   const stored = await page.request.get(app(`/api/agent/sessions?sessionId=${saved.id}`))
   expect(stored.status()).toBe(200)

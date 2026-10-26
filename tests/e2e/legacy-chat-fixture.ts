@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
+import { createParser } from '@openuidev/react-lang'
+import { createAgentLibrary } from '../../lib/agent-ui-catalog'
 import { expect } from './fixtures'
 
 export async function seedLegacyHistory(email: string) {
@@ -10,7 +12,11 @@ export async function seedLegacyHistory(email: string) {
   const pool = new Pool({ connectionString, max: 1 })
   const id = randomUUID()
   const title = `saved-${id.slice(0, 8)}`
-  const completion = 'root = Stack([TextContent("已保存的公开测试历史正文"), BeButton("旧消息动作", "不得执行历史动作", "outline")])'
+  const completion = 'root = Stack([TextContent("已保存的公开测试历史正文"), BeButton("继续细化", "不得执行历史动作", "outline")])'
+  const library = createAgentLibrary()
+  const parsed = createParser(library.toJSONSchema(), library.root).parse(completion)
+  expect(parsed.meta.errors).toEqual([])
+  expect(parsed.meta.unresolved).toEqual([])
   try {
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
     expect(user).toBeTruthy()
