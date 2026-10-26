@@ -1,0 +1,106 @@
+▶ public resource bridge: real split PG, held policy locks, exact quota and final source fence
+  ✔ missing legacy adapter still denies; inspection spends zero; ten duplicate actual requests execute once (492.020487ms)
+  ✔ policy revocation after availability denies before quota/send (52.511659ms)
+  ✔ captured workspace cannot spend a different owner-bound tenant (90.756731ms)
+  ✔ pause, expired reservation and cancelled source at the actual fetch fence refund proven unsent calls (152.138612ms)
+  ✔ first explicit 429 refunds only its own reservation; earlier successful work remains charged (221.477055ms)
+  ✔ unknown transport/body outcome stays fully charged, bounded and never sent again (627.452616ms)
+  ✔ web shares the canonical ledger; managed policy denies, cache reads are free and duplicates send once (248.968477ms)
+  ✖ shared context: A deny cannot be escaped through managed or unmanaged B quota (72.104497ms)
+  ✔ shared context: all policies allow while the sole quota charge stays captured in B (78.41658ms)
+  ✖ shared legacy summary and memory remain fenced after managed A withdrawal; isolated schedule stays B scoped (41.824968ms)
+  ✖ shared context: A policy changed after B availability still fences actual execution (71.013734ms)
+  ✖ provider success followed by local 403 or PG commit faults keeps full quota, rolls back publication and never resends (51.008264ms)
+  ✔ only an explicit first provider HTTP 401 402 403 or 429 response refunds sent work (201.688462ms)
+  ✔ membership withdrawal stays denied without an enterprise management adapter (34.905311ms)
+✖ public resource bridge: real split PG, held policy locks, exact quota and final source fence (2497.515544ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 10
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3040.194339
+
+✖ failing tests:
+
+test at lib/resources/model-execution-postgres.test.ts:1:9939
+✖ shared context: A deny cannot be escaped through managed or unmanaged B quota (72.104497ms)
+  AssertionError [ERR_ASSERTION]: A-denied shared context must never reach a provider through B
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (/workspace/Mikka-294/lib/resources/model-execution-postgres.test.ts:133:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-294/lib/resources/model-execution-postgres.test.ts:126:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/resources/model-execution-postgres.test.ts:1:11257
+✖ shared legacy summary and memory remain fenced after managed A withdrawal; isolated schedule stays B scoped (41.824968ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/Mikka-294/lib/resources/model-execution-postgres.test.ts:152:4)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-294/lib/resources/model-execution-postgres.test.ts:147:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /policySharedContextUnavailable/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at lib/resources/model-execution-postgres.test.ts:1:12701
+✖ shared context: A policy changed after B availability still fences actual execution (71.013734ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/Mikka-294/lib/resources/model-execution-postgres.test.ts:164:4)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-294/lib/resources/model-execution-postgres.test.ts:160:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /modelRouteDenied/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at lib/resources/model-execution-postgres.test.ts:1:13149
+✖ provider success followed by local 403 or PG commit faults keeps full quota, rolls back publication and never resends (51.008264ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'rejected'
+  - 'uncertain'
+  
+      at Object.<anonymous> (/workspace/Mikka-294/lib/resources/model-execution-postgres.test.ts:173:51)
+      at expectedException (node:assert:578:17)
+      at expectsError (node:assert:703:21)
+      at strict.rejects (node:assert:769:3)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/workspace/Mikka-294/lib/resources/model-execution-postgres.test.ts:173:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-294/lib/resources/model-execution-postgres.test.ts:167:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'uncertain',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

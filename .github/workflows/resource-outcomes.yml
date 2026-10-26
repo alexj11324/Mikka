@@ -82,6 +82,7 @@ jobs:
             node:24-bookworm-slim node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3180
           python3 scripts/record-terminal.py resource-sdk.cast node --import tsx scripts/verify-resource-sdk.mjs 2>&1 | tee resource-sdk.log
           python3 scripts/record-terminal.py schedule-sdk.cast node --import tsx scripts/verify-schedule-sdk.mjs 2>&1 | tee schedule-sdk.log
+          python3 scripts/record-terminal.py resource-policy-sdk.cast node --import tsx scripts/verify-resource-policy-sdk.mjs 2>&1 | tee resource-policy-sdk.log
       - name: Preserve diagnostics and stop disposable Next
         if: always()
         run: |
@@ -97,4 +98,6 @@ jobs:
             resource-next.log
             schedule-sdk.cast
             schedule-sdk.log
+            resource-policy-sdk.cast
+            resource-policy-sdk.log
           if-no-files-found: ignore

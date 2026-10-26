@@ -12,20 +12,39 @@ import type { PolicyClient } from '../policy/sql-client'
 /** Private to this composition: no public positive policy gate can be called
  * without the canonical quota/source-fence path below. #279's existing
  * authorizeModelRequest remains unchanged and fail-closed without an adapter. */
-async function withReservedModel<T>(store:PolicyStore,userId:string,workspaceId:string,route:ModelRoute,work:(tx:PolicyClient)=>Promise<T>):Promise<T>{
+async function withReservedModel<T>(store:PolicyStore,userId:string,workspaceId:string,resource:ModelExecutionScope['resource'],route:ModelRoute,work:(tx:PolicyClient)=>Promise<T>):Promise<T>{
  const result=await transaction(store.pool,async tx=>{
-  let resourceId='model'
+  let resourceId='model',auditWorkspace=workspaceId
   try{
    await store.member(tx,workspaceId,userId)
-   const bindings=await store.bindings(tx,userId,workspaceId,undefined,true)
-   for(const binding of bindings){
-    resourceId=binding.signed.payload.hash
-    if(binding.revoked)throw new PolicyError('policyRevoked',403)
-    admitModel(binding.effective,route)
+   // Coordinator history, summary and memory are still user-wide. Choosing a
+   // billing workspace cannot narrow their policy intersection. Keep this
+   // private to model admission; worker/tool policy semantics are unchanged.
+   const contexts=resource==='schedule.model'?[{workspaceId,status:'active'}]:(await tx.query<{workspaceId:string;status:string}>(
+    'SELECT "workspaceId",status FROM mikka_workspace_members WHERE "userId"=$1 ORDER BY "workspaceId" FOR SHARE',[userId],
+   )).rows
+   // Include retained suspended rows when locking: even an initial policy
+   // publication must serialize with a send containing retained shared context.
+   for(const context of contexts)await tx.query('SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',[`organization-policy:${context.workspaceId}`])
+   for(const context of contexts){
+    auditWorkspace=context.workspaceId
+    resourceId='shared-context'
+    if(context.status!=='active'){
+     if((await tx.query('SELECT 1 FROM organization_policy_heads WHERE workspace_id=$1',[context.workspaceId])).rowCount)throw new PolicyError('policySharedContextUnavailable',403)
+     continue
+    }
+    const bindings=await store.bindings(tx,userId,context.workspaceId,undefined,true)
+    for(const binding of bindings){
+     resourceId=binding.signed.payload.hash
+     if(binding.revoked)throw new PolicyError('policyRevoked',403)
+     admitModel(binding.effective,route)
+    }
    }
+   auditWorkspace=workspaceId
+   resourceId='model'
    return {value:await work(tx)}
   }catch(error){
-   await appendAudit(tx,workspaceId,{actorId:userId,actorType:'system',resourceId,action:'policy.model',outcome:'denied',reason:error instanceof PolicyError?error.code:'modelExecutionUnavailable',requestId:randomUUID()})
+   await appendAudit(tx,auditWorkspace,{actorId:userId,actorType:'system',resourceId,action:'policy.model',outcome:'denied',reason:error instanceof PolicyError?error.code:'modelExecutionUnavailable',requestId:randomUUID()})
    return {error}
   }
  })
@@ -84,7 +103,7 @@ async function responseBody(response: Response, signal: AbortSignal): Promise<Re
 export class ResourceModelExecution {
   constructor(private app: Pool, private policy: PolicyStore, private send: typeof fetch = fetch) {}
   async available(scope: Pick<ModelExecutionScope,'ownerId'|'workspaceId'|'resource'>,route:ModelRoute){
-    return withReservedModel(this.policy,scope.ownerId,scope.workspaceId,route,async workspace=>{
+    return withReservedModel(this.policy,scope.ownerId,scope.workspaceId,scope.resource,route,async workspace=>{
       const quota=new QuotaStore(this.app,async(owner,id)=>{
         if(id!==scope.workspaceId||owner!==scope.ownerId)return false
         await this.policy.member(workspace,id,owner)
@@ -94,7 +113,7 @@ export class ResourceModelExecution {
     })
   }
   async run<T>(scope: ModelExecutionScope, route: ModelRoute, invoke: ResourceInvoke<T>, options: ResourceOptions<T>) {
-    return this.execute(scope,invoke,options,work=>withReservedModel(this.policy,scope.ownerId,scope.workspaceId,route,work),route)
+    return this.execute(scope,invoke,options,work=>withReservedModel(this.policy,scope.ownerId,scope.workspaceId,scope.resource,route,work),route)
   }
   /** Same canonical reservation/send/settle path, with the existing tool policy
    * gate. A service cache hit or persisted receipt consumes no provider quota. */
@@ -129,7 +148,7 @@ export class ResourceModelExecution {
         key: `model:${scope.operationId}:${scope.generation}:${digest(scope.stepKey).slice(0,32)}`,
         resource: scope.resource, binding: { ...(route?{route}:{}), operation: scope.binding }, leaseMs }, fence)
       let reservation:Reservation|undefined=route?await begin():undefined
-      let sent = false,transportError:unknown
+      let sent = false,transportError:unknown,providerRejection:ReturnType<typeof quotaFailure>|undefined
       try {
         const guarded: typeof fetch = async (input, init) => {
           try{
@@ -153,7 +172,11 @@ export class ResourceModelExecution {
             const response = await bounded(this.send(input, { ...init, signal:requestSignal, redirect: 'error' }), requestSignal)
             if (!response.ok) {
               void response.body?.cancel().catch(() => {})
-              throw Object.assign(new Error('modelProviderRejected'), { statusCode: response.status, responseHeaders: { 'retry-after': response.headers.get('retry-after') } })
+              const rejected=Object.assign(new Error('modelProviderRejected'), { statusCode: response.status, responseHeaders: { 'retry-after': response.headers.get('retry-after') } })
+              // Only the guarded HTTP response establishes refundable provider
+              // rejection. A later local 403/429 cannot undo consumed work.
+              providerRejection=quotaFailure(rejected)
+              throw rejected
             }
             return await responseBody(response,requestSignal)
           }catch(error){transportError=error;throw error}
@@ -168,7 +191,7 @@ export class ResourceModelExecution {
         return result
       } catch (error) {
         if(!reservation)throw error
-        const failure = sent ? quotaFailure(error) : { outcome: 'refunded' as const }
+        const failure = !sent ? {outcome:'refunded' as const} : providerRejection??{outcome:'uncertain' as const}
         const row=await quotas.finish(scope.ownerId, reservation.id, failure.outcome, undefined, failure.retryAfter)
         const outcome=row.state==='refunded'?(sent?'rejected':'unsent'):'uncertain'
         const code=error instanceof QuotaError?error.code:error instanceof Error&&/timeout|abort/i.test(error.name)?'modelResponseTimeout':outcome==='rejected'?'modelProviderRejected':outcome==='unsent'?'modelNotSent':'modelExecutionUncertain'

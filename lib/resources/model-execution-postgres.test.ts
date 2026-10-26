@@ -8,6 +8,8 @@ import {ResourceModelExecution,type ModelExecutionScope,type ModelSourceFence} f
 import {AGENT_ROUTE,authorizeModelRequest} from '../policy/model'
 import {resourceFixture,isolatedResourceUrls,fixtureSigner} from './test-fixtures'
 import {PolicyStore} from '../policy/store'
+import {PolicyError} from '../policy/contract'
+import {QuotaError} from '../quota/errors'
 
 test('public resource bridge: real split PG, held policy locks, exact quota and final source fence',async t=>{
  const urls=isolatedResourceUrls(),app=new Pool({connectionString:urls.app,max:1}),workspace=new Pool({connectionString:urls.workspace,max:1}),control=new Pool({connectionString:urls.app,max:3}),members=new Pool({connectionString:urls.workspace,max:3})
@@ -112,6 +114,79 @@ test('public resource bridge: real split PG, held policy locks, exact quota and 
    await members.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',[free.workspaceId,free.owner])
    await assert.rejects(engine.runTool(web(free),async()=>({cached:true}),opts(free)),/policyAccessDenied/)
    assert.equal(await calls(free.operationId),1)
+  })
+  async function secondWorkspace(f:Awaited<ReturnType<typeof fixture>>,allowed:boolean){
+   const id=randomUUID()
+   await workspace.query('INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,\'retained context A\')',[id,f.owner])
+   await workspace.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,$2,$3,\'admin\')',[id,f.owner,`${f.owner}@example.invalid`])
+   const document={...f.document,layers:[{...f.document.layers[0],id,models:allowed?[AGENT_ROUTE]:[]}]}
+   await f.policy.publish(id,f.owner,0,document)
+   return {id,document}
+  }
+  await t.test('shared context: A deny cannot be escaped through managed or unmanaged B quota',async()=>{
+   for(const managed of [true,false]){
+    const f=await fixture(managed),a=await secondWorkspace(f,false)
+    let denied=false
+    try{await engine.available(f.scope,AGENT_ROUTE)}catch(error){assert.match(String(error),/modelRouteDenied/);denied=true}
+    // On the vulnerable baseline this reaches a real loopback HTTP request.
+    if(!denied)await run(f)
+    assert.equal(await calls(f.operationId),0,'A-denied shared context must never reach a provider through B')
+    assert.equal((await state(f.owner)).length,0)
+    await assert.rejects(run(f),/modelRouteDenied/)
+    for(const resource of ['coordinator.compact','gateway.decision'] as const)await assert.rejects(engine.available({...f.scope,resource},AGENT_ROUTE),/modelRouteDenied/)
+    assert.equal(await calls(f.operationId),0)
+    const audit=(await members.query("SELECT tenant FROM security_audit_events WHERE event->>'actorId'=$1 AND event->>'action'='policy.model' ORDER BY occurred_at DESC,seq DESC LIMIT 1",[f.owner])).rows
+    assert.equal(audit[0]?.tenant,a.id)
+   }
+  })
+  await t.test('shared context: all policies allow while the sole quota charge stays captured in B',async()=>{
+   const f=await fixture(false);await secondWorkspace(f,true)
+   await engine.available(f.scope,AGENT_ROUTE);await run(f)
+   assert.equal(await calls(f.operationId),1)
+   assert.deepEqual((await control.query('SELECT workspace_id,state,settled_units FROM quota_reservations WHERE owner_id=$1',[f.owner])).rows,[{workspace_id:f.workspaceId,state:'settled',settled_units:'2'}])
+  })
+  await t.test('shared legacy summary and memory remain fenced after managed A withdrawal; isolated schedule stays B scoped',async()=>{
+   const f=await fixture(false),a=await secondWorkspace(f,true)
+   await app.query('INSERT INTO coordinator_sessions("userId",summary,memory) VALUES($1,\'SYNTHETIC A SUMMARY\',\'SYNTHETIC A MEMORY\')',[f.owner])
+   await engine.available(f.scope,AGENT_ROUTE)
+   await members.query("UPDATE mikka_workspace_members SET status='suspended' WHERE \"workspaceId\"=$1 AND \"userId\"=$2",[a.id,f.owner])
+   await assert.rejects(engine.available(f.scope,AGENT_ROUTE),/policySharedContextUnavailable/)
+   await assert.rejects(run(f),/policySharedContextUnavailable/)
+   assert.equal(await calls(f.operationId),0);assert.equal((await state(f.owner)).length,0)
+   assert.deepEqual((await app.query('SELECT summary,memory FROM coordinator_sessions WHERE "userId"=$1',[f.owner])).rows,[{summary:'SYNTHETIC A SUMMARY',memory:'SYNTHETIC A MEMORY'}])
+   await engine.run({...f.scope,resource:'schedule.model'},AGENT_ROUTE,async(fetch,signal)=>{const r=await fetch(AGENT_ROUTE.endpoint,{method:'POST',signal,body:JSON.stringify({model:AGENT_ROUTE.model,operationId:f.operationId})});return r.json()},{fence:f.fence,timeoutMs:1000,leaseMs:5000})
+   assert.equal(await calls(f.operationId),1)
+   assert.deepEqual((await control.query('SELECT workspace_id,state FROM quota_reservations WHERE owner_id=$1',[f.owner])).rows,[{workspace_id:f.workspaceId,state:'settled'}])
+  })
+  await t.test('shared context: A policy changed after B availability still fences actual execution',async()=>{
+   const f=await fixture(),a=await secondWorkspace(f,true)
+   await engine.available(f.scope,AGENT_ROUTE)
+   await f.policy.publish(a.id,f.owner,1,{...a.document,layers:[{...a.document.layers[0],models:[]}]})
+   await assert.rejects(run(f),/modelRouteDenied/)
+   assert.equal(await calls(f.operationId),0);assert.equal((await state(f.owner)).length,0)
+  })
+  await t.test('provider success followed by local 403 or PG commit faults keeps full quota, rolls back publication and never resends',async()=>{
+   await app.query('CREATE TABLE IF NOT EXISTS resource_commit_probe(id uuid PRIMARY KEY)')
+   for(const kind of ['wake403','policy403','quota403','wrapped403','pgfault','usage403','invoke403','transport403']){
+    const f=await fixture(false)
+    const local=()=>{if(kind==='policy403')return new PolicyError('controlledLocalPolicy',403);if(kind==='quota403')return new QuotaError('controlledLocalQuota',403);if(kind==='wrapped403')return new Error('controlledLocalWrapper',{cause:{statusCode:403}});return Object.assign(new Error('controlledLocalWake'),{status:403})}
+    const actual=kind==='transport403'?new ResourceModelExecution(app,policy,async(input,init)=>{const response=await send(input,init);await response.body?.cancel();throw local()}):engine
+    const execute=()=>actual.run(f.scope,AGENT_ROUTE,async(fetch,signal)=>{const r=await fetch(AGENT_ROUTE.endpoint,{method:'POST',signal,body:JSON.stringify({model:AGENT_ROUTE.model,operationId:f.operationId})});const result=await r.json();if(kind==='invoke403')throw local();return result},{fence:f.fence,timeoutMs:1000,leaseMs:5000,usage:()=>{if(kind==='usage403')throw local();return {inputTokens:3,outputTokens:7}},commit:async tx=>{await tx.query('INSERT INTO resource_commit_probe(id) VALUES($1)',[f.operationId]);if(kind==='pgfault')await tx.query('SELECT controlled_missing_commit_function()');throw local()}})
+    await assert.rejects(execute(),error=>{assert.equal((error as {outcome?:string}).outcome,'uncertain');return true})
+    assert.equal(await calls(f.operationId),1)
+    assert.deepEqual((await state(f.owner)).map(r=>[r.state,r.settled_units]),[['uncertain','2']],kind)
+    assert.equal((await control.query('SELECT 1 FROM resource_commit_probe WHERE id=$1',[f.operationId])).rowCount,0)
+    await assert.rejects(execute(),/quotaOutcomeUncertain/);assert.equal(await calls(f.operationId),1)
+    console.log(JSON.stringify({evidence:'real PG + provider HTTP200; local failure retains charge and rolls back publication',kind,operationId:f.operationId,state:'uncertain',units:'2',httpRequests:1,publications:0}))
+   }
+  })
+  await t.test('only an explicit first provider HTTP 401 402 403 or 429 response refunds sent work',async()=>{
+   for(const status of [401,402,403,429]){
+    const f=await fixture(false);await assert.rejects(run(f,{reject:status}),/modelProviderRejected/)
+    assert.equal(await calls(f.operationId),1)
+    assert.deepEqual((await state(f.owner)).map(r=>[r.state,r.settled_units]),[['refunded','0']])
+    console.log(JSON.stringify({evidence:'actual loopback provider rejection',status,state:'refunded',units:'0',httpRequests:1}))
+   }
   })
   await t.test('membership withdrawal stays denied without an enterprise management adapter',async()=>{
    const f=await fixture();await members.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',[f.workspaceId,f.owner])

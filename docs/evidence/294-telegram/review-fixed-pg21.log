@@ -1,0 +1,45 @@
+▶ public resource bridge: real split PG, held policy locks, exact quota and final source fence
+  ✔ missing legacy adapter still denies; inspection spends zero; ten duplicate actual requests execute once (555.67864ms)
+  ✔ policy revocation after availability denies before quota/send (54.545286ms)
+  ✔ captured workspace cannot spend a different owner-bound tenant (43.731638ms)
+  ✔ pause, expired reservation and cancelled source at the actual fetch fence refund proven unsent calls (198.445755ms)
+  ✔ first explicit 429 refunds only its own reservation; earlier successful work remains charged (193.974093ms)
+  ✔ unknown transport/body outcome stays fully charged, bounded and never sent again (546.3843ms)
+  ✔ web shares the canonical ledger; managed policy denies, cache reads are free and duplicates send once (347.727788ms)
+  ✔ shared context: A deny cannot be escaped through managed or unmanaged B quota (148.861115ms)
+  ✔ shared context: all policies allow while the sole quota charge stays captured in B (95.510571ms)
+  ✔ shared legacy summary and memory remain fenced after managed A withdrawal; isolated schedule stays B scoped (97.793651ms)
+  ✔ shared context: A policy changed after B availability still fences actual execution (62.095708ms)
+{"evidence":"real PG + provider HTTP200; local failure retains charge and rolls back publication","kind":"wake403","operationId":"4a3d6094-3ede-4010-af1a-11a1e025a5b8","state":"uncertain","units":"2","httpRequests":1,"publications":0}
+{"evidence":"real PG + provider HTTP200; local failure retains charge and rolls back publication","kind":"policy403","operationId":"571b8193-4bc6-47e6-b5dd-c9da5591d1d5","state":"uncertain","units":"2","httpRequests":1,"publications":0}
+{"evidence":"real PG + provider HTTP200; local failure retains charge and rolls back publication","kind":"quota403","operationId":"9ecfc1e9-663a-4b9e-a9a4-6029cf64153f","state":"uncertain","units":"2","httpRequests":1,"publications":0}
+{"evidence":"real PG + provider HTTP200; local failure retains charge and rolls back publication","kind":"wrapped403","operationId":"f08b4492-a583-463d-b1dd-528e7a859096","state":"uncertain","units":"2","httpRequests":1,"publications":0}
+{"evidence":"real PG + provider HTTP200; local failure retains charge and rolls back publication","kind":"pgfault","operationId":"f3231390-6815-4d2a-8219-64a28202f779","state":"uncertain","units":"2","httpRequests":1,"publications":0}
+{"evidence":"real PG + provider HTTP200; local failure retains charge and rolls back publication","kind":"usage403","operationId":"64c7a677-8da2-42cd-ae88-211720e6e080","state":"uncertain","units":"2","httpRequests":1,"publications":0}
+{"evidence":"real PG + provider HTTP200; local failure retains charge and rolls back publication","kind":"invoke403","operationId":"b3b22b87-21cb-4a42-a72e-6de464d6ce91","state":"uncertain","units":"2","httpRequests":1,"publications":0}
+{"evidence":"real PG + provider HTTP200; local failure retains charge and rolls back publication","kind":"transport403","operationId":"16919e51-e98e-444d-b6b6-2d3b1b287150","state":"uncertain","units":"2","httpRequests":1,"publications":0}
+  ✔ provider success followed by local 403 or PG commit faults keeps full quota, rolls back publication and never resends (655.426057ms)
+{"evidence":"actual loopback provider rejection","status":401,"state":"refunded","units":"0","httpRequests":1}
+{"evidence":"actual loopback provider rejection","status":402,"state":"refunded","units":"0","httpRequests":1}
+{"evidence":"actual loopback provider rejection","status":403,"state":"refunded","units":"0","httpRequests":1}
+{"evidence":"actual loopback provider rejection","status":429,"state":"refunded","units":"0","httpRequests":1}
+  ✔ only an explicit first provider HTTP 401 402 403 or 429 response refunds sent work (257.745154ms)
+  ✔ membership withdrawal stays denied without an enterprise management adapter (30.521761ms)
+✔ public resource bridge: real split PG, held policy locks, exact quota and final source fence (3336.698759ms)
+{"evidence":"formal scheduled Agent generateText/provider SDK + actual split PG; controlled HTTP model","occurrenceId":"7fb469a3-41dc-4333-96ce-9cb9d7ebeb76","operationId":"563d3057-ea2c-4c2e-bbc6-2ede2329a051","generation":"returned","status":"succeeded","modelInvocations":1,"resultPublications":1}
+▶ scheduled read: formal provider SDK over controlled transport, separate outcome/publication and OS loss
+  ✔ SQL publication failure reuses immutable actual SDK result after fresh claim with zero regeneration (451.755697ms)
+  ✔ ten consumers of the same formal scheduled claim perform one actual SDK generation (209.732287ms)
+  ✔ actual user pause after preparation prevents provider send and new quota charge (121.952931ms)
+  ✔ checkpoint transaction loss after provider return is uncertain and cannot regenerate (190.805962ms)
+{"evidence":"actual formal schedule runtime OS SIGKILL/restart; controlled HTTP model","occurrenceId":"cf3d2a7b-2446-423b-996d-e32273aaaa2a","operationId":"c40442ab-e998-458a-9773-275345cb23fc","state":"uncertain","status":"failed","modelInvocations":1,"childExited":0,"workerStarted":true}
+  ✔ real formal runtime child SIGKILL after send stays uncertain and never generates on restart (4825.145422ms)
+✔ scheduled read: formal provider SDK over controlled transport, separate outcome/publication and OS loss (7019.563752ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7688.739268

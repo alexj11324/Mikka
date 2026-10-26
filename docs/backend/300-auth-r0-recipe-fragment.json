@@ -69,6 +69,12 @@
         "first explicit 429 refunds only its own reservation; earlier successful work remains charged",
         "unknown transport/body outcome stays fully charged, bounded and never sent again",
         "web shares the canonical ledger; managed policy denies, cache reads are free and duplicates send once",
+        "shared context: A deny cannot be escaped through managed or unmanaged B quota",
+        "shared context: all policies allow while the sole quota charge stays captured in B",
+        "shared legacy summary and memory remain fenced after managed A withdrawal; isolated schedule stays B scoped",
+        "shared context: A policy changed after B availability still fences actual execution",
+        "provider success followed by local 403 or PG commit faults keeps full quota, rolls back publication and never resends",
+        "only an explicit first provider HTTP 401 402 403 or 429 response refunds sent work",
         "membership withdrawal stays denied without an enterprise management adapter",
         "scheduled read: formal provider SDK over controlled transport, separate outcome/publication and OS loss",
         "SQL publication failure reuses immutable actual SDK result after fresh claim with zero regeneration",
@@ -77,7 +83,7 @@
         "checkpoint transaction loss after provider return is uncertain and cannot regenerate",
         "real formal runtime child SIGKILL after send stays uncertain and never generates on restart"
       ],
-      "expectedCount": 15
+      "expectedCount": 21
     },
     {
       "id": "telegram-postgres",
