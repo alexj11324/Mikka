@@ -47,6 +47,7 @@ async function main() {
     assert.ok(view?.url.startsWith('wss://'))
     await assert.rejects(store.operate({ ...actor, userId: 'different-owner' }, bot.id, 'takeover'), { status: 404 })
     await assert.rejects(store.operate(actor, bot.id, 'viewer', 'control'), { status: 403 })
+    assert.equal((await store.state(actor, bot.id)).machine, 'running', 'rejected control must not report a machine failure')
     await store.operate(actor, bot.id, 'takeover')
     assert.equal((await store.state(actor, bot.id)).control, 'user')
     await store.operate(actor, bot.id, 'handback')
