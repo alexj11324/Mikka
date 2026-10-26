@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { handleImprovement } from './http'
 import { ImprovementError } from './contract'
+import { BASELINE_ARTIFACT } from './builtin-skill'
+import { SKILL_PATH } from './regression'
 
 const origin = 'https://preview.example.test'
 const binding = { taskId: randomUUID(), issueId: randomUUID(), attemptId: randomUUID(), revision: 1, candidateId: randomUUID() }
@@ -13,7 +15,12 @@ function request(body: unknown, requestOrigin = origin) {
 
 test('registration HTTP boundary accepts only proposal and Factory binding after auth and same-origin checks', async () => {
   const calls: unknown[] = []
-  const registry = { registerCandidate: async (...args: unknown[]) => { calls.push(args); return { versionId: binding.candidateId } } }
+  const registered: Awaited<ReturnType<NonNullable<Parameters<typeof handleImprovement>[5]>['registerCandidate']>> = {
+    artifact:{...BASELINE_ARTIFACT,versionId:binding.candidateId},versionId:binding.candidateId,userId:'owner',issueId:binding.issueId,
+    agentId:randomUUID(),repoId:randomUUID(),proposalId:registration.proposalId,factoryTaskId:binding.taskId,candidateId:binding.candidateId,
+    repository:'example/fixture',commitSha:'a'.repeat(40),path:SKILL_PATH,baselineVersionId:BASELINE_ARTIFACT.versionId,createdAt:new Date(),
+  }
+  const registry = { registerCandidate: async (...args: unknown[]) => { calls.push(args); return registered } }
   const store = {} as Parameters<typeof handleImprovement>[0]
   assert.equal((await handleImprovement(store, request(registration), null, undefined, undefined, registry)).status, 401)
   assert.equal((await handleImprovement(store, request(registration, 'https://other.test'), 'owner', undefined, undefined, registry)).status, 403)

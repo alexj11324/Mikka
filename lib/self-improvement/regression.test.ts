@@ -106,7 +106,14 @@ function bridgeFixture() {
   },release(){}}
   const pool={connect:async()=>tx} as unknown as Parameters<typeof createImprovementFactoryBridge>[0]
   const factory={lockForDispatch:async()=>({stage:'execute'})} as unknown as Parameters<typeof createImprovementFactoryBridge>[1]
-  const dispatch=(async(_userId:string,input:{note?:string})=>{state.notes.push(input.note!);return {runId:randomUUID()}}) as Parameters<typeof createImprovementFactoryBridge>[2]
+  const dispatch:Parameters<typeof createImprovementFactoryBridge>[2]=async(_userId,input)=>{
+    state.notes.push(input.note!)
+    return {runId:randomUUID(),status:'queued',replayed:false,contractVersion:1,
+      task:{id:binding.taskId,userId,issueId,sourceEventId:randomUUID(),stage:'execute',status:'running',
+        revision:binding.revision,attemptId:binding.attemptId,candidateId:null,reason:'Candidate generation fixture',
+        route:{issueId,eventId:randomUUID(),sourceEventId:randomUUID(),rationale:'Candidate generation fixture',
+          missingInformation:[],missingPermissions:[],needsSpec:false}},attempts:[],candidates:[]}
+  }
   const assignments={} as Parameters<typeof createImprovementFactoryBridge>[3]
   const bridge=createImprovementFactoryBridge(pool,factory,dispatch,assignments,provider)
   return {state,request,call:()=>bridge.handoff(userId,request)}

@@ -8,7 +8,7 @@ import type { createSkillEvaluations } from './evaluations'
 import { FactoryError } from '../factory/contract'
 
 export async function handleImprovement(store: ReturnType<typeof createImprovementStore>, request: Request, userId: string | null,
-  assignments?: ReturnType<typeof createSkillAssignments>, bridge?: ReturnType<typeof createImprovementFactoryBridge>, registry?: ReturnType<typeof createSkillRegistry>, evaluations?: Pick<ReturnType<typeof createSkillEvaluations>, 'freezeBenchmark' | 'dispatchNext' | 'beginEvaluation' | 'compare'>): Promise<Response> {
+  assignments?: ReturnType<typeof createSkillAssignments>, bridge?: ReturnType<typeof createImprovementFactoryBridge>, registry?: Pick<ReturnType<typeof createSkillRegistry>, 'registerCandidate'>, evaluations?: Pick<ReturnType<typeof createSkillEvaluations>, 'freezeBenchmark' | 'dispatchNext' | 'beginEvaluation' | 'compare'>): Promise<Response> {
   const respond = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })
   if (!userId) return respond({ error: 'authRequired' }, 401)
   if (!['GET', 'POST'].includes(request.method)) return respond({ error: 'methodNotAllowed' }, 405)
