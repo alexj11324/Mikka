@@ -1,0 +1,92 @@
+name: Public durable resource outcomes
+on:
+  push:
+    branches: ['codex/176-public-resource-admission']
+  pull_request:
+    paths: ['lib/resources/**', 'lib/quota/**', 'lib/schedules/**', 'workflows/coordinator/**', '.github/workflows/resource-outcomes.yml']
+permissions:
+  contents: read
+jobs:
+  postgres-sdk:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      CI: 'true'
+      MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_resources_app_176
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_resources_ws_176
+      RESOURCE_APP_TEST_URL: postgresql://postgres@127.0.0.1:5432/mikka_resources_app_176
+      RESOURCE_WORKSPACE_TEST_URL: postgresql://postgres@127.0.0.1:5432/mikka_resources_ws_176
+      QUOTA_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_resource_quota215
+      BETTER_AUTH_URL: http://127.0.0.1:3180
+      BETTER_AUTH_SECRET: isolated-resource-proof-no-production-authorization-123456789
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Fresh split application/workspace databases and migration replay
+        run: |
+          createdb -h 127.0.0.1 -U postgres mikka_resources_app_176
+          createdb -h 127.0.0.1 -U postgres mikka_resources_ws_176
+          createdb -h 127.0.0.1 -U postgres mikka_resource_quota215
+          MIGRATE=1 node scripts/migrate.mjs
+          MIGRATE=1 node scripts/migrate.mjs
+      - name: Real PG model/web admission and schedule outcome regressions
+        run: node --import tsx --test lib/resources/model-execution-postgres.test.ts lib/schedules/model-outcomes-postgres.test.ts
+      - name: Original canonical quota regressions against composed store
+        run: |
+          git cat-file -e 50598846e592dbdb4b9419f96eb99b6cf5b9edbf || git fetch origin 50598846e592dbdb4b9419f96eb99b6cf5b9edbf
+          node scripts/test-resource-quota-upstream.mjs
+      - run: pnpm typecheck
+      - run: pnpm build
+      - name: Actual compiled Next, WorkflowAgent and authenticated Bot HTTP tool loop
+        shell: bash
+        env:
+          WORKFLOW_TARGET_WORLD: local
+          WORKFLOW_LOCAL_BASE_URL: http://127.0.0.1:3180/mikka
+          WORKFLOW_NODE_HTTP: '1'
+        run: |
+          set -o pipefail
+          export WORKFLOW_LOCAL_DATA_DIR="/tmp/mikka-resource-176-${GITHUB_RUN_ID}"
+          mkdir -p "$WORKFLOW_LOCAL_DATA_DIR"
+          git rev-parse HEAD > .next/resource-source-sha
+          docker run -d --name mikka176-resource-next --network host --user "$(id -u):$(id -g)" \
+            -e CI=true -e NODE_ENV=production -e NEXT_TELEMETRY_DISABLED=1 \
+            -e BETTER_AUTH_SECRET -e BETTER_AUTH_URL -e MIKKA_DATABASE_URL -e DATABASE_URL \
+            -e WORKFLOW_TARGET_WORLD -e WORKFLOW_LOCAL_BASE_URL -e WORKFLOW_LOCAL_DATA_DIR -e WORKFLOW_NODE_HTTP \
+            -e MIKKA_RESOURCE_TEST_ORIGIN=http://127.0.0.1:6183 -e SCHEDULE_AGENT_ENABLED=1 -e MIKKA_RUNTIME_SWEEP_ENABLED=1 \
+            -v "$PWD:$PWD" -v "$WORKFLOW_LOCAL_DATA_DIR:$WORKFLOW_LOCAL_DATA_DIR" -w "$PWD" \
+            node:24-bookworm-slim node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3180
+          python3 scripts/record-terminal.py resource-sdk.cast node --import tsx scripts/verify-resource-sdk.mjs 2>&1 | tee resource-sdk.log
+      - name: Preserve diagnostics and stop disposable Next
+        if: always()
+        run: |
+          docker logs mikka176-resource-next > resource-next.log 2>&1 || true
+          docker stop mikka176-resource-next || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-durable-resource-evidence
+          path: |
+            resource-sdk.cast
+            resource-sdk.log
+            resource-next.log
+          if-no-files-found: ignore

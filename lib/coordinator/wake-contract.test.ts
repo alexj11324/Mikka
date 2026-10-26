@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { registerHooks } from 'node:module'
 import { controlledWakeConfiguration } from './wake-controlled'
 
-test('public core has no positive resource-policy fallback', async () => {
+test('an uncaptured workspace cannot acquire default resource admission', async () => {
   const hooks = registerHooks({
     resolve(specifier, context, next) {
       return specifier === 'server-only'

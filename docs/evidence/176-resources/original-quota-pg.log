@@ -1,0 +1,29 @@
+{"upstream":"50598846e592dbdb4b9419f96eb99b6cf5b9edbf","subject":"current lib/quota/store.ts and errors.ts","operatorFixture":"temporary test only","production":false}
+✔ Retry-After parses delta/date, rounds safely and fails conservatively (29.658473ms)
+▶ real PostgreSQL quota contention, restart, retries and authorization
+  ✔ 10 simultaneous mixed entry requests share tenant concurrency; other tenant proceeds (272.468847ms)
+  ✔ same key gets one reservation and exactly one activation; changed binding rejected (252.015667ms)
+  ✔ reserve budget is atomic across owners within the same workspace (96.488138ms)
+  ✔ before-send refunds and contradictory settlement stays immutable (35.586817ms)
+  ✔ expiry before send refunds; after send consumes once and frees concurrency (69.891324ms)
+  ✔ provider 429 persists tenant/resource Retry-After across process-independent stores (45.65402ms)
+  ✔ rate is not refunded by failures and survives restarts (38.975715ms)
+  ✔ operator allocation and override are rechecked at activation/renewal; tenant admins cannot raise caps (78.669955ms)
+  ✔ rolling tenant windows cannot reset the platform allocation lifetime cap (82.725574ms)
+  ✔ SQL write fault rolls back reservation and releases the tenant lock (30.755353ms)
+  ✔ SIGKILL inside admission/activation/domain CAS leaves no orphan and allows one bounded retry (276.915963ms)
+  ✔ legacy reserved crash survives expiry and restart with one linked charge; unsafe states cannot recover (290.161279ms)
+  ✔ unknown configuration/cost, suspension, workspace mismatch and expired override fail closed (45.16067ms)
+  ✔ authorization is checked after a blocked tenant lock (14.577589ms)
+  ✔ configuration records actor, disallows active-window reset and owner reassignment (19.639386ms)
+  ✔ real SIGKILL after dispatch before/after HTTP effect: no resend on restart (577.912965ms)
+{"environment":"isolated cloud Linux PG","schema":"quota_3881540c4b64481e99a6a9ea70e33e07","server":"17.11","utc":"2026-10-26T00:37:11.412Z","recordsRetained":true}
+✔ real PostgreSQL quota contention, restart, retries and authorization (2376.648091ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2983.466561

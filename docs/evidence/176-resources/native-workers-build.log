@@ -1,0 +1,5 @@
+
+> next-app@0.0.1 build:byos-workers /workspace/Mikka-176-resources
+> node scripts/build-subscription-workers.mjs
+
+BYOS workers compiled and smoke-tested from pinned official Go and CPA sources

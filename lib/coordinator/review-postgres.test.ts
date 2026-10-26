@@ -100,7 +100,7 @@ test('review: background terminal fairness, protocol scope, cached guard and qui
             await fixture.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
           // Exact previously reviewed migration, not a reconstructed auth mock.
           await fixture.query(
-            execFileSync('git', ['show', `6c725df72f4fd4e70d85271bc0666529615a0496:drizzle/${initial}`], {
+            execFileSync('git', ['show', `6c725df72f4fd4e70d85271bc0666529615a0496:drizzle/20261025191001_coordinator_consumption_receipts.sql`], {
               encoding: 'utf8',
             }),
           )

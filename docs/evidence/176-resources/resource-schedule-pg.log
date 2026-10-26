@@ -1,0 +1,27 @@
+▶ public resource bridge: real split PG, held policy locks, exact quota and final source fence
+  ✔ missing legacy adapter still denies; inspection spends zero; ten duplicate actual requests execute once (657.092429ms)
+  ✔ policy revocation after availability denies before quota/send (57.37548ms)
+  ✔ captured workspace cannot spend a different owner-bound tenant (55.245953ms)
+  ✔ pause, expired reservation and cancelled source at the actual fetch fence refund proven unsent calls (202.835193ms)
+  ✔ first explicit 429 refunds only its own reservation; earlier successful work remains charged (282.520085ms)
+  ✔ unknown transport/body outcome stays fully charged, bounded and never sent again (573.945511ms)
+  ✔ web shares the canonical ledger; managed policy denies, cache reads are free and duplicates send once (389.208269ms)
+  ✔ membership withdrawal stays denied without an enterprise management adapter (96.705024ms)
+✔ public resource bridge: real split PG, held policy locks, exact quota and final source fence (2445.975325ms)
+{"evidence":"formal scheduled Agent generateText/provider SDK + actual split PG; controlled HTTP model","occurrenceId":"46effae8-8d31-4033-9084-a8766797058d","operationId":"89acd52e-36ed-402e-86e4-24131aaa1a73","generation":"returned","status":"succeeded","modelInvocations":1,"resultPublications":1}
+▶ scheduled read: formal provider SDK over controlled transport, separate outcome/publication and OS loss
+  ✔ SQL publication failure reuses immutable actual SDK result after fresh claim with zero regeneration (468.611616ms)
+  ✔ ten consumers of the same formal scheduled claim perform one actual SDK generation (356.214959ms)
+  ✔ actual user pause after preparation prevents provider send and new quota charge (165.215448ms)
+  ✔ checkpoint transaction loss after provider return is uncertain and cannot regenerate (214.375372ms)
+{"evidence":"actual formal schedule runtime OS SIGKILL/restart; controlled HTTP model","occurrenceId":"50feadc3-3a80-4605-99f1-1b862dbda59a","operationId":"77256124-2a66-4a5f-90ba-fd2d29109f83","state":"uncertain","status":"failed","modelInvocations":1,"childExited":0,"workerStarted":true}
+  ✔ real formal runtime child SIGKILL after send stays uncertain and never generates on restart (5819.327946ms)
+✔ scheduled read: formal provider SDK over controlled transport, separate outcome/publication and OS loss (8412.803003ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9285.114837

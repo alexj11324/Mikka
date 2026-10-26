@@ -1,3 +1,4 @@
+import {resourceControlledOrigin as controlledOrigin} from './controlled'
 import {AsyncLocalStorage} from 'node:async_hooks'
 import {createWebService,SearchProviderError,type SearchResponse,type ScrapeResponse} from '@/lib/search'
 import {createFirecrawlProvider} from '@/lib/search/firecrawl'
@@ -26,13 +27,6 @@ export type ModelOptions=Parameters<GatewayModel['doGenerate']>[0]
 const digest=intentDigest
 
 /** The keyless test transport changes destination after logical route checks. */
-function controlledOrigin(){
-  const origin=process.env.MIKKA_RESOURCE_TEST_ORIGIN
-  if(!origin)return null
-  const target=new URL(origin),db=process.env.MIKKA_DATABASE_URL
-  if(process.env.CI!=='true'||target.origin!==origin||target.hostname!=='127.0.0.1'||target.protocol!=='http:'||!db||new URL(db).hostname!=='127.0.0.1'||!new URL(db).pathname.endsWith('_176')||['VERCEL','AI_GATEWAY_API_KEY','DECISION_GATEWAY_API_KEY','OPENAI_API_KEY','OPENCODE_API_KEY','COMPOSIO_API_KEY','FIRECRAWL_API_KEY'].some(k=>process.env[k]))throw new Error('resourceControlledTransportInvalid')
-  return origin
-}
 export const resourceTestTransportEnabled=()=>Boolean(controlledOrigin())
 export const resourceDecisionEnabled=()=>Boolean(process.env.DECISION_GATEWAY_API_KEY)||resourceTestTransportEnabled()
 const transport:typeof fetch=async(input,init)=>{

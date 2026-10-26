@@ -1,0 +1,45 @@
+▶ formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoint, exhaustion and authority
+  ✔ legacy staged events require reconciliation; migration replay preserves decisions (1377.195718ms)
+  ✔ three transport failures persist; ten duplicate claims lead to one atomic response (497.778715ms)
+  ✔ accepted start whose ACK is lost after consumption never reopens completed event (104.909821ms)
+{"evidence":"actual child SIGKILL","phase":"staged","eventId":"6546615b-5e1f-407e-8ccb-759d9a41289e","state":"completed","generation":"returned"}
+  ✔ actual SIGKILL after staged: fenced restart and no blind generation resend (1121.536441ms)
+{"evidence":"actual child SIGKILL","phase":"checkpoint","eventId":"6cb75d1c-c275-4b88-a678-740ae79f81ff","state":"completed","generation":"returned"}
+  ✔ actual SIGKILL after checkpoint: fenced restart and no blind generation resend (1036.404102ms)
+{"evidence":"actual child SIGKILL","phase":"effect","eventId":"e47452b9-e4db-488f-8a09-e2add741ee51","state":"failed","generation":"uncertain"}
+  ✔ actual SIGKILL after effect: fenced restart and no blind generation resend (999.662506ms)
+  ✔ publication PG failure keeps checkpoint; fresh lease ACK reuses result without effect (249.132784ms)
+  ✔ exhaustion and owner-scoped replay preserve operation ID and never grant new approval (362.740654ms)
+  ✔ current workspace revocation and scope mismatch prevent consumption and publication (159.390132ms)
+  ✔ persisted output publishes without a new resource admission or generation (243.933223ms)
+  ✔ stop committed after staging fences generation and recovered notice has zero effects (264.187661ms)
+  ✔ budget deferral neither sends nor burns retry; late start ACK preserves defer (131.784029ms)
+✔ formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoint, exhaustion and authority (6598.024935ms)
+▶ review: background terminal fairness, protocol scope, cached guard and quiet triage
+  ✔ follow-up migration upgrades the previous receipt schema without changing terminal scopes or granting membership (1347.464832ms)
+{"evidence":"actual PG + actual authority child SIGKILL","prefix":49,"parent":"611326f6-67e5-4034-bdae-b7a4e87fb1ab","legal":"a0f3af23-424b-4d3d-a96a-b7f08210a57e","terminalRowsNotRevived":true}
+  ✔ 49 denied background rows cannot starve a later legal child across actual child SIGKILL (3268.919112ms)
+  ✔ failed, cancelled and legacy_review background rows remain terminal (103.604995ms)
+  ✔ protocol mailbox partition is not a real tenant grant (129.626299ms)
+  ✔ real tenant capture, mismatch, withdrawal and personal issue/device authority remain enforced (716.174457ms)
+{"evidence":"controlled cached-guard substitute; real effect handler and PG","name":"remember","denied":true,"memoryUnchanged":true,"messageWrites":0}
+  ✔ cached successful guard cannot authorize a later stale remember effect (154.479277ms)
+{"evidence":"controlled cached-guard substitute; real effect handler and PG","name":"forget","denied":true,"memoryUnchanged":true,"messageWrites":0}
+  ✔ cached successful guard cannot authorize a later stale forget effect (197.128964ms)
+{"evidence":"controlled cached-guard substitute; real effect handler and PG","name":"mailboxAction","denied":true,"memoryUnchanged":true,"messageWrites":0}
+  ✔ cached successful guard cannot authorize a later stale mailboxAction effect (123.863107ms)
+{"evidence":"synthetic SDK metadata; actual getStepMetadata/effect handlers/PG transactions","eventId":"cfb4d892-70d1-4639-8016-a7639e929327","tenReplays":1,"mailboxWrites":1,"receiptFaultRolledMemoryBack":true}
+  ✔ fresh internal effects and SDK-step receipts commit together and replay without duplicate memory/message writes (741.699972ms)
+  ✔ quiet run_report triages before any transport start (127.596573ms)
+  ✔ quiet run_retried triages before any transport start (28.818255ms)
+{"evidence":"actual core delivery/positive controlled admission; no model called","held":false,"generationWouldStart":false}
+  ✔ late delivery whose tier became background never stages or starts generation (58.087295ms)
+✔ review: background terminal fairness, protocol scope, cached guard and quiet triage (11531.921367ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 19843.924754

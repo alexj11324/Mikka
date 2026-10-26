@@ -1,8 +1,8 @@
 import 'server-only'
 import type { WakeAdmission } from './inbox-receipts'
 // A server-installed resource-policy function, not in-memory quota or authority.
-// Public core defines only the contract. Organization/operator/managed adapters
-// are deliberately absent pending the user's public/private product boundary.
+// The default public bridge reads canonical quota and current policy only.
+// It creates no allocation or membership; missing configuration stays deferred.
 let installed: WakeAdmission | undefined
 export function configureWakeAdmission(adapter: WakeAdmission) {
   if (installed && installed !== adapter) throw new Error('wakeAdmissionAlreadyConfigured')

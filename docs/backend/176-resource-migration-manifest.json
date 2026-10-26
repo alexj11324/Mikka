@@ -1,32 +1,296 @@
 {
   "frozenWakeHead": "90f66315b318efa0da2e14a01ea351882201caa7",
-  "base": "b7d7358a90cee9fde8e6c311159ce34b585c7374",
-  "productionExecution": "not authorized or executed",
-  "ownMigrations": [
-    {
-      "path": "drizzle/20261025180001_user_schedules.sql",
-      "target": "MIKKA_DATABASE_URL",
-      "sha256": "9d70757bf915f7bd8ea34e0b8159eb042be709828ad0bbc41aa9c257dee14b2d"
-    },
-    {
-      "path": "drizzle/20261025185701_schedule_recovery_decisions.sql",
-      "target": "MIKKA_DATABASE_URL",
-      "sha256": "e834575e37bd5ee42ce25aafb428bf2035b3516227737d7d58d2a1c2968475c1"
-    },
-    {
-      "path": "drizzle/20261025191001_coordinator_consumption_receipts.sql",
-      "target": "MIKKA_DATABASE_URL",
-      "sha256": "8d092371105428099f3b0e5187a94ea31428950f6afb82c4fd3a45ba7daec9ac"
-    },
-    {
-      "path": "drizzle/20261025213501_coordinator_effect_fences.sql",
-      "target": "MIKKA_DATABASE_URL",
-      "sha256": "43da1c3c9ba85a0523cb52981c0fc58060540d8216f97898ea673aaafc5c5af0"
-    }
-  ],
+  "mainCompositionBase": "f66971ae8c71bbd8d2d7b8a5517e89f1250428ac",
+  "policyDependency": "a04bf12b81e9f827e88c7ddf9b48c29d38ae19c7",
   "quotaDependency": {
     "sha": "50598846e592dbdb4b9419f96eb99b6cf5b9edbf",
-    "path": "drizzle/20261025165100_tenant_quotas.sql"
+    "scope": "canonical store/runtime/errors/model adapter only; full route integration belongs to R",
+    "migration": {
+      "originalPath": "drizzle/20261025165100_tenant_quotas.sql",
+      "path": "drizzle/20261026002525_tenant_quotas.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "4267dbdab2bb968ae7af37eb39c0d17d05b4ff1822f36153c64a32f950654904",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    }
   },
-  "policyDependency": "a04bf12b81e9f827e88c7ddf9b48c29d38ae19c7"
+  "searchDependency": "78e079a9dc9cac037df7a9f869486284569e4c94",
+  "providerModule": "3060a5157ef0ff1b6dd0aaa6c65b97e58e10ee72",
+  "productionExecution": "No production SQL executed; production ledger state not inspected. R owns integration and migration approval.",
+  "ownMigrations": [
+    {
+      "originalPath": "drizzle/20261025180001_user_schedules.sql",
+      "path": "drizzle/20261026002529_user_schedules.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "9d70757bf915f7bd8ea34e0b8159eb042be709828ad0bbc41aa9c257dee14b2d",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025185701_schedule_recovery_decisions.sql",
+      "path": "drizzle/20261026002530_schedule_recovery_decisions.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "e834575e37bd5ee42ce25aafb428bf2035b3516227737d7d58d2a1c2968475c1",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025191001_coordinator_consumption_receipts.sql",
+      "path": "drizzle/20261026002531_coordinator_consumption_receipts.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "8d092371105428099f3b0e5187a94ea31428950f6afb82c4fd3a45ba7daec9ac",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025213501_coordinator_effect_fences.sql",
+      "path": "drizzle/20261026002532_coordinator_effect_fences.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "43da1c3c9ba85a0523cb52981c0fc58060540d8216f97898ea673aaafc5c5af0",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025230001_schedule_generation_outcomes.sql",
+      "path": "drizzle/20261026002533_schedule_generation_outcomes.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "73e31708c1379b0c75e1b04ff0256430385cb1f244fddcfae9ff1eca2d7a5c53",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    }
+  ],
+  "compositionRenames": [
+    {
+      "originalPath": "drizzle/20261025051201_run_dispatch_keys.sql",
+      "path": "drizzle/20261026002500_run_dispatch_keys.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "ae4618bb7a9e9bfd9df1b52df5b36a6cead6b87edf5dd271eff4b4ca5b9ebf9d",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025051202_factory_192_stages.sql",
+      "path": "drizzle/20261026002501_factory_192_stages.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "675eb386f3ef611885c145051806e2c5d3a9c07a37bde1eed9b0285cf48ef5ea",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025051203_factory_194_approvals.sql",
+      "path": "drizzle/20261026002502_factory_194_approvals.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "9e5b437d465a41b4bd86c7818c1a0bf5dbbf986d10199bde3a67eefcad2b7a96",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025051204_factory_195_monitor.sql",
+      "path": "drizzle/20261026002503_factory_195_monitor.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "83c6454347229177133868a975054f5abc699bbfdc66ac0eee873f202cdb7acf",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025051205_factory_192_questions.sql",
+      "path": "drizzle/20261026002504_factory_192_questions.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "b29263653731169ae347c840f8d0a0ec5cfaa586c0016043e1de9ffc9d9fe40d",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025052001_operation_ledger.sql",
+      "path": "drizzle/20261026002505_operation_ledger.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "f5fbfacc61d5417aeacce88460244f185ec8a76a4784bddd151d006b48c627df",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025052031_session_mailboxes.sql",
+      "path": "drizzle/20261026002506_session_mailboxes.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "bdb756455f8d7ac8b84a50eef151bbec566336bc89e4b9d1ce3570139acc68c1",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025052032_group_artifact_review.sql",
+      "path": "drizzle/20261026002507_group_artifact_review.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "ce2f2540da0ec4fde581f95f60d2cd1b91cbf1dcfbd55fd32780efdc17b5e51a",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025052033_group_review_mailboxes.sql",
+      "path": "drizzle/20261026002508_group_review_mailboxes.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "0f26cb94f2e23ace80d6d29eb704d13e21ff2bfc982fa79c52426ff71c21d3b4",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025052200_credential_broker.sql",
+      "path": "drizzle/20261026002509_credential_broker.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "d3a0b1b2944eb4472ce54a463adb27fd10dc697679909459c3c2ee6fbbb42a62",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025052201_credential_browser_binding.sql",
+      "path": "drizzle/20261026002510_credential_browser_binding.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "110c25e095fd38d6b680dc552d8d606b0ff15c711ca8fb3afe5cd8cd57090886",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025052202_credential_handoff.sql",
+      "path": "drizzle/20261026002511_credential_handoff.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "084d1623751d1e2445c698b88d052fb4f86ed6e9f12b6bb02abea8ae29e4252f",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025060001_calendar_operation_binding.sql",
+      "path": "drizzle/20261026002512_calendar_operation_binding.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "60fc01efb736fd5614d2a51f779f9a2fbe6f78f3f3ce0b4f99b8b8240ac48f90",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025070001_account_action_intents.sql",
+      "path": "drizzle/20261026002513_account_action_intents.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "357d0e7103a8a696800decf3c92e8d9289eb9bfd0f27df8450b019d3c2a837e5",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025070600_self_improvement.sql",
+      "path": "drizzle/20261026002514_self_improvement.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "5e9bad53e922a3256d239c65c8ea287a267e10a4537ff1c40b0b447137b5c2d5",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025082237_group_turn_mailbox_policy.sql",
+      "path": "drizzle/20261026002515_group_turn_mailbox_policy.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "302a5c5ade61bce053231aad6ed3f59269e1f0ce144effc947e746524dec5338",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025083303_improvement_skill_assignments.sql",
+      "path": "drizzle/20261026002516_improvement_skill_assignments.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "8022d8244ffdbee4cda8e8080e245353a40691367edb977085e6f5acef153928",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025141650_byos_credential_publications.sql",
+      "path": "drizzle/20261026002517_byos_credential_publications.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "1ec983216f55262ceaf1adbdafd191168a3e2ac552909f8c529eb04ad74865e3",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025141651_byos_bindings_oauth.sql",
+      "path": "drizzle/20261026002518_byos_bindings_oauth.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "daa6b4adc31536f66b9cc56bb2c4142c834efc4c540e3073340b023dcd3839d8",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025141652_byos_device_authorization.sql",
+      "path": "drizzle/20261026002519_byos_device_authorization.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "6e4aa98f3efa36a48af3c0937b7eddd64bb1d03498c65cc92b48461dd7a0ce9f",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025141653_byos_access_and_cleanup.sql",
+      "path": "drizzle/20261026002520_byos_access_and_cleanup.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "5f08ca8b2814f5539af0013f7ef927ab264c895007d7cbc766fdbb0055aaca6d",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025141654_byos_native_runs.sql",
+      "path": "drizzle/20261026002521_byos_native_runs.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "8dd7726b41a89b602cf2b6e70217ab7a2374de4664a66b2ea4b7ea5c21bb3333",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025141655_byos_enrollment_transfers.sql",
+      "path": "drizzle/20261026002522_byos_enrollment_transfers.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "8e8887e88e39c74f9e240d7bf125029a511817038ef9e787d5a2c97d741daf43",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025141656_byos_enrollment_cleanup.sql",
+      "path": "drizzle/20261026002523_byos_enrollment_cleanup.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "3c159f69bc6ed132b0289499e2ea71d240f0b7a0324caecca7a5b6b206cb6ea4",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025160000_byos_environment_transfers.sql",
+      "path": "drizzle/20261026002524_byos_environment_transfers.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "6986521b3bae3201f9388282feca58c200f9944c8ef8df526e88216465ae99e9",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025165100_tenant_quotas.sql",
+      "path": "drizzle/20261026002525_tenant_quotas.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "4267dbdab2bb968ae7af37eb39c0d17d05b4ff1822f36153c64a32f950654904",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025170000_security_audit_application.sql",
+      "path": "drizzle/20261026002526_security_audit_application.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "05e51cde9f9113ef47079cbc1918d4df0f16aafc5533c678776f039039d6da83",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025170001_security_audit_workspace.sql",
+      "path": "drizzle/20261026002527_security_audit_workspace.sql",
+      "target": "DATABASE_URL",
+      "sha256": "65ec137264f3e8d619ebcf8303b9331879fe38851f9b5a3a502643b166302aed",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025180000_organization_policy.sql",
+      "path": "drizzle/20261026002528_organization_policy.sql",
+      "target": "DATABASE_URL",
+      "sha256": "0e64a891737a79f2480a23a217b34b93ebdbccc59d01d34a80a8a8c50bd8c1b9",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025180001_user_schedules.sql",
+      "path": "drizzle/20261026002529_user_schedules.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "9d70757bf915f7bd8ea34e0b8159eb042be709828ad0bbc41aa9c257dee14b2d",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025185701_schedule_recovery_decisions.sql",
+      "path": "drizzle/20261026002530_schedule_recovery_decisions.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "e834575e37bd5ee42ce25aafb428bf2035b3516227737d7d58d2a1c2968475c1",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025191001_coordinator_consumption_receipts.sql",
+      "path": "drizzle/20261026002531_coordinator_consumption_receipts.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "8d092371105428099f3b0e5187a94ea31428950f6afb82c4fd3a45ba7daec9ac",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025213501_coordinator_effect_fences.sql",
+      "path": "drizzle/20261026002532_coordinator_effect_fences.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "43da1c3c9ba85a0523cb52981c0fc58060540d8216f97898ea673aaafc5c5af0",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    },
+    {
+      "originalPath": "drizzle/20261025230001_schedule_generation_outcomes.sql",
+      "path": "drizzle/20261026002533_schedule_generation_outcomes.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "73e31708c1379b0c75e1b04ff0256430385cb1f244fddcfae9ff1eca2d7a5c53",
+      "sqlBytesUnchangedFrom": "6afbca0"
+    }
+  ]
 }

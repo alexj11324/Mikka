@@ -1,0 +1,33 @@
+▶ real PG schedule lifecycle, concurrency, fencing, recovery and original-chat result
+  ✔ ten repeated creates and ten concurrent due scans yield one occurrence/result (455.660357ms)
+  ✔ two recurring executions retain stable IDs across fresh process stores (167.321621ms)
+  ✔ claimed worker crash expires lease; stale claim cannot execute after restart (675.937855ms)
+  ✔ pause/cancel/update fence already claimed work, persistence and optimistic version (141.583816ms)
+  ✔ ten real cancellation-versus-execution races have one linearized outcome (737.752205ms)
+  ✔ late policy records skip; catch-up coalesces and records at most one backlog slot (41.369849ms)
+  ✔ cross owner/workspace/source denied and membership revoked before execution (67.130876ms)
+  ✔ read current issue state; revoked issue visibility produces a final error, not task data (104.906479ms)
+{"evidence":"retained PG schedule records","owner":"schedule-owner-156c7c35-328a-4f6b-8822-6ce70c4219d1","workspace":"d9b11704-33fa-47ae-9e5c-6de6e6598f81","session":"07c85497-c992-4a4b-b332-56fa5bcda971","source":"ee55ac8f-bade-4331-8811-a948c6a4ef21","at":"2030-01-01T00:32:02.001Z"}
+  ✔ real transaction failure retries three times and persists final error in chat (143.547178ms)
+✔ real PG schedule lifecycle, concurrency, fencing, recovery and original-chat result (2584.996696ms)
+{"evidence":"real report fault then fresh process-store retry","task":"reminder","occurrenceId":"acd7f516-5b89-421f-91f8-0cadc1df59d9","operationId":"388901a3-473c-4ee4-b2c4-7e5275a81b57","status":"skipped","result":null,"effects":0}
+▶ recovery P2s use actual PG report faults, effects and permission rows
+  ✔ immutable skip after real report fault and restarted reminder (305.646525ms)
+{"evidence":"real report fault then fresh process-store retry","task":"issue_snapshot","occurrenceId":"13157f76-cae7-4223-8223-1432c20d2a6e","operationId":"02f87f8a-e5b5-4b76-a315-99e7639ea6d4","status":"skipped","result":null,"effects":0}
+  ✔ immutable skip after real report fault and restarted issue_snapshot (174.186128ms)
+{"evidence":"real report fault then fresh process-store retry","task":"agent_read","occurrenceId":"5f281043-dd48-41b0-a710-cabd63d238ff","operationId":"ae9239d9-672b-498d-bf0f-efa112aa1903","status":"skipped","result":null,"effects":0}
+  ✔ immutable skip after real report fault and restarted agent_read (177.316153ms)
+  ✔ catch_up_once still executes after the same report fault without duplicate logical output (115.453953ms)
+{"evidence":"denied prefix before legal tenant","deniedCount":32,"queued":33,"scans":3,"limit":25,"healthyOccurrence":"bfc1e752-3072-4ccc-bd31-87a9175fe610","healthyReports":1,"deniedOwner":"recovery-c929407c-c359-4aa0-bf60-a2cf1a0e6bfa","healthyOwner":"recovery-f65b8838-247a-4120-8d3c-34c20c3f5c3e"}
+  ✔ more than LIMIT denied reports cannot starve a later authorized tenant after restart (2258.760507ms)
+✔ recovery P2s use actual PG report faults, effects and permission rows (3114.145934ms)
+{"evidence":"existing inbox compensation only; not Workflow SDK acceptance","owner":"wake179-54156a1e-c53d-4930-93fa-55d3509ae790","event":"ea1e4b33-db9a-4291-af2d-72cbf470de32","exhausted":"5e51142d-02ba-43ef-b314-cfe31a003666"}
+✔ existing inbox persists delivery failures, compensation, concurrent claim and exhaustion (649.186959ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8772.144174

@@ -1,0 +1,24 @@
+{"at":"2026-10-26T00:07:42.405Z","phase":"real SDK model path ready","source":"a1eff5117fd1e50006aed314cc0adaa5ba56bb2c","diagnosticBuild":true,"buildId":"pxtxCrmw9VmrluUjFIt9c","realProvider":false,"cloudWorkflow":false}
+{"at":"2026-10-26T00:07:47.949Z","phase":"actual compiled model steps","operationId":"e9016b53-3058-40f4-826b-84f237edfb92","calls":0,"stepLists":[{"runId":"wrun_01M5TRHKWHFHVMPEJ6VS3BCQ2X","status":"completed","steps":[{"name":"step//./workflows/coordinator/steps//failTurn","status":"completed"},{"name":"step//./workflows/coordinator/steps//recoverAccountActions","status":"failed"},{"name":"step//./workflows/coordinator/steps//assertWakeCurrent","status":"completed"},{"name":"step//./workflows/coordinator/steps//takeInbox","status":"completed"}]},{"runId":"wrun_01M5TRHKYAPBV9T7R747RZQKFT","status":"completed","steps":[{"name":"step//./workflows/coordinator/steps//takeInbox","status":"completed"}]},{"runId":"wrun_01M5TRHKYMFKGYH298RHFK3NGX","status":"completed","steps":[{"name":"step//./workflows/coordinator/steps//takeInbox","status":"completed"}]},{"runId":"wrun_01M5TRHKZ1YGT9TSY44EHTGMES","status":"completed","steps":[{"name":"step//./workflows/coordinator/steps//takeInbox","status":"completed"}]},{"runId":"wrun_01M5TRHKZ7WA168H1FQYG441X5","status":"completed","steps":[{"name":"step//./workflows/coordinator/steps//takeInbox","status":"completed"}]},{"runId":"wrun_01M5TRHKZJQPWG7XH4C7QWVCRA","status":"completed","steps":[{"name":"step//./workflows/coordinator/steps//takeInbox","status":"completed"}]},{"runId":"wrun_01M5TRHM09NQJHN1FA7CA5METV","status":"completed","steps":[{"name":"step//./workflows/coordinator/steps//takeInbox","status":"completed"}]},{"runId":"wrun_01M5TRHM0RWP80P9K6Y2MWVBM6","status":"completed","steps":[{"name":"step//./workflows/coordinator/steps//takeInbox","status":"completed"}]},{"runId":"wrun_01M5TRHM0XZ7GX3GHVCMNAV8Z4","status":"completed","steps":[{"name":"step//./workflows/coordinator/steps//takeInbox","status":"completed"}]},{"runId":"wrun_01M5TRHM12A6BAZAVFGDH70D2Z","status":"completed","steps":[{"name":"step//./workflows/coordinator/steps//takeInbox","status":"completed"}]}]}
+{"at":"2026-10-26T00:07:47.956Z","phase":"persistent model and publication state","event":{"wake_status":"pending","wake_generation_state":"not_started","wake_error":"coordinatorTurnUnavailable","processed_at":null},"quota":[]}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'pending'
+- 'completed'
+
+    at file:///workspace/Mikka-176-resources/scripts/verify-resource-sdk.mjs:52:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'pending',
+  expected: 'completed',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.19.0
