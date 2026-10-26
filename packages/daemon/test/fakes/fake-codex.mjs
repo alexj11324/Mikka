@@ -124,7 +124,8 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
         mkdirSync(sessions, { recursive: true })
         writeFileSync(join(sessions, `${threadId}.jsonl`), "{}\n")
       }
-      return send({ id, result: { thread: { id: threadId } } })
+      return send({ id, result: { thread: { id: threadId },
+        ...(model === "protocol-omits-model" ? {} : { model: model ? `observed:${model}` : "observed-default" }) } })
     case "turn/start":
       send({
         id,

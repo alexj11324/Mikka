@@ -413,6 +413,7 @@ export class CodexAdapter implements AgentAdapter {
     }
 
     let sessionId = threadId ?? ""
+    let runtimeModel: string | null = null
     const startTurn = async (message: string) => {
       lastError = undefined
       const { turn } = await rpc.sendRequest<{ turn: { id: string } }>(
@@ -485,6 +486,8 @@ export class CodexAdapter implements AgentAdapter {
         }
       }
       sessionId = response.thread.id
+      runtimeModel = typeof response.model === "string" && response.model ? response.model : null
+      if (runtimeModel) options.onRuntimeModel?.(sessionId, runtimeModel)
       if (options.requireSessionResume && sessionId !== threadId)
         throw new Error("Codex resumed a different question thread")
       await ready(startTurn(firstMessage), "turn/start")
@@ -499,6 +502,7 @@ export class CodexAdapter implements AgentAdapter {
 
     return {
       sessionId,
+      runtimeModel,
       events: () => queue.drain(),
       async send(message) {
         if (ending) throw new Error("The Codex session already ended")

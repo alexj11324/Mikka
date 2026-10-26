@@ -401,6 +401,7 @@ export class ClaudeAdapter implements AgentAdapter {
     const prompts = new PromptQueue(sessionId)
     let written = 0
     let results = 0
+    let runtimeModel: string | null = null
     let ending = false
     let lastError: string | undefined
     let graceTimer: NodeJS.Timeout | undefined
@@ -490,6 +491,13 @@ export class ClaudeAdapter implements AgentAdapter {
             message.session_id !== sessionId
           )
             throw new Error("Claude resumed a different question session")
+          if (message.type === "system" && message.subtype === "init" && typeof message.model === "string")
+            runtimeModel = message.model || null
+          if (message.type === "assistant" && message.parent_tool_use_id == null && typeof message.message.model === "string")
+            runtimeModel = message.message.model || null
+          if (runtimeModel && ((message.type === "system" && message.subtype === "init") ||
+            (message.type === "assistant" && message.parent_tool_use_id == null)))
+            options.onRuntimeModel?.(sessionId, runtimeModel)
           if (provesSession(message)) spoke(true)
           // A new turn (the queued message) produces its own result.
           if (message.type === "assistant" || message.type === "user")
@@ -541,6 +549,7 @@ export class ClaudeAdapter implements AgentAdapter {
 
     return {
       sessionId,
+      get runtimeModel() { return runtimeModel },
       events: () => queue.drain(),
       async send(text) {
         if (ending) throw new Error("The Claude session already ended")

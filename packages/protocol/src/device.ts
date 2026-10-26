@@ -20,7 +20,7 @@ import { z } from "zod"
 import { modelNameSchema, runPolicySchema } from "./agent-policy"
 import { harnessInfoSchema, harnessSchema } from "./harness"
 import { quotaSnapshotSchema } from "./quota"
-import { runStopReason } from "./run"
+import { runStopReason, runBenchmarkContext } from "./run"
 import { MAX_SKILLS_PER_RUN, runSkillSchema } from "./skill"
 import { skillAssignmentReceiptSchema } from './skill-artifact'
 
@@ -322,6 +322,8 @@ export const runAssignmentSchema = z.object({
   skills: z.array(runSkillSchema).max(MAX_SKILLS_PER_RUN).optional(),
   /** Server-minted assignment provenance; does not grant any policy permission. */
   skillReceipt: skillAssignmentReceiptSchema.optional(),
+  /** Frozen by the server benchmark ledger; never extracted from model output. */
+  benchmark: runBenchmarkContext.optional(),
 })
 export type RunAssignment = z.infer<typeof runAssignmentSchema>
 

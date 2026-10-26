@@ -6,6 +6,8 @@ import {
   type StopReason,
 } from "@mikka/protocol"
 
+import type { RunSkillMount, RunExecution, RunRuntime } from "@mikka/protocol/run"
+
 import { readJson, writeJsonAtomic } from "../fs-util"
 import type { RunAssignment } from "../server-link"
 
@@ -16,6 +18,10 @@ export interface JournalEntry {
   worktree: string | null
   /** The commit the worktree started from; checkpoints diff against it. */
   baseCommit?: string
+  /** Independent host reread, bound to the actual adapter session. */
+  skillMount?: RunSkillMount
+  execution?: RunExecution
+  runtime?: RunRuntime
   /** Last seq assigned to this run's events. */
   lastSeq: number
   error: string | null

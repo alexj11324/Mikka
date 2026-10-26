@@ -83,6 +83,8 @@ export interface SessionOptions {
    */
   skills?: readonly RunSkill[]
   skillReceipt?: SkillAssignmentReceipt
+  /** Persist an authentic root-session protocol observation before more output is processed. */
+  onRuntimeModel?: (sessionId: string, model: string) => void
   /** Mock harness only: fixture to replay. */
   fixture?: string
   /**
@@ -113,6 +115,10 @@ export interface StartOptions extends SessionOptions {
 
 export interface AgentSession {
   readonly sessionId: string
+  /** Observed from the harness protocol, never copied from requested options. */
+  readonly runtimeModel?: string | null
+  /** Existing durable handoff replayed on restart; no new model turn ran. */
+  readonly replayedHandoff?: true
   /** Single-consumer stream; ends after the `exit` event. */
   events(): AsyncIterable<AgentEvent>
   /** User message / interjection. */

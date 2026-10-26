@@ -54,7 +54,7 @@ const result = () =>
     usage: { input_tokens: 10, output_tokens: 5 },
   })
 
-out({ type: "system", subtype: "init", cwd: process.cwd() })
+out({ type: "system", subtype: "init", cwd: process.cwd(), ...(flag("--model") === "delayed-requested" ? {} : { model: "observed:root-model" }) })
 if (flag("--resume")) text(`resumed ${sessionId}`)
 
 let release = null
@@ -120,7 +120,14 @@ lines.on("line", async (line) => {
     return
   }
   if (message.includes("MODEL")) {
+    if (message.includes("DELAYED")) {
+      await new Promise(resolve => setTimeout(resolve, 50))
+      out({ type: "assistant", parent_tool_use_id: null,
+        message: { id: "delayed-root", model: "observed:delayed-model", content: [{ type: "text", text: "root output" }] } })
+    }
     text(`model: ${flag("--model") ?? "none"}`)
+    if (message.includes("SUBAGENT")) out({ type: "assistant", parent_tool_use_id: "child-tool",
+      message: { id: "child-model", model: "observed:subagent-model", content: [{ type: "text", text: "child output" }] } })
     result()
     return
   }

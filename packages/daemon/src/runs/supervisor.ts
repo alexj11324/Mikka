@@ -28,11 +28,14 @@
 // agent's summary, open questions, next step and blocker are taken from the
 // agent. A submission is `succeeded` only when verify passed.
 import { fixedCheckSnapshot } from "./check"
-import { verifySkillAssignment, verifySkillResume } from '../agents/skill-artifact'
+import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
 import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
-import { runQuestion } from "@mikka/protocol/run"
-import { randomUUID } from "node:crypto"
-import { resolve } from "node:path"
+import { runPaths } from "../agents/run-context"
+import { SKILLS_DIR, SKILL_BODY_FILE, skillSlug } from "@mikka/protocol/skill"
+import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/protocol/run"
+import { runPolicyDigestInput } from "@mikka/protocol/agent-policy"
+import { createHash, randomUUID } from "node:crypto"
+import { join, resolve } from "node:path"
 
 import { execa } from "execa"
 
@@ -86,6 +89,8 @@ import type { JournalEntry, RunJournal } from "./journal"
 
 export interface SupervisorDeps {
   journal: RunJournal
+  /** Same adapter state root used by RunContext; never supplied by the model. */
+  adapterStateDir?: string
   outbox: Outbox
   worktrees: WorktreeManager
   adapters: ReadonlyMap<Harness, AgentAdapter>
@@ -688,7 +693,28 @@ export class RunSupervisor {
   ) {
     // The kind the orchestrator dispatched, not what the agent said: an
     // agent must not be able to make a run read as a planning one (ADR ORV-205).
-    const planning = this.deps.journal.get(runId)?.assignment.kind === "plan"
+    const entry = this.deps.journal.get(runId)
+    const planning = entry?.assignment.kind === "plan"
+    // Never copy trusted evidence from an adapter/model report.
+    const { sourceCommit: _source, skillMount: _mount, execution: _execution, runtime: _runtime, ...content } = report
+    report = {
+      ...content,
+      ...(entry?.baseCommit && /^[a-f0-9]{40}$/.test(entry.baseCommit)
+        ? { sourceCommit: entry.baseCommit } : {}),
+      ...(entry?.skillMount && entry.skillMount.sessionId === entry.sessionId &&
+        entry.skillMount.receiptId === entry.assignment.skillReceipt?.id &&
+        entry.skillMount.versionId === entry.assignment.skillReceipt?.artifact.versionId &&
+        entry.skillMount.sha256 === entry.assignment.skillReceipt?.artifact.sha256
+        ? { skillMount: entry.skillMount,
+          ...(entry.runtime ? { runtime: { ...entry.runtime,
+            observedModel: this.active.get(runId)?.session?.runtimeModel ?? entry.runtime.observedModel,
+          } } : {}),
+          ...(entry.execution && entry.assignment.benchmark ? { execution: {
+            ...entry.execution,
+            observedModel: this.active.get(runId)?.session?.runtimeModel ?? entry.execution.observedModel,
+          } } : {}),
+        } : {}),
+    }
     // A planning hand-in leaves its two cards in the conversation (ADR ORV-205).
     this.emitPlanCards(runId, report, planning)
     this.endMessage(runId)
@@ -1077,6 +1103,15 @@ export class RunSupervisor {
       policy: assignment.policy,
       skills: assignment.skills,
       skillReceipt: assignment.skillReceipt,
+      onRuntimeModel: assignment.skillReceipt ? (sessionId: string, observedModel: string) => {
+        const current = this.deps.journal.get(runId)
+        if (!current?.runtime || isTerminalRunState(current.state) || current.sessionId !== sessionId ||
+          current.skillMount?.sessionId !== sessionId || current.skillMount.receiptId !== assignment.skillReceipt?.id) return
+        if (current.runtime.observedModel === observedModel && (!current.execution || current.execution.observedModel === observedModel)) return
+        this.deps.journal.update(runId, { runtime: { ...current.runtime, observedModel },
+          ...(current.execution ? { execution: { ...current.execution, observedModel } } : {}),
+        })
+      } : undefined,
       fixture: assignment.fixture,
       model: assignment.model,
     }
@@ -1103,7 +1138,24 @@ export class RunSupervisor {
             message: assignment.followUp ?? assignment.prompt,
           }
         : undefined
-    const session = resuming
+    const benchmark = assignment.benchmark
+    const policyDigest = assignment.skillReceipt ? createHash('sha256').update(runPolicyDigestInput(assignment.policy)).digest('hex') : undefined
+    if (benchmark && (!assignment.skillReceipt || assignment.harness === "mock" ||
+      !assignment.verifyCommand || benchmark.sourceCommit !== this.deps.journal.get(runId)?.baseCommit ||
+      policyDigest !== benchmark.policyDigest)) throw new Error("Frozen benchmark execution configuration mismatch")
+    let fixtureDigest: string | undefined
+    if (benchmark) {
+      if (runPolicy(assignment.policy).readOnly !== true) throw new Error("Benchmark fixture must be read-only")
+      const fixed = await fixedCheckSnapshot(repo.path, worktree, benchmark.sourceCommit)
+      fixtureDigest = createHash('sha256').update(fixed.sha).digest('hex')
+      if (fixtureDigest !== benchmark.fixtureDigest) throw new Error("Frozen benchmark fixture digest mismatch")
+    }
+    const previousMount = entry.skillMount
+    const previousExecution = entry.execution
+    const previousRuntime = entry.runtime
+    let session: AgentSession
+    try {
+      session = resuming
       ? await adapter.resume(entry.sessionId as string, options)
       : await (async () => {
           if (assignment.requireSessionResume)
@@ -1117,6 +1169,41 @@ export class RunSupervisor {
             requireSessionResume: assignment.requireSessionResume,
           })
         })()
+    } catch (error) {
+      if (assignment.skillReceipt) this.deps.journal.update(runId, { skillMount: undefined, execution: undefined, runtime: undefined })
+      throw error
+    }
+    if (assignment.skillReceipt) {
+      try {
+        const receipt = assignment.skillReceipt
+        if (!this.deps.adapterStateDir || assignment.harness === "mock" || !session.sessionId ||
+          (resuming && session.sessionId !== entry.sessionId) ||
+          (assignment.requireSessionResume && session.sessionId !== assignment.resumeSessionId))
+          throw new Error("Skill mount requires the actual original harness session")
+        verifySkillAssignment(assignment)
+        const file = join(runPaths(this.deps.adapterStateDir, runId).runDir,
+          SKILLS_DIR, skillSlug(assignment.skills![0].name), SKILL_BODY_FILE)
+        verifyMountedSkill(file, receipt)
+        const mount = runSkillMount.parse({ receiptId: receipt.id, versionId: receipt.artifact.versionId,
+          sha256: receipt.artifact.sha256, sessionId: session.sessionId, mountedAt: new Date().toISOString() })
+        if (previousMount && (previousMount.receiptId !== mount.receiptId || previousMount.versionId !== mount.versionId ||
+          previousMount.sha256 !== mount.sha256 || previousMount.sessionId !== mount.sessionId))
+          throw new Error("Skill mount receipt or session changed during resume")
+        const observedModel = session.runtimeModel ?? (resuming && session.replayedHandoff && previousMount
+          ? previousRuntime?.observedModel ?? previousExecution?.observedModel ?? null : null)
+        this.deps.journal.update(runId, { skillMount: previousMount ?? mount, sessionId: session.sessionId,
+          runtime: runRuntime.parse({ harness: assignment.harness, requestedModel: assignment.model ?? null,
+            observedModel, policyDigest, sourceCommit: this.deps.journal.get(runId)?.baseCommit }),
+          ...(benchmark ? { execution: runExecution.parse({ ...benchmark, harness: assignment.harness,
+            requestedModel: assignment.model ?? null, observedModel,
+            policyDigest, fixtureDigest, verifyCommand: assignment.verifyCommand }) } : {}),
+        })
+      } catch (error) {
+        this.deps.journal.update(runId, { skillMount: undefined, execution: undefined, runtime: undefined })
+        await session.cancel()
+        throw error
+      }
+    }
     if (assignment.requireSessionResume) {
       if (session.sessionId !== assignment.resumeSessionId) {
         await session.cancel()
@@ -1191,6 +1278,11 @@ export class RunSupervisor {
               : stopReason === "device_lost"
                 ? "Run lease expired; the server could not be reached"
                 : undefined)
+        if (assignment.benchmark) {
+          const fixed = await fixedCheckSnapshot(repo.path, worktree, assignment.benchmark.sourceCommit)
+          if (createHash('sha256').update(fixed.sha).digest('hex') !== assignment.benchmark.fixtureDigest)
+            throw new Error("Benchmark fixture changed during model execution")
+        }
         const outcome = await this.report(
           runId,
           worktree,

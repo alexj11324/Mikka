@@ -64,6 +64,7 @@ export class EventQueue {
 export function endedSession(sessionId: string, exit: ExitEvent): AgentSession {
   return {
     sessionId,
+    replayedHandoff: true,
     async *events() {
       yield exit
     },

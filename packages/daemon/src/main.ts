@@ -237,6 +237,7 @@ export class Daemon {
     ]))
     this.supervisor = new RunSupervisor({
       journal: this.journal,
+      adapterStateDir: this.paths.adapterState,
       outbox: this.outbox,
       worktrees: this.worktrees,
       adapters,
@@ -517,7 +518,7 @@ export class Daemon {
         privateDir: paths.privateDir,
         pidFile: paths.pidFile.replace(/\.pgid$/, ".verify.pgid"),
         networkAllow: repo.networkAllow,
-        env: buildChildEnv(),
+        env: { ...buildChildEnv(), MIKKA_HANDOFF_FILE: join(paths.runDir, "handoff.json") },
         timeoutMs,
         signal,
         readOnly,

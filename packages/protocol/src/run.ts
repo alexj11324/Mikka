@@ -69,6 +69,39 @@ export const runPublish = z.object({
 })
 export type RunPublish = z.infer<typeof runPublish>
 
+/** Frozen server assignment context for the concrete report benchmark. */
+export const runBenchmarkContext = z.object({
+  sourceCommit: z.string().regex(/^[a-f0-9]{40}$/),
+  benchmarkDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  caseId: z.string().min(1).max(200),
+  fixtureDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  policyDigest: z.string().regex(/^[a-f0-9]{64}$/),
+}).strict()
+
+/** Requested configuration and separately observed adapter protocol model. */
+export const runExecution = runBenchmarkContext.extend({
+  harness: z.enum(["codex", "claude_code", "cursor"]),
+  requestedModel: z.string().min(1).max(500).nullable(),
+  observedModel: z.string().min(1).max(500).nullable(),
+  verifyCommand: z.string().min(1).max(2_000),
+}).strict()
+export type RunExecution = z.infer<typeof runExecution>
+
+/** Host-observed runtime used to freeze the first baseline's execution settings. */
+export const runRuntime = runExecution.pick({ harness: true, requestedModel: true, observedModel: true,
+  policyDigest: true, sourceCommit: true }).strict()
+export type RunRuntime = z.infer<typeof runRuntime>
+
+/** Host reread of the mounted bytes after the actual adapter session opens. */
+export const runSkillMount = z.object({
+  receiptId: z.uuid(),
+  versionId: z.uuid(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  sessionId: z.string().min(1).max(500),
+  mountedAt: z.iso.datetime(),
+}).strict()
+export type RunSkillMount = z.infer<typeof runSkillMount>
+
 /**
  * The handoff report sent with every run completion. The agent fills what
  * it can through its submit / ask / blocker call (summary, open questions,
@@ -77,6 +110,11 @@ export type RunPublish = z.infer<typeof runPublish>
  * cannot report its own verify as passed.
  */
 export const runReport = z.object({
+  /** Worktree base journaled before the adapter started; never agent-supplied. */
+  sourceCommit: z.string().regex(/^[a-f0-9]{40}$/).optional(),
+  skillMount: runSkillMount.optional(),
+  execution: runExecution.optional(),
+  runtime: runRuntime.optional(),
   /** What was done, in a few sentences. Empty when the run crashed early. */
   summary: z.string().max(10_000),
   /** Paths relative to the worktree root (from `git status`). */

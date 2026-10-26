@@ -399,3 +399,9 @@ export function resolveAgentSettings(
 export function defaultRunPolicy(): RunPolicy {
   return resolveAgentSettings(null).policy
 }
+
+/** Stable policy input shared by server and daemon execution-evidence hashing. */
+export function runPolicyDigestInput(policy?: RunPolicy): string {
+  const resolved = runPolicySchema.parse(policy ?? defaultRunPolicy())
+  return JSON.stringify(resolved, [...Object.keys(resolved), ...Object.keys(resolved.permissions)].sort())
+}

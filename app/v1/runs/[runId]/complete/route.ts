@@ -1,4 +1,9 @@
 import { after, NextResponse } from 'next/server'
+import { drizzle } from 'drizzle-orm/node-postgres'
+import { recordCompletionSkillMount } from '@/lib/self-improvement/skill-mounts'
+import { skillEvaluations } from '@/lib/self-improvement/server'
+import { ImprovementError } from '@/lib/self-improvement/contract'
+import { issueForUser } from '@/lib/issue-access'
 import { and, eq } from 'drizzle-orm'
 import { runStateForStop } from '@mikka/protocol/daemon'
 import { runCompleteRequest, reachesReview } from '@mikka/protocol/run'
@@ -39,7 +44,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   if (!(LIVE_STATUSES as readonly string[]).includes(run.status)) return new NextResponse(null, { status: 204 })
   const parsed = runCompleteRequest.safeParse(await request.json().catch(() => null),)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid completion.' }, { status: 400 })
-  const { stopReason, report } = parsed.data
+  const { stopReason } = parsed.data
+  let report = parsed.data.report
   // The daemon's own terminal mapping, not just the stop reason: a
   // submission whose verify failed is a failure, and one with no verify
   // result only stopped. A `plan` run writes no code, so its verify says
@@ -47,10 +53,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   let status: RunStatus = runStateForStop(stopReason)
   if (stopReason === 'submitted' && report?.verify.status !== 'passed' && run.kind !== 'plan') {
     status = report?.verify.status === 'failed' ? 'failed' : 'stopped'
-  }
-  if (stopReason === 'submitted') {
-    try { await factoryMonitor.probeRun(run.userId, runId) }
-    catch (error) { if (!(error instanceof FactoryError)) throw error }
   }
   const tx = await pool.connect()
   let ended = false
@@ -61,8 +63,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
       'SELECT t.id FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" WHERE a."runId"=$1 AND t."userId"=$2 FOR UPDATE OF t',
       [runId, run.userId],
     )
+    report = await recordCompletionSkillMount(tx, run.userId, runId, stopReason, report,
+      async (userId, issueId, client) => Boolean(await issueForUser(userId, issueId, false, drizzle(client))),
+      skillEvaluations.authorizeEvaluation,skillEvaluations.validateExecution)
+    if (stopReason === 'submitted') {
+      await tx.query('SAVEPOINT monitor_probe')
+      try { await factoryMonitor.probeRun(run.userId, runId, tx, report) }
+      catch (error) {
+        await tx.query('ROLLBACK TO SAVEPOINT monitor_probe')
+        if (!(error instanceof FactoryError)) throw error
+      }
+    }
     const updated = await tx.query(
-      'UPDATE agent_runs SET status=$2,"stopReason"=$3,report=$4,"finishedAt"=now(),"updatedAt"=now() WHERE id=$1 AND status=ANY($5::text[]) RETURNING id',
+      'UPDATE agent_runs SET status=$2,"stopReason"=$3,report=$4,"finishedAt"=clock_timestamp(),"updatedAt"=now() WHERE id=$1 AND status=ANY($5::text[]) RETURNING id',
       [
         runId, status, stopReason,
         JSON.stringify( report ?? null), [...LIVE_STATUSES],
@@ -105,6 +118,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     await tx.query('COMMIT')
   } catch (error) {
     await tx.query('ROLLBACK')
+    if (error instanceof ImprovementError) return NextResponse.json({ error: error.code }, { status: 409 })
     throw error
   } finally {
     tx.release()
@@ -114,7 +128,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     await revokeRunTokens(runId)
     after(() => wakeCoordinator(run.userId))
   }
-  if (run.issueId && reachesReview(stopReason, report)) {
+  if (ended && run.issueId && reachesReview(stopReason, report)) {
     await db.update(issues).set({ status: 'review', updatedAt: new Date() }).where(eq(issues.id, run.issueId))
     dispatchLinearIssueSync(run.issueId)
   }
