@@ -6,11 +6,14 @@ import { Pool } from 'pg'
 import { ComputerStore } from './store'
 import type * as provider from './e2b-provider'
 
-test('real PostgreSQL: allocation, owner boundary, control generations and recovery', { skip: !process.env.COMPUTER_TEST_DATABASE_URL }, async () => {
+const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
+if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Computer database test URL required')
+test('real PostgreSQL: allocation, owner boundary, control generations and recovery', { skip: !databaseURL }, async () => {
   const schema = `computer_${randomUUID().replaceAll('-', '')}`
-  const admin = new Pool({ connectionString: process.env.COMPUTER_TEST_DATABASE_URL })
+  assert.ok(['127.0.0.1', 'localhost'].includes(new URL(databaseURL!).hostname))
+  const admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
-  const pool = new Pool({ connectionString: process.env.COMPUTER_TEST_DATABASE_URL, options: `-c search_path=${schema}` })
+  const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
   let created = 0, failSync = false, epoch = 0
   const runtime = {
     async createComputer() { created++; return { sandboxId: 'sandbox-test' } },

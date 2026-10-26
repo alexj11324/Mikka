@@ -44,6 +44,7 @@ export async function installComputerRuntime(sandbox: Sandbox) {
 export async function startDesktop(sandbox: Sandbox, display: number) {
   if (!Number.isInteger(display) || display < 1 || display > 999) throw new Error('Invalid display')
   await sandbox.commands.run(`bash /opt/mikka/computer/start-desktop.sh ${display}`, { user: 'user', background: true, timeoutMs: 0 })
+  await sandbox.commands.run(`for i in $(seq 1 60); do DISPLAY=:${display} xdpyinfo >/dev/null 2>&1 && curl -sf http://127.0.0.1:${9200 + display}/json/version >/dev/null && exit 0; sleep .25; done; exit 1`, { user: 'user', timeoutMs: 20_000 })
 }
 
 export async function syncDesktopLease(sandbox: Sandbox, lease: DesktopLease) {

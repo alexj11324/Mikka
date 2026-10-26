@@ -1,6 +1,6 @@
 """Build a plain Linux desktop template. E2B_API_KEY is read only by the SDK.
 
-Run from the repository root with e2b==2.28.0 or a compatible SDK installed.
+Run from the repository root with the E2B Python SDK installed.
 Never copy the repository, .env files, credentials or a whole home directory.
 """
 from e2b import Template
