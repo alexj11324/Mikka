@@ -328,7 +328,18 @@ test(
         409,
       );
       // Retained acceptance does not call sign-out: it physically deletes sessions.
-      if (retain) assert.equal((await anon(path)).status, 401);
+      if (retain) {
+        // Only the session created by this isolated synthetic signup is changed.
+        // Rotate its database token without deleting the row; keep the client's
+        // original cookie so this proves invalidation, not anonymous denial.
+        const invalidated = await pool.query(
+          'UPDATE "session" SET token=$1 WHERE id=$2 AND "userId"=$3 RETURNING id',
+          [randomBytes(32).toString("hex"), attested.humanSessionId, userId],
+        );
+        assert.equal(invalidated.rowCount, 1, "must invalidate exactly our synthetic session");
+        assert.equal((await owner(path)).status, 401, "the previously authenticated cookie must be rejected");
+        events.push({ retainedCookieInvalidation: true, retainedSessionId: attested.humanSessionId });
+      }
       else {
         await owner("/api/auth/sign-out", "POST", {});
         assert.equal((await owner(path)).status, 401);
