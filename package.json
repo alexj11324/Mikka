@@ -8,7 +8,7 @@
   "scripts": {
     "generate:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs",
     "check:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
-    "build": "pnpm generate:agent-ui && pnpm lint && pnpm migrate && next build",
+    "build": "pnpm generate:agent-ui && pnpm lint && next build",
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
     "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs",
