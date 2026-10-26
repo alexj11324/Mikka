@@ -51,7 +51,7 @@ test(
     });
     try {
       const migration = readFileSync(
-        "drizzle/20261025180000_organization_policy.sql",
+        "drizzle/20261026002528_organization_policy.sql",
         "utf8",
       );
       await pool.query(migration);

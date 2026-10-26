@@ -12,7 +12,7 @@ mkdirSync(temp,{recursive:true})
 for(const file of ['store.test.ts','config.ts','restart-worker.ts']){
  let text=execFileSync('git',['show',`${sha}:lib/quota/${file}`],{encoding:'utf8'})
  for(const module of ['store','errors'])text=text.replaceAll(`'./${module}'`,JSON.stringify(pathToFileURL(resolve(root,'lib/quota',module+'.ts')).href))
- text=text.replaceAll("new URL('../../drizzle/20261025165100_tenant_quotas.sql', import.meta.url)",`new URL(${JSON.stringify(pathToFileURL(resolve(root,'drizzle/20261025165100_tenant_quotas.sql')).href)})`)
+ text=text.replaceAll("new URL('../../drizzle/20261025165100_tenant_quotas.sql', import.meta.url)",`new URL(${JSON.stringify(pathToFileURL(resolve(root,'drizzle/20261026002525_tenant_quotas.sql')).href)})`)
  text=text.replaceAll("new URL('../..',import.meta.url)",`new URL(${JSON.stringify(pathToFileURL(root+'/').href)})`)
  writeFileSync(resolve(temp,file),text)
 }

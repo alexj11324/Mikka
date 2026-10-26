@@ -41,7 +41,7 @@ test('single durable group executor: concurrency, replay, rounds and uncertainty
  const claim=async()=>{const p=await worker({action:'poll'});assert.equal(p.status,200);assert.equal(p.body.runIds.length,1);const c=await worker({action:'claim',runId:p.body.runIds[0]});assert.equal(c.status,200);return c.body}
  try{
   for(const name of orderMigrations((await readdir(new URL('../drizzle/',import.meta.url))).filter(n=>n.endsWith('.sql'))))await pool.query(await readFile(new URL('../drizzle/'+name,import.meta.url),'utf8'))
-  await pool.query(await readFile(new URL('../drizzle/20261025082237_group_turn_mailbox_policy.sql',import.meta.url),'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261026002515_group_turn_mailbox_policy.sql',import.meta.url),'utf8'))
   for(const user of ['owner','member'])await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,'member','active')`,[workspace,user,user+'@example.invalid'])
   await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,'outsider','outsider','outsider@example.invalid','member','active')`,[otherWorkspace])
   await pool.query(`INSERT INTO devices(id,"ownerId",name,enabled) VALUES($1,'owner','fixture',true)`,[device])

@@ -93,9 +93,9 @@ test('credential broker: real HTTP + Better Auth + isolated Postgres, synthetic 
   await workspace.query(`CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY);
     CREATE TABLE mikka_workspace_members ("workspaceId" uuid, "userId" text, status text DEFAULT 'active');
     CREATE TABLE mikka_team_issues ("issueId" uuid, "workspaceId" uuid);`)
-  await app.query(await readFile(new URL('../../drizzle/20261025052200_credential_broker.sql', import.meta.url), 'utf8'))
-  await app.query(await readFile(new URL('../../drizzle/20261025052201_credential_browser_binding.sql', import.meta.url), 'utf8'))
-  await app.query(await readFile(new URL('../../drizzle/20261025052202_credential_handoff.sql', import.meta.url), 'utf8'))
+  await app.query(await readFile(new URL('../../drizzle/20261026002509_credential_broker.sql', import.meta.url), 'utf8'))
+  await app.query(await readFile(new URL('../../drizzle/20261026002510_credential_browser_binding.sql', import.meta.url), 'utf8'))
+  await app.query(await readFile(new URL('../../drizzle/20261026002511_credential_handoff.sql', import.meta.url), 'utf8'))
   upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening')
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`

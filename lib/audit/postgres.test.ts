@@ -41,20 +41,20 @@ test(
     try {
       await app.query(
         readFileSync(
-          "drizzle/20261025170000_security_audit_application.sql",
+          "drizzle/20261026002526_security_audit_application.sql",
           "utf8",
         ),
       );
       await workspace.query(
         readFileSync(
-          "drizzle/20261025170001_security_audit_workspace.sql",
+          "drizzle/20261026002527_security_audit_workspace.sql",
           "utf8",
         ),
       );
       // Repeat migration and keep existing history intact.
       await app.query(
         readFileSync(
-          "drizzle/20261025170000_security_audit_application.sql",
+          "drizzle/20261026002526_security_audit_application.sql",
           "utf8",
         ),
       );

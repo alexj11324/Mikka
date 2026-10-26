@@ -77,7 +77,7 @@ test('trusted submission -> durable batch -> new workflow -> run retry -> daemon
     })
     const before = await snapshot()
     assert.equal(before.proposals.length, 2)
-    const sql = await readFile(new URL('../../drizzle/20261025070001_account_action_intents.sql', import.meta.url), 'utf8')
+    const sql = await readFile(new URL('../../drizzle/20261026002513_account_action_intents.sql', import.meta.url), 'utf8')
     await pool.query(sql)
     await pool.query(sql)
     assert.deepEqual(await snapshot(), before)

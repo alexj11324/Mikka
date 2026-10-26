@@ -91,8 +91,8 @@ test('review: background terminal fairness, protocol scope, cached guard and qui
         await pool.query(`CREATE SCHEMA ${namespace}`)
         const fixture = new Pool({ connectionString: url, options: `-c search_path=${namespace}` })
         try {
-          const initial = '20261025191001_coordinator_consumption_receipts.sql',
-            followup = '20261025213501_coordinator_effect_fences.sql'
+          const initial = '20261026002531_coordinator_consumption_receipts.sql',
+            followup = '20261026002532_coordinator_effect_fences.sql'
           const names = orderMigrations(
             (await readdir(new URL('../../drizzle/', import.meta.url))).filter((n) => n.endsWith('.sql')),
           )

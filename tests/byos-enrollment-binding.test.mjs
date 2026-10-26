@@ -120,7 +120,7 @@ test('source cleanup migration backfills legacy published transfers and replays 
     const connected=randomUUID(), pending=randomUUID()
     await client.query('insert into byos_connections values($1),($2)',[connected,pending])
     await client.query('insert into byos_enrollment_transfers values($1,$2,now()),($3,$4,null)',[randomUUID(),connected,randomUUID(),pending])
-    const sql = await readFile(new URL('../drizzle/20261025141656_byos_enrollment_cleanup.sql',import.meta.url),'utf8')
+    const sql = await readFile(new URL('../drizzle/20261026002523_byos_enrollment_cleanup.sql',import.meta.url),'utf8')
     await client.query(sql);await client.query(sql)
     const {rows} = await client.query('select t."connectionId",t."boundAt",t."canonicalPublishedAt",t."sourceCreationState",count(s.*)::int copies from byos_enrollment_transfers t join byos_enrollment_sources s using("enrollmentId") group by t."enrollmentId"')
     assert.equal(rows.length,2)

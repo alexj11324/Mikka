@@ -60,8 +60,8 @@ test('formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoi
         const names = orderMigrations(
           (await readdir(new URL('../../drizzle/', import.meta.url))).filter((n) => n.endsWith('.sql')),
         )
-        const current = '20261025191001_coordinator_consumption_receipts.sql'
-        const followup = '20261025213501_coordinator_effect_fences.sql'
+        const current = '20261026002531_coordinator_consumption_receipts.sql'
+        const followup = '20261026002532_coordinator_effect_fences.sql'
         for (const name of names.filter((n) => n !== current && n !== followup))
           await fixture.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
         const ids = Array.from({ length: 4 }, () => randomUUID())

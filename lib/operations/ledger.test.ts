@@ -18,8 +18,8 @@ test('operation ledger: real PG concurrency, reconnect and HTTP fault windows', 
   assert.ok(['localhost', '127.0.0.1'].includes(parsed.hostname) && parsed.pathname === '/mikka_208_test', 'isolated loopback test DB only')
   const pool = new Pool({ connectionString: url, max: 12 })
   t.after(() => pool.end())
-  await pool.query(await readFile(new URL('../../drizzle/20261025052001_operation_ledger.sql', import.meta.url), 'utf8'))
-  await pool.query(await readFile(new URL('../../drizzle/20261025052001_operation_ledger.sql', import.meta.url), 'utf8'))
+  await pool.query(await readFile(new URL('../../drizzle/20261026002505_operation_ledger.sql', import.meta.url), 'utf8'))
+  await pool.query(await readFile(new URL('../../drizzle/20261026002505_operation_ledger.sql', import.meta.url), 'utf8'))
   const ownerId = randomUUID(), workspaceId = randomUUID()
   let revoked = false
   let allowedRun: string | null = null

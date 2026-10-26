@@ -18,7 +18,7 @@ test('real Better Auth HTTP + PG session and pending approval fences (isolated s
   await admin.query(`CREATE SCHEMA ${schema}`)
   const pool = new Pool({ connectionString: url.toString(), options: `-c search_path=${schema}`, application_name: schema })
   t.after(async () => { await pool.end(); await admin.end() }) // No schema/fixture deletion.
-  for (const migration of ['20261023221259_application_baseline.sql', '20261025043000_pending_actions.sql', '20261025052001_operation_ledger.sql']) {
+  for (const migration of ['20261023221259_application_baseline.sql', '20261025043000_pending_actions.sql', '20261026002505_operation_ledger.sql']) {
     await pool.query(await readFile(new URL(`../../drizzle/${migration}`, import.meta.url), 'utf8'))
   }
   // Better Auth deletes expired sessions internally. Preserve synthetic evidence rows.
