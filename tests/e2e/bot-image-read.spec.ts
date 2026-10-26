@@ -17,7 +17,7 @@ test('a saved current Bot reply loads its image via the canonical GET without le
   if (!connectionString) throw new Error('Requires disposable E2E database')
   const target = new URL(connectionString)
   if (process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true' || target.hostname !== '127.0.0.1' || target.port !== '5432' || target.pathname !== '/mikka_e2e' || target.search) throw new Error('Only Actions loopback mikka_e2e fixture is allowed')
-  const { email } = await register(page, '/?section=coordinator')
+  const { email } = await register(page)
   const pool = new Pool({ connectionString, max: 1 })
   try {
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
@@ -35,7 +35,7 @@ test('a saved current Bot reply loads its image via the canonical GET without le
     return route.fulfill({ json: { image } })
   })
   await page.route(image.src, route => route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a2ioAAAAASUVORK5CYII=', 'base64') }))
-  await page.reload()
+  await page.goto(app('/?section=coordinator'))
   const bot = page.getByRole('region', { name: 'Coordinator', exact: true })
   await expect(bot.getByText('已保存的 Bot 配图正文', { exact: true })).toBeVisible()
   await expect(bot.getByRole('img', { name: '公开文档配图', exact: true })).toBeVisible()
