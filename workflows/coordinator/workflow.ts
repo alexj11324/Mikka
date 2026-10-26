@@ -167,6 +167,14 @@ function coordinatorTools(userId: string, scope?: NativeToolScope) {
       description:'When the person requests a controlled Skill rehearsal, explicitly select the built-in baseline for an existing queued run before claim. This does not activate a candidate, grant permissions or prove execution.',
       inputSchema:z.object({runId:id}).strict(), execute:input=>steps.selectBaselineSkill(userId, input, scope),
     }),
+    select_active_skill: tool({
+      description:'Select the currently approved active Skill for an owned queued run. The server resolves the authorized version; withdrawn versions and arbitrary candidate versions cannot be selected.',
+      inputSchema:z.object({runId:id}).strict(), execute:input=>steps.selectActiveSkill(userId, input, scope),
+    }),
+    register_skill_candidate: tool({
+      description:'Register canonical Skill bytes from the exact committed Factory candidate linked to a failure-derived proposal. Supply only the existing current binding and proposal ID. Registration does not activate or approve the Skill.',
+      inputSchema:commandSchema.options[5].omit({action:true}), execute:input=>steps.registerSkillCandidate(userId, input, scope),
+    }),
     dispatch_baseline_rehearsal: tool({
       description:'For an explicitly requested controlled Skill rehearsal, atomically dispatch an existing authorized pending Factory execute task with the built-in baseline selected before any worker can claim it. Does not activate a candidate or grant permissions.',
       inputSchema:commandSchema.options[4].omit({action:true}),execute:input=>steps.dispatchBaselineRehearsal(userId, input, scope),

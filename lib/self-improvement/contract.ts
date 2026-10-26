@@ -11,9 +11,12 @@ export const commandSchema = z.discriminatedUnion('action', [
     agentId: z.uuid(), deviceRepoId: z.uuid() }).strict(),
   z.object({ action: z.literal('rehearse'), binding: bindingSchema,
     agentId: z.uuid(), deviceRepoId: z.uuid() }).strict(),
+  z.object({ action: z.literal('register_candidate'), proposalId: z.uuid(), binding: bindingSchema }).strict(),
+  z.object({ action: z.literal('select_active'), runId: z.uuid() }).strict(),
 ])
 export type Feedback = Extract<z.infer<typeof commandSchema>, { action: 'feedback' }>
 export type ImprovementHandoff = Extract<z.infer<typeof commandSchema>, { action: 'handoff' }>
+export type ImprovementRegistration = Extract<z.infer<typeof commandSchema>, { action: 'register_candidate' }>
 export type ImprovementRehearsal = Extract<z.infer<typeof commandSchema>, { action: 'rehearse' }>
 export class ImprovementError extends Error {
   constructor(public code: 'notFound' | 'invalid' | 'conflict' | 'runUnavailable' | 'configurationDrift' | 'workerCapabilityRequired' | 'sourceMismatch' | 'sourceRequired') { super(code) }

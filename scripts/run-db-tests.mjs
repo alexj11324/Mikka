@@ -81,7 +81,8 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
   for (const [file, source] of Object.entries(files)) {
     // Playwright DB fixtures run in the preserved server-backed browser/performance gates.
     if (!/\.(test|spec)\.(ts|mjs|js)$/.test(file) || file === BOOTSTRAP || file === 'scripts/run-db-tests.test.mjs' || file.startsWith('tests/e2e/')) continue
-    const databaseBacked = /(?:\.db\.test\.|-db\.test\.)/.test(file) || /(?:from\s*['"]pg['"]|import\(['"]pg['"]\)|REQUIRE_DB|CONVERSATION_READS_REQUIRE_DB)/.test(source)
+    const runtimeSource = source.replace(/^\s*import\s+type\s+(?:\{[^}]*\}|[\w$]+)\s+from\s*['"]pg['"];?/gm, '')
+    const databaseBacked = /(?:\.db\.test\.|-db\.test\.)/.test(file) || /(?:from\s*['"]pg['"]|import\(['"]pg['"]\)|REQUIRE_DB|CONVERSATION_READS_REQUIRE_DB)/.test(runtimeSource)
     if (!databaseBacked || covered.has(file) || excluded.has(file)) continue
     const matches = Object.entries(scripts).filter(([name, command]) => name.startsWith('test:') && commandHas(command, file))
     if (matches.length !== 1) throw new Error(`DB test ${file} needs one explicit package test script (found ${matches.length})`)

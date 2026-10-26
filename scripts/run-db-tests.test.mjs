@@ -45,6 +45,15 @@ test('discovers every present pg/DB suite and rejects unregistered or ambiguous 
   assert.throws(() => inventory(tree, full, ['test:not-present']), /Expected DB script not enrolled/)
   assert.throws(() => inventory(tree, { ...full, 'test:duplicate': `node --test ${extra}` }), /found 2/)
 })
+test('type-only pg imports do not enroll source-only tests as database suites', () => {
+  const tree = { ...files,
+    'lib/pure.test.ts': "import type { Pool, PoolClient } from 'pg'\nconst fakePool = {}",
+    'lib/multiline-pure.test.ts': 'import type {\n PoolClient,\n} from "pg";\nconst fakeClient = {}',
+  }
+  assert.deepEqual(inventory(tree, scripts).scripts, [sample.script])
+  assert.deepEqual(inventory(tree, scripts).files, [sample.file])
+  assert.throws(() => inventory({ ...tree, 'lib/runtime.test.ts': "import { Pool } from 'pg'" }, scripts), /needs one explicit/)
+})
 test('self-managed suites are excluded only with a reason and a live dedicated runner', () => {
   const own = { file: 'lib/own-db.test.ts', runner: 'scripts/test-own-db.mjs', reason: 'starts its own Postgres' }
   const tree = { ...files, [own.file]: "import { Pool } from 'pg'", [own.runner]: `spawn('node', ['--test', '${own.file}'])` }

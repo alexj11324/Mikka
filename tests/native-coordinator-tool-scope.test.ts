@@ -19,7 +19,13 @@ stub('../lib/pending-action-store.ts',{proposeAction:effect})
 stub('../lib/issue-access.ts',{issueForUser:effect})
 stub('../lib/telegram/client.ts',{postTelegramText:effect})
 stub('../lib/factory/server.ts',{dispatchFactoryRun:effect,factoryMonitor:{reconcile:effect},factoryStore:{},factoryQuestions:{},reconcileFactoryRuns:effect})
-stub('../lib/self-improvement/server.ts',{improvementStore:{},skillAssignments:{},improvementFactory:{}})
+stub('../lib/self-improvement/source.ts',{readCommittedSkill:async()=>{revoked=true;return 'source bytes'}})
+stub('../lib/self-improvement/server.ts',{improvementStore:{},skillAssignments:{},improvementFactory:{},skillRegistry:{
+  registerCandidate:async(_user:unknown,_input:unknown,readSource:(source:unknown)=>Promise<string>)=>{
+    await readSource({repository:'https://github.com/example/public',sha:'a'.repeat(40),baseSha:'b'.repeat(40)})
+    return effect()
+  },
+}})
 let steps: typeof import('../workflows/coordinator/steps')
 before(async()=>{steps=await import('../workflows/coordinator/steps')})
 const scope={holder:'holder',turnId:'turn',callId:'call'}
@@ -30,6 +36,8 @@ beforeEach(()=>{revoked=false;uncertain=false;checks.mock.resetCalls();effect.mo
 const binding={taskId:'task',issueId:'issue',attemptId:'attempt',revision:1,candidateId:null}
 const reference={questionId:'question',questionRevision:1,binding,originRunId:'run',originSessionId:'session'}
 const calls = {
+  selectActiveSkill:()=>steps.selectActiveSkill(user,{runId:'run'},scope),
+  registerSkillCandidate:()=>steps.registerSkillCandidate(user,{proposalId:'proposal',binding},scope),
   selectBaselineSkill:()=>steps.selectBaselineSkill(user,{runId:'run'},scope),
   dispatchBaselineRehearsal:()=>steps.dispatchBaselineRehearsal(user,{binding,agentId:'agent',deviceRepoId:'repo'},scope),
   recordRunFeedback:()=>steps.recordRunFeedback(user,{eventId:'event',runId:'run',verdict:'negative',note:'feedback'},scope),
@@ -84,4 +92,10 @@ test('unscoped AI SDK calls keep the existing business callbacks and account app
   assert.equal(checks.mock.callCount(),0)
   assert.equal(effect.mock.callCount(),2)
   assert.deepEqual(effect.mock.calls[1].arguments,[user,'send_email',{subject:'proposal'}])
+})
+
+test('candidate registration rechecks native authorization after source fetching before persistence',async()=>{
+  await assert.rejects(steps.registerSkillCandidate(user,{proposalId:'proposal',binding},scope),/coordinatorExpiredOrLeaseLost/)
+  assert.equal(checks.mock.callCount(),2)
+  assert.equal(effect.mock.callCount(),0)
 })

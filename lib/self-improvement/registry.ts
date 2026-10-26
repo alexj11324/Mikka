@@ -163,6 +163,23 @@ export function createSkillRegistry(pool: Pool, authorize: Authorize) {
       fingerprint: digest({ metadata, task, candidate, attempt, run, sources }) }
   }
   return {
+    /** Recheck live source provenance for activation while retaining immutable registered bytes. */
+    async readRegisteredCandidate(tx: PoolClient, userId: string, taskId: string, candidateId: string) {
+      if (!z.uuid().safeParse(taskId).success || !z.uuid().safeParse(candidateId).success) throw new ImprovementError('notFound')
+      const { rows: [metadata] } = await tx.query<SkillCandidateMetadata>(`SELECT * FROM improvement_skill_candidates
+        WHERE "factoryTaskId"=$1 AND "candidateId"=$2 AND "userId"=$3`, [taskId, candidateId, userId])
+      const { rows: [task] } = await tx.query('SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE', [taskId, userId])
+      if (!metadata || !task) throw new ImprovementError('notFound')
+      const live = await context(tx, userId, { proposalId: metadata.proposalId, binding: {
+        taskId, issueId: task.issueId, attemptId: task.attemptId, revision: task.revision, candidateId,
+      } })
+      const { createdAt: _createdAt, ...stored } = metadata
+      if (digest(stored) !== digest(live.metadata)) throw new ImprovementError('sourceMismatch')
+      const resolved = await resolveSkillVersion(tx, userId, { issueId: metadata.issueId, agentId: metadata.agentId,
+        deviceRepoId: metadata.repoId }, metadata.versionId)
+      if (!resolved.metadata) throw new ImprovementError('sourceMismatch')
+      return { ...resolved, metadata: resolved.metadata }
+    },
     async registerCandidate(userId: string, input: z.infer<typeof requestSchema>, sourceReader: SkillSourceReader = readCommittedSkill) {
       const parsed = requestSchema.safeParse(input)
       if (!parsed.success) throw new ImprovementError('invalid')

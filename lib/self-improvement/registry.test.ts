@@ -85,7 +85,9 @@ test('registration authorizes before network reads and rechecks a revoked Factor
   let open = false, authorized = true, fetched = 0, writes = 0
   const { digest } = await import('./contract')
   source.snapshot.reportDigest = digest(source.report)
-  const tx = { release() {}, query: async (sql: string) => {
+  const metadata = { versionId: candidateId, userId, issueId, agentId, repoId, proposalId, factoryTaskId: taskId, candidateId,
+    repository, commitSha: report.publish.commit, path: SKILL_PATH, baselineVersionId: BASELINE_ARTIFACT.versionId, createdAt: new Date() }
+  const tx = { release() {}, query: async (sql: string, values: unknown[] = []) => {
     if (sql === 'BEGIN') { open = true; return { rows: [] } }
     if (sql === 'COMMIT' || sql === 'ROLLBACK') { open = false; return { rows: [] } }
     if (sql.startsWith('INSERT')) { writes++; return { rows: [] } }
@@ -96,7 +98,9 @@ test('registration authorizes before network reads and rechecks a revoked Factor
     if (sql.includes('FROM improvement_factory_links')) return { rows: [{ taskId, issueId, attemptId, runId, request: { agentId, deviceRepoId: repoId } }] }
     if (sql.includes('FROM factory_candidates')) return { rows: [{ id: candidateId, taskId, runId, repository, sha: report.publish.commit }] }
     if (sql.includes('FROM factory_attempts')) return { rows: [{ id: attemptId, candidateId, runId, stage: 'execute', status: 'passed', sessionId: run.sessionId }] }
-    if (sql.includes('FROM improvement_skill_versions')) return { rows: [{ artifact: BASELINE_ARTIFACT, markdown: BASELINE_MARKDOWN }] }
+    if (sql.includes('FROM improvement_skill_candidates')) return { rows: [metadata] }
+    if (sql.includes('FROM improvement_skill_versions')) return { rows: [{ artifact: values[0] === candidateId ?
+      { ...BASELINE_ARTIFACT, versionId: candidateId } : BASELINE_ARTIFACT, markdown: BASELINE_MARKDOWN }] }
     if (sql.includes('FROM improvement_skill_receipts')) return { rows: [{ userId, receipt, artifact: BASELINE_ARTIFACT, markdown: BASELINE_MARKDOWN }] }
     if (sql.includes('count(*)')) return { rows: [{ total: 1 }] }
     if (sql.includes('FROM improvement_proposal_sources')) return { rows: [source] }
@@ -106,6 +110,11 @@ test('registration authorizes before network reads and rechecks a revoked Factor
   const pool = { connect: async () => tx } as unknown as Pool
   const registry = createSkillRegistry(pool, async () => authorized)
   const reader = async () => { fetched++; assert.equal(open, false); task.status = 'revoked'; return BASELINE_MARKDOWN }
+  const registered = await registry.readRegisteredCandidate(tx, userId, taskId, candidateId)
+  assert.equal(registered.metadata.candidateId, candidateId)
+  source.status = 'cancelled'
+  await assert.rejects(registry.readRegisteredCandidate(tx, userId, taskId, candidateId), /sourceMismatch/)
+  source.status = 'succeeded'
   authorized = false
   await assert.rejects(registry.registerCandidate(userId, { proposalId, binding }, reader), /notFound/)
   assert.equal(fetched, 0)

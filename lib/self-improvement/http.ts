@@ -3,10 +3,11 @@ import { commandSchema, ImprovementError } from './contract'
 import type { createImprovementStore } from './store'
 import type { createSkillAssignments } from './assignments'
 import type { createImprovementFactoryBridge } from './factory-bridge'
+import type { createSkillRegistry } from './registry'
 import { FactoryError } from '../factory/contract'
 
 export async function handleImprovement(store: ReturnType<typeof createImprovementStore>, request: Request, userId: string | null,
-  assignments?: ReturnType<typeof createSkillAssignments>, bridge?: ReturnType<typeof createImprovementFactoryBridge>): Promise<Response> {
+  assignments?: ReturnType<typeof createSkillAssignments>, bridge?: ReturnType<typeof createImprovementFactoryBridge>, registry?: ReturnType<typeof createSkillRegistry>): Promise<Response> {
   const respond = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })
   if (!userId) return respond({ error: 'authRequired' }, 401)
   if (!['GET', 'POST'].includes(request.method)) return respond({ error: 'methodNotAllowed' }, 405)
@@ -41,6 +42,14 @@ export async function handleImprovement(store: ReturnType<typeof createImproveme
     if (parsed.data.action === 'select_baseline') {
       if (!assignments) return respond({ error: 'sourceRequired' }, 409)
       return respond(await assignments.selectBaseline(userId, parsed.data.runId))
+    }
+    if (parsed.data.action === 'select_active') {
+      if (!assignments) return respond({ error: 'sourceRequired' }, 409)
+      return respond(await assignments.selectActive(userId, parsed.data.runId))
+    }
+    if (parsed.data.action === 'register_candidate') {
+      if (!registry) return respond({ error: 'sourceRequired' }, 409)
+      return respond(await registry.registerCandidate(userId, { proposalId: parsed.data.proposalId, binding: parsed.data.binding }))
     }
     if (parsed.data.action === 'handoff') {
       if (!bridge) return respond({ error:'sourceRequired' },409)

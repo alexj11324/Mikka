@@ -5,10 +5,12 @@ import { issueForUser } from '@/lib/issue-access'
 import { createImprovementStore } from './store'
 import { createSkillAssignments } from './assignments'
 import { factoryStore, dispatchFactoryRun } from '../factory/server'
+import { createSkillRegistry } from './registry'
 import { createImprovementFactoryBridge } from './factory-bridge'
 
 const authorize: Parameters<typeof createSkillAssignments>[1] = async (userId, issueId, tx) =>
   Boolean(await issueForUser(userId, issueId, false, drizzle(tx)))
 export const improvementStore = createImprovementStore(pool, authorize)
+export const skillRegistry = createSkillRegistry(pool, authorize)
 export const skillAssignments = createSkillAssignments(pool, authorize)
 export const improvementFactory = createImprovementFactoryBridge(pool, factoryStore, dispatchFactoryRun, skillAssignments)

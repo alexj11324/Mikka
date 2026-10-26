@@ -24,8 +24,9 @@ import type { FactoryDispatchInput } from '@/lib/factory/dispatch'
 import { factoryEventId } from '@/lib/factory/event-id'
 import { dispatchFactoryRun, factoryMonitor, factoryStore, factoryQuestions, reconcileFactoryRuns } from '@/lib/factory/server'
 import type { QuestionReference, ContextQuestionAnswer } from '@/lib/factory/questions/contract'
-import { improvementStore, skillAssignments, improvementFactory } from '@/lib/self-improvement/server'
-import { ImprovementError, type Feedback, type ImprovementHandoff, type ImprovementRehearsal } from '@/lib/self-improvement/contract'
+import { improvementStore, skillAssignments, improvementFactory, skillRegistry } from '@/lib/self-improvement/server'
+import { readCommittedSkill } from '@/lib/self-improvement/source'
+import { ImprovementError, type Feedback, type ImprovementHandoff, type ImprovementRehearsal, type ImprovementRegistration } from '@/lib/self-improvement/contract'
 import type { TelegramReplyTarget } from '@/lib/coordinator-events'
 import { postTelegramText } from '@/lib/telegram/client'
 
@@ -193,6 +194,20 @@ export async function selectBaselineSkill(userId: string, input: { runId:string 
   'use step'
   await assertNativeToolScope(userId,scope)
   return asToolResult(() => skillAssignments.selectBaseline(userId,input.runId))
+}
+export async function selectActiveSkill(userId: string, input: { runId: string }, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(() => skillAssignments.selectActive(userId,input.runId))
+}
+export async function registerSkillCandidate(userId: string, input: Omit<ImprovementRegistration,'action'>, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(() => skillRegistry.registerCandidate(userId,input,async source => {
+    const markdown = await readCommittedSkill(source)
+    await assertNativeToolScope(userId,scope)
+    return markdown
+  }))
 }
 export async function dispatchBaselineRehearsal(userId:string,input:Omit<ImprovementRehearsal,'action'>, scope?: NativeToolScope) {
   'use step'
