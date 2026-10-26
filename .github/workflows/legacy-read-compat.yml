@@ -1,7 +1,7 @@
 name: Legacy read compatibility
 on:
   push:
-    branches: ['codex/legacy-read-compat-20261026']
+    branches: ['codex/legacy-read-compat-20261026', 'codex/legacy-retirement-read-integration']
   workflow_dispatch:
 permissions:
   contents: read
@@ -60,6 +60,7 @@ jobs:
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
       - run: pnpm test:e2e:setup
+      - run: pnpm test:agent
       - run: pnpm test:legacy-reads
       - run: pnpm test:request-log
       - run: pnpm exec next typegen
@@ -67,7 +68,7 @@ jobs:
       - run: pnpm build
         id: build
       - name: Actual Next HTTP and focused browser regression (fixtures only)
-        run: pnpm exec playwright test tests/e2e/bot-image-read.spec.ts
+        run: pnpm exec playwright test tests/e2e/bot-image-read.spec.ts tests/e2e/agent.spec.ts tests/e2e/agent-performance.spec.ts tests/e2e/progressive-loading.spec.ts tests/e2e/history-request-observer.spec.ts
       - name: Upload browser failure evidence
         if: always()
         uses: actions/upload-artifact@v4
