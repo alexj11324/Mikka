@@ -15,6 +15,8 @@ const KEEP_TOOL_MESSAGES = 20
 export interface StoredMessage {
   position: number
   message: ModelMessage
+  /** coordinator_messages.id for persisted rows; absent for pending inbox items. */
+  id?: string
 }
 
 /**
@@ -83,7 +85,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
   const note = event.tier === 'attention' ? 'Triage: this needs the person; tell them.' : event.tier === 'background' ? 'Triage: background; mention it only if it matters to what you are doing.' : null
   switch (event.kind) {
     case 'user_message':
-      return String(payload.text ?? '')
+      return [event.issueId ? 'This chat is linked to issue ' + event.issueId + '.' : null, String(payload.text ?? '')].filter(Boolean).join('\n\n')
     case 'run_finished':
       return [
         `[Event] Run ${event.runId} ended with status ${payload.status} (${payload.stopReason}).`,
@@ -156,6 +158,8 @@ export function instructionsWithMemory(instructions: string, memory: string): st
 
 /** One entry in the chat the person sees. */
 export interface ChatItem {
+  /** coordinator_messages.id of the row this item starts at; absent while the message is still pending in the inbox. */
+  id?: string
   position: number
   from: 'person' | 'coordinator' | 'event'
   text: string
@@ -172,12 +176,12 @@ export interface ChatItem {
  */
 export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pending?: true })[]): ChatItem[] {
   const items: ChatItem[] = []
-  for (const { position, message, createdAt, pending } of rows) {
+  for (const { id, position, message, createdAt, pending } of rows) {
     if (message.role === 'user') {
       const text = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
       const event = text.startsWith('[Event]')
       // The triage line is for the Coordinator, not the person.
-      items.push({ position, from: event ? 'event' : 'person', text: event ? text.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') : text, tools: [], createdAt: createdAt.toISOString(), ...(pending ? { pending } : {}) })
+      items.push({ ...(id ? { id } : {}), position, from: event ? 'event' : 'person', text: event ? text.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') : text, tools: [], createdAt: createdAt.toISOString(), ...(pending ? { pending } : {}) })
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
       const text = parts.flatMap(part => part.type === 'text' && part.text.trim() ? [part.text.trim()] : []).join('\n\n')
@@ -187,7 +191,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         last.text = [last.text, text].filter(Boolean).join('\n\n')
         last.tools.push(...tools)
       } else if (text || tools.length) {
-        items.push({ position, from: 'coordinator', text, tools, createdAt: createdAt.toISOString() })
+        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text, tools, createdAt: createdAt.toISOString() })
       }
     }
   }

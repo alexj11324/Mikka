@@ -88,6 +88,11 @@ jobs:
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
       - run: pnpm test:integrations
+      - run: pnpm test:telegram
+      - run: pnpm test:agent
+      - run: pnpm test:acceptance
+      - run: pnpm test:suggestions
+      - run: pnpm test:db-runner
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:issues
@@ -141,6 +146,8 @@ jobs:
           --health-retries 10
     env:
       CI: 'true'
+      REQUIRE_DB: '1'
+      MIKKA_TEST_DB_PORT: '5432'
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
@@ -162,9 +169,10 @@ jobs:
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
-      - name: Group conversation API and migrations (temporary Postgres 17 only)
-        run: pnpm test:groups
       - run: pnpm test:e2e:setup
-      - name: Verify legacy workspace migration and idempotency
-        run: node --test tests/workspace-migration.test.mjs
+      - name: Required DB suites (temporary Postgres 17, no skips)
+        run: pnpm test:db
+        env:
+          REQUIRE_DB: '1'
+          DB_TEST_EXPECTED: test:activity-actor-db,test:conversation-reads,test:groups,test:relation-cycle,test:workspace-migration-db
       - run: pnpm build
