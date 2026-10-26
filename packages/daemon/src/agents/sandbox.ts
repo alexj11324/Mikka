@@ -62,7 +62,9 @@ export function shellJoin(argv: string[]): string {
 
 export class SandboxRuntime implements AgentSandbox {
   readonly kind = "sandbox-runtime" as const
+  private static owner: SandboxRuntime | null = null
   private ready: Promise<void> | null = null
+  private resetting: Promise<void> | null = null
 
   constructor(private readonly onAsk?: AskNetwork) {}
 
@@ -96,7 +98,13 @@ export class SandboxRuntime implements AgentSandbox {
   }
 
   private init() {
-    this.ready ??= SandboxManager.initialize(
+    if (this.resetting) return Promise.reject(new Error("sandbox runtime is stopping"))
+    if (this.ready) return this.ready
+    if (SandboxRuntime.owner && SandboxRuntime.owner !== this) {
+      return Promise.reject(new Error("sandbox runtime is already in use by another instance"))
+    }
+    SandboxRuntime.owner = this
+    this.ready = SandboxManager.initialize(
       {
         // Everything is per run (`registerCommandNetworkLists`).
         network: { allowedDomains: [], deniedDomains: [] },
@@ -106,7 +114,9 @@ export class SandboxRuntime implements AgentSandbox {
         enableWeakerNetworkIsolation: true,
       },
       async ({ host, port }) => (await this.onAsk?.({ host, port })) === true
-    ).catch((error: unknown) => {
+    ).catch(async (error: unknown) => {
+      await SandboxManager.reset().catch(() => undefined)
+      SandboxRuntime.owner = null
       this.ready = null
       throw error
     })
@@ -147,10 +157,20 @@ export class SandboxRuntime implements AgentSandbox {
   }
 
   /** Stops the proxy; the next `wrap` starts it again. */
-  async reset() {
-    if (!this.ready) return
-    this.ready = null
-    await SandboxManager.reset()
+  reset(): Promise<void> {
+    if (this.resetting) return this.resetting
+    if (SandboxRuntime.owner !== this) return Promise.resolve()
+    this.resetting = (async () => {
+      try {
+        await this.ready?.catch(() => undefined)
+        if (SandboxRuntime.owner === this) await SandboxManager.reset()
+      } finally {
+        if (SandboxRuntime.owner === this) SandboxRuntime.owner = null
+        this.ready = null
+        this.resetting = null
+      }
+    })()
+    return this.resetting
   }
 }
 

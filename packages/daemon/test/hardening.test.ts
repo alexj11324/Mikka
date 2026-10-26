@@ -21,6 +21,7 @@ import { SandboxRuntime } from "../src/agents/sandbox"
 import { acquireLock, DaemonAlreadyRunningError } from "../src/lock"
 import { Daemon } from "../src/main"
 import { daemonPaths } from "../src/paths"
+import { RpcServer } from "../src/rpc/server"
 import { MemoryServer } from "../src/server-link"
 import { HttpServerLink, seg } from "../src/server-link-http"
 import { runBranch, WorktreeManager } from "../src/worktrees"
@@ -177,6 +178,70 @@ describe("stopping never waits on an adapter", () => {
 })
 
 describe("claimed runs without an adapter", () => {
+  it("cleans up when stopped while its sandbox probe is running", async () => {
+    const supported = vi.spyOn(SandboxRuntime, "supported").mockReturnValue(true)
+    let finishProbe!: () => void
+    const probe = vi.spyOn(SandboxRuntime.prototype, "probe").mockImplementation(
+      () => new Promise<void>((resolve) => { finishProbe = resolve })
+    )
+    const reset = vi.spyOn(SandboxRuntime.prototype, "reset").mockResolvedValue()
+    const listen = vi.spyOn(RpcServer.prototype, "listen")
+    try {
+      const { server, dataDir } = await setup()
+      const daemon = new Daemon({ dataDir, flavor: "dev", link: server.link(), quotaSource: null })
+      const started = daemon.start()
+      await waitFor(() => probe.mock.calls.length > 0)
+      const stopped = daemon.stop()
+      finishProbe()
+      await expect(started).rejects.toThrow("daemon stopped during startup")
+      await stopped
+      expect(reset).toHaveBeenCalledOnce()
+      expect(listen).not.toHaveBeenCalled()
+    } finally {
+      supported.mockRestore()
+      probe.mockRestore()
+      reset.mockRestore()
+      listen.mockRestore()
+    }
+  })
+
+  it("releases its sandbox on stop and leaves injected sandboxes alone", async () => {
+    const supported = vi.spyOn(SandboxRuntime, "supported").mockReturnValue(true)
+    const probe = vi.spyOn(SandboxRuntime.prototype, "probe").mockResolvedValue()
+    const reset = vi.spyOn(SandboxRuntime.prototype, "reset").mockResolvedValue()
+    try {
+      const { server, dataDir } = await setup()
+      const daemon = await boot(server, dataDir)
+      await daemon.stop()
+      expect(reset).toHaveBeenCalledOnce()
+      const injected = new SandboxRuntime()
+      const next = await boot(server, tempDir(), { agentSandbox: injected })
+      await next.stop()
+      expect(reset).toHaveBeenCalledOnce()
+    } finally {
+      supported.mockRestore()
+      probe.mockRestore()
+      reset.mockRestore()
+    }
+  })
+
+  it("releases its sandbox if startup fails after the probe", async () => {
+    const supported = vi.spyOn(SandboxRuntime, "supported").mockReturnValue(true)
+    const probe = vi.spyOn(SandboxRuntime.prototype, "probe").mockResolvedValue()
+    const reset = vi.spyOn(SandboxRuntime.prototype, "reset").mockResolvedValue()
+    const listen = vi.spyOn(RpcServer.prototype, "listen").mockRejectedValue(new Error("listen failed"))
+    try {
+      const { server, dataDir } = await setup()
+      await expect(boot(server, dataDir)).rejects.toThrow("listen failed")
+      expect(reset).toHaveBeenCalledOnce()
+    } finally {
+      supported.mockRestore()
+      probe.mockRestore()
+      reset.mockRestore()
+      listen.mockRestore()
+    }
+  })
+
   it("does not advertise real harnesses when sandbox startup fails", async () => {
     const supported = vi.spyOn(SandboxRuntime, "supported").mockReturnValue(true)
     const probe = vi.spyOn(SandboxRuntime.prototype, "probe").mockRejectedValue(new Error("bwrap: uid map failed"))
