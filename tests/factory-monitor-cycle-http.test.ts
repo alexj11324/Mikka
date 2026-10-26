@@ -19,7 +19,10 @@ test(
     assert.ok(["localhost", "127.0.0.1"].includes(origin.hostname));
     assert.equal(target.hostname, "127.0.0.1");
     assert.equal(target.pathname, "/mikka_e2e");
-    assert.equal(target.username, "factorycycle192");
+    if (process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true") {
+      assert.equal(target.toString(), process.env.E2E_DATABASE_URL);
+      assert.equal(target.username, "e2e");
+    } else assert.equal(target.username, "factorycycle192");
     const pool = new Pool({ connectionString: target.toString(), max: 4 });
     const requests: {
       method: string;

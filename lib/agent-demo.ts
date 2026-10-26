@@ -53,7 +53,7 @@ const DEMO_RUN = '00000000-0000-4000-8000-0000000000a1'
 export const AGENT_DEMO_CITATIONS: Record<string, CitationSource> = {
   [DEMO_TASK]: { kind: 'issue', id: DEMO_TASK, number: 43, identifier: 'MIK-43', title: '演示任务：Coordinator 聊天迁到 OpenUI', status: 'doing', priority: 'high' },
   [DEMO_TASK_2]: { kind: 'issue', id: DEMO_TASK_2, number: 44, identifier: 'MIK-44', title: '演示任务：任务与来源 chip 注册为 OpenUI 组件', status: 'todo', priority: 'medium' },
-  [DEMO_RUN]: { kind: 'run', id: DEMO_RUN, agentName: 'Worker', harness: 'claude_code', status: 'running', issue: { id: DEMO_TASK, number: 43, identifier: 'MIK-43', title: '演示任务：Coordinator 聊天迁到 OpenUI' }, createdAt: '2026-10-23T14:00:00.000Z', finishedAt: null },
+  [DEMO_RUN]: { kind: 'run', id: DEMO_RUN, agentName: 'Worker', harness: 'claude_code', status: 'running', issue: { id: DEMO_TASK, number: 43, identifier: 'MIK-43', title: '演示任务：Coordinator 聊天迁到 OpenUI' }, name: '演示任务：Coordinator 聊天迁到 OpenUI', summary: null, steps: 12, createdAt: '2026-10-23T14:00:00.000Z', finishedAt: null },
 }
 
 export const AGENT_DEMO_SECTIONS = [
@@ -74,10 +74,11 @@ export const AGENT_DEMO_SECTIONS = [
     response: `root = Stack([BeTodoList("建议计划（演示）", [{id:"discover", title:"整理需求", detail:"只展示建议，不执行任务。"}, {id:"design", title:"评审设计"}], "suggestion"), BeTodoList("状态效果（演示数据）", [{id:"one", title:"需求整理", status:"completed"}, {id:"two", title:"原型设计", status:"in-progress", progress:60}, {id:"three", title:"交付检查", status:"pending"}], "user"), BeApproval("确认示例方案", "先整理需求，再准备交互原型。选择后仅产生演示反馈。", "纯本地组件演示，不执行或保存任何操作。"), BeQuestions("纯本地组件演示", [{id:"scope", title:"希望先体验哪个部分？", options:[{value:"content", label:"富文本与代码"}, {value:"cards", label:"卡片与交互"}], allowCustom:true}, {id:"checks", title:"需要查看哪些效果？", options:[{value:"motion", label:"动效"}, {value:"mobile", label:"移动端布局"}], multiple:true, allowCustom:true}]), BeFollowUps([{label:"如何组合这些组件？", prompt:"演示：组合组件"}, {label:"代码块有哪些功能？", prompt:"演示：代码块功能"}])])`,
   },
   {
-    id: 'citations', title: '任务、运行与来源 chip', description: '任务显示状态点、编号和标题，运行和网页显示为来源 chip；都跟着正文排，一行放不下时整体换到下一行。',
-    response: `root = Stack([line, wrap, ${content(`Markdown 正文里的引用同样显示为 chip：[[issue:${DEMO_TASK_2}]]，参考 [OpenUI 文档](https://www.openui.com/docs)。`)}])
+    id: 'citations', title: '任务、运行、来源 chip 与电脑卡片', description: '任务显示状态点、编号和标题，运行和网页显示为来源 chip；都跟着正文排，一行放不下时整体换到下一行。电脑卡片显示一句任务和 bot 电脑的画面。',
+    response: `root = Stack([line, wrap, computer, ${content(`Markdown 正文里的引用同样显示为 chip：[[issue:${DEMO_TASK_2}]]，参考 [OpenUI 文档](https://www.openui.com/docs)。`)}])
 line = InlineText(["已派给 ", RunChip("${DEMO_RUN}"), " 处理 ", TaskChip("${DEMO_TASK}"), "，完成后接着做 ", TaskChip("${DEMO_TASK_2}"), "。PR：", SourceChip("https://github.com/alexj11324/Mikka/pull/92", "Mikka#92"), "。"])
-wrap = InlineText(["这一句故意写得比较长，用来看换行效果：引用 ", TaskChip("${DEMO_TASK}"), " 放在行尾放不下时，会和后面的文字一起换到下一行，而不是单独占一行。"])`,
+wrap = InlineText(["这一句故意写得比较长，用来看换行效果：引用 ", TaskChip("${DEMO_TASK}"), " 放在行尾放不下时，会和后面的文字一起换到下一行，而不是单独占一行。"])
+computer = ComputerCard("demo-done", "${DEMO_RUN}", "打开 #66 的预览部署，用测试账号登录，截一张首页。", "done", "Mikka Frontend", "#66 预览部署检查")`,
   },
   {
     id: 'ui', title: 'shadcn、REUI 与数据图表', description: '折叠面板、标签页、表格、进度条和 OpenUI 数据图表，均使用固定演示数据。',

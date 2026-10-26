@@ -5,6 +5,7 @@ import { readdir,readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
+import { improvementTestDatabase } from './test-database'
 import { createSkillAssignments, assignedSkillForRun } from './assignments'
 import { createImprovementStore } from './store'
 import { createImprovementFactoryBridge } from './factory-bridge'
@@ -19,16 +20,16 @@ import { insertRunOnce } from '../run-dispatch'
 import { factoryDispatchDatabase } from '../factory/transaction'
 import { verifySkillAssignment } from '../../packages/daemon/src/agents/skill-artifact'
 
-test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!process.env.IMPROVEMENT_TEST_URL,timeout:120000},async t=>{
-  const target=new URL(process.env.IMPROVEMENT_TEST_URL!)
-  assert.ok(['localhost','127.0.0.1','[::1]'].includes(target.hostname));assert.equal(target.pathname,'/mikka_improvement')
+const databaseURL = improvementTestDatabase(process.env)
+test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databaseURL,timeout:120000},async t=>{
+  const target=new URL(databaseURL!)
   const admin=new Pool({connectionString:target.toString(),max:1}),schema=`skill_wiring_${randomUUID().replaceAll('-','')}`
   await admin.query(`CREATE SCHEMA "${schema}"`);target.searchParams.set('options',`-c search_path=${schema}`)
   const pool=new Pool({connectionString:target.toString(),max:12})
   t.after(async()=>{await pool.end();await admin.end()})
   const dir=new URL('../../drizzle/',import.meta.url)
   for(const name of orderMigrations((await readdir(dir)).filter(n=>n.endsWith('.sql')))) await pool.query(await readFile(new URL(name,dir),'utf8'))
-  await pool.query(await readFile(new URL('20261025083303_improvement_skill_assignments.sql',dir),'utf8'))
+  await pool.query(await readFile(new URL('20261026190331_improvement_skill_assignments.sql',dir),'utf8'))
   const userId=`synthetic-${randomUUID()}`,issueId=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID()
   await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Synthetic rehearsal','{}','todo','normal')`,[issueId,userId])
   await pool.query(`INSERT INTO devices(id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES($1,$2,'Synthetic device',true,now(),'[{"harness":"codex","installed":true}]')`,[deviceId,userId])

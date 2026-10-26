@@ -7,9 +7,10 @@ import { BadgeButton } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { ROW_VALUE } from './issue-property-row'
 import { statusDots, statusIconTints, statusTones, type StatusTone } from '@/lib/status-appearance'
 
-export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, disabled, iconOnly = false, onChange }: {
+export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, disabled, iconOnly = false, variant = 'badge', displayValue, onChange }: {
   label: string
   value: string
   options: readonly { value: string; label: string; icon?: LucideIcon; iconProps?: Pick<LucideProps, 'viewBox' | 'strokeWidth'>; indicatorClassName?: string; tone?: StatusTone }[]
@@ -18,6 +19,8 @@ export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, d
   pill?: boolean
   compact?: boolean
   iconOnly?: boolean
+  /** row: an icon and the value on a ghost button, for the detail page's properties column. */
+  variant?: 'badge' | 'row'
   displayValue?: string
   onChange: (value: string) => void
 }) {
@@ -31,7 +34,7 @@ export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, d
     if (i18nText.has(priorityKey as never)) return i18nText(priorityKey as never)
     return item.label
   }
-  const valueLabel = option ? optionLabel(option) : value
+  const valueLabel = displayValue ?? (option ? optionLabel(option) : value)
   const ValueIcon = option?.icon ?? FallbackIcon
   // Statuses carry their color; priorities stay grey, as their bars already say how urgent.
   const tintTone: StatusTone = option?.indicatorClassName ? option.tone ?? 'neutral' : 'neutral'
@@ -39,6 +42,9 @@ export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, d
     {/* iconOnly: just the value's own icon (board cards), the name stays in the menu and the tooltip. */}
     {iconOnly ? <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" disabled={disabled} className="text-muted-foreground" title={valueLabel} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
       <ValueIcon data-icon="inline-start" className={cn('shrink-0', statusIconTints[tintTone])} {...option?.iconProps} />
+    </DropdownMenuTrigger> : variant === 'row' ? <DropdownMenuTrigger render={<Button variant="ghost" size="sm" disabled={disabled} className={ROW_VALUE} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
+      <ValueIcon data-icon="inline-start" className={cn('shrink-0', statusIconTints[tintTone])} {...option?.iconProps} />
+      <span className="truncate">{valueLabel}</span>
     </DropdownMenuTrigger> : <DropdownMenuTrigger render={<BadgeButton disabled={disabled} variant="outline" size="xl" className={cn('cursor-pointer px-2 py-0.5 hover:brightness-95', statusTones[option?.tone ?? 'neutral'])} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
       {valueLabel}
     </DropdownMenuTrigger>}

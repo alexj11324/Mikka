@@ -78,7 +78,7 @@ test(
         await pool.query(await readFile(new URL(name, dir), "utf8"));
       await pool.query(
         await readFile(
-          new URL("20261025051205_factory_192_questions.sql", dir),
+          new URL("20261026190329_factory_192_questions.sql", dir),
           "utf8",
         ),
       );

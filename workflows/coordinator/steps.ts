@@ -1,13 +1,17 @@
+import { issueVisibility } from '@/lib/issue-visibility'
+import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
 import { generateText, type ModelMessage } from 'ai'
-import { and, asc, desc, eq, inArray, or } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
-import { addRunMessage, readRun, requestRunStop, runViewColumns } from '@/lib/agent-runs'
+import { addRunMessage, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db } from '@/lib/db'
-import { agentRuns, agents, coordinatorEvents, deviceRepos, devices, factoryAttempts, factoryTasks, issueMembers, issues } from '@/lib/db/schema'
+import { coordinatorEvents, factoryAttempts, factoryTasks } from '@/lib/db/schema'
+import { webSearch } from '@/lib/search'
+import { agents, deviceRepos, devices, issueMembers, issues, telegramLinks } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
@@ -22,6 +26,8 @@ import { dispatchFactoryRun, factoryMonitor, factoryStore, factoryQuestions, rec
 import type { QuestionReference, ContextQuestionAnswer } from '@/lib/factory/questions/contract'
 import { improvementStore, skillAssignments, improvementFactory } from '@/lib/self-improvement/server'
 import { ImprovementError, type Feedback, type ImprovementHandoff, type ImprovementRehearsal } from '@/lib/self-improvement/contract'
+import type { TelegramReplyTarget } from '@/lib/coordinator-events'
+import { postTelegramText } from '@/lib/telegram/client'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -40,6 +46,8 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
 
 export async function takeInbox(userId: string, holder: string) {
   'use step'
+  await reconcileFactoryRuns(userId)
+  await factoryMonitor.reconcile(userId)
   return store.takeInbox(userId, holder)
 }
 
@@ -58,6 +66,29 @@ export async function appendMessages(userId: string, holder: string, messages: M
   await store.appendMessages(userId, holder, messages, warning)
 }
 
+/** Linked, de-duplicated Telegram threads that should get this reply. */
+export async function telegramReplyThreads(userId: string, targets: TelegramReplyTarget[]): Promise<string[]> {
+  'use step'
+  const destinations = [...new Map(targets.map(target => [JSON.stringify(target), target])).values()]
+  const threads: string[] = []
+  for (const target of destinations) {
+    const [link] = await db.select({ userId: telegramLinks.userId }).from(telegramLinks)
+      .where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.telegramUserId, target.telegramUserId))).limit(1)
+    if (link && !threads.includes(target.threadId)) threads.push(target.threadId)
+  }
+  return threads
+}
+
+/**
+ * Sends one chunk to one thread. Each chunk is its own durable step, so a
+ * retry after a failed chunk resends only that chunk, never the ones already
+ * delivered (Telegram sends have no idempotency key).
+ */
+export async function sendTelegramChunk(threadId: string, chunk: string) {
+  'use step'
+  await postTelegramText(threadId, chunk)
+}
+
 /**
  * Folds older messages into the summary once the conversation passes the
  * token budget, then returns the prompt for this turn: the instructions with
@@ -65,8 +96,6 @@ export async function appendMessages(userId: string, holder: string, messages: M
  */
 export async function preparePrompt(userId: string): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
-  await reconcileFactoryRuns(userId)
-  await factoryMonitor.reconcile(userId)
   let { summary, memory, messages } = await store.loadConversation(userId)
   const cut = compactionCut(summary, messages)
   if (cut !== null) {
@@ -83,49 +112,54 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
   return { instructions: instructionsWithMemory(COORDINATOR_INSTRUCTIONS, memory), messages: promptMessages(summary, messages) }
 }
 
-export async function remember(userId: string, input: { note: string }) {
+export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return store.editMemory(userId, memory => {
     const next = rememberNote(memory, input.note)
     return next === null ? { error: 'memoryFull: forget something first' } : { memory: next, result: { remembered: true } }
   })
 }
 
-export async function forget(userId: string, input: { text: string }) {
+export async function forget(userId: string, input: { text: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return store.editMemory(userId, memory => {
     const { memory: next, removed } = forgetNotes(memory, input.text)
     return { memory: next, result: { removed } }
   })
 }
 
-export async function composioAction(userId: string, action: ComposioActionName, input: unknown) {
+export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return runComposioAction(userId, action, input)
 }
 
-export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown) {
+export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return proposeAction(userId, action, input)
 }
 
-export async function listIssues(userId: string, input: { status?: string }) {
+export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)), input.status ? eq(issues.status, input.status) : undefined))
+    .where(and((await issueVisibility(userId)).predicate, input.status ? eq(issues.status, input.status) : undefined))
     .orderBy(desc(issues.updatedAt)).limit(100)
   return rows.filter(row => !readIssueMetadata(row.content).deletedAt).slice(0, 50).map(({ content, updatedAt, ...row }) => ({
     ...row, number: readIssueMetadata(content).number ?? null, updatedAt: updatedAt.toISOString(),
   }))
 }
 
-export async function getIssue(userId: string, input: { issueId: string }) {
+export async function getIssue(userId: string, input: { issueId: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const issue = await issueForUser(userId, input.issueId)
   if (!issue) return { error: 'issueNotFound' }
-  const runs = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.issueId, issue.id), eq(agentRuns.userId, userId))).orderBy(desc(agentRuns.createdAt)).limit(5)
+  const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
   const {tasks: factory} = await factoryStore.listForIssue(userId,issue.id)
   return {
     id: issue.id, number: readIssueMetadata(issue.content).number ?? null, title: issue.title,
@@ -135,8 +169,9 @@ export async function getIssue(userId: string, input: { issueId: string }) {
   }
 }
 
-export async function listAgents(userId: string) {
+export async function listAgents(userId: string, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const rows = await db.select({ id: agents.id, name: agents.name, description: agents.description, harness: agents.harness, deviceId: agents.deviceId, deviceName: devices.name, enabled: devices.enabled, lastSeenAt: devices.lastSeenAt })
     .from(agents).leftJoin(devices, eq(devices.id, agents.deviceId)).where(eq(agents.userId, userId)).orderBy(asc(agents.name))
   const deviceIds = [...new Set(rows.map(row => row.deviceId).filter((id): id is string => Boolean(id)))]
@@ -148,42 +183,51 @@ export async function listAgents(userId: string) {
   }))
 }
 
-export async function dispatchRun(userId: string, input: FactoryDispatchInput) {
+export async function dispatchRun(userId: string, input: FactoryDispatchInput, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() => dispatchFactoryRun(userId, input))
 }
 
-export async function selectBaselineSkill(userId: string, input: { runId:string }) {
+export async function selectBaselineSkill(userId: string, input: { runId:string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() => skillAssignments.selectBaseline(userId,input.runId))
 }
-export async function dispatchBaselineRehearsal(userId:string,input:Omit<ImprovementRehearsal,'action'>) {
+export async function dispatchBaselineRehearsal(userId:string,input:Omit<ImprovementRehearsal,'action'>, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(()=>improvementFactory.rehearse(userId,{action:'rehearse',...input}))
 }
-export async function recordRunFeedback(userId: string, input: Omit<Feedback,'action'>) {
+export async function recordRunFeedback(userId: string, input: Omit<Feedback,'action'>, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() => improvementStore.recordFeedback(userId,{ action:'feedback',...input }))
 }
-export async function proposeSkillImprovement(userId: string, input: { runId:string }) {
+export async function proposeSkillImprovement(userId: string, input: { runId:string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() => improvementStore.propose(userId,input.runId))
 }
-export async function readRunImprovements(userId: string, input: { runId:string }) {
+export async function readRunImprovements(userId: string, input: { runId:string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() => improvementStore.read(userId,input.runId))
 }
-export async function handoffSkillImprovement(userId: string, input: Omit<ImprovementHandoff,'action'>) {
+export async function handoffSkillImprovement(userId: string, input: Omit<ImprovementHandoff,'action'>, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() => improvementFactory.handoff(userId,{ action:'handoff',...input }))
 }
-export async function getSkillImprovementFactory(userId: string, input: { proposalId:string }) {
+export async function getSkillImprovementFactory(userId: string, input: { proposalId:string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() => improvementFactory.status(userId,input.proposalId))
 }
 
-export async function listFactoryRequests(userId: string) {
+export async function listFactoryRequests(userId: string, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const rows = await db
     .select({
       sourceEventId: coordinatorEvents.id,
@@ -209,16 +253,17 @@ export async function listFactoryRequests(userId: string) {
   }))
 }
 
-export async function routeFactoryTask(userId: string, input: Omit<FactoryRoute,'eventId'>) {
+export async function routeFactoryTask(userId: string, input: Omit<FactoryRoute,'eventId'>, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() => factoryStore.route(userId,{...input,eventId:input.sourceEventId}))
 }
 
 export async function getFactoryTask(
   userId: string,
-  input: { taskId: string },
-) {
+  input: { taskId: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(async () => ({
     ...(await factoryStore.read(userId, input.taskId)),
     questions: await factoryQuestions.list(userId, input.taskId),
@@ -227,9 +272,9 @@ export async function getFactoryTask(
 
 export async function listFactoryQuestions(
   userId: string,
-  input: { taskId?: string },
-) {
+  input: { taskId?: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() =>
     input.taskId
       ? factoryQuestions.list(userId, input.taskId)
@@ -239,17 +284,17 @@ export async function listFactoryQuestions(
 
 export async function getFactoryQuestion(
   userId: string,
-  input: { questionId: string },
-) {
+  input: { questionId: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() => factoryQuestions.read(userId, input.questionId))
 }
 
 export async function answerFactoryContext(
   userId: string,
-  input: ContextQuestionAnswer,
-) {
+  input: ContextQuestionAnswer, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() =>
     factoryQuestions.answer({ source: 'orchestrator', userId }, input),
   )
@@ -257,9 +302,9 @@ export async function answerFactoryContext(
 
 export async function escalateFactoryQuestion(
   userId: string,
-  input: { reference: QuestionReference; eventId: string; reason: string },
-) {
+  input: { reference: QuestionReference; eventId: string; reason: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() => factoryQuestions.escalate(userId, input))
 }
 
@@ -269,9 +314,9 @@ export async function answerFactoryQuestionFromUser(
     reference: QuestionReference
     answerId: string
     sourceEventId: string
-  },
-) {
+  }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(async () => {
     const [event] = await db
       .select({ payload: coordinatorEvents.payload })
@@ -293,28 +338,29 @@ export async function answerFactoryQuestionFromUser(
   })
 }
 
-export async function resolveFactoryTask(userId: string, input: { binding: FactoryBinding; sourceEventId: string; rationale: string; missingInformation: string[]; missingPermissions: string[]; needsSpec: boolean }) {
+export async function resolveFactoryTask(userId: string, input: { binding: FactoryBinding; sourceEventId: string; rationale: string; missingInformation: string[]; missingPermissions: string[]; needsSpec: boolean }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const {binding,...resolution} = input
   return asToolResult(() => factoryStore.apply(userId,binding,input.sourceEventId,{action:'resolve',...resolution}))
 }
 
-export async function stopFactoryTask(userId: string, input: { binding: FactoryBinding; reason: string; action: 'cancel' | 'revoke' }) {
+export async function stopFactoryTask(userId: string, input: { binding: FactoryBinding; reason: string; action: 'cancel' | 'revoke' }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(() => factoryStore.apply(userId,input.binding,factoryEventId(input.action,input.binding.attemptId),{action:input.action,reason:input.reason}))
 }
 
-export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }) {
+export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope) {
   'use step'
-  const active = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const
-  const rows = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.userId, userId), input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined, input.activeOnly ? inArray(agentRuns.status, [...active]) : undefined))
-    .orderBy(desc(agentRuns.createdAt)).limit(20)
+  await assertNativeToolScope(userId,scope)
+  const rows = await visibleRuns(userId, input)
   return rows.map(run => ({ id: run.id, issueId: run.issueId, agent: run.agentName, status: run.status, stopReason: run.stopReason, createdAt: run.createdAt.toISOString() }))
 }
 
-export async function getRun(userId: string, input: { runId: string }) {
+export async function getRun(userId: string, input: { runId: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const detail = await readRun(userId, input.runId)
   if (!detail) return { error: 'runNotFound' }
   const { run } = detail
@@ -327,13 +373,15 @@ export async function getRun(userId: string, input: { runId: string }) {
   }
 }
 
-export async function sendToRun(userId: string, input: { runId: string; text: string }) {
+export async function sendToRun(userId: string, input: { runId: string; text: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(async () => { await addRunMessage(userId, input); return { sent: true } })
 }
 
-export async function stopRun(userId: string, input: { runId: string }) {
+export async function stopRun(userId: string, input: { runId: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(async () => {
     const [linked] = await db.select({taskId:factoryTasks.id}).from(factoryAttempts).innerJoin(factoryTasks,eq(factoryTasks.id,factoryAttempts.taskId))
       .where(and(eq(factoryAttempts.runId,input.runId),eq(factoryTasks.userId,userId))).limit(1)
@@ -343,4 +391,11 @@ export async function stopRun(userId: string, input: { runId: string }) {
     } else await requestRunStop(userId,input.runId)
     return {stopRequested:true}
   })
+}
+
+/** Web search through the shared SearchProvider (MIK-5); degrades to searchUnavailable on 429/5xx/timeout. */
+export async function webSearchStep(userId: string, input: { query: string; limit?: number }, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
 }

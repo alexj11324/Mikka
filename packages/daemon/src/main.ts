@@ -1,3 +1,4 @@
+import { coordinatorCapable, runNativeCoordinatorJob } from "./coordinator/runner"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
 //
@@ -172,6 +173,8 @@ export class Daemon {
   private stopped = false
   private adapters = new Map<Harness, AgentAdapter>()
   /** Registered (or re-registered) with the server since this start. */
+  private nativeCoordinator: Promise<void> | null = null
+  private nativeAbort: AbortController | null = null
   private registered = false
   /** Run ids the server sent that were refused as unsafe (reported once). */
   private refusedRuns = new Set<string>()
@@ -291,7 +294,7 @@ export class Daemon {
     // never pin a run here that no adapter would take. (A detected CLI
     // without an adapter yet is left out; the schema has no "unsupported".)
     const detected = this.options.harnesses ?? (await detectHarnesses())
-    this.harnesses = detected.filter((info) => this.adapters.has(info.harness))
+    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({ ...info, coordinator: coordinatorCapable(info) }))
     // Runs survive restarts: pick up what the journal says was active.
     await this.supervisor.resumeAll()
     if (this.options.quotaSource !== null) {
@@ -642,6 +645,7 @@ export class Daemon {
         // A receipted run blocked while offline may resume only after its
         // server authorization is available; no second recovery scheduler.
         await this.supervisor.resumeAll(true)
+        this.startCoordinatorPass(deviceId)
         for (const runId of await link.pendingRuns(deviceId)) {
           if (this.refusedRuns.has(runId)) continue
           await this.claimAndStart(runId).catch((error: unknown) =>
@@ -812,6 +816,7 @@ export class Daemon {
         return { ok: true as const }
       },
       "device.setCredential": (raw) => {
+        this.nativeAbort?.abort()
         const { credential, workspaceId } =
           daemonRpc["device.setCredential"].params.parse(raw)
         // The device id is kept, in every workspace (ADR ORV-284):
@@ -826,6 +831,7 @@ export class Daemon {
         return { ok: true as const }
       },
       "device.clearCredential": () => {
+        this.nativeAbort?.abort()
         // Signed out in the app: stop talking to the server as that person.
         // The device id stays, so signing in again keeps the device.
         this.saveDevice({ credential: undefined })
@@ -882,9 +888,30 @@ export class Daemon {
   }
 
   /** Graceful stop: active runs stay journaled and resume on next start. */
+  /** Never hold up heartbeats, worker cancellation or lease renewal for a chat. */
+  private startCoordinatorPass(deviceId: string) {
+    const link = this.options.link
+    const sandbox = this.agentSandbox()
+    if (this.nativeCoordinator || !link.claimCoordinator || !sandbox || this.stopped || !this.harnesses.some(info => info.coordinator)) return
+    const controller = new AbortController()
+    this.nativeAbort = controller
+    this.nativeCoordinator = (async () => {
+      const job = await link.claimCoordinator!(deviceId,controller.signal)
+      if (!job || controller.signal.aborted) return
+      await runNativeCoordinatorJob(job,{
+        deviceId, stateDir: join(this.paths.dataDir,"coordinator"),link,signal: controller.signal,sandbox,log: this.log,
+        codexBinary: this.options.harnessBinaries?.codex,claudeBinary: this.options.harnessBinaries?.claude_code,
+      })
+    })().catch(() => {
+      if (!controller.signal.aborted) this.log.warn("native Coordinator failed; no fallback model was used")
+    }).finally(() => { this.nativeCoordinator = null; this.nativeAbort = null })
+  }
+
   async stop() {
     if (this.stopped) return
     this.stopped = true
+    this.nativeAbort?.abort()
+    await this.nativeCoordinator
     if (this.timer) clearTimeout(this.timer)
     await this.quota?.stop()
     this.commandsAbort.abort()

@@ -4,10 +4,10 @@ The common-baseline maintainer owns naming. Workers change their validators/adap
 
 Current main snapshot: `8f8484ff3bf9a55f5c759d7e2316ab90c5fb854f`, latest migration `20261025043000_pending_actions.sql`. Reserved ordering slots:
 
-1. `20261025051201_run_dispatch_keys.sql` (#191; unchanged SQL).
-2. `20261025051202_factory_192_stages.sql` (#192; unchanged SQL).
-3. `20261025051203_factory_194_approvals.sql` (#194 filename-only compatibility; feature remains separate).
-4. `20261025051204_factory_195_monitor.sql` (#195; unchanged SQL).
+1. `20261026190325_run_dispatch_keys.sql` (#191; unchanged SQL).
+2. `20261026190326_factory_192_stages.sql` (#192; unchanged SQL).
+3. `20261026190327_factory_194_approvals.sql` (#194 filename-only compatibility; feature remains separate).
+4. `20261026190328_factory_195_monitor.sql` (#195; unchanged SQL).
 
 #193 currently adds no migration. Both Factory base migrations precede the dependent approval/monitor tables. All new files remain later than main's latest tracked SQL. The normal check-migrations script still reads origin/main; no check is skipped or pinned to a stale ref.
 
@@ -21,10 +21,14 @@ The parent appointed the #195 combined candidate as this batch’s naming owner.
 
 | Component | Previous timestamp | Canonical timestamp |
 | --- | --- | --- |
-| 191 dispatch | 20261025013401 | 20261025051201 |
-| 192 stages | 20261025013402 | 20261025051202 |
-| 194 approvals | 20261025013403 | 20261025051203 |
-| 195 monitor | 20261025014500 | 20261025051204 |
-| 192 questions (integrated) | 20261025040500 | 20261025051205 |
+| 191 dispatch | 20261025013401 | 20261026190325 |
+| 192 stages | 20261025013402 | 20261026190326 |
+| 194 approvals | 20261025013403 | 20261026190327 |
+| 195 monitor | 20261025014500 | 20261026190328 |
+| 192 questions (integrated) | 20261025040500 | 20261026190329 |
 
 The verified questions increment now occupies the reserved slot with its original SQL content. Other workers adopt this mapping instead of choosing fresh names. The manifest retains its original filename for downstream consumers; its main snapshot and contents are updated.
+
+## 2026-10-26 acceptance integration
+
+Current main `ba6a0c96` requires unpublished migrations after its latest migration. The five shared Factory migrations now use `20261026190325` through `20261026190329`; their SQL bytes and manifest hashes are unchanged. The unpublished Skill assignment migration moved from `20261025083303_improvement_skill_assignments.sql` to `20261026190331_improvement_skill_assignments.sql`, after `20261026190330_self_improvement.sql`, because it references the base proposal table and immutable-row trigger function. No applied migration ledger is rewritten.

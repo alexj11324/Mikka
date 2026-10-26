@@ -14,6 +14,7 @@ import { handleFactory } from "./http";
 import { createFactoryStore, type FactoryTask } from "./store";
 import { createFactoryDispatch } from "./dispatch";
 import { factoryDispatchDatabase } from "./transaction";
+import { createExecutionClaim } from "./execution-claim";
 import { createFactoryReconciler } from "./reconcile";
 import { insertRunOnce } from "../run-dispatch";
 
@@ -86,7 +87,7 @@ test(
         await pool.query(await readFile(new URL(file, dir), "utf8"));
       }
       const migration = await readFile(
-        new URL("20261025051202_factory_192_stages.sql", dir),
+        new URL("20261026190326_factory_192_stages.sql", dir),
         "utf8",
       );
       await pool.query(migration);
@@ -233,6 +234,134 @@ test(
       const plannedState = await store.read("owner", spec.task.id);
       assert.equal(plannedState.task.stage, "execute");
       assert.equal(plannedState.task.candidateId, null);
+      await test("execution claim fences cancelled, revoked, stale and unadopted retry bindings", async () => {
+        const claim = createExecutionClaim(pool, authorize);
+        for (const mode of [
+          "cancel",
+          "revoke",
+          "retry",
+          "stale",
+          "allowed",
+          "race",
+        ]) {
+          const fixtureIssue = randomUUID();
+          await pool.query(
+            `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Claim fixture','{}','todo','normal')`,
+            [fixtureIssue],
+          );
+          const initial = await route({
+            issueId: fixtureIssue,
+            needsSpec: mode !== "revoke",
+          });
+          const queued = await dispatcher("owner", {
+            binding: binding(initial.task),
+            agentId,
+            deviceRepoId: repoId,
+          });
+          let state = await store.read("owner", initial.task.id);
+          let runId = queued.runId;
+          if (mode === "retry") {
+            runId = randomUUID();
+            await pool.query(
+              `UPDATE agent_runs SET status='failed',"stopReason"='device_lost' WHERE id=$1`,
+              [queued.runId],
+            );
+            await pool.query(
+              `INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"retryOf") VALUES ($1,'owner',$2,$3,$4,$5,'queued',$6)`,
+              [runId, fixtureIssue, agentId, deviceId, repoId, queued.runId],
+            );
+            await rejects(
+              () =>
+                claim(
+                  "owner",
+                  deviceId,
+                  runId,
+                  new Date(Date.now() + 90000).toISOString(),
+                ),
+              "factoryRunMismatch",
+            );
+          }
+          if (["cancel", "revoke", "retry"].includes(mode))
+            await store.apply("owner", binding(state.task), randomUUID(), {
+              action: mode === "revoke" ? "revoke" : "cancel",
+              reason: "Fixture stop before claim",
+            });
+          if (mode === "stale")
+            await store.apply("owner", binding(state.task), randomUUID(), {
+              action: "finish",
+              status: "blocked",
+              reason: "Fixture old epoch",
+              evidence: [],
+              output: {},
+            });
+          const invoke = () =>
+            claim(
+              "owner",
+              deviceId,
+              runId,
+              new Date(Date.now() + 90000).toISOString(),
+            );
+          if (mode === "race") {
+            const tx = await pool.connect();
+            await tx.query("BEGIN");
+            await store.apply(
+              "owner",
+              binding(state.task),
+              randomUUID(),
+              {
+                action: "cancel",
+                reason: "Cancel owns task lock before claim",
+              },
+              tx,
+            );
+            const waiting = invoke().then(
+              () => "claimed",
+              (e) => e.code,
+            );
+            const blocker = (await tx.query("SELECT pg_backend_pid() AS pid"))
+              .rows[0].pid;
+            let blocked = false;
+            for (let poll = 0; poll < 100 && !blocked; poll++) {
+              blocked = (
+                await pool.query(
+                  "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1::int=ANY(pg_blocking_pids(pid))) AS blocked",
+                  [blocker],
+                )
+              ).rows[0].blocked;
+              if (!blocked)
+                await new Promise((resolve) => setTimeout(resolve, 10));
+            }
+            await tx.query("COMMIT");
+            tx.release();
+            assert.equal(
+              blocked,
+              true,
+              "claim actually waited on the cancellation task lock",
+            );
+            assert.equal(await waiting, "factoryStopped");
+          } else if (mode === "allowed") {
+            assert.equal((await invoke()).length, 1);
+            assert.equal((await invoke()).length, 0);
+          } else {
+            await rejects(invoke, "factoryStopped");
+          }
+          if (mode !== "allowed")
+            assert.equal(
+              (
+                await pool.query(`SELECT status FROM agent_runs WHERE id=$1`, [
+                  runId,
+                ])
+              ).rows[0].status,
+              "queued",
+            );
+          state = await store.read("owner", initial.task.id);
+          if (!["cancelled", "revoked"].includes(state.task.status))
+            await store.apply("owner", binding(state.task), randomUUID(), {
+              action: "cancel",
+              reason: "Fixture cleanup",
+            });
+        }
+      });
       const dispatchTask = await route();
       const dispatchInput = {
         binding: binding(dispatchTask.task),

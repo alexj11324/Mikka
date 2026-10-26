@@ -34,16 +34,17 @@ review the results.
 - **Bots coordinate. Threads execute.**
   - A bot chats with you, plans the work and hands it out. It does not do the
     work directly.
-  - Each piece of work runs in a **thread**: one agent run with its own name,
+  - Each piece of work runs in a **thread**: one work run with its own name,
     usually tied to a task. One bot can run many threads at once.
   - The full definitions are in the [glossary](docs/design/glossary.md).
+  - A **harness** is the execution layer, not another bot. The Coordinator uses Mikka's AI SDK / Workflow harness for chat and tools; dispatched coding work uses the daemon's Claude Code, Codex or Cursor CLI harness. The retired standalone Agent chat is available only as read-only history.
 
-- **One coordinator for many agents.**
+- **One Coordinator, multiple execution harnesses.**
   - The Coordinator is a long-running bot. It wakes when a run ends, a task
     changes state, or a worker asks a question, decides the next step, and
     notifies you only when your input is required.
-  - You can create dedicated bots for different kinds of work, or add several
-    bots to a group chat to divide the work among them.
+  - The Coordinator is the current built-in Bot. Its orchestration harness is
+    separate from the CLI harnesses that execute dispatched coding threads.
 
 - **Asks before it guesses.**
   - When a request is unclear, the Coordinator asks you for the missing details
@@ -54,7 +55,7 @@ review the results.
 
 - **Runs on your own machines.**
   - The Mikka daemon connects your Mac, Linux machine or server.
-  - It runs agents through the CLIs you have already installed and signed in
+  - It starts work through the CLI harnesses you have already installed and signed in
     to, so your existing plans and settings apply.
 
 - **Recovers from failures.**
@@ -134,12 +135,12 @@ Claude Code completes sign-in in your browser. Agents can then read and modify
 tasks, dispatch runs and update the Coordinator's memory. Other clients and the
 full tool list are in the [MCP docs](https://aspectlylabs.com/mikka/docs/mcp).
 
-### Run agents on your own machine
+### Run coding harnesses on your own machine
 
-The daemon in [`packages/daemon`](packages/daemon) detects the agent CLIs on
+The daemon in [`packages/daemon`](packages/daemon) detects the coding harness CLIs on
 the machine and runs threads through them:
 
-| Agent | CLI it looks for |
+| Execution harness | CLI it looks for |
 | --- | --- |
 | Claude Code | `claude` |
 | Codex | `codex` |
@@ -183,7 +184,7 @@ Dashed boxes and lines are on the roadmap: the Scheduler
 | Data | Postgres on Neon, Drizzle migrations in [`drizzle/`](drizzle) |
 | Auth | Better Auth, with Google and GitHub sign-in and an OAuth 2.1 server for MCP |
 | Integrations | GitHub and Linear webhooks; Composio for Gmail, Google Calendar, Notion and Slack; a Cloudflare Worker for Linear sync; Vercel Chat SDK for Telegram |
-| Agents | The Mikka daemon, with adapters for Claude Code, Codex and Cursor |
+| Execution harnesses | The Mikka daemon selects a Claude Code, Codex or Cursor CLI adapter for each work thread |
 
 ## Repository layout
 
@@ -192,7 +193,7 @@ app/                 # Next.js routes, server actions and API (MCP, webhooks, da
 components/          # React UI
 lib/                 # Domain logic: coordinator, issues, Linear sync, MCP, auth
 workflows/           # Durable workflows (the Coordinator)
-packages/daemon/     # Local daemon that runs agents through your own CLIs
+packages/daemon/     # Local daemon and CLI execution harness adapters
 packages/protocol/   # Types shared by the server and the daemon
 packages/config/     # Shared configuration
 cloudflare/          # Cloudflare Worker for Linear sync
@@ -249,6 +250,5 @@ you to offer its users the source code of your version.
 ## Contributing
 
 Contributions are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first.
-Before your first pull request merges, you sign the
-[Contributor License Agreement](CLA.md) by replying to a bot comment on the
-pull request.
+Contributions are made under the project's [AGPL-3.0-only](LICENSE) license;
+no separate contributor agreement is required.

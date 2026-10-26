@@ -1,3 +1,4 @@
+import type { NativeCoordinatorJob, NativeCoordinatorCommand, NativeCoordinatorToolResult } from "@mikka/protocol/coordinator"
 // The daemon's only view of the server. Everything the daemon needs from the
 // cloud goes through `ServerLink`, so tests use `MemoryServer` and the real
 // transport (`HttpServerLink`, apps/server routes) plugs in behind the same
@@ -58,6 +59,10 @@ export interface ChunkBatch {
  * the daemon keeps running and retries (offline tolerance, R13).
  */
 export interface ServerLink {
+  claimCoordinator?(deviceId: string, signal: AbortSignal): Promise<NativeCoordinatorJob | null>
+  coordinatorCommand?(deviceId: string, turnId: string, command: NativeCoordinatorCommand, signal: AbortSignal): Promise<void>
+  coordinatorToolResult?(deviceId: string, turnId: string, callId: string, signal: AbortSignal): Promise<NativeCoordinatorToolResult>
+
   /**
    * `credential` is the session from `mikka daemon login` (Better Auth
    * device authorization, RFC 8628) or one the signed-in desktop handed

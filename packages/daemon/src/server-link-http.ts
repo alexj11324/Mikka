@@ -1,3 +1,4 @@
+import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type NativeCoordinatorCommand } from "@mikka/protocol/coordinator"
 // HTTP transport for `ServerLink`: the routes apps/server serves for the
 // daemon (ADR 0016). Paths and payloads come from packages/protocol
 // (`devicePaths`, `runCompletePath` and their zod schemas); responses are
@@ -94,6 +95,22 @@ export function serverUrl(base: string, path: string): URL {
 }
 
 export class HttpServerLink implements ServerLink {
+  async claimCoordinator(deviceId: string, signal: AbortSignal) {
+    const response = await this.send("POST",`/v1/devices/${seg(deviceId)}/coordinator`,{ operation: "claim" },this.credential,{ signal })
+    if (response.status === 404) return null // Optional rollout / older server.
+    if (response.status === 401) throw new SessionRejectedError()
+    if (!response.ok) throw new ServerUnreachableError(response.status)
+    return nativeCoordinatorClaimSchema.parse(await response.json()).job
+  }
+
+  async coordinatorCommand(deviceId: string, turnId: string, command: NativeCoordinatorCommand, signal: AbortSignal): Promise<void> {
+    await this.call("POST",`/v1/devices/${seg(deviceId)}/coordinator`,{ body: { operation: "submit",turnId,command },signal })
+  }
+
+  async coordinatorToolResult(deviceId: string, turnId: string, callId: string, signal: AbortSignal) {
+    return this.call("POST",`/v1/devices/${seg(deviceId)}/coordinator`,{ body: { operation: "result",turnId,callId },signal,schema: nativeCoordinatorToolResultSchema })
+  }
+
   /** Device session, set by `registerDevice`. */
   private credential: string | null = null
 

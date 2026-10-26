@@ -16,6 +16,8 @@ const nextConfig = {
   },
   webpack(config) {
     config.resolve.alias['react-syntax-highlighter$'] = new URL('./components/workspace/agent-syntax-highlighter.tsx', import.meta.url).pathname
+    // noVNC ships ES modules with top-level await but no "type": "module".
+    config.module.rules.push({ test: /[\\/]@novnc[\\/]novnc[\\/]lib[\\/].*\.js$/, type: 'javascript/esm' })
     return config
   },
   onDemandEntries: {
@@ -38,7 +40,9 @@ const nextConfig = {
     ]
   },
   transpilePackages: ['@mikka/protocol'],
-  serverExternalPackages: ['ai', 'better-auth', 'drizzle-orm'],
+  // better-auth/react must share Next's SSR React dispatcher with client components.
+  // Externalizing the whole package loads native React and crashes enabled analytics.
+  serverExternalPackages: ['ai', 'drizzle-orm'],
   async headers() {
     return [{ source: '/(.*)', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },

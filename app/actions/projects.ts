@@ -22,7 +22,7 @@ async function userId() {
 }
 export async function listProjects() {
   const context = await loadWorkspaceContext()
-  return (await accessibleProjects(context.currentUserId, projectDb, context.workspace.id)).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+  return (await accessibleProjects(context.currentUserId, projectDb, context.workspace.id)).toSorted((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
 }
 async function persistProject(owner: string, input: unknown, partial: boolean) {
   const i18nText = await getTranslations();

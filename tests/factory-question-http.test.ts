@@ -17,7 +17,10 @@ test(
     assert.equal(new URL(origin).hostname, "localhost");
     assert.equal(new URL(origin).protocol, "http:");
     assert.equal(target.hostname, "127.0.0.1");
-    assert.equal(target.username, "factoryquestions192");
+    if (process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true") {
+      assert.equal(target.toString(), process.env.E2E_DATABASE_URL);
+      assert.equal(target.username, "e2e");
+    } else assert.equal(target.username, "factoryquestions192");
     assert.equal(target.pathname, "/mikka_e2e");
     const events: unknown[] = [];
     function client() {

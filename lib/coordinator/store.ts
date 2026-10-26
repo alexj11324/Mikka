@@ -1,13 +1,20 @@
+import { visibleRuns } from '@/lib/agent-runs'
+import { issueForUser } from '@/lib/issue-access'
+import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
-import { agentRuns, agents, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, type CoordinatorEventTier } from '@/lib/db/schema'
+import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { telegramReplyTargets, type TelegramReplyTarget } from '@/lib/coordinator-events'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
+import { runSummaryText } from '@/lib/issue-run-conversation'
+import { threadName } from '@/lib/issue-threads'
+import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -43,7 +50,7 @@ export async function hasWakingEvents(userId: string): Promise<boolean> {
  * but do not count: with nothing else waiting, nothing moves. `held` is false
  * when another turn holds the lease; that turn will pick the events up.
  */
-export async function takeInbox(userId: string, holder: string): Promise<{ held: boolean; added: number }> {
+export async function takeInbox(userId: string, holder: string): Promise<{ held: boolean; added: number; telegramTargets: TelegramReplyTarget[] }> {
   return db.transaction(async tx => {
     const now = new Date()
     await tx.insert(coordinatorSessions).values({ userId }).onConflictDoNothing()
@@ -51,23 +58,23 @@ export async function takeInbox(userId: string, holder: string): Promise<{ held:
       .set({ leaseHolder: holder, leaseUntil: new Date(now.getTime() + LEASE_MS), updatedAt: now })
       .where(and(eq(coordinatorSessions.userId, userId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
       .returning({ userId: coordinatorSessions.userId })
-    if (!taken) return { held: false, added: 0 }
+    if (!taken) return { held: false, added: 0, telegramTargets: [] }
     const due = await tx.select().from(coordinatorEvents).where(waking(userId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
-    if (!due.length) return { held: true, added: 0 }
+    if (!due.length) return { held: true, added: 0, telegramTargets: [] }
     const backgroundLimit = INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
-    if (!events.length) return { held: true, added: 0 }
+    if (!events.length) return { held: true, added: 0, telegramTargets: [] }
     const first = await nextPosition(tx, userId)
     await tx.insert(coordinatorMessages).values(events.map((event, index) => ({
       id: crypto.randomUUID(), userId, position: first + index,
       message: { role: 'user', content: eventPrompt(event) } satisfies ModelMessage,
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
-    return { held: true, added: events.length }
+    return { held: true, added: events.length, telegramTargets: telegramReplyTargets(events) }
   })
 }
 
@@ -153,14 +160,16 @@ export interface ChatView {
   sources: Record<string, CitationSource>
 }
 
-/** Looks up the issues and runs cited in `texts`, keeping only what `userId` may see. */
-export async function citationSources(userId: string, texts: readonly string[]): Promise<Record<string, CitationSource>> {
-  const { issueIds, runIds } = citedIds(texts)
+/** Looks up the issues and runs cited in `texts`, and the `threads` dispatched, keeping only what `userId` may see. */
+export async function citationSources(userId: string, texts: readonly string[], threads: readonly string[] = []): Promise<Record<string, CitationSource>> {
+  const cited = citedIds(texts)
+  const issueIds = cited.issueIds
+  const runIds = [...new Set([...cited.runIds, ...threads])]
   const sources: Record<string, CitationSource> = {}
   if (issueIds.length) {
     const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content })
       .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-      .where(and(inArray(issues.id, issueIds), or(eq(issues.userId, userId), eq(issueMembers.memberId, userId))))
+      .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId)).predicate))
     const identifiers = await taskIdentifiers(rows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
     for (const { content, ownerId: _owner, scope: _scope, ...row } of rows) {
       const metadata = readIssueMetadata(content)
@@ -168,14 +177,21 @@ export async function citationSources(userId: string, texts: readonly string[]):
     }
   }
   if (runIds.length) {
-    const rows = await db.select({ id: agentRuns.id, agentName: agents.name, harness: agents.harness, status: agentRuns.status, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, issueId: issues.id, issueOwnerId: issues.userId, issueScope: issues.scope, issueTitle: issues.title, issueContent: issues.content })
-      .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
-      .where(and(inArray(agentRuns.id, runIds), eq(agentRuns.userId, userId)))
-    const identifiers = await taskIdentifiers(rows.flatMap(row => row.issueId && row.issueOwnerId && row.issueScope && row.issueContent ? [{ id: row.issueId, ownerId: row.issueOwnerId, scope: row.issueScope, number: readIssueMetadata(row.issueContent).number }] : []))
+    const rows = await visibleRuns(userId, { runIds, limit: runIds.length })
+    // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
+    const ownIds = rows.filter(row => row.agentId).map(row => row.id)
+    const prompts = new Map((ownIds.length ? await db.select({ id: agentRuns.id, prompt: agentRuns.prompt }).from(agentRuns)
+      .where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))) : []).map(row => [row.id, row.prompt]))
+    const steps = new Map((ownIds.length ? await db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
+      .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId) : [])
+      .map(row => [row.runId, Number(row.count)]))
     for (const row of rows) {
-      const issue = row.issueId && row.issueTitle && row.issueContent && !readIssueMetadata(row.issueContent).deletedAt
-        ? { id: row.issueId, title: row.issueTitle, number: readIssueMetadata(row.issueContent).number ?? null, identifier: identifiers.get(row.issueId) ?? null } : null
-      sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
+      const task = row.issueId ? await issueForUser(userId, row.issueId) : null
+      const identifiers = task ? await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }]) : new Map<string, string>()
+      const issue = task ? { id: task.id, title: task.title, number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null } : null
+      sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue,
+        name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
+        createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
     }
   }
   return sources
@@ -184,7 +200,7 @@ export async function citationSources(userId: string, texts: readonly string[]):
 /** The latest of the conversation for the chat, oldest first. */
 export async function chatView(userId: string, limit = 200): Promise<ChatView> {
   const [session] = await db.select().from(coordinatorSessions).where(eq(coordinatorSessions.userId, userId)).limit(1)
-  const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
+  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(eq(coordinatorMessages.userId, userId))
     .orderBy(desc(coordinatorMessages.position)).limit(limit)
   // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.
@@ -193,15 +209,15 @@ export async function chatView(userId: string, limit = 200): Promise<ChatView> {
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const last = rows[0]?.position ?? 0
   const pending = waiting.filter(event => event.kind === 'user_message').map((event, index) => ({
-    position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage,
+    position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage, pending: true as const,
   }))
-  const leased = Boolean(session?.leaseUntil && session.leaseUntil.getTime() > Date.now())
+  const leased = coordinatorLeaseActive(session)
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   return {
     items,
     working: leased || waiting.some(event => event.tier !== 'background'),
     error: session?.lastError ?? null,
-    sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text)),
+    sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text), items.flatMap(item => item.threads)),
   }
 }
 

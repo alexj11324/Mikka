@@ -10,6 +10,8 @@ import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { revokeRunTokens } from '@/lib/mcp/worker'
 import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATTEMPTS, pickTakeover, RETRY_QUEUE_WAIT_MS, retryPrompt, type TakeoverCandidate } from '@/lib/run-retry'
 
+const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 // Run leases on the server (ADR 0012). The heartbeat renews the lease of each
 // run the device reports; a run left out is not renewed, and the daemon stops
 // it once its lease runs out. `reclaimLostRuns` handles runs whose device
@@ -23,11 +25,14 @@ import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATT
  */
 export async function renewRunLeases(deviceId: string, runIds: readonly string[], now = new Date()): Promise<{ leases: Record<string, string>; revoked?: string[] }> {
   if (!runIds.length) return { leases: {} }
+  // Protocol IDs can be short strings, but agent_runs.id is a UUID. Such an ID
+  // cannot be held here; revoke it without making PostgreSQL reject the whole beat.
+  const validRunIds = runIds.filter(id => RUN_UUID.test(id))
   const leaseExpiresAt = new Date(now.getTime() + RUN_LEASE_MS)
-  const renewed = await db.update(agentRuns)
+  const renewed = validRunIds.length ? await db.update(agentRuns)
     .set({ leaseExpiresAt, updatedAt: now })
-    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, [...runIds]), inArray(agentRuns.status, [...LEASED_RUN_STATUSES])))
-    .returning({ id: agentRuns.id })
+    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, validRunIds), inArray(agentRuns.status, [...LEASED_RUN_STATUSES])))
+    .returning({ id: agentRuns.id }) : []
   const held = new Set(renewed.map(run => run.id))
   const revoked = runIds.filter(id => !held.has(id))
   return { leases: Object.fromEntries([...held].map(id => [id, leaseExpiresAt.toISOString()])), ...(revoked.length ? { revoked } : {}) }

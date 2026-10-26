@@ -31,3 +31,12 @@ test('one canonical Factory migration per component, after main and before consu
     }
   }
 })
+
+test('Skill assignment migration follows its proposal table and immutable trigger prerequisites',()=>{
+  const ordered=orderMigrations(names)
+  const base=names.filter(name=>name.endsWith('_self_improvement.sql'))
+  const assignments=names.filter(name=>name.endsWith('_improvement_skill_assignments.sql'))
+  assert.equal(base.length,1)
+  assert.equal(assignments.length,1)
+  assert.ok(ordered.indexOf(assignments[0])>ordered.indexOf(base[0]))
+})
