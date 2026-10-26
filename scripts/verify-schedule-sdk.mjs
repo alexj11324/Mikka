@@ -56,7 +56,10 @@ const server=createServer(async(req,res)=>{
   const row=(await app.query('SELECT s.owner_id,s.id FROM schedule_occurrences o JOIN user_schedules s ON s.id=o.schedule_id WHERE o.operation_id=$1',[op])).rows[0]
   assert.equal(row?.owner_id,f.owner);assert.equal(row.id,readScheduleId);assert.equal(n,1)
   const payload=JSON.parse(text);assert.deepEqual(payload.tools??[],[],'scheduled task exposes no connected/write tools')
-  res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify(answer(readText)))
+  assert.equal(req.headers['x-controlled-logical-endpoint'],AGENT_ROUTE.endpoint)
+  // Scheduled reads use the actual OpenAI-compatible provider SDK, while the
+  // Coordinator above uses the Gateway v4 wire protocol. Keep those distinct.
+  res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify({id:'controlled-scheduled-read',object:'chat.completion',created:Math.floor(Date.now()/1000),model:AGENT_ROUTE.model,choices:[{index:0,message:{role:'assistant',content:readText},finish_reason:'stop'}],usage:{prompt_tokens:2,completion_tokens:2,total_tokens:4}}))
  }catch(error){console.error('controlled schedule transport rejected:',error.message);res.writeHead(500).end('{}')}
 })
 server.listen(6183,'127.0.0.1');await once(server,'listening')

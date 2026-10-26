@@ -14,9 +14,12 @@
   "resource-model-pg.log": "c2e45c8be6718c78585c84ef98fc048702bc27ba230ee17fc43939861432ea96",
   "round-stress-e4338ad-failure.cast": "77f1eceb868a3e56219b00c3161f5e90f250be18dd40156d35e48a2fc0e5acc2",
   "round-stress-e4338ad-failure.log": "523a5328212b0e4b9079ff7455993c758076bc2b78060a98dc62263b83e9f170",
+  "schedule-sdk-869302e-protocol-fixture-failure.cast": "bafe6d923dd0febacaf987fa20bcd0810dd4bf1dcc5741946a3776a980f4a8a9",
+  "schedule-sdk-869302e-protocol-fixture-failure.log": "b4e82e279a6c7bbd7106105eee7b59e4ee3ca537611c9a4c4a33811343a08289",
   "sdk-9f72584.cast": "26b1d76b8c3bb717f86a75ea834df5153a6d1980a3625f90124aec40231c1e0a",
   "sdk-9f72584.log": "d9d14178a5c37755a94b5d0bea2795565baa406d8e77e3010bb698cce8daad8b",
   "sdk-eee21b8.cast": "388391b5de6252d713a63f7f8130ce8f690bc9010169d689d54a542fd4e87e18",
   "sdk-eee21b8.log": "24bbe698a766784096a4f767481953c63bcbe48958fb8b3cdd02f4b50d49114f",
+  "split-pg22-869302e.log": "935af24efc61ac9cfb3deff0f4eb9d58ba8b423ac8cfe71ea7fc383d4c05784e",
   "strict-migrations-working-tree.log": "efaca3588b4e4edcfae72cd64f9a3dd3fd02c26544f24efd4907828d704d4190"
 }

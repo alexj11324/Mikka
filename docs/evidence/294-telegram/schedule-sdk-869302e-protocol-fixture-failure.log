@@ -1,0 +1,22 @@
+{"at":"2026-10-26T02:32:30.201Z","source":"869302ea888b764e3cf0d9f1374b39d06c70179f","phase":"authenticated HTTP → actual Bot durable tool lifecycle; no direct schedule handler call","sourceEventId":"a0fd25bd-b416-4879-97d7-663ea72dc17e","scheduleId":"00f47f3b-4480-432c-b5c8-76a695d5f391","readScheduleId":"7120945a-ce3f-4f49-bfe3-9a0048836994","toolCalls":["schedule_create","schedule_pause","schedule_update","schedule_resume","schedule_list","schedule_history","schedule_cancel","schedule_create"],"modelRequests":9,"workspaceId":"3a8236d8-067f-4fb2-bed3-59d9ca033732","nextUtc":"2026-10-26T02:32:32.597Z","timezone":"America/New_York","steps":[{"name":"step//./workflows/coordinator/steps//continueInbox","status":"completed"},{"name":"step//./workflows/coordinator/steps//appendMessages","status":"completed"},{"name":"step//@ai-sdk/workflow@2.0.80//doGenerateStep","status":"completed"},{"name":"step//./workflows/coordinator/steps//executeWakeTool","status":"completed"},{"name":"step//@ai-sdk/workflow@2.0.80//doGenerateStep","status":"completed"},{"name":"step//./workflows/coordinator/steps//executeWakeTool","status":"completed"},{"name":"step//@ai-sdk/workflow@2.0.80//doGenerateStep","status":"completed"},{"name":"step//./workflows/coordinator/steps//executeWakeTool","status":"completed"},{"name":"step//@ai-sdk/workflow@2.0.80//doGenerateStep","status":"completed"},{"name":"step//./workflows/coordinator/steps//executeWakeTool","status":"completed"},{"name":"step//@ai-sdk/workflow@2.0.80//doGenerateStep","status":"completed"},{"name":"step//./workflows/coordinator/steps//executeWakeTool","status":"completed"},{"name":"step//@ai-sdk/workflow@2.0.80//doGenerateStep","status":"completed"},{"name":"step//./workflows/coordinator/steps//executeWakeTool","status":"completed"},{"name":"step//@ai-sdk/workflow@2.0.80//doGenerateStep","status":"completed"},{"name":"step//./workflows/coordinator/steps//executeWakeTool","status":"completed"},{"name":"step//@ai-sdk/workflow@2.0.80//doGenerateStep","status":"completed"},{"name":"step//./workflows/coordinator/steps//executeWakeTool","status":"completed"},{"name":"step//@ai-sdk/workflow@2.0.80//doGenerateStep","status":"completed"},{"name":"step//./workflows/coordinator/steps//preparePrompt","status":"completed"}]}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'pending'
+- 'succeeded'
+
+    at file:///workspace/Mikka-294/scripts/verify-schedule-sdk.mjs:97:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'pending',
+  expected: 'succeeded',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

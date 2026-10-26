@@ -1,0 +1,35 @@
+▶ Telegram pending destinations: real split PG retry, fresh authority and delivery watermarks
+  ✔ failed turn keeps target in PG; a distinct successful turn and fresh store recover it (1107.535541ms)
+  ✔ old delivery ACK cannot remove a newly staged message to the same destination (602.01917ms)
+  ✔ current link, owner, original source and workspace membership gate the actual effect (277.367879ms)
+  ✔ actual Chat SDK Postgres state reuses a held one-connection app transaction (216.886557ms)
+  ✔ authenticated Telegram ingress captures a real unambiguous workspace and rejects ambiguity/revocation (308.967213ms)
+  ✔ pending destinations from another workspace never ride a current turn (792.209584ms)
+✔ Telegram pending destinations: real split PG retry, fresh authority and delivery watermarks (3311.085738ms)
+▶ public resource bridge: real split PG, held policy locks, exact quota and final source fence
+  ✔ missing legacy adapter still denies; inspection spends zero; ten duplicate actual requests execute once (1152.745394ms)
+  ✔ policy revocation after availability denies before quota/send (138.357828ms)
+  ✔ captured workspace cannot spend a different owner-bound tenant (132.078478ms)
+  ✔ pause, expired reservation and cancelled source at the actual fetch fence refund proven unsent calls (341.188619ms)
+  ✔ first explicit 429 refunds only its own reservation; earlier successful work remains charged (573.160158ms)
+  ✔ unknown transport/body outcome stays fully charged, bounded and never sent again (857.8016ms)
+  ✔ web shares the canonical ledger; managed policy denies, cache reads are free and duplicates send once (695.013301ms)
+  ✔ membership withdrawal stays denied without an enterprise management adapter (147.242615ms)
+✔ public resource bridge: real split PG, held policy locks, exact quota and final source fence (4147.089057ms)
+{"evidence":"formal scheduled Agent generateText/provider SDK + actual split PG; controlled HTTP model","occurrenceId":"b59d5630-a475-42c7-a850-95935eb84bd5","operationId":"22165de4-9846-4388-80b2-3fbe766004dc","generation":"returned","status":"succeeded","modelInvocations":1,"resultPublications":1}
+▶ scheduled read: formal provider SDK over controlled transport, separate outcome/publication and OS loss
+  ✔ SQL publication failure reuses immutable actual SDK result after fresh claim with zero regeneration (653.422791ms)
+  ✔ ten consumers of the same formal scheduled claim perform one actual SDK generation (546.922774ms)
+  ✔ actual user pause after preparation prevents provider send and new quota charge (715.180455ms)
+  ✔ checkpoint transaction loss after provider return is uncertain and cannot regenerate (478.626719ms)
+{"evidence":"actual formal schedule runtime OS SIGKILL/restart; controlled HTTP model","occurrenceId":"2d6836b1-c099-45f3-a87e-81ba382519ac","operationId":"b29140d2-0dc9-425f-9525-3453f36f00a5","state":"uncertain","status":"failed","modelInvocations":1,"childExited":0,"workerStarted":true}
+  ✔ real formal runtime child SIGKILL after send stays uncertain and never generates on restart (9454.245142ms)
+✔ scheduled read: formal provider SDK over controlled transport, separate outcome/publication and OS loss (15658.755171ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18020.226459
