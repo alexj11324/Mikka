@@ -7,6 +7,8 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { betterAuth } from 'better-auth'
 import { approvedWriteHandler } from './write-http'
+import { composioWriteProvider } from './write-provider'
+import type { ComposioActionClient } from '../composio-actions'
 import { createApprovedWrites } from './approved-writes'
 import { WRITE_ACTIONS, type WriteProvider } from './write-contract'
 
@@ -21,8 +23,10 @@ test('three approved writes: real PG, auth HTTP, loopback effects and durable re
   for (const file of ['20261023221259_application_baseline.sql','20261025043000_pending_actions.sql','20261026135215_operation_ledger.sql','20261026135216_approved_write_binding.sql']) await pool.query(await readFile(new URL('../../drizzle/' + file, import.meta.url), 'utf8'))
   await pool.query('CREATE RULE retain_test_sessions AS ON DELETE TO "session" DO INSTEAD NOTHING')
   let writes = 0, drop = false, missing = true, connection = 'fixture-account'
+  let currentEvent: Record<string,unknown> = {}
+  let deletes=0
   const receipts = new Map<string, string>()
-  const remote = createServer((req,res) => { const key = req.url!; if(req.method === 'POST'){ writes++; receipts.set(key,randomUUID()); if(drop){req.socket.destroy(); return} } res.writeHead(receipts.has(key)?200:404,{'content-type':'application/json'});res.end(JSON.stringify({id:receipts.get(key)})) })
+  const remote = createServer((req,res) => { const key = req.url!; if(req.method==='DELETE'){deletes++;if(req.headers['if-match']!==currentEvent.etag){res.writeHead(412);res.end();return}writes++;res.writeHead(204);res.end();return} if(req.method === 'POST'){ writes++; receipts.set(key,randomUUID()); if(drop){req.socket.destroy(); return} } res.writeHead(receipts.has(key)?200:404,{'content-type':'application/json'});res.end(JSON.stringify({id:receipts.get(key)})) })
   remote.listen(0,'127.0.0.1');await once(remote,'listening'); const address=remote.address();assert.ok(address && typeof address!=='string');const endpoint=`http://127.0.0.1:${address.port}`
   const provider: WriteProvider = { name:'synthetic-http',prepare:async()=>({accountId:connection,version:'fixed-v1'}),execute:async p=>{assert.equal(p.accountId,connection);await p.beforeSend();p.signal.throwIfAborted();const r=await fetch(endpoint+'/'+p.idempotencyKey,{method:'POST',signal:p.signal});return receipt((await r.json()).id)},lookup:async p=>{if(missing)return null;const r=await fetch(endpoint+'/'+p.idempotencyKey);return r.ok?receipt((await r.json()).id):null} }
   const receipt=(id:string)=>({providerObjectId:id,evidenceDigest:createHash('sha256').update(id).digest('hex')})
@@ -51,6 +55,13 @@ test('three approved writes: real PG, auth HTTP, loopback effects and durable re
       const otherInput=other==='send_slack_message'?{channel:'C12345678',text:'Synthetic'}:{event_id:'synthetic',send_updates:'none'}
       assert.equal((await(await call('/propose',{action:other,input:otherInput,intent})).json()).error,'operationBindingConflict')
     })
+    await t.test(action+' old bindings cannot execute but uninvoked proposals can decline',async()=>{
+      const {actionId:id}=await propose(), before=writes
+      await pool.query(`UPDATE pending_actions SET "operationBinding"="operationBinding"-'contextDigest' WHERE id=$1`,[id])
+      assert.equal((await call('/decide',{action,id,approve:true})).status,409)
+      assert.equal((await(await call('/decide',{action,id,approve:false})).json()).status,'declined')
+      assert.equal(writes,before)
+    })
     await t.test(action+' dropped response, fresh service, negative lookup, positive receipt',async()=>{const {actionId:id}=await propose(),before=writes;drop=true;assert.equal((await(await call('/decide',{action,id,approve:true})).json()).status,'running');drop=false;assert.equal(writes,before+1)
       assert.equal((await(await call('/decide',{action,id,approve:true})).json()).status,'running');assert.equal(writes,before+1);missing=false;assert.equal((await(await call('/decide',{action,id,approve:true})).json()).status,'done');missing=true;assert.equal(writes,before+1)
       const row=(await pool.query('SELECT * FROM operation_ledger WHERE "operationId"=$1',[id])).rows[0];assert.equal(row.ownerId,owner);assert.equal(row.workspaceId,`personal:${owner}`)
@@ -62,4 +73,43 @@ test('three approved writes: real PG, auth HTTP, loopback effects and durable re
       p=await propose();await pool.query('UPDATE session SET "expiresAt"=clock_timestamp()-interval \'1 second\' WHERE "userId"=$1',[owner]);assert.equal((await call('/decide',{action,id:p.actionId,approve:true})).status,401);await pool.query('UPDATE session SET "expiresAt"=clock_timestamp()+interval \'1 hour\' WHERE "userId"=$1',[owner]);assert.equal(writes,before)
     })
   }
+  await t.test('decline sees absent ledger, pauses, and serializes a concurrent approval',async()=>{
+    const actor={userId:owner,sessionId:(await pool.query('SELECT id FROM session WHERE "userId"=$1',[owner])).rows[0].id}
+    let observed!:()=>void, resume!:()=>void
+    const emptySeen=new Promise<void>(r=>{observed=r}), continued=new Promise<void>(r=>{resume=r})
+    let pause=true
+    const wrapped=new Proxy(pool,{get(target,key){if(key==='connect')return async()=>{const client=await target.connect();return new Proxy(client,{get(c,k){if(k==='query')return async(...args:unknown[])=>{const result=await Reflect.apply(c.query,c,args);if(pause&&String(args[0]).startsWith('SELECT status,"invokedAt" FROM operation_ledger')&&!result.rows.length){pause=false;observed();await continued}return result};const v=Reflect.get(c,k);return typeof v==='function'?v.bind(c):v}})};const v=Reflect.get(target,key);return typeof v==='function'?v.bind(target):v}})
+    const service=createApprovedWrites(wrapped,provider,'send_slack_message'),proposal=await service.propose(owner,{channel:'C12345678',text:'Race fixture'},randomUUID()),before=writes
+    const declining=service.decide(actor,proposal.actionId,false);await emptySeen
+    const application='approval_race_'+randomUUID(),otherPool=new Pool({connectionString:url.toString(),options:`-c search_path=${schema}`,application_name:application})
+    const approving=createApprovedWrites(otherPool,provider,'send_slack_message').decide(actor,proposal.actionId,true).then(()=>false,()=>true)
+    try {
+      let waiting=false
+      for(let i=0;i<100&&!waiting;i++){waiting=(await pool.query("SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event='advisory'",[application])).rows.length>0;if(!waiting)await new Promise(r=>setTimeout(r,10))}
+      assert.equal(waiting,true,'approval must wait at shared gate, not bypass the missing ledger row')
+      resume();assert.equal((await declining).status,'declined');assert.equal(await approving,true);assert.equal(writes,before)
+    } finally {resume();await otherPool.end()}
+    const p=await service.propose(owner,{channel:'C12345678',text:'Effect wins fixture'},randomUUID());assert.equal((await service.decide(actor,p.actionId,true)).status,'done');await assert.rejects(service.decide(actor,p.actionId,false),/operationUncertain/);assert.equal(writes,before+1)
+  })
+  await t.test('Calendar PG approval snapshot, execution revalidation, atomic If-Match and no replay',async()=>{
+    const actor={userId:owner,sessionId:(await pool.query('SELECT id FROM session WHERE "userId"=$1',[owner])).rows[0].id}
+    const original={id:'loopback-event',etag:'"v1"',status:'confirmed',eventType:'default',summary:'Synthetic',organizer:{self:true,email:'synthetic@example.invalid'},attendees:[{email:'approved@example.invalid'}],start:{date:'2027-01-01'},end:{date:'2027-01-02'}}
+    let race=false
+    const client={connectedAccounts:{list:async()=>({items:[{id:'fixture-account',toolkit:{slug:'googlecalendar'},status:'ACTIVE',isDisabled:false}]})},tools:{getRawComposioToolBySlug:async()=>({version:'fixed-v1'}),execute:async(slug:string)=>{assert.equal(slug,'GOOGLECALENDAR_EVENTS_GET');return {successful:true,data:structuredClone(currentEvent)}}}} as unknown as ComposioActionClient
+    const provider=composioWriteProvider(client,'cancel_calendar_event',async p=>{await p.beforeSend();if(race)currentEvent={...currentEvent,etag:'"raced"'};const r=await fetch(endpoint+'/calendar-event',{method:'DELETE',headers:{'if-match':p.ifMatch},signal:p.signal});return {status:r.status}})
+    const service=createApprovedWrites(pool,provider,'cancel_calendar_event')
+    const input={event_id:original.id,send_updates:'none'}
+    for(const mutation of [{etag:'"changed"'},{attendees:[{email:'unapproved@example.invalid'}]},{recurrence:['RRULE:FREQ=DAILY']}]){
+      currentEvent=structuredClone(original);const proposal=await service.propose(owner,input,randomUUID());const before=writes,requests=deletes
+      const stored=(await pool.query('SELECT context,"operationBinding" FROM pending_actions WHERE id=$1',[proposal.actionId])).rows[0];assert.equal(stored.context.etag,original.etag);assert.ok(stored.operationBinding.contextDigest)
+      currentEvent={...currentEvent,...mutation};assert.equal((await service.decide(actor,proposal.actionId,true)).status,'running');assert.equal(writes,before);assert.equal(deletes,requests)
+    }
+    currentEvent=structuredClone(original);let proposal=await service.propose(owner,input,randomUUID());const before=writes;race=true
+    assert.equal((await service.decide(actor,proposal.actionId,true)).status,'running');assert.equal(writes,before);const requests=deletes
+    assert.equal((await service.decide(actor,proposal.actionId,true)).status,'running');assert.equal(deletes,requests,'unknown conditional failure never resends')
+    race=false;currentEvent=structuredClone(original);proposal=await service.propose(owner,input,randomUUID());assert.equal((await service.decide(actor,proposal.actionId,true)).status,'done');assert.equal(writes,before+1)
+    currentEvent=structuredClone(original);proposal=await service.propose(owner,input,randomUUID());await pool.query("UPDATE pending_actions SET context=jsonb_set(context,'{etag}','\"tampered\"'::jsonb) WHERE id=$1",[proposal.actionId]);await assert.rejects(service.decide(actor,proposal.actionId,true),/operationBindingConflict/);assert.equal(writes,before+1)
+    currentEvent=structuredClone(original);const closed=createApprovedWrites(pool,composioWriteProvider(client,'cancel_calendar_event'),'cancel_calendar_event');proposal=await closed.propose(owner,input,randomUUID());assert.equal((await closed.decide(actor,proposal.actionId,true)).status,'running');assert.equal(writes,before+1,'no native conditional transport means zero DELETE')
+  })
+
 })

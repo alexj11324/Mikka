@@ -1,0 +1,19 @@
+{
+  "observedUTCDate": "2026-10-26",
+  "sdkLockedVersion": "@composio/core@0.26.0",
+  "catalogSource": "https://docs.composio.dev/toolkits/slack",
+  "catalogToolkitVersion": "20261020_00",
+  "catalogReadTool": "SLACK_RETRIEVE_CONVERSATION_INFORMATION",
+  "previousUnverifiedReadTool": "SLACK_CONVERSATIONS_INFO",
+  "metadataRead": {
+    "method": "GET",
+    "url": "https://backend.composio.dev/api/v3/tools/SLACK_RETRIEVE_CONVERSATION_INFORMATION?toolkit_version=20261020_00",
+    "authentication": "none",
+    "httpStatus": 401,
+    "attempts": 1
+  },
+  "verifiedNativeInputSchema": null,
+  "verifiedNativeOutputSchema": null,
+  "verifiedRawMetadataDigest": null,
+  "status": "BLOCKED: catalog name/version confirmed; native parameter schema unavailable without separately authorized metadata access. No real write attempted. Not a native tool schema fixture."
+}

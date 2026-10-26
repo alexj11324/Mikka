@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { parseWriteInput, type WriteActionName, writeTarget } from './write-contract'
-import { createOperationLedger, OperationError, type OperationIntent, type OperationRecord } from './ledger'
+import { createOperationLedger, lockOperation, OperationError, type OperationIntent, type OperationRecord } from './ledger'
 import { requireOperationSession, withOperationSession } from './session-authorization'
 import type { WriteProvider } from './write-contract'
 
@@ -12,8 +12,8 @@ function canonical(value: unknown): unknown {
   return value
 }
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex')
-const bindingSchema = z.object({ accountId: z.string().min(1), version: z.string().min(1), provider: z.string().min(1), payloadDigest: z.string().length(64) }).strict()
-interface Proposal { id: string; userId: string; action: string; input: Record<string, unknown>; status: string; operationBinding: z.infer<typeof bindingSchema>; intentKey: string }
+const bindingSchema = z.object({ accountId: z.string().min(1), version: z.string().min(1), provider: z.string().min(1), payloadDigest: z.string().length(64), contextDigest: z.string().length(64) }).strict()
+interface Proposal { id: string; userId: string; action: string; input: Record<string, unknown>; status: string; operationBinding: z.infer<typeof bindingSchema>; intentKey: string; context: Record<string, unknown> | null }
 // #204 acts in a person's own account, not a team workspace. Explicit personal
 // scope avoids inventing a workspace DB relationship or using a browser cookie.
 const scope = (owner: string) => `personal:${owner}`
@@ -39,7 +39,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
     const row = rows[0]
     if (!row || row.action !== action || !row.operationBinding) throw new OperationError('pendingActionUnavailable')
     bindingSchema.parse(row.operationBinding)
-    if (digest(row.input) !== row.operationBinding.payloadDigest) throw new OperationError('operationBindingConflict')
+    if (digest(row.input) !== row.operationBinding.payloadDigest || digest(row.context) !== row.operationBinding.contextDigest) throw new OperationError('operationBindingConflict')
     return row
   }
   async function current(tx: PoolClient, binding: OperationIntent, _run: string | null, phase: string) {
@@ -76,7 +76,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         const count = await tx.query(`SELECT count(*) FROM pending_actions WHERE "userId"=$1 AND status='pending' AND "createdAt">clock_timestamp()-interval '7 days'`, [owner])
         if (Number(count.rows[0].count) >= 20) throw new OperationError('tooManyPendingActions')
         const selected = await bounded(() => provider.prepare(owner, input))
-        const binding = bindingSchema.parse({ accountId: selected.accountId, version: selected.version, provider: provider.name, payloadDigest: hash })
+        const binding = bindingSchema.parse({ accountId: selected.accountId, version: selected.version, provider: provider.name, payloadDigest: hash, contextDigest: digest(selected.context ?? null) })
         const id = randomUUID()
         await tx.query('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding",context) VALUES ($1,$2,$6,$3,$4,$5,$7)', [id, owner, input, intentKey, binding, action, selected.context ?? null])
         return { status: 'awaiting_approval', actionId: id }
@@ -87,22 +87,22 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
       // All paths use ledger -> session -> proposal. Revocation waits for an
       // in-flight invoke and never reports cancellation of an already sent effect.
       const p = await transaction(async tx => {
+        await lockOperation(tx, { operationId: id, ownerId: actor.userId, workspaceId: scope(actor.userId) })
         const execution = await tx.query('SELECT status,"invokedAt" FROM operation_ledger WHERE "operationId"=$1 AND "ownerId"=$2 FOR UPDATE', [id, actor.userId])
         await requireOperationSession(tx, actor, actor.userId)
         if (!approve) {
-          const legacy = await tx.query("UPDATE pending_actions SET status='declined',\"decidedAt\"=clock_timestamp() WHERE id=$1 AND \"userId\"=$2 AND action=$3 AND \"operationBinding\" IS NULL AND status='pending' RETURNING id", [id, actor.userId, action])
-          if (legacy.rows.length) return null
+          if (execution.rows[0]?.invokedAt) throw new OperationError('operationUncertain')
+          // Closing an uninvoked owned proposal does not authorize an effect.
+          // Allow old bindings without contextDigest to be safely declined.
+          const closed = await tx.query("UPDATE pending_actions SET status='declined',\"decidedAt\"=clock_timestamp() WHERE id=$1 AND \"userId\"=$2 AND action=$3 AND status IN ('pending','running') RETURNING id", [id, actor.userId, action])
+          if (!closed.rows.length) throw new OperationError('pendingActionUnavailable')
+          await requireOperationSession(tx, actor, actor.userId)
+          return null
         }
         const row = await owned(tx, actor.userId, id)
         await requireOperationSession(tx, actor, actor.userId)
         const valid = await tx.query(`SELECT id FROM pending_actions WHERE id=$1 AND (status IN ('running','done') OR "createdAt">clock_timestamp()-interval '7 days')`, [id])
         if (!valid.rows.length) throw new OperationError('pendingActionUnavailable')
-        if (!approve) {
-          if (execution.rows[0]?.invokedAt) throw new OperationError('operationUncertain')
-          if (!['pending', 'running'].includes(row.status)) throw new OperationError('pendingActionUnavailable')
-          await tx.query("UPDATE pending_actions SET status='declined',\"decidedAt\"=clock_timestamp() WHERE id=$1", [id])
-          return null
-        }
         if (!['pending', 'running', 'done'].includes(row.status)) throw new OperationError('pendingActionUnavailable')
         if (row.status === 'pending') await tx.query("UPDATE pending_actions SET status='running',\"decidedAt\"=clock_timestamp() WHERE id=$1", [id])
         return row
@@ -125,7 +125,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         throw error
       }
       try {
-        const result = await ledger.invoke(identity(p), claimed.attemptToken!, (record, beforeSend) => bounded(signal => provider.execute({ signal, beforeSend, ownerId: p.userId, ...p.operationBinding, payload: p.input, idempotencyKey: record.idempotencyKey })))
+        const result = await ledger.invoke(identity(p), claimed.attemptToken!, (record, beforeSend) => bounded(signal => provider.execute({ signal, beforeSend, ownerId: p.userId, ...p.operationBinding, payload: p.input, approvalContext: p.context, idempotencyKey: record.idempotencyKey })))
         return project(result)
       } catch {
         // The durable invoke gate survives provider/writeback failures. Never resend.

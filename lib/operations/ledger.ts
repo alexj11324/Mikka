@@ -30,11 +30,16 @@ export class OperationError extends Error {}
  */
 export type OperationAuthorize = (tx: PoolClient, binding: OperationIntent, runId: string | null, phase: 'reserve' | 'claim' | 'read' | 'settle' | 'reconcile' | 'invoke') => Promise<void>
 
+/** Serialize even when no ledger row exists; common order is gate -> ledger
+ * -> session -> proposal. Transaction-scoped locks consume no extra connection. */
+export async function lockOperation(tx: PoolClient, input: OperationIdentity) {
+  await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['operation', input.operationId, input.ownerId, input.workspaceId])])
+}
 export function createOperationLedger(pool: Pool, authorize: OperationAuthorize) {
   if (typeof authorize !== 'function') throw new OperationError('operationAuthorizationRequired')
-  async function transaction<T>(work: (tx: PoolClient) => Promise<T>): Promise<T> {
+  async function transaction<T>(input: OperationIdentity, work: (tx: PoolClient) => Promise<T>): Promise<T> {
     const tx = await pool.connect()
-    try { await tx.query('BEGIN'); const result = await work(tx); await tx.query('COMMIT'); return result }
+    try { await tx.query('BEGIN'); await lockOperation(tx, input); const result = await work(tx); await tx.query('COMMIT'); return result }
     catch (error) { await tx.query('ROLLBACK'); throw error }
     finally { tx.release() }
   }
@@ -47,7 +52,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize)
   return {
     async reserve(input: OperationIntent) {
       const binding = intent.parse(input)
-      return transaction(async tx => {
+      return transaction(input, async tx => {
         const key = createHash('sha256').update(JSON.stringify(['mikka-operation-v1', binding.ownerId, binding.workspaceId, binding.operationId])).digest('hex')
         await tx.query('INSERT INTO operation_ledger ("operationId","ownerId","workspaceId",binding,"idempotencyKey") VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING', [binding.operationId, binding.ownerId, binding.workspaceId, binding, key])
         const row = await owned(tx, { operationId: binding.operationId, ownerId: binding.ownerId, workspaceId: binding.workspaceId })
@@ -57,11 +62,11 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize)
       })
     },
     async read(input: OperationIdentity) {
-      return transaction(async tx => { const row = await owned(tx, input); await authorize(tx, row.binding, row.runId, 'read'); return row })
+      return transaction(input, async tx => { const row = await owned(tx, input); await authorize(tx, row.binding, row.runId, 'read'); return row })
     },
     async claim(input: OperationIdentity, runId: string) {
       z.uuid().parse(runId)
-      return transaction(async tx => {
+      return transaction(input, async tx => {
         const row = await owned(tx, input)
         await authorize(tx, row.binding, runId, 'claim')
         if (row.status !== 'reserved') throw new OperationError('operationAlreadyClaimed')
@@ -75,14 +80,14 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize)
      */
     async invoke(input: OperationIdentity, attemptToken: string, execute: (record: Readonly<OperationRecord>, beforeSend: () => Promise<void>) => Promise<OperationReceipt>) {
       z.uuid().parse(attemptToken)
-      await transaction(async tx => {
+      await transaction(input, async tx => {
         const row = await owned(tx, input)
         await authorize(tx, row.binding, row.runId, 'invoke')
         if (row.attemptToken !== attemptToken || row.status !== 'executing') throw new OperationError('operationStaleAttempt')
         const result = await tx.query('UPDATE operation_ledger SET "invokedAt"=clock_timestamp() WHERE "operationId"=$1 AND "invokedAt" IS NULL', [row.operationId])
         if (!result.rowCount) throw new OperationError('operationAlreadyInvoked')
       })
-      return transaction(async tx => {
+      return transaction(input, async tx => {
         const row = await owned(tx, input)
         if (row.attemptToken !== attemptToken || row.status !== 'executing') throw new OperationError('operationStaleAttempt')
         await authorize(tx, row.binding, row.runId, 'invoke')
@@ -99,7 +104,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize)
       z.uuid().parse(attemptToken)
       const receipt = outcome.status === 'succeeded' ? receiptSchema.parse(outcome.receipt) : null
       z.enum(['succeeded', 'failed', 'uncertain']).parse(outcome.status)
-      return transaction(async tx => {
+      return transaction(input, async tx => {
         const row = await owned(tx, input)
         await authorize(tx, row.binding, row.runId, 'settle')
         if (row.attemptToken !== attemptToken || row.status !== 'executing') throw new OperationError('operationStaleAttempt')
@@ -111,7 +116,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize)
      * a negative query cannot prove an old in-flight request will not later complete.
      */
     async reconcile(input: OperationIdentity, lookup: (record: Readonly<OperationRecord>) => Promise<OperationReceipt | null>) {
-      return transaction(async tx => {
+      return transaction(input, async tx => {
         const row = await owned(tx, input)
         await authorize(tx, row.binding, row.runId, 'reconcile')
         if (!['executing', 'uncertain'].includes(row.status)) return row
