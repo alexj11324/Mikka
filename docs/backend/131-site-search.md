@@ -58,7 +58,7 @@ Input units cover limits and bound microsecond cursors. `tests/e2e/site-search.s
 runs actual built Next HTTP + Better Auth against isolated PG17. It retains
 synthetic fixtures, covers 130 history/125 group results, foreign owners/workspaces,
 private DMs/nonmembers, literal wildcard matching, body exclusion, exact result
-allowlists, task reuse, session revocation, group exit and workspace suspension.
+allowlists, task reuse, session revocation during a blocked real title SELECT, group exit and workspace suspension.
 The dedicated `site-search.yml` executes this profile, types and lint. This is a
 post-build Playwright API profile, not a stubbed handler or pre-build R0 recipe;
 it does not edit the R0 inventory/schema/permission helpers.

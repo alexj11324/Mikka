@@ -100,7 +100,23 @@ test('continuations recheck group leave, workspace suspension and real auth revo
   expect((await get(request, { source: 'tasks', workspaceId: workspace })).response.status()).toBe(403)
   // Owner archives remain personal even when a workspace membership is suspended.
   expect((await get(request, { source: 'history', q: `${prefix}-history-` })).body.items.length).toBeGreaterThan(0)
-  await pool.query('update session set token=$1 where id=$2', [randomUUID(), sessionId])
+  // Pause the real title SELECT, revoke after initial auth, then allow it to finish.
+  const locker = await pool.connect()
+  let pending: ReturnType<typeof get> | undefined
+  try {
+    await locker.query('BEGIN')
+    await locker.query('LOCK agent_sessions IN ACCESS EXCLUSIVE MODE')
+    pending = get(request, { source: 'history', q: `${prefix}-history-` })
+    await expect.poll(async () => {
+      const result = await pool.query("select count(*)::int n from pg_stat_activity where wait_event_type='Lock' and state='active' and query like '%agent_sessions%' and pid<>pg_backend_pid()")
+      return result.rows[0].n
+    }, { timeout: 10000 }).toBeGreaterThan(0)
+    await pool.query('update session set token=$1 where id=$2', [randomUUID(), sessionId])
+  } finally {
+    await locker.query('ROLLBACK')
+    locker.release()
+  }
+  expect((await pending!).response.status()).toBe(401)
   expect((await get(request, { source: 'history' })).response.status()).toBe(401)
   expect((await pool.query('select id from session where id=$1', [sessionId])).rowCount).toBe(1)
 })
