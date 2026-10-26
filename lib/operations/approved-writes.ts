@@ -38,6 +38,9 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
     const { rows } = await tx.query<Proposal>('SELECT * FROM pending_actions WHERE id=$1 AND "userId"=$2 FOR UPDATE', [id, owner])
     const row = rows[0]
     if (!row || row.action !== action || !row.operationBinding) throw new OperationError('pendingActionUnavailable')
+    const canonicalIntent = z.uuid().parse(row.intentKey).toLowerCase()
+    const aliases = await tx.query('SELECT id FROM pending_actions WHERE "userId"=$1 AND lower("intentKey")=$2 LIMIT 2', [owner, canonicalIntent])
+    if (aliases.rows.length !== 1) throw new OperationError('operationIntentAmbiguous')
     bindingSchema.parse(row.operationBinding)
     if (digest(row.input) !== row.operationBinding.payloadDigest || digest(row.context) !== row.operationBinding.contextDigest) throw new OperationError('operationBindingConflict')
     return row

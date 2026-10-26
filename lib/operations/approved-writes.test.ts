@@ -124,7 +124,8 @@ test('three approved writes: real PG, auth HTTP, loopback effects and durable re
     const before=writes
     for(const key of [intent,intent.toUpperCase()])assert.equal((await(await call('/propose',{action,input,intent:key})).json()).error,'operationIntentAmbiguous')
     assert.equal(writes,before)
-    for(const id of [first.actionId,duplicate])await call('/decide',{action,id,approve:false})
+    for(const id of [first.actionId,duplicate]){assert.equal((await(await call('/decide',{action,id,approve:true})).json()).error,'operationIntentAmbiguous');assert.equal((await(await call('/decide',{action,id,approve:false})).json()).status,'declined')}
+    assert.equal(writes,before)
   })
   await t.test('decline sees absent ledger, pauses, and serializes a concurrent approval',async()=>{
     const actor={userId:owner,sessionId:(await pool.query('SELECT id FROM session WHERE "userId"=$1',[owner])).rows[0].id}
