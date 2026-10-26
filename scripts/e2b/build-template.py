@@ -29,7 +29,7 @@ def source_context(directory, ref):
     (directory / 'source-sha').write_text(sha + '\n')
     return sha
 
-def build(name, ref='HEAD', api_key=None):
+def build(name, ref='HEAD', api_key=None, on_build_logs=None):
     with tempfile.TemporaryDirectory(prefix='mikka-e2b-template-') as temp:
         context = Path(temp)
         sha = source_context(context, ref)
@@ -38,9 +38,9 @@ def build(name, ref='HEAD', api_key=None):
                     .run_cmd('bash /tmp/mikka-bootstrap.sh', user='root')
                     .copy('worker.tar', '/tmp/mikka-worker.tar')
                     .copy('source-sha', '/opt/mikka/worker-source-sha')
-                    .run_cmd('mkdir -p /opt/mikka/worker && tar -xf /tmp/mikka-worker.tar -C /opt/mikka/worker && rm /tmp/mikka-worker.tar && cd /opt/mikka/worker && HOME=/tmp corepack pnpm install --filter @mikka/daemon... --frozen-lockfile', user='root'))
+                    .run_cmd('mkdir -p /opt/mikka/worker && tar -xf /tmp/mikka-worker.tar -C /opt/mikka/worker && rm /tmp/mikka-worker.tar && cd /opt/mikka/worker && HOME=/tmp corepack pnpm install --filter @mikka/daemon... --frozen-lockfile && chown -R root:root /opt/mikka/worker && chmod -R go-w /opt/mikka/worker && chown root:root /opt/mikka/worker-source-sha && chmod 0444 /opt/mikka/worker-source-sha', user='root'))
         return sha, Template.build(template, name=name, cpu_count=2, memory_mb=4096,
-                                   min_free_disk_mb=16384, api_key=api_key)
+                                   min_free_disk_mb=16384, skip_cache=True, api_key=api_key, on_build_logs=on_build_logs)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Build a versioned Mikka E2B template')

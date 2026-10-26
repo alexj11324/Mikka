@@ -200,6 +200,13 @@ The subsequent test used the separate template `27dk2k0wg8y19b3z91g7` (4 GB RAM,
 at least 16 GB free disk), pinned Node and the fixed container image. The test
 sandbox was deleted. This worker template is not selected for production.
 
+A later template (`9v29kepal8z4m2e5qjdb`) packaged the daemon from immutable
+commit `fc92ebf`, installed the pinned dependencies and started it as the
+dedicated non-root runner in a real E2B sandbox against its in-memory server.
+The runner reached online state, its code was not writable, and the task OS
+user could not read its device credential. The sandbox was deleted. This is
+a packaging/startup smoke test, not an application dispatch or provider test.
+
 Development and production databases also have the additive cloud-device-scope
 migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
 expiry validation, rotation and the Bot's pending-review state. The worker
