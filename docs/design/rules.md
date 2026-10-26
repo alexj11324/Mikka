@@ -115,8 +115,10 @@ do what Linear does. Figma: `220:5022` (MIK-25).
 - **R-62** 线程 lists the threads working on the issue: bot avatar, thread
   name, one line on what it is doing, status, time. Clicking one opens it on
   the right as a conversation that ends in the composer (R-10); people and
-  the agent talk there. Teammates on a workspace issue see the same thread
-  (R-26). The bot runs the thread (R-05); a coding agent it hands work
+  the agent talk there. A thread's content is its owner's alone: teammates
+  (R-26) see 「<人> 的线程」, its status and time, and cannot open or join it,
+  as GitHub Copilot and Cursor keep agent sessions private; what the thread
+  produces (a PR, a comment its owner posts) is how the team sees the work. The bot runs the thread (R-05); a coding agent it hands work
   to (Codex, Claude Code) shows as a step 「交给 Codex · …」, never as the
   runner in the list or the header.
 - **R-63** Activity: events (created, handed to, dispatched a thread,
