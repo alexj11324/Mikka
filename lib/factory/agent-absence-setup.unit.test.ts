@@ -17,7 +17,9 @@ const options = () => ({
 const prepared = (
   o: ReturnType<typeof options>,
   ids: { agentId: string; runId: string },
-) => ({
+) => {
+  const taskId = randomUUID(), attemptId = randomUUID();
+  return {
   agent: { id: ids.agentId, userId: o.ownerId },
   run: {
     id: ids.runId,
@@ -25,9 +27,14 @@ const prepared = (
     agentId: ids.agentId,
     issueId: o.issueId,
   },
-  taskId: randomUUID(),
-  attemptId: randomUUID(),
-});
+  taskId,
+  attemptId,
+  fixtureRegistry: {
+    schema: o.schema, registeredCount: 4, effectsComplete: false, approvalEligible: false, executedDeletion: false,
+    rows: [["agents", ids.agentId], ["agent_runs", ids.runId], ["factory_tasks", taskId], ["factory_attempts", attemptId]].map(([table, id]) => ({ table, pk: { id }, rowHash: "a".repeat(64) })),
+  },
+};
+};
 
 test("setup mode rejects mixed physical execution and never treats legacy authorization as setup", () => {
   assert.equal(factoryAgentSetupOnly({}), false);
@@ -105,7 +112,7 @@ test("partial preparation retains reserved IDs and an incomplete receipt", async
   }
 });
 test("foreign owner and linked run readbacks fail closed", async () => {
-  for (const field of ["owner", "agent", "issue", "run"]) {
+  for (const field of ["owner", "agent", "issue", "run", "missing-register", "missing-pk"]) {
     const o = options();
     await assert.rejects(
       () =>
@@ -117,6 +124,8 @@ test("foreign owner and linked run readbacks fail closed", async () => {
             if (field === "agent") row.run.agentId = randomUUID();
             if (field === "issue") row.run.issueId = randomUUID();
             if (field === "run") row.run.id = randomUUID();
+            if (field === "missing-register") Reflect.deleteProperty(row, "fixtureRegistry");
+            if (field === "missing-pk") { row.fixtureRegistry.rows.pop(); row.fixtureRegistry.registeredCount--; }
             return row;
           },
         }),

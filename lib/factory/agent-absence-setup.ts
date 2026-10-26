@@ -26,7 +26,7 @@ interface Prepared {
   run: { id: string; userId: string; agentId: string; issueId: string };
   taskId: string;
   attemptId: string;
-  fixtureRegistry?: { schema: string; registeredCount: number; rows: { table: string; pk: Record<string, unknown>; rowHash: string }[]; effectsComplete: boolean; approvalEligible: boolean; executedDeletion: boolean };
+  fixtureRegistry: { schema: string; registeredCount: number; rows: { table: string; pk: Record<string, unknown>; rowHash: string }[]; effectsComplete: boolean; approvalEligible: boolean; executedDeletion: boolean };
 }
 interface SetupOptions {
   schema: string;
@@ -104,7 +104,8 @@ export async function pauseFactoryAgentSetup(options: SetupOptions) {
     );
     assert.match(prepared.taskId, uuid);
     assert.match(prepared.attemptId, uuid);
-    if (prepared.fixtureRegistry) {
+    assert.ok(prepared.fixtureRegistry, "complete fixture PK register is required");
+    {
       const registry = prepared.fixtureRegistry;
       assert.equal(registry.schema, options.schema); assert.equal(registry.registeredCount, registry.rows.length);
       assert.equal(registry.effectsComplete, false); assert.equal(registry.approvalEligible, false); assert.equal(registry.executedDeletion, false);
