@@ -47,6 +47,15 @@ export async function rejectAcceptanceDisposal(resources: AcceptanceResources, p
   if (receipt?.authorized === true && receipt.directory === profile.directory) return
   throw new CredentialError('browser_acceptance_disposal_pending', 503)
 }
+// browser.close can yield for seconds. Revalidate the exact admitted directory
+// identities after that wait and immediately before invoking filesystem removal.
+export async function disposeAcceptanceSession(resources: AcceptanceResources, profile: AcceptanceProfile,
+  close: () => Promise<unknown>, remove: () => Promise<unknown>) {
+  await rejectAcceptanceDisposal(resources, profile, 'destroy')
+  await close()
+  await rejectAcceptanceDisposal(resources, profile, 'destroy')
+  await remove()
+}
 type Session = {
   binding: Binding; browser: Browser; context: BrowserContext; page: Page; directory: string
   contextIdentity: string
@@ -236,7 +245,10 @@ export class OwnedChromiumExecutor {
     const attempt = (async () => {
       if (session.acceptanceProfile) {
         session.fenced = true
-        await this.#retainAcceptance(session.acceptanceProfile, 'destroy')
+        await disposeAcceptanceSession(this.#acceptanceResources!, session.acceptanceProfile,
+          () => bounded(session.browser.close(), 5000),
+          () => rm(session.directory, { recursive: true, force: true }))
+        return
       }
       await bounded(session.browser.close(), 5000)
       await rm(session.directory, { recursive: true, force: true })

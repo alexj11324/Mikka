@@ -131,3 +131,48 @@ test('runtime source digest binds helper files as well as the main bundle', asyn
   await writeFile(join(root, 'additional.js'), 'new dependency')
   assert.notEqual(runtimeSourceDigest(root), before)
 })
+
+test('reservation entry rejects registry root, traversal, reused inode and symlink alias before wrappers', async () => {
+  const { symlink } = await import('node:fs/promises')
+  for (const variant of ['dot', 'traversal', 'root-inode', 'role-alias', 'symlink']) {
+    const registry = await createAcceptanceResourceRegistry(tmpdir(), { profiles: 2, launches: 2 })
+    const reservations: any[] = [await registry.reserveLaunch(), await registry.reserveLaunch()]
+    const rootStat = await stat(registry.root)
+    if (variant === 'dot') { reservations[0].id = '.'; reservations[0].directory = registry.root }
+    if (variant === 'traversal') reservations[0].id = '../foreign'
+    if (variant === 'root-inode') reservations[0].directories[0] = { ...reservations[0].directories[0], dev: String(rootStat.dev), ino: String(rootStat.ino) }
+    if (variant === 'role-alias') reservations[1] = reservations[0]
+    if (variant === 'symlink') {
+      const p = reservations[0].profile
+      await rename(p, p + '.retained'); await symlink(p + '.retained', p)
+    }
+    assert.throws(() => prepareAdmission(registry.root, {}, reservations, join(registry.root, 'fixture-target'), 'contract-fixture'))
+    await assert.rejects(stat(join(registry.root, 'initial-exec.sh')), /ENOENT/)
+    assert.ok((await stat(registry.root)).isDirectory())
+  }
+})
+
+test('an unfrozen actual runner is rejected even with a resource-contract approval', async () => {
+  const f = await fixture(); await f.approve()
+  assert.throws(() => admitRun({ ...f.plan, kind: 'executor-positive-once' }, f.binding), /runner and scenario are not frozen/)
+  await assert.rejects(stat(join(f.root, 'run-consumed.json')), /ENOENT/)
+})
+
+test('path replacement during close is refused before the removal callback', async () => {
+  const { mkdir } = await import('node:fs/promises')
+  const { disposeAcceptanceSession } = await import('../../lib/credentials/owned-chromium')
+  const f = await fixture(); await f.approve(); admitRun(f.plan, f.binding); admitCall(f.plan, 'initial', f.binding)
+  admitSpawn(f.plan, 'initial', identity(f.plan), args(f.plan), true)
+  const s = f.plan.sessions[0]
+  let removals = 0, checks = 0
+  await assert.rejects(disposeAcceptanceSession({
+    async prepareProfile() { return s }, async started() {},
+    async beforeCleanup() { checks++; return admitCleanup(f.plan, 'initial', f.binding) },
+  }, s, async () => {
+    await rename(s.directory, s.directory + '.retained')
+    await mkdir(s.directory, { mode: 0o700 })
+  }, async () => { removals++ }))
+  assert.equal(checks, 2); assert.equal(removals, 0)
+  assert.ok((await stat(s.directory)).isDirectory())
+  assert.ok((await stat(s.directory + '.retained')).isDirectory())
+})

@@ -12,7 +12,7 @@ const pwRoot = dirname(require.resolve('playwright-core/package.json'))
 const sha = value => createHash('sha256').update(value).digest('hex')
 const json = path => JSON.parse(readFileSync(path, 'utf8'))
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'"
-const frozenFiles = ['scripts/disposal/credential-admission.mjs', 'lib/credentials/acceptance-lifecycle.ts', 'lib/credentials/owned-chromium.ts', 'lib/credentials/acceptance-resource-registry.ts', 'package.json', 'pnpm-lock.yaml']
+const frozenFiles = ['scripts/disposal/credential-admission.mjs', 'lib/credentials/acceptance-lifecycle.ts', 'lib/credentials/owned-chromium.ts', 'lib/credentials/contracts.ts', 'lib/credentials/browser-protocol.ts', 'lib/credentials/acceptance-resource-registry.ts', 'package.json', 'pnpm-lock.yaml']
 export function runtimeSourceDigest(root) {
   const files = []
   const visit = (relative = '') => {
@@ -53,6 +53,26 @@ function evidence(path) { privateFile(path); return json(path) }
 function save(path, value) { writeFileSync(path, JSON.stringify(value), { flag: 'wx', mode: 0o600 }) }
 function rolePlan(plan, role) { const item = plan.sessions.find(s => s.role === role); assert.ok(item, 'unknown session role'); return item }
 function exactHost(plan) { assert.deepEqual(procIdentity(process.pid), plan.host, 'different execution host') }
+// Structural checks survive an already-removed session; live identity checks happen
+// separately at prepare/admission. Never let a reservation name address the registry.
+function reservationScope(root, registry, reservations) {
+  const identities = new Set([`${registry.dev}:${registry.ino}`])
+  const paths = new Set([root])
+  for (const r of reservations) {
+    assert.match(r.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/, 'UUID v4 reservation required')
+    assert.equal(r.directory, join(root, r.id))
+    assert.equal(dirname(r.directory), root, 'direct child required')
+    assert.notEqual(r.directory, root)
+    assert.equal(r.profile, join(r.directory, 'profile'))
+    assert.equal(r.artifacts, join(r.directory, 'artifacts'))
+    assert.deepEqual(r.directories.map(d => d.path), [r.directory, r.profile, r.artifacts])
+    for (const d of r.directories) {
+      assert.ok(!paths.has(d.path), 'reservation path alias')
+      assert.ok(!identities.has(`${d.dev}:${d.ino}`), 'reservation inode alias')
+      paths.add(d.path); identities.add(`${d.dev}:${d.ino}`)
+    }
+  }
+}
 function checkPlan(plan) {
   assert.ok(['executor-positive-once', 'contract-fixture'].includes(plan.kind))
   assert.equal(plan.registry.path, plan.root)
@@ -61,6 +81,7 @@ function checkPlan(plan) {
   assert.equal(plan.calls, 2); assert.equal(plan.startsPerCall, 2); assert.equal(plan.maxStarts, 4)
   assert.deepEqual(plan.sessions.map(s => s.role), ['initial', 'replacement'])
   directory(plan.registry)
+  reservationScope(plan.root, plan.registry, plan.sessions)
   privateFile(join(plan.root, 'owner.json'))
   assert.equal(sha(readFileSync(join(plan.root, 'owner.json'))), plan.ownerHash)
   assert.equal(sha(readFileSync(plan.executable)), plan.executableHash)
@@ -79,6 +100,8 @@ export function prepareAdmission(root, binding, reservations, executable, kind =
   else assert.equal(executable, join(root, 'fixture-target'))
   const owner = json(join(root, 'owner.json')), st = lstatSync(root)
   assert.equal(owner.root, root); assert.equal(owner.uid, process.getuid())
+  reservationScope(root, { dev: String(st.dev), ino: String(st.ino) }, reservations)
+  for (const r of reservations) for (const d of r.directories) directory(d)
   const roles = ['initial', 'replacement']
   const sessions = reservations.map((r, index) => {
     assert.equal(r.directory, join(root, r.id))
@@ -107,6 +130,9 @@ function approval(plan) {
   return { a, hash: sha(readFileSync(path)) }
 }
 export function admitRun(plan, binding) {
+  // Resource-contract setup alone does not freeze the executing scenario. Until
+  // a reviewed entry/config is implemented and pinned, real execution is refused.
+  assert.equal(plan.kind, 'contract-fixture', 'actual lifecycle runner and scenario are not frozen; setup-only')
   checkPlan(plan); exactHost(plan); assert.deepEqual(binding, plan.binding)
   const { a, hash } = approval(plan)
   assert.ok(Number.isFinite(Date.parse(a.launchExpiresAt)) && Date.parse(a.launchExpiresAt) > Date.now(), 'approval expired')
@@ -114,6 +140,7 @@ export function admitRun(plan, binding) {
   save(join(plan.root, 'run-consumed.json'), { nonce: plan.nonce, approvalHash: hash, source: plan.source, host: plan.host })
 }
 function grant(plan, launching) {
+  assert.equal(plan.kind, 'contract-fixture', 'actual lifecycle runner and scenario are not frozen; setup-only')
   checkPlan(plan)
   const { a, hash } = approval(plan), receipt = evidence(join(plan.root, 'run-consumed.json'))
   assert.equal(receipt.nonce, plan.nonce); assert.equal(receipt.approvalHash, hash); assert.equal(receipt.source, plan.source); assert.deepEqual(receipt.host, plan.host)
