@@ -1,11 +1,13 @@
+import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { NextResponse } from 'next/server'
 import { getTranslations } from 'next-intl/server'
 import { auth } from '@/lib/auth'
 import { loadWorkspaceSettings, WorkspaceError } from '@/lib/workspace-access'
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const started = performance.now()
   const session = await auth.api.getSession({ headers: request.headers })
+  noteLogUser(session?.user?.id)
   const authenticated = performance.now()
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
   try {
@@ -23,3 +25,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'workspaceReadFailed' }, { status: 500 })
   }
 }
+
+export const GET = withRequestLog('/api/workspace', handleGET)

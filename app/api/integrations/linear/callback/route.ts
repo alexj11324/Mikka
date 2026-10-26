@@ -1,3 +1,4 @@
+import { withRequestLog } from '@/lib/request-log'
 import { after, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { requireUser } from '@/lib/issue-access'
@@ -7,7 +8,7 @@ import { bootstrapSuggestions } from '@/lib/suggestions/sources'
 
 export const runtime = 'nodejs'
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const url = new URL(request.url)
   const failure = new URL(withBasePath('/?linear=error'), url.origin)
   const cookieStore = await cookies()
@@ -30,3 +31,5 @@ export async function GET(request: Request) {
     return redirect(failure)
   }
 }
+
+export const GET = withRequestLog('/api/integrations/linear/callback', handleGET)
