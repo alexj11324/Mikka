@@ -76,6 +76,8 @@ import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
 import { createHostedBotRunner } from "./subscription-hosted-runner"
+import type { ComputerBroker } from "./computer/broker.mjs"
+import { pollWebComputerReviews } from "./computer/web-review"
 
 export * from "./server-link"
 export { DAEMON_VERSION, daemonPaths, defaultDataDir } from "./paths"
@@ -116,6 +118,8 @@ export interface DaemonOptions {
   hostedSubscriptions?: boolean
   /** Only the trusted E2B runner is allowed to select its isolated socket. */
   e2bContainerRuntime?: boolean
+  /** Trusted infrastructure supplies its already-listening review broker. */
+  computerBroker?: ComputerBroker
   /** Long-poll wait for run commands, seconds (default 25; tests shorten). */
   commandsWaitSeconds?: number
   /** Called once the daemon stopped after `daemon.drain`. */
@@ -188,6 +192,8 @@ export class Daemon {
   private commandsAbort = new AbortController()
   private commandsLoop: Promise<void> = Promise.resolve()
   private fsLoop: Promise<void> = Promise.resolve()
+  private reviewAbort: AbortController | null = null
+  private reviewLoop: Promise<void> = Promise.resolve()
   /** Messages handed to an agent whose delivery the server has not taken yet. */
   private unacked = new Set<string>()
   /** Runs this daemon already started cancelling for a stop request. */
@@ -663,7 +669,14 @@ export class Daemon {
       this.saveDevice({ deviceId })
       this.log.info({ device_id: deviceId }, "device registered")
     }
+    if (this.options.computerBroker && !this.options.link.syncComputerReviews) throw new Error("Computer review transport unavailable")
     this.registered = true
+    if (this.options.computerBroker && !this.stopped) {
+      this.reviewAbort?.abort()
+      const abort = new AbortController()
+      this.reviewAbort = abort
+      this.reviewLoop = pollWebComputerReviews(this.options.computerBroker, deviceId, this.options.link, abort.signal)
+    }
     this.wakeCommands?.()
   }
 
@@ -727,6 +740,8 @@ export class Daemon {
         // sees no credential, ADR 0026).
         this.server = "unregistered"
         this.registered = false
+        this.reviewAbort?.abort()
+        this.reviewAbort = null
         this.saveDevice({ credential: undefined })
         this.log.warn("server refused the device session; sign in again")
       } else if (!(error instanceof ServerUnreachableError)) {
@@ -979,6 +994,8 @@ export class Daemon {
     if (this.timer) clearTimeout(this.timer)
     await this.quota?.stop()
     this.commandsAbort.abort()
+    this.reviewAbort?.abort()
+    await this.reviewLoop.catch(() => undefined)
     await this.commandsLoop.catch(() => undefined)
     await this.fsLoop.catch(() => undefined)
     await this.tick
