@@ -4,6 +4,7 @@ import { getWorkflowMetadata } from 'workflow'
 import { z } from 'zod'
 import { COORDINATOR_MAX_STEPS, COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
 import { createComposioAITools, createGoogleAITools } from '@/lib/composio-actions'
+import { splitTelegramText } from '@/lib/telegram/messages'
 import * as steps from './steps'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
@@ -32,15 +33,18 @@ export async function coordinatorTurn(userId: string) {
     try {
       const { instructions, messages } = await steps.preparePrompt(userId)
       const result = await agent.generate({ instructions, messages, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep })
-      // Persist every step and its final warning before forwarding the answer.
       await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text))
       if (inbox.telegramTargets.length && result.text.trim()) {
         // The reply is saved and shows on the web; a Telegram failure (a
         // blocked bot, an outage) must not fail the turn and stall the inbox.
-        try {
-          await steps.sendTelegramReply(userId, inbox.telegramTargets, result.text)
-        } catch (error) {
-          console.error('Telegram reply failed', error instanceof Error ? error.message : String(error))
+        // A thread whose chunk fails gets no later chunks; other threads still do.
+        const threads = await steps.telegramReplyThreads(userId, inbox.telegramTargets)
+        for (const threadId of threads) {
+          try {
+            for (const chunk of splitTelegramText(result.text)) await steps.sendTelegramChunk(threadId, chunk)
+          } catch (error) {
+            console.error('Telegram reply failed', error instanceof Error ? error.message : String(error))
+          }
         }
       }
     } catch (error) {

@@ -178,5 +178,5 @@ jobs:
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:groups,test:relation-cycle,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:conversation-reads,test:groups,test:relation-cycle,test:workspace-migration-db
       - run: pnpm build
