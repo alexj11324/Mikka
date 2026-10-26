@@ -8,6 +8,8 @@ import { bindComputerRun } from './run-binding'
 import { claimLocalRun } from './claim'
 import { syncComputerReviews, decideComputerReview } from './reviews'
 import { provisionCloudDevice } from './cloud-device'
+import { ComputerBroker } from '../../packages/daemon/src/computer/broker.mjs'
+import { applyWebComputerDecisions, webComputerSnapshots } from '../../packages/daemon/src/computer/web-review'
 import type * as provider from './e2b-provider'
 
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
@@ -108,6 +110,26 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal((await store.state(actor, bot.id)).pendingApproval, undefined)
     assert.equal(await decideComputerReview(pool, actor, review.id, review.digest, true), false)
     assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [review]), [{ id: review.id, digest: review.digest, approve: true }])
+    let executions = 0
+    const broker = new ComputerBroker({ socketPath: `/tmp/unused-computer-${randomUUID()}`,
+      driver: { installed: true, version: 'fixture', path: '/fake', fingerprint: 'f'.repeat(64) }, permitted: id => id === runId,
+      execute: async (_, call, display) => { executions++; assert.equal(display, ':1'); return call },
+    })
+    try {
+      const grant = broker.spec(runId, 'ask', { display: ':1' })!
+      const pending = broker.request(grant.token, { name: 'click', arguments: { x: 7, y: 8 } })
+      const snapshots = webComputerSnapshots(broker)
+      assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, snapshots), [])
+      const request = (await store.state(actor, bot.id)).pendingApproval!
+      assert.equal(request.id, snapshots[0].id)
+      assert.equal(executions, 0)
+      assert.equal(await decideComputerReview(pool, actor, request.id, request.digest, true), true)
+      await applyWebComputerDecisions(broker, await syncComputerReviews(pool, deviceId, actor.userId, snapshots))
+      assert.deepEqual(await pending, { name: 'click', arguments: { x: 7, y: 8 } })
+      assert.equal(executions, 1)
+      await applyWebComputerDecisions(broker, await syncComputerReviews(pool, deviceId, actor.userId, snapshots))
+      assert.equal(executions, 1, 'replayed decisions cannot execute again')
+    } finally { await broker.close() }
     await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [runId])
     await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [review]))
     const startedId = randomUUID()

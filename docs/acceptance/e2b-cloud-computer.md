@@ -178,9 +178,10 @@ owner can approve or deny a single operation; altered digests, cross-workspace
 decisions, stale/cancelled runs and replay are rejected. Run-wide approval is
 not implemented and fails explicitly. The daemon transport can sync snapshots and apply matching decisions, with a
 request-only MCP proxy regression test. A cancellable polling loop retries transport
-failures without approving calls, but is not yet attached to a hosted worker;
-hosted-run injection and chat events remain unwired, so this is not end-to-end
-approval acceptance.
+failures without approving calls; when a broker is supplied to the daemon, its
+polling starts after registration and stops on shutdown. Actual cloud worker
+provisioning, hosted-run injection and chat events remain unwired, so this is
+not end-to-end approval acceptance.
 
 ## Real E2B hosted-runner fixture
 
