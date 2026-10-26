@@ -1,11 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { COORDINATOR_MAX_STEPS, coordinatorStep, turnWarning } from './model'
+import { AGENT_MAX_ROUNDS, ROUND_WARNING_LINE } from '../agent-rounds'
+import { coordinatorStep, turnWarning } from './model'
 
-test('tools stay on until the last allowed step', () => {
-  assert.deepEqual(coordinatorStep({ stepNumber: 0 }), {})
-  assert.deepEqual(coordinatorStep({ stepNumber: COORDINATOR_MAX_STEPS - 2 }), {})
-  assert.deepEqual(coordinatorStep({ stepNumber: COORDINATOR_MAX_STEPS - 1 }), { toolChoice: 'none' })
+test('the Coordinator follows the shared round cap', () => {
+  assert.deepEqual(coordinatorStep({ stepNumber: 0, initialInstructions: 'base' }), {})
+  assert.deepEqual(coordinatorStep({ stepNumber: ROUND_WARNING_LINE - 1, initialInstructions: 'base' }), {})
+  assert.match(coordinatorStep({ stepNumber: ROUND_WARNING_LINE, initialInstructions: 'base' }).system ?? '', /^base\n\n.*还剩 30 轮/)
+  const last = coordinatorStep({ stepNumber: AGENT_MAX_ROUNDS - 1, initialInstructions: 'base' })
+  assert.equal(last.toolChoice, 'none')
+  assert.match(last.system ?? '', /还剩 1 轮/)
 })
 
 test('a reply that stopped normally with text has no warning', () => {
