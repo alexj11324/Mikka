@@ -1,0 +1,40 @@
+{
+  "sha": "470c5cd4873634ff2b992598349ab52cffe1ee62",
+  "deploymentId": "dpl_57fKqAnkLRRgW9pe6ZUVbkrjwipx",
+  "steps": [
+    {
+      "utc": "2026-10-26T02:58:28.088Z",
+      "path": "/mikka",
+      "status": 200,
+      "title": "\u767b\u5f55 \u00b7 Mikka"
+    },
+    {
+      "utc": "2026-10-26T02:58:31.566Z",
+      "path": "/mikka/sign-in",
+      "status": 200,
+      "title": "\u767b\u5f55 \u00b7 Mikka"
+    },
+    {
+      "utc": "2026-10-26T02:58:35.166Z",
+      "path": "/mikka/en/sign-in",
+      "status": 200,
+      "title": "Sign in \u00b7 Mikka"
+    }
+  ],
+  "pageErrors": [],
+  "rawVideo": "production-raw.webm",
+  "scope": "Real anonymous production rendering; no authenticated session or OAuth/provider interaction.",
+  "videoProcessing": "MP4 is a full format conversion of the original raw recording, no cuts or simulated content.",
+  "hashes": {
+    "sign-in.png": "d1ed26c8043dd59228bce3755bdd685e3fca4032e373591a2edefc5a9a29f92e",
+    "production-review.mp4": "a47ef9378b4bd8722bd4358302117f01996fe19640e3fc6aaa4ce24c39b2b842",
+    "production-raw.webm": "1646af3e712e933a07dba9b57619073893195adbda22012d26e10e5ddb06075a"
+  },
+  "migrationLedger": {
+    "count": 64,
+    "latestApplied": "2026-10-26T01:50:51.521Z",
+    "checkedAfterDeploymentBuild": true
+  },
+  "aliasVerified": "app.aspectlylabs.com -> dpl_57fKqAnkLRRgW9pe6ZUVbkrjwipx",
+  "mainVerified": "470c5cd4873634ff2b992598349ab52cffe1ee62"
+}
