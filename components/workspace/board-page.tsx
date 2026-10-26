@@ -1,5 +1,6 @@
 'use client'
 
+import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useId, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -10,7 +11,6 @@ import { listTaskRuns } from '@/app/actions/task-runs'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { ConversationPill } from '@/components/nav/conversation-pill'
-import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { AGENT_STATES, CARD_PROPERTIES, DEFAULT_CARD_PROPERTIES, DEFAULT_HIDDEN_COLUMNS, agentStateOf, type AgentState, type CardProperty } from '@/components/blocks/kanban-board-1/components/data'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup, ButtonGroupText } from '@/components/ui/button-group'
@@ -151,7 +151,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const options: Record<FilterField, { value: string; label: string; mark?: React.ReactNode }[]> = {
     status: ISSUE_STATUSES.map(status => ({ value: status.value, label: statusLabel(status.value), mark: <status.icon className={cn(statusIconTints[status.tone])} /> })),
     priority: ISSUE_PRIORITIES.map(priority => ({ value: priority.value, label: priorityLabel(priority.value), mark: <priority.icon {...priority.iconProps} /> })),
-    assignee: [{ value: ME, label: t('me') }, ...assignees.filter(assignee => assignee.id !== userId).map(assignee => ({ value: assignee.id, label: assignee.name, mark: assignee.kind === 'agent' ? <AgentSphere name={assignee.name} compact /> : <LetterAvatar name={assignee.name} size="row" /> })), { value: NONE, label: t('unassigned'), mark: <CircleUserRound /> }],
+    assignee: [{ value: ME, label: t('me') }, ...assignees.filter(assignee => assignee.id !== userId).map(assignee => ({ value: assignee.id, label: assignee.name, mark: assignee.kind === 'agent' ? <AgentSphere name={assignee.name} compact /> : <PersonAvatar name={assignee.name} image={assignee.image} size="row" /> })), { value: NONE, label: t('unassigned'), mark: <CircleUserRound /> }],
     labels: labels.map(label => ({ value: label.name, label: label.name, mark: <LabelDot color={label.color} /> })),
     project: [...projects.map(project => ({ value: project, label: project, mark: <Box /> })), { value: NONE, label: t('noProject') }],
     agentState: [...AGENT_STATES.map(state => ({ value: state, label: t(`card.agent.${state}` as `card.agent.${AgentState}`) })), { value: NONE, label: t('noRun') }],
@@ -225,7 +225,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
         </div>
       </div>
       {view === 'board'
-        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} context={{ properties: new Set(display.properties), agentStates, subtasks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { setSidebar(true); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
+        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} narrow={sidebar ? ['done'] : undefined} context={{ properties: new Set(display.properties), agentStates, subtasks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { setSidebar(true); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
         : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
     {sidebar && <aside aria-label={tNav('coordinator')} className="relative hidden w-90 shrink-0 flex-col border-l lg:flex">

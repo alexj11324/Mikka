@@ -11,10 +11,46 @@ export interface CoordinatorEventInput {
   payload: Record<string, unknown>
 }
 
+export interface TelegramReplyTarget {
+  threadId: string
+  telegramUserId: string
+}
+
+export interface TelegramMessageSource extends TelegramReplyTarget {
+  messageId: number
+}
+
 /** A message the person wrote to their Coordinator. */
-export function userMessageEvent(userId: string, text: string): CoordinatorEventInput {
+export function userMessageEvent(
+  userId: string,
+  text: string,
+  options: { issueId?: string | null; telegram?: TelegramMessageSource } = {},
+): CoordinatorEventInput {
   const id = crypto.randomUUID()
-  return { userId, kind: 'user_message', dedupeKey: `user_message:${id}`, issueId: null, runId: null, payload: { text } }
+  const telegram = options.telegram
+  return {
+    userId,
+    kind: 'user_message',
+    dedupeKey: telegram ? 'telegram:' + telegram.threadId + ':' + telegram.messageId : 'user_message:' + id,
+    issueId: options.issueId ?? null,
+    runId: null,
+    payload: { text, ...(telegram ? { telegram } : {}) },
+  }
+}
+
+/** Unique Telegram destinations for the user messages in one claimed batch. */
+export function telegramReplyTargets(events: ReadonlyArray<Pick<CoordinatorEventInput, 'kind' | 'payload'>>): TelegramReplyTarget[] {
+  const targets = new Map<string, TelegramReplyTarget>()
+  for (const event of events) {
+    if (event.kind !== 'user_message') continue
+    const value = event.payload.telegram
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+    const source = value as Record<string, unknown>
+    if (typeof source.threadId !== 'string' || !source.threadId || typeof source.telegramUserId !== 'string' || !source.telegramUserId || typeof source.messageId !== 'number' || !Number.isSafeInteger(source.messageId)) continue
+    const target = { threadId: source.threadId, telegramUserId: source.telegramUserId }
+    targets.set(JSON.stringify(target), target)
+  }
+  return [...targets.values()]
 }
 
 /** A run ended. One event per run, however often the daemon reports it. */

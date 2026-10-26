@@ -5,9 +5,11 @@ import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 
+import { PostHogAnalytics } from "@/components/posthog-analytics";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { routing } from "@/i18n/routing";
+import { posthogConfig } from "@/lib/posthog-config";
 
 import "../globals.css";
 
@@ -52,7 +54,7 @@ export default async function RootLayout({
       </head>
       <body className="antialiased">
         <NextIntlClientProvider messages={messages}>
-          <ThemeProvider>{children}<Toaster /></ThemeProvider>
+          <ThemeProvider>{posthogConfig.token && <PostHogAnalytics />}{children}<Toaster /></ThemeProvider>
         </NextIntlClientProvider>
       </body>
     </html>

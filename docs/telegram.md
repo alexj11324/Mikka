@@ -1,6 +1,6 @@
 # Telegram integration
 
-The Telegram bot accepts private messages only. Users connect it from **Settings → Integrations** with a one-time link, then create Backlog issues and link the chat to existing issues.
+The Telegram bot accepts private messages only. Users connect it from **Settings → Integrations** with a one-time link. Ordinary messages go to the user's persistent Orchestrator conversation and its replies return to Telegram. While a `/new` draft is active, ordinary messages add draft details.
 
 ## Production configuration
 
@@ -16,6 +16,7 @@ After the production deployment is ready, register `https://app.aspectlylabs.com
 
 ## Commands
 
+- Send an ordinary message to talk with the Orchestrator.
 - `/start <pairing token>` completes the one-time connection from Settings.
 - `/new <title>` starts an issue draft. Send detail messages, then use `/confirm` to create a Backlog issue.
 - `/cancel` discards the current draft.

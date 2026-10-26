@@ -9,17 +9,26 @@ import { createImprovementStore } from './store'
 import { handleImprovement } from './http'
 import { digest } from './contract'
 import { SCORER, SCORER_DIGEST } from './scorer'
+import { improvementTestDatabase } from './test-database'
 
-const enabled = Boolean(process.env.IMPROVEMENT_TEST_URL)
+const testURL = improvementTestDatabase(process.env)
+const enabled = Boolean(testURL)
 test('actual PG17 and HTTP: immutable feedback → scores → aggregate → candidate → fixed synthetic comparison', { skip: !enabled, timeout: 120000 }, async t => {
   // Never fall back to an application URL. Retain this synthetic schema for
   // inspection; deleting fixtures requires separate approval.
-  const target = new URL(process.env.IMPROVEMENT_TEST_URL!)
-  assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(target.hostname))
-  assert.equal(target.pathname, '/mikka_improvement')
+  const target = new URL(testURL!)
+  // Extensions are database-scoped. A fresh database, not public in search_path,
+  // prevents a previous suite's pg_trgm namespace or business tables leaking in.
+  // This server was validated as a dedicated local test service before any I/O.
+  const fixtureAdmin = new Pool({ connectionString: target.toString(), max: 1 })
+  const database = `mikka_improvement_${randomUUID().replaceAll('-', '')}`
+  try {
+    assert.equal((await fixtureAdmin.query('SHOW server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+    await fixtureAdmin.query(`CREATE DATABASE "${database}"`)
+  } finally { await fixtureAdmin.end() }
+  target.pathname = `/${database}`
   const schema = `improvement_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: target.toString(), max: 1 })
-  assert.equal((await admin.query('SHOW server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
   await admin.query(`CREATE SCHEMA "${schema}"`)
   target.searchParams.set('options', `-c search_path=${schema}`)
   let pool = new Pool({ connectionString: target.toString(), max: 12 })
@@ -27,7 +36,7 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
   const dir = new URL('../../drizzle/', import.meta.url)
   const files = orderMigrations((await readdir(dir)).filter(name => name.endsWith('.sql')))
   for (const name of files) await pool.query(await readFile(new URL(name, dir), 'utf8'))
-  await pool.query(await readFile(new URL('20261025070600_self_improvement.sql', dir), 'utf8'))
+  await pool.query(await readFile(new URL('20261026190330_self_improvement.sql', dir), 'utf8'))
   assert.equal((await pool.query(`SELECT count(*) FROM pg_constraint c
     JOIN pg_class child ON child.oid=c.conrelid JOIN pg_namespace n ON n.oid=child.relnamespace
     JOIN pg_class parent ON parent.oid=c.confrelid
@@ -245,6 +254,6 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
     assert.equal((await replay.json()).id, id)
   })
 
-  console.log(JSON.stringify({ layer: 'actual-PG17-HTTP', fixtures: 'synthetic-run-report-and-identity', retainedSchema: schema,
+  console.log(JSON.stringify({ layer: 'actual-PG17-HTTP', fixtures: 'synthetic-run-report-and-identity', retainedDatabase: database, retainedSchema: schema,
     scorerDigest: SCORER_DIGEST, migrations: files.length, productionAcceptance: false }))
 })

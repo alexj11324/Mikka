@@ -1,7 +1,8 @@
 // Applies pending drizzle/*.sql files in order and records each one, so a
-// file runs once per database. Runs as part of `pnpm build`, but only for
-// Vercel production builds unless MIGRATE=1 is set; preview and local builds
-// skip it.
+// file runs once per database. Invoke separately with `pnpm migrate` after
+// approving the target and SQL manifest. Default `pnpm build` never invokes it.
+// Explicit invocation runs in Vercel production or with MIGRATE=1; MIGRATE=0
+// skips before reading files or opening a database.
 //
 // A file targets MIKKA_DATABASE_URL unless its first lines contain
 // `-- target: DATABASE_URL` (the workspace database).
@@ -9,9 +10,9 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
 import { orderMigrations } from './migration-order.mjs'
 
-const shouldRun = process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production'
+const shouldRun = process.env.MIGRATE !== '0' && (process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production')
 if (!shouldRun) {
-  console.log('migrate: skipped (not a Vercel production build; set MIGRATE=1 to force)')
+  console.log('migrate: skipped (explicit MIGRATE=0 or non-production; set MIGRATE=1 to apply)')
   process.exit(0)
 }
 

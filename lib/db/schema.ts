@@ -9,7 +9,7 @@ export const users = pgTable('user', {
 export const issueMembers = pgTable('issue_members', {
   issueId: uuid('issueId').notNull(), userId: text('userId').notNull(), memberId: text('memberId').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [primaryKey({ columns: [table.issueId, table.memberId] })])
+}, table => [primaryKey({ columns: [table.issueId, table.memberId] }), index('issue_members_member_idx').on(table.memberId, table.issueId)])
 export const issueDocuments = pgTable('issue_documents', {
   issueId: uuid('issueId').primaryKey(), userId: text('userId').notNull(), state: text('state').notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
@@ -28,7 +28,7 @@ export const issues = pgTable('issues', {
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-})
+}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc())])
 // The personal issue prefix someone chose; without a row it comes from their email (MIK-46).
 export const issuePrefixes = pgTable('issue_prefixes', {
   userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
@@ -54,6 +54,8 @@ export const issueVersions = pgTable('issue_versions', {
   id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull(), userId: text('userId').notNull(),
   revision: integer('revision').notNull(), title: varchar('title', { length: 200 }).notNull(),
   content: jsonb('content').$type<JSONContent>().notNull(), status: text('status').notNull(), priority: text('priority').notNull(),
+  // Who made the change; set on the server only. Null on rows written before 20261025200000_activity_version_actor.
+  actorType: text('actor_type').$type<'user' | 'agent' | 'system'>(), actorId: text('actor_id'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -430,3 +432,23 @@ export const pendingActions = pgTable('pending_actions', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   decidedAt: timestamp('decidedAt', { withTimezone: true }),
 }, table => [index('pending_actions_user_status_idx').on(table.userId, table.status, table.createdAt)])
+
+// Optional native Coordinator bridge (#312). Existing users default to AI SDK.
+export const coordinatorRuntimeSettings = pgTable('coordinator_runtime_settings', {
+  userId: text('userId').primaryKey(), runtime: jsonb('runtime').notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+export const nativeCoordinatorTurns = pgTable('native_coordinator_turns', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  deviceId: uuid('deviceId').notNull().references(() => devices.id, { onDelete: 'cascade' }),
+  holder: text('holder').notNull(), round: integer('round').notNull(), payload: jsonb('payload').notNull(),
+  status: text('status').notNull().default('queued'), reply: text('reply'),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique().on(table.userId, table.holder, table.round), index('native_coordinator_pending_idx').on(table.deviceId, table.status, table.createdAt)])
+export const nativeCoordinatorTools = pgTable('native_coordinator_tools', {
+  turnId: uuid('turnId').notNull().references(() => nativeCoordinatorTurns.id, { onDelete: 'cascade' }),
+  callId: text('callId').notNull(), name: text('name').notNull(), input: jsonb('input').notNull(),
+  status: text('status').notNull().default('pending'), output: jsonb('output'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.turnId, table.callId] })])

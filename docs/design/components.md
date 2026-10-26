@@ -11,10 +11,11 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | App shell (window, top bar, rail, content card) | `components/app-shell.tsx`, `components/nav/icon-rail.tsx` | Comma structure, R-35 |
 | Bot list (left) | `components/nav/conversation-list.tsx` | Lists bots; the file name is old, the model is the glossary's |
 | Centre chat title | `components/nav/conversation-pill.tsx` | Borderless, centred |
-| Right panel | `components/nav/context-panel.tsx` | No input box, R-10 |
+| Right panel | `components/nav/context-panel.tsx` | No input box in the thread list or under a screen; an open thread ends in the composer, R-10 |
 | Composer | the composer in `components/coordinator/coordinator-chat.tsx` (`InputGroup` + `InputGroupTextarea`) | Attachment button, no model picker. Reuse it for every chat |
 | Messages | `components/ui/message.tsx`, `components/ui/bubble.tsx`, `MessageScroller*` | R-13, R-14 |
 | Task, run and source chips in chat | OpenUI `TaskChip`, `RunChip`, `SourceChip` (`components/workspace/agent-ui-library.tsx`, data from `agent-citations.tsx`) | R-15 |
+| Thread card under a Coordinator reply | `components/coordinator/thread-card.tsx`; opens `IssueThreadPanel` in the centre | R-66 |
 | New task | `components/coordinator/new-task-dialog.tsx` | R-22, R-23 |
 | Search | reUI `CommandDialog` (⌘K), centred | |
 | Board | reUI `Kanban` (`components/reui/kanban.tsx`) | R-25 |
@@ -39,8 +40,19 @@ them when their last caller goes.
 | `components/app-sidebar.tsx`, `nav-main.tsx`, `nav-secondary.tsx` | shadcn sidebar shell, replaced by the Comma shell; no callers left, safe to delete | Shell that "looked like a wireframe" |
 | reUI Pro App Shell blocks (`app-shell-*`) | Extensible shells that do not fit Mikka (Alex 2026-10-23) | |
 | HeroUI gradient-sphere avatars for bots | Replaced by bloub (R-36) | |
-| Any input inside the right panel | R-10 | 「指挥这个任务…」 field |
+| An input in the thread list or under a computer screen | Not a conversation (R-10) | 「指挥这个任务…」 field |
 | shadcn `Input` defaults in dark mode | `border-input` draws a white hairline (R-31) | |
+
+## Historical chat compatibility
+
+`legacy-chat-archive.tsx` displays saved pre-retirement chat records read-only.
+It has no composer, generation request or retry execution. Historical replies
+use an accessible static projection: every saved Accordion item and Tab is
+expanded as readable text; live ComputerCard and action components are never
+mounted. The body is selectable and remains in the accessibility tree. The standalone `agent-panel`, `agent-chat`, `agent-composer`, `agent-welcome`
+and `agent-response` generation host components are retired. Shared `agent-*`
+rendering primitives used by the current Bot are retained; their internal names
+are not a separate product entity.
 
 ## Changing this list
 
