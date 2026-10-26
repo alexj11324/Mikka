@@ -42,6 +42,8 @@ test('automatic mailbox workflow cannot reuse a previous native deletion approva
  assert.match(workflow,/BLOCKED: this automatic run has no run-specific native resource deletion authorization/)
  assert.ok(workflow.indexOf('Native authorization is pending')<workflow.indexOf('pnpm test:groups'))
  assert.match(workflow,/exit 1/)
+ assert.match(workflow,/mailboxes:\n    needs: native-authorization/)
+ assert.doesNotMatch(workflow.split('  mailboxes:')[0],/services:/)
  assert.match(workflow,/MIKKA_TEST_NATIVE_GROUPS: '1'/)
  assert.match(workflow,/pnpm test:group-native/)
 })
