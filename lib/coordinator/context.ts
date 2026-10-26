@@ -165,9 +165,20 @@ export interface ChatItem {
   text: string
   /** Tools the Coordinator used for this reply, in order. */
   tools: string[]
+  /** Runs this reply dispatched, each shown once as a thread card under it (R-66). */
+  threads: string[]
   createdAt: string
   /** Still in the inbox: its position is inferred, not a coordinator_messages row, so it can't be marked read. */
   pending?: true
+}
+
+/** The run id a dispatch_run result carries, if it succeeded. */
+function dispatchedRun(part: { type: string; toolName?: string; output?: unknown }): string | null {
+  if (part.type !== 'tool-result' || part.toolName !== 'dispatch_run') return null
+  const output = part.output as { type?: string; value?: unknown } | undefined
+  const value = output?.type === 'json' ? output.value : null
+  const runId = value && typeof value === 'object' ? (value as { runId?: unknown }).runId : null
+  return typeof runId === 'string' ? runId : null
 }
 
 /**
@@ -181,7 +192,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const text = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
       const event = text.startsWith('[Event]')
       // The triage line is for the Coordinator, not the person.
-      items.push({ ...(id ? { id } : {}), position, from: event ? 'event' : 'person', text: event ? text.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') : text, tools: [], createdAt: createdAt.toISOString(), ...(pending ? { pending } : {}) })
+      items.push({ ...(id ? { id } : {}), position, from: event ? 'event' : 'person', text: event ? text.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') : text, tools: [], threads: [], createdAt: createdAt.toISOString(), ...(pending ? { pending } : {}) })
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
       const text = parts.flatMap(part => part.type === 'text' && part.text.trim() ? [part.text.trim()] : []).join('\n\n')
@@ -191,7 +202,14 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         last.text = [last.text, text].filter(Boolean).join('\n\n')
         last.tools.push(...tools)
       } else if (text || tools.length) {
-        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text, tools, createdAt: createdAt.toISOString() })
+        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text, tools, threads: [], createdAt: createdAt.toISOString() })
+      }
+    } else if (message.role === 'tool') {
+      const last = items.at(-1)
+      if (last?.from !== 'coordinator') continue
+      for (const part of message.content) {
+        const runId = dispatchedRun(part)
+        if (runId && !last.threads.includes(runId)) last.threads.push(runId)
       }
     }
   }

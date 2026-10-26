@@ -7,6 +7,7 @@ import { getLinkPreview } from '@/app/actions/link-preview'
 import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { cn } from 'cn'
+import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { Badge } from '@/components/reui/badge'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
 import { SourceAvatar, SourcesList, SourcesSummary, type StreamingSource } from '@/components/ui/streaming-text'
@@ -82,7 +83,7 @@ export function CitationSources({ text }: { text: string }) {
       if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
       else {
         const issue = source.issue
-        listed.set(source.id, { name: t('runOf', { agent: source.agentName }), domain: source.harness === 'claude_code' ? 'Claude Code' : 'Codex', icon: source.harness === 'claude_code' ? <Claude /> : <OpenAI />, onSelect: issue ? () => onOpenIssue(issue.id) : undefined })
+        listed.set(source.id, { name: source.name, domain: source.agentName, icon: <LetterAvatar name={source.agentName} size="row" />, onSelect: issue ? () => onOpenIssue(issue.id) : undefined })
       }
     }
   }
@@ -141,6 +142,7 @@ export function RunCitation({ run, onOpen }: { run: RunSource; onOpen: (id: stri
   const format = useFormatter()
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
+  // The bot runs the thread; the coding agent is a step inside it, never its face (R-62).
   const issue = run.issue
   const status = t.has(`runStatus.${run.status}` as never) ? t(`runStatus.${run.status}` as never) : run.status
   return <InlineCitation>
@@ -148,12 +150,12 @@ export function RunCitation({ run, onOpen }: { run: RunSource; onOpen: (id: stri
       aria-label={issue ? t('openRunIssue', { agent: run.agentName, title: issue.title }) : t('runOf', { agent: run.agentName })}
       onClick={issue ? () => onOpen(issue.id) : undefined}
     >
-      <SourceAvatar source={{ name: harness, domain: harness, icon: <HarnessIcon /> }} />
-      <InlineCitationLabel>{t('runOf', { agent: run.agentName })}</InlineCitationLabel>
+      <SourceAvatar source={{ name: run.agentName, domain: run.agentName, icon: <LetterAvatar name={run.agentName} size="row" /> }} className="size-4 rounded-full" />
+      <InlineCitationLabel>{run.name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
-        <InlineCitationSource><HarnessIcon />{harness} · {run.agentName}</InlineCitationSource>
+        <InlineCitationSource>{run.agentName} · <HarnessIcon />{harness}</InlineCitationSource>
         <InlineCitationTitle>{issue ? `${issue.identifier ? `${issue.identifier} ` : ''}${issue.title}` : t('noIssue')}</InlineCitationTitle>
         <InlineCitationMeta>
           <Badge variant={RUN_BADGES[run.status] ?? 'secondary'} size="sm">{status}</Badge>

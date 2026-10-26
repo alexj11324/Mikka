@@ -2286,6 +2286,8 @@
     "hidden": "An agent thread",
     "open": "Open thread {name}",
     "dispatched": "started a thread",
+    "back": "Back to {name}",
+    "starting": "Getting ready",
     "close": "Close thread",
     "conversation": "Thread conversation",
     "loading": "Opening thread",
