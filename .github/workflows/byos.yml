@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Prevent legacy cleanup from bypassing pending R0 recipes
         env:
-          R0_RETENTION_REQUIRED: ${{ github.head_ref == 'fix/168-170-data-integration' || github.ref == 'refs/heads/fix/168-170-data-integration' }}
+          R0_RETENTION_REQUIRED: ${{ github.head_ref == 'fix/168-170-data-integration' || github.ref == 'refs/heads/fix/168-170-data-integration' || github.head_ref == 'integration/auth-r0-main975ee' || github.ref == 'refs/heads/integration/auth-r0-main975ee' }}
         run: |
           if [ "$R0_RETENTION_REQUIRED" = true ]; then
             echo '::error::BLOCKED: BYOS recipes require retained harness acceptance; automatic container deletion is not authorized for this R0 run'

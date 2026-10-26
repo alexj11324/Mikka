@@ -63,11 +63,10 @@ test('claim initializes mailboxes before the queued-to-preparing compare-and-set
   assert.match(claim, /Run is already claimed/)
 })
 
-test('Bot turns advertise messaging only when mailbox setup succeeds', () => {
+test('retired legacy Agent route cannot advertise or execute mailbox messaging', () => {
   const route = source('app/api/agent/route.ts')
-  assert.match(route, /mailboxes.conversation\([\s\S]*?\.catch\(/)
-  assert.match(route, /mailboxActor \? mailboxTools\(mailboxes, mailboxActor\) : \{\}/)
-  assert.match(route, /mailboxActor \? MAILBOX_INSTRUCTIONS : ''/)
+  assert.match(route, /export \{ GET \} from '\.\/images\/route'/)
+  assert.doesNotMatch(route, /POST|mailboxTools|MAILBOX_INSTRUCTIONS|mailboxes\.conversation|streamText/)
 })
 
 test('device discovery and the final claim predicate both reject disabled mailboxes', () => {
