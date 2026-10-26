@@ -1,9 +1,8 @@
 # #131 independent title read contract
 
-Base: main 2203c2c. The current GlobalSearch filters supplied recent arrays;
-this candidate supplies reads for a later frontend integration. Latest main 05ca9d4
-adds avatar changes, including lib/auth.ts; this independent branch does not overwrite
-them. No layout changes.
+Integration base: main 38efb919 (normal merge, preserving the complete latest tree). The current GlobalSearch filters supplied recent arrays;
+this candidate supplies reads for a later frontend integration. Main now includes #307 code-only builds/legacy generation retirement and #306/#309
+avatar/auth behavior. All of those changes are retained without replacing their files. No layout changes.
 No Bot/harness tool registration, Agent generation/list product or knowledge store
 is added. #131 remains open until coordinated integration and real acceptance.
 
@@ -111,3 +110,36 @@ Blob-denied artifact 12657970544 is not retried or used as this revision's proof
 No deployed Preview/production, real-user, performance or frontend acceptance is
 claimed. Parent owns Auth composition, frontend wiring and fixed-version actual
 acceptance. Keep draft; CI/PR success alone does not complete #131.
+
+
+## Claude consumer handoff after legacy retirement
+
+The history result's `id` is the retained `agent_sessions.id`, and `title` comes
+from that owner-authorized session row even beyond the recent 100. Read its saved
+body with the existing authenticated `GET /mikka/api/agent/sessions?sessionId=<id>`.
+The integrated HTTP regression locates a 1999-dated title behind 130 newer rows,
+reads its exact stored completion, checks foreign/missing IDs both return 404,
+unauthenticated access returns 401, retired generation POST returns 405, and the
+stored completion is unchanged. This supplies API locator evidence, not frontend
+server-search wiring or generation acceptance.
+
+The current archive UI accepts the existing controller action
+`onConversation({ kind: 'agent', sessionId: hit.id })`; the controller sets a
+LegacyChatRequest for the read-only archive. `?section=agent` alone opens a recent
+archive: the page does not currently parse a sessionId deep-link parameter.
+Do not invent `/agent/<id>` or claim a direct deep link is implemented.
+
+Known display gap for Claude: the detail GET still returns only the recent 100
+`sessions`; LegacyChatArchive looks up the selected title there. A result older
+than that list can display the generic archive heading despite its correct body.
+Keep `hit.title` with the selection and coordinate its archive-header presentation
+(or a separately reviewed selected-session metadata contract) during frontend
+integration. No archive layout/renderer or shared history helper is changed here.
+Current client-only GlobalSearch still cannot select older server hits until
+Claude wires this API; existing browser cases establish the recent archive path.
+
+The candidate stays draft. Use the existing browser-tests workflow's explicit
+workflow_dispatch on the frozen candidate to run the same full ready/before-merge
+suite without changing readiness or invoking a merge/deployment. Dedicated dual-PG
+HTTP remains separate from that single-DB browser fixture job. Browser plugin not
+available; browser validation uses the repository's regular Playwright CI workflow.

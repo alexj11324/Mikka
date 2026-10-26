@@ -89,6 +89,9 @@ const secret = process.env.BETTER_AUTH_SECRET
 if (!secret) throw new Error('Synthetic auth secret required')
 const cookie = `better-auth.session_token=${encodeURIComponent(`${token}.${createHmac('sha256', secret).update(token).digest('base64')}`)}`
 const prefix = `title-${randomUUID()}`
+const archivedId = randomUUID(), foreignToken = randomUUID()
+const foreignCookie = `better-auth.session_token=${encodeURIComponent(`${foreignToken}.${createHmac('sha256', secret).update(foreignToken).digest('base64')}`)}`
+const archivedCompletion = 'root = TextContent("synthetic retained archive body")'
 let groupIds: string[] = []
 async function get(request: APIRequestContext, params: Record<string, string>, authenticated = true) {
   const response = await request.get(`http://127.0.0.1:3210/mikka/api/search?${new URLSearchParams(params)}`, { headers: authenticated ? { cookie } : {} })
@@ -108,10 +111,13 @@ test.beforeAll(async () => {
   await startIsolatedNext()
   for (const id of [owner, outsider]) await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$1,$2,true,now(),now())', [id, `${id}@example.invalid`])
   await pool.query('insert into session (id,token,"userId","expiresAt","createdAt","updatedAt") values ($1,$2,$3,now()+interval \'1 hour\',now(),now())', [sessionId, token, owner])
+  await pool.query('insert into session (id,token,"userId","expiresAt","createdAt","updatedAt") values ($1,$2,$3,now()+interval \'1 hour\',now(),now())', [randomUUID(), foreignToken, outsider])
   for (const [id, user] of [[workspace, owner], [otherWorkspace, outsider]]) {
     await workspacePool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,\'Synthetic search\')', [id, user])
     await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",email,name,role,status) values ($1,$2,$3,$2,\'admin\',\'active\')', [id, user, `${user}@example.invalid`])
   }
+  await pool.query('insert into agent_sessions (id,"userId",title,"updatedAt") values ($1,$2,$3,\'1999-01-01T00:00:00Z\')', [archivedId, owner, `${prefix}-archive-locator`])
+  await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,\'synthetic archived question\',$4,\'complete\',$5)', [randomUUID(), archivedId, owner, archivedCompletion, randomUUID()])
   // Recent nonmatches and hidden matches cannot consume the page's visible LIMIT.
   for (const user of [owner, outsider]) await pool.query(`insert into agent_sessions (id,"userId",title,"updatedAt") select gen_random_uuid(),$1,$2||g,'2020-01-01T00:00:00.123456Z'::timestamptz + g * interval '1 microsecond' from generate_series(1,130) g`, [user, `${prefix}-history-`])
   await pool.query(`insert into agent_sessions (id,"userId",title,"updatedAt") select gen_random_uuid(),$1,'recent unrelated',now() from generate_series(1,130)`, [owner])
@@ -206,6 +212,34 @@ test('auth, unsupported sources, invalid input and workspace existence share pri
   expect(missing.body).toEqual(foreign.body)
   const first = await get(request, { source: 'history', q: `${prefix}-history-`, limit: '1' })
   expect((await get(request, { source: 'history', q: 'different', cursor: first.body.nextCursor })).response.status()).toBe(400)
+})
+
+test('retired archive title hit locates owner history beyond the latest 100 without generation', async ({ request }) => {
+  const found = await get(request, { source: 'history', q: `${prefix}-archive-locator` })
+  expect(found.response.status()).toBe(200)
+  expect(found.body.items).toHaveLength(1)
+  expect(found.body.items[0]).toMatchObject({ id: archivedId, title: `${prefix}-archive-locator`, type: 'history', scope: 'owner' })
+  const endpoint = `http://127.0.0.1:3210/mikka/api/agent/sessions?sessionId=${encodeURIComponent(found.body.items[0].id)}`
+  const archive = await request.get(endpoint, { headers: { cookie } })
+  expect(archive.status()).toBe(200)
+  expect(archive.headers()['cache-control']).toBe('private, no-store')
+  const saved = await archive.json()
+  expect(saved.sessionId).toBe(archivedId)
+  expect(saved.turns[0].completion).toBe(archivedCompletion)
+  expect(saved.sessions).toHaveLength(100)
+  expect(saved.sessions.some((row: { id: string }) => row.id === archivedId)).toBe(false)
+  // The recent-list title cap is a consumer limitation; do not fake an old-ID title here.
+  const foreign = await request.get(endpoint, { headers: { cookie: foreignCookie } })
+  const missing = await request.get(`http://127.0.0.1:3210/mikka/api/agent/sessions?sessionId=${randomUUID()}`, { headers: { cookie: foreignCookie } })
+  expect(foreign.status()).toBe(404)
+  expect(missing.status()).toBe(404)
+  expect(await foreign.json()).toEqual(await missing.json())
+  expect((await request.get(endpoint)).status()).toBe(401)
+  const generated = await request.post('http://127.0.0.1:3210/mikka/api/agent', { headers: { cookie }, data: { prompt: 'synthetic retired generation must not execute' } })
+  expect(generated.status()).toBe(405)
+  const retained = await pool.query('select completion from agent_turns where "sessionId"=$1', [archivedId])
+  expect(retained.rows.map(row => row.completion)).toEqual([archivedCompletion])
+  console.log('search131 retired archive locator: title/id beyond recent100 -> owner GET 200, foreign/missing 404, unauthenticated 401, generation POST 405; selected title remains outside recent list')
 })
 
 test('real query result rechecks group exit including the hidden lookahead before response', async ({ request }) => {
