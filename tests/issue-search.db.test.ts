@@ -19,7 +19,7 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
   const params = (query: Record<string,string>) => parseSearchParams(new URLSearchParams(query))
   const search = (query: Record<string,string>, userId = owner, workspaceId = workspace) => searchIssues(db,{userId,workspaceId,params:params(query)})
   try {
-    for (const file of ['20261025200100_issue_search_pg_trgm.sql','20261025200200_issue_search_title_idx.sql','20261025200300_issue_search_recent_idx.sql','20261025200400_issue_search_number_idx.sql']) {
+    for (const file of ['20261026013000_issue_search_pg_trgm.sql','20261026013001_issue_search_title_idx.sql','20261026013002_issue_search_recent_idx.sql','20261026013003_issue_search_number_idx.sql']) {
       const text = await readFile(new URL(`../drizzle/${file}`,import.meta.url),'utf8')
       await pool.query(text)
       await pool.query(text) // idempotent migration replay, outside transactions
