@@ -1337,7 +1337,7 @@
         "worker adaptations preserve finish, permission, foreground, skills and publication ownership contracts",
         "source attribution includes full upstream MIT license and immutable pin",
         "claim initializes mailboxes before the queued-to-preparing compare-and-set",
-        "Bot turns advertise messaging only when mailbox setup succeeds",
+        "retired legacy Agent route cannot advertise or execute mailbox messaging",
         "device discovery and the final claim predicate both reject disabled mailboxes",
         "Coordinator advances actionable goals and events through evidence-backed acceptance",
         "Coordinator limits questions to essential decisions and preserves scope and human authority",
