@@ -24,7 +24,7 @@ Date: 2026-10-26. Tracks #172. Branch: `codex/e2b-cloud-computer-172`.
 - Default 15-minute provider pause lifecycle; viewing/waking refreshes activity.
   Control state survives app restart in PostgreSQL. Provider pause is checked
   when reading computer state.
-- Run-to-Bot binding storage enforces matching owner/workspace through foreign keys and only admits queued runs; the bind operation serializes with run claiming. This storage is not yet wired to dispatch.
+- Run-to-Bot binding storage enforces matching owner/workspace through foreign keys and only admits queued runs; the bind operation serializes with run claiming. The local daemon claim path rejects bound runs rather than running them without the Bot desktop. Binding is not yet wired to dispatch or a cloud worker.
 - Reused #161's exact-operation broker/driver/proxy and regression tests; cloud display is bound to the trusted grant and included in the approval digest.
   Driver display selection is per child process, avoiding global DISPLAY races.
 
