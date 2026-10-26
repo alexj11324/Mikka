@@ -160,9 +160,10 @@ jobs:
     env:
       CI: 'true'
       REQUIRE_DB: '1'
-      DB_TEST_EXPECTED: active-agents,activity-actor-db,audit,byos-claim,byos-worker,conversation-reads,credentials,e2e:setup,factory,factory-monitor-http,factory-query-http,factory-question-http,group-native,groups,historical-upgrade-db,improvement,issue-search-db,issue-threads-db,mailboxes,migration-session,operations,relation-cycle,run-dispatch,visibility-db,workspace-migration-db
+      DB_TEST_EXPECTED: active-agents,activity-actor-db,audit,byos-claim,byos-retained,byos-worker,conversation-reads,credentials,credentials-disposal,e2e:setup,factory,factory-monitor-http,factory-query-http,factory-question-http,group-native,groups,historical-upgrade-db,improvement,issue-search-db,issue-threads-db,mailboxes,migration-session,operations,relation-cycle,run-dispatch,visibility-db,workspace-migration-db
       MIKKA_TEST_DB_PORT: '5432'
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      CREDENTIAL_TEST_ADMIN_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/postgres
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3100

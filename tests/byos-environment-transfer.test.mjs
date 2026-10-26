@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { randomUUID, createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createServer as httpsServer } from 'node:https'
@@ -19,7 +19,10 @@ import { enrollmentBindingDatabaseIdentity } from '../lib/subscription-enrollmen
 test('authenticated transfer route carries separate leases through production worker and preserves source', { timeout: 30000 }, async () => {
  const databaseUrl=process.env.MIKKA_BYOS_TEST_DATABASE_URL
  assert.ok(databaseUrl && new URL(databaseUrl).hostname==='127.0.0.1' && new URL(databaseUrl).pathname.endsWith('_e2e'))
- const pool=new Pool({connectionString:databaseUrl,max:2})
+ const workspaceUrl=process.env.MIKKA_BYOS_WORKSPACE_TEST_DATABASE_URL
+ assert.ok(workspaceUrl && new URL(workspaceUrl).hostname==='127.0.0.1' && new URL(workspaceUrl).pathname.endsWith('_e2e'))
+ assert.notEqual(new URL(workspaceUrl).pathname,new URL(databaseUrl).pathname)
+ const pool=new Pool({connectionString:databaseUrl,max:2}), workspacePool=new Pool({connectionString:workspaceUrl,max:2})
  const dir=await mkdtemp(join(tmpdir(),'mikka-transfer-'))
  const cert=join(dir,'cert.pem'),key=join(dir,'key.pem')
  execFileSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=app.infisical.com','-addext','subjectAltName=DNS:app.infisical.com','-addext','basicConstraints=critical,CA:TRUE'],{stdio:'ignore'})
@@ -64,15 +67,15 @@ test('authenticated transfer route carries separate leases through production wo
  try{
   await new Promise(r=>vault.listen(0,'127.0.0.1',r));await new Promise(r=>proxy.listen(0,'127.0.0.1',r))
   process.env.HTTPS_PROXY=`http://127.0.0.1:${proxy.address().port}`;process.env.HTTP_PROXY=process.env.HTTPS_PROXY;delete process.env.ALL_PROXY;process.env.NO_PROXY='127.0.0.1';process.env.SSL_CERT_FILE=cert
-  await pool.query('insert into mikka_workspaces(id,"userId",name) values($1,$2,\'Synthetic transfer\')',[workspace,owner])
-  await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,\'Fixture\',\'fixture@example.invalid\',\'admin\')',[workspace,owner])
+  await workspacePool.query('insert into mikka_workspaces(id,"userId",name) values($1,$2,\'Synthetic transfer\')',[workspace,owner])
+  await workspacePool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,\'Fixture\',\'fixture@example.invalid\',\'admin\')',[workspace,owner])
   const common={origin:'https://app.infisical.com',projectId:'89850d6a-f020-4936-863e-df77380dfe40'}
   const approval={transferId:randomUUID(),enrollmentId:id,ownerId:owner,workspaceId:workspace,sourcePrincipal:principal,provider:'claude',providerSubject:JSON.stringify(['fixture-account','fixture-org']),source:{...common,environment:'staging',grantPath:'/byos/pending-grants'},destination:{...common,environment:'prod',grantPath:'/byos/grants'},destinationOrigin:'https://app.aspectlylabs.com',destinationDatabaseIdentity:enrollmentBindingDatabaseIdentity(databaseUrl),sourceDigest:createHash('sha256').update(source).digest('hex'),sourceRevision:1,expiresAt:new Date(Date.now()+600000).toISOString(),deleteSource:false}
   let sourceGeneration=0, sourceLogins=0, custodyLogins=0
   const sourceTokens=universalAuthTokenProvider({origin:common.origin,credentials:()=>({clientId:'fixture-source',clientSecret:`fixture-source-${sourceGeneration}`}),fetch:async()=>{sourceLogins++;return Response.json({accessToken:'fixture-source-lease',tokenType:'Bearer',expiresIn:600})}})
   const custodyTokens=universalAuthTokenProvider({origin:common.origin,credentials:()=>({clientId:'fixture-custody',clientSecret:'fixture-custody-bootstrap'}),fetch:async()=>{custodyLogins++;return Response.json({accessToken:'fixture-destination-lease',tokenType:'Bearer',expiresIn:600})}})
   const client=new EnrollmentClient({binary:resolve('packages/subscription-worker/bin/mikka-subscription-enrollment'),infisicalOrigin:common.origin,project:common.projectId,environment:'prod',workloadToken:'',tokens:{get:()=>custodyTokens.getAccessToken(),reject:(_role,token)=>custodyTokens.rejectAccessToken(token)},sourceTokens,attemptPath:'/byos/enrollment-attempts',claimPath:'/byos/enrollment-claims',grantPath:'/byos/pending-grants',databaseUrl,canonicalGrantPath:'/byos/grants',accessPath:'/byos/access',transferApproval:approval,runtimeOrigin:'https://app.aspectlylabs.com'})
-  const route=enrollmentBindHTTP({operator:async()=> 'operator:'+ 'b'.repeat(64),session:async req=>req.headers.get('cookie')==='fixture=valid'?{userId:owner}:null,workspace:async(user,ws)=>{const r=await pool.query('select 1 from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2 and status=\'active\'',[ws,user]);assert.equal(r.rowCount,1)},client:()=>client})
+  const route=enrollmentBindHTTP({operator:async()=> 'operator:'+ 'b'.repeat(64),session:async req=>req.headers.get('cookie')==='fixture=valid'?{userId:owner}:null,workspace:async(user,ws)=>{const r=await workspacePool.query('select 1 from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2 and status=\'active\'',[ws,user]);assert.equal(r.rowCount,1)},client:()=>client})
   const post=(session,body={id,workspaceId:workspace})=>route(new Request('https://app.aspectlylabs.com/mikka/api/subscriptions/enrollments/bind',{method:'POST',headers:{'content-type':'application/json',cookie:session?'fixture=valid':''},body:JSON.stringify(body)}))
   assert.equal((await post(false)).status,401);assert.equal((await post(true,{id,workspaceId:workspace,ownerId:'forged'})).status,409)
   for(const mode of ['receipt-get','claim-create','claim-read']) {
@@ -102,6 +105,6 @@ test('authenticated transfer route carries separate leases through production wo
   assert.equal(sourceLogins,5);assert.equal(custodyLogins,1)
  }finally{
   for(const k of keys){if(saved[k]===undefined)delete process.env[k];else process.env[k]=saved[k]}
-  for(const s of sockets)s.destroy();proxy.closeAllConnections();vault.closeAllConnections();await Promise.all([new Promise(r=>proxy.close(r)),new Promise(r=>vault.close(r))]);await pool.end();await rm(dir,{recursive:true,force:true})
+  for(const s of sockets)s.destroy();proxy.closeAllConnections();vault.closeAllConnections();await Promise.all([new Promise(r=>proxy.close(r)),new Promise(r=>vault.close(r))]);await pool.end();await workspacePool.end();console.log(JSON.stringify({fixture:'byos-environment-transfer',directory:dir,disposition:'retained'}))
  }
 })

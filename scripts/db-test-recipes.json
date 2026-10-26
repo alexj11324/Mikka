@@ -5,9 +5,11 @@
     "activity-actor-db",
     "audit",
     "byos-claim",
+    "byos-retained",
     "byos-worker",
     "conversation-reads",
     "credentials",
+    "credentials-disposal",
     "e2e:setup",
     "factory",
     "factory-monitor-http",
@@ -386,6 +388,21 @@
         "R0_GROUP_APP_DATABASE_URL",
         "R0_WORKSPACE_DATABASE_URL"
       ]
+    },
+    "byos-retained": {
+      "targets": [],
+      "provisioner": "scripts/test-byos-retained.mjs",
+      "bindings": {},
+      "env": {
+        "RETAIN_SYNTHETIC_RECORDS": "1"
+      },
+      "provisionedTarget": {
+        "host": "127.0.0.1",
+        "database": "mikka_byos_retained_app_e2e",
+        "workspaceDatabase": "mikka_byos_retained_workspace_e2e",
+        "port": "ephemeral",
+        "retention": "stopped-and-retained"
+      }
     }
   },
   "recipes": [
@@ -517,13 +534,7 @@
         {
           "path": "tests/byos-enrollment-binding.test.mjs",
           "requiredNames": [
-            "source cleanup migration backfills legacy published transfers and replays without erasing history"
-          ]
-        },
-        {
-          "path": "tests/byos-environment-transfer.test.mjs",
-          "requiredNames": [
-            "authenticated transfer route carries separate leases through production worker and preserves source"
+            "authenticated binding migrates one escrow through actual canonical publication and recovers projection failure"
           ]
         }
       ],
@@ -537,7 +548,7 @@
       "status": "pending",
       "packageScript": "test:byos-worker",
       "runner": "scripts/test-subscription-worker.mjs",
-      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "pendingReason": "Full application/native and enrollment binding call physical worker SQL cleanup and PID/profile removal; Go fixtures also delete rows. Retained transfer/migration coverage is separate, not a substitute.",
       "prerequisites": [
         "Go worker build",
         "local synthetic TLS fixture",
@@ -592,7 +603,7 @@
         {
           "path": "lib/credentials/acceptance.test.ts",
           "requiredNames": [
-            "credential broker: real HTTP + Better Auth + isolated Postgres, synthetic vault and upstream"
+            "credential broker retained: real HTTP + Better Auth + isolated dual Postgres"
           ]
         }
       ],
@@ -603,12 +614,41 @@
       ],
       "profile": "credentials",
       "phase": "external",
-      "status": "pending",
+      "status": "ready",
       "packageScript": "test:credentials",
       "runner": "scripts/test-credential-backend.mjs",
-      "pendingReason": "Credential harness drops its two databases and physically deletes synthetic workspace/session rows; needs retained equivalent before execution.",
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "default/missing identity refuses without transport; only HTTPS origin accepted",
+        "single flight, early refresh, new login beyond original maximum lifetime",
+        "refresh failure discards still-valid old token, cools down, later recovers",
+        "401/403 latches until credential rotation; rejected vault token is not reissued",
+        "in-flight old login cannot survive rotation or disable; no cached credential leak",
+        "malformed/overlong/non-bearer/invalid-expiry/slow responses fail closed and redact",
+        "real loopback HTTP30-day cleaner login/delete/denial and redirect refusal; no real Infisical identity",
+        "old refresh and old vault rejection cannot overwrite a rotated token",
+        "vault rejection during early refresh fences late login response",
+        "delayed old-identity denial does not latch rotated credentials while login is pending",
+        "bounded worker lifetime requires enough validity and refreshes cached tokens before dispatch",
+        "issuer 30-day lifetime works for default cleaner and bounded BYOS leases, with early refresh and denial",
+        "long issuer lifetime cannot survive elapsed expiry or unsafe deadline arithmetic",
+        "credential broker retained: real HTTP + Better Auth + isolated dual Postgres",
+        "authenticated creation; cross-user, workspace, CSRF, strict schema and size rejection",
+        "system tool adapter derives live context, rejects cross-owner/run/task, and never accepts secret arguments",
+        "one-time submit/replay; opaque-only events/DB; fixed-target executor discards echo body",
+        "cancel racing vault write; no ready transition; durable failed-delete retry",
+        "expiry racing vault write and read; cancellation before admission prevents upstream call",
+        "cancel after use admission blocks all later uses while an admitted call completes",
+        "session-only explicit save; disconnect, permission and auth revocation deny new use",
+        "provider exceptions, crashed operations and late-write tombstones clean without leakage",
+        "small connection pool concurrent submit/use does not borrow a second app connection",
+        "same-origin policy drift revokes before vault read; stale run lease fails closed",
+        "DB lifecycle hooks revoke on stop/device disable independently of app callbacks",
+        "Infisical v4 adapter contract: synthetic transport only, scope, no redirects, sanitized failures"
+      ],
+      "expectedCount": 26,
+      "supportFiles": [
+        "lib/credentials/acceptance-harness.ts"
+      ]
     },
     {
       "id": "e2e:setup",
@@ -773,19 +813,18 @@
       ],
       "profile": "factory-question-http",
       "phase": "postbuild",
-      "status": "pending",
+      "status": "ready",
       "prerequisites": [
         "completed Next production build",
         "running synthetic loopback Next server",
-        "owner-provided restricted fixture identity"
+        "isolated synthetic signup session, scoped token rotation, retained fixtures"
       ],
       "expectedTests": [
         "real local question HTTP: owner, origin, replay, cancellation and isolation"
       ],
       "expectedCount": 1,
       "packageScript": "test:factory-question-http",
-      "runner": "scripts/test-factory-question-http.mjs",
-      "pendingReason": "Independent review: retained mode repeats anonymous 401 but does not invalidate the existing owner cookie; awaiting group-owner retained session revocation regression."
+      "runner": "scripts/test-factory-question-http.mjs"
     },
     {
       "id": "group-native",
@@ -1325,6 +1364,76 @@
         "legacy workspaces upgrade twice without losing data or team constraints"
       ],
       "expectedCount": 1
+    },
+    {
+      "id": "credentials-disposal",
+      "files": [
+        {
+          "path": "lib/credentials/disposal.db.test.ts",
+          "requiredNames": [
+            "physical workspace absence rejects credential use",
+            "Linux Chromium controlled page: browser path fails closed before any vault write or DOM fill",
+            "owned Chromium: real HTTP secret submission, exclusive isolation, real fill/submit/site verification, destroy and restore",
+            "owned Chromium bounded keyboard fallback keeps the fence; invalid target hands off only after cleanup",
+            "owned Chromium replacement-launch fault quarantines all reads after original process destruction",
+            "retained task login: protected read after scrub/unlock, identity refusal, completion/cancel/TTL cleanup"
+          ]
+        }
+      ],
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/credentials/disposal.db.test.ts"
+      ],
+      "profile": "credentials",
+      "phase": "external",
+      "status": "pending",
+      "pendingReason": "Physical workspace absence and Chromium profile/process disposal require separately scoped approval; retained credentials does not cover these six cases.",
+      "expectedTests": [
+        "credential broker disposal: physical workspace absence and Chromium lifecycle",
+        "physical workspace absence rejects credential use",
+        "Linux Chromium controlled page: browser path fails closed before any vault write or DOM fill",
+        "owned Chromium: real HTTP secret submission, exclusive isolation, real fill/submit/site verification, destroy and restore",
+        "owned Chromium bounded keyboard fallback keeps the fence; invalid target hands off only after cleanup",
+        "owned Chromium replacement-launch fault quarantines all reads after original process destruction",
+        "retained task login: protected read after scrub/unlock, identity refusal, completion/cancel/TTL cleanup"
+      ],
+      "expectedCount": 7,
+      "supportFiles": [
+        "lib/credentials/acceptance-harness.ts"
+      ]
+    },
+    {
+      "id": "byos-retained",
+      "files": [
+        {
+          "path": "tests/byos-enrollment-migration.db.test.mjs",
+          "requiredNames": [
+            "source cleanup migration backfills legacy published transfers and replays without erasing history"
+          ]
+        },
+        {
+          "path": "tests/byos-environment-transfer.test.mjs",
+          "requiredNames": [
+            "authenticated transfer route carries separate leases through production worker and preserves source"
+          ]
+        }
+      ],
+      "command": [
+        "node",
+        "scripts/test-byos-retained.mjs"
+      ],
+      "profile": "byos-retained",
+      "phase": "external",
+      "status": "ready",
+      "runner": "scripts/test-byos-retained.mjs",
+      "expectedTests": [
+        "source cleanup migration backfills legacy published transfers and replays without erasing history",
+        "authenticated transfer route carries separate leases through production worker and preserves source"
+      ],
+      "expectedCount": 2
     }
   ]
 }

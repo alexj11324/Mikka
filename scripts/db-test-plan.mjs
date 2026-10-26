@@ -27,6 +27,7 @@ export function coveragePlan(files, scripts, config, { required = [], selfManage
     if (!p || !Array.isArray(p.targets) || !p.bindings || !p.env || (!p.targets.length && !p.provisioner)) throw Error(`Missing target profile: ${r.id}`)
     if (p.provisioner && (!files[p.provisioner] || p.provisioner !== r.runner || !p.provisionedTarget?.database || p.provisionedTarget.host !== '127.0.0.1')) throw Error(`Missing provisioning contract: ${r.id}`)
     for (const target of p.targets) if (!target.key || (!target.database && !target.suffix) || target.host !== '127.0.0.1' || !/^[0-9]+$/.test(target.port ?? '')) throw Error(`Missing target DB contract: ${r.id}`)
+    if (r.supportFiles !== undefined && (!Array.isArray(r.supportFiles) || new Set(r.supportFiles).size !== r.supportFiles.length || r.supportFiles.some(f => typeof f !== 'string' || !Object.hasOwn(files, f)))) throw Error(`Missing or invalid support files: ${r.id}`)
     if (!r.files?.length) throw Error(`Missing test files: ${r.id}`)
     const complete = Array.isArray(r.expectedTests) && r.expectedTests.length > 0 && r.expectedTests.every(n => typeof n === 'string' && n.trim()) && Number.isInteger(r.expectedCount) && r.expectedCount === r.expectedTests.length
     if (!complete) {
@@ -55,7 +56,7 @@ export function coveragePlan(files, scripts, config, { required = [], selfManage
   for (const f of databaseFiles(files)) if (!exempt.has(f) && !coverage.has(f)) throw Error(`Unregistered DB suite: ${f}`)
   for (const { marker, file } of required) if (Object.hasOwn(files, marker) && !coverage.has(file)) throw Error(`Required feature suite missing: ${file}`)
   // Bind evidence to the complete reviewed configuration, invoked commands, suite and runner bytes.
-  const sourceFiles = [...new Set(config.recipes.flatMap(r => [...r.files.map(f => f.path), ...(r.runner ? [r.runner] : [])]))].sort()
+  const sourceFiles = [...new Set(config.recipes.flatMap(r => [...r.files.map(f => f.path), ...(r.supportFiles ?? []), ...(r.runner ? [r.runner] : [])]))].sort()
   const digest = createHash('sha256').update(JSON.stringify({ config, commands: config.recipes.map(r => r.packageScript ? scripts[r.packageScript] : r.command), sources: sourceFiles.map(f => [f, files[f]]) })).digest('hex')
   return { version: 1, digest, contractErrors, expected: sorted(ids), recipes: config.recipes, profiles, files: sorted(coverage.keys()), selfManaged: sorted(exempt) }
 }

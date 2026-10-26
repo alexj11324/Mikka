@@ -87,7 +87,7 @@ test('aggregation binds exact SHA/plan/profile/command/phase and every result on
 })
 test('actual tree has exact complete R0 inventory, all previously missing suites and no new exclusions', () => {
  const pkg=JSON.parse(readFileSync('package.json','utf8')).scripts,c=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8')),p=inventory(readTree(),pkg)
- assert.equal(p.files.length,43);assert.equal(p.recipes.length,25);assert.deepEqual(p.expected,c.expected)
+ assert.equal(p.files.length,45);assert.equal(p.recipes.length,27);assert.deepEqual(p.expected,c.expected)
  for(const id of ['credentials','groups','group-native','operations','migration-session','improvement','byos-claim','byos-worker','factory-question-http'])assert.ok(p.expected.includes(id))
  assert.ok(p.contractErrors.length>0,'unverified result contracts remain failed, not excluded');
  assert.deepEqual(p.selfManaged,['lib/auth-email.test.ts']);assert.equal(p.recipes.find(r=>r.id==='group-native').status,'pending');assert.equal(p.recipes.find(r=>r.id==='factory-question-http').phase,'postbuild')
@@ -205,4 +205,29 @@ test('BYOS claim provisioner requires retained fixtures and has no automatic dis
  assert.equal(recipe.status,'ready');assert.equal(recipe.expectedCount,1)
  assert.deepEqual(recipe.expectedTests,recipe.files[0].requiredNames)
  assert.equal(c.profiles['byos-claim'].provisionedTarget.retention,'stopped-and-retained')
+})
+
+test('shared harness support bytes are required and invalidate prior recipe evidence',()=>{
+ const c=config();c.recipes[0].supportFiles=['tests/helper.ts']
+ assert.throws(()=>plan(c),/support files/)
+ const a=plan(c,{...files,'tests/helper.ts':'real assertion A'})
+ const b=plan(c,{...files,'tests/helper.ts':'real assertion B'})
+ assert.notEqual(a.digest,b.digest)
+ for(const bad of [['tests/helper.ts','tests/helper.ts'],['missing.ts'],[null]]){
+  const changed=structuredClone(c);changed.recipes[0].supportFiles=bad
+  assert.throws(()=>plan(changed,{...files,'tests/helper.ts':'real assertion A'}),/support files/)
+ }
+})
+
+test('credential retained and disposal contracts cover every shared-harness scenario explicitly',()=>{
+ const c=JSON.parse(readFileSync('scripts/db-test-recipes.json'))
+ const retained=c.recipes.find(r=>r.id==='credentials'),disposal=c.recipes.find(r=>r.id==='credentials-disposal')
+ const source=readFileSync('lib/credentials/acceptance-harness.ts','utf8')
+ const cases=[...source.matchAll(/await scenario\('([^']+)'/g)].map(m=>m[1])
+ for(const name of cases)assert.equal([retained,disposal].filter(r=>r.expectedTests.includes(name)).length,1)
+ assert.equal(disposal.status,'pending');assert.equal(disposal.expectedCount,7)
+ assert.equal(retained.expectedCount,26)
+ for(const r of [retained,disposal])assert.ok(r.supportFiles.includes('lib/credentials/acceptance-harness.ts'))
+ assert.match(readFileSync('lib/credentials/disposal.db.test.ts','utf8'),/throw new Error\('Pending scoped approval/)
+ assert.doesNotMatch(readFileSync('scripts/test-credential-backend.mjs','utf8'),/DROP DATABASE/)
 })
