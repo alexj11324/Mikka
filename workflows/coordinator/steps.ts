@@ -54,15 +54,27 @@ export async function appendMessages(userId: string, holder: string, messages: M
   await store.appendMessages(userId, holder, messages, warning)
 }
 
-export async function sendTelegramReply(userId: string, targets: TelegramReplyTarget[], text: string) {
+/** Linked, de-duplicated Telegram threads that should get this reply. */
+export async function telegramReplyThreads(userId: string, targets: TelegramReplyTarget[]): Promise<string[]> {
   'use step'
-  // shortcut: Telegram sends have no idempotency key; add delivery receipts if duplicate replies appear.
   const destinations = [...new Map(targets.map(target => [JSON.stringify(target), target])).values()]
+  const threads: string[] = []
   for (const target of destinations) {
     const [link] = await db.select({ userId: telegramLinks.userId }).from(telegramLinks)
       .where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.telegramUserId, target.telegramUserId))).limit(1)
-    if (link) await postTelegramText(target.threadId, text)
+    if (link && !threads.includes(target.threadId)) threads.push(target.threadId)
   }
+  return threads
+}
+
+/**
+ * Sends one chunk to one thread. Each chunk is its own durable step, so a
+ * retry after a failed chunk resends only that chunk, never the ones already
+ * delivered (Telegram sends have no idempotency key).
+ */
+export async function sendTelegramChunk(threadId: string, chunk: string) {
+  'use step'
+  await postTelegramText(threadId, chunk)
 }
 
 /**
