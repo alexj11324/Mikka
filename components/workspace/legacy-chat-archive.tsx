@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ConversationPill } from '@/components/nav/conversation-pill'
 import { AgentThemeProvider } from './agent-theme'
 import { AgentConversation } from './agent-conversation'
-import { AgentGenerativeUI } from './agent-generative-ui'
+import { LegacyReplyContent } from './legacy-reply-content'
 import { AgentInteractionContext } from './agent-interaction'
 
 /** Legacy URLs can select existing history; they can never start another generation. */
@@ -41,8 +41,8 @@ export function LegacyChatArchive({ userId, initialHistory, request, onActive, o
           : history.turns.length === 0 ? <p className="px-4 py-2 text-sm text-muted-foreground">{t('empty')}</p>
             : <AgentConversation streaming={false} turns={history.turns.map(turn => ({
               id: turn.id, question: turn.prompt,
-              response: <div inert>
-                <AgentGenerativeUI response={turn.completion} isStreaming={false} onAction={() => {}} showErrors={false} />
+              response: <div data-testid="archived-reply">
+                <LegacyReplyContent response={turn.completion} />
                 {turn.error && <p className="text-sm text-muted-foreground">{turn.error}</p>}
                 {turn.status !== 'complete' && <p className="text-sm text-muted-foreground">{t('incomplete')}</p>}
               </div>,
