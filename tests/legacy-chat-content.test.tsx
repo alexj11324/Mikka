@@ -36,12 +36,14 @@ test('Malformed source remains visible and escaped rather than silently disappea
   assert.doesNotMatch(html, /<script|\sinert/)
 })
 
-test('Repeated saved content, code and table data retain their text', () => {
-  const response = 'root = Stack([body,body,BeCodeBlock("const saved = true", "js"),ShadcnTable(["Name","Value"],[["saved","42"]])])\nbody = TextContent("Repeated saved text")'
+test('Repeated saved content, code, tables and saved references retain their text', () => {
+  const response = 'root = Stack([body,body,BeCodeBlock("const saved = true", "js"),ShadcnTable(["Name","Value"],[["saved","42"]]),TaskChip("11111111-1111-4111-8111-111111111111"),RunChip("22222222-2222-4222-8222-222222222222")])\nbody = TextContent("Repeated saved text")'
   const result = legacyChatContent(response)
   assert.equal(result.text.split('Repeated saved text').length - 1, 2)
   const html = renderToStaticMarkup(<LegacyReplyContent response={response} />)
   assert.match(html, /const saved = true/)
   assert.match(html, /<table>/)
   assert.match(html, /<td>42<\/td>/)
+  assert.match(html, /11111111-1111-4111-8111-111111111111/)
+  assert.match(html, /22222222-2222-4222-8222-222222222222/)
 })

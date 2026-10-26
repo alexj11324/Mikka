@@ -28,6 +28,7 @@ export function legacyChatContent(response: string): { format: 'markdown' | 'sou
         if (!record(value)) return ''
         if (value.type === 'element' && record(value.props)) {
           const props = value.props
+          if ((value.typeName === 'TaskChip' || value.typeName === 'RunChip') && typeof props.id === 'string') return props.id
           if (value.typeName === 'BeCodeBlock' && typeof props.code === 'string') {
             const marker = fence(props.code)
             return `${marker}\n${props.code}\n${marker}`
