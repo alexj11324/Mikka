@@ -71,14 +71,17 @@ jobs:
           export WORKFLOW_LOCAL_DATA_DIR="/tmp/mikka-resource-176-${GITHUB_RUN_ID}"
           mkdir -p "$WORKFLOW_LOCAL_DATA_DIR"
           git rev-parse HEAD > .next/resource-source-sha
+          export CRON_SECRET="$(node --input-type=module -e 'import {randomUUID} from "node:crypto";process.stdout.write(randomUUID())')"
+          echo "::add-mask::$CRON_SECRET"
           docker run -d --name mikka176-resource-next --network host --user "$(id -u):$(id -g)" \
             -e CI=true -e NODE_ENV=production -e NEXT_TELEMETRY_DISABLED=1 \
             -e BETTER_AUTH_SECRET -e BETTER_AUTH_URL -e MIKKA_DATABASE_URL -e DATABASE_URL \
             -e WORKFLOW_TARGET_WORLD -e WORKFLOW_LOCAL_BASE_URL -e WORKFLOW_LOCAL_DATA_DIR -e WORKFLOW_NODE_HTTP \
-            -e MIKKA_RESOURCE_TEST_ORIGIN=http://127.0.0.1:6183 -e SCHEDULE_AGENT_ENABLED=1 -e MIKKA_RUNTIME_SWEEP_ENABLED=1 \
+            -e MIKKA_RESOURCE_TEST_ORIGIN=http://127.0.0.1:6183 -e MIKKA_SCHEDULE_AGENT_ENABLED=1 -e MIKKA_RUNTIME_SWEEP_ENABLED=1 -e CRON_SECRET \
             -v "$PWD:$PWD" -v "$WORKFLOW_LOCAL_DATA_DIR:$WORKFLOW_LOCAL_DATA_DIR" -w "$PWD" \
             node:24-bookworm-slim node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3180
           python3 scripts/record-terminal.py resource-sdk.cast node --import tsx scripts/verify-resource-sdk.mjs 2>&1 | tee resource-sdk.log
+          python3 scripts/record-terminal.py schedule-sdk.cast node --import tsx scripts/verify-schedule-sdk.mjs 2>&1 | tee schedule-sdk.log
       - name: Preserve diagnostics and stop disposable Next
         if: always()
         run: |
@@ -92,4 +95,6 @@ jobs:
             resource-sdk.cast
             resource-sdk.log
             resource-next.log
+            schedule-sdk.cast
+            schedule-sdk.log
           if-no-files-found: ignore
