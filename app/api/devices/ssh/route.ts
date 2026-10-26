@@ -1,3 +1,4 @@
+import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { NextResponse } from 'next/server'
 import { and, desc, eq, gt } from 'drizzle-orm'
 import { z } from 'zod'
@@ -58,8 +59,9 @@ async function isAllowedSshHost(hostname: string): Promise<boolean> {
  * deployment without `ssh` (Vercel) it fails at the first step; the manual
  * token flow is the fallback there.
  */
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
+  noteLogUser(session?.user?.id)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const parsed = bodySchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid host.' }, { status: 400 })
@@ -180,3 +182,5 @@ export async function POST(request: Request) {
     headers: { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store' },
   })
 }
+
+export const POST = withRequestLog('/api/devices/ssh', handlePOST)

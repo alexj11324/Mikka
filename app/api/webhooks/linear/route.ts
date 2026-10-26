@@ -1,3 +1,4 @@
+import { withRequestLog } from '@/lib/request-log'
 import { after } from 'next/server'
 import { db } from '@/lib/db'
 import { linearSyncInbox } from '@/lib/db/schema'
@@ -8,7 +9,7 @@ import { ingestNotifications } from '@/lib/suggestions/store'
 
 export const runtime = 'nodejs'
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const parsed = await parseLinearWebhookRequest(request, process.env.LINEAR_WEBHOOK_SECRET)
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: parsed.status })
   if ('ignored' in parsed) return new Response(null, { status: 200 })
@@ -28,3 +29,5 @@ export async function POST(request: Request) {
   }
   return new Response(null, { status: 200 })
 }
+
+export const POST = withRequestLog('/api/webhooks/linear', handlePOST)
