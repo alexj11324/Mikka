@@ -137,7 +137,7 @@
         "host": "127.0.0.1",
         "database": "byos_claim_fixture",
         "port": "ephemeral",
-        "retention": "pending"
+        "retention": "stopped-and-retained"
       }
     },
     "byos-worker": {
@@ -497,12 +497,13 @@
       ],
       "profile": "byos-claim",
       "phase": "external",
-      "status": "pending",
+      "status": "ready",
       "packageScript": "test:byos-claim",
       "runner": "scripts/test-byos-claim.mjs",
-      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
-      "expectedTests": null,
-      "expectedCount": null
+      "expectedTests": [
+        "real PG claim atomically publishes binding; concurrency, failure and cancellation preserve fences"
+      ],
+      "expectedCount": 1
     },
     {
       "id": "byos-worker",
