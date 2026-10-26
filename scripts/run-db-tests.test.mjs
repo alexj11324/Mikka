@@ -236,8 +236,9 @@ test('credential retained and disposal contracts cover every shared-harness scen
 test('failure diagnostics retain status/assertion locations but never credential strings or bodies',()=>{
  const raw = "code: 'ERR_ASSERTION'\nexpected: 200\nactual: 429\nerror: secret-token-DO-NOT-RETAIN\nactual: 'secret-cookie-DO-NOT-RETAIN'\n at signup (/home/runner/work/project/tests/factory-question-http.test.ts:66:14)\nhttps://private.example/secret?token=DO-NOT-RETAIN"
  const result=failureDiagnostics(raw)
- assert.deepEqual(result,{codes:['ERR_ASSERTION'],assertions:[{kind:'expected',value:200},{kind:'actual',value:429}],locations:['tests/factory-question-http.test.ts:66:14']})
+ assert.deepEqual(result,{goCases:[],codes:['ERR_ASSERTION'],assertions:[{kind:'expected',value:200},{kind:'actual',value:429}],locations:['tests/factory-question-http.test.ts:66:14']})
  assert.doesNotMatch(JSON.stringify(result),/secret|cookie|private|token|DO-NOT/)
+ assert.deepEqual(failureDiagnostics("R0_FAILED_CASE: TestKnownFixture\nR0_FAILED_CASE: secret-token").goCases,["TestKnownFixture"])
 })
 
 test('retained partitions preserve pending physical contracts and bind Go allowlist sources', () => {

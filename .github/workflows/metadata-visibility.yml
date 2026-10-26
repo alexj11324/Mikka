@@ -76,6 +76,7 @@ jobs:
       - name: Real Go broker observes actual application revoke
         working-directory: packages/subscription-worker
         env:
+          RETAIN_SYNTHETIC_RECORDS: '1'
           CGO_ENABLED: '0'
           GOTOOLCHAIN: local
           GOMODCACHE: ${{ github.workspace }}/packages/subscription-worker/.cache/build-toolchain/modules

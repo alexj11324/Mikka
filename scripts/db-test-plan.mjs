@@ -117,7 +117,8 @@ export function failureDiagnostics(output) {
   const codes = [...output.matchAll(/^\s*code:\s*['"]?(ERR_[A-Z0-9_]+|[0-9A-Z]{5})['"]?\s*$/gm)].map(m=>m[1])
   const assertions = [...output.matchAll(/^\s*(expected|actual):\s*(-?\d+(?:\.\d+)?|true|false|null)\s*$/gm)].map(m=>({kind:m[1],value:JSON.parse(m[2])}))
   const locations = [...output.matchAll(/(?:^|[\s/(])((?:tests|lib|scripts)\/[a-zA-Z0-9_./-]+\.(?:ts|mjs|js):\d+(?::\d+)?)/gm)].map(m=>m[1])
-  return {codes:[...new Set(codes)].slice(0,12),assertions:assertions.slice(0,24),locations:[...new Set(locations)].slice(0,20)}
+  const goCases = [...output.matchAll(/^R0_FAILED_CASE: (Test[A-Za-z0-9_]+)$/gm)].map(m=>m[1])
+  return {goCases:[...new Set(goCases)].slice(0,64),codes:[...new Set(codes)].slice(0,12),assertions:assertions.slice(0,24),locations:[...new Set(locations)].slice(0,20)}
 }
 export function executePhase(plan, phase, sha, env, run) {
   if (!PHASES.includes(phase) || !/^[a-f0-9]{40}$/.test(sha)) throw Error('Exact SHA and explicit phase required')

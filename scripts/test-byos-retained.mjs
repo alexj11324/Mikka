@@ -154,7 +154,20 @@ try {
     "-c",
     'CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-enrollment ./cmd/mikka-subscription-enrollment && CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-worker ./cmd/mikka-subscription-worker && CGO_ENABLED=0 go build -mod=readonly -trimpath -tags mikka_byos_fixture -o bin/mikka-subscription-fixture ./testfixture && CGO_ENABLED=1 go test -mod=readonly -json -race -timeout 180s -count=1 -run "$MIKKA_BYOS_RETAINED_PATTERN" . > "$MIKKA_BYOS_GO_EVIDENCE" 2> "$MIKKA_BYOS_GO_EVIDENCE.stderr"'
   )
-  await run("docker", dockerArgs)
+  try {
+    await run("docker", dockerArgs)
+  } catch (error) {
+    if (existsSync(goEvidence)) {
+      const allowed = new Set(goContract.retainedTests)
+      for (const line of readFileSync(goEvidence, "utf8").split("\n")) {
+        let event
+        try { event = JSON.parse(line) } catch { continue }
+        const name = typeof event.Test === "string" ? event.Test.split("/")[0] : ""
+        if (event.Action === "fail" && allowed.has(name)) console.error(`R0_FAILED_CASE: ${name}`)
+      }
+    }
+    throw error
+  }
   // Docker exit 0 is required above; raw output stays in the retained log, never stdout.
   console.log(retainedGoTap(readFileSync(goEvidence, "utf8"), goContract))
   await run(process.execPath, ["--import", "tsx", "--test", "--test-reporter=tap", "tests/byos-enrollment-migration.db.test.mjs", "tests/byos-environment-transfer.test.mjs", "tests/byos-oauth-retained.db.test.mjs", "tests/byos-binding-retained.db.test.mjs"], {
