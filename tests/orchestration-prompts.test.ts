@@ -126,7 +126,7 @@ test('proactive policy remains in the actual Coordinator instruction composition
   assert.match(workflow, /steps.preparePrompt\(userId,source\)/)
   assert.match(workflow, /steps.coordinatorModelSource\(userId,holder,delivery\)/)
   assert.match(workflow, /agent.generate\(\{ instructions, messages/)
-  assert.match(workflow, /isStepCount\(COORDINATOR_MAX_STEPS\)/)
+  assert.match(workflow, /isStepCount\(AGENT_MAX_ROUNDS\)/)
 })
 
 test('ordinary recovery has evidence and budget bounds; the conditional one-retry rule applies only to actual denials', () => {
