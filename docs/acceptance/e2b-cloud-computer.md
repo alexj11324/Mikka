@@ -24,7 +24,8 @@ Date: 2026-10-26. Tracks #172. Branch: `codex/e2b-cloud-computer-172`.
 - Default 15-minute provider pause lifecycle; viewing/waking refreshes activity.
   Control state survives app restart in PostgreSQL. Provider pause is checked
   when reading computer state.
-- Reused #161's exact-operation broker/driver/proxy and ten regression tests.
+- Run-to-Bot binding storage enforces matching owner/workspace through foreign keys and only admits queued runs; the bind operation serializes with run claiming. This storage is not yet wired to dispatch.
+- Reused #161's exact-operation broker/driver/proxy and regression tests; cloud display is bound to the trusted grant and included in the approval digest.
   Driver display selection is per child process, avoiding global DISPLAY races.
 
 ## Actually executed
@@ -114,3 +115,5 @@ for all users:
 
 Keep the cloud-computer feature flag off until those product-level paths are
 integrated and exercised. A successful SDK/desktop probe alone is insufficient.
+
+A subsequent disposable real E2B test reran two-display screenshots, an approved click and replay denial using the broker’s display-bound grants. The sandbox was deleted after the test. The run binding migration and owner/workspace/queued-state tests passed against isolated PostgreSQL 17. Neither test establishes hosted daemon dispatch or model-run integration.

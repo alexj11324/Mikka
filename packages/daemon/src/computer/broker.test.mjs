@@ -200,3 +200,23 @@ test("pinned platform click schemas preserve desktop coordinates without unsuppo
   assert.deepEqual(driverArguments(call, "darwin"), { x: 216, y: 326, scope: "desktop", delivery_mode: "foreground" });
   assert.throws(() => driverArguments({ name: "click", arguments: { x: 1, y: 2, scope: "window" } }, "darwin"));
 });
+
+
+test("concurrent approved runs execute on their own trusted display", async (t) => {
+  const executions = [];
+  const b = await fixture(t, { execute: async (_, call, display) => {
+    executions.push({ call, display });
+    return { ok: true };
+  } });
+  assert.throws(() => b.spec("bad", "ask", { display: ":0;touch /tmp/owned" }));
+  const first = b.spec("run-a", "ask", { display: ":1" });
+  const second = b.spec("run-b", "ask", { display: ":2" });
+  const a = b.request(first.token, { name: "click", arguments: { x: 10, y: 20 } });
+  const c = b.request(second.token, { name: "click", arguments: { x: 30, y: 40 } });
+  const rows = b.list();
+  assert.deepEqual(rows.map(row => row.display), [":1", ":2"]);
+  await Promise.all(rows.map(row => b.decide(row.id, row.digest, true)));
+  await Promise.all([a, c]);
+  assert.deepEqual(executions.map(row => row.display), [":1", ":2"]);
+  assert.throws(() => normalizeCall({ name: "click", arguments: { x: 1, y: 2, display: ":2" } }));
+});

@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { ComputerStore } from './store'
+import { bindComputerRun } from './run-binding'
 import type * as provider from './e2b-provider'
 
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
@@ -30,6 +31,9 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES (\'alice\'),(\'bob\')')
     const migration = await readFile(new URL('../../drizzle/20261026235901_cloud_computers.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
+    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, status text NOT NULL)')
+    const bindingMigration = await readFile(new URL('../../drizzle/20261027000000_computer_run_bindings.sql', import.meta.url), 'utf8')
+    await pool.query(bindingMigration); await pool.query(bindingMigration)
     const store = new ComputerStore(pool, runtime)
     const bot = await store.createBot(actor, 'Desktop')
     assert.deepEqual(await store.state(actor, bot.id), { machine: 'sleeping', control: 'idle' })
@@ -38,6 +42,19 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await Promise.all([store.operate(actor, bot.id, 'wake'), store.operate(actor, bot.id, 'wake')])
     assert.equal(created, 1)
     const bobBot = await store.createBot(bob, 'Other owner')
+    const runId = randomUUID()
+    await pool.query('INSERT INTO agent_runs VALUES ($1,$2,$3)', [runId, actor.userId, 'queued'])
+    await assert.rejects(bindComputerRun(pool, bob, runId, bobBot.id), { status: 404 })
+    await assert.rejects(bindComputerRun(pool, otherWorkspace, runId, bot.id), { status: 404 })
+    await assert.rejects(bindComputerRun(pool, actor, runId, bobBot.id), { status: 404 })
+    await bindComputerRun(pool, actor, runId, bot.id)
+    await bindComputerRun(pool, actor, runId, bot.id)
+    const another = await store.createBot(actor, 'Another bot')
+    await assert.rejects(bindComputerRun(pool, actor, runId, another.id), { status: 409 })
+    const startedId = randomUUID()
+    await pool.query('INSERT INTO agent_runs VALUES ($1,$2,$3)', [startedId, actor.userId, 'running'])
+    await assert.rejects(bindComputerRun(pool, actor, startedId, bot.id), { status: 409 })
+    await assert.rejects(pool.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [startedId, bobBot.id, actor.workspaceId, actor.userId]), { code: '23503' })
     await assert.rejects(store.operate(bob, bobBot.id, 'wake'), { status: 409 })
     await assert.rejects(store.operate(actor, bot.id, 'viewer', 'control'), { status: 403 })
     await store.operate(actor, bot.id, 'takeover')

@@ -10,11 +10,11 @@ const driver = await detectComputerDriver('/opt/mikka/computer/cua-driver')
 assert.ok(driver, 'pinned driver')
 const brokers = [1, 2].map(n => new ComputerBroker({
   driver, socketPath: `/tmp/probe-${n}.sock`, permitted: run => run === `probe-${n}`,
-  execute: (d, call) => executeDriver(d, call, `:${n}`),
+  execute: executeDriver,
 }))
 async function approved(index, call) {
   const broker = brokers[index - 1]
-  const grant = broker.spec(`probe-${index}`, 'ask')
+  const grant = broker.spec(`probe-${index}`, 'ask', { display: `:${index}` })
   const result = broker.request(grant.token, call)
   const request = broker.list()[0]
   assert.ok(request)

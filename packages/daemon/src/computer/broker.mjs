@@ -21,7 +21,10 @@ export class ComputerBroker {
   }) {
     Object.assign(this, { driver, socketPath, permitted, execute, now, ttl });
   }
-  spec(runId, permission) {
+  spec(runId, permission, { display } = {}) {
+    // Cloud desktops must be bound by the trusted caller, never the model.
+    if (display !== undefined && !/^:[1-9][0-9]{0,2}$/.test(display))
+      throw new Error("Invalid desktop display");
     // No permission object means no injection. Default ask inside a supplied
     // run policy is still safe: every call waits for an authenticated review.
     if (!this.driver || !permission || !["ask", "allow"].includes(permission))
@@ -29,7 +32,7 @@ export class ComputerBroker {
     for (const [old, grant] of this.grants)
       if (grant.runId === runId) this.grants.delete(old);
     const token = randomBytes(32).toString("hex");
-    this.grants.set(token, { runId, fingerprint: this.driver.fingerprint });
+    this.grants.set(token, { runId, fingerprint: this.driver.fingerprint, display });
     return { socketPath: this.socketPath, token };
   }
   async listen() {
@@ -81,6 +84,7 @@ export class ComputerBroker {
       id: randomUUID(),
       runId: grant.runId,
       target: this.driver.fingerprint,
+      ...(grant.display === undefined ? {} : { display: grant.display }),
       call,
       expiresAt: this.now() + this.ttl,
     };
@@ -124,7 +128,7 @@ export class ComputerBroker {
     this.pending.delete(id);
     row.cleanup();
     clearTimeout(row.timer); // Claim BEFORE I/O. Never refund.
-    const { runId, call, expiresAt, target } = row.request;
+    const { runId, call, expiresAt, target, display } = row.request;
     if (
       !this.grants.has(row.token) ||
       !approve ||
@@ -136,7 +140,7 @@ export class ComputerBroker {
       return { ok: true };
     }
     try {
-      row.resolve(await this.execute(this.driver, call));
+      row.resolve(await this.execute(this.driver, call, display));
     } catch (error) {
       row.reject(error);
     }
