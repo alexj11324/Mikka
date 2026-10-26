@@ -19,6 +19,9 @@ test(
     assert.equal(target.hostname, "127.0.0.1");
     assert.equal(target.username, "factoryquestions192");
     assert.equal(target.pathname, "/mikka_e2e");
+    assert.equal(target.search, "");
+    assert.equal(target.hash, "");
+    const retain = process.env.FACTORY_QUESTION_RETAIN_FIXTURES === "1";
     const events: unknown[] = [];
     function client() {
       let cookie = "";
@@ -324,8 +327,17 @@ test(
         ).status,
         409,
       );
-      await owner("/api/auth/sign-out", "POST", {});
-      assert.equal((await owner(path)).status, 401);
+      // Retained acceptance does not call sign-out: it physically deletes sessions.
+      if (retain) assert.equal((await anon(path)).status, 401);
+      else {
+        await owner("/api/auth/sign-out", "POST", {});
+        assert.equal((await owner(path)).status, 401);
+      }
+      const retained = await pool.query('SELECT count(*)::int AS count FROM factory_questions WHERE "userId"=$1', [userId]);
+      assert.ok(retained.rows[0].count > 0);
+      const sessions = await pool.query('SELECT count(*)::int AS count FROM "session" WHERE "userId"=$1', [userId]);
+      if (retain) assert.ok(sessions.rows[0].count > 0, "retained mode must preserve its synthetic sessions");
+      events.push({ retained: retain, owner: userId, questionRows: retained.rows[0].count, sessionRows: sessions.rows[0].count });
       console.log(
         `PASS ${events.length} actual HTTP requests; concurrent answer = one strict continuation`,
       );

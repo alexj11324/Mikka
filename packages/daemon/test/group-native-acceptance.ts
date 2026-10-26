@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import {mkdtemp,mkdir,writeFile,readFile,copyFile,rm,readdir} from 'node:fs/promises'
+import {mkdtemp,mkdir,writeFile,readFile,copyFile,rm,rename,readdir} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {execFile} from 'node:child_process'
@@ -10,6 +10,7 @@ import {HttpServerLink} from '../src/server-link-http'
 import {createNativeGroupProcessor} from '../src/adapters/group-review'
 interface Fixtures {pool:Pool;command:(id:string,user:string,input:unknown)=>Promise<unknown>;port:number;agentId:string;ccAgentId:string;newRequest:(target?:string,comment?:string)=>Promise<{path:string;group:{id:string};base:{artifactId:string;baseVersionId:string;baseHash:string};work:{workId:string}}>;post:(path:string,input:unknown,user?:string)=>Promise<any>;worker:(input:unknown,user?:string)=>Promise<any>}
 export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId,newRequest,post,worker}:Fixtures){
+   assert.equal(process.env.MIKKA_NATIVE_DISPOSAL_AUTHORIZED,'1','Native acceptance requires explicit authorization for task-owned daemon/container disposal')
 
    const exec=promisify(execFile),build=await mkdtemp(join(tmpdir(),'mgn-img-'))
    let image='',badImage='',badCapImage='',missingCapImage=''
@@ -92,7 +93,7 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
      const limit=await newRequest();await worker({action:'poll'})
      await pool.query('UPDATE conversation_work SET "claimEpoch"=3 WHERE id=$1',[limit.work.workId])
      assert.equal((await worker({action:'claim',runId:limit.work.workId})).status,'uncertain')
-    }finally{await daemon.stop();await rm(dataDir,{recursive:true,force:true})}
+    }finally{await daemon.stop();if(!process.env.KEEP_NATIVE_TEST_FIXTURES)await rm(dataDir,{recursive:true,force:true})}
     // Missing compatibility/isolation capability fails closed before execution.
     await assert.rejects(createNativeGroupProcessor({codex:'latest'}))
     await assert.rejects(createNativeGroupProcessor({codex:'sha256:'+'0'.repeat(64)}))
@@ -131,8 +132,8 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
     let lateCreate=''
     for(let i=0;i<40;i++){try{lateCreate=await readFile(marker,'utf8');break}catch{await new Promise(resolve=>setTimeout(resolve,25))}}
     assert.equal(lateCreate,'0','timeout regression must actually create its delayed disposable container: '+await readFile(shimLog,'utf8'))
-    const blockRm=join(build,'block-rm')
-    await writeFile(join(shim,'docker'),`#!/usr/bin/env node\nconst {spawnSync}=require('node:child_process');const {existsSync}=require('node:fs');const args=process.argv.slice(2);if(args.includes('rm')&&existsSync(${JSON.stringify(blockRm)})){process.stderr.write('controlled cleanup unavailable');process.exit(1)}process.exit(spawnSync(${JSON.stringify(realDocker)},args,{stdio:'inherit'}).status??1)\n`,{mode:0o700})
+    const blockRm=join(build,'block-rm'),ownedNames=join(build,'cleanup-owned-names')
+    await writeFile(join(shim,'docker'),`#!/usr/bin/env node\nconst {spawnSync}=require('node:child_process');const {existsSync,appendFileSync}=require('node:fs');const args=process.argv.slice(2);if(args.includes('create')&&args.includes('--name'))appendFileSync(${JSON.stringify(ownedNames)},args[args.indexOf('--name')+1]+'\\n');if(args.includes('rm')&&existsSync(${JSON.stringify(blockRm)})){process.stderr.write('controlled cleanup unavailable');process.exit(1)}process.exit(spawnSync(${JSON.stringify(realDocker)},args,{stdio:'inherit'}).status??1)\n`,{mode:0o700})
     const localDocker=(args:string[])=>exec(realDocker,['--host','unix:///var/run/docker.sock','--config',join(build,'docker-config'),...args],{env:{PATH:pathBefore,NODE_ENV:'test'},timeout:5000})
     try{
      process.env.PATH=shim+':'+pathBefore
@@ -153,8 +154,9 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
       await rejected
       await assert.rejects(failingCleanup(assignment,new AbortController().signal),/disposed/)
      }finally{
-      controller.abort();await rm(blockRm,{force:true})
-      const names=(await localDocker(['ps','--all','--filter','name=mikka-group-cli-','--format','{{.Names}}'])).stdout.trim().split('\n').filter(Boolean)
+      controller.abort();if(process.env.KEEP_NATIVE_TEST_FIXTURES)await rename(blockRm,blockRm+'.retained').catch(error=>{if(error.code!=='ENOENT')throw error});else await rm(blockRm,{force:true})
+      const owned=new Set((await readFile(ownedNames,'utf8')).trim().split('\n').filter(Boolean))
+      const names=(await localDocker(['ps','--all','--format','{{.Names}}'])).stdout.trim().split('\n').filter(name=>owned.has(name))
       if(names.length)await localDocker(['rm','--force',...names])
       await failingCleanup.dispose().catch(()=>{})
       await command(r.group.id,'member',{action:'cancel',workId:r.work.workId})
@@ -166,7 +168,7 @@ export async function nativeGroupAcceptance({pool,command,port,agentId,ccAgentId
    }finally{
     if(previous===undefined)delete process.env.PRIVATE_HOST_SENTINEL;else process.env.PRIVATE_HOST_SENTINEL=previous
     for(const key of dockerKeys){if(oldDocker[key]===undefined)delete process.env[key];else process.env[key]=oldDocker[key]}
-    await rm(build,{recursive:true,force:true});for(const id of [image,badImage,badCapImage,missingCapImage])if(id)await exec('docker',['image','rm',id]).catch(()=>{})
+    if(!process.env.KEEP_NATIVE_TEST_FIXTURES)await rm(build,{recursive:true,force:true});for(const id of [image,badImage,badCapImage,missingCapImage])if(id&&!process.env.KEEP_NATIVE_TEST_FIXTURES)await exec('docker',['image','rm',id]).catch(()=>{})
    }
 
 }

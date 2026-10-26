@@ -17,6 +17,7 @@ import {groupReviewHttpLink,runGroupReviewBatch,type GroupReviewAssignment,type 
 const url=process.env.MIKKA_DISPOSABLE_POSTGRES_URL ?? (process.env.CI==='true' && process.env.GITHUB_ACTIONS==='true'?process.env.E2E_DATABASE_URL:undefined)
 const workspaceURL=process.env.MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL ?? url
 for(const value of [url,workspaceURL])if(value){const u=new URL(value);assert.equal(u.hostname,'127.0.0.1');assert.ok(['/mikka_review','/mikka_e2e','/mikka_workspace_review'].includes(u.pathname))}
+if(process.env.MIKKA_TEST_NATIVE_GROUPS==='1')assert.equal(process.env.MIKKA_NATIVE_DISPOSAL_AUTHORIZED,'1','Native profile requires explicit runtime disposal authorization before any fixture executes')
 test('actual HTTP dispatch → group mailbox → isolated fake worker → trusted revision', {skip:!url},async t=>{
  const schema='bridge_'+randomUUID().replaceAll('-',''),admin=new Pool({connectionString:url})
  const wsAdmin=new Pool({connectionString:workspaceURL})
@@ -139,11 +140,11 @@ test('actual HTTP dispatch → group mailbox → isolated fake worker → truste
   })
   await t.test('reply, proposed version, mailbox ACK and terminal state roll back together and retry safely',async()=>{
    const r=await newRequest();await worker({action:'poll'});const c=await claim(r.work.workId)
-   await pool.query(`CREATE FUNCTION fail_group_ack() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'simulated ACK persistence failure'; END $$; CREATE TRIGGER fail_group_ack BEFORE UPDATE OF "acknowledgedAt" ON run_messages FOR EACH ROW EXECUTE FUNCTION fail_group_ack()`)
+   await pool.query(`CREATE TABLE group_ack_fault (active boolean NOT NULL); INSERT INTO group_ack_fault VALUES(true); CREATE FUNCTION fail_group_ack() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF (SELECT active FROM group_ack_fault) THEN RAISE EXCEPTION 'simulated ACK persistence failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER fail_group_ack BEFORE UPDATE OF "acknowledgedAt" ON run_messages FOR EACH ROW EXECUTE FUNCTION fail_group_ack()`)
    await assert.rejects(complete(c),/simulated ACK/)
    assert.equal((await post(r.path,{action:'read',artifactId:r.base.artifactId})).versions.length,1)
    assert.equal((await pool.query('SELECT status FROM conversation_work WHERE id=$1',[c.runId])).rows[0].status,'dispatched')
-   await pool.query('DROP TRIGGER fail_group_ack ON run_messages');await complete(c)
+   await pool.query('UPDATE group_ack_fault SET active=false');await complete(c)
    assert.equal((await post(r.path,{action:'read',artifactId:r.base.artifactId})).versions.length,2)
   })
   await t.test('additive group mailbox backfill preserves identity and hides old group runs from private discovery',async()=>{
