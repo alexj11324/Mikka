@@ -12,6 +12,7 @@ import { eventsForInbox } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
+import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -197,7 +198,7 @@ export async function chatView(userId: string, limit = 200): Promise<ChatView> {
   const pending = waiting.filter(event => event.kind === 'user_message').map((event, index) => ({
     position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage,
   }))
-  const leased = Boolean(session?.leaseUntil && session.leaseUntil.getTime() > Date.now())
+  const leased = coordinatorLeaseActive(session)
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   return {
     items,

@@ -85,6 +85,10 @@ jobs:
       - run: pnpm test:ssh-target
       - run: pnpm test:linear-sync
       - run: pnpm test:coordinator-events
+      - run: pnpm test:active-agents
+        env:
+          # Database regressions run against ephemeral Postgres in browser-tests below.
+          MIKKA_DATABASE_URL: ""
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
       - run: pnpm test:integrations
@@ -177,5 +181,5 @@ jobs:
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:activity-actor-db,test:conversation-reads,test:groups,test:relation-cycle,test:visibility-db,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:conversation-reads,test:groups,test:relation-cycle,test:visibility-db,test:workspace-migration-db
       - run: pnpm build
