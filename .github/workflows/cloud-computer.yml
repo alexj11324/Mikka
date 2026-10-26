@@ -33,6 +33,7 @@ jobs:
       - run: node --import ./scripts/server-test.mjs --import tsx --test lib/computer/handler.test.ts
       - run: node --import ./scripts/server-test.mjs --import tsx --test lib/cua/local-review.test.ts
       - run: node --test packages/daemon/src/computer/broker.test.mjs
+      - run: node --import ./scripts/server-test.mjs --import tsx --test packages/daemon/src/computer/web-review.node.ts
       - run: node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts
         env:
           COMPUTER_TEST_DATABASE_URL: postgresql://postgres:isolated-ci@localhost:5432/computer_test

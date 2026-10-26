@@ -15,6 +15,7 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 // retrying cannot fix.
 import type { z } from "zod"
 import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
+import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
 
 import {
   CLIENT_VERSION_HEADER,
@@ -239,6 +240,10 @@ export class HttpServerLink implements ServerLink {
       devicePaths.claim(checkId(deviceId), checkId(runId)),
       { schema: runAssignmentSchema, claimOf: runId }
     )
+  }
+  async syncComputerReviews(deviceId: string, requests: LocalComputerRequest[]) {
+    const result = await this.call("POST", computerSyncPath(checkId(deviceId)), { body: { requests }, schema: computerSyncResponse })
+    return result.decisions
   }
   async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
     return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})

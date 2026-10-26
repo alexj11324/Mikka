@@ -31,6 +31,7 @@ import {
   type RunCheckpoint,
 } from "@mikka/protocol"
 
+import type { LocalComputerDecision, LocalComputerRequest } from "@mikka/protocol/computer"
 import type { RunChunk } from "./chunks"
 import type { NativeBrokerContext, NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
@@ -81,6 +82,8 @@ export interface ServerLink {
   pendingRuns(deviceId: string): Promise<string[]>
   /** Fails with `RunNotPinnedHereError` for runs pinned elsewhere. */
   claimRun(deviceId: string, runId: string): Promise<RunAssignment>
+  /** Owner-reviewed computer requests; responses carry decisions only. */
+  syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[]): Promise<LocalComputerDecision[]>
   /** Private hosted-run channel; these methods never return provider tokens. */
   nativeContext?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeBrokerContext>
   nativeRequest?(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal):Promise<{contentType:string;body:ReadableStream<Uint8Array>}>
