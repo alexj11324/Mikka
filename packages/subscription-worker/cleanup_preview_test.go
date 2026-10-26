@@ -40,9 +40,18 @@ func assertCleanupPreviewRetained(t *testing.T,w *Worker,store *cleanupPreviewSt
 }
 func TestCleanupPauseRetainsArtifactsAndAttempts(t *testing.T){
  w,store,state,name:=cleanupPreviewFixture(t,5)
+ enrollment,transfer:=newID(),newID()
+ _,setupErr:=w.Repo.DB.Exec(`insert into byos_enrollment_transfers("enrollmentId","transferId","connectionId","ownerId","workspaceId",principal,"databaseIdentity","escrowDigest","providerSubject",epoch,"operationId","boundAt","sourceCreationState","attemptCreationSettled") values($1,$2,$3,$4,$5,'synthetic', $6,$6,'synthetic',1,$7,now(),'settled',true)`,enrollment,transfer,w.Scope.ConnectionID,w.Scope.OwnerID,w.Scope.WorkspaceID,hashText(newID()),newID())
+ if setupErr!=nil{t.Fatal(setupErr)}
+ _,setupErr=w.Repo.DB.Exec(`insert into byos_enrollment_sources("enrollmentId",kind,"connectionId") values($1,'escrow',$2),($1,'attempt',$2)`,enrollment,w.Scope.ConnectionID)
+ if setupErr!=nil{t.Fatal(setupErr)}
+
  calls:=0
  w.cleanupObserver=&cleanupPreviewObserver{ArtifactBudget:4,AttemptBudget:1,Observe:func(p cleanupPreview)error{
   calls++
+  if len(p.EnrollmentRows)!=2{t.Fatal("missing exact enrollment composite PKs")}
+  for _,row:=range p.EnrollmentRows{if row.EnrollmentID!=enrollment||row.TransferID!=transfer||row.ConnectionID!=w.Scope.ConnectionID||!row.Eligible||!row.Settled||row.RetainSource{t.Fatal("enrollment association mismatch")}}
+
   if p.Scope!=w.Scope||p.Status!="blocked"||p.EffectsComplete||p.Enrollment==""||p.ArtifactLimit!=4||len(p.Artifacts)!=4||len(p.Attempts)!=1||p.Attempts[0].StateHash!=state||p.Attempts[0].ArtifactName!=name{t.Fatal("inaccurate or approvable preview")}
   rows,err:=w.Repo.DB.Query(`select name from byos_secret_artifacts where "connectionId"=$1 and "deletedAt" is null order by name limit 4`,w.Scope.ConnectionID)
   if err!=nil{t.Fatal(err)};defer rows.Close()
@@ -55,6 +64,16 @@ func TestCleanupPauseRetainsArtifactsAndAttempts(t *testing.T){
  w.cleanupObserver.Observe=func(cleanupPreview)error{return errors.New("synthetic observer failure")}
  _,err=w.Cleanup(context.Background());if !errors.Is(err,ErrCleanupPaused)||!errors.Is(err,errCleanupPreviewRefused){t.Fatal("observer failure resumed cleanup",err)}
  assertCleanupPreviewRetained(t,w,store,5,state)
+ // Retained active OAuth artifact: its attempt becomes eligible only if an
+ // approved future store deletion succeeds. No store call is made here.
+ future,futureStore,futureState,futureName:=cleanupPreviewFixture(t,0)
+ if _,err:=future.Repo.DB.Exec(`update byos_secret_artifacts set "deletedAt"=null,"publishedAt"=now() where name=$1`,futureName);err!=nil{t.Fatal(err)}
+ future.cleanupObserver=&cleanupPreviewObserver{ArtifactBudget:1,AttemptBudget:1,Observe:func(p cleanupPreview)error{
+  if len(p.Attempts)!=1||p.Attempts[0].StateHash!=futureState||p.Attempts[0].EligibleNow{t.Fatal("future attempt PK not frozen")}
+  return nil
+ }}
+ if _,err:=future.Cleanup(context.Background());!errors.Is(err,ErrCleanupPaused)||errors.Is(err,errCleanupPreviewRefused){t.Fatal(err)}
+ assertCleanupPreviewRetained(t,future,futureStore,1,futureState)
 }
 func TestCleanupPauseRejectsOwnershipAndBudget(t *testing.T){
  w,store,state,_:=cleanupPreviewFixture(t,2)

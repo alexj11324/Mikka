@@ -44,6 +44,12 @@ test('creates have private receipts, labels and full IDs; rm inspects and uses o
  const f=fixture(),name='mikka-group-cli-'+randomUUID()
  auditedNativeDocker(f.registry,createArgs(f.prefix,name),f.execute)
  assert.equal(f.registry.created().length,1);assert.equal(f.registry.created()[0].id,id)
+ const inspected={...f.containers.get(id),State:{Running:false,Pid:0},HostConfig:{AutoRemove:false}}
+ const snapshot=f.registry.setupSnapshot(target=>{assert.equal(target,id);return inspected})
+ assert.equal(snapshot.containerCount,1);assert.equal(snapshot.approvalEligible,false);assert.equal(snapshot.executedDeletion,false)
+ assert.throws(()=>f.registry.setupSnapshot(()=>({...inspected,HostConfig:{AutoRemove:true}})),/implicit disposal/)
+ assert.throws(()=>f.registry.setupSnapshot(()=>({...inspected,State:{Running:true,Pid:123}})),/stopped/)
+
  assert.ok(f.calls[0].includes('--rm'),'original adapter auto-removal semantics must be preserved')
  auditedNativeDocker(f.registry,[...f.prefix,'rm','--force',name],f.execute)
  const removal=f.calls.findIndex(args=>args[4]==='rm')

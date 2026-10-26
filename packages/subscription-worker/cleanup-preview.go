@@ -19,7 +19,8 @@ type cleanupPreviewObserver struct {
  Observe func(cleanupPreview) error
 }
 type cleanupArtifactCandidate struct { Name, Kind string }
-type cleanupAttemptCandidate struct { StateHash, ArtifactName, OperationID string }
+type cleanupAttemptCandidate struct { StateHash, ArtifactName, OperationID string; EligibleNow bool }
+type cleanupEnrollmentCandidate struct { EnrollmentID, Kind, TransferID, ConnectionID string; Eligible, Settled, RetainSource bool }
 type cleanupPreview struct {
  Scope Scope
  Artifacts []cleanupArtifactCandidate
@@ -27,6 +28,7 @@ type cleanupPreview struct {
  ArtifactLimit int
  EffectsComplete bool
  Enrollment string
+ EnrollmentRows []cleanupEnrollmentCandidate
  Status string
 }
 var cleanupStateHash = regexp.MustCompile(`^[a-f0-9]{64}$`)
@@ -62,19 +64,36 @@ func (w *Worker) previewCleanup(ctx context.Context,observer cleanupPreviewObser
   if len(out.Artifacts)>observer.ArtifactBudget{rows.Close();return out,errCleanupPreviewRefused}
  }
  err=rows.Err();rows.Close();if err!=nil{return out,errCleanupPreviewRefused}
+ selected:=[]string{"","","",""}
+ for i,a:=range out.Artifacts{selected[i]=a.Name}
  // Match the production DELETE join exactly. Never SQL-filter attempt ownership:
  // an attempt in another scope that aliases the artifact would also be affected.
- rows,err=tx.QueryContext(ctx,`select o."stateHash",o."secretName",o."operationId"::text,o."connectionId"::text,o."ownerId",o."workspaceId",a."ownerId",a."workspaceId",a.provider,a.kind,coalesce(a."operationId"::text,'') from byos_oauth_attempts o join byos_secret_artifacts a on o."secretName"=a.name where a."connectionId"=$1 and a."deletedAt" is not null order by o."stateHash",a.name limit $2`,out.Scope.ConnectionID,observer.AttemptBudget+1)
+ rows,err=tx.QueryContext(ctx,`select o."stateHash",o."secretName",o."operationId"::text,o."connectionId"::text,o."ownerId",o."workspaceId",a."ownerId",a."workspaceId",a.provider,a.kind,coalesce(a."operationId"::text,''),a."deletedAt" is not null from byos_oauth_attempts o join byos_secret_artifacts a on o."secretName"=a.name where a."connectionId"=$1 and (a."deletedAt" is not null or (a.name in ($3,$4,$5,$6) and not a."createUncertain" and (not a."createStarted" or a."createSettled"))) order by o."stateHash",a.name limit $2`,out.Scope.ConnectionID,observer.AttemptBudget+1,selected[0],selected[1],selected[2],selected[3])
  if err!=nil{return out,errCleanupPreviewRefused}
  seen:=map[string]bool{};seenArtifacts:=map[string]bool{}
  for rows.Next(){
   var candidate cleanupAttemptCandidate;var connection,owner,workspace,artifactOwner,artifactWorkspace,provider,kind,operation string
-  if rows.Scan(&candidate.StateHash,&candidate.ArtifactName,&candidate.OperationID,&connection,&owner,&workspace,&artifactOwner,&artifactWorkspace,&provider,&kind,&operation)!=nil || !cleanupStateHash.MatchString(candidate.StateHash) || !validSecretName(candidate.ArtifactName) || !uuidPattern.MatchString(candidate.OperationID) || candidate.OperationID!=operation || kind!="oauth" || connection!=out.Scope.ConnectionID || owner!=out.Scope.OwnerID || artifactOwner!=out.Scope.OwnerID || workspace!=out.Scope.WorkspaceID || artifactWorkspace!=out.Scope.WorkspaceID || provider!=out.Scope.Provider || seen[candidate.StateHash] || seenArtifacts[candidate.ArtifactName]{rows.Close();return out,errCleanupPreviewRefused}
+  if rows.Scan(&candidate.StateHash,&candidate.ArtifactName,&candidate.OperationID,&connection,&owner,&workspace,&artifactOwner,&artifactWorkspace,&provider,&kind,&operation,&candidate.EligibleNow)!=nil || !cleanupStateHash.MatchString(candidate.StateHash) || !validSecretName(candidate.ArtifactName) || !uuidPattern.MatchString(candidate.OperationID) || candidate.OperationID!=operation || kind!="oauth" || connection!=out.Scope.ConnectionID || owner!=out.Scope.OwnerID || artifactOwner!=out.Scope.OwnerID || workspace!=out.Scope.WorkspaceID || artifactWorkspace!=out.Scope.WorkspaceID || provider!=out.Scope.Provider || seen[candidate.StateHash] || seenArtifacts[candidate.ArtifactName]{rows.Close();return out,errCleanupPreviewRefused}
   seen[candidate.StateHash]=true;seenArtifacts[candidate.ArtifactName]=true
   out.Attempts=append(out.Attempts,candidate)
   if len(out.Attempts)>observer.AttemptBudget{rows.Close();return out,errCleanupPreviewRefused}
  }
  err=rows.Err();rows.Close();if err!=nil{return out,errCleanupPreviewRefused}
+ // Freeze composite PKs and associations without contacting source stores.
+ // Source custody/claim verification remains a separate blocking requirement.
+ rows,err=tx.QueryContext(ctx,`select a."enrollmentId"::text,a.kind,t."transferId"::text,a."connectionId"::text,t."connectionId"::text,t."ownerId",t."workspaceId",(t."canonicalPublishedAt" is not null or t."boundAt" is not null or c.epoch>t.epoch),case a.kind when 'escrow' then t."sourceCreationState"='settled' else t."attemptCreationSettled" end,exists(select 1 from byos_environment_transfers e where e."enrollmentId"=t."enrollmentId" and e."retainSource") from byos_enrollment_sources a left join byos_enrollment_transfers t on t."enrollmentId"=a."enrollmentId" left join byos_connections c on c.id=a."connectionId" where (a."connectionId"=$1 or t."connectionId"=$1) and a."deletedAt" is null order by a."enrollmentId",a.kind limit 3`,out.Scope.ConnectionID)
+ if err!=nil{return out,errCleanupPreviewRefused}
+ enrollmentIDs:=map[string]bool{}
+ for rows.Next(){
+  var candidate cleanupEnrollmentCandidate;var connection,owner,workspace string
+  if rows.Scan(&candidate.EnrollmentID,&candidate.Kind,&candidate.TransferID,&candidate.ConnectionID,&connection,&owner,&workspace,&candidate.Eligible,&candidate.Settled,&candidate.RetainSource)!=nil || !uuidPattern.MatchString(candidate.EnrollmentID) || !uuidPattern.MatchString(candidate.TransferID) || (candidate.Kind!="escrow"&&candidate.Kind!="attempt") || candidate.ConnectionID!=out.Scope.ConnectionID || connection!=out.Scope.ConnectionID || owner!=out.Scope.OwnerID || workspace!=out.Scope.WorkspaceID {rows.Close();return out,errCleanupPreviewRefused}
+  key:=candidate.EnrollmentID+":"+candidate.Kind
+  if enrollmentIDs[key]{rows.Close();return out,errCleanupPreviewRefused};enrollmentIDs[key]=true
+  out.EnrollmentRows=append(out.EnrollmentRows,candidate)
+  if len(out.EnrollmentRows)>2{rows.Close();return out,errCleanupPreviewRefused}
+ }
+ err=rows.Err();rows.Close();if err!=nil{return out,errCleanupPreviewRefused}
+ out.Enrollment="blocked: exact source PKs recorded; external custody/claim not verified"
  if tx.Commit()!=nil{return out,errCleanupPreviewRefused}
  return out,nil
 }

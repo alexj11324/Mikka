@@ -160,6 +160,26 @@ export class NativeRegistry {
   assert.equal(entry.owner,this.owner.owner);assert.equal(entry.runId,this.owner.runId)
   return entry
  })}
+ // Freeze only already-created, stopped resources. This has no start/rm or
+ // approval operation; incomplete reservations and implicit auto-removal refuse.
+ setupSnapshot(inspect:(id:string)=>unknown){
+  const stat=lstatSync(this.directory)
+  assert.deepEqual({dev:stat.dev,ino:stat.ino},this.directoryIdentity)
+  assert.deepEqual(read(join(this.directory,'owner.json')),this.owner)
+  const containers=this.created(),configs=this.configs()
+  assert.equal(containers.length,readdirSync(join(this.directory,'requests')).length,'unresolved container reservation')
+  assert.equal(configs.length,readdirSync(join(this.directory,'configs')).length,'unresolved config reservation')
+  assert.ok(containers.length<=this.owner.requests&&configs.length<=this.owner.configs)
+  for(const entry of containers){
+   const current=inspect(entry.id) as {State:{Running:boolean;Pid:number};HostConfig:{AutoRemove:boolean}}
+   this.verify(this.request(entry.id),current)
+   assert.equal(current.State.Running,false,'setup container must be stopped')
+   assert.equal(current.State.Pid,0,'setup container has process')
+   assert.equal(current.HostConfig.AutoRemove,false,'implicit disposal forbidden')
+  }
+  const directories=configs.map(entry=>{this.verifyConfig(entry.path);const st=lstatSync(entry.path);return {...entry,dev:st.dev,ino:st.ino,uid:st.uid}})
+  return {runId:this.owner.runId,containers,directories,containerCount:containers.length,directoryCount:directories.length,approvalEligible:false,executedDeletion:false,mode:'setup-only' as const}
+ }
  event(value:unknown){exclusive(join(this.directory,'events',randomUUID()+'.json'),value)}
 }
 
