@@ -1,0 +1,51 @@
+{
+  "sha": "9a85d15b6cbe03a1d5fb5bccc676eb1b7c64377d",
+  "deploymentId": "dpl_geXduXGatJmS1cnR2swFVgQ9ozdN",
+  "steps": [
+    {
+      "utc": "2026-10-26T01:31:43.625Z",
+      "path": "/mikka",
+      "status": 200,
+      "title": "Sign in \u00b7 Mikka"
+    },
+    {
+      "utc": "2026-10-26T01:31:47.714Z",
+      "path": "/mikka/sign-in",
+      "status": 200,
+      "title": "Sign in \u00b7 Mikka"
+    },
+    {
+      "utc": "2026-10-26T01:31:51.829Z",
+      "path": "/mikka/en/sign-in",
+      "status": 200,
+      "title": "Sign in \u00b7 Mikka"
+    }
+  ],
+  "rawVideo": "production-raw.webm",
+  "scope": "Anonymous rendering only; no login or credential interaction",
+  "rawVideoSha256": "3cbbc92ae2480b60ad79b6d1c55491405fdcbd33c97f799b31adc0f68c21f970",
+  "screenshot": "production-sign-in.png",
+  "productionHTTP": [
+    {
+      "path": "/mikka",
+      "status": 200,
+      "requestId": "cle1::iad1::v27xh-1792978096675-6ee2a641eb93"
+    },
+    {
+      "path": "/mikka/sign-in",
+      "status": 200,
+      "requestId": "cle1::iad1::5txzr-1792978098490-be868b82f0e5"
+    },
+    {
+      "path": "/mikka/en/sign-in",
+      "status": 200,
+      "requestId": "cle1::iad1::2wwwv-1792978099055-50b7a1ea6a35"
+    },
+    {
+      "path": "/mikka/api/cron/credential-cleanup",
+      "status": 401,
+      "requestId": "cle1::iad1::hbvww-1792978099401-0cdc1ebe140b"
+    }
+  ],
+  "note": "Unedited actual browser recording. No account sign-in, OAuth, provider, or credential cleanup execution was performed."
+}
