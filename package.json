@@ -11,7 +11,7 @@
     "build": "pnpm build:byos-workers && pnpm generate:agent-ui && pnpm lint && pnpm migrate && next build && node scripts/verify-subscription-worker-artifacts.mjs",
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
-    "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs tests/factory-migration-order.test.mjs",
+    "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs tests/factory-migration-order.test.mjs scripts/historical-migrations.test.mjs",
     "dev": "node scripts/dev-preview.mjs",
     "test:preview": "node --test tests/preview-ready.test.mjs",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
@@ -73,7 +73,10 @@
     "test:wake:postgres": "node --conditions=react-server --import tsx --test lib/coordinator/inbox-postgres.test.ts lib/coordinator/schedules-postgres.test.ts",
     "test:wake": "node --conditions=react-server --import tsx --test lib/coordinator/wake-contract.test.ts",
     "test:wake:review": "node --conditions=react-server --import tsx --test lib/coordinator/review-postgres.test.ts",
-    "test:resources": "node --import tsx --test lib/resources/controlled.test.ts"
+    "test:resources": "node --import tsx --test lib/resources/controlled.test.ts",
+    "test:telegram:postgres": "node --import tsx --test lib/coordinator/telegram-pending-postgres.test.ts",
+    "test:resources:postgres": "node --import tsx --test lib/resources/model-execution-postgres.test.ts lib/schedules/model-outcomes-postgres.test.ts",
+    "test:historical-upgrade-db": "node --test tests/historical-upgrade.db.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

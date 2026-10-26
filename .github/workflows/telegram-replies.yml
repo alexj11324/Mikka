@@ -48,7 +48,13 @@ jobs:
           MIGRATE=1 node scripts/migrate.mjs
           MIGRATE=1 node scripts/migrate.mjs
       - name: Real PG pending destinations, source/workspace/link fences and one-connection Chat SDK state
-        run: node --import tsx --test lib/coordinator/telegram-pending-postgres.test.ts
+        run: pnpm test:telegram:postgres
+      - name: Current main to candidate fresh/upgrade/replay parity
+        env:
+          E2E_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_history_driver_e2e
+        run: |
+          createdb -h 127.0.0.1 -U postgres mikka_history_driver_e2e
+          pnpm test:historical-upgrade-db
       - run: pnpm typecheck
       - run: pnpm build
       - name: Actual compiled Coordinator and SDK reply recovery with controlled transport
@@ -83,4 +89,5 @@ jobs:
             telegram-sdk.cast
             telegram-sdk.log
             telegram-next.log
+            test-results/history-upgrade/**
           if-no-files-found: ignore

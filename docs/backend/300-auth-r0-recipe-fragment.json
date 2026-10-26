@@ -1,0 +1,126 @@
+{
+  "mechanismSource": "d89334d541876a3021ca473758b6e3665d3448ed",
+  "destination": "scripts/db-test-recipes.json in auth R0 integrated tree; this is an exact merge fragment, not an alternate runner",
+  "expectedAdditions": [
+    "resources-postgres",
+    "telegram-postgres"
+  ],
+  "profiles": {
+    "durable-resource-split": {
+      "targets": [
+        {
+          "key": "RESOURCE_APP_TEST_URL",
+          "suffix": "_176",
+          "host": "127.0.0.1",
+          "port": "5432"
+        },
+        {
+          "key": "RESOURCE_WORKSPACE_TEST_URL",
+          "suffix": "_176",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "distinct": [
+        "RESOURCE_APP_TEST_URL",
+        "RESOURCE_WORKSPACE_TEST_URL"
+      ],
+      "bindings": {
+        "RESOURCE_APP_TEST_URL": "RESOURCE_APP_TEST_URL",
+        "RESOURCE_WORKSPACE_TEST_URL": "RESOURCE_WORKSPACE_TEST_URL"
+      },
+      "env": {
+        "CI": "true"
+      }
+    }
+  },
+  "recipes": [
+    {
+      "id": "resources-postgres",
+      "files": [
+        {
+          "path": "lib/resources/model-execution-postgres.test.ts",
+          "requiredNames": [
+            "public resource bridge: real split PG, held policy locks, exact quota and final source fence"
+          ]
+        },
+        {
+          "path": "lib/schedules/model-outcomes-postgres.test.ts",
+          "requiredNames": [
+            "scheduled read: formal provider SDK over controlled transport, separate outcome/publication and OS loss"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:resources:postgres"
+      ],
+      "profile": "durable-resource-split",
+      "phase": "external",
+      "status": "ready",
+      "packageScript": "test:resources:postgres",
+      "expectedTests": [
+        "public resource bridge: real split PG, held policy locks, exact quota and final source fence",
+        "missing legacy adapter still denies; inspection spends zero; ten duplicate actual requests execute once",
+        "policy revocation after availability denies before quota/send",
+        "captured workspace cannot spend a different owner-bound tenant",
+        "pause, expired reservation and cancelled source at the actual fetch fence refund proven unsent calls",
+        "first explicit 429 refunds only its own reservation; earlier successful work remains charged",
+        "unknown transport/body outcome stays fully charged, bounded and never sent again",
+        "web shares the canonical ledger; managed policy denies, cache reads are free and duplicates send once",
+        "membership withdrawal stays denied without an enterprise management adapter",
+        "scheduled read: formal provider SDK over controlled transport, separate outcome/publication and OS loss",
+        "SQL publication failure reuses immutable actual SDK result after fresh claim with zero regeneration",
+        "ten consumers of the same formal scheduled claim perform one actual SDK generation",
+        "actual user pause after preparation prevents provider send and new quota charge",
+        "checkpoint transaction loss after provider return is uncertain and cannot regenerate",
+        "real formal runtime child SIGKILL after send stays uncertain and never generates on restart"
+      ],
+      "expectedCount": 15
+    },
+    {
+      "id": "telegram-postgres",
+      "files": [
+        {
+          "path": "lib/coordinator/telegram-pending-postgres.test.ts",
+          "requiredNames": [
+            "Telegram pending destinations: real split PG retry, fresh authority and delivery watermarks"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:telegram:postgres"
+      ],
+      "profile": "durable-resource-split",
+      "phase": "external",
+      "status": "ready",
+      "packageScript": "test:telegram:postgres",
+      "expectedTests": [
+        "Telegram pending destinations: real split PG retry, fresh authority and delivery watermarks",
+        "failed turn keeps target in PG; a distinct successful turn and fresh store recover it",
+        "old delivery ACK cannot remove a newly staged message to the same destination",
+        "current link, owner, original source and workspace membership gate the actual effect",
+        "actual Chat SDK Postgres state reuses a held one-connection app transaction",
+        "authenticated Telegram ingress captures a real unambiguous workspace and rejects ambiguity/revocation",
+        "pending destinations from another workspace never ride a current turn"
+      ],
+      "expectedCount": 7
+    }
+  ],
+  "existingRecipeNameReplacements": [
+    {
+      "recipe": "operations",
+      "from": "real Factory dispatch snapshots references in its transaction; device-loss retry copies them",
+      "to": "real Factory dispatch snapshots references and trusted workspace in its transaction; device-loss retry copies them"
+    },
+    {
+      "recipe": "mailboxes",
+      "from": "Bot turns advertise messaging only when mailbox setup succeeds",
+      "to": "retired standalone chat cannot dispatch; Bot mailbox effects require the durable consumer receipt"
+    }
+  ],
+  "historyRecipe": "Reuse existing historical-upgrade-db recipe unchanged: 1 test, prebuild, source-bound evidence. All original wake/schedule recipe enrollments still required; no removal/exemption."
+}

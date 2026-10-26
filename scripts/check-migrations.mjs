@@ -2,9 +2,9 @@
 // scripts/migrate.mjs 以文件名为主键记录已执行的迁移，所以：
 // - 旧的 NNNN_*.sql 已经在生产执行过，冻结：不许新增、改名或修改（含 0004–0008 的历史重号）。
 // - 新迁移一律 YYYYMMDDHHMMSS_slug.sql（UTC），时间戳必须合法、晚于 main 上最新的迁移、文件名唯一。
-import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { historicalImports, fetchHistoricalSources, verifyHistoricalSources, currentMainMigrations } from './historical-migrations.mjs'
 
 // 冻结的旧迁移：文件名 -> 内容 sha256 前 12 位。改动这些文件会让生产状态和仓库不一致。
 export const LEGACY_FROZEN = {
@@ -45,7 +45,7 @@ export function parseTimestamp(name) {
 export const hash = (text) => createHash('sha256').update(text).digest('hex').slice(0, 12)
 
 // files: 当前分支的 [{name, content}]；mainFiles: main 上的文件名数组（拿不到时为 null）
-export function checkMigrations(files, mainFiles, legacy = LEGACY_FROZEN) {
+export function checkMigrations(files, mainFiles, legacy = LEGACY_FROZEN, historicalNames = new Set()) {
   const problems = []
   const names = files.map((f) => f.name)
   if (new Set(names).size !== names.length) problems.push('存在重复的迁移文件名')
@@ -63,7 +63,7 @@ export function checkMigrations(files, mainFiles, legacy = LEGACY_FROZEN) {
     if (!ts) { problems.push(`${name}：文件名必须是 YYYYMMDDHHMMSS_snake_case.sql，且时间合法（UTC）`); continue }
     if (seenTs.has(ts)) problems.push(`${name}：时间戳和 ${seenTs.get(ts)} 相同，请换一个时间戳`)
     seenTs.set(ts, name)
-    if (mainFiles && !mainSet.has(name) && ts <= mainLatest) {
+    if (mainFiles && !mainSet.has(name) && ts <= mainLatest && !historicalNames.has(name)) {
       problems.push(`${name}：时间戳必须晚于 main 上最新的迁移 ${mainLatest}，请用当前 UTC 时间重新命名`)
     }
   }
@@ -73,21 +73,15 @@ export function checkMigrations(files, mainFiles, legacy = LEGACY_FROZEN) {
   return problems
 }
 
-function mainMigrationNames() {
-  const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-  for (const ref of ['origin/main', 'FETCH_HEAD']) {
-    try { return git('ls-tree', '--name-only', ref, 'drizzle/').split('\n').filter(Boolean).map((p) => p.slice('drizzle/'.length)) } catch {}
-    if (ref === 'origin/main') { try { git('fetch', '--depth=1', 'origin', 'main') } catch {} }
-  }
-  return null
-}
-
 if (import.meta.url === `file://${process.argv[1]}`) {
   const dir = new URL('../drizzle/', import.meta.url)
   const files = readdirSync(dir).filter((n) => n.endsWith('.sql')).map((name) => ({ name, content: readFileSync(new URL(name, dir), 'utf8') }))
-  const mainFiles = mainMigrationNames()
-  if (!mainFiles) console.warn('migrations: 拿不到 origin/main，跳过「晚于 main 最新迁移」这一项')
-  const problems = checkMigrations(files, mainFiles)
+  const entries = historicalImports(files)
+  const main = currentMainMigrations()
+  fetchHistoricalSources(entries)
+  verifyHistoricalSources(entries)
+  console.log(`migrations: compared current main ${main.sha}; ${entries.length} hash-verified historical imports`)
+  const problems = checkMigrations(files, main.files, LEGACY_FROZEN, new Set(entries.map(entry => entry.path.slice('drizzle/'.length))))
   if (problems.length) {
     console.error(`migrations: ${problems.length} 个问题\n${problems.map((p) => `  - ${p}`).join('\n')}`)
     process.exit(1)

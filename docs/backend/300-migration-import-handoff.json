@@ -1,0 +1,20 @@
+{
+  "mechanismSource": "d89334d541876a3021ca473758b6e3665d3448ed",
+  "historicalSource": "25d3d1bade8075c3aed10544bbdb1f3cbaed0fc0",
+  "historicalEntries": 34,
+  "historicalManifestSha256": "127d9997060c0e8e7379e85493d040f8662fe86c8101abfb903e2e8922a61760",
+  "oldStackIdentityChanged": false,
+  "currentMain": "56635047d2ddf9c076417e43ffe23dfdaf220cd4",
+  "newTelegramMigration": {
+    "previousUnpublishedPath": "drizzle/20261026010000_coordinator_telegram_reply_targets.sql",
+    "path": "drizzle/20261026020742_coordinator_telegram_reply_targets.sql",
+    "sha256": "3f67e3d2155584a9d5a0bb970ff2901c0ebfa08ae392fc66c427c0d08d6fbddf",
+    "productionExecution": "not requested or executed; only temporary CI/local PostgreSQL used"
+  },
+  "importedCurrentMainSql": [
+    "drizzle/20261026013000_issue_search_pg_trgm.sql",
+    "drizzle/20261026013001_issue_search_title_idx.sql",
+    "drizzle/20261026013002_issue_search_recent_idx.sql",
+    "drizzle/20261026013003_issue_search_number_idx.sql"
+  ]
+}

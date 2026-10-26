@@ -1,0 +1,31 @@
+
+> next-app@0.0.1 test:migrations /workspace/Mikka-294
+> node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs tests/factory-migration-order.test.mjs scripts/historical-migrations.test.mjs
+
+✔ 历史重号在白名单内通过 (8.216253ms)
+✔ 新的 NNNN_ 文件被拒绝 (6.017307ms)
+✔ 修改旧迁移被拒绝 (1.056768ms)
+✔ 删除旧迁移被拒绝 (0.516178ms)
+✔ 非法时间戳被拒绝 (0.74661ms)
+✔ 不晚于 main 最新迁移被拒绝 (0.37647ms)
+✔ 晚于 main 最新迁移通过 (0.659234ms)
+✔ 时间戳重复被拒绝 (0.301866ms)
+✔ 拿不到 main 时只跳过顺序检查 (0.695831ms)
+✔ exact reviewed manifest, all 34 byte hashes and source provenance (27.321669ms)
+✔ manifest bytes cannot add/remove/relabel an import (12.833087ms)
+✔ missing/duplicate/content mutation fails even after imports enter main (23.675099ms)
+✔ unavailable or mismatched frozen source cannot grant an exception (1.52493ms)
+✔ only chronology of exact imports is exempt; all other checks remain (9.432314ms)
+✔ fresh main failure never falls back to stale origin/main or null (1.256636ms)
+✔ unrelated fetch cannot replace the frozen current-main comparison (0.934486ms)
+✔ only the explicit baseline precedes legacy migrations, without changing their IDs (2.403495ms)
+✔ missing baseline fails before connecting to any database (1.023209ms)
+✔ one canonical Factory migration per component, after main and before consumers, with unchanged shared SQL (12.112846ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 729.750459

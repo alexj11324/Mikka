@@ -18,7 +18,7 @@ Pending targets are fulfilled on a subsequent successful Coordinator turn. There
 
 ## Migration
 
-- File: `drizzle/20261026010000_coordinator_telegram_reply_targets.sql`
+- File: `drizzle/20261026020742_coordinator_telegram_reply_targets.sql`
 - Target: application `MIKKA_DATABASE_URL`
 - SHA-256: `3f67e3d2155584a9d5a0bb970ff2901c0ebfa08ae392fc66c427c0d08d6fbddf`
 - Adds one JSONB session field and its array constraint; no new grants, cron or provider resource.
@@ -33,3 +33,16 @@ The positive SDK cases include empty fallback; a failed Telegram turn followed b
 #297 is a 120-model-round ceiling per generate/inbox batch, not a promise to complete 120 calls before another guard. The independent helper tests assert the 90/119 boundaries exactly. The first real Local World stress experiment reached 58 controlled sends in 44.1s, then failed before 120 under the unchanged 45s generate deadline; 116 admission units remained settled. That failure is preserved and is not reported as 120-round completion. The revised acceptance explicitly checks either a completed 120-round run with final tools disabled, or a stable recorded earlier deadline with fewer than 120 sends; a separate tight-budget case must stop before a third send. Deadlines and canonical budget are not increased or removed for acceptance.
 
 Final exact-head CI and integrated main/browser validation are still required. #176/#179/#294 are not closed and this candidate is not a production acceptance claim.
+
+
+## #300 CI migration correction
+
+The first exact-head CI (`eee21b81b70c0e20c58733576a1d2864d3168c9c`) failed before its Next/SDK steps: main had advanced to `56635047d2ddf9c076417e43ffe23dfdaf220cd4` with migration 20261026013003. Those failures are retained. The correction ports auth owner PR #291's exact historical-import mechanism from `d89334d541876a3021ca473758b6e3665d3448ed`, with this lane's immutable 34-file manifest pinned to source `25d3d1bade8075c3aed10544bbdb1f3cbaed0fc0`. Existing SQL identities and bytes are unchanged. Only the new, unpublished Telegram migration moves from 01:00:00 to 02:07:42 UTC. Four current-main search SQL files are imported byte-for-byte. No production ledger or previously used temporary database ledger is edited.
+
+The strict checker validates full hashes and source Git objects, always fetches current main into a private ref, and refuses unavailable main/source provenance. It grants only the exact reviewed historical set a chronology exception. `migrate.mjs` validates the same full hashes before connecting; production execution does not require Git/network. Unknown backdated SQL and any mutation/missing source still fail. Explicit `MIGRATE=0` preserves auth's operator-managed deployment behavior.
+
+The ported real PG17 current-main→candidate acceptance passes: retained fresh and upgrade application/workspace databases have identical complete schemas (including columns, ACL, RLS, functions, triggers), original appliedAt values and synthetic business rows survive, dependency order is checked, and replay writes no ledger entries. The local evidence accurately records an eee21b8 HEAD with a modified working tree; exact clean-head CI will supply final source-bound evidence. All 19 migration/source tests and the explicit seven-case Telegram PG entry pass. CI now runs the same `test:telegram:postgres` package entry and current-main upgrade check before build.
+
+Local compiled source eee21b8 / build `E64w7TNKsPdnFibUJNKHH` passed all six actual SDK groups. Its controlled round stress reached 80 sends, then recorded a 46,320ms generation deadline failure and retained 160 settled units; the separate five-unit budget allowed exactly two sends/four settled units. This is not 120-round completion. Recordings and original failures are kept in `docs/evidence/294-telegram`.
+
+Auth's R0 owner must compose `300-auth-r0-recipe-fragment.json` into the central exact-SHA runner: resource split PG 15, Telegram split PG 7, the existing history recipe, and precise two renamed assertion titles. The fragment is data for that runner, not another test runner or a scanner exemption. Existing wake/schedule enrollments remain required. The current branch still carries the older shared runner, so a main DB inventory failure is not a green acceptance claim. R must resolve the already reported full-main auth/API conflicts and run the complete combination.

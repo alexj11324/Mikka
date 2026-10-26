@@ -1,5 +1,9 @@
 {
+  "history-upgrade-eee21b8-working-tree.log": "3d92c6b4b8f35d01283d15c555a93d90523530e4a14d125d2fc3143f4ea030ca",
+  "history-upgrade-working-tree.json": "30658aa2995a1df1259ee85ee3fa74c1a36d758b9e206df990070e6ba014846b",
+  "migration-tests-working-tree.log": "d6fe869c8ea709c36de50eda8fd98959ca83ebf9a4a5787b31fd13c6597a74c4",
   "original-wake-pg.log": "a43053d4bd36405f5e79e651952e65b8df8758233302b1c274a1719be4139d5b",
+  "pending-state-pg-with-explicit-entry.log": "910039d536565196cde6e03aa2d34df9b7e5123553d99a766cc66b672f63cfe8",
   "pending-state-pg.log": "509c421b66fc7483403b2d22a8f2fdf899719809e5d7ade4274e43560c653ef7",
   "reproduction-ad6d488.cast": "daa665987f4d19b3030b0bedcbb2b51cf030e164c463e4cf4f05abceaaf48e0c",
   "reproduction-ad6d488.log": "29d60cfeeb803f3a5108febabc51dc11bb9b8c1b72441ba3cf3aa9222ccaf124",
@@ -7,5 +11,8 @@
   "round-stress-e4338ad-failure.cast": "77f1eceb868a3e56219b00c3161f5e90f250be18dd40156d35e48a2fc0e5acc2",
   "round-stress-e4338ad-failure.log": "523a5328212b0e4b9079ff7455993c758076bc2b78060a98dc62263b83e9f170",
   "sdk-9f72584.cast": "26b1d76b8c3bb717f86a75ea834df5153a6d1980a3625f90124aec40231c1e0a",
-  "sdk-9f72584.log": "d9d14178a5c37755a94b5d0bea2795565baa406d8e77e3010bb698cce8daad8b"
+  "sdk-9f72584.log": "d9d14178a5c37755a94b5d0bea2795565baa406d8e77e3010bb698cce8daad8b",
+  "sdk-eee21b8.cast": "388391b5de6252d713a63f7f8130ce8f690bc9010169d689d54a542fd4e87e18",
+  "sdk-eee21b8.log": "24bbe698a766784096a4f767481953c63bcbe48958fb8b3cdd02f4b50d49114f",
+  "strict-migrations-working-tree.log": "efaca3588b4e4edcfae72cd64f9a3dd3fd02c26544f24efd4907828d704d4190"
 }

@@ -1,0 +1,20 @@
+
+> next-app@0.0.1 test:telegram:postgres /workspace/Mikka-294
+> node --import tsx --test lib/coordinator/telegram-pending-postgres.test.ts
+
+▶ Telegram pending destinations: real split PG retry, fresh authority and delivery watermarks
+  ✔ failed turn keeps target in PG; a distinct successful turn and fresh store recover it (390.116393ms)
+  ✔ old delivery ACK cannot remove a newly staged message to the same destination (189.639573ms)
+  ✔ current link, owner, original source and workspace membership gate the actual effect (162.33904ms)
+  ✔ actual Chat SDK Postgres state reuses a held one-connection app transaction (37.666308ms)
+  ✔ authenticated Telegram ingress captures a real unambiguous workspace and rejects ambiguity/revocation (67.103523ms)
+  ✔ pending destinations from another workspace never ride a current turn (183.006215ms)
+✔ Telegram pending destinations: real split PG retry, fresh authority and delivery watermarks (1034.277455ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2610.431504
