@@ -21,7 +21,18 @@
       "personal": "Personal",
       "judgedByAgent": "Set by agent",
       "movedToWorkspace": "Now a workspace task; it will sync to Linear.",
-      "movedToPersonal": "Now a personal task; it stays in Mikka."
+      "movedToPersonal": "Now a personal task; it stays in Mikka.",
+      "confirm": {
+        "title": "Make this task personal?",
+        "description": "Once it is personal, teammates will no longer see this task in Mikka.",
+        "linearCopy": "A copy already synced to Linear may still be visible to the team. No sync record does not prove no earlier copy exists.",
+        "archiveIsNotErasure": "Archiving in Linear is not a privacy erase. The title, description and comments may still be seen.",
+        "checking": "Checking Linear sync records…",
+        "blocked": "This task has a Linear link, publication or unfinished sync. It can't become personal until how to handle that is decided.",
+        "alreadyPersonal": "This task is already personal.",
+        "recheck": "Check again",
+        "action": "Make personal"
+      }
     },
     "properties": "Task properties",
     "statusLabel": "Status",
@@ -2344,15 +2355,16 @@
     }
   },
   "Shell": {
-    "searchPlaceholder": "Search conversations, tasks, agents, knowledge",
+    "searchPlaceholder": "Search conversations, group chats, tasks and projects",
     "searchLabel": "Search everything",
-    "searchDescription": "Search conversations, tasks and projects. Use the arrow keys to choose and Enter to open.",
+    "searchDescription": "Search conversations, group chats, tasks and projects. Use the arrow keys to choose and Enter to open.",
     "searchEmpty": "Nothing matches",
     "groups": {
       "conversations": "Conversations",
       "tasks": "Tasks",
       "projects": "Projects",
-      "actions": "Quick actions"
+      "actions": "Quick actions",
+      "groupChats": "Group chats"
     },
     "newTask": "New task",
     "newConversation": "New conversation",
@@ -2542,6 +2554,22 @@
       "collapse": "Hide conversation",
       "expand": "Show conversation",
       "unassigned": "Unassigned"
+    },
+    "search": {
+      "searching": "Searching…",
+      "more": "Load more",
+      "loadingMore": "Loading…",
+      "count": "{count, plural, one {# result} other {# results}}",
+      "tooLong": "Search terms can be at most 200 characters",
+      "authRequired": "Your sign-in has expired. Sign in again to search.",
+      "failed": "Couldn't search {sources}",
+      "retry": "Retry",
+      "source": {
+        "history": "past conversations",
+        "groups": "group chats",
+        "tasks": "tasks"
+      },
+      "sourceSeparator": ", "
     }
   },
   "Unread": {
@@ -2558,5 +2586,20 @@
     "loadError": "Unable to load saved chat history.",
     "retry": "Retry",
     "incomplete": "This saved reply did not finish."
+  },
+  "GroupChat": {
+    "untitled": "Untitled group chat",
+    "readOnly": "Group chats are read-only for now; sending isn't open yet.",
+    "messages": "Group chat messages",
+    "you": "You",
+    "member": "Member",
+    "bot": "Bot",
+    "empty": "No messages in this group yet.",
+    "notFound": "This group chat doesn't exist, or you're no longer in it.",
+    "authRequired": "Your sign-in has expired. Sign in again.",
+    "loadError": "Couldn't load group chat messages.",
+    "retry": "Retry",
+    "older": "Load earlier messages",
+    "loadingOlder": "Loading…"
   }
 }

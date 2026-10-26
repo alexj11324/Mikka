@@ -16,7 +16,7 @@ import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { LetterAvatar } from './letter-avatar'
 
 /** Current Bot chat or a read-only historical chat. `agent` is a legacy URL discriminator only. */
-export type Conversation = { kind: 'coordinator' } | { kind: 'agent'; sessionId: string | null }
+export type Conversation = { kind: 'coordinator' } | { kind: 'agent'; sessionId: string | null } | { kind: 'group'; id: string; title: string; workspaceId: string }
 
 type ListProps = {
   active: Conversation | null
@@ -93,7 +93,7 @@ export function ConversationList({ active, onOpen, rail, onRail, user, onSetting
   const lastReply = coordinator?.items.findLast(item => item.from !== 'event')
   const latest: Record<string, string> = {}
   if (lastReply?.from === 'coordinator') latest.coordinator = lastReply.createdAt
-  const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.sessionId ?? null
+  const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.kind === 'agent' ? active.sessionId : null
   const unread = useUnread(activeId, latest)
   function choose(conversation: Conversation) { onOpen(conversation); setOpenMobile(false) }
   const body = <>

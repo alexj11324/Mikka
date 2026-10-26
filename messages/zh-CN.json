@@ -21,7 +21,18 @@
       "personal": "个人",
       "judgedByAgent": "Agent 判断",
       "movedToWorkspace": "已改为工作区任务，会同步到 Linear。",
-      "movedToPersonal": "已改为个人任务，只留在 Mikka。"
+      "movedToPersonal": "已改为个人任务，只留在 Mikka。",
+      "confirm": {
+        "title": "改为个人任务？",
+        "description": "改为个人后，团队成员在 Mikka 中将不再看到这个任务。",
+        "linearCopy": "已同步到 Linear 的副本可能仍对团队可见；没有同步记录也不能证明不存在历史副本。",
+        "archiveIsNotErasure": "在 Linear 中归档不等于隐私擦除，标题、描述和评论仍可能被看到。",
+        "checking": "正在检查 Linear 同步记录…",
+        "blocked": "这个任务在 Linear 中有关联、发布或未完成的同步记录。处理方式确定前，暂时不能改为个人。",
+        "alreadyPersonal": "这个任务已经是个人任务。",
+        "recheck": "重新检查",
+        "action": "改为个人"
+      }
     },
     "properties": "任务属性",
     "statusLabel": "任务状态",
@@ -2344,15 +2355,16 @@
     }
   },
   "Shell": {
-    "searchPlaceholder": "搜索对话、任务、Agent、知识库",
+    "searchPlaceholder": "搜索对话、群聊、任务和项目",
     "searchLabel": "全局搜索",
-    "searchDescription": "搜索对话、任务和项目，用方向键选择，按 Enter 打开。",
+    "searchDescription": "搜索对话、群聊、任务和项目，用方向键选择，按 Enter 打开。",
     "searchEmpty": "没有匹配的结果",
     "groups": {
       "conversations": "对话",
       "tasks": "任务",
       "projects": "项目",
-      "actions": "快捷操作"
+      "actions": "快捷操作",
+      "groupChats": "群聊"
     },
     "newTask": "新建任务",
     "newConversation": "新对话",
@@ -2542,6 +2554,22 @@
       "collapse": "收起对话",
       "expand": "展开对话",
       "unassigned": "未分配"
+    },
+    "search": {
+      "searching": "正在搜索…",
+      "more": "加载更多",
+      "loadingMore": "正在加载…",
+      "count": "{count} 条结果",
+      "tooLong": "搜索词最多 200 个字符",
+      "authRequired": "登录已失效，请重新登录后再搜索。",
+      "failed": "无法搜索{sources}",
+      "retry": "重试",
+      "source": {
+        "history": "历史对话",
+        "groups": "群聊",
+        "tasks": "任务"
+      },
+      "sourceSeparator": "、"
     }
   },
   "Unread": {
@@ -2558,5 +2586,20 @@
     "loadError": "无法加载已保存的历史对话。",
     "retry": "重试",
     "incomplete": "此历史回复未完成。"
+  },
+  "GroupChat": {
+    "untitled": "未命名群聊",
+    "readOnly": "群聊暂时只能阅读，发送消息还没有开放。",
+    "messages": "群聊消息",
+    "you": "你",
+    "member": "成员",
+    "bot": "Bot",
+    "empty": "群里还没有消息。",
+    "notFound": "找不到这个群聊，或你已不在群里。",
+    "authRequired": "登录已失效，请重新登录。",
+    "loadError": "无法加载群聊消息。",
+    "retry": "重试",
+    "older": "加载更早的消息",
+    "loadingOlder": "正在加载…"
   }
 }
