@@ -35,3 +35,13 @@ test('native group app rejects the separate Factory database before fixtures',()
  const native=JSON.parse(readFileSync('scripts/backend-acceptance-profiles.json','utf8')).profiles.find(p=>p.name==='group-native-required')
  assert.deepEqual(native.appDatabases,['mikka_review']);assert.equal(native.appBinding,'R0_GROUP_APP_DATABASE_URL')
 })
+
+test('automatic mailbox workflow cannot reuse a previous native deletion approval',()=>{
+ const workflow=readFileSync('.github/workflows/mailboxes.yml','utf8')
+ assert.doesNotMatch(workflow,/MIKKA_NATIVE_DISPOSAL_AUTHORIZED\s*:/)
+ assert.match(workflow,/BLOCKED: this automatic run has no run-specific native resource deletion authorization/)
+ assert.ok(workflow.indexOf('Native authorization is pending')<workflow.indexOf('pnpm test:groups'))
+ assert.match(workflow,/exit 1/)
+ assert.match(workflow,/MIKKA_TEST_NATIVE_GROUPS: '1'/)
+ assert.match(workflow,/pnpm test:group-native/)
+})

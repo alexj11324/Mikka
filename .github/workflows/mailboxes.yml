@@ -22,6 +22,13 @@ jobs:
       KEEP_GROUP_TEST_FIXTURES: '1'
       KEEP_NATIVE_TEST_FIXTURES: '1'
     steps:
+      # Automatic events never inherit a prior human deletion approval.
+      # No native invocation runs until a separately reviewed, run-scoped caller
+      # supplies its own authorization and preserves exact resource receipts.
+      - name: Native authorization is pending for automatic events
+        run: |
+          echo '::error::BLOCKED: this automatic run has no run-specific native resource deletion authorization'
+          exit 1
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
@@ -42,14 +49,11 @@ jobs:
           MIKKA_DISPOSABLE_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/mikka_review
           MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/mikka_workspace_review
           MIKKA_TEST_NATIVE_GROUPS: '1'
-          # Authorized only for own offline adapter containers/config directories.
-          MIKKA_NATIVE_DISPOSAL_AUTHORIZED: '1'
       - name: Required native profile count and retained receipt
         run: pnpm test:group-native
         env:
           MIKKA_DISPOSABLE_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/mikka_review
           MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/mikka_workspace_review
-          MIKKA_NATIVE_DISPOSAL_AUTHORIZED: '1'
       - run: pnpm --filter @mikka/daemon exec vitest run test/mailbox.test.ts test/skills.test.ts test/adapters.test.ts test/runs.test.ts test/group-review-worker.test.ts test/server-link-http.test.ts
       - run: pnpm --filter @mikka/daemon typecheck
       - name: Preserve native resource receipts
