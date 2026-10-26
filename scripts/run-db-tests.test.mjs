@@ -178,6 +178,8 @@ test('merged workflow cannot resurrect implicit DB runner or direct destructive 
  assert.equal((workflow.match(/DB_TEST_EXPECTED:/g)??[]).length,1)
  assert.ok(!/run: pnpm test:db\s*\n/.test(job))
  assert.ok(!job.includes('pnpm test:e2e:setup'))
+ assert.ok(job.indexOf('node --test scripts/run-db-tests.test.mjs scripts/backend-recipes.test.mjs')>=0)
+ assert.ok(job.indexOf('node --test scripts/run-db-tests.test.mjs scripts/backend-recipes.test.mjs')<job.indexOf('tests/migrate-empty-db.test.mjs'))
  for(const recipe of c.recipes)for(const file of recipe.files)assert.ok(!job.includes(file.path),`DB file must execute only through its explicit phase/profile: ${file.path}`)
 })
 

@@ -185,6 +185,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Generate ephemeral test-only auth secret
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+      - name: Verify R0 entrypoints before any database harness
+        run: node --test scripts/run-db-tests.test.mjs scripts/backend-recipes.test.mjs
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
