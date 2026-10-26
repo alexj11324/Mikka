@@ -1,0 +1,145 @@
+{
+  "ourSource": "25d3d1bade8075c3aed10544bbdb1f3cbaed0fc0",
+  "authMechanismSource": "d89334d541876a3021ca473758b6e3665d3448ed",
+  "ourIdentities": 34,
+  "authIdentities": 32,
+  "sharedPaths": 0,
+  "sameBytesDifferentIdentities": [
+    {
+      "ours": "drizzle/20261026002500_run_dispatch_keys.sql",
+      "auth": "drizzle/20261025051201_run_dispatch_keys.sql",
+      "sha256": "ae4618bb7a9e9bfd9df1b52df5b36a6cead6b87edf5dd271eff4b4ca5b9ebf9d"
+    },
+    {
+      "ours": "drizzle/20261026002501_factory_192_stages.sql",
+      "auth": "drizzle/20261025051202_factory_192_stages.sql",
+      "sha256": "675eb386f3ef611885c145051806e2c5d3a9c07a37bde1eed9b0285cf48ef5ea"
+    },
+    {
+      "ours": "drizzle/20261026002502_factory_194_approvals.sql",
+      "auth": "drizzle/20261025051203_factory_194_approvals.sql",
+      "sha256": "9e5b437d465a41b4bd86c7818c1a0bf5dbbf986d10199bde3a67eefcad2b7a96"
+    },
+    {
+      "ours": "drizzle/20261026002503_factory_195_monitor.sql",
+      "auth": "drizzle/20261025051204_factory_195_monitor.sql",
+      "sha256": "83c6454347229177133868a975054f5abc699bbfdc66ac0eee873f202cdb7acf"
+    },
+    {
+      "ours": "drizzle/20261026002504_factory_192_questions.sql",
+      "auth": "drizzle/20261025051205_factory_192_questions.sql",
+      "sha256": "b29263653731169ae347c840f8d0a0ec5cfaa586c0016043e1de9ffc9d9fe40d"
+    },
+    {
+      "ours": "drizzle/20261026002505_operation_ledger.sql",
+      "auth": "drizzle/20261025052001_operation_ledger.sql",
+      "sha256": "f5fbfacc61d5417aeacce88460244f185ec8a76a4784bddd151d006b48c627df"
+    },
+    {
+      "ours": "drizzle/20261026002506_session_mailboxes.sql",
+      "auth": "drizzle/20261025052031_session_mailboxes.sql",
+      "sha256": "bdb756455f8d7ac8b84a50eef151bbec566336bc89e4b9d1ce3570139acc68c1"
+    },
+    {
+      "ours": "drizzle/20261026002507_group_artifact_review.sql",
+      "auth": "drizzle/20261025052032_group_artifact_review.sql",
+      "sha256": "ce2f2540da0ec4fde581f95f60d2cd1b91cbf1dcfbd55fd32780efdc17b5e51a"
+    },
+    {
+      "ours": "drizzle/20261026002508_group_review_mailboxes.sql",
+      "auth": "drizzle/20261025052033_group_review_mailboxes.sql",
+      "sha256": "0f26cb94f2e23ace80d6d29eb704d13e21ff2bfc982fa79c52426ff71c21d3b4"
+    },
+    {
+      "ours": "drizzle/20261026002509_credential_broker.sql",
+      "auth": "drizzle/20261025052200_credential_broker.sql",
+      "sha256": "d3a0b1b2944eb4472ce54a463adb27fd10dc697679909459c3c2ee6fbbb42a62"
+    },
+    {
+      "ours": "drizzle/20261026002510_credential_browser_binding.sql",
+      "auth": "drizzle/20261025052201_credential_browser_binding.sql",
+      "sha256": "110c25e095fd38d6b680dc552d8d606b0ff15c711ca8fb3afe5cd8cd57090886"
+    },
+    {
+      "ours": "drizzle/20261026002511_credential_handoff.sql",
+      "auth": "drizzle/20261025052202_credential_handoff.sql",
+      "sha256": "084d1623751d1e2445c698b88d052fb4f86ed6e9f12b6bb02abea8ae29e4252f"
+    },
+    {
+      "ours": "drizzle/20261026002512_calendar_operation_binding.sql",
+      "auth": "drizzle/20261025060001_calendar_operation_binding.sql",
+      "sha256": "60fc01efb736fd5614d2a51f779f9a2fbe6f78f3f3ce0b4f99b8b8240ac48f90"
+    },
+    {
+      "ours": "drizzle/20261026002513_account_action_intents.sql",
+      "auth": "drizzle/20261025070001_account_action_intents.sql",
+      "sha256": "357d0e7103a8a696800decf3c92e8d9289eb9bfd0f27df8450b019d3c2a837e5"
+    },
+    {
+      "ours": "drizzle/20261026002514_self_improvement.sql",
+      "auth": "drizzle/20261025070600_self_improvement.sql",
+      "sha256": "5e9bad53e922a3256d239c65c8ea287a267e10a4537ff1c40b0b447137b5c2d5"
+    },
+    {
+      "ours": "drizzle/20261026002515_group_turn_mailbox_policy.sql",
+      "auth": "drizzle/20261025082237_group_turn_mailbox_policy.sql",
+      "sha256": "302a5c5ade61bce053231aad6ed3f59269e1f0ce144effc947e746524dec5338"
+    },
+    {
+      "ours": "drizzle/20261026002516_improvement_skill_assignments.sql",
+      "auth": "drizzle/20261025083303_improvement_skill_assignments.sql",
+      "sha256": "8022d8244ffdbee4cda8e8080e245353a40691367edb977085e6f5acef153928"
+    },
+    {
+      "ours": "drizzle/20261026002517_byos_credential_publications.sql",
+      "auth": "drizzle/20261025141650_byos_credential_publications.sql",
+      "sha256": "1ec983216f55262ceaf1adbdafd191168a3e2ac552909f8c529eb04ad74865e3"
+    },
+    {
+      "ours": "drizzle/20261026002518_byos_bindings_oauth.sql",
+      "auth": "drizzle/20261025141651_byos_bindings_oauth.sql",
+      "sha256": "daa6b4adc31536f66b9cc56bb2c4142c834efc4c540e3073340b023dcd3839d8"
+    },
+    {
+      "ours": "drizzle/20261026002519_byos_device_authorization.sql",
+      "auth": "drizzle/20261025141652_byos_device_authorization.sql",
+      "sha256": "6e4aa98f3efa36a48af3c0937b7eddd64bb1d03498c65cc92b48461dd7a0ce9f"
+    },
+    {
+      "ours": "drizzle/20261026002520_byos_access_and_cleanup.sql",
+      "auth": "drizzle/20261025141653_byos_access_and_cleanup.sql",
+      "sha256": "5f08ca8b2814f5539af0013f7ef927ab264c895007d7cbc766fdbb0055aaca6d"
+    },
+    {
+      "ours": "drizzle/20261026002521_byos_native_runs.sql",
+      "auth": "drizzle/20261025141654_byos_native_runs.sql",
+      "sha256": "8dd7726b41a89b602cf2b6e70217ab7a2374de4664a66b2ea4b7ea5c21bb3333"
+    },
+    {
+      "ours": "drizzle/20261026002522_byos_enrollment_transfers.sql",
+      "auth": "drizzle/20261025141655_byos_enrollment_transfers.sql",
+      "sha256": "8e8887e88e39c74f9e240d7bf125029a511817038ef9e787d5a2c97d741daf43"
+    },
+    {
+      "ours": "drizzle/20261026002523_byos_enrollment_cleanup.sql",
+      "auth": "drizzle/20261025141656_byos_enrollment_cleanup.sql",
+      "sha256": "3c159f69bc6ed132b0289499e2ea71d240f0b7a0324caecca7a5b6b206cb6ea4"
+    },
+    {
+      "ours": "drizzle/20261026002524_byos_environment_transfers.sql",
+      "auth": "drizzle/20261025160000_byos_environment_transfers.sql",
+      "sha256": "6986521b3bae3201f9388282feca58c200f9944c8ef8df526e88216465ae99e9"
+    },
+    {
+      "ours": "drizzle/20261026002526_security_audit_application.sql",
+      "auth": "drizzle/20261025170000_security_audit_application.sql",
+      "sha256": "05e51cde9f9113ef47079cbc1918d4df0f16aafc5533c678776f039039d6da83"
+    },
+    {
+      "ours": "drizzle/20261026002527_security_audit_workspace.sql",
+      "auth": "drizzle/20261025170001_security_audit_workspace.sql",
+      "sha256": "65ec137264f3e8d619ebcf8303b9331879fe38851f9b5a3a502643b166302aed"
+    }
+  ],
+  "decision": "No production ledger alias/delete/rename authorized or performed. R must compose exact reviewed identities against the real ledger before deployment."
+}
