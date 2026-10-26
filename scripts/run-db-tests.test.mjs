@@ -69,13 +69,15 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(plan.selfManaged.includes('lib/auth-email.test.ts'))
   const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
   const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
+  // Pure gates also run without a database in the fast job; their DB run is still only through pnpm test:db.
+  const pureGates = ['test:groups', 'test:active-agents', 'test:group-turns', 'test:issue-search']
   for (const script of plan.scripts) {
-    if (script !== 'test:groups') assert.ok(!workflow.includes(`pnpm ${script}`), `${script} runs once, through pnpm test:db`)
+    if (!pureGates.includes(script)) assert.ok(!workflow.includes(`pnpm ${script}`), `${script} runs once, through pnpm test:db`)
   }
   assert.ok(!/node --test tests\/workspace-migration\.test\.mjs/.test(workflow), 'workspace migration runs once, through pnpm test:db')
   const pinned = workflow.match(/DB_TEST_EXPECTED: ([^\n]+)/)?.[1].split(',').sort()
   assert.deepEqual(pinned, plan.scripts, 'workflow explicitly pins every suite expected on this tree')
-  for (const script of ['test:active-agents', 'test:group-turns', 'test:issue-search']) {
+  for (const script of pureGates.slice(1)) {
     if (pkg[script]) {
       assert.ok(workflow.includes(`pnpm ${script}`), `${script} strict pure gate retained`)
       assert.ok(pkg.check.includes(`pnpm ${script}`), `${script} pure gate in check`)

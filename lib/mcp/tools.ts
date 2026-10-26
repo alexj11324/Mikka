@@ -11,11 +11,12 @@ import { issueForUser } from '@/lib/issue-access'
 import { issueOwnerScope } from '@/lib/issue-owner-scope'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
+import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
+import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 
 // What the MCP tools read and write, scoped to one person. The Coordinator's
 // own tools (workflows/coordinator/steps.ts) read the same tables.
 
-const ACTIVE_RUN_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const
 /** How often a waiting read checks for the Coordinator's reply. */
 const REPLY_POLL_MS = 2000
 
@@ -59,10 +60,10 @@ async function messagesAfter(userId: string, after: number, limit: number) {
 
 /** Whether a turn is running, and why the last one failed (cleared when a turn succeeds). */
 async function turnState(userId: string) {
-  const [session] = await db.select({ leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt })
+  const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt })
     .from(coordinatorSessions).where(eq(coordinatorSessions.userId, userId)).limit(1)
   return {
-    working: Boolean(session?.leaseUntil && session.leaseUntil.getTime() > Date.now()),
+    working: coordinatorLeaseActive(session),
     error: session?.lastError ?? null, errorAt: session?.lastErrorAt ?? null,
   }
 }
@@ -129,7 +130,7 @@ export async function getIssue(userId: string, issueId: string) {
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }) {
   const rows = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.userId, userId), input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined, input.activeOnly ? inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]) : undefined))
+    .where(and(eq(agentRuns.userId, userId), input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined, input.activeOnly ? inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]) : undefined))
     .orderBy(desc(agentRuns.createdAt)).limit(20)
   return rows.map(run => ({ id: run.id, issueId: run.issueId, agent: run.agentName, status: run.status, stopReason: run.stopReason, createdAt: run.createdAt.toISOString() }))
 }

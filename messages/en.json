@@ -2048,6 +2048,7 @@
     "pleaseSignInFirst": "Please sign in first.",
     "invalidConversationID": "Invalid conversation ID.",
     "unableToLoadChatHistoryPleaseTry": "Unable to load chat history. Please try again.",
+    "activeAgentsNoParameters": "This endpoint takes no parameters.",
     "conversationNotFound": "Conversation not found.",
     "aResponseIsStillGeneratingPleaseTry": "A response is still generating. Please try again shortly.",
     "thisMessageWasAlreadySubmittedPleaseAsk": "This message was already submitted. Please ask a new question.",
