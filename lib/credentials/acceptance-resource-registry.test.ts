@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { tmpdir } from 'node:os'
 import { writeFile, symlink, rename, readFile, readdir, lstat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createAcceptanceResourceRegistry, uniqueChildForProfile, safeLaunchFailure, ownNodeChildren, type ProcessIdentity } from './acceptance-resource-registry'
+import { createAcceptanceResourceRegistry, uniqueChildForProfile, safeLaunchFailure, ownNodeChildren, procChildren, processSnapshot, type ProcessIdentity } from './acceptance-resource-registry'
 import { OwnedChromiumExecutor, rejectAcceptanceDisposal, guardAcceptanceLaunch, type AcceptanceResources } from './owned-chromium'
 
 test('registry reserves explicit budgets before creation and retains a private per-run root', async () => {
@@ -154,4 +154,34 @@ test('acceptance diagnostics privately preserve controlled cause codes without e
   assert.deepEqual(JSON.parse(content).diagnostic, diagnostic)
   assert.ok(!content.includes(secret)); assert.ok(!content.includes('fixture.invalid'))
   await assert.rejects(hook.recordFailure!({ ...profile, id: 'other-owner' }, 'launch-failed', error), /unknown acceptance/)
+})
+
+
+test('proc PPID inventory works without task children and rejects unreadable or replaced identities', async () => {
+  const stat = (ppid: number, start = '100') => `123 (name with ) spaces) S ${ppid} ${Array(17).fill('0').join(' ')} ${start}`
+  const rows = new Map([[50, stat(1)], [51, stat(50)], [52, stat(51)], [53, stat(99)]])
+  const io = { entries: async () => ['self', '50', '51', '51', '52', '53', '54'], stat: async (pid: number) => {
+    const row = rows.get(pid)
+    if (!row) throw Object.assign(new Error('gone'), { code: 'ENOENT' })
+    return row
+  } }
+  assert.deepEqual(await procChildren(50, io), [51])
+  await assert.rejects(procChildren(50, { ...io, stat: async pid => {
+    if (pid === 53) throw Object.assign(new Error('denied'), { code: 'EACCES' })
+    return io.stat(pid)
+  } }), /denied/)
+  let reads = 0
+  await assert.rejects(procChildren(50, { ...io, stat: async pid => pid === 51 ? stat(50, String(++reads)) : io.stat(pid) }), /child identity changed/)
+  await assert.rejects(procChildren(50, { ...io, stat: async pid => pid === 53 ? 'invalid' : io.stat(pid) }), /invalid proc stat/)
+})
+
+
+test('process snapshots reject PID reuse and malformed identity before associating root references', async () => {
+  const stat = (start: string) => `51 (comm ) with spaces) S 50 ${Array(17).fill('0').join(' ')} ${start}`
+  const io = { stat: async () => stat('100'), status: async () => 'Uid: 1000 1000 1000 1000', cmdline: async () => 'chromium\0--user-data-dir=/synthetic/profile\0' }
+  assert.deepEqual(await processSnapshot(51, io), { pid: 51, ppid: 50, starttime: '100', uid: 1000, args: ['chromium', '--user-data-dir=/synthetic/profile', ''] })
+  let reads = 0
+  await assert.rejects(processSnapshot(51, { ...io, stat: async () => stat(String(++reads)) }), /process changed/)
+  await assert.rejects(processSnapshot(51, { ...io, stat: async () => 'bad' }), /invalid proc stat/)
+  await assert.rejects(processSnapshot(51, { ...io, status: async () => '' }), /UID required/)
 })

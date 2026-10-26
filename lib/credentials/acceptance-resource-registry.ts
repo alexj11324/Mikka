@@ -33,22 +33,63 @@ export function safeLaunchFailure(cause: unknown) {
   return { version: 1, chain, rawMessageRetained: false, causeChainBound: 4 }
 }
 
-export async function ownNodeChildren(): Promise<number[]> {
-  const tasks = await readdir('/proc/self/task')
+export function parseProcStat(text: string) {
+  const end = text.lastIndexOf(')')
+  assert.ok(end > 0, 'invalid proc stat')
+  const fields = text.slice(end + 2).trim().split(/\s+/)
+  assert.match(fields[1] ?? '', /^\d+$/)
+  assert.match(fields[19] ?? '', /^\d+$/)
+  return { ppid: Number(fields[1]), starttime: fields[19] }
+}
+
+// Some Linux procfs mounts omit task/*/children. Scan stat PPIDs instead;
+// missing processes may have exited, but permission/malformed reads must fail.
+export async function procChildren(parentPid: number, io = {
+  entries: () => readdir('/proc'),
+  stat: (pid: number) => readFile(`/proc/${pid}/stat`, 'utf8'),
+}): Promise<number[]> {
+  assert.ok(Number.isSafeInteger(parentPid) && parentPid > 1)
+
+  const parent = parseProcStat(await io.stat(parentPid))
+  const entries = await io.entries()
+  assert.ok(entries.length <= 65536, 'unexpected proc inventory')
   const children = new Set<number>()
-  for (const task of tasks) {
-    assert.match(task, /^\d+$/)
-    let text: string
-    try { text = await readFile(`/proc/self/task/${task}/children`, 'utf8') }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue; throw error }
-    for (const value of text.trim().split(/\s+/).filter(Boolean)) {
-      assert.match(value, /^\d+$/)
-      const pid = Number(value); assert.ok(Number.isSafeInteger(pid) && pid > 1)
+  for (const entry of entries) {
+    if (!/^\d+$/.test(entry)) continue
+    const pid = Number(entry)
+    assert.ok(Number.isSafeInteger(pid) && pid > 0)
+    try {
+      const first = parseProcStat(await io.stat(pid))
+      if (first.ppid !== parentPid) continue
+      const second = parseProcStat(await io.stat(pid))
+      assert.deepEqual(second, first, 'child identity changed during inventory')
       children.add(pid)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
+      throw error
     }
   }
+  assert.deepEqual(parseProcStat(await io.stat(parentPid)), parent, 'parent identity changed during inventory')
   assert.ok(children.size <= 1024, 'unexpected child process inventory')
   return [...children]
+}
+
+export async function processSnapshot(pid: number, io = {
+  stat: (id: number) => readFile(`/proc/${id}/stat`, 'utf8'),
+  status: (id: number) => readFile(`/proc/${id}/status`, 'utf8'),
+  cmdline: (id: number) => readFile(`/proc/${id}/cmdline`, 'utf8'),
+}) {
+  assert.ok(Number.isSafeInteger(pid) && pid > 1)
+  const before = parseProcStat(await io.stat(pid))
+  const status = await io.status(pid), uid = /^Uid:\s+(\d+)/m.exec(status)
+  assert.ok(uid, 'process UID required')
+  const args = (await io.cmdline(pid)).split('\0')
+  assert.deepEqual(parseProcStat(await io.stat(pid)), before, 'process changed during snapshot')
+  return { pid, ...before, uid: Number(uid[1]), args }
+}
+
+export async function ownNodeChildren(): Promise<number[]> {
+  return procChildren(process.pid)
 }
 
 export async function uniqueChildForProfile(profile: string, children = ownNodeChildren, inspect = readLinuxProcess) {
