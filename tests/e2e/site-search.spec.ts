@@ -94,7 +94,7 @@ const foreignCookie = `better-auth.session_token=${encodeURIComponent(`${foreign
 const archivedCompletion = 'root = TextContent("synthetic retained archive body")'
 let groupIds: string[] = []
 async function get(request: APIRequestContext, params: Record<string, string>, authenticated = true) {
-  const response = await request.get(`http://127.0.0.1:3210/mikka/api/search?${new URLSearchParams(params)}`, { headers: authenticated ? { cookie } : {} })
+  const response = await request.get(`http://127.0.0.1:3210/mikka/api/search?${new URLSearchParams(params)}`, { headers: { cookie: authenticated ? cookie : '' } })
   expect(response.headers()['cache-control']).toBe('private, no-store')
   return { response, body: await response.json() }
 }
@@ -234,7 +234,8 @@ test('retired archive title hit locates owner history beyond the latest 100 with
   expect(foreign.status()).toBe(404)
   expect(missing.status()).toBe(404)
   expect(await foreign.json()).toEqual(await missing.json())
-  expect((await request.get(endpoint)).status()).toBe(401)
+  // Archive GET refreshes cookies; explicitly suppress the API context's cookie jar.
+  expect((await request.get(endpoint, { headers: { cookie: '' } })).status()).toBe(401)
   const generated = await request.post('http://127.0.0.1:3210/mikka/api/agent', { headers: { cookie }, data: { prompt: 'synthetic retired generation must not execute' } })
   expect(generated.status()).toBe(405)
   const retained = await pool.query('select completion from agent_turns where "sessionId"=$1', [archivedId])
