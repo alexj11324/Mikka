@@ -1,3 +1,4 @@
+import { withRequestLog } from '@/lib/request-log'
 import { after } from 'next/server'
 import { verifyComposioWebhook } from '@/lib/composio-webhook'
 import { composioNotification } from '@/lib/suggestions/notification'
@@ -5,7 +6,7 @@ import { ingestNotifications } from '@/lib/suggestions/store'
 
 export const runtime = 'nodejs'
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const apiKey = process.env.COMPOSIO_API_KEY
   const verifySecret = process.env.COMPOSIO_WEBHOOK_SECRET
   if (!apiKey || !verifySecret) return new Response('Webhook is not configured.', { status: 503, headers: { 'Cache-Control': 'no-store' } })
@@ -25,3 +26,5 @@ export async function POST(request: Request) {
   }
   return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })
 }
+
+export const POST = withRequestLog('/api/webhooks/composio', handlePOST)

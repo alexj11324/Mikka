@@ -47,7 +47,7 @@ export async function revokeRunTokens(runId: string): Promise<void> {
 export async function verifyRunToken(_request: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
   if (!bearerToken?.startsWith(RUN_TOKEN_PREFIX)) return undefined
   const [row] = await db
-    .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId })
+    .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId, agentId: agentRuns.agentId })
     .from(runTokens)
     .innerJoin(agentRuns, eq(agentRuns.id, runTokens.runId))
     .where(and(
@@ -59,7 +59,7 @@ export async function verifyRunToken(_request: Request, bearerToken?: string): P
   return {
     token: bearerToken, clientId: `run:${row.runId}`, scopes: [],
     expiresAt: Math.floor(row.expiresAt.getTime() / 1000),
-    extra: { userId: row.userId, runId: row.runId, issueId: row.issueId },
+    extra: { userId: row.userId, runId: row.runId, issueId: row.issueId, agentId: row.agentId },
   }
 }
 

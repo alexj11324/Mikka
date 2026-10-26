@@ -30,7 +30,7 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
     for (const id of [owner,viewer]) await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$1,$2,true,now(),now())',[id,`${id}@example.invalid`])
     for (const [w,u] of [[workspace,owner],[otherWorkspace,viewer]]) await pool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,\'Search CI\')',[w,u])
     for (const [w,u] of [[workspace,owner],[workspace,viewer],[otherWorkspace,viewer]]) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')',[w,u,`${u}@example.invalid`])
-    await pool.query('insert into orvilo_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Search CI\',\'SCI\')',[team,workspace,owner])
+    await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Search CI\',\'SCI\')',[team,workspace,owner])
     // >100 recent rows cannot hide an older keyword match. Large synthetic
     // dataset also makes the real planner choice observable without prod data.
     await pool.query(`insert into issues (id,"userId",title,content,status,priority,scope,"updatedAt")
@@ -40,7 +40,7 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
     await add(child,'child rare-needle','personal',{parentId:root,number:14001})
     await add(hidden,'private rare-needle','personal',{parentId:root,number:14002})
     await pool.query('insert into issue_members ("issueId","userId","memberId") values ($1,$2,$3)',[hidden,owner,viewer])
-    await pool.query('insert into orvilo_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[hidden,team,workspace,owner])
+    await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[hidden,team,workspace,owner])
     assert.deepEqual((await search({q:'rare-needle'})).items.map(x=>x.id).sort(),[root,child,hidden].sort())
     assert.ok((await search({q:'修'})).items.some(x=>x.id===root))
     assert.deepEqual((await search({q:'50%_off'})).items.map(x=>x.id),[root])
@@ -74,9 +74,9 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
     assert.match(JSON.stringify(plan.rows[0]['QUERY PLAN']),/issues_title_search_trgm_idx/)
   } finally {
     await pool.query('delete from issue_members where "userId"=$1',[owner])
-    await pool.query('delete from orvilo_team_issues where "userId"=$1',[owner])
+    await pool.query('delete from mikka_team_issues where "userId"=$1',[owner])
     await pool.query('delete from issues where "userId"=$1',[owner])
-    await pool.query('delete from orvilo_teams where id=$1',[team])
+    await pool.query('delete from mikka_teams where id=$1',[team])
     await pool.query('delete from mikka_workspace_members where "workspaceId"=any($1::uuid[])',[[workspace,otherWorkspace]])
     await pool.query('delete from mikka_workspaces where id=any($1::uuid[])',[[workspace,otherWorkspace]])
     await pool.query('delete from "user" where id=any($1::text[])',[[owner,viewer]])

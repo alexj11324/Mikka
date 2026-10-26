@@ -248,3 +248,10 @@ test('utility parser respects bracket expressions and variants', () => {
   assert.deepEqual(splitUtilities('flex [&_svg]:size-4 text-[length:var(--size)]'), ['flex', '[&_svg]:size-4', 'text-[length:var(--size)]'])
   assert.equal(utilityBase('dark:hover:text-[length:var(--size)]'), 'text-[length:var(--size)]')
 })
+
+test('the issue page may draw its header and comment-card lines (R-61, R-63); other pages may not', () => {
+  for (const file of ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx']) {
+    assert.ok(!auditSource(file, '<header className="border-b border-rule" />', policy).some(d => d.rule === 'style/no-horizontal-rule'))
+  }
+  assert.ok(auditSource('components/workspace/task-detail.tsx', '<div className="border-b border-rule" />', policy).some(d => d.rule === 'style/no-horizontal-rule'))
+})

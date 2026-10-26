@@ -1,0 +1,25 @@
+import { randomUUID } from 'node:crypto'
+import { test, expect, register, app, seedTask } from './fixtures'
+
+test('closing an issue opened from a project returns to that project, not the board', async ({ page }) => {
+  await register(page)
+  const title = `Project return ${randomUUID()}`
+  await seedTask(page, title)
+  await page.goto(app('/?section=projects'))
+  await page.getByRole('button', { name: '新建项目', exact: true }).first().click()
+  const projectDialog = page.getByRole('dialog', { name: '新建项目', exact: true })
+  await projectDialog.getByLabel('项目名称', { exact: true }).fill('返回测试项目')
+  await projectDialog.getByRole('button', { name: '创建项目', exact: true }).click()
+  await expect(projectDialog).not.toBeVisible()
+  await page.getByRole('tab', { name: /^任务/ }).click()
+  await page.getByRole('button', { name: '关联任务', exact: true }).click()
+  const picker = page.getByRole('dialog', { name: '关联项目任务', exact: true })
+  await picker.getByRole('checkbox', { name: title, exact: false }).check()
+  await picker.getByRole('button', { name: '保存关联', exact: true }).click()
+  await expect(picker).not.toBeVisible()
+  await page.locator('[aria-label="任务列表"]').getByText(title, { exact: true }).click()
+  await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
+  await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '返回测试项目', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: '任务看板', exact: true })).toHaveCount(0)
+})

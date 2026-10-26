@@ -85,9 +85,19 @@ jobs:
       - run: pnpm test:ssh-target
       - run: pnpm test:linear-sync
       - run: pnpm test:coordinator-events
+      - run: pnpm test:active-agents
+        env:
+          # Database regressions run against ephemeral Postgres in browser-tests below.
+          MIKKA_DATABASE_URL: ""
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
       - run: pnpm test:integrations
+      - run: pnpm test:request-log
+      - run: pnpm test:telegram
+      - run: pnpm test:agent
+      - run: pnpm test:acceptance
+      - run: pnpm test:suggestions
+      - run: pnpm test:db-runner
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:issues
@@ -142,6 +152,8 @@ jobs:
           --health-retries 10
     env:
       CI: 'true'
+      REQUIRE_DB: '1'
+      MIKKA_TEST_DB_PORT: '5432'
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
@@ -163,13 +175,12 @@ jobs:
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
-      - name: Group conversation API and migrations (temporary Postgres 17 only)
-        run: pnpm test:groups
       - run: pnpm test:e2e:setup
-      - name: Team task and run visibility (temporary Postgres 17 only)
-        run: REQUIRE_DB=1 pnpm test:visibility-db
-      - name: Issue search and indexed pagination (temporary Postgres 17 only)
-        run: REQUIRE_DB=1 pnpm test:issue-search-db
-      - name: Verify legacy workspace migration and idempotency
-        run: node --test tests/workspace-migration.test.mjs
+      - name: Verify thread sharing, membership and privacy against isolated database
+        run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-threads.integration.ts
+      - name: Required DB suites (temporary Postgres 17, no skips)
+        run: pnpm test:db
+        env:
+          REQUIRE_DB: '1'
+          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:conversation-reads,test:groups,test:issue-search-db,test:relation-cycle,test:visibility-db,test:workspace-migration-db
       - run: pnpm build

@@ -78,8 +78,8 @@ export function GoogleSignInSettings({ googleEnabled }: { googleEnabled: boolean
         </Button>}
       </div>
     </SettingRow>
-    {!googleEnabled && <p role="status" className="text-sm text-muted-foreground">{t('googleNotConfigured')}</p>}
-    {googleSuccess && <p role="status" className="text-sm text-muted-foreground">{googleSuccess}</p>}
-    {googleError && <p role="alert" className="text-sm text-destructive">{googleError}</p>}
+    {!googleEnabled && <p role="status" className="px-5 py-3 text-sm text-muted-foreground">{t('googleNotConfigured')}</p>}
+    {googleSuccess && <p role="status" className="px-5 py-3 text-sm text-muted-foreground">{googleSuccess}</p>}
+    {googleError && <p role="alert" className="px-5 py-3 text-sm text-destructive">{googleError}</p>}
   </SettingsSection>
 }

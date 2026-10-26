@@ -3,6 +3,7 @@ import 'server-only'
 import { and, asc, desc, eq, gt, inArray, or, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { actAs } from '@/lib/acting-user'
+import type { ActivityActor } from '@/lib/activity-actor'
 import { addRunMessage, queueRun, requestRunStop } from '@/lib/agent-runs'
 import { forgetNotes, rememberNote } from '@/lib/coordinator/context'
 import { editMemory } from '@/lib/coordinator/store'
@@ -87,26 +88,26 @@ function issueResult(issue: { id: string; title: string; status: string; priorit
   }
 }
 
-export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }) {
+export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }, actor?: ActivityActor) {
   return attempt(() => actAs(userId, async () => {
     const created = unwrap(await saveIssue({ title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' })).issue
     return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeAgentId: input.assigneeAgentId }))
-  }))
+  }, actor))
 }
 
-export async function updateIssue(userId: string, input: IssueChanges & { issueId: string }) {
+export async function updateIssue(userId: string, input: IssueChanges & { issueId: string }, actor?: ActivityActor) {
   return attempt(() => actAs(userId, async () => {
     const { issueId, ...changes } = input
     return issueResult(await applyChanges(userId, issueId, changes))
-  }))
+  }, actor))
 }
 
-export async function linkIssues(userId: string, input: { issueId: string; kind: 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'; targetId: string | null; remove?: boolean }) {
+export async function linkIssues(userId: string, input: { issueId: string; kind: 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'; targetId: string | null; remove?: boolean }, actor?: ActivityActor) {
   return attempt(() => actAs(userId, async () => {
     const issue = await readIssue(input.issueId)
     const saved = unwrap(await updateIssueRelation({ id: issue.id, revision: issue.revision, kind: input.kind, targetId: input.targetId, remove: input.remove ?? false })).issue
     return issueResult(saved)
-  }))
+  }, actor))
 }
 
 /** Issues whose title or text contains `query`, most recently updated first. */

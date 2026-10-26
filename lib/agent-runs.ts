@@ -8,6 +8,7 @@ import { issueVisibility } from '@/lib/issue-visibility'
 import { workspaceRunView } from '@/lib/run-visibility'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
+import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -89,7 +90,7 @@ export async function visibleRuns(userId: string, input: { issueId?: string; run
       or(eq(agentRuns.userId, userId), and(visibility.predicate, shared)),
       input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined,
       input.runIds ? inArray(agentRuns.id, input.runIds) : undefined,
-      input.activeOnly ? inArray(agentRuns.status, ['queued', 'preparing', 'running', 'waiting_input', 'finishing']) : undefined,
+      input.activeOnly ? inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]) : undefined,
     )).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(Math.max(1, Math.min(input.limit ?? 20, 100)))
   return rows.map(({ ownerId, ...run }) => ownerId === userId ? run : workspaceRunView(run))
 }

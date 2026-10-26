@@ -14,6 +14,7 @@ import { SPHERE_TONES } from '@/lib/status-appearance'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut } from '@/components/ui/command'
+import { ROW_VALUE } from './issue-property-row'
 
 
 /** An agent's mark: a gradient sphere with a soft highlight, tinted by name. */
@@ -45,8 +46,8 @@ export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, o
     if (await onChange(value)) { setOpen(false); setQuery('') }
   }
   return <Popover open={open} onOpenChange={value => { setOpen(value); setQuery('') }}>
-    <PopoverTrigger render={<Button data-assignee-trigger type="button" variant="ghost" size={compact ? 'icon-compact' : 'sm'} disabled={disabled} aria-label={t('aria', { name: assignee?.name ?? t('unassigned') })} title={t('ariaShortcut', { name: assignee?.name ?? t('unassigned') })} />}>
-      <AssigneeAvatar assignee={assignee} compact={compact} />{!compact && (assignee?.name ?? t('unassignedLabel'))}
+    <PopoverTrigger render={<Button data-assignee-trigger type="button" variant="ghost" size={compact ? 'icon-compact' : 'sm'} className={cn(!compact && ROW_VALUE)} disabled={disabled} aria-label={t('aria', { name: assignee?.name ?? t('unassigned') })} title={t('ariaShortcut', { name: assignee?.name ?? t('unassigned') })} />}>
+      <AssigneeAvatar assignee={assignee} compact={compact} />{!compact && <span className={cn('truncate', !assignee && 'text-muted-foreground')}>{assignee?.name ?? t('unassignedLabel')}</span>}
     </PopoverTrigger>
     <PopoverContent align="end" className="w-72 p-0">
       <Command onKeyDownCapture={event => {

@@ -1,8 +1,9 @@
+import { withRequestLog } from '@/lib/request-log'
 import { getTranslations } from 'next-intl/server'
 import { createHmac } from 'node:crypto'
 import { auth, authBaseURL } from '@/lib/auth'
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const i18nText = await getTranslations();
   if (process.env.NODE_ENV !== 'development') return new Response(null, { status: 404 })
 
@@ -33,3 +34,5 @@ export async function POST(request: Request) {
     return new Response(null, { status: 503 })
   }
 }
+
+export const POST = withRequestLog('/api/test-workspace', handlePOST)
