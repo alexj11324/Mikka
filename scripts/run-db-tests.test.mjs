@@ -171,3 +171,12 @@ test('Factory uses existing CI paths without incompatible local fixture override
  const workflow=readFileSync('.github/workflows/mailboxes.yml','utf8')
  assert.ok(!/MIKKA_NATIVE_DISPOSAL_AUTHORIZED:.*1/.test(workflow))
  })
+
+test('merged workflow cannot resurrect implicit DB runner or direct destructive harnesses',()=>{
+ const workflow=readFileSync('.github/workflows/ui-policy.yml','utf8'), job=workflow.slice(workflow.indexOf('  browser-tests:'))
+ const c=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8'))
+ assert.equal((workflow.match(/DB_TEST_EXPECTED:/g)??[]).length,1)
+ assert.ok(!/run: pnpm test:db\s*\n/.test(job))
+ assert.ok(!job.includes('pnpm test:e2e:setup'))
+ for(const recipe of c.recipes)for(const file of recipe.files)assert.ok(!job.includes(file.path),`DB file must execute only through its explicit phase/profile: ${file.path}`)
+})
