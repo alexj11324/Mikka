@@ -8,6 +8,8 @@ import { bindComputerRun } from './run-binding'
 import { claimLocalRun } from './claim'
 import { syncComputerReviews, decideComputerReview } from './reviews'
 import { provisionCloudDevice } from './cloud-device'
+import { claimWorkerLease, renewWorkerLease, releaseWorkerLease } from './worker-lease'
+import { startCloudWorker } from './cloud-worker'
 import { ComputerBroker } from '../../packages/daemon/src/computer/broker.mjs'
 import { applyWebComputerDecisions, webComputerSnapshots } from '../../packages/daemon/src/computer/web-review'
 import type * as provider from './e2b-provider'
@@ -39,9 +41,11 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, status text NOT NULL, "deviceId" uuid, "startedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
     const bindingMigration = await readFile(new URL('../../drizzle/20261027000000_computer_run_bindings.sql', import.meta.url), 'utf8')
     await pool.query(bindingMigration); await pool.query(bindingMigration)
-    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\'); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "revokedAt" timestamptz)')
+    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz)')
     const scopeMigration = await readFile(new URL('../../drizzle/20261027000300_cloud_device_scope.sql', import.meta.url), 'utf8')
     await pool.query(scopeMigration); await pool.query(scopeMigration)
+    const workerLeaseMigration = await readFile(new URL('../../drizzle/20261027000400_cloud_worker_leases.sql', import.meta.url), 'utf8')
+    await pool.query(workerLeaseMigration); await pool.query(workerLeaseMigration)
     const reviewMigration = await readFile(new URL('../../drizzle/20261027000200_local_computer_reviews.sql', import.meta.url), 'utf8')
     await pool.query(reviewMigration); await pool.query(reviewMigration)
     await pool.query('CREATE TABLE byos_bindings (id uuid PRIMARY KEY); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id))')
@@ -52,6 +56,44 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await assert.rejects(store.operate(otherWorkspace, bot.id, 'wake'), { status: 404 })
     await Promise.all([store.operate(actor, bot.id, 'wake'), store.operate(actor, bot.id, 'wake')])
     assert.equal(created, 1)
+    const leaseA = randomUUID(), leaseB = randomUUID()
+    const leaseClaims = await Promise.all([claimWorkerLease(pool, actor, 'sandbox-test', leaseA), claimWorkerLease(pool, actor, 'sandbox-test', leaseB)])
+    assert.equal(leaseClaims.filter(Boolean).length, 1)
+    const leaseWinner = leaseClaims[0] ? leaseA : leaseB, leaseLoser = leaseClaims[0] ? leaseB : leaseA
+    assert.equal(await renewWorkerLease(pool, actor, leaseLoser), false)
+    await releaseWorkerLease(pool, actor, leaseLoser)
+    assert.equal(await claimWorkerLease(pool, actor, 'sandbox-test', leaseLoser), false)
+    await assert.rejects(provisionCloudDevice(pool, actor, new Date(Date.now() + 60000), leaseLoser), /not found/)
+    assert.equal(await renewWorkerLease(pool, actor, leaseWinner), true)
+    await pool.query('UPDATE cloud_machines SET "workerLeaseUntil"=now()-interval \'1 second\' WHERE "workspaceId"=$1', [actor.workspaceId])
+    assert.equal(await renewWorkerLease(pool, actor, leaseWinner), false)
+    await assert.rejects(provisionCloudDevice(pool, actor, new Date(Date.now() + 60000), leaseWinner), /not found/)
+    assert.equal(await claimWorkerLease(pool, actor, 'sandbox-test', leaseLoser), true)
+    await releaseWorkerLease(pool, actor, leaseWinner)
+    assert.equal(await claimWorkerLease(pool, actor, 'sandbox-test', leaseWinner), false)
+    await releaseWorkerLease(pool, actor, leaseLoser)
+    let handoff: { deviceId: string; credential: string } | undefined
+    const sha = 'a'.repeat(40)
+    const sandbox = { sandboxId: 'sandbox-test', files: {
+      read: async () => sha,
+      write: async (_path: string, data: string) => { handoff = JSON.parse(data) },
+    }, commands: { run: async (command: string) => {
+      assert.ok(!command.includes('orv_'), 'credential must not enter a shell command')
+      if (command.includes('bin/cloud-worker.ts')) {
+        assert.ok(handoff)
+        await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [handoff.deviceId])
+        await pool.query('UPDATE device_tokens SET "lastUsedAt"=now() WHERE "tokenHash"=$1', [createHash('sha256').update(handoff.credential).digest('hex')])
+      }
+    } } } as unknown as import('e2b').Sandbox
+    const workerRuntime = { ...runtime, ensureHostedRunnerImage: async () => {} } as typeof provider
+    await assert.rejects(startCloudWorker(pool, bob, sandbox, 'https://mikka.example/mikka', sha, workerRuntime), /busy or unavailable/)
+    await assert.rejects(startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', 'b'.repeat(40), workerRuntime), /version mismatch/)
+    const worker = await startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', sha, workerRuntime)
+    assert.equal(worker.deviceId, handoff!.deviceId)
+    assert.equal((await pool.query('SELECT "workerLeaseId" FROM cloud_machines WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0].workerLeaseId, null)
+    const tokenCount = Number((await pool.query('SELECT count(*) FROM device_tokens WHERE "boundDeviceId"=$1', [worker.deviceId])).rows[0].count)
+    assert.equal((await startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', sha, workerRuntime)).deviceId, worker.deviceId)
+    assert.equal(Number((await pool.query('SELECT count(*) FROM device_tokens WHERE "boundDeviceId"=$1', [worker.deviceId])).rows[0].count), tokenCount, 'healthy worker is reused without rotating its token')
     await assert.rejects(provisionCloudDevice(pool, bob, new Date(Date.now() + 60000)), /not found/)
     await assert.rejects(provisionCloudDevice(pool, actor, new Date(Date.now() - 1)), /expiry/)
     const firstCredential = await provisionCloudDevice(pool, actor, new Date(Date.now() + 60000))
