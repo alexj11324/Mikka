@@ -57,7 +57,9 @@
     "test:db": "node scripts/run-db-tests.mjs",
     "test:db-runner": "node --test scripts/run-db-tests.test.mjs",
     "test:workspace-migration-db": "node --test tests/workspace-migration.test.mjs",
-    "test:activity-actor-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/activity-actor-db.test.ts"
+    "test:activity-actor-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/activity-actor-db.test.ts",
+    "test:cleaner-auth": "node --import tsx --test lib/credentials/universal-auth.test.ts lib/credentials/vault-diagnostics.test.ts",
+    "test:cleaner-db": "node --import tsx --test lib/credentials/cleanup-postgres.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

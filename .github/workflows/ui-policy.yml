@@ -178,9 +178,11 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Verify thread sharing, membership and privacy against isolated database
         run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-threads.integration.ts
+      - run: pnpm test:cleaner-auth
       - name: Required DB suites (temporary Postgres 17, no skips)
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:conversation-reads,test:groups,test:issue-search-db,test:relation-cycle,test:visibility-db,test:workspace-migration-db
+          CLEANER_TEST_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+          DB_TEST_EXPECTED: test:cleaner-db,test:active-agents,test:activity-actor-db,test:conversation-reads,test:groups,test:issue-search-db,test:relation-cycle,test:visibility-db,test:workspace-migration-db
       - run: pnpm build
