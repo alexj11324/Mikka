@@ -7,7 +7,7 @@ import {
   evaluateTask,
   freezeBenchmarkInstance,
   type ReportBenchmarkRun,
-} from "./report-benchmark.ts";
+} from "./report-benchmark";
 
 const instance = freezeBenchmarkInstance("f".repeat(64));
 const evaluate = (caseId: string, output: unknown) =>
