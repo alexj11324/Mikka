@@ -1,3 +1,4 @@
+import {createBotWebTools} from '@/lib/bot-web-tools'
 import { splitTelegramText } from '@/lib/telegram/messages'
 import type { WakeDelivery } from '@/lib/coordinator/inbox-receipts'
 import { scheduleTools } from '@/lib/schedules/tools'
@@ -69,6 +70,7 @@ function coordinatorTools(userId: string, context: ActionContext | undefined, ho
   const guardedSteps = Object.fromEntries(Object.keys(steps).map(name=>[name,(...args:unknown[])=>steps.executeWakeTool(userId,holder,delivery,name,args.slice(1))])) as typeof steps
   const id = z.uuid()
   const tools = {
+    ...createBotWebTools({search:input=>guardedSteps.webSearchStep(userId,input),scrape:input=>guardedSteps.webScrapeStep(userId,input)}),
     ...scheduleTools(command => guardedSteps.scheduleCommand(userId, command, context)),
     ...createCredentialAITools((name, input) => guardedSteps.credentialTool(userId, name, input)),
     mailbox_recipients: tool({ description: 'Find authorized session mailbox addresses.', inputSchema: z.object({}), execute: () => guardedSteps.mailboxAction(userId, 'recipients') }),
@@ -214,6 +216,6 @@ function coordinatorTools(userId: string, context: ActionContext | undefined, ho
       execute: ( input) => guardedSteps.stopRun(userId, input),
     }),
   }
-  const readTools = new Set(['list_issues','get_issue','list_agents','list_factory_requests','get_factory_task','list_factory_questions','get_factory_question','list_runs','get_run','get_run_improvements','get_skill_improvement_factory','mailbox_recipients','mailbox_inbox','mailbox_sent','schedule_list','schedule_history','search_notion_pages','read_notion_page_blocks','search_slack_messages','read_slack_thread','search_gmail','list_calendar_events','get_calendar_event'])
+  const readTools = new Set(['web_search','read_webpage','list_issues','get_issue','list_agents','list_factory_requests','get_factory_task','list_factory_questions','get_factory_question','list_runs','get_run','get_run_improvements','get_skill_improvement_factory','mailbox_recipients','mailbox_inbox','mailbox_sent','schedule_list','schedule_history','search_notion_pages','read_notion_page_blocks','search_slack_messages','read_slack_thread','search_gmail','list_calendar_events','get_calendar_event'])
   return Object.fromEntries(Object.entries(tools).filter(([name])=>!recovery||readTools.has(name)))
 }

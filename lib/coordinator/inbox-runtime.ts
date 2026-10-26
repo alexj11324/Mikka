@@ -103,7 +103,7 @@ export function coordinatorInbox() {
 export async function fenceCoordinatorModel(tx:PoolClient,workspace:PolicyClient,input:{ownerId:string;workspaceId:string;eventId:string;generation:number;holder:string;delivery:WakeDelivery},deadline:Date){
   const session=(await tx.query('SELECT * FROM coordinator_sessions WHERE "userId"=$1 FOR SHARE',[input.ownerId])).rows[0]
   const event=(await tx.query('SELECT * FROM coordinator_events WHERE id=$1 AND "userId"=$2 FOR SHARE',[input.eventId,input.ownerId])).rows[0]
-  if(!session||!event||event.wake_replays!==input.generation||event.wake_workspace_id!==input.workspaceId||event.processed_at||event.wake_checkpoint||event.wake_status!=='running'||!['attention','result'].includes(event.tier)||event.kind==='issue_done'||event.wake_delivery_token!==input.delivery.token||event.processing_holder!==input.holder||session.leaseHolder!==input.holder||!session.leaseUntil||session.leaseUntil<=deadline)throw new WakeError('wakeLeaseLost')
+  if(!session||!event||event.wake_replays!==input.generation||event.wake_workspace_id!==input.workspaceId||event.processed_at||event.wake_checkpoint||event.wake_status!=='running'||event.wake_generation_state!=='sending'||!['attention','result'].includes(event.tier)||event.kind==='issue_done'||event.wake_delivery_token!==input.delivery.token||event.processing_holder!==input.holder||session.leaseHolder!==input.holder||!session.leaseUntil||session.leaseUntil<=deadline)throw new WakeError('wakeLeaseLost')
   const mode=await workspaceScope.run(drizzle(workspace as PoolClient),()=>authorize(tx,event,'commit'))
   if(mode==='notify_only')throw new WakeError('wakeRunStopped')
 }

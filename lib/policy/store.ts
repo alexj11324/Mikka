@@ -307,7 +307,7 @@ export class PolicyStore {
    * calls; a call waiting behind publication sees the new version. */
   async withTool<T>(
     userId: string,
-    work: () => Promise<T>,
+    work: (tx: PolicyClient) => Promise<T>,
     capturedWorkspaces: string[] = [],
   ): Promise<T> {
     const result = await transaction(this.pool, async (tx) => {
@@ -322,7 +322,7 @@ export class PolicyStore {
         true,
       );
       if (denied) return { denied };
-      return { value: await work() };
+      return { value: await work(tx) };
     });
     if (result.denied) throw result.denied;
     return result.value as T;

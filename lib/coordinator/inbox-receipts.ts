@@ -138,7 +138,6 @@ export class CoordinatorInbox {
           ownerId: event.userId,
           workspaceId: event.wake_workspace_id,
           operationId: event.id,
-        telegramTargets: telegramReplyTargets(events),
           generation: event.wake_replays,
         },
         phase,

@@ -6,8 +6,8 @@ import {policySigner} from '../policy/signing'
 import {AGENT_ROUTE} from '../policy/model'
 import type {ModelRoute,PolicyDocument} from '../policy/contract'
 export const fixtureSigner=()=>policySigner('isolated-resource-proof-no-production-authorization-123456789')
-export const fixtureResources={ 'coordinator.model':{units:2,unknownCostApproved:true},'coordinator.compact':{units:2,unknownCostApproved:true},'gateway.decision':{units:2,unknownCostApproved:true},'schedule.model':{units:2,unknownCostApproved:true} }
-export async function resourceFixture(app:Pool,workspace:Pool,routes:ModelRoute[]=[AGENT_ROUTE]){
+export const fixtureResources={ 'coordinator.model':{units:2,unknownCostApproved:true},'coordinator.compact':{units:2,unknownCostApproved:true},'gateway.decision':{units:2,unknownCostApproved:true},'schedule.model':{units:2,unknownCostApproved:true},'web.search':{units:1,unknownCostApproved:true},'web.scrape':{units:1,unknownCostApproved:true} }
+export async function resourceFixture(app:Pool,workspace:Pool,routes:ModelRoute[]=[AGENT_ROUTE],managed=true){
  const owner=`resources-${randomUUID()}`,workspaceId=randomUUID(),operationId=randomUUID()
  await app.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())',[owner,`${owner}@example.invalid`])
  await workspace.query('INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,\'isolated resource proof\')',[workspaceId,owner])
@@ -17,7 +17,7 @@ export async function resourceFixture(app:Pool,workspace:Pool,routes:ModelRoute[
  await app.query('INSERT INTO quota_owners(owner_id,workspace_id) VALUES($1,$2)',[owner,workspaceId])
  const document:PolicyDocument={schemaVersion:1,state:'enforce',offlineTtlSeconds:60,layers:[{scope:'workspace',id:workspaceId,ceiling:{git_push:'deny'},models:routes}]}
  const policy=new PolicyStore(workspace,fixtureSigner())
- await policy.publish(workspaceId,owner,0,document)
+ if(managed)await policy.publish(workspaceId,owner,0,document)
  return {owner,workspaceId,operationId,policy,document}
 }
 export function isolatedResourceUrls(){

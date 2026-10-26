@@ -40,12 +40,12 @@ export type ModelExecutionScope = {
   operationId: string
   generation: number
   stepKey: string
-  resource: 'coordinator.model' | 'coordinator.compact' | 'gateway.decision' | 'schedule.model'
+  resource: 'coordinator.model' | 'coordinator.compact' | 'gateway.decision' | 'schedule.model' | 'web.search' | 'web.scrape'
   binding: unknown
 }
 export type ModelSourceFence = (tx: PoolClient, reservation: Reservation, deadline: Date, workspace: PolicyClient) => Promise<void>
 export class ModelExecutionFailure extends Error{
-  constructor(readonly outcome:'unsent'|'rejected'|'uncertain',code:string,readonly retryAfter?:number){super(code);this.name='ModelExecutionFailure'}
+  constructor(readonly outcome:'unsent'|'rejected'|'uncertain',code:string,readonly retryAfter?:number,readonly statusCode?:number){super(code);this.name='ModelExecutionFailure'}
 }
 
 function digest(value: unknown) { return createHash('sha256').update(JSON.stringify(value)).digest('hex') }
@@ -93,8 +93,19 @@ export class ResourceModelExecution {
       return quota.inspect(scope.ownerId,scope.workspaceId,scope.resource)
     })
   }
-  async run<T>(scope: ModelExecutionScope, route: ModelRoute, invoke: (send: typeof fetch, signal: AbortSignal) => Promise<T>,
-    options: { fence: ModelSourceFence; signal?: AbortSignal; timeoutMs?: number; leaseMs?: number; usage?: (value: T) => { inputTokens?: number; outputTokens?: number };commit?:(tx:PoolClient,reservation:Reservation,value:T,workspace:PolicyClient)=>Promise<void> } ) {
+  async run<T>(scope: ModelExecutionScope, route: ModelRoute, invoke: ResourceInvoke<T>, options: ResourceOptions<T>) {
+    return this.execute(scope,invoke,options,work=>withReservedModel(this.policy,scope.ownerId,scope.workspaceId,route,work),route)
+  }
+  /** Same canonical reservation/send/settle path, with the existing tool policy
+   * gate. A service cache hit or persisted receipt consumes no provider quota. */
+  async runTool<T>(scope:ModelExecutionScope,invoke:ResourceInvoke<T>,options:ResourceOptions<T>&{
+    preflight:(tx:PoolClient,workspace:PolicyClient,deadline:Date)=>Promise<void>
+  }){
+    if(!['web.search','web.scrape'].includes(scope.resource))throw new QuotaError('modelScopeMismatch',403)
+    return this.execute(scope,invoke,options,work=>this.policy.withTool(scope.ownerId,work,[scope.workspaceId]))
+  }
+  private async execute<T>(scope:ModelExecutionScope,invoke:ResourceInvoke<T>,options:ResourceOptions<T>,
+    admit:(work:(workspace:PolicyClient)=>Promise<T>)=>Promise<T>,route?:ModelRoute){
     if (!scope.workspaceId || !scope.ownerId || !scope.operationId || !scope.stepKey || !Number.isSafeInteger(scope.generation) || scope.generation < 0)
       throw new QuotaError('modelScopeUnavailable', 403)
     const timeoutMs = options.timeoutMs ?? 40000, leaseMs = options.leaseMs ?? 60000
@@ -102,9 +113,8 @@ export class ResourceModelExecution {
       throw new QuotaError('modelDeadlineInvalid', 400)
     const signal = AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(options.signal ? [options.signal] : [])])
     const deadline = new Date(Date.now() + timeoutMs)
-    return withReservedModel(this.policy, scope.ownerId, scope.workspaceId, route, async workspace => {
+    return admit(async workspace => {
       aborted(signal)
-      // Reuse the held workspace transaction even with a one-connection pool.
       const quotas = new QuotaStore(this.app, async (owner, id) => {
         if (id !== scope.workspaceId || owner !== scope.ownerId) return false
         await this.policy.member(workspace, id, owner)
@@ -114,40 +124,61 @@ export class ResourceModelExecution {
         if (reservation.workspace_id !== scope.workspaceId) throw new QuotaError('modelWorkspaceMismatch', 403)
         await options.fence(tx, reservation, deadline, workspace)
       }
-      const reservation = await beginQuotaWith(quotas, { ownerId: scope.ownerId,
+      if(options.preflight)await transaction(this.app,tx=>options.preflight!(tx,workspace,deadline))
+      const begin=()=>beginQuotaWith(quotas, { ownerId: scope.ownerId,
         key: `model:${scope.operationId}:${scope.generation}:${digest(scope.stepKey).slice(0,32)}`,
-        resource: scope.resource, binding: { route, operation: scope.binding }, leaseMs }, fence)
-      let sent = false
+        resource: scope.resource, binding: { ...(route?{route}:{}), operation: scope.binding }, leaseMs }, fence)
+      let reservation:Reservation|undefined=route?await begin():undefined
+      let sent = false,transportError:unknown
       try {
         const guarded: typeof fetch = async (input, init) => {
-          if (sent) throw new QuotaError('modelTransportRepeated', 409)
-          const url = input instanceof Request ? input.url : String(input)
-          if (url !== route.endpoint || typeof init?.body !== 'string') throw new QuotaError('modelTransportBindingMismatch', 403)
-          const payload = JSON.parse(init.body), headers = new Headers(init.headers)
-          const model = route.provider === 'vercel_gateway' && headers.has('ai-language-model-id') ? headers.get('ai-language-model-id') : payload.model
-          if (model !== route.model) throw new QuotaError('modelTransportBindingMismatch', 403)
-          aborted(signal)
-          await quotas.revalidate(scope.ownerId, reservation.id, fence)
-          aborted(signal)
-          sent = true
-          const response = await bounded(this.send(input, { ...init, signal, redirect: 'error' }), signal)
-          if (!response.ok) {
-            void response.body?.cancel().catch(() => {})
-            throw Object.assign(new Error('modelProviderRejected'), { statusCode: response.status, responseHeaders: { 'retry-after': response.headers.get('retry-after') } })
-          }
-          return responseBody(response, signal)
+          try{
+            if (sent) throw new QuotaError('modelTransportRepeated', 409)
+            const url = input instanceof Request ? input.url : String(input)
+            if(typeof init?.body !== 'string')throw new QuotaError('modelTransportBindingMismatch',403)
+            const payload = JSON.parse(init.body), headers = new Headers(init.headers)
+            if(route){
+              const model = route.provider === 'vercel_gateway' && headers.has('ai-language-model-id') ? headers.get('ai-language-model-id') : payload.model
+              if(url!==route.endpoint||model!==route.model)throw new QuotaError('modelTransportBindingMismatch',403)
+            }else{
+              const endpoint=scope.resource==='web.search'?'search':'scrape'
+              if(url!==`https://api.firecrawl.dev/v2/${endpoint}`||init.method!=='POST'||headers.has('cookie')||init.credentials!=='omit')throw new QuotaError('modelTransportBindingMismatch',403)
+            }
+            aborted(signal)
+            reservation??=await begin()
+            await quotas.revalidate(scope.ownerId, reservation.id, fence)
+            aborted(signal)
+            sent = true
+            const requestSignal=AbortSignal.any([signal,...(init.signal?[init.signal]:[])])
+            const response = await bounded(this.send(input, { ...init, signal:requestSignal, redirect: 'error' }), requestSignal)
+            if (!response.ok) {
+              void response.body?.cancel().catch(() => {})
+              throw Object.assign(new Error('modelProviderRejected'), { statusCode: response.status, responseHeaders: { 'retry-after': response.headers.get('retry-after') } })
+            }
+            return await responseBody(response,requestSignal)
+          }catch(error){transportError=error;throw error}
         }
-        const result = await bounded(invoke(guarded, signal), signal)
-        if (!sent) throw new Error('modelTransportMissing')
-        await quotas.finish(scope.ownerId, reservation.id, 'settled', options.usage?.(result),undefined,options.commit?(tx,row)=>options.commit!(tx,row,result,workspace):undefined)
+        const result = await bounded(invoke(guarded, signal,workspace), signal)
+        // SearchProvider deliberately degrades failures; it cannot erase an
+        // actual network outcome or change whether canonical quota refunds.
+        if(transportError)throw transportError
+        if(!route&&sent&&(result as {ok?:boolean}).ok===false)throw new Error('webProviderInvalidResponse')
+        if(route&&!sent)throw new Error('modelTransportMissing')
+        if(reservation)await quotas.finish(scope.ownerId,reservation.id,'settled',options.usage?.(result),undefined,options.commit?(tx,row)=>options.commit!(tx,row,result,workspace):undefined)
         return result
       } catch (error) {
+        if(!reservation)throw error
         const failure = sent ? quotaFailure(error) : { outcome: 'refunded' as const }
         const row=await quotas.finish(scope.ownerId, reservation.id, failure.outcome, undefined, failure.retryAfter)
         const outcome=row.state==='refunded'?(sent?'rejected':'unsent'):'uncertain'
         const code=error instanceof QuotaError?error.code:error instanceof Error&&/timeout|abort/i.test(error.name)?'modelResponseTimeout':outcome==='rejected'?'modelProviderRejected':outcome==='unsent'?'modelNotSent':'modelExecutionUncertain'
-        throw new ModelExecutionFailure(outcome,code,failure.retryAfter)
+        throw new ModelExecutionFailure(outcome,code,failure.retryAfter,(error as {statusCode?:number})?.statusCode)
       }
     })
   }
 }
+type ResourceInvoke<T>=(send:typeof fetch,signal:AbortSignal,workspace:PolicyClient)=>Promise<T>
+type ResourceOptions<T>={fence:ModelSourceFence;signal?:AbortSignal;timeoutMs?:number;leaseMs?:number;
+ usage?:(value:T)=>{inputTokens?:number;outputTokens?:number};
+ preflight?:(tx:PoolClient,workspace:PolicyClient,deadline:Date)=>Promise<void>;
+ commit?:(tx:PoolClient,reservation:Reservation,value:T,workspace:PolicyClient)=>Promise<void>}

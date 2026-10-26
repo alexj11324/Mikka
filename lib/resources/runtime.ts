@@ -1,3 +1,7 @@
+import {AsyncLocalStorage} from 'node:async_hooks'
+import {createWebService,SearchProviderError,type SearchResponse,type ScrapeResponse} from '@/lib/search'
+import {createFirecrawlProvider} from '@/lib/search/firecrawl'
+import {webUrlSchema} from '@/lib/search/url-schema'
 import 'server-only'
 import { intentDigest } from '@/lib/operations/action-intents'
 import { createGateway, type gateway } from 'ai'
@@ -7,7 +11,7 @@ import { policyStore } from '@/lib/policy/runtime'
 import { AGENT_ROUTE, coordinatorRoute } from '@/lib/policy/model'
 import { PolicyError } from '@/lib/policy/contract'
 import { QuotaError } from '@/lib/quota/errors'
-import { ResourceModelExecution, type ModelExecutionScope, type ModelSourceFence } from './model-execution'
+import { ResourceModelExecution,ModelExecutionFailure, type ModelExecutionScope, type ModelSourceFence } from './model-execution'
 import type { WakeDelivery, WakeAdmission } from '@/lib/coordinator/inbox-receipts'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { DECISION_MODEL, DECISIONS_URL,answersByName,type DecisionResponse } from '@/lib/coordinator/decision'
@@ -26,7 +30,7 @@ function controlledOrigin(){
   const origin=process.env.MIKKA_RESOURCE_TEST_ORIGIN
   if(!origin)return null
   const target=new URL(origin),db=process.env.MIKKA_DATABASE_URL
-  if(process.env.CI!=='true'||target.origin!==origin||target.hostname!=='127.0.0.1'||target.protocol!=='http:'||!db||new URL(db).hostname!=='127.0.0.1'||!new URL(db).pathname.endsWith('_176')||['VERCEL','AI_GATEWAY_API_KEY','DECISION_GATEWAY_API_KEY','OPENAI_API_KEY','OPENCODE_API_KEY','COMPOSIO_API_KEY'].some(k=>process.env[k]))throw new Error('resourceControlledTransportInvalid')
+  if(process.env.CI!=='true'||target.origin!==origin||target.hostname!=='127.0.0.1'||target.protocol!=='http:'||!db||new URL(db).hostname!=='127.0.0.1'||!new URL(db).pathname.endsWith('_176')||['VERCEL','AI_GATEWAY_API_KEY','DECISION_GATEWAY_API_KEY','OPENAI_API_KEY','OPENCODE_API_KEY','COMPOSIO_API_KEY','FIRECRAWL_API_KEY'].some(k=>process.env[k]))throw new Error('resourceControlledTransportInvalid')
   return origin
 }
 export const resourceTestTransportEnabled=()=>Boolean(controlledOrigin())
@@ -35,8 +39,8 @@ const transport:typeof fetch=async(input,init)=>{
   const origin=controlledOrigin()
   if(!origin)return fetch(input,init)
   const logical=new URL(input instanceof Request?input.url:String(input))
-  if(!['https://ai-gateway.vercel.sh/v4/ai/language-model',DECISIONS_URL,AGENT_ROUTE.endpoint].includes(logical.href))throw new Error('resourceControlledRouteInvalid')
-  return fetch(origin+'/model',{...init,headers:{...Object.fromEntries(new Headers(init?.headers)), 'x-controlled-logical-endpoint':logical.href}})
+  if(!['https://ai-gateway.vercel.sh/v4/ai/language-model',DECISIONS_URL,AGENT_ROUTE.endpoint,'https://api.firecrawl.dev/v2/search','https://api.firecrawl.dev/v2/scrape'].includes(logical.href))throw new Error('resourceControlledRouteInvalid')
+  return fetch(origin+(logical.hostname==='api.firecrawl.dev'?logical.pathname:'/model'),{...init,headers:{...Object.fromEntries(new Headers(init?.headers)), 'x-controlled-logical-endpoint':logical.href}})
 }
 function execution(operationId?:string){
   const send:typeof fetch=(input,init)=>{
@@ -105,4 +109,63 @@ export const publicWakeAdmission:WakeAdmission=async(scope,_phase)=>{
     if(!(error instanceof QuotaError)&&!(error instanceof PolicyError))throw error
     return {admitted:false,retryAt:new Date(Date.now()+Math.min(900000,Math.max(1000,error instanceof QuotaError?error.retryAfter*1000:60000)))}
   }
+}
+
+// One shared provider service retains its existing bounded search cache and
+// throttle. The async scope supplies the already admitted actual SDK fetch.
+// No caller can install a second permissive transport in the Bot harness.
+const webScope=new AsyncLocalStorage<{source:Extract<ModelSource,{kind:'coordinator'}>;send:typeof fetch}>()
+const webProvider=createFirecrawlProvider((input,init)=>{
+  const scope=webScope.getStore()
+  if(!scope)throw new QuotaError('modelScopeUnavailable',403)
+  return scope.send(input,init)
+},{resolve:async hostname=>{
+  if(controlledOrigin()){
+    if(hostname!=='fixture.public.invalid')throw new Error('resourceControlledHostInvalid')
+    return [{address:'8.8.8.8'}]
+  }
+  const {lookup}=await import('node:dns/promises')
+  return lookup(hostname,{all:true})
+}})
+const webService=createWebService({provider:webProvider,authorize:ctx=>{
+  const scope=webScope.getStore()
+  return Boolean(scope&&ctx.userId===scope.source.ownerId&&ctx.workspaceId===scope.source.workspaceId&&ctx.caller==='coordinator')
+}})
+export async function runResourceWeb(source:Extract<ModelSource,{kind:'coordinator'}>,operation:'search'|'scrape',input:{query?:string;limit?:number;url?:string}):Promise<SearchResponse|ScrapeResponse>{
+ if(source.kind!=='coordinator')throw new QuotaError('modelScopeMismatch',403)
+ const safe:{query:string;limit:number}|{url:string}=operation==='search'?{query:String(input.query??'').trim(),limit:input.limit??5}:{url:webUrlSchema.parse(input.url)}
+ if('query'in safe&&(safe.query.length<2||safe.query.length>300||!Number.isInteger(safe.limit)||safe.limit<1||safe.limit>10))throw new QuotaError('webInputInvalid',400)
+ const key=`web:${source.generation}:${digest([operation,safe])}`
+ const binding=digest([source.ownerId,source.workspaceId,source.operationId,source.generation,operation,safe])
+ let cached:{binding:string;value:SearchResponse|ScrapeResponse}|undefined
+ const authorize=async(tx:import('pg').PoolClient,workspace:import('@/lib/policy/sql-client').PolicyClient,deadline:Date)=>{
+  const {fenceCoordinatorModel}=await import('@/lib/coordinator/inbox-runtime')
+  await fenceCoordinatorModel(tx,workspace,{...source,eventId:source.operationId},deadline)
+ }
+ try{
+ return await execution(source.operationId).runTool({...source,stepKey:key,resource:operation==='search'?'web.search':'web.scrape',binding:{operationId:source.operationId,workspaceId:source.workspaceId,generation:source.generation,inputDigest:binding}},async(send,signal)=>{
+  if(cached)return cached.value
+  const value=await webScope.run({source,send},()=>operation==='search'
+   ?webService.search(('query'in safe?safe.query:''),{userId:source.ownerId,workspaceId:source.workspaceId,caller:'coordinator'},{limit:'limit'in safe?safe.limit:5,signal})
+   :webService.scrape(('url'in safe?safe.url:''),{userId:source.ownerId,workspaceId:source.workspaceId,caller:'coordinator'},{signal}))
+  if(value.ok&&'page'in value)return {...value,page:{...value.page,markdown:value.page.markdown.slice(0,12000)}}
+  return value
+ },{timeoutMs:10000,leaseMs:15000,fence:sourceFence(source),preflight:async(tx,workspace,deadline)=>{
+  await authorize(tx,workspace,deadline)
+  const row=(await tx.query('SELECT wake_tool_receipts FROM coordinator_events WHERE id=$1 AND "userId"=$2',[source.operationId,source.ownerId])).rows[0]
+  cached=row.wake_tool_receipts?.[key]
+  if(cached&&cached.binding!==binding)throw new QuotaError('webReceiptMismatch',409)
+ },commit:async(tx,_reservation,value,workspace)=>{
+  await authorize(tx,workspace,new Date())
+  const row=(await tx.query('SELECT wake_tool_receipts FROM coordinator_events WHERE id=$1 AND "userId"=$2 FOR UPDATE',[source.operationId,source.ownerId])).rows[0]
+  const receipts=row.wake_tool_receipts??{}
+  if(Object.keys(receipts).length>=128&&!receipts[key])throw new QuotaError('webReceiptLimit',409)
+  // This domain result checkpoint is atomic with canonical quota settlement.
+  await tx.query('UPDATE coordinator_events SET wake_tool_receipts=$3 WHERE id=$1 AND "userId"=$2',[source.operationId,source.ownerId,{...receipts,[key]:{binding,value}}])
+ }})
+ }catch(error){
+  // Stable degradation only, never raw provider/auth/error strings in chat.
+  if(error instanceof SearchProviderError)return {ok:false,error:'searchUnavailable',outcome:error.outcome}
+  return {ok:false,error:'searchUnavailable',outcome:error instanceof ModelExecutionFailure&&error.statusCode===429||error instanceof QuotaError&&error.status===429?'rate_limited':error instanceof ModelExecutionFailure&&error.statusCode&&error.statusCode>=500?'upstream_error':error instanceof ModelExecutionFailure&&error.message==='modelResponseTimeout'?'timeout':'error'}
+ }
 }

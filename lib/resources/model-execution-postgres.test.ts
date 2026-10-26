@@ -24,8 +24,8 @@ test('public resource bridge: real split PG, held policy locks, exact quota and 
  const send:typeof fetch=(_url,init)=>fetch(`http://127.0.0.1:${address.port}/model`,init)
  const policy=new PolicyStore(workspace,fixtureSigner())
  const engine=new ResourceModelExecution(app,policy,send)
- async function fixture(){
-  const f=await resourceFixture(app,workspace)
+ async function fixture(managed=true){
+  const f=await resourceFixture(app,workspace,undefined,managed)
   await app.query("INSERT INTO resource_execution_probe(id,owner_id,workspace_id,lease_until) VALUES($1,$2,$3,clock_timestamp()+interval '5 minutes')",[f.operationId,f.owner,f.workspaceId])
   const scope:ModelExecutionScope={ownerId:f.owner,workspaceId:f.workspaceId,operationId:f.operationId,generation:0,stepKey:'first-model-step',resource:'coordinator.model',binding:{version:1}}
   const fence:ModelSourceFence=async tx=>{
@@ -93,6 +93,25 @@ test('public resource bridge: real split PG, held policy locks, exact quota and 
    await assert.rejects(invoke(),/timeout|abort/i);assert.equal(sent,1);assert.ok(Date.now()-start<1500)
    const row=(await state(f.owner))[0];assert.equal(row.state,'uncertain');assert.equal(row.settled_units,'2')
    await assert.rejects(invoke(),/quotaOutcomeUncertain/)
+  })
+  await t.test('web shares the canonical ledger; managed policy denies, cache reads are free and duplicates send once',async()=>{
+   const managed=await fixture(),free=await fixture(false)
+   const web=(f:typeof free)=>({...f.scope,resource:'web.scrape' as const,stepKey:'web:stable-url'})
+   const opts=(f:typeof free)=>({fence:f.fence,preflight:async(tx:import('pg').PoolClient,ws:import('../policy/sql-client').PolicyClient,deadline:Date)=>f.fence(tx,{workspace_id:f.workspaceId} as import('../quota/store').Reservation,deadline,ws),timeoutMs:1000,leaseMs:5000})
+   const call=(f:typeof free)=>engine.runTool(web(f),async send=>{
+    const r=await send('https://api.firecrawl.dev/v2/scrape',{method:'POST',credentials:'omit',body:JSON.stringify({operationId:f.operationId,url:'https://fixture.public.invalid/page'})})
+    return r.json()
+   },opts(f))
+   await assert.rejects(call(managed),/toolEnforcementUnavailable/)
+   assert.equal(await calls(managed.operationId),0);assert.equal((await state(managed.owner)).length,0)
+   assert.deepEqual(await engine.runTool(web(free),async()=>({cached:true}),opts(free)),{cached:true})
+   assert.equal((await state(free.owner)).length,0)
+   const results=await Promise.allSettled(Array.from({length:10},()=>call(free)))
+   assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(await calls(free.operationId),1)
+   assert.deepEqual((await state(free.owner)).map(r=>[r.state,r.settled_units]),[['settled','1']])
+   await members.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',[free.workspaceId,free.owner])
+   await assert.rejects(engine.runTool(web(free),async()=>({cached:true}),opts(free)),/policyAccessDenied/)
+   assert.equal(await calls(free.operationId),1)
   })
   await t.test('membership withdrawal stays denied without an enterprise management adapter',async()=>{
    const f=await fixture();await members.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',[f.workspaceId,f.owner])

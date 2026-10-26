@@ -501,13 +501,19 @@ export async function wakeCheckpoint(userId: string,delivery: WakeDelivery) {
   return coordinatorInbox().cached(userId,delivery)
 }
 
-const wakeToolHandlers = { answerFactoryContext, answerFactoryQuestionFromUser, composioAction, credentialTool, dispatchBaselineRehearsal, dispatchRun, escalateFactoryQuestion, forget, getFactoryQuestion, getFactoryTask, getIssue, getRun, getSkillImprovementFactory, handoffSkillImprovement, listAgents, listFactoryQuestions, listFactoryRequests, listIssues, listRuns, mailboxAction, proposeAccountAction, proposeSkillImprovement, readRunImprovements, recordRunFeedback, remember, resolveFactoryTask, routeFactoryTask, scheduleCommand, selectBaselineSkill, sendToRun, stopFactoryTask, stopRun }
+const wakeToolHandlers = { webSearchStep, webScrapeStep, answerFactoryContext, answerFactoryQuestionFromUser, composioAction, credentialTool, dispatchBaselineRehearsal, dispatchRun, escalateFactoryQuestion, forget, getFactoryQuestion, getFactoryTask, getIssue, getRun, getSkillImprovementFactory, handoffSkillImprovement, listAgents, listFactoryQuestions, listFactoryRequests, listIssues, listRuns, mailboxAction, proposeAccountAction, proposeSkillImprovement, readRunImprovements, recordRunFeedback, remember, resolveFactoryTask, routeFactoryTask, scheduleCommand, selectBaselineSkill, sendToRun, stopFactoryTask, stopRun }
 /** One actual SDK step owns fresh fencing and the domain call. This must not
  * be split into a cached assert step followed by an unfenced mutation step. */
 export async function executeWakeTool(userId:string,holder:string,delivery:WakeDelivery,name:string,args:unknown[]){
   'use step'
   if(!Object.hasOwn(wakeToolHandlers,name)||!Array.isArray(args))throw new WakeError('wakeToolUnavailable')
   await coordinatorInbox().assertCurrent(userId,holder,delivery)
+  if(name==='webSearchStep'||name==='webScrapeStep'){
+    const source=await coordinatorModelSource(userId,holder,delivery)
+    if(source.kind!=='coordinator')throw new WakeError('wakeModelScopeUnavailable')
+    if(name==='webSearchStep')return webSearchStep(userId,args[0] as {query:string;limit?:number},source)
+    return webScrapeStep(userId,args[0] as {url:string},source)
+  }
   if(name==='remember'||name==='forget'||name==='mailboxAction'){
     const execution:WakeExecution={holder,delivery,operationKey:getStepMetadata().stepId,binding:intentDigest([name,args])}
     if(name==='remember')return remember(userId,args[0] as {note:string},execution)
@@ -518,3 +524,17 @@ export async function executeWakeTool(userId:string,holder:string,delivery:WakeD
   return handler(userId,...args)
 }
 executeWakeTool.maxRetries=0
+
+/** Public web tools use the same durable consumer and generation fence. */
+export async function webSearchStep(userId:string,input:{query:string;limit?:number},source?:Extract<ModelSource,{kind:'coordinator'}>){
+ 'use step'
+ if(!source||source.ownerId!==userId)throw new WakeError('wakeReceiptRequired')
+ const {runResourceWeb}=await import('@/lib/resources/runtime')
+ return runResourceWeb(source,'search',input) as Promise<import('@/lib/search').SearchResponse>
+}
+export async function webScrapeStep(userId:string,input:{url:string},source?:Extract<ModelSource,{kind:'coordinator'}>){
+ 'use step'
+ if(!source||source.ownerId!==userId)throw new WakeError('wakeReceiptRequired')
+ const {runResourceWeb}=await import('@/lib/resources/runtime')
+ return runResourceWeb(source,'scrape',input) as Promise<import('@/lib/search').ScrapeResponse>
+}
