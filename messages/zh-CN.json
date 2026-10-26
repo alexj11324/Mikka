@@ -1,4 +1,21 @@
 {
+  "DeviceSetup": {
+    "title": "设置 {device}",
+    "description": "填写此设备上的仓库和公开 GitHub 远程地址。设备运行前会检查 Git origin。",
+    "path": "本地仓库路径",
+    "remote": "公开 GitHub 远程地址",
+    "branch": "基础分支",
+    "verify": "验证命令",
+    "addRepo": "添加仓库",
+    "repoSaved": "已添加仓库",
+    "repoError": "无法添加仓库，请检查路径、公开 GitHub 地址和设备连接。",
+    "agentName": "Agent 名称",
+    "harness": "已安装的执行器",
+    "chooseHarness": "选择执行器",
+    "addAgent": "添加 Agent",
+    "agentSaved": "已添加 Agent",
+    "agentError": "无法添加 Agent，请检查名称和设备连接。"
+  },
   "SelfImprovement": {
     "resume": "继续启用",
     "activate": "启用已批准的 Skill",
@@ -709,6 +726,7 @@
     "editorAria": "{label}编辑器"
   },
   "Devices": {
+    "setup": "设置仓库和 Agent",
     "otherDevices": "Remote control",
     "menu": "{name} 的更多操作",
     "add": {

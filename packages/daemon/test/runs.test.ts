@@ -141,6 +141,47 @@ describe("mock runs", () => {
     client.close()
   })
 
+  it("rejects a claimed run before execution when Git origin differs from its assignment", async () => {
+    const { server, dataDir, repo } = await setup()
+    git(repo, "remote", "add", "origin", "https://github.com/example/other.git")
+    const daemon = await boot(server, dataDir)
+    const runId = server.queueRun(DEVICE, {
+      issueId: "issue-origin-mismatch", repoId: "repo-1", baseBranch: "main", harness: "mock",
+      prompt: "do it", fixture: "success-edit", verifyCommand: VERIFY,
+      expectedRepoRemote: "https://github.com/example/expected",
+    })
+    await daemon.syncWithServer()
+    await waitFor(() => server.runs.get(runId)?.completion)
+    expect(server.runs.get(runId)?.completion?.stopReason).toBe("error")
+    expect(daemon.supervisor.list().some(run => run.runId === runId)).toBe(false)
+    expect(existsSync(join(repo, "MIKKA_MOCK.md"))).toBe(false)
+  })
+
+  it("refreshes a newly added repository when its run arrives after the repo list", async () => {
+    const repo = await makeRepo()
+    git(repo, "remote", "add", "origin", "git@github.com:example/repo.git")
+    const server = new MemoryServer(DEVICE)
+    const link = server.link()
+    const claim = link.claimRun.bind(link)
+    link.claimRun = async (deviceId, runId) => {
+      server.addRepo(DEVICE, { repoId: "repo-new", name: "new", path: repo })
+      return claim(deviceId, runId)
+    }
+    const daemon = await new Daemon({ dataDir: tempDir(), flavor: "dev", link, credential: "cred-1",
+      harnesses: [{ harness: "mock", installed: true, version: "test" }], mockSpeed: Number.POSITIVE_INFINITY,
+      heartbeatMs: 60_000, quotaSource: null }).start()
+    daemons.push(daemon)
+    await daemon.syncWithServer()
+    const runId = server.queueRun(DEVICE, { issueId: "issue-new-repo", repoId: "repo-new", baseBranch: "main",
+      harness: "mock", prompt: "do it", fixture: "success-edit", verifyCommand: VERIFY,
+      expectedRepoRemote: "https://github.com/example/repo" })
+    await daemon.syncWithServer()
+    await waitFor(() => daemon.supervisor.list().find(run => run.runId === runId))
+    await daemon.supervisor.idle()
+    await waitFor(() => server.runs.get(runId)?.completion)
+    expect(server.runs.get(runId)?.completion?.stopReason).toBe("submitted")
+  })
+
   it("refuses a repo that is not allow-listed", async () => {
     const { server, dataDir } = await setup()
     await boot(server, dataDir)

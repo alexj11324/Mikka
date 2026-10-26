@@ -18,6 +18,7 @@ import { SKILL_ARTIFACT_HEADER, skillReceiptRevalidationSchema } from '@mikka/pr
 
 import {
   CLIENT_VERSION_HEADER,
+  REPO_ORIGIN_HEADER,
   DAEMON_RPC_ERRORS,
   devicePaths,
   fsPaths,
@@ -140,6 +141,7 @@ export class HttpServerLink implements ServerLink {
           "content-type": "application/json",
           [CLIENT_VERSION_HEADER]: this.clientVersion,
           [SKILL_ARTIFACT_HEADER]: '1',
+          [REPO_ORIGIN_HEADER]: '1',
           ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
         body: body === undefined ? undefined : JSON.stringify(body),

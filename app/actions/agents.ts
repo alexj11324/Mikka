@@ -26,6 +26,7 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, type IssueThread } from '@/lib/issue-threads'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import type { DispatchInput, DispatchResult } from '@/lib/run-dispatch'
+import { githubRepository } from '@/lib/self-improvement/source'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -168,6 +169,7 @@ export async function listLocalSshHosts(): Promise<SshHostView[]> {
 export async function addDeviceRepo(input: {
   deviceId: string
   repoPath: string
+  remoteUrl: string
   baseBranch: string
   verifyCommand: string
 }): Promise<void> {
@@ -176,30 +178,39 @@ export async function addDeviceRepo(input: {
     .object({
       deviceId: z.uuid(),
       repoPath: z.string().trim().min(1).max(4000).startsWith('/'),
+      remoteUrl: z.string().trim().min(1).max(2000),
       baseBranch: z.string().trim().min(1).max(200),
       verifyCommand: z.string().trim().max(2000),
     })
     .safeParse(input)
   if (!parsed.success) throw new ActionFailureError('repoPathInvalid')
+  let remoteUrl: string
+  try { remoteUrl = githubRepository(parsed.data.remoteUrl) } catch { throw new ActionFailureError('repoPathInvalid') }
+  const response = await fetch(`https://api.github.com/repos/${remoteUrl.slice('https://github.com/'.length)}`, { headers: { Accept: 'application/vnd.github+json' }, redirect: 'error', signal: AbortSignal.timeout(10000) })
+  if (!response.ok) throw new ActionFailureError('repoPathInvalid')
+  const metadata = await response.json()
+  if (metadata.private !== false || metadata.full_name?.toLowerCase() !== remoteUrl.slice('https://github.com/'.length).toLowerCase()) throw new ActionFailureError('repoPathInvalid')
   const [device] = await db
-    .select({ id: devices.id })
+    .select({ id: devices.id, enabled: devices.enabled, lastSeenAt: devices.lastSeenAt })
     .from(devices)
     .where(
       and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId)),
     )
     .limit(1)
-  if (!device) throw new ActionFailureError('deviceNotFound')
-  await db
+  if (!device || !device.enabled || !device.lastSeenAt || Date.now() - device.lastSeenAt.getTime() >= DEVICE_ONLINE_WINDOW_MS) throw new ActionFailureError('deviceNotFound')
+  const inserted = await db
     .insert(deviceRepos)
     .values({
       id: crypto.randomUUID(),
       deviceId: device.id,
       userId,
       repoPath: parsed.data.repoPath,
+      remoteUrl,
       baseBranch: parsed.data.baseBranch,
       verifyCommand: parsed.data.verifyCommand || null,
     })
-    .onConflictDoNothing()
+    .onConflictDoNothing().returning({ id: deviceRepos.id })
+  if (!inserted.length) throw new ActionFailureError('repoPathInvalid')
 }
 
 export async function removeDeviceRepo(id: string): Promise<void> {
@@ -329,7 +340,7 @@ async function ownedDeviceWithHarness(
     .from(devices)
     .where(and(eq(devices.id, deviceId), eq(devices.ownerId, userId)))
     .limit(1)
-  if (!device) return null
+  if (!device || !device.enabled || !device.lastSeenAt || Date.now() - device.lastSeenAt.getTime() >= DEVICE_ONLINE_WINDOW_MS) return null
   return device.harnesses.some(
     (info) => info.harness === harness && info.installed,
   )

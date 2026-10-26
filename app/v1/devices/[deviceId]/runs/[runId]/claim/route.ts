@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { and, eq, isNull } from 'drizzle-orm'
-import { RUN_LEASE_MS } from '@mikka/protocol/device'
+import { RUN_LEASE_MS, REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
@@ -91,6 +91,8 @@ export async function POST(
       { status: 409 },
     )
   }
+  if (repo.remoteUrl && request.headers.get(REPO_ORIGIN_HEADER) !== '1')
+    return NextResponse.json({ error: 'Device update required for repository verification.' }, { status: 409 })
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
   try {
@@ -224,6 +226,7 @@ export async function POST(
     issueId: run.issueId,
     deviceId,
     repoId: repo.id,
+    ...(repo.remoteUrl ? { expectedRepoRemote: repo.remoteUrl } : {}),
     baseBranch: run.baseBranch,
     harness: agent.harness,
     prompt: run.prompt,

@@ -203,12 +203,15 @@ export const setupRecipeSchema = z.object({
 })
 export type SetupRecipe = z.infer<typeof setupRecipeSchema>
 
+export const REPO_ORIGIN_HEADER = "x-mikka-repo-origin-check"
+
 /** One allow-listed repo on a device (`device_repo`). */
 export const deviceRepoSchema = z.object({
   repoId: id,
   name: z.string().max(500),
   /** Absolute path of the main checkout on the device. */
   path: z.string().min(1).max(4_000),
+  remoteUrl: z.string().max(2_000).nullable().optional(),
   setup: setupRecipeSchema.optional(),
   /** Domains agents may reach in this repo, on top of the harness's own. */
   networkAllow: z.array(z.string().min(1).max(253)).max(200).optional(),
@@ -245,6 +248,7 @@ export const runAssignmentSchema = z.object({
   issueId: id,
   deviceId: id,
   repoId: id,
+  expectedRepoRemote: z.string().max(2_000).optional(),
   baseBranch: z.string().min(1).max(500),
   harness: harnessSchema,
   prompt: z.string().max(100_000),

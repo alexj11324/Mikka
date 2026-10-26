@@ -48,7 +48,7 @@ import { runPaths } from "./agents/run-context"
 import { runVerify } from "./agents/verify"
 import { SandboxRuntime, type AgentSandbox } from "./agents/sandbox"
 import { buildChildEnv } from "./env"
-import { browseFolder } from "./fs-browse"
+import { browseFolder, verifyExpectedOrigin } from "./fs-browse"
 import {
   DaemonError,
   InvalidIdError,
@@ -683,6 +683,16 @@ export class Daemon {
     if (existing) return this.supervisor.summary(existing)
     const assignment = await this.options.link.claimRun(deviceId, runId)
     if (assignment.runId !== runId) return this.refuseRun(runId)
+    let repo = this.device.repos?.find(item => item.repoId === assignment.repoId)
+    if (!repo && assignment.expectedRepoRemote) {
+      this.saveDevice({ repos: await this.options.link.listRepos(deviceId) })
+      repo = this.device.repos?.find(item => item.repoId === assignment.repoId)
+    }
+    if (assignment.expectedRepoRemote && (!repo || !await verifyExpectedOrigin(repo.path, assignment.expectedRepoRemote))) {
+      const message = "Repository origin does not match the approved GitHub repository"
+      await this.options.link.completeRun(runId, { stopReason: "error", report: baseReport(message) })
+      throw new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
+    }
     return this.supervisor.start(assignment)
   }
 

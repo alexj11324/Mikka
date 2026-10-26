@@ -1,4 +1,21 @@
 {
+  "DeviceSetup": {
+    "title": "Set up {device}",
+    "description": "Enter a repository on this device and its public GitHub remote. The device checks its Git origin before running.",
+    "path": "Local repository path",
+    "remote": "Public GitHub remote",
+    "branch": "Base branch",
+    "verify": "Verification command",
+    "addRepo": "Add repository",
+    "repoSaved": "Repository added",
+    "repoError": "Could not add the repository. Check the path, public GitHub remote, and device connection.",
+    "agentName": "Agent name",
+    "harness": "Installed harness",
+    "chooseHarness": "Choose a harness",
+    "addAgent": "Add agent",
+    "agentSaved": "Agent added",
+    "agentError": "Could not add the agent. Check its name and device connection."
+  },
   "SelfImprovement": {
     "resume": "Resume activation",
     "activate": "Activate approved Skill",
@@ -709,6 +726,7 @@
     "editorAria": "{label} editor"
   },
   "Devices": {
+    "setup": "Set up repository and agent",
     "otherDevices": "Remote control",
     "menu": "More for {name}",
     "add": {

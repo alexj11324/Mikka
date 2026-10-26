@@ -7,13 +7,14 @@ import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { listDevices, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuItem, DropdownMenuGroup, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
 import { IconTile } from '@/components/reui/icon-tile'
 import { useActionError } from '@/lib/use-action-error'
 import { AddDeviceDialog } from './add-device-dialog'
 import { DeviceIcon } from './device-icon'
+import { DeviceSetupDialog } from './device-setup-dialog'
 
 /** Personal computers count as 本机; servers reached over SSH or Tailnet are the rest. */
 const isPersonal = (device: DeviceView) => device.platform === 'darwin' || device.platform === 'win32'
@@ -23,6 +24,7 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
   const host = device.hostname ?? device.name
+  const [setup, setSetup] = useState(false)
   const translateError = useActionError()
   async function toggle(enabled: boolean) {
     try {
@@ -41,10 +43,12 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
     {!device.online && !isPersonal(device) && <Button variant="outline" size="sm" onClick={() => onReconnect(host)}><RefreshCw data-icon="inline-start" />{t('reconnect')}</Button>}
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('menu', { name: device.name })} />}><MoreHorizontal data-icon="inline-start" /></DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end"><DropdownMenuGroup>
+        <DropdownMenuItem disabled={!device.online || !device.enabled} onClick={() => setSetup(true)}>{t('setup')}</DropdownMenuItem>
         <DropdownMenuCheckboxItem checked={device.enabled} onCheckedChange={checked => { void toggle(checked) }}>{t('allowScheduling')}</DropdownMenuCheckboxItem>
-      </DropdownMenuContent>
+      </DropdownMenuGroup></DropdownMenuContent>
     </DropdownMenu>
+    <DeviceSetupDialog device={device} open={setup} onOpenChange={setSetup} onChanged={onChanged} />
   </Item>
 }
 

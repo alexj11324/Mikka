@@ -18,6 +18,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ devi
       repoId: repo.id,
       name: repo.repoPath.split('/').filter(Boolean).pop() ?? repo.repoPath,
       path: repo.repoPath,
+      remoteUrl: repo.remoteUrl,
     })),
   })
 }
