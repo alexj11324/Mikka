@@ -282,7 +282,7 @@ async function readableThread(issueId: string, runId: string) {
 export interface IssueThreadDetail {
   thread: IssueThread & { prompt: string }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
-  messages: { id: string; text: string; at: Date; author: string; mine: boolean }[]
+  messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
 }
 
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
@@ -290,14 +290,14 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
   const { row, user } = await readableThread(issueId, runId)
   const chunks = await db.select({ chunk: runChunks.chunk, at: runChunks.createdAt }).from(runChunks)
     .where(eq(runChunks.runId, row.id)).orderBy(asc(runChunks.seq))
-  const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email })
+  const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
   const [thread] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id, row.userId]), true)
   return {
     thread: { ...thread, prompt: row.prompt },
     chunks,
-    messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', mine: message.userId === user.id })),
+    messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
   }
 }
 
