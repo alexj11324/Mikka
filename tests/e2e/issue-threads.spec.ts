@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { test, expect, register, watchRuntime, seedTask, openIssueFromSearch } from './fixtures'
+import { test, expect, register, watchRuntime, seedTask, openIssueFromSearch, openSearch } from './fixtures'
 
 function isolatedPool() {
   const connectionString = process.env.E2E_DATABASE_URL
@@ -72,7 +72,7 @@ test('Issue threads open on the right as a conversation; comments are cards with
   await page.reload()
   await expect(page.getByRole('region', { name: '任务活动', exact: true }).getByRole('article', { name: /的评论$/ })).toContainText('Agreed')
 
-  // A collaborator on a personal issue sees that threads exist, not what they say.
+  // A personal issue is the owner's alone (R-26): a legacy invitation doesn't reveal it or its threads.
   const colleague = await browser.newContext({ locale: 'zh-CN' })
   const colleagueErrors = watchRuntime(colleague)
   try {
@@ -86,10 +86,10 @@ test('Issue threads open on the right as a conversation; comments are cards with
       await pool.query('INSERT INTO issue_members ("issueId","userId","memberId") VALUES ($1,$2,$3)', [issueId, owner.id, member.id])
     } finally { await pool.end() }
     await teammatePage.reload()
-    await openIssueFromSearch(teammatePage, title)
-    const shared = teammatePage.getByRole('region', { name: /^线程/ })
-    await expect(shared.getByText('Agent 的线程')).toHaveCount(2)
-    await expect(shared.getByRole('button', { name: /^打开线程 / })).toHaveCount(0)
+    const search = await openSearch(teammatePage)
+    await search.getByRole('combobox', { name: '全局搜索', exact: true }).fill(title)
+    await expect(search.getByText(/^没有匹配的(任务|结果)$/)).toBeVisible()
+    await expect(search.getByRole('option').filter({ hasText: title })).toHaveCount(0)
     await expect(teammatePage.getByText('Route group replies')).toHaveCount(0)
     await expect(teammatePage.getByText('Agent reply', { exact: false })).toHaveCount(0)
   } finally {
