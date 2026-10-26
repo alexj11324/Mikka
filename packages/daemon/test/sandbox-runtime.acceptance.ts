@@ -11,7 +11,14 @@ import { Daemon } from "../src/main"
 import { MemoryServer } from "../src/server-link"
 import { cleanupTempDirs, tempDir } from "./helpers"
 
-const HOST_DENIAL = /(?:namespace.*(?:Operation not permitted|Permission denied)|(?:uid|gid) map.*(?:Operation not permitted|Permission denied|Read-only file system)|No permissions to create new namespace)/i
+const HOST_DENIAL = /(?:^sandbox probe failed: bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted$|namespace.*(?:Operation not permitted|Permission denied)|(?:uid|gid) map.*(?:Operation not permitted|Permission denied|Read-only file system)|No permissions to create new namespace)/i
+
+it("recognizes the observed loopback refusal while rejecting unknown probe errors", () => {
+  expect(HOST_DENIAL.test("sandbox probe failed: bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted")).toBe(true)
+  expect(HOST_DENIAL.test("sandbox probe failed: bwrap: loopback: Failed RTM_NEWADDR: Invalid argument")).toBe(false)
+  expect(HOST_DENIAL.test("sandbox probe failed: bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted; unrelated error")).toBe(false)
+  expect(HOST_DENIAL.test("sandbox probe failed: bwrap: execvp /bin/sh: No such file or directory")).toBe(false)
+})
 
 function runtimeResources() {
   return {

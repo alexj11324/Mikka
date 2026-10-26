@@ -23,28 +23,6 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  sandbox-runtime:
-    name: Real Linux sandbox startup and cleanup
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.34.3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install sandbox runtime dependencies without changing host namespace policy
-        run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
-      - run: pnpm install --frozen-lockfile
-      - name: Require real sandbox probe and daemon lifecycle acceptance (no skips)
-        run: pnpm --filter @mikka/daemon test
-        env:
-          MIKKA_SANDBOX_ACCEPTANCE: '1'
-
   cloud-secret-access:
     name: Cloud credential access (OIDC)
     if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka'
@@ -110,6 +88,12 @@ jobs:
       - run: pnpm test:coordinator-native-relay
       - run: pnpm test:coordinator-native-scope
       - run: pnpm --filter @mikka/daemon test
+      - name: Install sandbox runtime dependencies without changing host namespace policy
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
+      - name: Require real sandbox probe and daemon lifecycle acceptance (no skips)
+        run: pnpm --filter @mikka/daemon test
+        env:
+          MIKKA_SANDBOX_ACCEPTANCE: '1'
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/protocol typecheck
       - run: pnpm test:active-agents
