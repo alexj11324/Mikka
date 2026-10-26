@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Sandbox } from 'e2b'
+import { HOSTED_NATIVE_IMAGE } from '@mikka/protocol/subscription'
 
 const lifetime = 15 * 60_000
 export type DesktopLease = { botId: string; ownerId: string; display: number; epoch: number; controlledBy: string | null; controlUntil: number }
@@ -48,6 +49,13 @@ export async function ensureContainerRuntime(sandbox: Sandbox) {
   await sandbox.files.write('/opt/mikka/computer/start-container-runtime.sh', script, { user: 'root' })
   await sandbox.commands.run('bash /opt/mikka/computer/start-container-runtime.sh', { user: 'root', background: true, timeoutMs: 0 })
   await sandbox.commands.run('for i in $(seq 1 60); do docker --host=unix:///run/mikka-container/docker.sock info >/dev/null 2>&1 && exit 0; sleep .5; done; exit 1', { user: 'root', timeoutMs: 35_000 })
+}
+
+/** Provision only the fixed reviewed runtime image, never a model-supplied image. */
+export async function ensureHostedRunnerImage(sandbox: Sandbox) {
+  await ensureContainerRuntime(sandbox)
+  const image = HOSTED_NATIVE_IMAGE
+  await sandbox.commands.run(`docker --host=unix:///run/mikka-container/docker.sock image inspect ${image} >/dev/null 2>&1 || docker --host=unix:///run/mikka-container/docker.sock pull ${image} >/dev/null`, { user: 'root', timeoutMs: 300_000 })
 }
 
 export async function startDesktop(sandbox: Sandbox, display: number) {

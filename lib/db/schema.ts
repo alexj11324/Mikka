@@ -122,6 +122,7 @@ export type SupportedHarness = (typeof SUPPORTED_HARNESSES)[number]
 export const devices = pgTable('devices', {
   id: uuid('id').primaryKey(), ownerId: text('ownerId').notNull(),
   name: text('name').notNull(), hostname: text('hostname'),
+  kind: text('kind').$type<'local' | 'cloud'>().notNull().default('local'),
   platform: text('platform'), arch: text('arch'),
   daemonVersion: text('daemonVersion'), protocolVersion: integer('protocolVersion'),
   harnesses: jsonb('harnesses').$type<HarnessInfo[]>().notNull().default([]),
@@ -138,6 +139,9 @@ export const deviceTokens = pgTable('device_tokens', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   name: text('name').notNull().default(''),
   tokenHash: text('tokenHash').notNull(),
+  boundDeviceId: uuid('boundDeviceId').references(() => devices.id, { onDelete: 'cascade' }),
+  boundWorkspaceId: uuid('boundWorkspaceId'),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
   lastUsedAt: timestamp('lastUsedAt', { withTimezone: true }),
   revokedAt: timestamp('revokedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),

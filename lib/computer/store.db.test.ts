@@ -7,6 +7,7 @@ import { ComputerStore } from './store'
 import { bindComputerRun } from './run-binding'
 import { claimLocalRun } from './claim'
 import { syncComputerReviews, decideComputerReview } from './reviews'
+import { provisionCloudDevice } from './cloud-device'
 import type * as provider from './e2b-provider'
 
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
@@ -36,7 +37,9 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, status text NOT NULL, "deviceId" uuid, "startedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
     const bindingMigration = await readFile(new URL('../../drizzle/20261027000000_computer_run_bindings.sql', import.meta.url), 'utf8')
     await pool.query(bindingMigration); await pool.query(bindingMigration)
-    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL)')
+    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\'); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "revokedAt" timestamptz)')
+    const scopeMigration = await readFile(new URL('../../drizzle/20261027000300_cloud_device_scope.sql', import.meta.url), 'utf8')
+    await pool.query(scopeMigration); await pool.query(scopeMigration)
     const reviewMigration = await readFile(new URL('../../drizzle/20261027000200_local_computer_reviews.sql', import.meta.url), 'utf8')
     await pool.query(reviewMigration); await pool.query(reviewMigration)
     await pool.query('CREATE TABLE byos_bindings (id uuid PRIMARY KEY); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id))')
@@ -47,6 +50,16 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await assert.rejects(store.operate(otherWorkspace, bot.id, 'wake'), { status: 404 })
     await Promise.all([store.operate(actor, bot.id, 'wake'), store.operate(actor, bot.id, 'wake')])
     assert.equal(created, 1)
+    await assert.rejects(provisionCloudDevice(pool, bob, new Date(Date.now() + 60000)), /not found/)
+    await assert.rejects(provisionCloudDevice(pool, actor, new Date(Date.now() - 1)), /expiry/)
+    const firstCredential = await provisionCloudDevice(pool, actor, new Date(Date.now() + 60000))
+    const rotatedCredential = await provisionCloudDevice(pool, actor, new Date(Date.now() + 120000))
+    assert.equal(rotatedCredential.deviceId, firstCredential.deviceId)
+    assert.notEqual(rotatedCredential.token, firstCredential.token)
+    const credentials = await pool.query('SELECT "tokenHash","revokedAt" FROM device_tokens WHERE "boundDeviceId"=$1 ORDER BY "expiresAt"', [firstCredential.deviceId])
+    assert.equal(credentials.rows[0].tokenHash, createHash('sha256').update(firstCredential.token).digest('hex'))
+    assert.ok(credentials.rows[0].revokedAt)
+    assert.equal(credentials.rows[1].revokedAt, null)
     const bobBot = await store.createBot(bob, 'Other owner')
     const runId = randomUUID()
     await pool.query('INSERT INTO agent_runs (id,"userId",status) VALUES ($1,$2,$3)', [runId, actor.userId, 'queued'])
@@ -55,7 +68,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await assert.rejects(bindComputerRun(pool, actor, runId, bobBot.id), { status: 404 })
     await bindComputerRun(pool, actor, runId, bot.id)
     const deviceId = randomUUID()
-    await pool.query('INSERT INTO devices VALUES ($1,$2)', [deviceId, actor.userId])
+    await pool.query('INSERT INTO devices (id,"ownerId") VALUES ($1,$2)', [deviceId, actor.userId])
     await pool.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [runId, deviceId])
     assert.equal(await claimLocalRun(pool, runId, deviceId, new Date(Date.now() + 30000)), 'cloud-required')
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status, 'queued')

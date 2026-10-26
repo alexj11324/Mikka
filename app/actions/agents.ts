@@ -67,7 +67,7 @@ export type { RunDetail, RunView } from '@/lib/agent-runs'
 /** Every device this person owns, with the repos agents may work in. */
 export async function listDevices(): Promise<DeviceView[]> {
   const userId = await getUserId()
-  const rows = await db.select().from(devices).where(eq(devices.ownerId, userId)).orderBy(desc(devices.lastSeenAt))
+  const rows = await db.select().from(devices).where(and(eq(devices.ownerId, userId), eq(devices.kind, 'local'))).orderBy(desc(devices.lastSeenAt))
   const repos = rows.length
     ? await db.select().from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
     : []

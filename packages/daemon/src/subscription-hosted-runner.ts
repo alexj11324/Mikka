@@ -19,7 +19,7 @@ import type {
   SpawnOptions,
   SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk";
-import { nativeBrokerContextSchema, type RunAssignment } from "@mikka/protocol";
+import { HOSTED_NATIVE_IMAGE, nativeBrokerContextSchema, type RunAssignment } from "@mikka/protocol";
 import { ClaudeAdapter } from "./adapters/claude";
 import { CodexAdapter } from "./adapters/codex";
 import type { AgentSession, StartOptions } from "./adapters/types";
@@ -31,8 +31,7 @@ import type { ServerLink } from "./server-link";
 import { readJson, writeJsonAtomic } from "./fs-util";
 
 const exec = promisify(execFile);
-const image =
-  "node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a";
+const image = HOSTED_NATIVE_IMAGE;
 const bootstrap = fileURLToPath(
   new URL("./agents/native-container.mjs", import.meta.url),
 );
