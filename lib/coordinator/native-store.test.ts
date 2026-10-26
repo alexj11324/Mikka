@@ -5,11 +5,12 @@ import { before, after, test } from 'node:test'
 import { Pool } from 'pg'
 import { NativeCoordinatorStore } from './native-store'
 
-const url = process.env.NATIVE_COORDINATOR_TEST_DATABASE_URL
+const url = process.env.NATIVE_COORDINATOR_TEST_DATABASE_URL ?? (process.env.REQUIRE_DB === '1' ? process.env.E2E_DATABASE_URL : undefined)
 if (url) {
   const parsed = new URL(url)
-  if (!['127.0.0.1','localhost'].includes(parsed.hostname) || parsed.pathname !== '/mikka_native_test') throw new Error('Native Coordinator tests require an isolated localhost mikka_native_test database')
-}
+  const ci = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && process.env.REQUIRE_DB === '1' && url === process.env.E2E_DATABASE_URL
+  if (!['127.0.0.1','localhost'].includes(parsed.hostname) || (parsed.pathname !== '/mikka_native_test' && !(ci && parsed.pathname === '/mikka_e2e')) || parsed.search || parsed.hash) throw new Error('Native Coordinator tests require an isolated localhost test database')
+} else if (process.env.REQUIRE_DB === '1') throw new Error('Native Coordinator database is required')
 const schema = `native_${randomUUID().replaceAll('-','')}`
 const admin = url ? new Pool({ connectionString: url }) : null
 const pool = url ? new Pool({ connectionString: url, options: `-c search_path=${schema}`, max: 8 }) : null
@@ -64,6 +65,9 @@ check('tool roundtrip is fenced, idempotent, validated by the workflow and prese
   assert.deepEqual(await store!.result(p.userId,p.deviceId,p.id,command.callId),{status:'done',output:{pendingApproval:true}})
   const text = 'root = TextContent("收到邮件，需要处理吗？")'
   await store!.submit(p.userId,p.deviceId,p.id,{type:'complete',text})
+  await store!.finishTool(p.userId,p.holder,p.id,command.callId,{pendingApproval:true})
+  await assert.rejects(store!.finishTool(p.userId,p.holder,p.id,command.callId,{changed:true}),/LeaseLost/)
+  await assert.rejects(store!.finishTool(p.userId,p.holder,p.id,'unknown',{pendingApproval:true}),/LeaseLost/)
   assert.equal((await store!.poll(p.userId,p.holder,p.id)).reply,text)
   await store!.close(p.userId,p.holder,p.id)
   await assert.rejects(store!.result(p.userId,p.deviceId,p.id,command.callId),/Unavailable/)
@@ -84,3 +88,48 @@ check('concurrent requests cannot exceed the per-turn budget and existing calls 
   await store!.submit(p.userId,p.deviceId,p.id,command(0))
   assert.equal((await store!.poll(p.userId,p.holder,p.id)).calls.length,40)
 })
+
+check('tool execution rechecks live authorization on every attempt and binds the pending call', async () => {
+  const p=await person(); await store!.claim(p.userId,p.deviceId)
+  await store!.submit(p.userId,p.deviceId,p.id,{type:'tool',callId:'call',name:'propose_reply',input:{text:'draft'}})
+  await store!.assertToolActive(p.userId,p.holder,p.id,'call')
+  await assert.rejects(store!.assertToolActive(randomUUID(),p.holder,p.id,'call'),/LeaseLost/)
+  await assert.rejects(store!.assertToolActive(p.userId,'other-holder',p.id,'call'),/LeaseLost/)
+  await assert.rejects(store!.assertToolActive(p.userId,p.holder,p.id,'other-call'),/LeaseLost/)
+  await pool!.query('UPDATE devices SET enabled=false WHERE id=$1',[p.deviceId])
+  await assert.rejects(store!.assertToolActive(p.userId,p.holder,p.id,'call'),/LeaseLost/)
+  await pool!.query('UPDATE devices SET enabled=true WHERE id=$1',[p.deviceId])
+  await store!.finishTool(p.userId,p.holder,p.id,'call',{ok:true})
+  await store!.finishTool(p.userId,p.holder,p.id,'call',{ok:true}) // Result write retries remain idempotent.
+  await assert.rejects(store!.assertToolActive(p.userId,p.holder,p.id,'call'),/LeaseLost/)
+})
+
+check('a completed turn accepts only an identical result acknowledgment under live authorization', async () => {
+  const p=await person(); await store!.claim(p.userId,p.deviceId)
+  await store!.submit(p.userId,p.deviceId,p.id,{type:'tool',callId:'call',name:'propose_reply',input:{text:'draft'}})
+  await store!.finishTool(p.userId,p.holder,p.id,'call',{ok:true})
+  await store!.submit(p.userId,p.deviceId,p.id,{type:'complete',text:'Finished'})
+  await store!.finishTool(p.userId,p.holder,p.id,'call',{ok:true})
+  await pool!.query('UPDATE devices SET enabled=false WHERE id=$1',[p.deviceId])
+  await assert.rejects(store!.finishTool(p.userId,p.holder,p.id,'call',{ok:true}),/LeaseLost/)
+})
+
+for (const revoked of ['device','owner','holder','released','lease','deadline','failed','closed'] as const) {
+  check(`tool execution and result writes fail closed after ${revoked} revocation`, async () => {
+    const p=await person(); await store!.claim(p.userId,p.deviceId)
+    await store!.submit(p.userId,p.deviceId,p.id,{type:'tool',callId:'call',name:'propose_reply',input:{text:'draft'}})
+    await store!.assertToolActive(p.userId,p.holder,p.id,'call')
+    if (revoked === 'device') await pool!.query('UPDATE devices SET enabled=false WHERE id=$1',[p.deviceId])
+    else if (revoked === 'owner') await pool!.query('UPDATE devices SET "ownerId"=$2 WHERE id=$1',[p.deviceId,randomUUID()])
+    else if (revoked === 'holder') await pool!.query('UPDATE coordinator_sessions SET "leaseHolder"=$2 WHERE "userId"=$1',[p.userId,'replacement'])
+    else if (revoked === 'released') await pool!.query('UPDATE coordinator_sessions SET "leaseHolder"=null,"leaseUntil"=null WHERE "userId"=$1',[p.userId])
+    else if (revoked === 'lease') await pool!.query('UPDATE coordinator_sessions SET "leaseUntil"=now() WHERE "userId"=$1',[p.userId])
+    else if (revoked === 'deadline') await pool!.query('UPDATE native_coordinator_turns SET "expiresAt"=now() WHERE id=$1',[p.id])
+    else if (revoked === 'failed') await store!.submit(p.userId,p.deviceId,p.id,{type:'failed'})
+    else await store!.close(p.userId,p.holder,p.id)
+    await assert.rejects(store!.assertToolActive(p.userId,p.holder,p.id,'call'),/LeaseLost/)
+    await assert.rejects(store!.finishTool(p.userId,p.holder,p.id,'call',{late:true}),/LeaseLost/)
+    const {rows}=await pool!.query('SELECT status FROM native_coordinator_tools WHERE "turnId"=$1',[p.id])
+    assert.equal(rows[0].status,'pending')
+  })
+}

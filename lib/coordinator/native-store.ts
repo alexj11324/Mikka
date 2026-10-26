@@ -106,11 +106,22 @@ export class NativeCoordinatorStore {
     return { ...rows[0], calls: calls.rows }
   }
 
+  /** Check inside the executing business step, including every durable retry. */
+  async assertToolActive(userId: string, holder: string, id: string, callId: string): Promise<void> {
+    const { rows } = await this.pool.query(`SELECT 1 FROM native_coordinator_turns j,coordinator_sessions s,devices d,native_coordinator_tools t
+      WHERE ${ACTIVE} AND j.id=$1 AND j."userId"=$2 AND j.holder=$3 AND j.status='running'
+      AND t."turnId"=j.id AND t."callId"=$4 AND t.status='pending'`, [id,userId,holder,callId])
+    if (!rows.length) throw new NativeCoordinatorError(409,'coordinatorExpiredOrLeaseLost')
+  }
+
   async finishTool(userId: string, holder: string, id: string, callId: string, output: unknown) {
     const result = JSON.stringify(output ?? null)
     if (result.length > 500_000) throw new NativeCoordinatorError(413,'coordinatorToolOutputTooLarge')
-    await this.pool.query(`UPDATE native_coordinator_tools t SET status='done',output=$5 FROM native_coordinator_turns j,coordinator_sessions s,devices d
-      WHERE ${ACTIVE} AND j.id=$1 AND j."userId"=$2 AND j.holder=$3 AND t."turnId"=j.id AND t."callId"=$4`,[id,userId,holder,callId,result])
+    const { rowCount } = await this.pool.query(`UPDATE native_coordinator_tools t SET status='done',output=$5 FROM native_coordinator_turns j,coordinator_sessions s,devices d
+      WHERE ${ACTIVE} AND j.id=$1 AND j."userId"=$2 AND j.holder=$3
+      AND (j.status='running' OR (j.status='completed' AND t.status='done' AND t.output=$5::jsonb))
+      AND t."turnId"=j.id AND t."callId"=$4`,[id,userId,holder,callId,result])
+    if (!rowCount) throw new NativeCoordinatorError(409,'coordinatorExpiredOrLeaseLost')
   }
 
   async close(userId: string, holder: string, id: string) {

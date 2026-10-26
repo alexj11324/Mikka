@@ -2,9 +2,11 @@ import { asSchema, type ModelMessage, type ToolSet } from 'ai'
 import { sleep } from 'workflow'
 import type { CoordinatorRuntime, NativeCoordinatorJob } from '@mikka/protocol/coordinator'
 import * as native from './native-steps'
+import type { NativeToolScope } from './tool-scope'
 
 /** A durable transport relay, not an additional LLM/agent loop. Native harness chooses tools. */
-export async function nativeCoordinatorTurn(userId: string, holder: string, round: number, runtime: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, tools: ToolSet) {
+export async function nativeCoordinatorTurn(userId: string, holder: string, round: number, runtime: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, createTools: (scope?: NativeToolScope) => ToolSet) {
+  const tools = createTools()
   const definitions: NativeCoordinatorJob['tools'] = []
   for (const [name, definition] of Object.entries(tools)) {
     if (definition.type === 'provider' || !definition.execute) continue
@@ -19,7 +21,7 @@ export async function nativeCoordinatorTurn(userId: string, holder: string, roun
       if (state.status === 'failed' || state.status === 'closed') throw new Error('nativeCoordinatorFailed: check the selected device and CLI login')
       for (const call of state.calls) {
         if (!completed.has(call.callId)) {
-          const selected = tools[call.name]
+          const selected = createTools({ holder, turnId, callId: call.callId })[call.name]
           if (!selected?.execute || selected.type === 'provider') throw new Error('nativeCoordinatorUnknownTool')
           const checked = await asSchema(selected.inputSchema).validate?.(call.input)
           if (!checked?.success) {

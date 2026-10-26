@@ -67,6 +67,12 @@ job status and deadline. Tool names and JSON schemas come from the host, never
 an email. Tool execution reuses current account approval behavior: an OpenUI
 button is not consent to send email. Duplicate native call IDs reuse receipts;
 changed arguments conflict. Admission is serialized and capped at 40 calls.
+Each native business step rechecks the device, lease, running turn and pending
+call before executing, including on durable retries. Revocation prevents later
+steps from starting; an operation already admitted and in progress can finish.
+Result writes reject lost authorization. An identical recorded result may still
+be acknowledged after normal completion, so a lost durable-step acknowledgment
+does not turn a successful conversation into a failure.
 This does not claim universal exactly-once external side effects: existing tool
 implementations must retain their own idempotency/approval guarantees.
 
