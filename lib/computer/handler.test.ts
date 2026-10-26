@@ -10,7 +10,7 @@ function fixture(signedIn = true) {
   const store = {
     listBots: async (...args: unknown[]) => { calls.push(args); return [] },
     createBot: async (...args: unknown[]) => { calls.push(args); return { id: botId, name: 'Bot', ownerId: actor.userId, workspaceId: actor.workspaceId } },
-    state: async (...args: unknown[]) => { calls.push(args); return { machine: 'sleeping', control: 'idle' } },
+    state: async (...args: unknown[]) => { calls.push(args); return { machine: 'sleeping', control: 'idle' } as const },
     operate: async (...args: unknown[]) => { calls.push(args); return null },
   }
   return { calls, store, handle: createComputerHandler(store, async () => signedIn ? actor : null) }
