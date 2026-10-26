@@ -14,12 +14,13 @@ export type OwnedBrowserPolicy = {
 export type OwnedTaskPage = { id: string; url: string; regions: { id: string; selector: string }[]; links?: { id: string; selector: string; pageId: string }[] }
 export type AcceptanceProfile = Readonly<{ id: string; directory: string; profile: string; artifacts: string }>
 export type AcceptanceCleanupStage = 'launch-blocked' | 'launch-failed' | 'setup-failed' | 'destroy'
-// Trusted synthetic Linux fixture observation only; never receives browser/page
-// handles and cannot authorize disposal. All cleanup with this hook stays pending.
+// Trusted synthetic Linux fixture hooks; never receive browser/page handles.
+// Registry-only hooks retain resources; one-run hooks require explicit admission.
 export type AcceptanceResources = {
-  prepareProfile(): Promise<AcceptanceProfile>
+  prepareProfile(binding?: Binding): Promise<AcceptanceProfile>
+  admitLaunch?(profile: AcceptanceProfile, binding?: Binding): Promise<{ executablePath: string; env: Record<string, string> }>
   started(profile: AcceptanceProfile): Promise<void>
-  beforeCleanup(profile: AcceptanceProfile, stage: AcceptanceCleanupStage): Promise<void>
+  beforeCleanup(profile: AcceptanceProfile, stage: AcceptanceCleanupStage): Promise<void | { authorized: boolean; directory: string }>
   recordFailure?(profile: AcceptanceProfile, stage: 'launch-failed' | 'setup-failed', cause: unknown): Promise<void>
 }
 // Shared by the real launch call and prepare-only validation; ordinary launches
@@ -33,15 +34,17 @@ export function acceptanceArtifactOptions(profile?: AcceptanceProfile) {
 }
 // Playwright owns additional failure/exit cleanup outside this executor. Until
 // that lifecycle has separately approved control, acceptance is setup-only.
-export async function guardAcceptanceLaunch(resources?: AcceptanceResources, profile?: AcceptanceProfile): Promise<void> {
+export async function guardAcceptanceLaunch(resources?: AcceptanceResources, profile?: AcceptanceProfile, binding?: Binding): Promise<{ executablePath: string; env: Record<string, string> } | undefined> {
   if (!resources) return
   if (!profile) throw new CredentialError('browser_acceptance_profile_missing', 503)
   acceptanceArtifactOptions(profile)
+  if (resources.admitLaunch) return resources.admitLaunch(profile, binding)
   await resources.beforeCleanup(profile, 'launch-blocked')
   throw new CredentialError('browser_acceptance_setup_only', 503)
 }
-export async function rejectAcceptanceDisposal(resources: AcceptanceResources, profile: AcceptanceProfile, stage: 'launch-failed' | 'setup-failed' | 'destroy'): Promise<never> {
-  await resources.beforeCleanup(profile, stage)
+export async function rejectAcceptanceDisposal(resources: AcceptanceResources, profile: AcceptanceProfile, stage: 'launch-failed' | 'setup-failed' | 'destroy'): Promise<void> {
+  const receipt = await resources.beforeCleanup(profile, stage)
+  if (receipt?.authorized === true && receipt.directory === profile.directory) return
   throw new CredentialError('browser_acceptance_disposal_pending', 503)
 }
 type Session = {
@@ -108,7 +111,7 @@ export class OwnedChromiumExecutor {
     if (config.acceptanceResources) {
       if (config.loopbackFixture !== true || process.platform !== 'linux') throw new CredentialError('browser_acceptance_resources_forbidden', 503)
       const resources = config.acceptanceResources
-      this.#acceptanceResources = Object.freeze({ prepareProfile: resources.prepareProfile.bind(resources), started: resources.started.bind(resources), beforeCleanup: resources.beforeCleanup.bind(resources), recordFailure: resources.recordFailure?.bind(resources) })
+      this.#acceptanceResources = Object.freeze({ prepareProfile: resources.prepareProfile.bind(resources), admitLaunch: resources.admitLaunch?.bind(resources), started: resources.started.bind(resources), beforeCleanup: resources.beforeCleanup.bind(resources), recordFailure: resources.recordFailure?.bind(resources) })
     }
     if (process.env.PWDEBUG || /pw:|playwright/i.test(process.env.DEBUG ?? '')) throw new CredentialError('browser_debug_capture_forbidden', 503)
     if (config.sessionTTLms !== undefined && (!Number.isInteger(config.sessionTTLms) || config.sessionTTLms < 250 || config.sessionTTLms > 300_000)) throw new CredentialError('browser_policy_invalid', 503)
@@ -137,21 +140,21 @@ export class OwnedChromiumExecutor {
   }
 
   async #launch(binding: Binding): Promise<Session> {
-    const prepared = await this.#acceptanceResources?.prepareProfile()
+    const prepared = await this.#acceptanceResources?.prepareProfile(binding)
     const acceptanceProfile = prepared ? Object.freeze({ ...prepared }) : undefined
-    await guardAcceptanceLaunch(this.#acceptanceResources, acceptanceProfile)
+    const launchAdmission = await guardAcceptanceLaunch(this.#acceptanceResources, acceptanceProfile, binding)
     const directory = acceptanceProfile?.directory ?? await mkdtemp(join(tmpdir(), 'mikka-credential-browser-'))
     try {
       // An anonymous debugging pipe, never a listening CDP port. The profile is fresh,
       // private and destroyed with the process; it is never attached to or reused.
       const context = await chromium.launchPersistentContext(acceptanceProfile?.profile ?? join(directory, 'profile'), {
-        executablePath: this.config.executablePath, headless: true,
+        executablePath: launchAdmission?.executablePath ?? this.config.executablePath, headless: true,
         timeout: 5000,
         // Explicit host-side path: browser env TMPDIR alone does not contain Playwright artifacts.
         ...acceptanceArtifactOptions(acceptanceProfile),
         acceptDownloads: false, serviceWorkers: 'block', javaScriptEnabled: false,
         chromiumSandbox: !this.config.loopbackFixture,
-        env: { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: directory, TMPDIR: directory, LANG: 'C.UTF-8' },
+        env: { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: directory, TMPDIR: directory, LANG: 'C.UTF-8', ...launchAdmission?.env },
         args: ['--disable-extensions', '--disable-sync', '--disable-save-password-bubble', '--disable-breakpad'],
       })
       const browser = context.browser()!
@@ -180,7 +183,7 @@ export class OwnedChromiumExecutor {
     }
   }
 
-  async #retainAcceptance(profile: AcceptanceProfile, stage: 'launch-failed' | 'setup-failed' | 'destroy'): Promise<never> {
+  async #retainAcceptance(profile: AcceptanceProfile, stage: 'launch-failed' | 'setup-failed' | 'destroy'): Promise<void> {
     return rejectAcceptanceDisposal(this.#acceptanceResources!, profile, stage)
   }
 

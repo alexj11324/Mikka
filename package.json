@@ -78,7 +78,7 @@
     "test:backend-recipes": "node --test scripts/backend-recipes.test.mjs",
     "test:factory-db-retained": "node --import tsx --test --test-concurrency=1 lib/factory/approval.test.ts lib/factory/check-independence.test.ts lib/factory/checks.test.ts lib/factory/monitor-cycle.test.ts lib/factory/monitor-dispatch.test.ts lib/factory/monitor.test.ts lib/factory/postgres.test.ts lib/factory/questions/postgres.test.ts",
     "test:audit-session": "node --import tsx --test lib/audit/disposal-session.db.test.ts",
-    "test:disposal-inventory": "node --import tsx --test scripts/disposal/byos-inventory.test.mjs scripts/disposal/factory-effects.test.mjs lib/credentials/acceptance-resource-registry.test.ts packages/daemon/test/native-resource-registry.node-test.ts",
+    "test:disposal-inventory": "node --import tsx --test scripts/disposal/credential-admission.test.ts scripts/disposal/byos-inventory.test.mjs scripts/disposal/factory-effects.test.mjs lib/credentials/acceptance-resource-registry.test.ts packages/daemon/test/native-resource-registry.node-test.ts",
     "test:disposal-catalog-db": "node --test scripts/disposal/catalog-fixture.db.test.mjs",
     "test:legacy-reads": "node --import tsx --experimental-test-module-mocks --test lib/agent-image-loader.test.ts tests/legacy-read-routes.test.ts"
   },
