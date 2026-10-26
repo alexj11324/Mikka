@@ -100,7 +100,8 @@ export class ComputerStore {
       if (persistProgress) {
         // Never roll back a generation already sent to the gateway: doing so
         // could revive an old control token on the next synchronization.
-        await client.query('UPDATE cloud_machines SET state=$2 WHERE "workspaceId"=$1', [actor.workspaceId, 'error'])
+        // An expected authorization/conflict response is not a provider failure.
+        if (!(error instanceof ComputerError)) await client.query('UPDATE cloud_machines SET state=$2 WHERE "workspaceId"=$1', [actor.workspaceId, 'error'])
         await client.query('COMMIT')
       } else await client.query('ROLLBACK')
       throw error

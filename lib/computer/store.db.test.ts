@@ -63,6 +63,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await assert.rejects(pool.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [startedId, bobBot.id, actor.workspaceId, actor.userId]), { code: '23503' })
     await assert.rejects(store.operate(bob, bobBot.id, 'wake'), { status: 409 })
     await assert.rejects(store.operate(actor, bot.id, 'viewer', 'control'), { status: 403 })
+    assert.equal((await pool.query('SELECT state FROM cloud_machines WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0].state, 'running', 'denied control must not mark a working machine as failed')
     await store.operate(actor, bot.id, 'takeover')
     const taken = epoch
     assert.equal((await store.state(actor, bot.id)).control, 'user')
