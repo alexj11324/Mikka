@@ -2,6 +2,9 @@ import type { MessageConnection } from "vscode-jsonrpc/node"
 import { z } from "zod"
 import { coordinatorDeadline, coordinatorSystemPrompt, CoordinatorToolHost, COORDINATOR_DEFAULT_TOOL_LIMIT, validateCoordinatorReply, type CoordinatorInput, type CoordinatorReply, type CoordinatorTool } from "./contract"
 
+/** Shared by process startup and thread creation; legacy `untrusted` fails in Codex 0.163. */
+export const CODEX_COORDINATOR_APPROVAL_POLICY = "on-request" as const
+
 /** A fresh isolated app-server connection. Closing it must kill its process group. */
 export interface CodexCoordinatorHost {
   cwd: string
@@ -14,7 +17,7 @@ export function codexCoordinatorThread(input: CoordinatorInput, host: Pick<Codex
     cwd: host.cwd,
     baseInstructions: coordinatorSystemPrompt(input.instructions),
     developerInstructions: "Mikka owns tools, memory, events and approval. Use the supplied dynamic tools for all external operations. Do not use coding-worker submit/handoff tools.",
-    approvalPolicy: "untrusted" as const,
+    approvalPolicy: CODEX_COORDINATOR_APPROVAL_POLICY,
     sandbox: "read-only" as const,
     ephemeral: true,
     config: { "features.shell_tool": false, "features.multi_agent": false, "features.js_repl": false, web_search: "disabled", "apps._default.enabled": false },

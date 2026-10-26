@@ -12,7 +12,7 @@ import { jsonlConnection } from "../agents/jsonl-rpc"
 import { HARNESS_DOMAINS, credentialDenyRead, daemonSecrets } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import { runClaudeCoordinator } from "./claude"
-import { runCodexCoordinator } from "./codex"
+import { CODEX_COORDINATOR_APPROVAL_POLICY, runCodexCoordinator } from "./codex"
 import type { CoordinatorTool } from "./contract"
 
 export function coordinatorCapable(info: HarnessInfo): boolean {
@@ -69,7 +69,7 @@ export async function runNativeCoordinatorJob(job: NativeCoordinatorJob, options
         active.throwIfAborted()
         const home = prepareCodexHome(join(dir,"codex-home"),options.log)
         // Never inherit a coding worker's permissive defaults or the user's MCP config.
-        writeFileSync(join(home.home,"config.toml"),'approval_policy = "untrusted"\nsandbox_mode = "read-only"\n',{ mode: 0o600 })
+        writeFileSync(join(home.home,"config.toml"),`approval_policy = "${CODEX_COORDINATOR_APPROVAL_POLICY}"\nsandbox_mode = "read-only"\n`,{ mode: 0o600 })
         const checkAuth = guardCodexAuth(home.authFile,options.log)
         const child = await spawnCli(options.sandbox,[options.codexBinary ?? "codex","app-server"],{
           cwd, env: { ...buildChildEnv(process.env), CODEX_HOME: home.home },

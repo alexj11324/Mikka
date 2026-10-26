@@ -47,7 +47,7 @@ describe("Codex Coordinator over real JSONL RPC", () => {
     const result = await runCodexCoordinator(input, f.host)
     expect(result.text).toBe(final)
     expect(f.calls.initialize).toMatchObject({ capabilities: { experimentalApi: true } })
-    expect(f.calls.thread).toMatchObject({ baseInstructions: expect.stringContaining(input.instructions), sandbox: "read-only", ephemeral: true, config: { "features.shell_tool": false } })
+    expect(f.calls.thread).toMatchObject({ baseInstructions: expect.stringContaining(input.instructions), approvalPolicy: "on-request", sandbox: "read-only", ephemeral: true, config: { "features.shell_tool": false } })
     expect(f.calls.turn).toMatchObject({ input: [{ type: "text", text: input.context }] })
     expect(f.close).toHaveBeenCalledTimes(1)
   })
