@@ -25,27 +25,38 @@ Thank you for helping improve Mikka.
   pnpm check
   ```
 
-- CI runs the full gate on every pull request, including the production build
-  and browser tests. A pull request merges once the required checks pass.
+- A pull request merges once the required checks pass. See "How changes are
+  tested" below for which checks run when.
 - Never commit credentials. Project secrets live in Infisical Cloud.
 
-## Contributor License Agreement
+## How changes are tested
 
-Before your first pull request can merge, you sign the
-[Contributor License Agreement](CLA.md). A bot comments on the pull request
-with instructions; you sign by replying with one sentence, and the signature
-covers all your later contributions.
+Slow checks run less often and later. Each layer catches what the one before
+cannot.
 
-The agreement lets the project maintainer, and any company later formed to
-develop Mikka, distribute your contribution under the project's license or
-other terms. You keep the copyright in your work.
+1. **While writing** (seconds, on your machine or the agent's container):
+   `pnpm typecheck`, `pnpm lint` and the unit tests for what you changed. Run a
+   browser test only for the flow you changed, and only if you can.
+2. **Every push and pull request** (minutes, CI): production build, every unit
+   test, database migrations and integration tests such as thread privacy.
+   This is the gate review waits on.
+3. **Before merging into main** (CI job "Browser tests (before merge)"): the
+   full browser suite (Playwright, functionality and performance). It runs on
+   a pull request once it is ready for review, and again on every push while
+   it stays ready, against the PR merged with the latest main, so two changes
+   that each pass but break together are caught. Keep a PR as a draft while it
+   is in progress to skip it. To run it on a branch without a PR, start CI by
+   hand: Actions → Browser tests → Run workflow.
+4. **After merging** (CI): the same suite on main, and again every night.
 
 ## License
 
-Mikka is licensed under [AGPL-3.0-only](LICENSE). By contributing, you agree
-that your contributions are also licensed under the AGPL-3.0-only, in addition
-to the rights granted in the CLA. Send questions about the license or the CLA
-to [legal@aspectlylabs.com](mailto:legal@aspectlylabs.com).
+Mikka is licensed under [AGPL-3.0-only](LICENSE). Contributions are submitted
+under the same license; contributors retain copyright in their work. No separate
+contributor agreement or copyright assignment is required. Please only submit
+work you are authorized to license under AGPL-3.0-only, and identify any
+third-party material and its license in your pull request. Send licensing
+questions to [legal@aspectlylabs.com](mailto:legal@aspectlylabs.com).
 
 ## Security
 

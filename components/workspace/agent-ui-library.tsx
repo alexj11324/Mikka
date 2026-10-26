@@ -9,6 +9,7 @@ import { AgentImage } from './agent-image'
 import { AgentFollowUps } from './agent-follow-ups'
 import { AgentImageCard } from './agent-image-card'
 import { CitationChip, WebCitation } from './agent-citations'
+import { ComputerCard } from '@/components/computer/computer-card'
 import { Button as BeButton } from '@/components/motion/button/base'
 import { AnimatedBadge } from '@/components/motion/animated-badge'
 import { AnimatedNumber } from '@/components/motion/animated-number'
@@ -66,6 +67,7 @@ const renderers = {
   TaskChip: ({ props }) => <CitationChip id={props.id.toLowerCase()} kind="issue" />,
   RunChip: ({ props }) => <CitationChip id={props.id.toLowerCase()} kind="run" />,
   SourceChip: ({ props }) => <WebCitation url={props.url} label={props.label ?? null} />,
+  ComputerCard: ({ props }) => <ComputerCard {...props} />,
   ShadcnCard: ({ props, renderNode }) => <Card size="sm" className="min-w-0">
     <CardHeader><CardTitle>{props.title}</CardTitle>{props.description && <CardDescription>{props.description}</CardDescription>}</CardHeader>
     <CardContent className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</CardContent>

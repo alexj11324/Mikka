@@ -113,6 +113,7 @@
     "myTasks": "My tasks",
     "agent": "Agent",
     "coordinator": "Coordinator",
+    "coordinatorWorking": "Coordinator, working",
     "yourTeams": "Your teams",
     "home": "Home",
     "tasks": "Tasks",
@@ -176,15 +177,13 @@
     "createDescription": "Start with your first task and turn ideas into traceable progress.",
     "welcomeDescription": "Sign in to Mikka and continue with your tasks and documents.",
     "continueGoogle": "Continue with Google",
-    "googleScope": "Only your basic profile and email are requested for sign-in.",
     "googleLinkHint": "If this email already has a Mikka account, sign in with your password and link Google under Settings → Account.",
     "googleNotConfigured": "Google sign-in is not configured yet. Continue with email.",
     "viewGoogleCallback": "View the Google OAuth callback URL",
     "continueGithub": "Continue with GitHub",
-    "githubScope": "Only the identity and email needed to sign in are requested; repository read/write access is not.",
     "githubNotConfigured": "GitHub sign-in is not configured yet. Continue with email.",
     "viewCallback": "View the GitHub App callback URL",
-    "orEmail": "Or use email",
+    "orEmail": "or",
     "name": "Name",
     "namePlaceholder": "What should we call you?",
     "email": "Email",
@@ -325,6 +324,7 @@
       "searchAria": "Search related tasks",
       "loadFailed": "Could not load tasks",
       "noTasks": "No other tasks from this owner are available.",
+      "noMatch": "No matching tasks",
       "noTasksSameOwner": "Tasks owned by someone else cannot be linked here.",
       "loading": "Loading tasks…",
       "group": "Available tasks",
@@ -685,7 +685,35 @@
     "editorAria": "{label} editor"
   },
   "Devices": {
+    "otherDevices": "Remote control",
+    "menu": "More for {name}",
+    "add": {
+      "title": "Add device",
+      "description": "Any machine you can SSH into. Mikka installs itself.",
+      "trigger": "Add device",
+      "host": "Host",
+      "hostPlaceholder": "Hostname or IP",
+      "user": "User",
+      "userPlaceholder": "Your username on that machine",
+      "tailnet": "On your Tailnet",
+      "sshConfig": "In your SSH config",
+      "configured": "Set up",
+      "sshNew": "ssh · not set up",
+      "tailnetNew": "tailnet · not set up",
+      "shortcut": "Shortcut",
+      "cancel": "Cancel",
+      "setUp": "Set up",
+      "settingUp": "Setting up {host}",
+      "settingUpDescription": "Log in over SSH, install Mikka, start the service and record the host key.",
+      "progress": "Setup progress",
+      "interrupted": "The connection dropped.",
+      "back": "Back",
+      "done": "Done",
+      "emptyDescription": "Add a machine you can SSH into."
+    },
     "neverOnline": "Never online",
+    "lastOnline": "Last online {time}",
+    "reconnect": "Reconnect",
     "lastHeartbeat": "Last heartbeat {time}",
     "installedWithVersion": "Installed · {version}",
     "installed": "Installed",
@@ -735,7 +763,7 @@
       "steps": {
         "login": "Sign in",
         "check": "Check host",
-        "install": "Install daemon",
+        "install": "Install Mikka",
         "start": "Start service",
         "connect": "Connect"
       },
@@ -807,7 +835,8 @@
       "addedSubtask": "Added subtask {title}",
       "addedLabel": "Added label {name}",
       "removedLabel": "Removed label {name}",
-      "unknownAssignee": "someone"
+      "unknownAssignee": "someone",
+      "separator": ", "
     },
     "detail": {
       "readFailed": "Could not load this task. Please try again.",
@@ -1249,8 +1278,7 @@
     "savingProperties": "Saving properties…",
     "noMatchTitle": "No matching projects",
     "noMatchDescription": "Try another name or status.",
-    "emptyTitle": "Organize work around goals",
-    "emptyDescription": "Create a project, link tasks, and track delivery progress.",
+    "emptyTitle": "No projects yet",
     "columns": {
       "name": "Name",
       "health": "Health",
@@ -1427,7 +1455,12 @@
     "noResults": "No matching settings",
     "groups": {
       "personal": "Personal",
-      "workspace": "Workspace"
+      "workspace": "Workspace",
+      "administration": "Administration",
+      "yourTeams": "Your teams"
+    },
+    "nav": {
+      "createTeam": "Create a team"
     },
     "sections": {
       "members": {
@@ -1448,6 +1481,10 @@
       "integrations": {
         "title": "Integrations",
         "description": "Manage connected apps and message platforms."
+      },
+      "devices": {
+        "title": "Devices",
+        "description": "Machines you connected."
       },
       "workspace": {
         "title": "Workspace",
@@ -1602,7 +1639,7 @@
     }
   },
   "TelegramBot": {
-    "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nSend details, then /confirm to create it in Backlog\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
+    "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
     "connect": "Connect Telegram from Mikka Settings → Integrations, then open the link here.",
     "alreadyConnected": "Your Telegram account is already connected. Send /help for commands.",
     "paired": "Telegram is connected to Mikka. Send /help to see commands.",
@@ -1631,6 +1668,11 @@
     "detailsAdded": "Details added. Send more, or use /confirm to create the Backlog task.",
     "linkedChat": "This chat is linked to a task. Use /status, /unlink, or /new <title>.",
     "startDraftMessage": "Start a task draft with /new <title>. Send details, then /confirm.",
+    "coordinatorQueued": "Sent to the Orchestrator. I’ll reply here when it answers.",
+    "coordinatorUnavailable": "The Orchestrator is not available right now. Try again shortly.",
+    "coordinatorMessageRequired": "Send a text message to the Orchestrator.",
+    "coordinatorMessageTooLong": "That message is too long. Shorten it and try again.",
+    "messageUnavailable": "I couldn’t read that Telegram message. Please send it again.",
     "status": {
       "backlog": "Backlog",
       "todo": "Todo",
@@ -1950,7 +1992,6 @@
   "Coordinator": {
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
-    "emptyTitle": "Talk to your Coordinator",
     "usedTools": "Used {tools}",
     "pendingActions": {
       "label": "Waiting for your approval",
@@ -2088,6 +2129,10 @@
     "organizingResponseContent": "Organizing response content",
     "preparingAResponse": "Preparing a response",
     "waitingForAResponse": "Waiting for a response",
+    "agentStatusThinking": "Thinking…",
+    "agentStatusSearching": "Searching…",
+    "agentStatusReading": "Reading the page…",
+    "agentStatusWorking": "Using a tool…",
     "requestFailedPleaseTryAgain": "Request failed. Please try again.",
     "yourInputHasBeenPreserved": "Your input has been preserved.",
     "retryThisResponse": "Retry this response",
@@ -2253,8 +2298,51 @@
     "send": "Send",
     "sendFailed": "Not sent. Your draft is still here"
   },
+  "Computer": {
+    "status": {
+      "working": "Agent working",
+      "approval": "Needs your approval",
+      "done": "Done",
+      "failed": "Error",
+      "sleeping": "Asleep",
+      "waking": "Waking",
+      "running": "Running",
+      "user": "You're in control"
+    },
+    "screenOf": "{name}'s screen",
+    "computerOf": "{name}'s computer",
+    "cloud": "Mikka Cloud",
+    "card": "Computer task",
+    "cardTitle": "Computer",
+    "openScreen": "Open {name}'s screen full window",
+    "open": "Open",
+    "sleeping": "The computer is asleep",
+    "wake": "Wake",
+    "waking": "Waking",
+    "machineError": "The computer didn't start",
+    "retry": "Retry",
+    "wakeFailed": "Couldn't wake it. Try again.",
+    "viewer": {
+      "title": "{name}'s screen",
+      "close": "Exit full window",
+      "controls": "Control",
+      "viewOnly": "View only",
+      "otherControls": "Someone else is in control",
+      "youControl": "You're in control",
+      "takeover": "Take control",
+      "handback": "Hand back to Agent",
+      "takenByOther": "Someone else is controlling this computer.",
+      "takeoverFailed": "Couldn't take control. Try again.",
+      "handbackFailed": "Couldn't hand back. Try again."
+    },
+    "approval": {
+      "allowRun": "Allow for this task",
+      "deny": "Deny",
+      "allow": "Allow",
+      "failed": "Not delivered. Try again."
+    }
+  },
   "Shell": {
-    "pinned": "Pinned",
     "searchPlaceholder": "Search conversations, tasks, agents, knowledge",
     "searchLabel": "Search everything",
     "searchDescription": "Search conversations, tasks and projects. Use the arrow keys to choose and Enter to open.",
@@ -2274,8 +2362,6 @@
     "attach": "Add file",
     "attachUnsupported": "Only text files up to {max} characters can be attached",
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
-    "whoIsWorking": "Who's working",
-    "agentsWorking": "{count, plural, one {# agent is} other {# agents are}} on tasks",
     "panel": {
       "label": "Right panel",
       "tabs": "Right panel content",
@@ -2293,7 +2379,7 @@
     "details": {
       "conversation": "This conversation",
       "kind": "Type",
-      "coordinatorKind": "Coordinator · pinned",
+      "coordinatorKind": "Coordinator",
       "agentKind": "Agent conversation",
       "updated": "Last activity",
       "none": "No messages yet"
@@ -2306,8 +2392,8 @@
       "briefing": "{count, plural, one {# new message is} other {# new messages are}} worth a look, starting with",
       "noneToday": "No new suggestions today.",
       "routine": "Routine",
-      "emptyTitle": "Nothing here",
-      "emptyDescription": "Check back later",
+      "empty": "Nothing to read right now",
+      "connect": "Connect apps",
       "refresh": "Refresh suggestions",
       "loadError": "Suggestions failed to load.",
       "action": {
@@ -2325,13 +2411,13 @@
       }
     },
     "tasks": {
-      "mine": "My tasks",
+      "mine": "Tasks",
       "waiting": "Waiting on you",
       "running": "Running",
       "failed": "Failed",
       "doneToday": "Done",
       "today": "today {count}",
-      "empty": "No tasks handed to an agent yet.",
+      "empty": "No tasks yet",
       "status": {
         "waiting_input": "needs your reply",
         "queued": "queued",
@@ -2340,15 +2426,12 @@
         "finishing": "finishing",
         "failed": "failed",
         "succeeded": "done"
-      },
-      "command": "Direct this task…",
-      "commandLabel": "Send an instruction to the Coordinator",
-      "send": "Send",
-      "sent": "Sent to the Coordinator.",
-      "sendFailed": "That didn't send. Try again."
+      }
     },
     "empty": {
-      "nothing": "Nothing here",
+      "browser": "No web pages opened yet",
+      "knowledge": "No documents yet",
+      "schedules": "No scheduled tasks yet",
       "arrange": "Let an agent set it up",
       "knowledgePrompt": "Help me put the documents I use often into the knowledge base: ",
       "schedulesPrompt": "Help me set up a scheduled task: "
@@ -2363,6 +2446,8 @@
       "device": "Machine",
       "noDevice": "No machine connected",
       "offline": "Offline",
+      "online": "Online",
+      "cloud": "Mikka Cloud",
       "contextProject": "project: {project}",
       "contextSeparator": ", ",
       "prompt": "Create a task for me: {text}",
@@ -2393,6 +2478,8 @@
       "property": { "identifier": "ID", "priority": "Priority", "assignee": "Assignee", "labels": "Labels", "pullRequests": "PR", "subtasks": "Subtasks", "agentState": "Agent state", "project": "Project", "dueDate": "Due date", "createdAt": "Created" },
       "hiddenColumns": "Hidden columns",
       "hiddenLane": "Hidden",
+      "expandColumn": "Expand the {status} column",
+      "foldColumn": "Fold to a strip",
       "hideColumn": "Hide column",
       "hideColumnNamed": "Hide {status} column",
       "showColumn": "Show {status} column",

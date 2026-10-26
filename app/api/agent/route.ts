@@ -1,3 +1,4 @@
+import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createUIMessageStreamResponse, isStepCount, streamText, toUIMessageStream } from 'ai'
@@ -8,6 +9,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import systemPrompt from '@/lib/agent-system-prompt.json'
 import { validateAgentStream } from '@/lib/agent-fetch'
+import { agentStatusStream } from '@/lib/agent-status'
 import { persistAgentStream } from '@/lib/agent-history'
 import { AgentStoreError, beginAgentTurn, saveAgentTurn } from '@/lib/agent-store'
 
@@ -29,15 +31,17 @@ function agentErrorMessage(error: unknown) {
 
 export async function HEAD(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
+  noteLogUser(session?.user?.id)
   return new Response(null, { status: session?.user ? 204 : 401, headers: { 'Cache-Control': 'private, no-store' } })
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   if (request.headers.get('sec-fetch-site') === 'cross-site') {
     return new Response(agentCopy.crosssiteRequestsAreNotAllowed, { status: 403, headers: errorHeaders })
   }
   const startedAt = performance.now()
   const session = await auth.api.getSession({ headers: request.headers })
+  noteLogUser(session?.user?.id)
   const authenticatedAt = performance.now()
   if (!session?.user) return new Response(agentCopy.signInBeforeUsingAgent, { status: 401, headers: errorHeaders })
   if (!request.headers.get('content-type')?.startsWith('application/json')) {
@@ -128,6 +132,8 @@ export async function POST(request: Request) {
       stream: result.stream,
       sendReasoning: false,
       onError: agentErrorMessage,
-    }).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),
+    }).pipeThrough(agentStatusStream({ startedAt, turnId })).pipeThrough(validateAgentStream()), checkpoint => saveAgentTurn(session.user.id, sessionId, turnId, turn.attemptId, checkpoint), request.signal),
   })
 }
+
+export const POST = withRequestLog('/api/agent', handlePOST)

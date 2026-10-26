@@ -52,7 +52,7 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
   const [loadedId, setLoadedId] = useState<string | null>(null)
   const { data, error, mutate } = useSWR(['issue', id], () => getIssue(id), { revalidateOnFocus: false, revalidateOnMount: true, dedupingInterval: 0, onSuccess: () => setLoadedId(id) })
   if (error) return <UnavailableIssue id={id} onRetry={() => { void mutate() }} onClose={props.onClose} />
-  if (!data || loadedId !== id) return <div role="status" aria-label={t('reading')} className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div>
+  if (!data || loadedId !== id) return <div role="status" aria-label={t('reading')} className="mx-auto flex w-full max-w-170 flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div>
   return <SectionBoundary key={id} onClose={props.onClose}><TaskForm initial={data} {...props} /></SectionBoundary>
 }
 
@@ -214,7 +214,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
   return <div className="flex min-w-0 flex-1">
     <div className="flex min-w-0 flex-1 flex-col">
     <IssueDetailHeader workspaceName={workspaceName} identifier={saved.identifier} title={title} saveLabel={error ? t('saveFailed') : syncState.error ? t('syncFailed') : pending || metadataSaving ? t('saving') : t('autosaved')} saved={!error && !syncState.error && !pending && !metadataSaving} pending={false} navigation={navigation} onClose={onClose} actions={<IssueDetailActions task={saved} userId={user.id} disabled={false} documentTools={documentTools} request={actionRequest} getCurrent={getCurrent} onSaved={adopt} onOpen={onOpen} onDeleted={onDeleted} onHistory={() => { void save().then(success => { if (success) { void refreshVersions(); setHistory(true) } }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)} onProperty={requestProperty} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} />} />
-    <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-1 flex-col gap-6 px-5 py-6 sm:px-8 lg:py-10">
+    <div className="mx-auto flex w-full min-w-0 max-w-170 flex-1 flex-col gap-6 px-5 py-6 sm:px-8 lg:py-10">
       {!wide && <SectionBoundary onClose={onClose}>{properties}</SectionBoundary>}
       <div className="min-w-0">
         <div className="flex w-full flex-col gap-8">

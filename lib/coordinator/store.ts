@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql } 
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
 import { agentRuns, agents, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { telegramReplyTargets, type TelegramReplyTarget } from '@/lib/coordinator-events'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
@@ -45,7 +46,7 @@ export async function hasWakingEvents(userId: string): Promise<boolean> {
  * but do not count: with nothing else waiting, nothing moves. `held` is false
  * when another turn holds the lease; that turn will pick the events up.
  */
-export async function takeInbox(userId: string, holder: string): Promise<{ held: boolean; added: number }> {
+export async function takeInbox(userId: string, holder: string): Promise<{ held: boolean; added: number; telegramTargets: TelegramReplyTarget[] }> {
   return db.transaction(async tx => {
     const now = new Date()
     await tx.insert(coordinatorSessions).values({ userId }).onConflictDoNothing()
@@ -53,23 +54,23 @@ export async function takeInbox(userId: string, holder: string): Promise<{ held:
       .set({ leaseHolder: holder, leaseUntil: new Date(now.getTime() + LEASE_MS), updatedAt: now })
       .where(and(eq(coordinatorSessions.userId, userId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
       .returning({ userId: coordinatorSessions.userId })
-    if (!taken) return { held: false, added: 0 }
+    if (!taken) return { held: false, added: 0, telegramTargets: [] }
     const due = await tx.select().from(coordinatorEvents).where(waking(userId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
-    if (!due.length) return { held: true, added: 0 }
+    if (!due.length) return { held: true, added: 0, telegramTargets: [] }
     const backgroundLimit = INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
-    if (!events.length) return { held: true, added: 0 }
+    if (!events.length) return { held: true, added: 0, telegramTargets: [] }
     const first = await nextPosition(tx, userId)
     await tx.insert(coordinatorMessages).values(events.map((event, index) => ({
       id: crypto.randomUUID(), userId, position: first + index,
       message: { role: 'user', content: eventPrompt(event) } satisfies ModelMessage,
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
-    return { held: true, added: events.length }
+    return { held: true, added: events.length, telegramTargets: telegramReplyTargets(events) }
   })
 }
 
@@ -193,7 +194,7 @@ export async function citationSources(userId: string, texts: readonly string[], 
 /** The latest of the conversation for the chat, oldest first. */
 export async function chatView(userId: string, limit = 200): Promise<ChatView> {
   const [session] = await db.select().from(coordinatorSessions).where(eq(coordinatorSessions.userId, userId)).limit(1)
-  const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
+  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(eq(coordinatorMessages.userId, userId))
     .orderBy(desc(coordinatorMessages.position)).limit(limit)
   // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.

@@ -113,6 +113,7 @@
     "myTasks": "我的任务",
     "agent": "Agent",
     "coordinator": "Coordinator",
+    "coordinatorWorking": "Coordinator，正在工作",
     "yourTeams": "你的团队",
     "home": "主页",
     "tasks": "任务",
@@ -176,15 +177,13 @@
     "createDescription": "从第一个任务开始，把想法变成可追踪的进展。",
     "welcomeDescription": "登录 Mikka，继续你的任务与文档。",
     "continueGoogle": "使用 Google 继续",
-    "googleScope": "仅请求登录所需的基本个人资料与邮箱。",
     "googleLinkHint": "如果此邮箱已注册 Mikka，请先用邮箱密码登录，再到「设置 → 账户」关联 Google。",
     "googleNotConfigured": "Google 登录暂未配置，请使用邮箱继续。",
     "viewGoogleCallback": "查看 Google OAuth 回调地址",
     "continueGithub": "使用 GitHub 继续",
-    "githubScope": "仅获取登录所需的身份与邮箱，不请求仓库读写权限。",
     "githubNotConfigured": "GitHub 登录暂未配置，请使用邮箱继续。",
     "viewCallback": "查看 GitHub App 回调地址",
-    "orEmail": "或使用邮箱",
+    "orEmail": "或",
     "name": "称呼",
     "namePlaceholder": "怎么称呼你",
     "email": "邮箱",
@@ -325,6 +324,7 @@
       "searchAria": "搜索关联任务",
       "loadFailed": "任务读取失败",
       "noTasks": "当前没有同一创建者的其他任务可以关联。",
+      "noMatch": "没有匹配的任务",
       "noTasksSameOwner": "其他创建者的任务不能在这里关联。",
       "loading": "正在读取任务…",
       "group": "可关联的任务",
@@ -685,7 +685,35 @@
     "editorAria": "{label}编辑器"
   },
   "Devices": {
+    "otherDevices": "Remote control",
+    "menu": "{name} 的更多操作",
+    "add": {
+      "title": "添加设备",
+      "description": "能用 SSH 登录的机器，Mikka 会自己装好。",
+      "trigger": "添加设备",
+      "host": "主机",
+      "hostPlaceholder": "主机名或 IP",
+      "user": "用户",
+      "userPlaceholder": "你在那台机器上的用户名",
+      "tailnet": "Tailnet 上",
+      "sshConfig": "SSH 配置里",
+      "configured": "已设置",
+      "sshNew": "ssh · 未设置",
+      "tailnetNew": "tailnet · 未设置",
+      "shortcut": "快捷键",
+      "cancel": "取消",
+      "setUp": "设置",
+      "settingUp": "正在设置 {host}",
+      "settingUpDescription": "用 SSH 登录，装好 Mikka，启动服务，记下主机密钥。",
+      "progress": "设置进度",
+      "interrupted": "连接中断。",
+      "back": "返回",
+      "done": "完成",
+      "emptyDescription": "添加一台能用 SSH 登录的机器。"
+    },
     "neverOnline": "从未上线",
+    "lastOnline": "最后在线 {time}",
+    "reconnect": "重新连接",
     "lastHeartbeat": "最后心跳 {time}",
     "installedWithVersion": "已安装 · {version}",
     "installed": "已安装",
@@ -735,7 +763,7 @@
       "steps": {
         "login": "登录",
         "check": "检查主机",
-        "install": "安装 daemon",
+        "install": "安装 Mikka",
         "start": "启动服务",
         "connect": "连接"
       },
@@ -807,7 +835,8 @@
       "addedSubtask": "添加了子任务 {title}",
       "addedLabel": "添加了标签 {name}",
       "removedLabel": "移除了标签 {name}",
-      "unknownAssignee": "某人"
+      "unknownAssignee": "某人",
+      "separator": "，"
     },
     "detail": {
       "readFailed": "任务读取失败，请重试。",
@@ -1249,8 +1278,7 @@
     "savingProperties": "正在保存属性…",
     "noMatchTitle": "没有匹配的项目",
     "noMatchDescription": "试试其他名称或状态。",
-    "emptyTitle": "围绕目标组织工作",
-    "emptyDescription": "创建项目，关联任务并追踪交付进度。",
+    "emptyTitle": "还没有项目",
     "columns": {
       "name": "名称",
       "health": "健康度",
@@ -1427,7 +1455,12 @@
     "noResults": "没有匹配的设置",
     "groups": {
       "personal": "个人",
-      "workspace": "工作区"
+      "workspace": "工作区",
+      "administration": "管理",
+      "yourTeams": "你的团队"
+    },
+    "nav": {
+      "createTeam": "创建团队"
     },
     "sections": {
       "members": {
@@ -1448,6 +1481,10 @@
       "integrations": {
         "title": "集成",
         "description": "管理已连接的应用与消息平台。"
+      },
+      "devices": {
+        "title": "设备",
+        "description": "你自己接入的机器。"
       },
       "workspace": {
         "title": "工作区",
@@ -1602,7 +1639,7 @@
     }
   },
   "TelegramBot": {
-    "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n发送详情后用 /confirm 创建到待办\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",
+    "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n草稿进行中时发送详情，然后用 /confirm 创建到待办\n其他消息会发送给 Orchestrator，回复会发回此处\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",
     "connect": "请在 Mikka 设置 → 集成中连接 Telegram，然后打开生成的链接。",
     "alreadyConnected": "你的 Telegram 账号已连接。发送 /help 查看命令。",
     "paired": "Telegram 已连接到 Mikka。发送 /help 查看命令。",
@@ -1631,6 +1668,11 @@
     "detailsAdded": "详情已添加。可继续发送，或用 /confirm 创建待办任务。",
     "linkedChat": "本会话已关联任务。可用 /status、/unlink 或 /new <标题>。",
     "startDraftMessage": "请用 /new <标题> 开始草稿，发送详情后用 /confirm 创建。",
+    "coordinatorQueued": "已发送给 Orchestrator，收到回复后我会在这里告诉你。",
+    "coordinatorUnavailable": "Orchestrator 当前不可用，请稍后重试。",
+    "coordinatorMessageRequired": "请发送文字消息给 Orchestrator。",
+    "coordinatorMessageTooLong": "消息过长，请缩短后重试。",
+    "messageUnavailable": "无法读取这条 Telegram 消息，请重新发送。",
     "status": {
       "backlog": "待办",
       "todo": "待处理",
@@ -1950,7 +1992,6 @@
   "Coordinator": {
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
-    "emptyTitle": "和你的 Coordinator 聊聊",
     "usedTools": "调用了 {tools}",
     "pendingActions": {
       "label": "等你确认",
@@ -2088,6 +2129,10 @@
     "organizingResponseContent": "正在整理回复内容",
     "preparingAResponse": "正在准备回复",
     "waitingForAResponse": "正在等待回复",
+    "agentStatusThinking": "正在思考…",
+    "agentStatusSearching": "正在搜索…",
+    "agentStatusReading": "正在读取网页…",
+    "agentStatusWorking": "正在调用工具…",
     "requestFailedPleaseTryAgain": "请求失败，请稍后重试。",
     "yourInputHasBeenPreserved": "你的输入已保留。",
     "retryThisResponse": "重试此回复",
@@ -2253,8 +2298,51 @@
     "send": "发送",
     "sendFailed": "没发出去，草稿还在"
   },
+  "Computer": {
+    "status": {
+      "working": "Agent 操作中",
+      "approval": "等你审批",
+      "done": "完成",
+      "failed": "出错",
+      "sleeping": "休眠中",
+      "waking": "唤醒中",
+      "running": "运行中",
+      "user": "你在操作"
+    },
+    "screenOf": "{name} 的屏幕",
+    "computerOf": "{name} 的电脑",
+    "cloud": "Mikka Cloud",
+    "card": "电脑任务",
+    "cardTitle": "电脑",
+    "openScreen": "全屏查看 {name} 的屏幕",
+    "open": "打开",
+    "sleeping": "电脑正在休眠",
+    "wake": "唤醒",
+    "waking": "唤醒中",
+    "machineError": "电脑没能启动",
+    "retry": "重试",
+    "wakeFailed": "唤醒失败，请重试。",
+    "viewer": {
+      "title": "{name} 的屏幕",
+      "close": "退出全屏",
+      "controls": "控制",
+      "viewOnly": "仅观看",
+      "otherControls": "别人在操作",
+      "youControl": "你在操作",
+      "takeover": "取得控制权",
+      "handback": "交还给 Agent",
+      "takenByOther": "别人正在操作这台电脑。",
+      "takeoverFailed": "没能取得控制权，请重试。",
+      "handbackFailed": "没能交还，请重试。"
+    },
+    "approval": {
+      "allowRun": "本任务内都允许",
+      "deny": "拒绝",
+      "allow": "允许",
+      "failed": "没有送达，请重试。"
+    }
+  },
   "Shell": {
-    "pinned": "置顶",
     "searchPlaceholder": "搜索对话、任务、Agent、知识库",
     "searchLabel": "全局搜索",
     "searchDescription": "搜索对话、任务和项目，用方向键选择，按 Enter 打开。",
@@ -2274,8 +2362,6 @@
     "attach": "添加文件",
     "attachUnsupported": "只能附加 {max} 字以内的文本文件",
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
-    "whoIsWorking": "谁在工作",
-    "agentsWorking": "{count} 个 agent 正在处理任务",
     "panel": {
       "label": "右栏",
       "tabs": "右栏内容",
@@ -2293,7 +2379,7 @@
     "details": {
       "conversation": "当前对话",
       "kind": "类型",
-      "coordinatorKind": "Coordinator · 置顶",
+      "coordinatorKind": "Coordinator",
       "agentKind": "Agent 对话",
       "updated": "最近活动",
       "none": "还没有消息"
@@ -2306,8 +2392,8 @@
       "briefing": "有 {count} 条新消息值得看，先看",
       "noneToday": "今天还没有新的建议。",
       "routine": "例行事项",
-      "emptyTitle": "这里是空的",
-      "emptyDescription": "Check back later",
+      "empty": "暂时没有要看的消息",
+      "connect": "连接应用",
       "refresh": "刷新建议",
       "loadError": "建议加载失败。",
       "action": {
@@ -2325,13 +2411,13 @@
       }
     },
     "tasks": {
-      "mine": "我的任务",
+      "mine": "任务",
       "waiting": "等你",
       "running": "运行中",
       "failed": "出错",
       "doneToday": "已完成",
       "today": "今天 {count}",
-      "empty": "还没有派给 Agent 的任务。",
+      "empty": "还没有任务",
       "status": {
         "waiting_input": "等你回复",
         "queued": "排队中",
@@ -2340,15 +2426,12 @@
         "finishing": "收尾中",
         "failed": "失败",
         "succeeded": "已完成"
-      },
-      "command": "指挥这个任务…",
-      "commandLabel": "给 Coordinator 发指令",
-      "send": "发送",
-      "sent": "已发给 Coordinator。",
-      "sendFailed": "没发出去，再试一次。"
+      }
     },
     "empty": {
-      "nothing": "这里是空的",
+      "browser": "还没打开过网页",
+      "knowledge": "还没有资料",
+      "schedules": "还没有定时任务",
       "arrange": "让 Agent 安排",
       "knowledgePrompt": "帮我把常用的资料整理进知识库：",
       "schedulesPrompt": "帮我设一个定时任务："
@@ -2363,6 +2446,8 @@
       "device": "运行的机器",
       "noDevice": "未连接机器",
       "offline": "离线",
+      "online": "在线",
+      "cloud": "Mikka Cloud",
       "contextProject": "项目：{project}",
       "contextSeparator": "，",
       "prompt": "帮我新建一个任务：{text}",
@@ -2393,6 +2478,8 @@
       "property": { "identifier": "编号", "priority": "优先级", "assignee": "负责人", "labels": "标签", "pullRequests": "PR", "subtasks": "子任务", "agentState": "Agent 状态", "project": "项目", "dueDate": "截止日期", "createdAt": "创建时间" },
       "hiddenColumns": "隐藏的列",
       "hiddenLane": "已隐藏",
+      "expandColumn": "展开{status}列",
+      "foldColumn": "收起成窄条",
       "hideColumn": "隐藏此列",
       "hideColumnNamed": "隐藏{status}列",
       "showColumn": "显示{status}列",

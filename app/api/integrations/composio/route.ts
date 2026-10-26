@@ -1,3 +1,4 @@
+import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth, authBaseURL } from '@/lib/auth'
@@ -13,8 +14,9 @@ function sameOrigin(request: Request) {
   return request.headers.get('origin') === new URL(request.url).origin
 }
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
+  noteLogUser(session?.user?.id)
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
   const composio = getComposio()
   const callbackVerifierConfigured = isComposioCallbackVerifierConfigured(authBaseURL, BASE_PATH)
@@ -33,8 +35,9 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
+  noteLogUser(session?.user?.id)
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
   if (!sameOrigin(request)) return NextResponse.json({ error: 'originNotAllowed' }, { status: 403 })
   const parsed = connectSchema.safeParse(await request.json().catch(() => null))
@@ -52,8 +55,9 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+async function handleDELETE(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
+  noteLogUser(session?.user?.id)
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
   if (!sameOrigin(request)) return NextResponse.json({ error: 'originNotAllowed' }, { status: 403 })
   const parsed = disconnectSchema.safeParse(await request.json().catch(() => null))
@@ -70,3 +74,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'integrationDisconnectFailed' }, { status: 502 })
   }
 }
+
+export const GET = withRequestLog('/api/integrations/composio', handleGET)
+export const POST = withRequestLog('/api/integrations/composio', handlePOST)
+export const DELETE = withRequestLog('/api/integrations/composio', handleDELETE)

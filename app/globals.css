@@ -75,6 +75,10 @@
 --color-success: var(--success);
 --color-label-violet: var(--label-violet);
 --color-label-blue: var(--label-blue);
+--color-attention: var(--attention);
+--color-attention-foreground: var(--attention-foreground);
+--color-screen: var(--screen);
+--color-screen-foreground: var(--screen-foreground);
 /* App shell layers (Nav v3.1): the top bar and icon rail, then the list and right panels, then the conversation. */
 --color-shell-chrome: var(--shell-chrome);
 --color-shell-panel: var(--shell-panel);
@@ -187,6 +191,11 @@
 --warning-foreground: var(--color-yellow-900);
 --invert: var(--color-zinc-900);
 --invert-foreground: var(--color-zinc-50);
+/* The computer: orange while it waits on you or you hold control; the viewer is dark in both themes. */
+--attention: var(--color-orange-500);
+--attention-foreground: var(--color-orange-600);
+--screen: oklch(0.17 0 0);
+--screen-foreground: oklch(0.985 0 0);
 }
 
 .dark {
@@ -253,6 +262,10 @@
 --warning-foreground: var(--color-yellow-600);
 --invert: var(--color-zinc-700);
 --invert-foreground: var(--color-zinc-50);
+--attention: var(--color-orange-500);
+--attention-foreground: var(--color-orange-400);
+--screen: oklch(0.17 0 0);
+--screen-foreground: oklch(0.985 0 0);
 }
 
 @layer base {
@@ -266,3 +279,4 @@ body {
   @apply bg-background text-foreground;
 }
 }
+
