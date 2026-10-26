@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { readdirSync } from 'node:fs'
 import { Pool } from 'pg'
 import { getMigrations } from 'better-auth/db/migration'
 import { oauthProvider } from '@better-auth/oauth-provider'
@@ -16,8 +19,22 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || !target.pa
   throw new Error('测试初始化仅允许本机且名称以 _e2e 结尾的数据库。')
 }
 
+// Bootstrap probes use disposable schemas; the app itself needs migrations on its E2E target.
+execFileSync(process.execPath, ['scripts/migrate.mjs'], {
+  cwd: new URL('..', import.meta.url), stdio: 'inherit',
+  env: { ...process.env, MIKKA_DATABASE_URL: connectionString, DATABASE_URL: connectionString, MIGRATE: '1' },
+})
+
 const authPool = new Pool({ connectionString, max: 1 })
 try {
+  const expected = readdirSync(new URL('../drizzle/', import.meta.url)).filter(name => name.endsWith('.sql')).sort()
+  const applied = (await authPool.query('SELECT name FROM schema_migrations ORDER BY name')).rows.map(row => row.name)
+  assert.deepEqual(applied, expected, 'The E2E app target must contain every tracked migration')
+  for (const table of ['factory_questions', 'improvement_skill_candidates', 'improvement_skill_selections',
+    'improvement_skill_mounts', 'improvement_benchmark_instances', 'improvement_skill_lifecycle']) {
+    assert.ok((await authPool.query('SELECT to_regclass($1) AS relation', [table])).rows[0].relation,
+      `Missing SQL-only E2E table: ${table}`)
+  }
   // The OAuth provider's tables (drizzle/0009); its pages do not matter here.
   const migration = await getMigrations({ database: authPool, emailAndPassword: { enabled: true }, plugins: [oauthProvider({ loginPage: '/sign-in', consentPage: '/oauth/consent', disableJwtPlugin: true })] })
   await migration.runMigrations()

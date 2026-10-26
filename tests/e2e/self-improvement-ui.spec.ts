@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, seedTask, openIssueFromSearch } from './fixtures'
+import { test, expect, register, seedTask, openIssueFromSearch, app } from './fixtures'
+
+const taskId = randomUUID()
+test.use({ expectedConsoleErrors: [{ path: app(`/api/factory/tasks/${taskId}/approval`), message: 'Failed to load resource: the server responded with a status of 409 (Conflict)' }] })
 
 // UI contract test: the server responses are fixtures, not activation evidence.
 test('human reviews evidence before approving and activating the selected Skill target', async ({ page }) => {
   await register(page)
   const title = `Skill review ${randomUUID()}`
   await seedTask(page, title)
-  const taskId = randomUUID(), candidateId = randomUUID(), approvalId = randomUUID(), readId = randomUUID()
+  const candidateId = randomUUID(), approvalId = randomUUID(), readId = randomUUID()
   const binding = { taskId, issueId: randomUUID(), attemptId: randomUUID(), revision: 1, candidateId }
   const publishBinding = { ...binding, attemptId: randomUUID(), revision: 2 }
   const publicationId = randomUUID()
