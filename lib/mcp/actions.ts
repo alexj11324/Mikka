@@ -1,3 +1,4 @@
+import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 import { and, asc, desc, eq, gt, inArray, or, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
@@ -115,7 +116,7 @@ export async function searchIssues(userId: string, input: { query: string; statu
   const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(
-      or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)),
+      (await issueVisibility(userId)).predicate,
       or(sql`${issues.title} ilike ${pattern}`, sql`${issues.content}::text ilike ${pattern}`),
       input.status ? eq(issues.status, input.status) : undefined,
     ))

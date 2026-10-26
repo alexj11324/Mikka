@@ -1,12 +1,13 @@
 'use server'
 
-import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
 import { currentUser } from '@/lib/acting-user'
 import { accessibleTeams } from '@/lib/team-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { issueVisibility } from '@/lib/issue-visibility'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
 import { issues, issueVersions, issueMembers, linearIssueLinks, users } from '@/lib/db/schema'
@@ -60,11 +61,10 @@ export async function listIssues() {
   const userId = await getUserId()
   const context = await loadWorkspaceContext()
   const teams = await accessibleTeams(userId, context.workspace.id)
-  const publicLinks = await issueTeamScope(userId)
-  const publicIds = publicLinks.map(link => link.issueId)
-  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId), publicIds.length ? inArray(issues.id, publicIds) : undefined), sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
+  const visibility = await issueVisibility(userId)
+  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
   const links = await issueTeamScope(userId, rows.map(row => row.id))
-  const visibleRows = rows.filter(row => { const link = links.find(item => item.issueId === row.id); return !link || teams.some(team => team.id === link.teamId) })
+  const visibleRows = rows.filter(row => { const link = links.find(item => item.issueId === row.id); return row.scope === 'personal' || !link || teams.some(team => team.id === link.teamId) })
   const ownersWithoutNumbers = [...new Set(visibleRows.filter(row => !readIssueMetadata(row.content).number).map(row => row.ownerId))]
   if (ownersWithoutNumbers.length) {
     for (const ownerId of ownersWithoutNumbers) await ensureIssueNumbers(ownerId)

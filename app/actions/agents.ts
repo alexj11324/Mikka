@@ -1,5 +1,7 @@
 'use server'
 
+import { visibleRuns } from '@/lib/agent-runs'
+
 import { headers } from 'next/headers'
 import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
@@ -14,7 +16,7 @@ import {
 import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/device-link'
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
-import { addRunMessage, queueRun, readRun, requestRunStop, runViewColumns, type RunDetail, type RunView } from '@/lib/agent-runs'
+import { addRunMessage, queueRun, readRun, requestRunStop, type RunDetail, type RunView } from '@/lib/agent-runs'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
@@ -230,12 +232,7 @@ export async function startRun(input: { issueId: string; agentId: string; device
 
 export async function listRuns(issueId: string): Promise<RunView[]> {
   const userId = await getUserId()
-  const parsed = z.uuid().safeParse(issueId)
-  if (!parsed.success) return []
-  const rows = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.issueId, parsed.data), eq(agentRuns.userId, userId)))
-    .orderBy(desc(agentRuns.createdAt)).limit(20)
-  return rows
+  return visibleRuns(userId, { issueId })
 }
 
 /** Who currently collaborates on the issue, and whether its threads are shared with them (R-26). */

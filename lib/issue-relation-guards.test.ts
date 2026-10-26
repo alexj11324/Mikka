@@ -104,6 +104,8 @@ before(async () => {
     taskIdentifiers: async () => new Map(),
   } })
   mock.module(file('./linear-sync/dispatch.ts'), { namedExports: { dispatchLinearWork: () => {}, dispatchLinearIssueSync: () => {} } })
+  // Team visibility (#169) only filters listIssueConnections; relation guards go through requireIssueAccess above.
+  mock.module(file('./issue-visibility.ts'), { namedExports: { issueVisibility: async () => ({ predicate: undefined, allowedIds: [] }) } })
   ;({ updateIssueRelation } = await import('../app/actions/issue-operations'))
 })
 
