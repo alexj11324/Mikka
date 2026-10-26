@@ -9,6 +9,7 @@ import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { Sandbox } from 'e2b'
 import { ComputerStore } from '../../lib/computer/store'
+import { ensureContainerRuntime } from '../../lib/computer/e2b-provider'
 
 async function main() {
   const url = new URL(process.env.COMPUTER_TEST_DATABASE_URL ?? '')
@@ -33,6 +34,13 @@ async function main() {
     const ingress = await fetch(`https://${sandbox.getHost(6080)}/vnc`, { signal: AbortSignal.timeout(15_000) })
     assert.equal(ingress.status, 401, 'public viewer requires a grant')
     console.log('live stage: public viewer denies anonymous traffic')
+    if (process.env.E2B_TEST_CONTAINERS === '1') {
+      await ensureContainerRuntime(sandbox)
+      await ensureContainerRuntime(sandbox)
+      const access = await sandbox.commands.run('if test -r /run/mikka-container/docker.sock || test -w /run/mikka-container/docker.sock; then exit 1; fi', { user: 'user' })
+      assert.equal(access.exitCode, 0)
+      console.log('live stage: root-only container runtime available')
+    }
     const rawCDP = await fetch(`https://${sandbox.getHost(9201)}/json/version`, { signal: AbortSignal.timeout(15_000) })
     assert.ok([502, 503].includes(rawCDP.status), 'no public CDP listener')
     console.log('live stage: public CDP unavailable')
@@ -57,6 +65,7 @@ async function main() {
     assert.equal((await store.state(actor, bot.id)).machine, 'sleeping')
     await new ComputerStore(pool).operate(actor, bot.id, 'wake')
     sandbox = await Sandbox.connect(id, connection)
+    if (process.env.E2B_TEST_CONTAINERS === '1') { await ensureContainerRuntime(sandbox); console.log('live stage: container runtime survives pause/resume') }
     assert.equal(await sandbox.files.read('/workspace/acceptance-marker'), 'preserved')
     await sandbox.commands.run('/usr/bin/python3 /opt/mikka/computer/viewer-probe.py', { user: 'root', timeoutMs: 30_000 })
     const privilege = await sandbox.commands.run('if sudo -n true >/dev/null 2>&1; then exit 1; fi; if cat /run/mikka-viewer/key >/dev/null 2>&1; then exit 1; fi', { user: 'user' })

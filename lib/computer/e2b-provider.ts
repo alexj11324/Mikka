@@ -41,6 +41,15 @@ export async function installComputerRuntime(sandbox: Sandbox) {
   await sandbox.commands.run('for i in $(seq 1 30); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401 ] && exit 0; sleep .2; done; exit 1', { user: 'root', timeoutMs: 10_000 })
 }
 
+/** Start the root-only container service for a trusted hosted worker. The
+ * task account never receives its socket or E2B control-plane credentials. */
+export async function ensureContainerRuntime(sandbox: Sandbox) {
+  const script = await readFile(join(process.cwd(), 'scripts/e2b/start-container-runtime.sh'), 'utf8')
+  await sandbox.files.write('/opt/mikka/computer/start-container-runtime.sh', script, { user: 'root' })
+  await sandbox.commands.run('bash /opt/mikka/computer/start-container-runtime.sh', { user: 'root', background: true, timeoutMs: 0 })
+  await sandbox.commands.run('for i in $(seq 1 60); do docker --host=unix:///run/mikka-container/docker.sock info >/dev/null 2>&1 && exit 0; sleep .5; done; exit 1', { user: 'root', timeoutMs: 35_000 })
+}
+
 export async function startDesktop(sandbox: Sandbox, display: number) {
   if (!Number.isInteger(display) || display < 1 || display > 999) throw new Error('Invalid display')
   await sandbox.commands.run(`bash /opt/mikka/computer/start-desktop.sh ${display}`, { user: 'user', background: true, timeoutMs: 0 })

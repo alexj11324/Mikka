@@ -147,3 +147,11 @@ access that socket. This proves the runtime prerequisite only; it does not
 prove hosted CLI, provider inference or E2B task dispatch. Fresh migrations and
 both historical BYOS migration-name sets were tested on disposable PostgreSQL;
 existing database ledger entries are preserved and equivalent SQL is not replayed.
+
+A dedicated E2B worker template `1rk83v3fyo1xs4n6x4vk` was built with the
+production-scoped E2B key. The actual store/provider started its root-only
+container service twice, verified the task account cannot access the socket,
+then exercised real framebuffer/control and verified the container service
+again after E2B pause/resume. The disposable sandbox and schema were removed.
+This template is not yet selected for production and is not a hosted-worker
+or model-inference acceptance.
