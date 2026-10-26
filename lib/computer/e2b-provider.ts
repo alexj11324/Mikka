@@ -8,7 +8,7 @@ const lifetime = 15 * 60_000
 export type DesktopLease = { botId: string; ownerId: string; display: number; epoch: number; controlledBy: string | null; controlUntil: number }
 const options = () => {
   if (!process.env.E2B_API_KEY) throw new Error('Cloud computer is not configured')
-  return { apiKey: process.env.E2B_API_KEY, timeoutMs: lifetime }
+  return { apiKey: process.env.E2B_API_KEY, timeoutMs: lifetime, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
 }
 
 export async function connectComputer(id: string) {
