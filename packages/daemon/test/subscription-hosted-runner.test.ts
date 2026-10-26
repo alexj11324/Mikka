@@ -52,6 +52,7 @@ for (const harness of ["codex", "claude_code"] as const) {
       stateDir,
       link,
       binaries: { [harness]: binary },
+      ...(process.env.MIKKA_E2B_TEST_DOCKER === '1' ? { dockerSocket: "unix:///run/mikka-container/docker.sock" as const } : {}),
     });
     const assignment = {
       runId,
