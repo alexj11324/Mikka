@@ -38,7 +38,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const migrated = await promisify(execFile)(process.execPath, ['scripts/migrate.mjs'], {
     env: { ...process.env, MIGRATE: '1', VERCEL_ENV: '' }, maxBuffer: 4 << 20,
   })
-  assert.match(migrated.stdout, /applied 20261026025303_personal_scope_detachment.sql/)
+  assert.match(migrated.stdout, /applied 20261026220000_personal_scope_detachment.sql/)
   const pool = new Pool({ connectionString: connection, max: 5 })
   const { changeIssueScopeLocally } = await import('../lib/issue-scope-store')
   const { actAs } = await import('../lib/acting-user')
@@ -728,7 +728,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   await pool.query('insert into scope184_provider_evidence values ($1)',[JSON.stringify({requests:provider.requests,issues:[...provider.issues.values()],comments:[...provider.comments.values()]})])
   t.diagnostic(`Synthetic provider boundary: ${provider.requests.length} GraphQL calls redirected to loopback HTTP; retained in scope184_provider_evidence; no real Linear acceptance`)
   assert.equal(rejectedExternalRequests,0,'no real provider request is permitted or required')
-  await pool.query(await readFile(new URL('../drizzle/20261026033440_linear_publications.sql', import.meta.url), 'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261026220200_linear_publications.sql', import.meta.url), 'utf8'))
   assert.equal((await pool.query('select scope from issues where id=$1',[issue])).rows[0].scope,'personal')
   assert.equal((await pool.query('select count(*)::int n from linear_issue_detachments where "issueId"=$1',[issue])).rows[0].n,1)
   t.diagnostic(`Synthetic fixtures retained: ${JSON.stringify({database,owner,member,workspace,team,fixtureIds,memberRun,ownerRun})}`)
