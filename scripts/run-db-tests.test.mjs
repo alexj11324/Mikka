@@ -125,3 +125,31 @@ test('different credentials cannot make one database satisfy the two-database pr
  const p={targets:[{key:'APP',database:'shared_e2e',host:'127.0.0.1',port:'5432'},{key:'WS',database:'shared_e2e',host:'127.0.0.1',port:'5432'}],distinct:['APP','WS'],bindings:{APP:'APP',WS:'WS'},env:{}}
  assert.throws(()=>profileEnvironment(p,{...env,APP:'postgres://one:first@127.0.0.1:5432/shared_e2e',WS:'postgres://two:second@127.0.0.1/shared_e2e'},'prebuild'),/Separate databases/)
 })
+
+test('groups profile uses the exact common harness database pair, never an arbitrary suffix', () => {
+ const c=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8')),p=c.profiles.groups
+ const local={...env,R0_GROUP_APP_DATABASE_URL:'postgres://fixture@127.0.0.1:5432/mikka_review',R0_WORKSPACE_DATABASE_URL:'postgres://fixture@127.0.0.1:5432/mikka_workspace_review',BETTER_AUTH_SECRET:'synthetic-test-only'}
+ const child=profileEnvironment(p,local,'prebuild')
+ assert.equal(child.MIKKA_DISPOSABLE_POSTGRES_URL,local.R0_GROUP_APP_DATABASE_URL)
+ assert.equal(child.MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL,local.R0_WORKSPACE_DATABASE_URL)
+ assert.equal(child.MIKKA_DATABASE_URL,local.R0_GROUP_APP_DATABASE_URL)
+ assert.deepEqual(p.distinct,['R0_GROUP_APP_DATABASE_URL','R0_WORKSPACE_DATABASE_URL'])
+ for(const database of ['another_e2e','mikka_e2e','mikka_review'])assert.throws(()=>profileEnvironment(p,{...local,R0_WORKSPACE_DATABASE_URL:`postgres://fixture@127.0.0.1:5432/${database}`},'prebuild'),/Invalid isolated target/)
+ assert.throws(()=>profileEnvironment(p,{...local,R0_GROUP_APP_DATABASE_URL:target},'prebuild'),/Invalid isolated target/)
+ for(const id of ['groups','group-native'])assert.equal(c.recipes.find(r=>r.id===id).status,'pending')
+})
+
+test('Factory uses existing CI paths without incompatible local fixture overrides', () => {
+ const c=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8')),p=c.profiles.factory
+ const localKeys=['FACTORY_TEST_DATABASE_URL','FACTORY_QUESTION_TEST_URL','FACTORY_CYCLE_TEST_URL','FACTORY_MONITOR_DISPATCH_TEST_URL']
+ const supplied={...env,BETTER_AUTH_SECRET:'synthetic-test-only',...Object.fromEntries(localKeys.map(k=>[k,'postgres://wrong@localhost/invalid']))}
+ const child=profileEnvironment(p,supplied,'prebuild')
+ for(const key of localKeys)assert.equal(child[key],undefined)
+ assert.equal(child.FACTORY_LOCAL_DB_TESTS,undefined)
+ // monitor has no E2E fallback, but explicitly accepts this exact CI service URL.
+ assert.equal(child.FACTORY_MONITOR_TEST_URL,target)
+ assert.equal(child.CI,'true');assert.equal(child.GITHUB_ACTIONS,'true')
+ assert.throws(()=>profileEnvironment(p,{...supplied,GITHUB_ACTIONS:undefined,MIKKA_ISOLATED_R0:'1'},'prebuild'),/GitHub CI service/)
+ assert.throws(()=>profileEnvironment(p,{...supplied,E2E_DATABASE_URL:target.replace('postgresql:','postgres:')},'prebuild'),/Invalid isolated target/)
+ assert.equal(c.recipes.find(r=>r.id==='factory').status,'pending')
+})

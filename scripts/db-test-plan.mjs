@@ -66,6 +66,7 @@ export function databaseIdentity(value) {
 }
 export function profileEnvironment(profile, env, phase) {
   if (!((env.CI === 'true' && env.GITHUB_ACTIONS === 'true') || env.MIKKA_ISOLATED_R0 === '1')) throw Error('Explicit isolated R0 execution required')
+  if (profile.githubServiceOnly && !(env.CI === 'true' && env.GITHUB_ACTIONS === 'true')) throw Error('Profile requires the GitHub CI service branch')
   const child = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'LANG'].filter(k => env[k]).map(k => [k, env[k]]))
   Object.assign(child, { CI: 'true', REQUIRE_DB: '1', CONVERSATION_READS_REQUIRE_DB: '1', RETAIN_SYNTHETIC_RECORDS: '1', KEEP_GROUP_TEST_FIXTURES: '1' }, profile.env)
   if (env.GITHUB_ACTIONS === 'true') child.GITHUB_ACTIONS = 'true'
@@ -73,7 +74,7 @@ export function profileEnvironment(profile, env, phase) {
   for (const t of profile.targets) {
     let u
     try { u = new URL(env[t.key]) } catch { throw Error(`Missing target: ${t.key}`) }
-    if (!['postgres:', 'postgresql:'].includes(u.protocol) || u.hostname !== t.host || (u.port || '5432') !== t.port || u.search || u.hash || (t.database && u.pathname !== `/${t.database}`) || (t.suffix && !u.pathname.endsWith(t.suffix)) || (t.user && u.username !== t.user)) throw Error(`Invalid isolated target: ${t.key}`)
+    if (!['postgres:', 'postgresql:'].includes(u.protocol) || (t.protocol && u.protocol !== t.protocol) || u.hostname !== t.host || (u.port || '5432') !== t.port || u.search || u.hash || (t.database && u.pathname !== `/${t.database}`) || (t.suffix && !u.pathname.endsWith(t.suffix)) || (t.user && u.username !== t.user)) throw Error(`Invalid isolated target: ${t.key}`)
   }
   if (profile.distinct && new Set(profile.distinct.map(k => databaseIdentity(env[k]))).size !== profile.distinct.length) throw Error('Separate databases required')
   if (profile.http) {

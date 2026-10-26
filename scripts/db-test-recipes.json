@@ -239,24 +239,24 @@
     "groups": {
       "targets": [
         {
-          "key": "E2E_DATABASE_URL",
-          "database": "mikka_e2e",
+          "key": "R0_GROUP_APP_DATABASE_URL",
+          "database": "mikka_review",
           "host": "127.0.0.1",
           "port": "5432"
         },
         {
           "key": "R0_WORKSPACE_DATABASE_URL",
-          "suffix": "_e2e",
           "host": "127.0.0.1",
-          "port": "5432"
+          "port": "5432",
+          "database": "mikka_workspace_review"
         }
       ],
       "bindings": {
-        "E2E_DATABASE_URL": "E2E_DATABASE_URL",
-        "MIKKA_DATABASE_URL": "E2E_DATABASE_URL",
-        "DATABASE_URL": "E2E_DATABASE_URL",
+        "E2E_DATABASE_URL": "R0_GROUP_APP_DATABASE_URL",
+        "MIKKA_DATABASE_URL": "R0_GROUP_APP_DATABASE_URL",
+        "DATABASE_URL": "R0_GROUP_APP_DATABASE_URL",
         "BETTER_AUTH_SECRET": "BETTER_AUTH_SECRET",
-        "MIKKA_DISPOSABLE_POSTGRES_URL": "E2E_DATABASE_URL",
+        "MIKKA_DISPOSABLE_POSTGRES_URL": "R0_GROUP_APP_DATABASE_URL",
         "MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL": "R0_WORKSPACE_DATABASE_URL"
       },
       "env": {
@@ -267,7 +267,7 @@
         "KEEP_GROUP_TEST_FIXTURES": "1"
       },
       "distinct": [
-        "E2E_DATABASE_URL",
+        "R0_GROUP_APP_DATABASE_URL",
         "R0_WORKSPACE_DATABASE_URL"
       ]
     },
@@ -277,7 +277,8 @@
           "key": "E2E_DATABASE_URL",
           "database": "mikka_e2e",
           "host": "127.0.0.1",
-          "port": "5432"
+          "port": "5432",
+          "protocol": "postgresql:"
         }
       ],
       "bindings": {
@@ -285,20 +286,16 @@
         "MIKKA_DATABASE_URL": "E2E_DATABASE_URL",
         "DATABASE_URL": "E2E_DATABASE_URL",
         "BETTER_AUTH_SECRET": "BETTER_AUTH_SECRET",
-        "FACTORY_TEST_DATABASE_URL": "E2E_DATABASE_URL",
-        "FACTORY_MONITOR_TEST_URL": "E2E_DATABASE_URL",
-        "FACTORY_QUESTION_TEST_URL": "E2E_DATABASE_URL",
-        "FACTORY_CYCLE_TEST_URL": "E2E_DATABASE_URL",
-        "FACTORY_MONITOR_DISPATCH_TEST_URL": "E2E_DATABASE_URL"
+        "FACTORY_MONITOR_TEST_URL": "E2E_DATABASE_URL"
       },
       "env": {
         "REQUIRE_DB": "1",
         "CONVERSATION_READS_REQUIRE_DB": "1",
         "MIKKA_TEST_DB_PORT": "5432",
         "RETAIN_SYNTHETIC_RECORDS": "1",
-        "KEEP_GROUP_TEST_FIXTURES": "1",
-        "FACTORY_LOCAL_DB_TESTS": "1"
-      }
+        "KEEP_GROUP_TEST_FIXTURES": "1"
+      },
+      "githubServiceOnly": true
     },
     "run-dispatch": {
       "targets": [
