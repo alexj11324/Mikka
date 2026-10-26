@@ -3,8 +3,7 @@
 // authorization; fixture-retention flags alone never enable this entry.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
-import { rollbackProbe } from "./disposal-contract";
+import { rollbackProbe, validatePruneRows } from "./disposal-contract";
 import { claimAuditDisposal } from "./disposal-session";
 import { appendAudit, createExport, transaction, verifyAudit, pruneAudit } from "./store";
 
@@ -87,7 +86,7 @@ test("pending PostgreSQL audit: immutable deletion refusal, privileged deletion 
             );
           });
           await assert.rejects(
-            transaction(app, (tx) => pruneAudit(tx, aged, owner)),
+            rollbackProbe(app,async()=>{const tx=await app.connect();try{return await pruneAudit(tx,aged,owner);}finally{tx.release();}}),
             /auditLegalHold/,
           );
           await app.query(
@@ -95,10 +94,10 @@ test("pending PostgreSQL audit: immutable deletion refusal, privileged deletion 
             [aged],
           );
           const snapshot = await transaction(app, (tx) =>
-            createExport(tx, aged, owner, randomUUID()),
+            createExport(tx, aged, owner, plan.exportId),
           );
           assert.equal(
-            (await transaction(app, (tx) => pruneAudit(tx, aged, owner)))
+            (await rollbackProbe(app,async()=>{const tx=await app.connect();try{return await pruneAudit(tx,aged,owner);}finally{tx.release();}}))
               .removed,
             0,
           );
@@ -109,9 +108,18 @@ test("pending PostgreSQL audit: immutable deletion refusal, privileged deletion 
           assert.equal(
             (await transaction(app, async (tx) => {
                 await tx.query("LOCK TABLE security_audit_events IN EXCLUSIVE MODE");
-                const targets=(await tx.query("SELECT id::text FROM security_audit_events WHERE tenant=$1 ORDER BY seq",[aged])).rows;
-                assert.deepEqual(targets,[{id}],"only the approved event may be pruned");
-                return pruneAudit(tx, aged, "system");
+                const targets=(await tx.query(`SELECT e.id::text,e.seq::text,h.floor::text,h.retention_days AS retention,e.event,
+                  e.occurred_at<clock_timestamp()-make_interval(days=>h.retention_days) AS expired
+                  FROM security_audit_events e JOIN security_audit_heads h ON h.tenant=e.tenant
+                  WHERE e.tenant=$1 ORDER BY e.seq`,[aged])).rows;
+                validatePruneRows(targets,plan);
+                const before=(await tx.query("SELECT tenant,id::text FROM security_audit_events ORDER BY tenant,id")).rows;
+                const result=await pruneAudit(tx, aged, "system");
+                assert.equal(result.removed,"1","disposal budget must pass before commit");
+                const after=(await tx.query("SELECT tenant,id::text FROM security_audit_events ORDER BY tenant,id")).rows;
+                const removed=before.filter(row=>!after.some(other=>other.tenant===row.tenant&&other.id===row.id));
+                assert.deepEqual(removed,[{tenant:aged,id}],"only exact approved event may disappear before commit");
+                return result;
               }))
               .removed,
             "1",

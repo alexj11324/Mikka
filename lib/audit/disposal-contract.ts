@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 
 export const hash = (text: string) => createHash('sha256').update(text).digest('hex');
-export type DisposalPlan = { runId: string; tenant: string; agedTenant: string; eventId: string; agedEventId: string; owner: string };
+export type DisposalPlan = { runId: string; tenant: string; agedTenant: string; eventId: string; agedEventId: string; exportId: string; owner: string };
 export function validatePlan(p: DisposalPlan) {
   assert.match(p.runId, /^r0-disposal-[a-f0-9-]{36}$/);
-  for (const id of [p.tenant,p.agedTenant,p.eventId,p.agedEventId]) assert.match(id,/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
-  assert.equal(new Set([p.tenant,p.agedTenant,p.eventId,p.agedEventId]).size,4);
+  for (const id of [p.tenant,p.agedTenant,p.eventId,p.agedEventId,p.exportId]) assert.match(id,/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
+  assert.equal(new Set([p.tenant,p.agedTenant,p.eventId,p.agedEventId,p.exportId]).size,5);
   assert.equal(p.owner,`audit_pending_${p.runId}`);
 }
 export function validateTarget(raw: string, p: DisposalPlan) {
@@ -30,4 +30,11 @@ export function validateApproval(a: Approval, manifestText: string, sourceHash: 
 export async function rollbackProbe<T>(db: { query: (sql: string) => Promise<unknown> }, work: () => Promise<T>): Promise<T> {
   await db.query('BEGIN');
   try { return await work(); } finally { await db.query('ROLLBACK'); }
+}
+
+export function validatePruneRows(rows: unknown, p: DisposalPlan) {
+  assert.deepEqual(rows,[
+    {id:p.agedEventId,seq:'1',floor:'0',retention:90,expired:true,event:{actorId:p.owner,actorType:'human',resourceId:p.eventId,action:'credential.revoked',outcome:'success',reason:'revoked'}},
+    {id:p.exportId,seq:'2',floor:'0',retention:90,expired:false,event:{actorId:p.owner,actorType:'human',resourceId:p.exportId,action:'audit.export',outcome:'success',reason:'snapshot'}}
+  ],'exact prepared event plus approved export record required; only aged event may expire');
 }

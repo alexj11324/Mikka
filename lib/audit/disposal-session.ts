@@ -4,8 +4,8 @@ import { Pool } from 'pg';
 import { appendAudit } from './store';
 import { hash, validatePlan, validateTarget, validateApproval, type DisposalPlan, type Approval } from './disposal-contract';
 
-const sourceFiles=['lib/audit/disposal-contract.ts','lib/audit/disposal-session.ts','lib/audit/postgres-deletion.pending.test.ts','lib/audit/store.ts','drizzle/20261025170000_security_audit_application.sql'];
-async function sourceHash() { return hash(JSON.stringify(await Promise.all(sourceFiles.map(async p=>[p,hash(await readFile(p,'utf8'))])))); }
+const sourceFiles=['lib/audit/disposal-contract.ts','lib/audit/disposal-session.ts','lib/audit/postgres-deletion.pending.test.ts','lib/audit/store.ts','drizzle/20261025170000_security_audit_application.sql','scripts/prepare-audit-disposal.ts','package.json','pnpm-lock.yaml','tsconfig.json'];
+export async function auditSourceHash() { return hash(JSON.stringify({runtime:process.version,files:await Promise.all(sourceFiles.map(async p=>[p,hash(await readFile(new URL('../../'+p,import.meta.url),'utf8'))]))})); }
 async function readPrivate(path: string) {
   const st=await lstat(path); assert.ok(st.isFile()&&!st.isSymbolicLink()); assert.equal(st.mode&0o077,0,'private manifest/approval file required');
   assert.equal(st.uid,process.getuid?.()); return readFile(path,'utf8');
@@ -37,7 +37,7 @@ async function snapshot(pool: Pool) {
 }
 export async function prepareAuditDisposal(planPath: string, output: string, raw: string) {
   const plan=JSON.parse(await readPrivate(planPath)) as DisposalPlan; validatePlan(plan);
-  const target=validateTarget(raw,plan), source=await sourceHash();
+  const target=validateTarget(raw,plan), source=await auditSourceHash();
   const pool=await pinnedPool(raw);
   try {
     const environment=await identity(pool); assert.equal(environment.schema,'public');
@@ -63,7 +63,7 @@ export async function claimAuditDisposal(manifestPath: string, approvalPath: str
   const text=await readPrivate(manifestPath), m=JSON.parse(text);
   assert.equal(m.version,1); assert.equal(m.maxPersistentDeletedEvents,1);
   const target=validateTarget(raw,m.plan); assert.deepEqual(target,m.target);
-  const source=await sourceHash(); assert.equal(m.sourceHash,source);
+  const source=await auditSourceHash(); assert.equal(m.sourceHash,source);
   validateApproval(JSON.parse(await readPrivate(approvalPath)) as Approval,text,source,m.plan.runId);
   const pool=await pinnedPool(raw);
   try {

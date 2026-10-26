@@ -105,6 +105,7 @@ jobs:
       - run: pnpm test:acceptance
       - run: pnpm test:suggestions
       - run: pnpm test:db-runner
+      - run: pnpm test:audit-contract
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:issues
