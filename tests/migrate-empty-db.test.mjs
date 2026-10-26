@@ -12,6 +12,7 @@ import * as workspaceSchema from '../lib/db/workspace-schema.ts'
 import * as projectSchema from '../lib/db/project-schema.ts'
 import * as teamSchema from '../lib/db/team-schema.ts'
 import { APPLICATION_BASELINE } from '../scripts/migration-order.mjs'
+import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '../lib/issue-meta.ts'
 
 const run = promisify(execFile)
 const directory = new URL('../drizzle/', import.meta.url)
@@ -104,6 +105,11 @@ for (const separateTargets of [false, true]) {
       const issue = randomUUID()
       await app.query(`insert into issues (id, "userId", title, content, status, priority)
         values ($1, 'existing-owner', 'Keep this issue', '{"type":"doc"}', 'todo', 'normal')`, [issue])
+      // The tracked schema must accept every current product code and still reject invalid input.
+      for (const status of ISSUE_STATUS_CODES) await app.query('update issues set status=$2 where id=$1', [issue, status])
+      for (const priority of ISSUE_PRIORITY_CODES) await app.query('update issues set priority=$2 where id=$1', [issue, priority])
+      await assert.rejects(app.query('update issues set status=$2 where id=$1', [issue, 'unsupported']), { code: '23514' })
+      await assert.rejects(app.query('update issues set priority=$2 where id=$1', [issue, 'none']), { code: '23514' })
       const userBefore = (await app.query('select * from "user"')).rows
       const issueBefore = (await app.query('select * from issues')).rows
       const before = [await snapshot(app), await snapshot(workspace)]

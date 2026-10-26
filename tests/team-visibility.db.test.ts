@@ -31,7 +31,7 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     for (const [w,u] of [[workspace,owner],[workspace,member],[otherWorkspace,foreign]]) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [w,u,`${u}@example.invalid`])
     for (const [id,w,u] of [[team,workspace,owner],[otherTeam,otherWorkspace,foreign]]) await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Visibility\',\'VIS\')', [id,w,u])
     for (const [id,u,scope,label] of [[shared,owner,'workspace','shared-label'],[personal,owner,'personal','secret-label'],[foreignIssue,foreign,'workspace','foreign-label'],[unlinked,owner,'workspace','invite-label']]) {
-      await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'doing\',\'none\',$5)', [id,u,id,doc(label),scope])
+      await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'doing\',\'normal\',$5)', [id,u,id,doc(label),scope])
       await pool.query('insert into issue_members ("issueId","userId","memberId") values ($1,$2,$3)', [id,u,member])
     }
     // Stale invitations cannot bypass a workspace link; personal scope wins
