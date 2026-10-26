@@ -7,6 +7,8 @@ const scalar=v=>typeof v==='string'||typeof v==='boolean'||(typeof v==='number'&
 
 // SELECT-only snapshot; caller owns an already open READ ONLY REPEATABLE READ
 // transaction. Every affected PK must be registered by setup. No approval/deletion.
+// FK effects only: enabled user triggers/rules and NO ACTION/RESTRICT dependencies
+// are deliberately not modeled. Original full-migration fixtures remain pending.
 export async function inventoryFactoryEffects(db,{schema,roots,fixtureRows,maxRows}) {
  assert.equal(typeof schema,'string')
  const profile=/^(factory_192|monitor_195|questions)_[a-f0-9]{32}$/.exec(schema)?.[1]
@@ -16,6 +18,18 @@ export async function inventoryFactoryEffects(db,{schema,roots,fixtureRows,maxRo
  assert.deepEqual(roots.map(r=>r.table).sort(),{factory_192:['agents'],monitor_195:['agent_runs','issues'],questions:['agent_runs']}[profile],'wrong root contract')
  const isolation=(await db.query("SELECT current_setting('transaction_read_only') AS read_only, current_setting('transaction_isolation') AS isolation")).rows
  assert.equal(isolation.length,1);assert.equal(isolation[0].read_only,'on');assert.equal(isolation[0].isolation,'repeatable read')
+ // Inspect the entire fixture schema, not only already-discovered FK targets:
+ // user triggers and rewrite rules can mutate rows outside the FK graph. FK
+ // constraint triggers are internal; disabled triggers/rules cannot execute.
+ // _RETURN is PostgreSQL's generated view SELECT rule, not a table write rule.
+ const sideEffects=await db.query(`SELECT 'trigger' AS side_effect_kind, c.relname AS table_name, t.tgname AS object_name
+ FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+ WHERE n.nspname=$1 AND NOT t.tgisinternal AND t.tgenabled <> 'D'
+ UNION ALL
+ SELECT 'rule' AS side_effect_kind, c.relname AS table_name, r.rulename AS object_name
+ FROM pg_rewrite r JOIN pg_class c ON c.oid=r.ev_class JOIN pg_namespace n ON n.oid=c.relnamespace
+ WHERE n.nspname=$1 AND r.ev_enabled <> 'D' AND r.rulename <> '_RETURN'`,[schema])
+ assert.ok(Array.isArray(sideEffects.rows)&&sideEffects.rows.length===0,'enabled user trigger or rule requires explicit side-effect inventory')
  const metadata=await db.query(`SELECT t.relname AS table_name,
  ARRAY(SELECT a.attname::text FROM unnest(p.conkey) WITH ORDINALITY k(n,o) JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=k.n ORDER BY k.o) AS pk_columns,
  ARRAY(SELECT a.attname::text FROM pg_attribute a WHERE a.attrelid=t.oid AND a.attnum>0 AND NOT a.attisdropped AND a.attnotnull ORDER BY a.attnum) AS not_null_columns

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {inventoryFactoryEffects} from './factory-effects.mjs'
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`
 const schema=prefix=>`${prefix}_${'a'.repeat(32)}`
-function fixture({profile='factory_192',edges=[],data,pk={},isolation='repeatable read',readOnly='on'}={}){
+function fixture({profile='factory_192',edges=[],data,pk={},isolation='repeatable read',readOnly='on',sideEffects=[]}={}){
  const ns=schema(profile),rootTables={factory_192:['agents'],monitor_195:['agent_runs','issues'],questions:['agent_runs']}[profile]
  data??=Object.fromEntries(rootTables.map((t,i)=>[t,[{id:id(i+1),privateText:'must-not-be-output'}]]))
  const roots=rootTables.map(t=>({table:t,pk:{id:data[t][0].id}}))
@@ -13,6 +13,12 @@ function fixture({profile='factory_192',edges=[],data,pk={},isolation='repeatabl
  const db={async query(sql,args){
   queries.push({sql,args});assert.match(sql,/^SELECT/);assert.doesNotMatch(sql,/\b(?:DELETE|DROP|UPDATE|INSERT|TRUNCATE|BEGIN|COMMIT)\b/)
   if(sql.includes('transaction_read_only'))return {rows:[{read_only:readOnly,isolation}]}
+  if(sql.includes('AS side_effect_kind')){
+   assert.deepEqual(args,[ns]);assert.match(sql,/NOT t\.tgisinternal/)
+   assert.match(sql,/t\.tgenabled <> 'D'/);assert.match(sql,/r\.ev_enabled <> 'D'/)
+   assert.match(sql,/r\.rulename <> '_RETURN'/)
+   return {rows:sideEffects}
+  }
   if(sql.includes('AS table_name'))return {rows:Object.keys(data).map(table_name=>({table_name,pk_columns:pk[table_name]??['id'],not_null_columns:pk[table_name]??['id']}))}
   if(sql.includes('AS child_schema')){assert.match(sql,/sn\.nspname=\$1 OR dn\.nspname=\$1/);return {rows:constraints}}
   const table=/FROM "[^"]+"\."([^"]+)"/.exec(sql)?.[1];assert.ok(table)
@@ -85,4 +91,24 @@ test('hashes use canonical row order and missing registered root fails closed',a
 test('SET NULL of a referenced key refuses unmodeled ON UPDATE effects',async()=>{
  const f=fixture({data:{agents:[{id:id(1)}],links:[{id:id(2),agentId:id(1)}],dependent:[{id:id(3),linkAgentId:id(1)}]},edges:[edge('agents','links',['id'],['agentId'],'n'),edge('links','dependent',['agentId'],['linkAgentId'])]})
  await assert.rejects(inventoryFactoryEffects(f.db,f.options),/referenced-key SET NULL/)
+})
+
+test('enabled user triggers and rules anywhere in the fixture schema refuse FK-only inventory',async()=>{
+ for(const side_effect_kind of ['trigger','rule']){
+  // An unrelated table also blocks: its effects must not be presumed irrelevant.
+  const f=fixture({sideEffects:[{side_effect_kind,table_name:'other_fixture_table',object_name:'synthetic_side_effect'}]})
+  await assert.rejects(inventoryFactoryEffects(f.db,f.options),/enabled user trigger or rule/)
+  assert.equal(f.queries.length,2)
+  assert.ok(!f.queries.some(q=>q.sql.includes('to_jsonb')))
+ }
+})
+
+test('no reported enabled user effects permits FK inventory without weakening transaction checks',async()=>{
+ const f=fixture({sideEffects:[]})
+ assert.equal((await inventoryFactoryEffects(f.db,f.options)).count,1)
+ const query=f.queries.find(q=>q.sql.includes('AS side_effect_kind'))
+ assert.ok(query.sql.includes('pg_trigger')&&query.sql.includes('pg_rewrite'))
+ const unsafe=fixture({readOnly:'off',sideEffects:[]})
+ await assert.rejects(inventoryFactoryEffects(unsafe.db,unsafe.options))
+ assert.equal(unsafe.queries.length,1)
 })

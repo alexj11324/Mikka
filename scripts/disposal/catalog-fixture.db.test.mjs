@@ -31,6 +31,13 @@ test('retained PG inventory: actual catalog arrays, composite cascade, SET NULL 
    const tx=await pool.connect()
    try{await tx.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');const result=await inventoryFactoryEffects(tx,{schema,roots,fixtureRows,maxRows:fixtureRows.length});assert.equal(result.count,fixtureRows.length);assert.equal(result.executedDeletion,false);assert.equal(result.effects.filter(e=>e.effect==='set-null').length,family==='factory_192'?0:1);receipt.inventory=result;await assert.rejects(inventoryFactoryEffects(tx,{schema,roots,fixtureRows,maxRows:fixtureRows.length-1}),/budget/);await tx.query('COMMIT')}
    catch(e){await tx.query('ROLLBACK');throw e}finally{tx.release()}
+   // Only install inert synthetic metadata; never invoke DELETE or the trigger.
+   const rootTable=roots[0].table
+   if(family==='factory_192')await pool.query(`CREATE FUNCTION "${schema}".fixture_guard() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN OLD; END $$; CREATE TRIGGER fixture_guard BEFORE DELETE ON "${schema}"."${rootTable}" FOR EACH ROW EXECUTE FUNCTION "${schema}".fixture_guard()`)
+   else await pool.query(`CREATE RULE fixture_guard AS ON DELETE TO "${schema}"."${rootTable}" DO INSTEAD NOTHING`)
+   const guarded=await pool.connect()
+   try{await guarded.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');await assert.rejects(inventoryFactoryEffects(guarded,{schema,roots,fixtureRows,maxRows:fixtureRows.length}),/trigger|rule/);await guarded.query('COMMIT');receipt.unmodeledSideEffectRefused=true}
+   catch(e){await guarded.query('ROLLBACK');throw e}finally{guarded.release()}
   })
   await t.test('real BYOS join freezes the attempt PK and rejects a cross-scope alias',async()=>{
    const schema='byos_inventory_'+randomUUID().replaceAll('-',''),id=randomUUID(),operation=randomUUID(),name='mikka-byos-'+randomUUID();await pool.query(`CREATE SCHEMA "${schema}"`)
