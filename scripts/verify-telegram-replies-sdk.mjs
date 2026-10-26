@@ -15,7 +15,7 @@ import {CoordinatorInbox,isolatedInboxOptions} from '../lib/coordinator/wake-tes
 const urls=isolatedResourceUrls(),source=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()
 if(process.env.CI!=='true'||process.env.WORKFLOW_LOCAL_BASE_URL!=='http://127.0.0.1:3180/mikka'||!['/workspace/176-private-evidence/','/tmp/mikka-telegram-294-'].some(p=>process.env.WORKFLOW_LOCAL_DATA_DIR?.startsWith(p))||['TELEGRAM_BOT_TOKEN','FIRECRAWL_API_KEY','AI_GATEWAY_API_KEY','COMPOSIO_API_KEY','VERCEL'].some(k=>process.env[k]))throw new Error('isolated keyless Telegram acceptance only')
 assert.equal(readFileSync('.next/telegram-source-sha','utf8').trim(),source)
-const app=new Pool({connectionString:urls.app}),workspace=new Pool({connectionString:urls.workspace}),inbox=new CoordinatorInbox(app,isolatedInboxOptions(app,workspace,()=>new Date())),world=await getWorld(),plans=new Map(),calls=new Map(),destinations=new Map(),runs=[]
+const app=new Pool({connectionString:urls.app}),workspace=new Pool({connectionString:urls.workspace}),inbox=new CoordinatorInbox(app,isolatedInboxOptions(app,workspace,()=>new Date())),world=await getWorld(),plans=new Map(),calls=new Map(),roundFacts=new Map(),destinations=new Map(),runs=[]
 const entry=JSON.parse(readFileSync('.next/diagnostics/workflows-manifest.json')).workflows['workflows/coordinator/workflow.ts'].coordinatorTurn
 const log=x=>console.log(JSON.stringify({at:new Date().toISOString(),source,...x}))
 const server=createServer(async(req,res)=>{
@@ -38,6 +38,11 @@ const server=createServer(async(req,res)=>{
  assert.equal(req.url,'/model')
  const id=req.headers['x-controlled-operation-id'];calls.set(id,(calls.get(id)??0)+1)
  const mode=plans.get(id)
+ if(mode==='rounds'||mode==='budget'){
+  const payload=JSON.parse(text),instructions=JSON.stringify(payload.prompt)
+  const facts=roundFacts.get(id)??[];facts.push({round:calls.get(id),noticeCount:(instructions.match(/这条消息已经用了/g)??[]).length,hasOriginalInstructions:instructions.includes('Use schedule_create'),toolChoice:payload.toolChoice});roundFacts.set(id,facts)
+  if(calls.get(id)<120){res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify({content:[{type:'tool-call',toolCallId:'controlled-list-'+calls.get(id),toolName:'list_issues',input:'{}'}],finishReason:{unified:'tool-calls',raw:'tool_calls'},usage:{inputTokens:{total:1,noCache:1,cacheRead:0,cacheWrite:0},outputTokens:{total:1,text:1,reasoning:0}},warnings:[]}));return}
+ }
  if(mode==='fail'){res.writeHead(503,{'content-type':'application/json'}).end('{}');return}
  const answer=mode==='empty'?'':mode==='long'?'A'.repeat(4095)+'😀'+'B'.repeat(6000):'CONTROLLED recovered Telegram response'
  res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify({content:[{type:'text',text:answer}],finishReason:{unified:'stop',raw:'stop'},usage:{inputTokens:{total:3,noCache:3,cacheRead:0,cacheWrite:0},outputTokens:{total:3,text:3,reasoning:0}},warnings:[]}))
@@ -45,7 +50,7 @@ const server=createServer(async(req,res)=>{
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 async function wait(fn,label){const end=Date.now()+90000;while(Date.now()<end){if(await fn())return;await sleep(100)}throw new Error('timeout '+label)}
 async function fixture(extra={}){
- const f=await resourceFixture(app,workspace,[coordinatorRoute(COORDINATOR_MODEL)]),threadId='telegram:controlled:'+randomUUID(),telegramUserId='synthetic-'+randomUUID()
+ const f=await resourceFixture(app,workspace,[coordinatorRoute(COORDINATOR_MODEL)],!extra.unmanaged),threadId='telegram:controlled:'+randomUUID(),telegramUserId='synthetic-'+randomUUID()
  await app.query('INSERT INTO telegram_links("userId","telegramUserId") VALUES($1,$2)',[f.owner,telegramUserId])
  destinations.set(threadId,{owner:f.owner,attempts:[],delivered:[],...extra})
  return {...f,threadId,telegramUserId}
@@ -84,5 +89,19 @@ try{
  assert.equal(denied.event.wake_status,'completed');assert.equal(revokePlan.attempts.length,1);assert.equal(revokePlan.delivered.length,0);assert.equal((await pending(revoked.owner)).length,1)
  assert.ok(denied.steps.some(s=>s.name.includes('telegramReplyThreads')&&s.status==='completed'));assert.ok(denied.steps.some(s=>s.name.includes('sendTelegramChunk')&&s.status==='failed'))
  log({phase:'actual SDK retries with cached target-selection result fail fresh link fence; no new HTTP or false delivery cleanup',eventId:denied.id,runId:denied.runId,telegramRequests:revokePlan.attempts.length,pendingTargets:1,steps:denied.steps})
+ const roundScope=await fixture({unmanaged:true}),roundRun=await launch(roundScope,'rounds',false),facts=roundFacts.get(roundRun.id)
+ assert.equal(roundRun.event.wake_status,'completed');assert.equal(calls.get(roundRun.id),120)
+ assert.equal(facts[89].noticeCount,0);assert.equal(facts[90].noticeCount,1);assert.equal(facts[119].noticeCount,1)
+ assert.ok(facts.every(f=>f.hasOriginalInstructions));assert.deepEqual(facts[119].toolChoice,{type:'none'})
+ const roundQuota=(await app.query('SELECT count(*)::int n,sum(settled_units)::text units FROM quota_reservations WHERE owner_id=$1 AND resource=\'coordinator.model\' AND state=\'settled\'',[roundScope.owner])).rows[0]
+ assert.deepEqual(roundQuota,{n:120,units:'240'})
+ log({phase:'actual current Bot 120 generate rounds retain quota/fence and replace round notice once; final round has tools off',eventId:roundRun.id,runId:roundRun.runId,modelRequests:120,quota:roundQuota,warningRound:facts[90],lastRound:facts[119],counterScope:'per generate/inbox batch; no durable per-message counter',deadlineMs:45000})
+ const budget=await fixture({unmanaged:true})
+ await app.query('UPDATE quota_tenants SET budget_units=5 WHERE workspace_id=$1',[budget.workspaceId])
+ const stopped=await launch(budget,'budget',false)
+ assert.equal(stopped.event.wake_status,'failed');assert.equal(calls.get(stopped.id),2)
+ const held=(await app.query('SELECT count(*)::int n,sum(settled_units)::text units FROM quota_reservations WHERE owner_id=$1',[budget.owner])).rows[0]
+ assert.deepEqual(held,{n:2,units:'4'})
+ log({phase:'existing quota stops actual Bot before a third send despite 120-round cap; prior successful rounds remain charged',eventId:stopped.id,runId:stopped.runId,modelRequests:2,quota:held,event:stopped.event})
  log({result:'PASS actual Next/PG/Workflow SDK Telegram pending recovery, empty fallback, chunk retry and cached-step authority fence; all external transport controlled'})
 }finally{for(const r of runs)try{if(['pending','running'].includes(await r.status))await r.cancel()}catch{}server.closeAllConnections();await new Promise(r=>server.close(()=>r()));await Promise.all([app.end(),workspace.end()])}
