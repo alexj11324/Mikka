@@ -9,6 +9,7 @@ export interface CoordinatorEventInput {
   issueId: string | null
   runId: string | null
   payload: Record<string, unknown>
+  wakeWorkspaceId?:string
 }
 
 export interface TelegramReplyTarget {
@@ -24,7 +25,7 @@ export interface TelegramMessageSource extends TelegramReplyTarget {
 export function userMessageEvent(
   userId: string,
   text: string,
-  options: { issueId?: string | null; telegram?: TelegramMessageSource } = {},
+  options: { issueId?: string | null; telegram?: TelegramMessageSource;workspaceId?:string } = {},
 ): CoordinatorEventInput {
   const id = crypto.randomUUID()
   const telegram = options.telegram
@@ -34,7 +35,8 @@ export function userMessageEvent(
     dedupeKey: telegram ? 'telegram:' + telegram.threadId + ':' + telegram.messageId : 'user_message:' + id,
     issueId: options.issueId ?? null,
     runId: null,
-    payload: { text, ...(telegram ? { telegram } : {}) },
+    ...(options.workspaceId?{wakeWorkspaceId:options.workspaceId}:{}),
+    payload: { text, ...(telegram ? { telegram } : {}),...(options.workspaceId?{workspaceId:options.workspaceId}:{}) },
   }
 }
 

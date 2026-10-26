@@ -1,4 +1,4 @@
-import { telegramReplyTargets, type TelegramReplyTarget } from '../coordinator-events'
+import {addTelegramPending,acknowledgeTelegramPending,hasTelegramPending,type PendingTelegramTarget} from './telegram-pending'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import type { ModelMessage } from 'ai'
@@ -11,6 +11,7 @@ export type WakeDelivery = { eventId: string; token: string }
 export type WakeExecution = { holder: string; delivery: WakeDelivery; operationKey: string; binding: string }
 export type WakeEvent = {
   id: string
+  sequence: string
   userId: string
   kind: CoordinatorEventKind
   tier: CoordinatorEventTier | null
@@ -84,7 +85,7 @@ export type InboxReceipt = {
   recovery?: boolean
   notifyOnly?: boolean
   notification?: string
-  telegramTargets?: TelegramReplyTarget[]
+  telegramTargets?: PendingTelegramTarget[]
   hasCheckpoint?: boolean
   actionContext?: ActionContext & { recovery: boolean }
 }
@@ -339,7 +340,7 @@ export class CoordinatorInbox {
       delivery?.eventId ??
       (
         await this.pool.query(
-          "SELECT id FROM coordinator_events WHERE \"userId\"=$1 AND processed_at IS NULL AND wake_status IN ('pending','running') AND kind<>'issue_done' AND (tier IS NULL OR tier<>'background') ORDER BY sequence LIMIT 1",
+          `SELECT id FROM coordinator_events WHERE "userId"=$1 AND processed_at IS NULL AND wake_status IN ('pending','running') AND kind<>'issue_done' AND (tier IS NULL OR tier<>'background') ORDER BY sequence LIMIT 1`,
           [owner],
         )
       ).rows[0]?.id
@@ -439,13 +440,15 @@ export class CoordinatorInbox {
           event.id,
           { holder, closed: false, batches: [] },
         ])
+      const pending=addTelegramPending(session.telegram_reply_pending??[],events)
+      await tx.query('UPDATE coordinator_sessions SET telegram_reply_pending=$2 WHERE "userId"=$1',[owner,JSON.stringify(pending)])
       const actionContext = event.kind === 'user_message' ? { sourceEventId: event.id, holder, recovery } : undefined
       return {
         held: true,
         added,
         delivery: receipt,
         operationId: event.id,
-        telegramTargets: telegramReplyTargets(events),
+        telegramTargets: pending.filter(target=>target.workspaceId===event.wake_workspace_id),
         recovery,
         notifyOnly: mode === 'notify_only',
         notification: eventPrompt(event),
@@ -517,6 +520,29 @@ export class CoordinatorInbox {
         { ...receipts, [execution.operationKey]: { binding: execution.binding, value } },
       ])
       return value
+    })
+  }
+  /** The actual chunk step checks current owner/workspace/source/link while
+   * their read locks are held through delivery. A cached prior gate is useless. */
+  async telegramReply<T>(owner:string,target:PendingTelegramTarget,send:()=>Promise<T>){
+    return this.scoped(owner,target.sourceEventId,'read',async tx=>{
+      const session=await this.session(tx,owner)
+      if(!hasTelegramPending(session.telegram_reply_pending??[],target))return {replayed:true as const}
+      const event=(await tx.query<WakeEvent>('SELECT * FROM coordinator_events WHERE id=$1 AND "userId"=$2 FOR SHARE',[target.sourceEventId,owner])).rows[0]
+      if(!event||event.wake_workspace_id!==target.workspaceId||String(event.sequence)!==target.sequence)throw new WakeError('wakeTelegramTargetChanged',403)
+      const raw=event.payload.telegram as Record<string,unknown>|undefined
+      if(event.kind!=='user_message'||raw?.threadId!==target.threadId||raw?.telegramUserId!==target.telegramUserId)throw new WakeError('wakeTelegramTargetChanged',403)
+      await this.authorize(tx,event,'read')
+      if(!(await tx.query('SELECT 1 FROM telegram_links WHERE "userId"=$1 AND "telegramUserId"=$2 FOR SHARE',[owner,target.telegramUserId])).rowCount)throw new WakeError('wakeTelegramLinkUnavailable',403)
+      return {replayed:false as const,value:await send()}
+    })
+  }
+  /** Cleanup only after all chunks were acknowledged by the delivery step.
+   * A newer staged watermark cannot be cleared by an older turn. */
+  async acknowledgeTelegram(owner:string,target:PendingTelegramTarget){
+    await this.tx(async tx=>{
+      const session=await this.session(tx,owner)
+      await tx.query('UPDATE coordinator_sessions SET telegram_reply_pending=$2 WHERE "userId"=$1',[owner,JSON.stringify(acknowledgeTelegramPending(session.telegram_reply_pending??[],target))])
     })
   }
   async beginGeneration(owner: string, holder: string, delivery: WakeDelivery) {

@@ -34,10 +34,11 @@ export async function coordinatorTurn(userId: string, delivery: WakeDelivery) {
     if(inbox.hasCheckpoint){
       const checkpoint=await steps.wakeCheckpoint(userId,delivery)
       if(!checkpoint)throw new Error('wakeCheckpointRequired')
-      replyText=checkpoint.messages.flatMap(m=>m.role==='assistant'?(typeof m.content==='string'?[m.content]:m.content.flatMap(p=>p.type==='text'?[p.text]:[])):[]).join('\n\n')
+      replyText=checkpoint.messages.flatMap(m=>m.role==='assistant'?(typeof m.content==='string'?[m.content]:m.content.flatMap(p=>p.type==='text'?[p.text]:[])):[]).join('\n\n')||'没有生成回复，请再试一次'
       await steps.appendMessages(userId,holder,checkpoint.messages,checkpoint.warning,inbox.actionContext,delivery)
     }else if(inbox.notifyOnly){
-      await steps.appendMessages(userId,holder,[{role:'assistant',content:'The run is stopped; it has not been resumed. '+inbox.notification}],null,undefined,delivery)
+      replyText='The run is stopped; it has not been resumed. '+inbox.notification
+      await steps.appendMessages(userId,holder,[{role:'assistant',content:replyText}],null,undefined,delivery)
     }else{
       await steps.assertWakeCurrent(userId,holder,delivery)
       const recovered = inbox.actionContext ? await steps.recoverAccountActions(userId, inbox.actionContext) : []
@@ -49,12 +50,16 @@ export async function coordinatorTurn(userId: string, delivery: WakeDelivery) {
       const { instructions, messages } = await steps.preparePrompt(userId,source)
       messages.push(...recovered)
       const result = await agent.generate({ instructions, messages, timeout:45000, maxOutputTokens:8192, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep })
-      replyText=result.text
-      await steps.appendMessages(userId,holder,[...recovered,...result.responseMessages],turnWarning(result.finishReason,result.text),inbox.actionContext,delivery)
+      replyText=result.text.trim()?result.text:'没有生成回复，请再试一次'
+      const output=result.text.trim()?result.responseMessages:[...result.responseMessages,{role:'assistant' as const,content:replyText}]
+      await steps.appendMessages(userId,holder,[...recovered,...output],turnWarning(result.finishReason,result.text),inbox.actionContext,delivery)
     }
     if(inbox.telegramTargets?.length&&replyText.trim()){
-      for(const threadId of await steps.telegramReplyThreads(userId,inbox.telegramTargets)){
-        try{for(const chunk of splitTelegramText(replyText))await steps.sendTelegramChunk(threadId,chunk)}
+      for(const target of await steps.telegramReplyThreads(userId,inbox.telegramTargets)){
+        try{
+          for(const chunk of splitTelegramText(replyText))await steps.sendTelegramChunk(userId,target,chunk)
+          await steps.acknowledgeTelegramReply(userId,target)
+        }
         catch{console.error('Telegram reply failed')}
       }
     }

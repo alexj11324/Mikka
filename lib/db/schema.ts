@@ -273,6 +273,7 @@ export const coordinatorEvents = pgTable('coordinator_events', {
   payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
   /** Null until triaged; an untriaged event wakes the Coordinator. */
   tier: text('tier').$type<CoordinatorEventTier>(),
+  wakeWorkspaceId: uuid('wake_workspace_id'),
   wakeStatus: text('wake_status').notNull().default('pending'),
   processedAt: timestamp('processed_at', { withTimezone: true }),
   accountActionBatch: jsonb('accountActionBatch').$type<import('../operations/action-intents').ActionBatch | null>(),
@@ -294,6 +295,7 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   summary: text('summary'),
   summaryThrough: integer('summaryThrough').notNull().default(0),
   memory: text('memory').notNull().default(''),
+  telegramReplyPending: jsonb('telegram_reply_pending').$type<import('../coordinator/telegram-pending').PendingTelegramTarget[]>().notNull().default([]),
   /** Why the last turn failed; cleared when a turn answers. */
   lastError: text('lastError'),
   lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),

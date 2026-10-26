@@ -1,4 +1,5 @@
-import type { TelegramReplyTarget } from '@/lib/coordinator-events'
+import {resourceControlledOrigin} from '@/lib/resources/controlled'
+import type {PendingTelegramTarget} from '@/lib/coordinator/telegram-pending'
 import { postTelegramText } from '@/lib/telegram/client'
 import { authorizeModel, authorizePolicyTool } from '@/lib/policy/runtime'
 import { coordinatorRoute } from '@/lib/policy/model'
@@ -88,14 +89,14 @@ export async function appendMessages(userId: string, holder: string, messages: M
 }
 
 /** Linked, de-duplicated Telegram threads that should get this reply. */
-export async function telegramReplyThreads(userId: string, targets: TelegramReplyTarget[]): Promise<string[]> {
+export async function telegramReplyThreads(userId: string, targets: PendingTelegramTarget[]): Promise<PendingTelegramTarget[]> {
   'use step'
   const destinations = [...new Map(targets.map(target => [JSON.stringify(target), target])).values()]
-  const threads: string[] = []
+  const threads: PendingTelegramTarget[] = []
   for (const target of destinations) {
     const [link] = await db.select({ userId: telegramLinks.userId }).from(telegramLinks)
       .where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.telegramUserId, target.telegramUserId))).limit(1)
-    if (link && !threads.includes(target.threadId)) threads.push(target.threadId)
+    if (link && !threads.some(t=>t.threadId===target.threadId)) threads.push(target)
   }
   return threads
 }
@@ -105,9 +106,21 @@ export async function telegramReplyThreads(userId: string, targets: TelegramRepl
  * retry after a failed chunk resends only that chunk, never the ones already
  * delivered (Telegram sends have no idempotency key).
  */
-export async function sendTelegramChunk(threadId: string, chunk: string) {
+export async function sendTelegramChunk(userId:string,target:PendingTelegramTarget,chunk:string) {
   'use step'
-  await postTelegramText(threadId, chunk)
+  if(!target||typeof target!=='object'||typeof chunk!=='string')throw new WakeError('wakeTelegramReceiptRequired')
+  return coordinatorInbox().telegramReply(userId,target,async()=>{
+    const controlled=resourceControlledOrigin()
+    if(controlled){
+      const response=await fetch(controlled+'/telegram',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({threadId:target.threadId,text:chunk}),signal:AbortSignal.timeout(8000),redirect:'error'})
+      if(!response.ok)throw new Error('telegramReplyUnavailable')
+      await response.body?.cancel()
+    }else await postTelegramText(target.threadId,chunk)
+  })
+}
+export async function acknowledgeTelegramReply(userId:string,target:PendingTelegramTarget){
+ 'use step'
+ await coordinatorInbox().acknowledgeTelegram(userId,target)
 }
 
 /**

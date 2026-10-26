@@ -1,3 +1,5 @@
+import {telegramCoordinatorWorkspace} from './coordinator-scope'
+import {workspacePool} from '@/lib/workspace-db'
 import 'server-only'
 
 import { createHash } from 'node:crypto'
@@ -296,7 +298,10 @@ async function handleTelegramMessage(input: {
     if (detail.length > 10_000) return t('coordinatorMessageTooLong')
     if (!coordinatorEnabled()) return t('coordinatorUnavailable')
     if (input.messageId === null) return t('messageUnavailable')
+    const workspaceId=await telegramCoordinatorWorkspace(workspacePool,link.userId,conversation.issueId)
+    if(!workspaceId)return t('coordinatorUnavailable')
     await recordCoordinatorEvent(tx, userMessageEvent(link.userId, detail, {
+      workspaceId,
       issueId: conversation.issueId,
       telegram: { threadId: conversation.threadId, telegramUserId, messageId: input.messageId },
     }))
