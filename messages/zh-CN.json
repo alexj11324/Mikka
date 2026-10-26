@@ -1449,7 +1449,12 @@
     "noResults": "没有匹配的设置",
     "groups": {
       "personal": "个人",
-      "workspace": "工作区"
+      "workspace": "工作区",
+      "administration": "管理",
+      "yourTeams": "你的团队"
+    },
+    "nav": {
+      "createTeam": "创建团队"
     },
     "sections": {
       "members": {
