@@ -43,6 +43,17 @@ them when their last caller goes.
 | An input in the thread list or under a computer screen | Not a conversation (R-10) | 「指挥这个任务…」 field |
 | shadcn `Input` defaults in dark mode | `border-input` draws a white hairline (R-31) | |
 
+## Historical chat compatibility
+
+`legacy-chat-archive.tsx` displays saved pre-retirement chat records read-only.
+It has no composer, generation request or retry execution. Historical replies
+use an accessible static projection: every saved Accordion item and Tab is
+expanded as readable text; live ComputerCard and action components are never
+mounted. The body is selectable and remains in the accessibility tree. The standalone `agent-panel`, `agent-chat`, `agent-composer`, `agent-welcome`
+and `agent-response` generation host components are retired. Shared `agent-*`
+rendering primitives used by the current Bot are retained; their internal names
+are not a separate product entity.
+
 ## Changing this list
 
 Adding a component, retiring one, or moving one between the tables is a

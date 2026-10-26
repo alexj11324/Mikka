@@ -5,7 +5,7 @@ import type { AgentImageResult } from './agent-images'
 import { agentImageQuery } from './agent-images'
 
 export function agentImageKey(query: string) {
-  return withBasePath(`/api/agent?q=${encodeURIComponent(query)}`)
+  return withBasePath(`/api/agent/images?q=${encodeURIComponent(query)}`)
 }
 
 export async function loadAgentImage(url: string): Promise<{ image: AgentImageResult | null }> {

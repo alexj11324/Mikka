@@ -39,7 +39,8 @@
     "./roles": "./src/roles.ts",
     "./label-colors": "./src/label-colors.ts",
     "./members": "./src/members.ts",
-    "./collab": "./src/collab.ts"
+    "./collab": "./src/collab.ts",
+    "./coordinator": "./src/coordinator.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",

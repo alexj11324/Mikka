@@ -29,7 +29,9 @@ jobs:
     name: Browser tests (before merge)
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # OS/browser setup took 9–10 minutes in runs 40320688470/40324658490.
+    # Budget setup separately without weakening any Playwright test limits.
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:17
@@ -63,7 +65,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Generate ephemeral test-only auth secret
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Install Chromium and official system dependencies
+        timeout-minutes: 15
+        run: pnpm exec playwright install --with-deps chromium
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:

@@ -38,7 +38,7 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
     <h2 id={`threads-${issueId}`} className="flex items-baseline gap-1.5 text-sm font-medium">{t('title')}<span className="text-xs font-normal text-muted-foreground tabular-nums">{data.length}</span></h2>
     <ul className="flex flex-col rounded-xl bg-muted/50 p-1">
       {data.map(thread => {
-        const name = thread.detail?.name ?? t('hidden')
+        const name = thread.detail?.name ?? (thread.ownerName ? t('ownerThread', { name: thread.ownerName }) : t('hidden'))
         // The bot runs the thread; the coding agent it hands work to is a step inside it, not the runner (R-05).
         const meta = thread.detail?.summary ?? null
         const body = <>
@@ -67,7 +67,7 @@ export function ThreadEvents({ issueId, onOpen }: { issueId: string; onOpen: (id
   const { data } = useIssueThreads(issueId)
   if (!data?.length) return null
   return <>{[...data].reverse().map((thread: IssueThread) => {
-    const name = thread.detail?.name ?? t('hidden')
+    const name = thread.detail?.name ?? (thread.ownerName ? t('ownerThread', { name: thread.ownerName }) : t('hidden'))
     return <div key={thread.id} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
       <LetterAvatar name={thread.detail?.agentName ?? t('agent')} size="pill" />
       <span className="font-medium">{thread.detail?.agentName ?? t('agent')}</span>
