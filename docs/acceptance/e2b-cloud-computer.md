@@ -73,7 +73,7 @@ control generations and recovery after a failed gateway synchronization.
 Build from the repository root with the Python E2B SDK:
 
 ```sh
-python scripts/e2b/build-template.py
+python scripts/e2b/build-template.py --name mikka-cloud-desktop-NEW_VERSION
 ```
 
 Provide `E2B_API_KEY` only to the control-plane process. Configure the resulting
