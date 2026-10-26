@@ -15,7 +15,9 @@ Date: 2026-10-26. Tracks #172. Branch: `codex/e2b-cloud-computer-172`.
   Multi-owner execution is rejected, not silently treated as isolated.
 - Two-minute signed viewer grants, server-enforced view-only VNC, five-minute
   renewable control leases, generation-based revocation and active socket closure.
-  VNC and CDP bind loopback; the viewer gateway is the only desktop ingress.
+  VNC uses Unix sockets and Chromium exposes no CDP TCP listener; the signed
+  viewer gateway is the only desktop ingress. E2B was observed forwarding even
+  loopback TCP listeners publicly, so loopback binding is not a security boundary.
 - Default 15-minute provider pause lifecycle; viewing/waking refreshes activity.
   Control state survives app restart in PostgreSQL. Provider pause is checked
   when reading computer state.
@@ -51,6 +53,12 @@ In a real E2B instance:
    handback → pause → new store instance → wake → read preserved file. Cross-owner
    access and control without takeover were rejected. Its sandbox/schema were
    removed in cleanup. This is not a mocked provider test.
+6. Public-ingress testing found that E2B forwards localhost TCP ports. The final
+   runtime uses Unix VNC sockets, explicitly disables both IPv4 and IPv6 RFB
+   listeners, and removes Chromium's CDP TCP listener. The live store probe was
+   rerun: anonymous public viewer access returned 401, public CDP returned 502,
+   no x11vnc/Chromium TCP listeners existed, and real pixels/view-only/control
+   still passed through the Unix socket gateway.
 
 Database regression also ran against real PostgreSQL 17: idempotent migration,
 concurrent allocation, account/workspace denial, single-owner machine admission,

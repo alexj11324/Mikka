@@ -27,8 +27,21 @@ async function main() {
     const actor = { userId: 'acceptance-owner', workspaceId: randomUUID() }
     const bot = await store.createBot(actor, 'E2B acceptance')
     await store.operate(actor, bot.id, 'wake')
+    console.log('live stage: provisioned')
     const id = (await pool.query('SELECT "sandboxId" FROM cloud_machines')).rows[0].sandboxId
     sandbox = await Sandbox.connect(id, connection)
+    const ingress = await fetch(`https://${sandbox.getHost(6080)}/vnc`, { signal: AbortSignal.timeout(15_000) })
+    assert.equal(ingress.status, 401, 'public viewer requires a grant')
+    console.log('live stage: public viewer denies anonymous traffic')
+    const rawCDP = await fetch(`https://${sandbox.getHost(9201)}/json/version`, { signal: AbortSignal.timeout(15_000) })
+    assert.ok([502, 503].includes(rawCDP.status), 'no public CDP listener')
+    console.log('live stage: public CDP unavailable')
+    const listeners = await sandbox.commands.run("ss -ltnp | grep -E 'x11vnc|chromium' || true", { user: 'root' })
+    assert.equal(listeners.stdout.trim(), '', `Unexpected desktop TCP listener: ${listeners.stdout}`)
+    console.log('live stage: no raw TCP desktop listeners')
+    await sandbox.files.write('/opt/mikka/computer/viewer-probe.py', await readFile(new URL('./viewer-probe.py', import.meta.url), 'utf8'), { user: 'root' })
+    await sandbox.commands.run('/usr/bin/python3 /opt/mikka/computer/viewer-probe.py', { user: 'root', timeoutMs: 30_000 })
+    console.log('live stage: real pixels and control verified')
     assert.equal((await store.state(actor, bot.id)).machine, 'running')
     const view = await store.operate(actor, bot.id, 'viewer')
     assert.ok(view?.url.startsWith('wss://'))
@@ -44,9 +57,10 @@ async function main() {
     await new ComputerStore(pool).operate(actor, bot.id, 'wake')
     sandbox = await Sandbox.connect(id, connection)
     assert.equal(await sandbox.files.read('/workspace/acceptance-marker'), 'preserved')
+    await sandbox.commands.run('/usr/bin/python3 /opt/mikka/computer/viewer-probe.py', { user: 'root', timeoutMs: 30_000 })
     const privilege = await sandbox.commands.run('if sudo -n true >/dev/null 2>&1; then exit 1; fi; if cat /run/mikka-viewer/key >/dev/null 2>&1; then exit 1; fi', { user: 'user' })
     assert.equal(privilege.exitCode, 0)
-    console.log(JSON.stringify({ provision: true, persistentBot: true, viewer: true, takeover: true, handback: true, ownerDenial: true, sleepResume: true, diskPreserved: true, keyIsolated: true }))
+    console.log(JSON.stringify({ provision: true, persistentBot: true, viewer: true, publicIngressProtected: true, unixVncPixels: true, takeover: true, handback: true, ownerDenial: true, sleepResume: true, diskPreserved: true, keyIsolated: true }))
   } finally {
     // Recover the ID from the ledger even when acceptance failed mid-provision.
     const ids = await pool.query('SELECT "sandboxId" FROM cloud_machines WHERE "sandboxId" IS NOT NULL').catch(() => ({ rows: [] }))
@@ -54,4 +68,4 @@ async function main() {
     await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end()
   }
 }
-void main().catch(error => { console.error(error instanceof Error ? error.name : "Acceptance failed"); process.exitCode = 1 })
+void main().catch(error => { console.error(error instanceof assert.AssertionError ? error.message : error instanceof Error ? error.name : "Acceptance failed"); process.exitCode = 1 })

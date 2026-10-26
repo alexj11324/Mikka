@@ -46,9 +46,9 @@ async def viewer(request):
     except (ValueError, KeyError, OSError, TypeError):
         raise web.HTTPUnauthorized()
     # View-only is enforced by x11vnc, not a client-side toggle.
-    port = (6900 if grant['mode'] == 'view' else 5900) + grant['display']
+    socket = f"/home/user/.mikka/vnc/{grant['display']}-{grant['mode']}.sock"
     try:
-        reader, writer = await asyncio.open_connection('127.0.0.1', port)
+        reader, writer = await asyncio.open_unix_connection(socket)
     except OSError:
         raise web.HTTPServiceUnavailable()
     ws = web.WebSocketResponse(protocols=('binary',), max_msg_size=1024 * 1024)
