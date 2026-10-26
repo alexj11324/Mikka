@@ -106,13 +106,34 @@ async function eventTeamState(team: typeof linearTeamSyncs.$inferSelect, remoteI
   return db.transaction(async tx => {
     if (remoteId) {
       const [publication] = await tx.select().from(linearIssuePublications).where(eq(linearIssuePublications.linearIssueId, remoteId)).limit(1)
-      const localId = publication?.issueId ?? (/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(remoteId) ? remoteId : null)
+      const [candidateLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.linearIssueId, remoteId)).limit(1)
+      const localId = publication?.issueId ?? candidateLink?.issueId ?? (/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(remoteId) ? remoteId : null)
       const [issue] = localId ? await tx.select().from(issues).where(eq(issues.id, localId)).for('update') : []
+      if (issue && (issue.scope !== 'workspace' || issue.linearSyncBlocked || issue.userId !== team.ownerId)) return false
+      const [link] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.linearIssueId, remoteId)).for('update')
+      const [latestPublication] = await tx.select().from(linearIssuePublications).where(eq(linearIssuePublications.linearIssueId, remoteId)).limit(1)
+      if (candidateLink && (!link || candidateLink.id !== link.id)) return false
+      if (link && (!issue || !link.externalTargetVerified || link.issueId !== issue.id || link.ownerId !== issue.userId || link.teamSyncId !== team.id)) return false
+      if (publication && (!latestPublication || publication.id !== latestPublication.id)) return false
       const [detached] = await tx.select({ id: linearIssueDetachments.linearIssueId }).from(linearIssueDetachments).where(eq(linearIssueDetachments.linearIssueId, remoteId)).limit(1)
-      if (detached || (publication && (!issue || issue.scope !== 'workspace' || issue.scopeVersion !== publication.scopeVersion || publication.retiredAt || publication.teamSyncId !== team.id))) return false
+      if (detached || (latestPublication && (!issue || latestPublication.issueId !== issue.id || issue.scopeVersion !== latestPublication.scopeVersion || latestPublication.retiredAt || latestPublication.teamSyncId !== team.id))) return false
     }
     await tx.update(linearTeamSyncs).set({ lastError: message, lastErrorAt: message ? new Date() : null, updatedAt: new Date() }).where(eq(linearTeamSyncs.id, team.id))
     return true
+  })
+}
+
+// Lock the issue first, matching retirement and inbound application ordering.
+// Legacy unknown links are retained but cannot mutate local synchronization state.
+async function withVerifiedInboundLink(link: typeof linearIssueLinks.$inferSelect, organizationId: string, operation: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<void>) {
+  await db.transaction(async tx => {
+    const [issue] = await tx.select().from(issues).where(eq(issues.id, link.issueId)).for('update')
+    const [current] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.id, link.id)).for('update')
+    if (!issue || issue.scope !== 'workspace' || issue.linearSyncBlocked || issue.userId !== link.ownerId || !current || !current.externalTargetVerified || current.issueId !== issue.id || current.ownerId !== issue.userId || current.teamSyncId !== link.teamSyncId || current.linearIssueId !== link.linearIssueId) return
+    const [owner] = await tx.select({ id: linearTeamSyncs.id }).from(linearTeamSyncs)
+      .innerJoin(linearConnections, eq(linearConnections.userId, linearTeamSyncs.ownerId))
+      .where(and(eq(linearTeamSyncs.id, current.teamSyncId), eq(linearTeamSyncs.ownerId, issue.userId), eq(linearTeamSyncs.active, true), eq(linearConnections.organizationId, organizationId))).for('update').limit(1)
+    if (owner) await operation(tx)
   })
 }
 
@@ -124,15 +145,12 @@ async function processIssueEvent(event: WebhookEvent) {
   if (detached) return
   const [link] = await db.select().from(linearIssueLinks).where(eq(linearIssueLinks.linearIssueId, remoteId)).limit(1)
   if (event.action === 'remove') {
-    if (link && event.organizationId) {
-      const [owner] = await db.select({ id: linearIssueLinks.id }).from(linearIssueLinks)
-        .innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId))
-        .innerJoin(linearConnections, eq(linearConnections.userId, linearTeamSyncs.ownerId))
-        .where(and(eq(linearIssueLinks.id, link.id), eq(linearConnections.organizationId, event.organizationId))).limit(1)
-      if (owner) await db.update(linearIssueLinks).set({ remoteRemovedAt: new Date(), syncStatus: 'remote_removed', lastError: null, updatedAt: new Date() }).where(eq(linearIssueLinks.id, link.id))
-    }
+    if (link && event.organizationId) await withVerifiedInboundLink(link, event.organizationId, async tx => {
+      await tx.update(linearIssueLinks).set({ remoteRemovedAt: new Date(), syncStatus: 'remote_removed', lastError: null, updatedAt: new Date() }).where(eq(linearIssueLinks.id, link.id))
+    })
     return
   }
+  if (link && !link.externalTargetVerified) return
   const teamData = data?.team as Record<string, unknown> | undefined
   const teamId = stringField(teamData, 'id') ?? stringField(data, 'teamId')
   const team = await teamForEvent(event.organizationId, teamId)
@@ -181,17 +199,16 @@ async function processCommentEvent(event: WebhookEvent) {
   const [existingComment] = await db.select().from(linearCommentLinks).where(eq(linearCommentLinks.linearCommentId, commentId)).limit(1)
   if (event.action === 'remove') {
     if (existingComment && event.organizationId) {
-      const [owner] = await db.select({ id: linearCommentLinks.id }).from(linearCommentLinks)
-        .innerJoin(linearIssueLinks, eq(linearIssueLinks.id, linearCommentLinks.issueLinkId))
-        .innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId))
-        .innerJoin(linearConnections, eq(linearConnections.userId, linearTeamSyncs.ownerId))
-        .where(and(eq(linearCommentLinks.id, existingComment.id), eq(linearConnections.organizationId, event.organizationId))).limit(1)
-      if (owner) await db.update(linearCommentLinks).set({ syncStatus: 'remote_removed', updatedAt: new Date() }).where(eq(linearCommentLinks.id, existingComment.id))
+      const [link] = await db.select().from(linearIssueLinks).where(eq(linearIssueLinks.id, existingComment.issueLinkId)).limit(1)
+      if (link && (!remoteIssueId || link.linearIssueId === remoteIssueId)) await withVerifiedInboundLink(link, event.organizationId, async tx => {
+        await tx.update(linearCommentLinks).set({ syncStatus: 'remote_removed', updatedAt: new Date() }).where(and(eq(linearCommentLinks.id, existingComment.id), eq(linearCommentLinks.issueLinkId, link.id)))
+      })
     }
     return
   }
   const resolved = await issueLinkForComment(event, data)
   if (!resolved) throw new LinearSyncConflictError('Waiting for the related Linear issue to be linked', true)
+  if (!resolved.link.externalTargetVerified) return
   const token = await linearAccessToken(resolved.team.ownerId)
   const remote = await linearComment(token, commentId)
   if (!remote || remote.issue?.id !== resolved.remoteIssueId) return

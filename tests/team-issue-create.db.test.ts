@@ -49,7 +49,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   }
   const {retryLinearIssue}=await import('../app/actions/linear-sync')
   const {syncAppIssueToLinear}=await import('../lib/linear-sync/issue-sync')
-  const {processLinearIssueOutbox}=await import('../lib/linear-sync/worker')
+  const {processLinearIssueOutbox,processLinearInboxDelivery}=await import('../lib/linear-sync/worker')
   const owner=`team-owner-${randomUUID()}`, racer=`team-racer-${randomUUID()}`, stranger=`team-stranger-${randomUUID()}`
   const workspaceId=randomUUID(), teamId=randomUUID(), raceTeam=randomUUID(), badTeam=randomUUID()
   for(const user of [owner,racer,stranger]) await app.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Synthetic\',$2,true,now(),now())',[user,`${user}@example.invalid`])
@@ -135,6 +135,22 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
     } finally {target.transaction=original}
   })
+  await t.test('lost app promotion response with unavailable reconciliation reports unknown and replays once',async()=>{
+    testGlobals.teamCreateTestUser=owner
+    const created=await withAfter(()=>saveIssue({title:'Existing task app commit response lost',content,status:'todo',priority:'normal'}))
+    assert.ok('issue' in created && created.issue);const id=created.issue.id
+    const request={requestId:randomUUID(),issueId:id,revision:created.issue.revision,teamId,expectedTeamId:null}
+    const target=db as unknown as {transaction:(...args:unknown[])=>Promise<unknown>;select:(...args:unknown[])=>unknown}
+    const originalTx=target.transaction,originalSelect=target.select;let calls=0
+    target.transaction=async (...args:unknown[])=>{const result=await originalTx.apply(db,args);if(++calls===2){target.select=()=>{throw new Error('synthetic reconciliation unavailable')};throw new Error('synthetic lost app commit response')}return result}
+    try {
+      assert.deepEqual(await promoteIssueToTeam(request),{error:'teamIssueOutcomeUnknown',requestId:request.requestId})
+      assert.equal((await app.query('select scope from issues where id=$1',[id])).rows[0].scope,'workspace')
+    } finally {target.transaction=originalTx;target.select=originalSelect}
+    const replay=await promoteIssueToTeam(request);assert.ok('issue' in replay && replay.issue);assert.equal(replay.issue.id,id)
+    assert.equal((await workspace.query('select count(*)::int n from team_issue_promotion_receipts where "requestId"=$1',[request.requestId])).rows[0].n,1)
+    assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
+  })
   await t.test('revocation after existing-task relation commit prevents promotion',async()=>{
     const revoked=`promotion-owner-${randomUUID()}`
     await app.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Synthetic\',$2,true,now(),now())',[revoked,`${revoked}@example.invalid`])
@@ -214,6 +230,22 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     await app.query('update issues set title=\'Unverified linked update\' where id=$1',[id])
     assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
     assert.equal((await app.query('select count(*)::int n from linear_issue_publications where id=$1',[publication])).rows[0].n,1)
+    assert.equal(externalCalls,0)
+  })
+  await t.test('unverified historical issue and comment removal webhooks cannot mutate retained links',async()=>{
+    const id=randomUUID(),remoteId=randomUUID(),linkId=randomUUID(),commentId=randomUUID(),commentLinkId=randomUUID()
+    const team=(await app.query('select id from linear_team_syncs where "ownerId"=$1',[owner])).rows[0].id
+    await app.query('insert into linear_connections ("userId","linearUserId","organizationId","organizationName","accessToken","refreshToken","expiresAt") values ($1,\'synthetic\',\'synthetic-unknown\',\'Synthetic\',\'unused\',\'unused\',now()+interval \'1 hour\')',[owner])
+    await app.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Unverified inbound fixture\',$3,\'todo\',\'normal\',\'workspace\')',[id,owner,JSON.stringify(content)])
+    await app.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") values ($1,$2,$3,$4,$5,\'EXT-unknown\')',[linkId,id,owner,team,remoteId])
+    await app.query('insert into linear_comment_links (id,"issueLinkId","threadId","messageId","linearCommentId","bodyHash") values ($1,$2,\'thread\',\'message\',$3,\'synthetic\')',[commentLinkId,linkId,commentId])
+    for (const event of [{type:'Issue',data:{id:remoteId}},{type:'Comment',data:{id:commentId,issueId:remoteId}}]) {
+      const deliveryId=`unknown-remove-${randomUUID()}`
+      await app.query('insert into linear_sync_inbox ("deliveryId","organizationId","eventType",payload) values ($1,\'synthetic-unknown\',$2,$3)',[deliveryId,event.type,JSON.stringify({...event,action:'remove',organizationId:'synthetic-unknown'})])
+      await processLinearInboxDelivery(deliveryId)
+    }
+    assert.deepEqual((await app.query('select "externalTargetVerified","remoteRemovedAt","syncStatus" from linear_issue_links where id=$1',[linkId])).rows[0],{externalTargetVerified:false,remoteRemovedAt:null,syncStatus:'synced'})
+    assert.equal((await app.query('select "syncStatus" from linear_comment_links where id=$1',[commentLinkId])).rows[0].syncStatus,'pending')
     assert.equal(externalCalls,0)
   })
   await t.test('an explicitly imported external task retains its verified link and can enqueue',async()=>{
@@ -321,7 +353,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   await t.test('failed promotion after association remains private and resumes the same request',async()=>{
     const value={...input(teamId),title:`promotion-failure-${randomUUID()}`}
     await app.query('insert into team184_app_controls (title,fail) values ($1,true)',[value.title])
-    assert.deepEqual(await query(owner,value),{error:'teamIssueRetry',requestId:value.requestId})
+    assert.deepEqual(await query(owner,value),{error:'teamIssueOutcomeUnknown',requestId:value.requestId})
     const row=(await app.query('select i.id,i.scope,i."linearSyncBlocked" from issues i join team_issue_create_requests r on r."issueId"=i.id where r."requestId"=$1',[value.requestId])).rows[0]
     assert.equal(row.scope,'personal');assert.equal(row.linearSyncBlocked,true)
     assert.equal((await workspace.query('select count(*)::int n from mikka_team_issues where "issueId"=$1',[row.id])).rows[0].n,1)
@@ -335,7 +367,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   await t.test('a changed relation while pending is not restored by retry',async()=>{
     const value={...input(teamId),title:`changed-pending-${randomUUID()}`}
     await app.query('insert into team184_app_controls (title,fail) values ($1,true)',[value.title])
-    assert.deepEqual(await query(owner,value),{error:'teamIssueRetry',requestId:value.requestId})
+    assert.deepEqual(await query(owner,value),{error:'teamIssueOutcomeUnknown',requestId:value.requestId})
     const row=(await app.query('select i.id,i.scope from issues i join team_issue_create_requests r on r."issueId"=i.id where r."requestId"=$1',[value.requestId])).rows[0]
     await workspace.query('update mikka_team_issues set "teamId"=$2 where "issueId"=$1',[row.id,badTeam])
     await app.query('update team184_app_controls set fail=false where title=$1',[value.title])

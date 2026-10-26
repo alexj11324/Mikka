@@ -98,6 +98,8 @@ export async function createTeamIssueForUser(userId: string, input: unknown) {
           if (issue) return { issue: await issueView(issue), linearSync: { enabled: false as const, reason: 'no_explicit_target' as const } }
         }
       } catch { return { error: 'teamIssueOutcomeUnknown' as const, requestId } }
+      // A read can observe preparing while the commit is still resolving.
+      return { error: 'teamIssueOutcomeUnknown' as const, requestId }
     }
     console.error('Team task creation failed')
     return { error: 'teamIssueRetry' as const, requestId }

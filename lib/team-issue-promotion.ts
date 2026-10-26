@@ -103,6 +103,10 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
           if (issue) return { issue: await issueView(issue), linearSync: syncResult }
         }
       } catch { return { error: 'teamIssueOutcomeUnknown' as const, requestId } }
+      // A plain read can still see preparing while the original COMMIT is in
+      // flight. Only a completed request proves success; do not report a
+      // definite retry/private outcome for any other second-stage failure.
+      return { error: 'teamIssueOutcomeUnknown' as const, requestId }
     }
     console.error('Team task promotion failed')
     return { error: 'teamIssueRetry' as const, requestId }
