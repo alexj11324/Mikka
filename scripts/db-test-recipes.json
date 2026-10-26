@@ -1726,7 +1726,12 @@
         "unauthorised mutation blocked and controlled privileged corruption/deletion/reorder detected",
         "legal hold, export lease, checkpoint prune and tombstone replay after expiry"
       ],
-      "expectedCount": 3
+      "expectedCount": 3,
+      "supportFiles": [
+        "lib/audit/disposal-contract.ts",
+        "lib/audit/disposal-session.ts",
+        "scripts/prepare-audit-disposal.ts"
+      ]
     },
     {
       "id": "factory-physical-absence",

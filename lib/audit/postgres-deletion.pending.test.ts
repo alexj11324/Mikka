@@ -4,41 +4,34 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { Pool } from "pg";
+import { rollbackProbe } from "./disposal-contract";
+import { claimAuditDisposal } from "./disposal-session";
 import { appendAudit, createExport, transaction, verifyAudit, pruneAudit } from "./store";
 
-if (process.env.AUDIT_DELETION_ACCEPTANCE_AUTHORIZED !== "1") {
-  throw new Error("Pending audit deletion acceptance requires separate explicit authorization");
-}
-const target = new URL(process.env.AUDIT_APP_TEST_URL ?? "http://invalid");
-assert.ok(["postgres:", "postgresql:"].includes(target.protocol));
-assert.equal(target.hostname, "127.0.0.1");
-assert.ok(target.pathname.endsWith("_e2e"));
-assert.equal(target.search, "");
-assert.equal(target.hash, "");
+const manifestPath=process.env.AUDIT_DISPOSAL_MANIFEST;
+const approvalPath=process.env.AUDIT_DISPOSAL_APPROVAL;
+if(!manifestPath||!approvalPath||!process.env.AUDIT_APP_TEST_URL) throw new Error("Pending exact manifest and separately approved one-run audit disposal");
 
 test("pending PostgreSQL audit: immutable deletion refusal, privileged deletion detection and retention prune", async t => {
-  // The dedicated isolated database must already have the tracked audit schema.
-  // Only UUID tenants created by this invocation are passed to the deletion cases.
-  const app = new Pool({ connectionString: target.href });
-  const tenant = randomUUID(), owner = `audit_pending_${randomUUID()}`;
-  const event = { actorId: owner, actorType: "human" as const, resourceId: randomUUID(), action: "credential.revoked", outcome: "success" as const, reason: "revoked" };
+  const {pool:app,plan}=await claimAuditDisposal(manifestPath,approvalPath,process.env.AUDIT_APP_TEST_URL!);
+  const tenant=plan.tenant, owner=plan.owner;
+  const event = { actorId: owner, actorType: "human" as const, resourceId: plan.eventId, action: "credential.revoked", outcome: "success" as const, reason: "revoked" };
   try {
-    await appendAudit(app, tenant, event);
+      let probesPassed=false;
       await t.test(
         "unauthorised mutation blocked and controlled privileged corruption/deletion/reorder detected",
         async () => {
           await assert.rejects(
-            app.query(
+            rollbackProbe(app,()=>app.query(
               "UPDATE security_audit_events SET hash='bad' WHERE tenant=$1",
               [tenant],
-            ),
+            )),
             /security_audit_immutable/,
           );
           await assert.rejects(
-            app.query("DELETE FROM security_audit_events WHERE tenant=$1", [
+            rollbackProbe(app,()=>app.query("DELETE FROM security_audit_events WHERE tenant=$1", [
               tenant,
-            ]),
+            ])),
             /security_audit_immutable/,
           );
           for (const corruption of [
@@ -47,25 +40,27 @@ test("pending PostgreSQL audit: immutable deletion refusal, privileged deletion 
             "UPDATE security_audit_events SET seq=99999 WHERE tenant=$1 AND seq=1",
           ]) {
             await assert.rejects(
-              transaction(app, async (tx) => {
-                await tx.query(
+              rollbackProbe(app, async () => {
+                const tx=await app.connect();
+                try { await tx.query(
                   "ALTER TABLE security_audit_events DISABLE TRIGGER security_audit_immutable",
                 );
                 await tx.query(corruption, [tenant]);
                 await verifyAudit(tx, tenant);
+                } finally { tx.release(); }
               }),
               /auditIntegrityViolation/,
             );
           }
           await transaction(app, (tx) => verifyAudit(tx, tenant));
+          probesPassed=true;
         },
       );
+      if(!probesPassed) throw new Error("Audit probes failed; prune forbidden");
       await t.test(
         "legal hold, export lease, checkpoint prune and tombstone replay after expiry",
         async () => {
-          const aged = randomUUID(),
-            id = randomUUID();
-          await appendAudit(app, aged, event, id);
+          const aged = plan.agedTenant, id = plan.agedEventId;
           // Test-only age injection requires owner override; never expose this in an API.
           await transaction(app, async (tx) => {
             await tx.query(
@@ -112,7 +107,12 @@ test("pending PostgreSQL audit: immutable deletion refusal, privileged deletion 
             [snapshot.id],
           );
           assert.equal(
-            (await transaction(app, (tx) => pruneAudit(tx, aged, "system")))
+            (await transaction(app, async (tx) => {
+                await tx.query("LOCK TABLE security_audit_events IN EXCLUSIVE MODE");
+                const targets=(await tx.query("SELECT id::text FROM security_audit_events WHERE tenant=$1 ORDER BY seq",[aged])).rows;
+                assert.deepEqual(targets,[{id}],"only the approved event may be pruned");
+                return pruneAudit(tx, aged, "system");
+              }))
               .removed,
             "1",
           );
