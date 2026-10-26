@@ -2507,5 +2507,12 @@
       "expand": "Show conversation",
       "unassigned": "Unassigned"
     }
+  },
+  "Unread": {
+    "divider": "New messages start here",
+    "newLabel": "New",
+    "jumpToUnread": "{count, plural, one {{display} new message} other {{display} new messages}}",
+    "jumpToLatest": "{count, plural, one {{display} new message} other {{display} new messages}}",
+    "dismiss": "Dismiss"
   }
 }

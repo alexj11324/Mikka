@@ -2507,5 +2507,12 @@
       "expand": "展开对话",
       "unassigned": "未分配"
     }
+  },
+  "Unread": {
+    "divider": "以下是新消息",
+    "newLabel": "新",
+    "jumpToUnread": "{count, plural, other {{display} 条新消息}}",
+    "jumpToLatest": "{count, plural, other {{display} 条新消息}}",
+    "dismiss": "关闭"
   }
 }
