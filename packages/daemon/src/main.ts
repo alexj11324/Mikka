@@ -896,6 +896,8 @@ export class Daemon {
       },
       "device.setCredential": (raw) => {
         this.nativeAbort?.abort()
+        this.reviewAbort?.abort()
+        this.reviewAbort = null
         const { credential, workspaceId } =
           daemonRpc["device.setCredential"].params.parse(raw)
         // The device id is kept, in every workspace (ADR ORV-284):
@@ -911,6 +913,8 @@ export class Daemon {
       },
       "device.clearCredential": () => {
         this.nativeAbort?.abort()
+        this.reviewAbort?.abort()
+        this.reviewAbort = null
         // Signed out in the app: stop talking to the server as that person.
         // The device id stays, so signing in again keeps the device.
         this.saveDevice({ credential: undefined })

@@ -207,6 +207,12 @@ The runner reached online state, its code was not writable, and the task OS
 user could not read its device credential. The sandbox was deleted. This is
 a packaging/startup smoke test, not an application dispatch or provider test.
 
+The next template (`o76gkx1s4jt7cv50bdd0`) packaged commit `1f3777b` and added
+the official pinned Codex 0.163.0 binary. In disposable E2B sandboxes the daemon
+reached online state against an in-memory server, and hosted-runtime preflight
+detected both Codex and Claude Code. These tests do not use provider credentials
+or establish inference; both sandboxes were deleted.
+
 Development and production databases also have the additive cloud-device-scope
 migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
 expiry validation, rotation and the Bot's pending-review state. The worker
