@@ -7,7 +7,7 @@ import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 
 /** Resolve workspace membership in its own DB; never cross-join the two DBs.
  * No request/global cache: suspension/removal takes effect on the next read. */
-export async function issueVisibility(userId: string, includeDeleted = false) {
+export async function issueVisibility(userId: string, includeDeleted = false, workspaceId?: string) {
   const candidates = await db.select({ id: issues.id }).from(issues).where(or(
     eq(issues.userId, userId),
     sql`exists (select 1 from ${issueMembers} where ${issueMembers.issueId} = ${issues.id} and ${issueMembers.userId} = ${issues.userId} and ${issueMembers.memberId} = ${userId})`,
@@ -15,6 +15,6 @@ export async function issueVisibility(userId: string, includeDeleted = false) {
   const links = await issueTeamScope(userId, candidates.map(row => row.id))
   // issueTeamScope includes candidate links even when membership is revoked.
   const allowed = await issueTeamScope(userId)
-  const allowedIds = allowed.map(link => link.issueId)
+  const allowedIds = allowed.filter(link => !workspaceId || link.workspaceId === workspaceId).map(link => link.issueId)
   return { predicate: issueVisibilityPredicate(userId, { linkedIds: links.map(link => link.issueId), allowedIds }, includeDeleted), allowedIds }
 }
