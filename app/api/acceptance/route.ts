@@ -1,3 +1,4 @@
+import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
@@ -11,11 +12,12 @@ function redirectWithinPreview(path: '/' | '/?acceptance=1' | '/acceptance') {
   return new NextResponse(null, { status: 307, headers: { Location: withBasePath(path), 'Cache-Control': 'no-store' } })
 }
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   if (!isAcceptanceEnabled()) return new NextResponse(null, { status: 404 })
 
   try {
     const session = await auth.api.getSession({ headers: request.headers })
+    noteLogUser(session?.user?.id)
     if (session?.user) return redirectWithinPreview('/')
 
     const result = await auth.api.signUpEmail({
@@ -38,3 +40,5 @@ export async function GET(request: NextRequest) {
     return redirectWithinPreview('/acceptance')
   }
 }
+
+export const GET = withRequestLog('/api/acceptance', handleGET)
