@@ -1,3 +1,4 @@
+import { telegramReplyTargets, type TelegramReplyTarget } from '../coordinator-events'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import type { ModelMessage } from 'ai'
@@ -83,6 +84,7 @@ export type InboxReceipt = {
   recovery?: boolean
   notifyOnly?: boolean
   notification?: string
+  telegramTargets?: TelegramReplyTarget[]
   hasCheckpoint?: boolean
   actionContext?: ActionContext & { recovery: boolean }
 }
@@ -136,6 +138,7 @@ export class CoordinatorInbox {
           ownerId: event.userId,
           workspaceId: event.wake_workspace_id,
           operationId: event.id,
+        telegramTargets: telegramReplyTargets(events),
           generation: event.wake_replays,
         },
         phase,
@@ -443,6 +446,7 @@ export class CoordinatorInbox {
         added,
         delivery: receipt,
         operationId: event.id,
+        telegramTargets: telegramReplyTargets(events),
         recovery,
         notifyOnly: mode === 'notify_only',
         notification: eventPrompt(event),

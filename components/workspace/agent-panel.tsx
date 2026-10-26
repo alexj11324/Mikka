@@ -21,15 +21,19 @@ import { ComputerConversation } from '@/components/computer/computer-agents'
 import { fetchAgentResponse, observeAgentImages } from '@/lib/agent-fetch'
 import { preloadAgentImage } from '@/lib/agent-image-loader'
 import { withBasePath } from '@/lib/base-path'
+import { observeAgentStatus, type AgentStatus } from '@/lib/agent-status'
 
 const AgentDemo = dynamic(() => import('./agent-demo').then(module => module.AgentDemo))
 
-const fetchAgentWithImages: typeof fetch = async (input, options) => {
-  const response = await fetchAgentResponse(input, options)
-  if (!response.ok || !response.body || !response.headers.get('content-type')?.includes('text/event-stream')) return response
-  return new Response(response.body.pipeThrough(observeAgentImages(preloadAgentImage)), {
-    status: response.status, statusText: response.statusText, headers: response.headers,
-  })
+function createAgentFetch(onStatus: (status: AgentStatus | null) => void): typeof fetch {
+  return async (input, options) => {
+    onStatus(null)
+    const response = await fetchAgentResponse(input, options)
+    if (!response.ok || !response.body || !response.headers.get('content-type')?.includes('text/event-stream')) return response
+    return new Response(response.body.pipeThrough(observeAgentStatus(onStatus)).pipeThrough(observeAgentImages(preloadAgentImage)), {
+      status: response.status, statusText: response.statusText, headers: response.headers,
+    })
+  }
 }
 
 
@@ -120,7 +124,9 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
   const agentCopy = useAgentCopy()
 
   const restored = initial.turns.at(-1)
-  const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ id: completionId, api: withBasePath('/api/agent'), credentials: 'same-origin', fetch: fetchAgentWithImages, initialCompletion: restored?.completion ?? '' })
+  const [statusSteps, setStatusSteps] = useState<AgentStatus[]>([])
+  const [fetchAgent] = useState(() => createAgentFetch(status => setStatusSteps(steps => status ? [...steps, status] : steps.length ? [] : steps)))
+  const { input: draft, setInput: updateDraft, complete, completion, error, isLoading, stop } = useCompletion({ id: completionId, api: withBasePath('/api/agent'), credentials: 'same-origin', fetch: fetchAgent, initialCompletion: restored?.completion ?? '' })
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const submittingRef = useRef(false)
   const lastRequestRef = useRef<{ prompt: string; failed: boolean } | null>(restored ? { prompt: restored.prompt, failed: restored.status !== 'complete' } : null)
@@ -185,7 +191,7 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
       <AgentChat
         turns={[
           ...previousTurns.map(turn => ({ id: turn.id, question: turn.question, response: <AgentResponse completion={turn.completion} error={turn.error} stopped={turn.stopped} isLoading={false} onAction={handleUIAction} /> })),
-          ...(question ? [{ id: generation, question, response: <AgentResponse completion={completion} error={error ?? restoredError} stopped={stopped} isLoading={isLoading} onAction={handleUIAction} onRetry={() => { if (lastRequestRef.current) lastRequestRef.current.failed = true; void request(question, 'inline') }} /> }] : []),
+          ...(question ? [{ id: generation, question, response: <AgentResponse completion={completion} error={error ?? restoredError} stopped={stopped} isLoading={isLoading} statusSteps={statusSteps} onAction={handleUIAction} onRetry={() => { if (lastRequestRef.current) lastRequestRef.current.failed = true; void request(question, 'inline') }} /> }] : []),
         ]}
         streaming={isLoading}
         sessions={sessions}
@@ -193,7 +199,6 @@ function AgentSession({ onReset, onSelect, onSaved, onState, onDemo, initial, se
         onSelect={onSelect}
         onReset={onReset}
         onDemo={onDemo}
-        onSuggestion={prompt => { updateDraft(prompt); inputRef.current?.focus() }}
         composer={<AgentComposer ref={inputRef} isEmpty={!question} draft={draft} onChange={updateDraft} onSubmit={() => { void request(draft) }} isLoading={isLoading} onStop={() => { setStopped(true); stop() }} />}
       />
     </ComputerConversation></AgentInteractionContext>

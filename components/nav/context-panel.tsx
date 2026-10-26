@@ -8,7 +8,7 @@ import type { listIssues } from '@/app/actions/issues'
 import type { TaskRun } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
+import { Empty, EmptyHeader, EmptyDescription } from '@/components/ui/empty'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
@@ -63,7 +63,7 @@ function greetingKey(now: Date) {
 }
 
 /** 建议: today's briefing and the routine items by source app, from GET /api/suggestions (MIK-28). */
-function Suggestions({ name }: { name: string }) {
+function Suggestions({ name, onConnect }: { name: string; onConnect: () => void }) {
   const t = useTranslations('Shell.suggestions')
   const timeZone = typeof Intl === 'undefined' ? 'UTC' : Intl.DateTimeFormat().resolvedOptions().timeZone
   const { data, error, isValidating, mutate } = useSWR(withBasePath(`/api/suggestions?tz=${encodeURIComponent(timeZone)}`), fetchSuggestions, { revalidateOnFocus: false })
@@ -84,7 +84,7 @@ function Suggestions({ name }: { name: string }) {
         {group.items.map(item => <p key={item.id} className="flex min-w-0 items-center gap-2 text-sm"><span className="shrink-0">{t(`action.${item.action}`)}</span><SourceChip item={item} /></p>)}
       </div>)}
     </>}
-    {empty && <Empty className="py-10"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle><EmptyDescription>{t('emptyDescription')}</EmptyDescription></EmptyHeader></Empty>}
+    {empty && <Empty className="py-10"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader><Button variant="secondary" className="rounded-full" onClick={onConnect}>{t('connect')}</Button></Empty>}
   </section>
 }
 
@@ -136,11 +136,10 @@ function MyTasks({ issues, runs, onOpenIssue }: { issues: Issue[]; runs: TaskRun
   </section>
 }
 
-function EmptyTab({ title, onArrange, arrangeLabel }: { title: string; onArrange?: () => void; arrangeLabel?: string }) {
-  const t = useTranslations('Shell.empty')
+function EmptyTab({ title, line, onArrange, arrangeLabel }: { title: string; line: string; onArrange?: () => void; arrangeLabel?: string }) {
   return <div className="flex flex-1 flex-col">
     <h2 className="text-lg font-semibold">{title}</h2>
-    <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('nothing')}</EmptyDescription></EmptyHeader>{onArrange && <Button variant="secondary" className="rounded-full" onClick={onArrange}>{arrangeLabel}</Button>}</Empty>
+    <Empty className="flex-1"><EmptyHeader><EmptyDescription>{line}</EmptyDescription></EmptyHeader>{onArrange && <Button variant="secondary" className="rounded-full" onClick={onArrange}>{arrangeLabel}</Button>}</Empty>
   </div>
 }
 
@@ -151,13 +150,14 @@ export type PanelConversation = { id?: string | null; name: string; kind: 'coord
  * 浏览器 / 知识库 / 定时任务. The current tab shows its name, the others only
  * their icons; ⤢ widens just this column.
  */
-export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue, onArrange, onSearch, onClose }: {
+export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue, onArrange, onConnect, onSearch, onClose }: {
   userName: string
   issues: Issue[]
   runs: TaskRun[]
   conversation: PanelConversation
   onOpenIssue: (id: string) => void
   onArrange: (prompt: string) => void
+  onConnect: () => void
   onSearch: () => void
   onClose: () => void
 }) {
@@ -201,13 +201,13 @@ export function ContextPanel({ userName, issues, runs, conversation, onOpenIssue
       </TabsContent>
       <TabsContent value="tasks" className="flex min-h-0 flex-col">
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-3">
-          <Suggestions name={userName} />
+          <Suggestions name={userName} onConnect={onConnect} />
           <MyTasks issues={issues} runs={runs} onOpenIssue={onOpenIssue} />
         </div>
       </TabsContent>
-      <TabsContent value="browser" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('browser')} /></TabsContent>
-      <TabsContent value="knowledge" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('knowledge')} arrangeLabel={tEmpty('arrange')} onArrange={() => onArrange(tEmpty('knowledgePrompt'))} /></TabsContent>
-      <TabsContent value="schedules" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('schedules')} arrangeLabel={tEmpty('arrange')} onArrange={() => onArrange(tEmpty('schedulesPrompt'))} /></TabsContent>
+      <TabsContent value="browser" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('browser')} line={tEmpty('browser')} /></TabsContent>
+      <TabsContent value="knowledge" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('knowledge')} line={tEmpty('knowledge')} arrangeLabel={tEmpty('arrange')} onArrange={() => onArrange(tEmpty('knowledgePrompt'))} /></TabsContent>
+      <TabsContent value="schedules" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('schedules')} line={tEmpty('schedules')} arrangeLabel={tEmpty('arrange')} onArrange={() => onArrange(tEmpty('schedulesPrompt'))} /></TabsContent>
     </Tabs>
   </aside>
 }

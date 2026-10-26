@@ -1,3 +1,4 @@
+import { splitTelegramText } from '@/lib/telegram/messages'
 import type { WakeDelivery } from '@/lib/coordinator/inbox-receipts'
 import { scheduleTools } from '@/lib/schedules/tools'
 import { WorkflowAgent } from '@ai-sdk/workflow'
@@ -27,10 +28,12 @@ export async function coordinatorTurn(userId: string, delivery: WakeDelivery) {
   const holder = getWorkflowMetadata().workflowRunId
   const inbox = await steps.takeInbox(userId, holder, delivery)
   if (!inbox.held || !inbox.added) return
+  let replyText=''
   try {
     if(inbox.hasCheckpoint){
       const checkpoint=await steps.wakeCheckpoint(userId,delivery)
       if(!checkpoint)throw new Error('wakeCheckpointRequired')
+      replyText=checkpoint.messages.flatMap(m=>m.role==='assistant'?(typeof m.content==='string'?[m.content]:m.content.flatMap(p=>p.type==='text'?[p.text]:[])):[]).join('\n\n')
       await steps.appendMessages(userId,holder,checkpoint.messages,checkpoint.warning,inbox.actionContext,delivery)
     }else if(inbox.notifyOnly){
       await steps.appendMessages(userId,holder,[{role:'assistant',content:'The run is stopped; it has not been resumed. '+inbox.notification}],null,undefined,delivery)
@@ -45,7 +48,14 @@ export async function coordinatorTurn(userId: string, delivery: WakeDelivery) {
       const { instructions, messages } = await steps.preparePrompt(userId,source)
       messages.push(...recovered)
       const result = await agent.generate({ instructions, messages, timeout:45000, maxOutputTokens:8192, stopWhen: isStepCount(COORDINATOR_MAX_STEPS), prepareStep: coordinatorStep })
+      replyText=result.text
       await steps.appendMessages(userId,holder,[...recovered,...result.responseMessages],turnWarning(result.finishReason,result.text),inbox.actionContext,delivery)
+    }
+    if(inbox.telegramTargets?.length&&replyText.trim()){
+      for(const threadId of await steps.telegramReplyThreads(userId,inbox.telegramTargets)){
+        try{for(const chunk of splitTelegramText(replyText))await steps.sendTelegramChunk(threadId,chunk)}
+        catch{console.error('Telegram reply failed')}
+      }
     }
     await steps.continueInbox(userId)
   }catch{

@@ -8,6 +8,7 @@ import { appendAudit } from '@/lib/audit/store'
 import { withPolicyTool } from '@/lib/policy/runtime'
 import { randomUUID } from 'node:crypto'
 import { MCP_SCOPE } from '@/lib/mcp/resource'
+import { mcpAuthActor, type ActivityActor } from '@/lib/activity-actor'
 
 /** Prefix the OAuth provider puts on access tokens (lib/auth.ts); it is not stored. */
 const ACCESS_TOKEN_PREFIX = 'mka_'
@@ -17,6 +18,11 @@ export function mcpUserId(authInfo: AuthInfo | undefined): string {
   const userId = authInfo?.extra?.userId
   if (typeof userId !== 'string') throw new Error('MCP request is not authenticated')
   return userId
+}
+
+/** Who issue history records for an MCP write: the run's agents.id for a run token, otherwise the OAuth client id. */
+export function mcpActor(authInfo: AuthInfo | undefined): ActivityActor {
+  return mcpAuthActor(authInfo)
 }
 
 /**

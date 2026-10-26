@@ -102,7 +102,7 @@ test('Agent 首次进入、完整历史刷新、返回和新任务均小于 1 �
   const resetStart = await page.evaluate(() => performance.now())
   await page.getByRole('button', { name: '新对话', exact: true }).click()
   panel = await assertInteractiveWithinBudget(page, info, '新任务', resetStart)
-  await expect(panel.getByRole('region', { name: '推荐建议', exact: true })).toBeVisible()
+  await expect(panel.getByRole('textbox', { name: '向 Agent 提问', exact: true })).toBeVisible()
   await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
   expect(historyRequests).toHaveLength(3)
   await expect(panel.getByText(/发送消息后|对话按账号保存|账号会话/)).toHaveCount(0)
@@ -127,7 +127,7 @@ test('历史读取保持账号隔离，并正确处理空会话与无效会话',
     const empty = await otherPage.request.get(app('/api/agent/sessions'))
     expect(await empty.json()).toEqual({ sessions: [], sessionId: null, turns: [] })
     await otherPage.getByRole('button', { name: '新对话', exact: true }).click()
-    await expect(otherPage.getByRole('region', { name: '推荐建议', exact: true })).toBeVisible()
+    await expect(otherPage.getByRole('textbox', { name: '向 Agent 提问', exact: true })).toBeVisible()
     await expect(otherPage.getByText('第三轮性能验收的已保存正文', { exact: true })).toHaveCount(0)
   } finally {
     await context.close()

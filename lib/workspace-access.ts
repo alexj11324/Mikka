@@ -1,5 +1,6 @@
 import { getLocale } from 'next-intl/server'
 import 'server-only'
+import { cache } from 'react'
 import { createHash } from 'node:crypto'
 import { cookies } from 'next/headers'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
@@ -41,9 +42,16 @@ export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: st
 }
 
 export async function loadWorkspaceContext(requestedId?: string, authenticatedUser?: AuthenticatedUser) {
-  const locale = workspaceLocale(await getLocale())
   if (requestedId) z.uuid().parse(requestedId)
-  const [user, cookieStore] = await Promise.all([authenticatedUser ?? requireUser(), cookies()])
+  const [user, locale] = await Promise.all([authenticatedUser ?? requireUser(), getLocale().then(workspaceLocale)])
+  return readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, requestedId ?? '', locale)
+}
+
+// The pages, the switcher and the list actions all ask for the same context. React cache shares it
+// within one server render only (never across requests or users); the key is all primitives.
+const readWorkspaceContext = cache(async (userId: string, email: string, name: string, image: string | null, requestedId: string, locale: WorkspaceLocale) => {
+  const user = { id: userId, email, name, image }
+  const cookieStore = await cookies()
   const readChoices = () => workspaceDb.select({ id: workspaces.id, name: workspaces.name, role: workspaceMembers.role }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
     .where(and(eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'))).orderBy(asc(workspaces.createdAt))
@@ -65,7 +73,7 @@ export async function loadWorkspaceContext(requestedId?: string, authenticatedUs
   }
 
   const savedId = cookieStore.get('mikka-workspace')?.value
-  const workspaceId = requestedId ?? choices.find(item => item.id === savedId)?.id ?? choices[0]?.id
+  const workspaceId = requestedId || (choices.find(item => item.id === savedId)?.id ?? choices[0]?.id)
   let selected = choices.find(item => item.id === workspaceId)
   if (selected) {
     const nextName = renameGeneratedWorkspace(selected.name, locale, user.name)
@@ -87,22 +95,24 @@ export async function loadWorkspaceContext(requestedId?: string, authenticatedUs
     role: selected.role,
     currentUser: { email: user.email, image: user.image ?? null },
   }
-}
+})
 
 export async function loadWorkspaceSettings(requestedId?: string, authenticatedUser?: AuthenticatedUser) {
   const context = await loadWorkspaceContext(requestedId, authenticatedUser)
   const workspaceId = context.workspace.id
-  const members = await workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name, email: workspaceMembers.email, role: workspaceMembers.role, status: workspaceMembers.status, createdAt: workspaceMembers.createdAt })
-    .from(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId)).orderBy(asc(workspaceMembers.createdAt))
+  const [members, invitations] = await Promise.all([
+    workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name, email: workspaceMembers.email, role: workspaceMembers.role, status: workspaceMembers.status, createdAt: workspaceMembers.createdAt })
+      .from(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId)).orderBy(asc(workspaceMembers.createdAt)),
+    context.role === 'admin'
+      ? workspaceDb.select({ id: workspaceInvitations.id, email: workspaceInvitations.email, role: workspaceInvitations.role, status: workspaceInvitations.status, createdAt: workspaceInvitations.createdAt, expiresAt: workspaceInvitations.expiresAt })
+        .from(workspaceInvitations).where(and(eq(workspaceInvitations.workspaceId, workspaceId), eq(workspaceInvitations.status, 'pending'))).orderBy(asc(workspaceInvitations.createdAt))
+      : [],
+  ])
   // Auth profiles are only queried for members already authorized by the selected workspace.
   const profiles = members.length ? await db.select({ id: users.id, image: users.image }).from(users)
     .where(inArray(users.id, members.map(member => member.userId))) : []
   const images = new Map(profiles.map(profile => [profile.id, profile.image]))
   images.set(context.currentUserId, context.currentUser.image)
-  const invitations = context.role === 'admin'
-    ? await workspaceDb.select({ id: workspaceInvitations.id, email: workspaceInvitations.email, role: workspaceInvitations.role, status: workspaceInvitations.status, createdAt: workspaceInvitations.createdAt, expiresAt: workspaceInvitations.expiresAt })
-      .from(workspaceInvitations).where(and(eq(workspaceInvitations.workspaceId, workspaceId), eq(workspaceInvitations.status, 'pending'))).orderBy(asc(workspaceInvitations.createdAt))
-    : []
   return {
     ...context,
     members: members.map(member => ({ ...member, image: images.get(member.userId) ?? null, createdAt: member.createdAt.toISOString() })),
