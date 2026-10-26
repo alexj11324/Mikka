@@ -129,3 +129,13 @@ performed takeover and handback, paused and resumed the machine, and checked
 the retained file. The temporary sandbox was deleted. This used an isolated
 local PostgreSQL schema: it does not establish that a deployed production app,
 a model run or a subscription connection has passed acceptance.
+
+## Subscription custody integration in progress
+
+The CPA custody worker, owner-scoped subscription APIs, protocol and migrations
+are selectively reused from draft #206. The retired `/api/agent` entry point
+and the old settings UI were not restored. `MIKKA_BYOS_ENABLED` and enrollment
+remain disabled pending worker build, integration with the current Bot harness,
+provider-specific validation and real user OAuth consent. The local model and
+enrollment tests use synthetic providers; they do not establish production
+subscription inference, hosted CLI operation, or computer-task execution.

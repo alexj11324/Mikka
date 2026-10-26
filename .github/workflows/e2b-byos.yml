@@ -1,0 +1,24 @@
+name: E2B subscription custody
+on:
+  push:
+    branches: ['codex/e2b-cloud-computer-172']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:byos
+      - run: pnpm --filter @mikka/protocol exec vitest run src/subscription.test.ts
+      - run: pnpm test:byos-worker
+        env:
+          MIKKA_BYOS_BACKEND_ONLY: '1'

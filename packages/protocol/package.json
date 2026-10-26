@@ -41,7 +41,8 @@
     "./members": "./src/members.ts",
     "./collab": "./src/collab.ts",
     "./coordinator": "./src/coordinator.ts",
-    "./computer": "./src/computer.ts"
+    "./computer": "./src/computer.ts",
+    "./subscription": "./src/subscription.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",

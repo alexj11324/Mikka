@@ -11,6 +11,8 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 const nextConfig = {
   outputFileTracingIncludes: {
     '/api/bots/*/computer/*': ['./scripts/e2b/start-desktop.sh', './scripts/e2b/viewer-gateway.py'],
+    '/api/subscriptions/**': ['./packages/subscription-worker/bin/mikka-subscription-worker', './packages/subscription-worker/bin/mikka-subscription-enrollment'],
+    '/api/cron/subscriptions': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
   },
   turbopack: {
     resolveAlias: {
