@@ -171,3 +171,107 @@ test('long issuer lifetime cannot survive elapsed expiry or unsafe deadline arit
  const overflow=universalAuthTokenProvider({origin,credentials:()=>credentials,now:()=>Number.MAX_SAFE_INTEGER-10,fetch:async()=>token('overflow',600)})
  await rejected(overflow.getAccessToken())
 })
+
+test('non-2xx diagnostics use only fixed classifications and a hashed request identifier', async () => {
+  const cases = [
+    [401, 'UnauthorizedError', 'Invalid credentials', 'invalid_credentials'],
+    [401, 'UnauthorizedError', 'Access denied due to expired client secret', 'client_secret_expired'],
+    [401, 'UnauthorizedError', 'Access denied due to client secret usage limit reached', 'client_secret_usage_limit'],
+    [401, 'UnauthorizedError', 'This identity auth method is temporarily locked, please try again later', 'temporarily_locked'],
+    [403, 'ForbiddenRequestError', 'You are not allowed to access this resource from the current IP address', 'ip_denied'],
+  ] as const
+  for (const [status, error, message, reason] of cases) {
+    const observed: unknown[] = []
+    const p = universalAuthTokenProvider({ origin, credentials: () => credentials,
+      fetch: async () => Response.json({ statusCode: status, error, message, reqId: 'req-abc123', unexpected: credentials }, { status }),
+      onFailure: value => observed.push(value),
+    })
+    await rejected(p.getAccessToken())
+    const value = observed[0] as Record<string, unknown>
+    assert.deepEqual(Object.keys(value).sort(), ['kind', 'reason', 'requestIdHash', 'status'])
+    assert.equal(value.reason, reason); assert.match(String(value.requestIdHash), /^[a-f0-9]{64}$/)
+    for (const forbidden of [message, 'req-abc123', credentials.clientId, credentials.clientSecret, 'unexpected']) assert(!JSON.stringify(observed).includes(forbidden))
+  }
+})
+
+test('unknown, malicious and overlong upstream payloads cannot become diagnostic text', async () => {
+  const cases = [
+    Response.json({ statusCode: 401, error: 'UnauthorizedError', message: `Invalid credentials ${credentials.clientSecret}`, reqId: 'req-a\nInjected' }, { status: 401 }),
+    Response.json({ statusCode: 401, error: 'UnauthorizedError', message: 'x'.repeat(5000), reqId: 'req-a' }, { status: 401 }),
+    Response.json({ statusCode: 403, error: 'UnauthorizedError', message: 'Invalid credentials', reqId: 'req-a' }, { status: 401 }),
+    Response.json({ statusCode: 401, error: 'UnknownError', message: credentials.clientSecret, reqId: credentials.clientSecret }, { status: 401 }),
+    new Response(`<html>${credentials.clientSecret}</html>`, { status: 401, headers: { 'content-type': 'text/html' } }),
+    new Response('{invalid', { status: 401, headers: { 'content-type': 'application/json' } }),
+    Response.json(null, { status: 401 }), Response.json([], { status: 401 }),
+    new Response('{}', { status: 401, headers: { 'content-type': 'application/json', 'content-length': '999999' } }),
+  ]
+  for (const response of cases) {
+    const observed: unknown[] = []
+    const p = universalAuthTokenProvider({ origin, credentials: () => credentials, fetch: async () => response, onFailure: value => observed.push(value) })
+    await rejected(p.getAccessToken()); assert.deepEqual(observed, [{ kind: 'http', status: 401, reason: 'unknown' }])
+  }
+})
+
+test('request ID length, syntax and credential collisions are rejected without exposing any original field', async () => {
+  for (const reqId of ['req-' + 'x'.repeat(100), 'https://private.invalid/token', 'req-a\r\nsecret', credentials.clientSecret, 'req-secret']) {
+    const observed: unknown[] = []
+    const current = { ...credentials, clientSecret: 'req-secret' }
+    const p = universalAuthTokenProvider({ origin, credentials: () => current,
+      fetch: async () => Response.json({ statusCode: 401, error: 'UnauthorizedError', message: 'Invalid credentials', reqId }, { status: 401 }),
+      onFailure: value => observed.push(value),
+    })
+    await rejected(p.getAccessToken()); assert.deepEqual(observed, [{ kind: 'http', status: 401, reason: 'invalid_credentials' }])
+  }
+})
+
+test('hostile streams are bounded and 401 remains latched without retry or secret-bearing errors', async () => {
+  for (const mode of ['never', 'many', 'large', 'error'] as const) {
+    let canceled = false, calls = 0, time = 0
+    const observed: unknown[] = []
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (mode === 'many') controller.enqueue(new Uint8Array())
+        if (mode === 'large') controller.enqueue(new Uint8Array(4097))
+        if (mode === 'error') controller.error(new Error(credentials.clientSecret))
+      },
+      cancel() { canceled = true },
+    })
+    const p = universalAuthTokenProvider({ origin, credentials: () => credentials, now: () => time,
+      fetch: async () => { calls++; return new Response(stream, { status: 401, headers: { 'content-type': 'application/json' } }) },
+      onFailure: value => { observed.push(value); throw new Error(credentials.clientSecret) },
+    })
+    const started = performance.now()
+    await Promise.all(Array.from({ length: 5 }, () => rejected(p.getAccessToken())))
+    time += 999999; await rejected(p.getAccessToken())
+    assert.equal(calls, 1); assert(performance.now() - started < 1500)
+    assert.deepEqual(observed, [{ kind: 'http', status: 401, reason: 'unknown' }])
+    if (mode !== 'error') assert(canceled)
+  }
+})
+
+test('real loopback login denial produces fixed classification, hashed ID and exactly one request', async () => {
+  let calls = 0
+  const observed: unknown[] = []
+  const server = createServer(async (req, res) => {
+    calls++; assert.equal(req.method, 'POST'); assert.equal(req.url, '/api/v1/auth/universal-auth/login')
+    assert.equal(req.headers['content-type'], 'application/json')
+    let body = ''; for await (const chunk of req) body += chunk
+    assert.deepEqual(JSON.parse(body), credentials)
+    res.writeHead(401, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ statusCode: 401, error: 'UnauthorizedError', message: 'Access denied due to expired client secret', reqId: 'req-loopback', private: credentials.clientSecret }))
+  })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  const address = server.address(); assert(address && typeof address !== 'string')
+  try {
+    const p = universalAuthTokenProvider({ origin, credentials: () => credentials,
+      fetch: (input, init) => { const url = new URL(String(input)); assert.equal(url.origin, origin); return fetch(`http://127.0.0.1:${address.port}${url.pathname}`, init) },
+      onFailure: value => observed.push(value),
+    })
+    await rejected(p.getAccessToken()); await rejected(p.getAccessToken())
+    assert.equal(calls, 1)
+    const diagnostic = observed[0] as Record<string, unknown>
+    assert.equal(diagnostic.reason, 'client_secret_expired')
+    assert.match(String(diagnostic.requestIdHash), /^[a-f0-9]{64}$/)
+    assert(!JSON.stringify(observed).includes('req-loopback')); assert(!JSON.stringify(observed).includes(credentials.clientSecret))
+  } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())) }
+})
