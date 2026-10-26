@@ -113,6 +113,7 @@
     "myTasks": "My tasks",
     "agent": "Agent",
     "coordinator": "Coordinator",
+    "coordinatorWorking": "Coordinator, working",
     "yourTeams": "Your teams",
     "home": "Home",
     "tasks": "Tasks",
@@ -320,6 +321,7 @@
       "searchAria": "Search related tasks",
       "loadFailed": "Could not load tasks",
       "noTasks": "No other tasks from this owner are available.",
+      "noMatch": "No matching tasks",
       "noTasksSameOwner": "Tasks owned by someone else cannot be linked here.",
       "loading": "Loading tasks…",
       "group": "Available tasks",
@@ -1270,8 +1272,7 @@
     "savingProperties": "Saving properties…",
     "noMatchTitle": "No matching projects",
     "noMatchDescription": "Try another name or status.",
-    "emptyTitle": "Organize work around goals",
-    "emptyDescription": "Create a project, link tasks, and track delivery progress.",
+    "emptyTitle": "No projects yet",
     "columns": {
       "name": "Name",
       "health": "Health",
@@ -1632,7 +1633,7 @@
     }
   },
   "TelegramBot": {
-    "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nSend details, then /confirm to create it in Backlog\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
+    "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
     "connect": "Connect Telegram from Mikka Settings → Integrations, then open the link here.",
     "alreadyConnected": "Your Telegram account is already connected. Send /help for commands.",
     "paired": "Telegram is connected to Mikka. Send /help to see commands.",
@@ -1661,6 +1662,11 @@
     "detailsAdded": "Details added. Send more, or use /confirm to create the Backlog task.",
     "linkedChat": "This chat is linked to a task. Use /status, /unlink, or /new <title>.",
     "startDraftMessage": "Start a task draft with /new <title>. Send details, then /confirm.",
+    "coordinatorQueued": "Sent to the Orchestrator. I’ll reply here when it answers.",
+    "coordinatorUnavailable": "The Orchestrator is not available right now. Try again shortly.",
+    "coordinatorMessageRequired": "Send a text message to the Orchestrator.",
+    "coordinatorMessageTooLong": "That message is too long. Shorten it and try again.",
+    "messageUnavailable": "I couldn’t read that Telegram message. Please send it again.",
     "status": {
       "backlog": "Backlog",
       "todo": "Todo",
@@ -1980,7 +1986,6 @@
   "Coordinator": {
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
-    "emptyTitle": "Talk to your Coordinator",
     "usedTools": "Used {tools}",
     "pendingActions": {
       "label": "Waiting for your approval",
@@ -2118,6 +2123,10 @@
     "organizingResponseContent": "Organizing response content",
     "preparingAResponse": "Preparing a response",
     "waitingForAResponse": "Waiting for a response",
+    "agentStatusThinking": "Thinking…",
+    "agentStatusSearching": "Searching…",
+    "agentStatusReading": "Reading the page…",
+    "agentStatusWorking": "Using a tool…",
     "requestFailedPleaseTryAgain": "Request failed. Please try again.",
     "yourInputHasBeenPreserved": "Your input has been preserved.",
     "retryThisResponse": "Retry this response",
@@ -2309,7 +2318,6 @@
     }
   },
   "Shell": {
-    "pinned": "Pinned",
     "searchPlaceholder": "Search conversations, tasks, agents, knowledge",
     "searchLabel": "Search everything",
     "searchDescription": "Search conversations, tasks and projects. Use the arrow keys to choose and Enter to open.",
@@ -2329,8 +2337,6 @@
     "attach": "Add file",
     "attachUnsupported": "Only text files up to {max} characters can be attached",
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
-    "whoIsWorking": "Who's working",
-    "agentsWorking": "{count, plural, one {# agent is} other {# agents are}} on tasks",
     "panel": {
       "label": "Right panel",
       "tabs": "Right panel content",
@@ -2348,7 +2354,7 @@
     "details": {
       "conversation": "This conversation",
       "kind": "Type",
-      "coordinatorKind": "Coordinator · pinned",
+      "coordinatorKind": "Coordinator",
       "agentKind": "Agent conversation",
       "updated": "Last activity",
       "none": "No messages yet"
@@ -2361,8 +2367,8 @@
       "briefing": "{count, plural, one {# new message is} other {# new messages are}} worth a look, starting with",
       "noneToday": "No new suggestions today.",
       "routine": "Routine",
-      "emptyTitle": "Nothing here",
-      "emptyDescription": "Check back later",
+      "empty": "Nothing to read right now",
+      "connect": "Connect apps",
       "refresh": "Refresh suggestions",
       "loadError": "Suggestions failed to load.",
       "action": {
@@ -2380,13 +2386,13 @@
       }
     },
     "tasks": {
-      "mine": "My tasks",
+      "mine": "Tasks",
       "waiting": "Waiting on you",
       "running": "Running",
       "failed": "Failed",
       "doneToday": "Done",
       "today": "today {count}",
-      "empty": "No tasks handed to an agent yet.",
+      "empty": "No tasks yet",
       "status": {
         "waiting_input": "needs your reply",
         "queued": "queued",
@@ -2398,7 +2404,9 @@
       }
     },
     "empty": {
-      "nothing": "Nothing here",
+      "browser": "No web pages opened yet",
+      "knowledge": "No documents yet",
+      "schedules": "No scheduled tasks yet",
       "arrange": "Let an agent set it up",
       "knowledgePrompt": "Help me put the documents I use often into the knowledge base: ",
       "schedulesPrompt": "Help me set up a scheduled task: "
@@ -2445,6 +2453,8 @@
       "property": { "identifier": "ID", "priority": "Priority", "assignee": "Assignee", "labels": "Labels", "pullRequests": "PR", "subtasks": "Subtasks", "agentState": "Agent state", "project": "Project", "dueDate": "Due date", "createdAt": "Created" },
       "hiddenColumns": "Hidden columns",
       "hiddenLane": "Hidden",
+      "expandColumn": "Expand the {status} column",
+      "foldColumn": "Fold to a strip",
       "hideColumn": "Hide column",
       "hideColumnNamed": "Hide {status} column",
       "showColumn": "Show {status} column",

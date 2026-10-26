@@ -7,7 +7,8 @@ import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db } from '@/lib/db'
-import { agentRuns, agents, deviceRepos, devices, issueMembers, issues } from '@/lib/db/schema'
+import { webSearch } from '@/lib/search'
+import { agentRuns, agents, deviceRepos, devices, issueMembers, issues, telegramLinks } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
@@ -15,6 +16,8 @@ import { proposeAction } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
+import type { TelegramReplyTarget } from '@/lib/coordinator-events'
+import { postTelegramText } from '@/lib/telegram/client'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -49,6 +52,17 @@ export async function failTurn(userId: string, holder: string, error: string) {
 export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null) {
   'use step'
   await store.appendMessages(userId, holder, messages, warning)
+}
+
+export async function sendTelegramReply(userId: string, targets: TelegramReplyTarget[], text: string) {
+  'use step'
+  // shortcut: Telegram sends have no idempotency key; add delivery receipts if duplicate replies appear.
+  const destinations = [...new Map(targets.map(target => [JSON.stringify(target), target])).values()]
+  for (const target of destinations) {
+    const [link] = await db.select({ userId: telegramLinks.userId }).from(telegramLinks)
+      .where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.telegramUserId, target.telegramUserId))).limit(1)
+    if (link) await postTelegramText(target.threadId, text)
+  }
 }
 
 /**
@@ -173,4 +187,10 @@ export async function sendToRun(userId: string, input: { runId: string; text: st
 export async function stopRun(userId: string, input: { runId: string }) {
   'use step'
   return asToolResult(async () => { await requestRunStop(userId, input.runId); return { stopRequested: true } })
+}
+
+/** Web search through the shared SearchProvider (MIK-5); degrades to searchUnavailable on 429/5xx/timeout. */
+export async function webSearchStep(userId: string, input: { query: string; limit?: number }) {
+  'use step'
+  return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
 }

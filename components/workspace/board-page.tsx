@@ -225,7 +225,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
         </div>
       </div>
       {view === 'board'
-        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} context={{ properties: new Set(display.properties), agentStates, subtasks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { setSidebar(true); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
+        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} narrow={sidebar ? ['done'] : undefined} context={{ properties: new Set(display.properties), agentStates, subtasks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { setSidebar(true); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
         : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
     {sidebar && <aside aria-label={tNav('coordinator')} className="relative hidden w-90 shrink-0 flex-col border-l lg:flex">

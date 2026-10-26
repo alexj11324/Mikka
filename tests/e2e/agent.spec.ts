@@ -44,7 +44,8 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(panel.locator('[data-slot="frame"]')).toHaveCount(0)
   await expect(panel.locator('form')).toBeVisible()
   await expect(panel.getByText('今天想完成什么？', { exact: true })).toHaveCount(0)
-  await expect(panel.getByRole('region', { name: '推荐建议' })).toBeVisible()
+  // No starter cards (R-12) and no model picker (R-11).
+  await expect(panel.getByRole('region', { name: '推荐建议' })).toHaveCount(0)
   await expect(panel.locator('[data-slot="message-scroller"]')).toHaveCount(0)
   await expect(page.locator('main')).toHaveCount(1)
   await expect(panel.locator('header')).toHaveCount(1)
@@ -54,9 +55,6 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   const send = panel.getByRole('button', { name: '发送消息' })
   await expect(send).toBeDisabled()
 
-  await panel.getByRole('button', { name: '拆解项目计划 把想法拆成清晰的阶段和可执行任务', exact: true }).click()
-  await expect(input).toHaveValue('帮我把一个新项目拆解成清晰的阶段、交付物和可执行任务。')
-  await expect(input).toBeFocused()
   await panel.getByRole('button', { name: '添加到提问', exact: true }).click()
   await page.getByRole('dialog', { name: '添加到提问', exact: true }).getByRole('button', { name: '拆解项目计划', exact: true }).click()
   await expect(input).toHaveValue('帮我把一个新项目拆解成清晰的阶段、交付物和可执行任务。')
@@ -95,7 +93,8 @@ test('Agent 直接组合 OpenUI 组件，不嵌入外部网页且保留工作区
   await expect(input).toHaveValue('')
   await expect(send).toBeDisabled()
   await expect(panel.getByRole('article', { name: 'Agent 回复', exact: true })).toHaveCount(0)
-  await expect(panel.getByRole('region', { name: '推荐建议' })).toBeVisible()
+  // No starter cards (R-12) and no model picker (R-11).
+  await expect(panel.getByRole('region', { name: '推荐建议' })).toHaveCount(0)
 
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(input).toBeVisible()
