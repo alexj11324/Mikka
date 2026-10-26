@@ -1,6 +1,6 @@
 # #131 independent title read contract
 
-Integration base: main 975ee7a7 (#311 thread owner-only included) (normal merge, preserving the complete latest tree). The current GlobalSearch filters supplied recent arrays;
+Integration base: main 2cfbd5ad (#311, #314 and #315 included) (normal merge, preserving the complete latest tree). The current GlobalSearch filters supplied recent arrays;
 this candidate supplies reads for a later frontend integration. Main now includes #307 code-only builds/legacy generation retirement and #306/#309
 avatar/auth behavior. All of those changes are retained without replacing their files. No layout changes.
 No Bot/harness tool registration, Agent generation/list product or knowledge store
@@ -129,12 +129,14 @@ LegacyChatRequest for the read-only archive. `?section=agent` alone opens a rece
 archive: the page does not currently parse a sessionId deep-link parameter.
 Do not invent `/agent/<id>` or claim a direct deep link is implemented.
 
-Known display gap for Claude: the detail GET still returns only the recent 100
-`sessions`; LegacyChatArchive looks up the selected title there. A result older
-than that list can display the generic archive heading despite its correct body.
-Keep `hit.title` with the selection and coordinate its archive-header presentation
-(or a separately reviewed selected-session metadata contract) during frontend
-integration. No archive layout/renderer or shared history helper is changed here.
+The owner-scoped detail GET now also returns `selectedSession: { id, title } | null`
+from the selected session row, independent of its recent-100 `sessions` list. The
+new type marks it optional during mixed-version rollout; on this candidate the key
+is always present and is null for fresh/no-selection. This lets a client recover
+an older title after refresh without saving the search hit. Existing archive UI
+still looks only in `sessions`, so Claude must wire `selectedSession.title` (or
+retain the already-authorized hit title) into its presentation. No layout or
+renderer is changed. Foreign IDs still return the same 404 as missing IDs.
 Current client-only GlobalSearch still cannot select older server hits until
 Claude wires this API; existing browser cases establish the recent archive path.
 
@@ -167,3 +169,20 @@ DELETE. The entire normal browser gate is rerun on the new exact SHA as well.
 A task search hit is still metadata authority, never thread content or private-DM
 permission. Do not widen #311 or change Auth's task visibility policy to compose
 these interfaces. No frontend layout, Auth/R0 helper or S runtime change is made.
+
+
+## Latest-main integration
+
+Main 2cfbd5ad873eec99b7b6b24a845ed76a904d9150 is merged normally, retaining
+#311 owner-only threads and the complete #314/#315 native Coordinator, schema
+and R0 changes. Relative to main, the history-store change projects only id/title
+from the already owner-filtered selected row and adds it to the GET result. The
+existing recent list, turns, error behavior and generation retirement remain.
+No SQL migration, frontend layout or Coordinator runtime is changed. Existing
+CI on 5549e66 was against older main and is not evidence for this candidate.
+
+The dual-PG HTTP regression verifies a title older than 100 recent sessions appears
+in `selectedSession` as well as search, while the recent list still omits it; a
+foreign history owner sees their own selected title, and other users receive 404.
+Claude must use this field or the search hit when wiring the archive heading; no
+claim of frontend integration, deployment or real-user acceptance is made.

@@ -90,7 +90,7 @@ const secret = process.env.BETTER_AUTH_SECRET
 if (!secret) throw new Error('Synthetic auth secret required')
 const cookie = `better-auth.session_token=${encodeURIComponent(`${token}.${createHmac('sha256', secret).update(token).digest('base64')}`)}`
 const prefix = `title-${randomUUID()}`
-const archivedId = randomUUID(), foreignToken = randomUUID()
+const archivedId = randomUUID(), emptyArchiveId = randomUUID(), foreignToken = randomUUID()
 const foreignCookie = `better-auth.session_token=${encodeURIComponent(`${foreignToken}.${createHmac('sha256', secret).update(foreignToken).digest('base64')}`)}`
 const boundary = { issue: randomUUID(), run: randomUUID(), agent: randomUUID(), history: randomUUID(), dm: randomUUID() }
 const execute = promisify(execFile)
@@ -121,6 +121,7 @@ test.beforeAll(async () => {
   }
   await pool.query('insert into agent_sessions (id,"userId",title,"updatedAt") values ($1,$2,$3,\'1999-01-01T00:00:00Z\')', [archivedId, owner, `${prefix}-archive-locator`])
   await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,\'synthetic archived question\',$4,\'complete\',$5)', [randomUUID(), archivedId, owner, archivedCompletion, randomUUID()])
+  await pool.query('insert into agent_sessions (id,"userId",title,"updatedAt") values ($1,$2,$3,\'1998-01-01T00:00:00Z\')', [emptyArchiveId, owner, `${prefix}-empty-archive`])
   // A searchable task never grants its owner access to a colleague's private thread/history/DM.
   const boundaryTeam = randomUUID()
   await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",email,name,role,status) values ($1,$2,$3,$2,\'member\',\'active\')', [workspace, outsider, `${outsider}@example.invalid`])
@@ -242,10 +243,19 @@ test('retired archive title hit locates owner history beyond the latest 100 with
   expect(archive.headers()['cache-control']).toBe('private, no-store')
   const saved = await archive.json()
   expect(saved.sessionId).toBe(archivedId)
+  expect(saved.selectedSession).toEqual({ id: archivedId, title: `${prefix}-archive-locator` })
   expect(saved.turns[0].completion).toBe(archivedCompletion)
   expect(saved.sessions).toHaveLength(100)
   expect(saved.sessions.some((row: { id: string }) => row.id === archivedId)).toBe(false)
-  // The recent-list title cap is a consumer limitation; do not fake an old-ID title here.
+  const empty = await request.get(`http://127.0.0.1:3210/mikka/api/agent/sessions?sessionId=${emptyArchiveId}`, { headers: { cookie } })
+  expect(empty.status()).toBe(200)
+  const emptyBody = await empty.json()
+  expect(emptyBody.selectedSession).toEqual({ id: emptyArchiveId, title: `${prefix}-empty-archive` })
+  expect(emptyBody.turns).toEqual([])
+  const fresh = await request.get('http://127.0.0.1:3210/mikka/api/agent/sessions?new=1', { headers: { cookie } })
+  expect(fresh.status()).toBe(200)
+  expect((await fresh.json()).selectedSession).toBeNull()
+  // The selected title comes from the owner-scoped row, not the recent-list window.
   const foreign = await request.get(endpoint, { headers: { cookie: foreignCookie } })
   const missing = await request.get(`http://127.0.0.1:3210/mikka/api/agent/sessions?sessionId=${randomUUID()}`, { headers: { cookie: foreignCookie } })
   expect(foreign.status()).toBe(404)
@@ -278,7 +288,9 @@ test('searchable task grants no colleague thread content, old history or private
   expect(await deniedArchive.text()).not.toContain('BOUNDARY_PRIVATE_')
   const ownedArchive = await request.get(archive, { headers: { cookie: foreignCookie } })
   expect(ownedArchive.status()).toBe(200)
-  expect((await ownedArchive.json()).turns[0].completion).toBe('BOUNDARY_PRIVATE_ARCHIVE')
+  const foreignOwned = await ownedArchive.json()
+  expect(foreignOwned.selectedSession).toEqual({ id: boundary.history, title: input.q })
+  expect(foreignOwned.turns[0].completion).toBe('BOUNDARY_PRIVATE_ARCHIVE')
   const dm = await request.get(`http://127.0.0.1:3210/mikka/api/conversations/${boundary.dm}/messages`, { headers: { cookie } })
   expect(dm.status()).toBe(404)
   expect(await dm.text()).not.toContain('BOUNDARY_PRIVATE_')
