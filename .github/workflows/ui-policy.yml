@@ -95,8 +95,11 @@ jobs:
       - run: pnpm test:auth-composio
       - run: pnpm test:groups
       - run: pnpm test:integrations
+      - run: pnpm test:telegram
       - run: pnpm test:agent
       - run: pnpm test:acceptance
+      - run: pnpm test:suggestions
+      - run: pnpm test:db-runner
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:issues
@@ -151,6 +154,8 @@ jobs:
           --health-retries 10
     env:
       CI: 'true'
+      REQUIRE_DB: '1'
+      MIKKA_TEST_DB_PORT: '5432'
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
@@ -168,6 +173,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Generate ephemeral test-only auth secret
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+      - name: Historical imports fresh install and current-main dual DB upgrade
+        run: pnpm test:historical-upgrade-db
+        env:
+          HISTORY_PG_CONTAINER: ${{ job.services.postgres.id }}
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
@@ -180,8 +189,6 @@ jobs:
         run: pnpm test:factory
         env:
           FACTORY_MONITOR_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
-      - name: Group conversation API and migrations (temporary Postgres 17 only)
-        run: pnpm test:groups
       - run: pnpm test:e2e:setup
       - name: Credential broker integration (isolated temporary Postgres databases)
         run: pnpm test:credentials
@@ -189,16 +196,11 @@ jobs:
           CREDENTIAL_TEST_ADMIN_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/postgres
       - name: Team task and run visibility (temporary Postgres 17 only)
         run: REQUIRE_DB=1 pnpm test:visibility-db
-      - name: Actor history writers and idempotent migration (temporary Postgres 17 only)
-        run: pnpm test:activity-actor-db
-        env:
-          REQUIRE_DB: '1'
       - name: Issue search and indexed pagination (temporary Postgres 17 only)
         run: REQUIRE_DB=1 pnpm test:issue-search-db
-      - name: Verify legacy workspace migration and idempotency
-        run: node --test tests/workspace-migration.test.mjs
-      - name: Relation action cycle guards (ephemeral Postgres only)
-        run: pnpm test:relation-cycle
+      - name: Required DB suites (temporary Postgres 17, no skips)
+        run: pnpm test:db
         env:
           REQUIRE_DB: '1'
+          DB_TEST_EXPECTED: test:activity-actor-db,test:groups,test:relation-cycle,test:workspace-migration-db
       - run: pnpm build

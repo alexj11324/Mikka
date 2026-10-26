@@ -11,7 +11,7 @@ import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db } from '@/lib/db'
-import { agents, coordinatorEvents, deviceRepos, devices, factoryAttempts, factoryTasks, issueMembers, issues } from '@/lib/db/schema'
+import { agents, coordinatorEvents, deviceRepos, devices, factoryAttempts, factoryTasks, issueMembers, issues, telegramLinks } from '@/lib/db/schema'
 import { webSearch } from '@/lib/search'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
@@ -31,6 +31,8 @@ import { improvementStore, skillAssignments, improvementFactory } from '@/lib/se
 import { ImprovementError, type Feedback, type ImprovementHandoff, type ImprovementRehearsal } from '@/lib/self-improvement/contract'
 import { executeSystemCredentialTool } from '@/lib/credentials/runtime'
 import type { CredentialToolName } from '@/lib/credentials/execution-tools'
+import type { TelegramReplyTarget } from '@/lib/coordinator-events'
+import { postTelegramText } from '@/lib/telegram/client'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -70,6 +72,29 @@ export async function failTurn(userId: string, holder: string, error: string) {
 export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, actionContext?: ActionContext) {
   'use step'
   await store.appendMessages(userId, holder, messages, warning, actionContext)
+}
+
+/** Linked, de-duplicated Telegram threads that should get this reply. */
+export async function telegramReplyThreads(userId: string, targets: TelegramReplyTarget[]): Promise<string[]> {
+  'use step'
+  const destinations = [...new Map(targets.map(target => [JSON.stringify(target), target])).values()]
+  const threads: string[] = []
+  for (const target of destinations) {
+    const [link] = await db.select({ userId: telegramLinks.userId }).from(telegramLinks)
+      .where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.telegramUserId, target.telegramUserId))).limit(1)
+    if (link && !threads.includes(target.threadId)) threads.push(target.threadId)
+  }
+  return threads
+}
+
+/**
+ * Sends one chunk to one thread. Each chunk is its own durable step, so a
+ * retry after a failed chunk resends only that chunk, never the ones already
+ * delivered (Telegram sends have no idempotency key).
+ */
+export async function sendTelegramChunk(threadId: string, chunk: string) {
+  'use step'
+  await postTelegramText(threadId, chunk)
 }
 
 /**

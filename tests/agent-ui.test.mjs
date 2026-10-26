@@ -139,7 +139,8 @@ test('图片复用正文入口并共享 SWR 预加载，回复缩略图不懒加
   assert.match(image, /const image = previewImage \?\? data\?\.image/)
   assert.match(image, /ImageViewerThumbnail loading="eager"/)
   assert.match(panel, /observeAgentImages\(preloadAgentImage\)/)
-  assert.match(panel, /fetch: fetchAgentWithImages/)
+  assert.match(panel, /fetch: fetchAgent,/)
+  assert.match(panel, /observeAgentImages\(preloadAgentImage\)/)
 })
 
 test('资料配图和详细回答规则进入模型规范', async () => {

@@ -36,6 +36,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Historical imports fresh install and current-main dual DB upgrade
+        run: REQUIRE_DB=1 pnpm test:historical-upgrade-db
+        env:
+          HISTORY_PG_CONTAINER: ${{ job.services.postgres.id }}
       - name: Ephemeral isolated session key
         run: |
           node --input-type=module <<'JS'
@@ -93,6 +97,7 @@ jobs:
         with:
           name: metadata-visibility-sanitized-evidence
           path: |
+            test-results/history-upgrade/**/evidence.json
             test-results/data/http-evidence.json
             test-results/visibility/http-evidence.json
             test-results/visibility/assignment-evidence.json

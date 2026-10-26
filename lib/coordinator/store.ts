@@ -7,6 +7,7 @@ import type { ActionContext, ActionBatch } from '../operations/action-intents'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
 import { coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, type CoordinatorEventTier } from '@/lib/db/schema'
+import { telegramReplyTargets, type TelegramReplyTarget } from '@/lib/coordinator-events'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
@@ -47,7 +48,7 @@ export async function hasWakingEvents(userId: string): Promise<boolean> {
  * but do not count: with nothing else waiting, nothing moves. `held` is false
  * when another turn holds the lease; that turn will pick the events up.
  */
-export async function takeInbox(userId: string, holder: string): Promise<{ held: boolean; added: number; actionContext?: ActionContext }> {
+export async function takeInbox(userId: string, holder: string): Promise<{ held: boolean; added: number; actionContext?: ActionContext; telegramTargets: TelegramReplyTarget[] }> {
   return db.transaction(async tx => {
     const now = new Date()
     await tx.insert(coordinatorSessions).values({ userId }).onConflictDoNothing()
@@ -55,16 +56,16 @@ export async function takeInbox(userId: string, holder: string): Promise<{ held:
       .set({ leaseHolder: holder, leaseUntil: new Date(now.getTime() + LEASE_MS), updatedAt: now })
       .where(and(eq(coordinatorSessions.userId, userId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
       .returning({ userId: coordinatorSessions.userId })
-    if (!taken) return { held: false, added: 0 }
+    if (!taken) return { held: false, added: 0, telegramTargets: [] }
     const due = await tx.select().from(coordinatorEvents).where(waking(userId))
       .orderBy(asc(coordinatorEvents.sequence)).limit(1)
-    if (!due.length) return { held: true, added: 0 }
+    if (!due.length) return { held: true, added: 0, telegramTargets: [] }
     const backgroundLimit = INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
       .orderBy(asc(coordinatorEvents.sequence)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
-    if (!events.length) return { held: true, added: 0 }
+    if (!events.length) return { held: true, added: 0, telegramTargets: [] }
     const source = due[0]
     const actionContext = source.kind === 'user_message' ? { sourceEventId: source.id, holder } : undefined
     if (actionContext && (!source.accountActionBatch || !source.accountActionBatch.batches.length)) {
@@ -77,7 +78,7 @@ export async function takeInbox(userId: string, holder: string): Promise<{ held:
       message: { role: 'user', content: eventPrompt(event) } satisfies ModelMessage,
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
-    return { held: true, added: events.length, actionContext }
+    return { held: true, added: events.length, actionContext, telegramTargets: telegramReplyTargets(events) }
   })
 }
 

@@ -9,6 +9,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
 import { orderMigrations } from './migration-order.mjs'
+import { historicalImports } from './historical-migrations.mjs'
 import { configureMigrationSession } from './migration-session.mjs'
 
 const shouldRun = process.env.MIGRATE !== '0' && (process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production')
@@ -28,11 +29,14 @@ const dir = new URL('../drizzle/', import.meta.url)
 const sqlFiles = readdirSync(dir).filter((name) => name.endsWith('.sql'))
 const unknown = sqlFiles.filter((name) => !/^(\d{4}|\d{14})_.+\.sql$/.test(name))
 if (unknown.length) throw new Error(`migrate: 无法识别的迁移文件名：${unknown.join(', ')}`)
+// Fail before opening either DB, including when imported files are already in main.
+const contents = new Map(sqlFiles.map(name => [name, readFileSync(new URL(name, dir))]))
+historicalImports([...contents].map(([name, content]) => ({ name, content })))
 const files = orderMigrations(sqlFiles)
 
 const byTarget = new Map()
 for (const name of files) {
-  const sql = readFileSync(new URL(name, dir), 'utf8')
+  const sql = contents.get(name).toString('utf8')
   const target = /^--\s*target:\s*(\w+)/m.exec(sql)?.[1] ?? 'MIKKA_DATABASE_URL'
   if (!(target in targets)) throw new Error(`migrate: ${name} names unknown target ${target}`)
   if (!byTarget.has(target)) byTarget.set(target, [])

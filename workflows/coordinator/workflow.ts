@@ -12,6 +12,7 @@ import {
   questionEscalationSchema,
 } from '@/lib/factory/questions/contract'
 import type { ActionContext } from '@/lib/operations/action-intents'
+import { splitTelegramText } from '@/lib/telegram/messages'
 import * as steps from './steps'
 import { commandSchema } from '@/lib/self-improvement/contract'
 import { createCredentialAITools } from '@/lib/credentials/ai-tools'
@@ -45,6 +46,19 @@ export async function coordinatorTurn(userId: string) {
       // Every step's messages, not only the final step's: the tool calls and
       // results are history the next turn needs.
       await steps.appendMessages(userId, holder, [...recovered, ...result.responseMessages], turnWarning(result.finishReason, result.text), inbox.actionContext)
+      if (inbox.telegramTargets.length && result.text.trim()) {
+        // The reply is saved and shows on the web; a Telegram failure (a
+        // blocked bot, an outage) must not fail the turn and stall the inbox.
+        // A thread whose chunk fails gets no later chunks; other threads still do.
+        const threads = await steps.telegramReplyThreads(userId, inbox.telegramTargets)
+        for (const threadId of threads) {
+          try {
+            for (const chunk of splitTelegramText(result.text)) await steps.sendTelegramChunk(threadId, chunk)
+          } catch (error) {
+            console.error('Telegram reply failed', error instanceof Error ? error.message : String(error))
+          }
+        }
+      }
     } catch (error) {
       // The messages stay in the conversation; the next wake answers them.
       await steps.failTurn(userId, holder, error instanceof Error ? error.message : String(error),)

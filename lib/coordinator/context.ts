@@ -115,7 +115,7 @@ export function eventPrompt(event: {
         : null
   switch (event.kind) {
     case 'user_message':
-      return String(payload.text ?? '')
+      return [event.issueId ? 'This chat is linked to issue ' + event.issueId + '.' : null, String(payload.text ?? '')].filter(Boolean).join('\n\n')
     case 'run_finished':
       return [
         `[Event] Run ${event.runId} ended with status ${payload.status} (${payload.stopReason}).`,
