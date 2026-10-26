@@ -71,3 +71,13 @@ Questions waiting on Alex. Move a row to "Decided" when he answers.
 | --- | --- | --- |
 | 2026-10-24 | Remove white hairlines app-wide (dialog and popover rings, column borders), not only inputs? | Inputs only |
 | 2026-10-24 | Token drift between Figma and code (`rules.md` § Tokens): which side moves? | Code value ships, Figma follows |
+
+
+## 2026-10-25: Retire standalone Agent generation
+
+Alex clarified that the product chat entity is a Bot; the earlier standalone
+Agent chat runtime is retired. Remove its new-generation entrypoints and input
+behaviour. Preserve owner-scoped historical reads, shared Bot rendering/images,
+and Claude Code/Codex/Cursor task execution harnesses. Harness names describe
+execution layers, not extra user-facing Bots. This is a behavioural retirement,
+not a shell/layout redesign; source correction: Alex 2026-10-25 23:40 UTC.
