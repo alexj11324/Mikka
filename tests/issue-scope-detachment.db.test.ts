@@ -46,9 +46,11 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const { readRun, queueRun, visibleRuns } = await import('../lib/agent-runs')
   const { issueRunToken, verifyRunToken } = await import('../lib/mcp/worker')
   const { renewRunLeases } = await import('../lib/run-leases')
+  const { completeRunForDevice, dispatchCompletedIssue } = await import('../lib/run-completion')
   const { createAppIssueFromLinear, applyLinearIssueToApp, syncAppIssueToLinear } = await import('../lib/linear-sync/issue-sync')
   const { processLinearIssueOutbox, processLinearInboxDelivery } = await import('../lib/linear-sync/worker')
   const { hashDeviceToken } = await import('../lib/device-link')
+  const complete = await import('../app/v1/runs/[runId]/complete/route')
   const claim = await import('../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
   const { db } = await import('../lib/db')
   const { linearTeamSyncs, linearIssueLinks } = await import('../lib/db/schema')
@@ -253,6 +255,142 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal((await pool.query('select status from agent_runs where id=$1',[run])).rows[0].status,'cancelled')
       assert.equal((await pool.query('select count(*)::int n from issue_versions where "issueId"=$1',[id])).rows[0].n,1)
     } finally { await writer.query('rollback');writer.release();if(transition) await Promise.allSettled([transition]) }
+  })
+  await t.test('HTTP completion paused after live read cannot write or dispatch after an unlinked task becomes personal', async () => {
+    const localOwner=`complete-owner-${randomUUID()}`,id=randomUUID(),run=randomUUID()
+    fixtureIds.push(id)
+    await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Complete owner\',$2,true,now(),now())',[localOwner,`${localOwner}@example.invalid`])
+    await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Complete owner\',$3,\'member\',\'active\')',[workspace,localOwner,`${localOwner}@example.invalid`])
+    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Unlinked completion fixture\',$3,\'todo\',\'normal\',\'workspace\')',[id,localOwner,doc])
+    await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,localOwner])
+    await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId",status) values ($1,$2,$3,$4,$5,\'running\')',[run,member,id,agent,device])
+    const prepared=Promise.withResolvers<void>(),release=Promise.withResolvers<void>()
+    const server=createServer(async(incoming,outgoing)=>{
+      const chunks:Buffer[]=[];for await(const chunk of incoming) chunks.push(Buffer.from(chunk))
+      const body=Buffer.concat(chunks).toString()
+      const request=new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{authorization:incoming.headers.authorization??''},body})
+      request.json=async()=>{prepared.resolve();await release.promise;return JSON.parse(body)}
+      try {const response=await complete.POST(request,{params:Promise.resolve({runId:run})});outgoing.writeHead(response.status);outgoing.end(await response.text())}
+      catch {outgoing.writeHead(500);outgoing.end('Completion failed')}
+    })
+    await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve))
+    let responsePromise:Promise<Response>|undefined
+    try {
+      const origin=`http://127.0.0.1:${(server.address() as {port:number}).port}`
+      const report={summary:'Synthetic verified completion',filesChanged:[],verify:{status:'passed'},openQuestions:[],nextStep:null}
+      responsePromise=fetch(`${origin}/complete`,{method:'POST',headers:{authorization:`Bearer ${deviceToken}`,'content-type':'application/json'},body:JSON.stringify({stopReason:'submitted',report})})
+      await prepared.promise
+      const changed=await actAs(localOwner,()=>setIssueScope({id,revision:1,scope:'personal'}))
+      assert.ok('issue' in changed)
+      release.resolve()
+      assert.equal((await responsePromise).status,204)
+      const row=(await pool.query('select status,scope from issues where id=$1',[id])).rows[0]
+      assert.deepEqual(row,{status:'todo',scope:'personal'})
+      assert.equal((await pool.query('select status from agent_runs where id=$1',[run])).rows[0].status,'cancelled')
+      assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
+      assert.equal((await pool.query('select count(*)::int n from coordinator_events where "runId"=$1',[run])).rows[0].n,0)
+    } finally {release.resolve();if(responsePromise) await Promise.allSettled([responsePromise]);await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()))}
+  })
+  const passedReport={summary:'Synthetic completion',filesChanged:[],verify:{status:'passed' as const},openQuestions:[],nextStep:null}
+  async function completionFixture(issueOwner: string, actor: string, scope='workspace', kind='implement', withIssue=true) {
+    const id=randomUUID(),run=randomUUID()
+    if(withIssue) {
+      fixtureIds.push(id)
+      await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Completion fixture\',$3,\'todo\',\'normal\',$4)',[id,issueOwner,doc,scope])
+      await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,issueOwner])
+    }
+    await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId",status,kind) values ($1,$2,$3,$4,$5,\'running\',$6)',[run,actor,withIssue?id:null,actor===owner?ownerAgent:agent,actor===owner?ownerDevice:device,kind])
+    return {id,run,issueId:withIssue?id:null}
+  }
+  await t.test('completion and review commit before retirement; deferred dispatch is rejected after retirement and republishing', async()=>{
+    const fixture=await completionFixture(member,owner)
+    const locker=await pool.connect()
+    let finishing:ReturnType<typeof completeRunForDevice>|undefined,privatizing:ReturnType<typeof changeIssueScopeLocally>|undefined
+    try {
+      await locker.query('begin');await locker.query('select id from agent_runs where id=$1 for update',[fixture.run])
+      const lockerPid=(await locker.query('select pg_backend_pid() pid')).rows[0].pid
+      finishing=completeRunForDevice(owner,{id:fixture.run,issueId:fixture.id},{stopReason:'submitted',report:passedReport})
+      let completionPid:number|undefined
+      for(let n=0;n<200;n++) {
+        const waiting=await pool.query('select pid from pg_stat_activity where $1=any(pg_blocking_pids(pid))',[lockerPid])
+        if(waiting.rows[0]) {completionPid=waiting.rows[0].pid;break}
+        if(n===199) assert.fail('completion did not acquire the task before waiting for the run')
+      }
+      privatizing=changeIssueScopeLocally(member,{id:fixture.id,revision:1,scope:'personal'},{allowLinkedPersonal:false})
+      for(let n=0;n<200;n++) {
+        const waiting=await pool.query('select exists(select 1 from pg_stat_activity where $1=any(pg_blocking_pids(pid))) waiting',[completionPid])
+        if(waiting.rows[0].waiting) break
+        if(n===199) assert.fail('retirement did not wait for the completion transaction')
+      }
+      await locker.query('commit')
+      const completed=await finishing;assert.ok(completed)
+      assert.ok('issue' in await privatizing)
+      assert.equal((await pool.query('select status from agent_runs where id=$1',[fixture.run])).rows[0].status,'succeeded')
+      assert.deepEqual((await pool.query('select status,scope from issues where id=$1',[fixture.id])).rows[0],{status:'review',scope:'personal'})
+      let dispatched=0
+      assert.equal(await dispatchCompletedIssue(completed,()=>{dispatched++}),false)
+      assert.ok('issue' in await changeIssueScopeLocally(member,{id:fixture.id,revision:2,scope:'workspace'},{allowLinkedPersonal:false}))
+      await pool.query('update issues set status=\'doing\' where id=$1',[fixture.id])
+      assert.equal(await dispatchCompletedIssue(completed,()=>{dispatched++}),false)
+      assert.equal(dispatched,0)
+      assert.equal((await pool.query('select status from issues where id=$1',[fixture.id])).rows[0].status,'doing')
+    } finally {await locker.query('rollback');locker.release();await Promise.allSettled([finishing,privatizing].filter(Boolean))}
+  })
+  await t.test('completion preserves member, owner-personal, plan, not-run, failed-verify and null-task behavior with idempotent replay',async()=>{
+    for(const control of [
+      {issueOwner:owner,actor:member,scope:'workspace',kind:'implement',verify:'passed' as const,status:'succeeded',review:true,dispatch:1},
+      {issueOwner:owner,actor:member,scope:'workspace',kind:'implement',verify:'not_run' as const,status:'stopped',review:true,dispatch:1},
+      {issueOwner:owner,actor:member,scope:'workspace',kind:'plan',verify:'not_run' as const,status:'succeeded',review:true,dispatch:1},
+      {issueOwner:owner,actor:member,scope:'workspace',kind:'implement',verify:'failed' as const,status:'failed',review:false,dispatch:0},
+      {issueOwner:owner,actor:owner,scope:'personal',kind:'implement',verify:'passed' as const,status:'succeeded',review:true,dispatch:0},
+    ]) {
+      const fixture=await completionFixture(control.issueOwner,control.actor,control.scope,control.kind)
+      const token=(await issueRunToken({id:fixture.run,userId:control.actor})).token
+      const completed=await completeRunForDevice(control.actor,{id:fixture.run,issueId:fixture.id},{stopReason:'submitted',report:{...passedReport,verify:{status:control.verify}}})
+      assert.ok(completed)
+      let dispatched=0;await dispatchCompletedIssue(completed,()=>{dispatched++});assert.equal(dispatched,control.dispatch)
+      assert.equal((await pool.query('select status from agent_runs where id=$1',[fixture.run])).rows[0].status,control.status)
+      assert.equal((await pool.query('select status from issues where id=$1',[fixture.id])).rows[0].status,control.review?'review':'todo')
+      assert.equal(Boolean(await verifyRunToken(new Request('http://127.0.0.1/'),token)),false)
+      assert.equal(await completeRunForDevice(control.actor,{id:fixture.run,issueId:fixture.id},{stopReason:'error'}),null)
+      assert.equal((await pool.query('select count(*)::int n from coordinator_events where "runId"=$1',[fixture.run])).rows[0].n,1)
+      if(control.actor===member) assert.equal((await complete.POST(new Request('http://127.0.0.1/complete',{method:'POST',headers:{authorization:`Bearer ${deviceToken}`},body:'invalid-json'}),{params:Promise.resolve({runId:fixture.run})})).status,204)
+    }
+    const orphan=await completionFixture(owner,owner,'personal','implement',false)
+    const completed=await completeRunForDevice(owner,{id:orphan.run,issueId:null},{stopReason:'error'})
+    assert.ok(completed);assert.equal(completed.review,null)
+    assert.equal((await pool.query('select status from agent_runs where id=$1',[orphan.run])).rows[0].status,'failed')
+  })
+  await t.test('completion retries a real heartbeat lock-order deadlock and commits one event',async()=>{
+    const fixture=await completionFixture(owner,member),writer=await pool.connect()
+    let finishing:Promise<{result:Awaited<ReturnType<typeof completeRunForDevice>>;error:unknown}>|undefined
+    try {
+      await writer.query('begin');await writer.query("set local deadlock_timeout='5s'")
+      await writer.query('select id from agent_runs where id=$1 for update',[fixture.run])
+      const pid=(await writer.query('select pg_backend_pid() pid')).rows[0].pid
+      finishing=completeRunForDevice(member,{id:fixture.run,issueId:fixture.id},{stopReason:'submitted',report:passedReport}).then(result=>({result,error:null}),error=>({result:null,error}))
+      for(let n=0;n<200;n++) {
+        const waiting=await pool.query('select exists(select 1 from pg_stat_activity where $1=any(pg_blocking_pids(pid))) waiting',[pid])
+        if(waiting.rows[0].waiting) break
+        if(n===199) assert.fail('completion did not wait on the held heartbeat run')
+      }
+      await writer.query('update agent_runs set "updatedAt"=now() where id=$1',[fixture.run]);await writer.query('commit')
+      const outcome=await finishing
+      assert.equal(outcome.error,null)
+      assert.ok(outcome.result)
+      assert.equal((await pool.query('select status from issues where id=$1',[fixture.id])).rows[0].status,'review')
+      assert.equal((await pool.query('select count(*)::int n from coordinator_events where "runId"=$1',[fixture.run])).rows[0].n,1)
+    } finally {await writer.query('rollback');writer.release();if(finishing) await Promise.allSettled([finishing])}
+  })
+  await t.test('completion rolls back run, token, event and task together when persistence fails',async()=>{
+    const fixture=await completionFixture(owner,member)
+    const token=(await issueRunToken({id:fixture.run,userId:member})).token
+    await pool.query(`alter table coordinator_events add constraint completion_failure_${fixture.run.replaceAll('-','')} check ("runId" <> '${fixture.run}'::uuid)`)
+    await assert.rejects(completeRunForDevice(member,{id:fixture.run,issueId:fixture.id},{stopReason:'submitted',report:passedReport}))
+    assert.equal((await pool.query('select status from agent_runs where id=$1',[fixture.run])).rows[0].status,'running')
+    assert.equal((await pool.query('select status from issues where id=$1',[fixture.id])).rows[0].status,'todo')
+    assert.ok(await verifyRunToken(new Request('http://127.0.0.1/'),token))
+    assert.equal((await pool.query('select count(*)::int n from coordinator_events where "runId"=$1',[fixture.run])).rows[0].n,0)
   })
   assert.equal(rejectedExternalRequests,0,'no real provider request is permitted or required')
   await pool.query(await readFile(new URL('../drizzle/20261026025303_personal_scope_detachment.sql', import.meta.url), 'utf8'))
