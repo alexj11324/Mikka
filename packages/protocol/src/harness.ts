@@ -10,6 +10,8 @@ export type Harness = z.infer<typeof harnessSchema>
 export const harnessInfoSchema = z.object({
   harness: harnessSchema,
   installed: z.boolean(),
+  /** This daemon can host a Mikka personal Coordinator on this harness. */
+  coordinator: z.boolean().optional(),
   /** Version string reported by the CLI, null when not installed. */
   version: z.string().nullable(),
 })

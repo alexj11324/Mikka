@@ -13,7 +13,7 @@ import { coordinatorTurn } from '@/workflows/coordinator/workflow'
  * events still collect in the inbox and wait.
  */
 export function coordinatorEnabled(): boolean {
-  return process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY)
+  return process.env.MIKKA_NATIVE_COORDINATOR === '1' || process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY)
 }
 
 /** Asks the decision model whether an event needs the person. When it does not answer, the event gets its quiet tier. */

@@ -1,4 +1,5 @@
 import { issueVisibility } from '@/lib/issue-visibility'
+import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
 import { generateText, type ModelMessage } from 'ai'
 import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
@@ -101,34 +102,39 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
   return { instructions: instructionsWithMemory(COORDINATOR_INSTRUCTIONS, memory), messages: promptMessages(summary, messages) }
 }
 
-export async function remember(userId: string, input: { note: string }) {
+export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return store.editMemory(userId, memory => {
     const next = rememberNote(memory, input.note)
     return next === null ? { error: 'memoryFull: forget something first' } : { memory: next, result: { remembered: true } }
   })
 }
 
-export async function forget(userId: string, input: { text: string }) {
+export async function forget(userId: string, input: { text: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return store.editMemory(userId, memory => {
     const { memory: next, removed } = forgetNotes(memory, input.text)
     return { memory: next, result: { removed } }
   })
 }
 
-export async function composioAction(userId: string, action: ComposioActionName, input: unknown) {
+export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return runComposioAction(userId, action, input)
 }
 
-export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown) {
+export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return proposeAction(userId, action, input)
 }
 
-export async function listIssues(userId: string, input: { status?: string }) {
+export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and((await issueVisibility(userId)).predicate, input.status ? eq(issues.status, input.status) : undefined))
@@ -138,8 +144,9 @@ export async function listIssues(userId: string, input: { status?: string }) {
   }))
 }
 
-export async function getIssue(userId: string, input: { issueId: string }) {
+export async function getIssue(userId: string, input: { issueId: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const issue = await issueForUser(userId, input.issueId)
   if (!issue) return { error: 'issueNotFound' }
   const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
@@ -150,8 +157,9 @@ export async function getIssue(userId: string, input: { issueId: string }) {
   }
 }
 
-export async function listAgents(userId: string) {
+export async function listAgents(userId: string, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const rows = await db.select({ id: agents.id, name: agents.name, description: agents.description, harness: agents.harness, deviceId: agents.deviceId, deviceName: devices.name, enabled: devices.enabled, lastSeenAt: devices.lastSeenAt })
     .from(agents).leftJoin(devices, eq(devices.id, agents.deviceId)).where(eq(agents.userId, userId)).orderBy(asc(agents.name))
   const deviceIds = [...new Set(rows.map(row => row.deviceId).filter((id): id is string => Boolean(id)))]
@@ -163,19 +171,22 @@ export async function listAgents(userId: string) {
   }))
 }
 
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(async () => ({ ...(await queueRun(userId, input)), status: 'queued' }))
 }
 
-export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }) {
+export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const rows = await visibleRuns(userId, input)
   return rows.map(run => ({ id: run.id, issueId: run.issueId, agent: run.agentName, status: run.status, stopReason: run.stopReason, createdAt: run.createdAt.toISOString() }))
 }
 
-export async function getRun(userId: string, input: { runId: string }) {
+export async function getRun(userId: string, input: { runId: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const detail = await readRun(userId, input.runId)
   if (!detail) return { error: 'runNotFound' }
   const { run } = detail
@@ -188,18 +199,21 @@ export async function getRun(userId: string, input: { runId: string }) {
   }
 }
 
-export async function sendToRun(userId: string, input: { runId: string; text: string }) {
+export async function sendToRun(userId: string, input: { runId: string; text: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(async () => { await addRunMessage(userId, input); return { sent: true } })
 }
 
-export async function stopRun(userId: string, input: { runId: string }) {
+export async function stopRun(userId: string, input: { runId: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(async () => { await requestRunStop(userId, input.runId); return { stopRequested: true } })
 }
 
 /** Web search through the shared SearchProvider (MIK-5); degrades to searchUnavailable on 429/5xx/timeout. */
-export async function webSearchStep(userId: string, input: { query: string; limit?: number }) {
+export async function webSearchStep(userId: string, input: { query: string; limit?: number }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
 }
