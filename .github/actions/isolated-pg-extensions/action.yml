@@ -1,0 +1,13 @@
+name: Isolated PostgreSQL fixture extensions
+description: Install pg_trgm only inside this job's disposable PostgreSQL 17 service
+inputs:
+  container:
+    description: GitHub job.services.postgres.id; never a database URL
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        PG_FIXTURE_CONTAINER: ${{ inputs.container }}
+      run: bash "$GITHUB_ACTION_PATH/prepare.sh"

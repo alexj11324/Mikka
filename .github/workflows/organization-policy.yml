@@ -38,6 +38,9 @@ jobs:
       POLICY_EXTERNAL_SERVER: '1'
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/isolated-pg-extensions
+        with:
+          container: ${{ job.services.postgres.id }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.34.3

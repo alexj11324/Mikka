@@ -1,0 +1,6 @@
+CREATE EXTENSION
+isolated fixture extension: database=mikka_improvement server=170011 schema=pg_catalog
+CREATE EXTENSION
+isolated fixture extension: database=postgres server=170011 schema=pg_catalog
+CREATE EXTENSION
+isolated fixture extension: database=template1 server=170011 schema=pg_catalog

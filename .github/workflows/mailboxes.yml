@@ -20,6 +20,9 @@ jobs:
       MAILBOX_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/mikka_mailbox_e2e
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/isolated-pg-extensions
+        with:
+          container: ${{ job.services.postgres.id }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.34.3

@@ -1,0 +1,47 @@
+▶ formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoint, exhaustion and authority
+  ✔ legacy staged events require reconciliation; migration replay preserves decisions (713.518237ms)
+  ✔ three transport failures persist; ten duplicate claims lead to one atomic response (522.675169ms)
+  ✔ accepted start whose ACK is lost after consumption never reopens completed event (104.589716ms)
+{"evidence":"actual child SIGKILL","phase":"staged","eventId":"0c6d4355-6388-4f97-bcad-788ffe987b83","state":"completed","generation":"returned"}
+  ✔ actual SIGKILL after staged: fenced restart and no blind generation resend (782.980921ms)
+{"evidence":"actual child SIGKILL","phase":"checkpoint","eventId":"2042b16e-d63f-4eff-89cc-866d47c7213f","state":"completed","generation":"returned"}
+  ✔ actual SIGKILL after checkpoint: fenced restart and no blind generation resend (874.90164ms)
+{"evidence":"actual child SIGKILL","phase":"effect","eventId":"b3e3245d-4fbc-4982-9990-5217520d5ca7","state":"failed","generation":"uncertain"}
+  ✔ actual SIGKILL after effect: fenced restart and no blind generation resend (877.733183ms)
+  ✔ publication PG failure keeps checkpoint; fresh lease ACK reuses result without effect (216.213081ms)
+  ✔ exhaustion and owner-scoped replay preserve operation ID and never grant new approval (278.971328ms)
+  ✔ current workspace revocation and scope mismatch prevent consumption and publication (135.4944ms)
+  ✔ persisted output publishes without a new resource admission or generation (242.953569ms)
+  ✔ stop committed after staging fences generation and recovered notice has zero effects (277.025947ms)
+  ✔ budget deferral neither sends nor burns retry; late start ACK preserves defer (102.440496ms)
+✔ formal inbox: accepted delivery, lost ACK, real consumer SIGKILL, checkpoint, exhaustion and authority (5158.418849ms)
+▶ review: background terminal fairness, protocol scope, cached guard and quiet triage
+  ✔ follow-up migration upgrades the previous receipt schema without changing terminal scopes or granting membership (861.459071ms)
+{"evidence":"actual PG + actual authority child SIGKILL","prefix":49,"parent":"b05b86a8-f8db-43ae-bc6f-00cc435361cb","legal":"2e522460-2b0e-442f-a33a-2abfa28298bd","terminalRowsNotRevived":true}
+  ✔ 49 denied background rows cannot starve a later legal child across actual child SIGKILL (2581.179606ms)
+  ✔ failed, cancelled and legacy_review background rows remain terminal (73.021564ms)
+  ✔ protocol mailbox partition is not a real tenant grant (103.451698ms)
+  ✔ real tenant capture, mismatch, withdrawal and personal issue/device authority remain enforced (655.460131ms)
+{"evidence":"controlled cached-guard substitute; real effect handler and PG","name":"remember","denied":true,"memoryUnchanged":true,"messageWrites":0}
+  ✔ cached successful guard cannot authorize a later stale remember effect (97.903952ms)
+{"evidence":"controlled cached-guard substitute; real effect handler and PG","name":"forget","denied":true,"memoryUnchanged":true,"messageWrites":0}
+  ✔ cached successful guard cannot authorize a later stale forget effect (99.451778ms)
+{"evidence":"controlled cached-guard substitute; real effect handler and PG","name":"mailboxAction","denied":true,"memoryUnchanged":true,"messageWrites":0}
+  ✔ cached successful guard cannot authorize a later stale mailboxAction effect (85.60149ms)
+{"evidence":"synthetic SDK metadata; actual getStepMetadata/effect handlers/PG transactions","eventId":"7cd127da-6cee-4921-8b31-405c02596aec","tenReplays":1,"mailboxWrites":1,"receiptFaultRolledMemoryBack":true}
+  ✔ fresh internal effects and SDK-step receipts commit together and replay without duplicate memory/message writes (546.205184ms)
+  ✔ quiet run_report triages before any transport start (36.932142ms)
+  ✔ quiet run_retried triages before any transport start (49.269404ms)
+{"evidence":"actual core delivery/positive controlled admission; no model called","held":false,"generationWouldStart":false}
+  ✔ late delivery whose tier became background never stages or starts generation (46.959158ms)
+✔ review: background terminal fairness, protocol scope, cached guard and quiet triage (9937.794968ms)
+{"evidence":"actual tool handler, not model conversation","owner":"wake176-b1f09ea5-396f-41e2-b782-ba6546e7360a","sourceEventId":"c9e5e1d2-fb4e-4585-9be4-9f3e6797c3bb","workspaceId":"d06648dc-bdd7-4d84-845b-8e24b1e84e7d","scheduleId":"08d6dc65-c3cc-4143-ae60-1993abbfee2c","otherWorkspaceId":"cce7278f-6a09-40a1-afa7-a251524c494a"}
+✔ actual Coordinator schedule tool uses its persisted workspace and original chat (5138.222474ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10567.855809

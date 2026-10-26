@@ -46,7 +46,12 @@ test('retained dual DB: fresh candidate equals current-main ledger upgrade; repl
   assert.equal(rows.length,3);assert.ok(rows.every(r=>r.indisvalid&&r.indisready));return rows
  }
  try{
-  assert.ok((await admin.query('show server_version_num')).rows[0].server_version_num.startsWith('17'))
+  const serverVersion=(await admin.query('show server_version_num')).rows[0].server_version_num
+  const dumpContainer=process.env.HISTORY_PG_CONTAINER
+  const dumpVersion=dumpContainer?run('docker',['exec',dumpContainer,'pg_dump','--version']):run('pg_dump',['--version'])
+  assert.ok(serverVersion.startsWith('17'),'isolated PostgreSQL 17 server required')
+  assert.match(dumpVersion,/\b17\.\d+/,'matching PostgreSQL 17 dump client required before acceptance')
+  evidence.postgres={serverVersion,dumpVersion:dumpVersion.trim(),dumpContainer:dumpContainer??null}
   const freshApp=await make('fresh_app'),freshWs=await make('fresh_ws'),upApp=await make('upgrade_app'),upWs=await make('upgrade_ws')
   migrate(baseline,upApp,upWs)
   const beforeApp=await ledger(upApp),beforeWs=await ledger(upWs)
