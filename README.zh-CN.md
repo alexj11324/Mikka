@@ -35,7 +35,7 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 
 - **由 Coordinator 协调多个执行 harness。**
   - Coordinator 是常驻运行的 bot。当运行结束、任务状态变更或 worker 提出问题时，它会被唤醒并决定下一步操作，仅在需要你决策时发出通知。
-  - 你可以为不同类型的工作创建专门的 bot，也可以将多个 bot 加入群聊，由它们分工协作。
+  - Coordinator 是当前内置的 Bot。它的协调 harness 与执行编码线程的 CLI harness 分开运行。
 
 - **先确认，再执行。**
   - 需求不明确时，Coordinator 会在派发运行前，先在对话中向你确认缺少的信息。

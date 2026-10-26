@@ -28,4 +28,4 @@ export class SearchProviderError extends Error {
 }
 
 /** Context for the permission hook (MIK-5, tiers designed by Chief of Staff). */
-export type SearchContext = { userId: string; workspaceId?: string; caller: 'coordinator' | 'bot' | 'agent-panel' }
+export type SearchContext = { userId: string; workspaceId?: string; caller: 'coordinator' | 'bot' }

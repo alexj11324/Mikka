@@ -10,7 +10,7 @@ export async function seedLegacyHistory(email: string) {
   const pool = new Pool({ connectionString, max: 1 })
   const id = randomUUID()
   const title = `saved-${id.slice(0, 8)}`
-  const completion = 'root = TextContent("已保存的公开测试历史正文")'
+  const completion = 'root = Stack([TextContent("已保存的公开测试历史正文"), BeButton("旧消息动作", "不得执行历史动作", "outline")])'
   try {
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
     expect(user).toBeTruthy()

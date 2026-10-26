@@ -43,8 +43,8 @@ review the results.
   - The Coordinator is a long-running bot. It wakes when a run ends, a task
     changes state, or a worker asks a question, decides the next step, and
     notifies you only when your input is required.
-  - You can create dedicated bots for different kinds of work, or add several
-    bots to a group chat to divide the work among them.
+  - The Coordinator is the current built-in Bot. Its orchestration harness is
+    separate from the CLI harnesses that execute dispatched coding threads.
 
 - **Asks before it guesses.**
   - When a request is unclear, the Coordinator asks you for the missing details

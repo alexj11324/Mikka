@@ -50,6 +50,7 @@ jobs:
           MIGRATION_BOOTSTRAP_CI: '1'
       - run: pnpm test:e2e:setup
       - run: pnpm test:agent
+      - run: pnpm exec next typegen
       - run: pnpm typecheck
       - run: pnpm build
         id: build

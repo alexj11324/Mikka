@@ -7,7 +7,7 @@ import { createWebService } from './index'
 const publicHost = async () => [{ address: '8.8.8.8' }]
 const url = 'https://www.iana.org/help/example-domains'
 const validPage = () => ({ success: true, data: { markdown: '# Example domains', metadata: { statusCode: 200, sourceURL: url, url } } })
-const ctx = { userId: 'synthetic-provider', caller: 'agent-panel' as const }
+const ctx = { userId: 'synthetic-provider', caller: 'bot' as const }
 // Keep the event loop alive while exercising AbortSignal.timeout's unref timer.
 async function timed(work: () => Promise<unknown>) { const timer = setInterval(() => {}, 1000); try { return await work() } finally { clearInterval(timer) } }
 
