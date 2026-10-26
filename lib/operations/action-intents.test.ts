@@ -121,8 +121,11 @@ test('trusted submission -> durable batch -> new workflow -> run retry -> daemon
     assert.equal((await pool.query('SELECT count(*) FROM pending_actions WHERE "userId"=$1', [user])).rows[0].count, '0')
     assert.equal((await pool.query('SELECT "accountActionBatch" FROM coordinator_events WHERE id=$1', [submitted.sourceEventId])).rows[0].accountActionBatch.batches.length, 1)
   })
+  const capturedWorkspace=randomUUID()
   let runId = '', retryId = '', token = '', deviceId = randomUUID(), repoId = randomUUID(), agentId = randomUUID(), issueId = randomUUID()
-  await t.test('real Factory dispatch snapshots references in its transaction; device-loss retry copies them', async () => {
+  await t.test('real Factory dispatch snapshots references and trusted workspace in its transaction; device-loss retry copies them', async () => {
+    await pool.query('INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,\'actual captured fixture workspace\')',[capturedWorkspace,owner])
+    await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,$2,$3,\'admin\')',[capturedWorkspace,owner,owner+'@example.invalid'])
     await pool.query(`INSERT INTO devices (id,"ownerId",name) VALUES ($1,$2,'Fixture')`, [deviceId, owner])
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'/fixture')`, [repoId, deviceId, owner])
     await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,$2,'Fixture','codex',$3)`, [agentId, owner, deviceId])
@@ -132,7 +135,12 @@ test('trusted submission -> durable batch -> new workflow -> run retry -> daemon
     await pool.query(`UPDATE coordinator_sessions SET "leaseUntil"=now()-interval '1 second' WHERE "userId"=$1`, [owner])
     const inbox = await run(() => store.takeInbox(owner, randomUUID())); assert.equal(inbox.actionContext?.sourceEventId, batchSource.sourceEventId)
     const state = await factory.route(owner, { issueId, sourceEventId: batchSource.sourceEventId, eventId: randomUUID(), rationale: 'Fixture authenticated source' })
-    const dispatch = createFactoryDispatch(pool, factory, (tx, user, input) => insertRunOnce(factoryDispatchDatabase(tx), user, input, { deviceId, baseBranch: 'main', prompt: 'Fixture' }))
+    const dispatch = createFactoryDispatch(pool, factory, async (tx, user, input) => {
+      // Match the server-owned request scope captured in the insertion transaction.
+      // Never retrofit the immutable audit projection after a run is inserted.
+      await tx.query("SELECT set_config('mikka.audit_workspace',$1,true)",[capturedWorkspace])
+      return insertRunOnce(factoryDispatchDatabase(tx), user, input, { deviceId, baseBranch: 'main', prompt: 'Fixture' })
+    })
     const task = state.task
     const dispatchInput = { binding: { taskId: task.id, issueId, attemptId: task.attemptId, revision: task.revision, candidateId: task.candidateId }, agentId, deviceRepoId: repoId }
     const mixed = [{ role: 'assistant' as const, content: [{ type: 'tool-call' as const, toolCallId: 'dispatch-first', toolName: 'dispatch_run', input: dispatchInput }, ...calls] }]
@@ -146,6 +154,7 @@ test('trusted submission -> durable batch -> new workflow -> run retry -> daemon
     await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()-interval '1 minute' WHERE id=$1`, [runId])
     await run(() => reclaimLostRuns(owner))
     const retry = (await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [runId])).rows[0]; assert.ok(retry); retryId = retry.id
+    assert.deepEqual((await pool.query("SELECT tenant FROM security_audit_resource_scopes WHERE source='agent_runs' AND resource=ANY($1::text[]) ORDER BY resource",[[runId,retryId]])).rows.map(r=>r.tenant),[capturedWorkspace,capturedWorkspace])
     assert.deepEqual(retry.accountActionRefs.find((r: { operationId: string }) => r.operationId === operationId), ref)
     await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [retryId])
     token = (await run(() => worker.issueRunToken({ id: retryId, userId: owner }))).token
@@ -161,6 +170,9 @@ test('trusted submission -> durable batch -> new workflow -> run retry -> daemon
     const headers = { Authorization: `Bearer ${token}` }
     const response = await fetch(`${origin}/api/worker/account-actions`, { headers }); assert.equal(response.status, 200)
     const body = await response.json(); assert.equal(body.actions.length, 2); assert.equal(body.actions[0].canExecute, false)
+    await pool.query("UPDATE mikka_workspace_members SET status='suspended' WHERE \"workspaceId\"=$1 AND \"userId\"=$2",[capturedWorkspace,owner])
+    assert.equal((await fetch(`${origin}/api/worker/account-actions`, { headers })).status,401)
+    await pool.query("UPDATE mikka_workspace_members SET status='active' WHERE \"workspaceId\"=$1 AND \"userId\"=$2",[capturedWorkspace,owner])
     assert.equal((await fetch(`${origin}/api/worker/account-actions?operationId=${randomUUID()}`, { headers })).status, 403)
     await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [retryId])
     assert.equal((await fetch(`${origin}/api/worker/account-actions`, { headers })).status, 403)

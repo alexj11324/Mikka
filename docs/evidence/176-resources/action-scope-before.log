@@ -1,0 +1,61 @@
+▶ trusted submission -> durable batch -> new workflow -> run retry -> daemon read-only recovery
+  ✔ ten submission retries reuse source, changed request conflicts, intentional identical request differs (212.444668ms)
+  ✔ actual tool wrapper persists entire batch before first proposal and distinct identical slots survive concurrency (460.634777ms)
+  ✔ migration replay after SQL commit preserves persisted source slots and operation identity (20.218114ms)
+  ✔ new workflow replays persisted calls before model; regenerated call cannot create another intent (150.463047ms)
+  ✔ SIGKILL after batch commit before proposal: separate process and new holder recover original slots (778.959917ms)
+  ✔ background events still ride with one foreground source; expired preflight cannot create a proposal (486.438113ms)
+  ✔ real Factory dispatch snapshots references in its transaction; device-loss retry copies them (155.132675ms)
+  ✖ actual HTTP worker route checks token, owner, bound reference and live lease without provider writes (47.593508ms)
+  ✖ real daemon journal restart preserves references; local MCP tool reads actual HTTP endpoint (186.928963ms)
+✖ trusted submission -> durable batch -> new workflow -> run retry -> daemon read-only recovery (11659.222995ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 7
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16089.985444
+
+✖ failing tests:
+
+test at lib/operations/action-intents.test.ts:1:14915
+✖ actual HTTP worker route checks token, owner, bound reference and live lease without provider writes (47.593508ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  401 !== 200
+  
+      at TestContext.<anonymous> (/workspace/Mikka-176-resources/lib/operations/action-intents.test.ts:162:95)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176-resources/lib/operations/action-intents.test.ts:160:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 401,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/operations/action-intents.test.ts:1:15739
+✖ real daemon journal restart preserves references; local MCP tool reads actual HTTP endpoint (186.928963ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(!result.isError)
+  
+      at TestContext.<anonymous> (/workspace/Mikka-176-resources/lib/operations/action-intents.test.ts:177:54)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/workspace/Mikka-176-resources/lib/operations/action-intents.test.ts:169:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

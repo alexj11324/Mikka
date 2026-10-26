@@ -1,0 +1,26 @@
+postgres-sdk	Run pnpm typecheck	﻿2026-10-26T00:45:09.3285080Z ##[group]Run pnpm typecheck
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3285459Z [36;1mpnpm typecheck[0m
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3358605Z shell: /usr/bin/bash -e {0}
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3358828Z env:
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3358995Z   CI: true
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3359291Z   MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_resources_app_176
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3359723Z   DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_resources_ws_176
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3360148Z   RESOURCE_APP_TEST_URL: postgresql://postgres@127.0.0.1:5432/mikka_resources_app_176
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3360585Z   RESOURCE_WORKSPACE_TEST_URL: postgresql://postgres@127.0.0.1:5432/mikka_resources_ws_176
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3361026Z   QUOTA_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_resource_quota215
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3361372Z   BETTER_AUTH_URL: http://127.0.0.1:3180
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3361727Z   BETTER_AUTH_SECRET: isolated-resource-proof-no-production-authorization-123456789
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3362093Z   NEXT_TELEMETRY_DISABLED: 1
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3362389Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.3362650Z ##[endgroup]
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.5882658Z 
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.5883340Z > next-app@0.0.1 typecheck /home/runner/work/Mikka/Mikka
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.5883818Z > tsgo --noEmit
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:09.5883963Z 
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:17.0405164Z ##[error]lib/resources/controlled.test.ts(6,40): error TS2741: Property 'NODE_ENV' is missing in type '{}' but required in type 'ProcessEnv'.
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:17.0446031Z ##[error]lib/resources/controlled.test.ts(7,40): error TS2741: Property 'NODE_ENV' is missing in type '{ CI: string; MIKKA_RESOURCE_TEST_ORIGIN: string; MIKKA_DATABASE_URL: string; DATABASE_URL: string; }' but required in type 'ProcessEnv'.
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:17.0449849Z ##[error]lib/resources/controlled.test.ts(8,217): error TS2741: Property 'NODE_ENV' is missing in type '{ CI: string; MIKKA_RESOURCE_TEST_ORIGIN: string; MIKKA_DATABASE_URL: string; DATABASE_URL: string; }' but required in type 'ProcessEnv'.
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:17.0454356Z ##[error]lib/resources/controlled.test.ts(14,49): error TS2345: Argument of type '{ CI: string; MIKKA_RESOURCE_TEST_ORIGIN: string; MIKKA_DATABASE_URL: string; DATABASE_URL: string; } | { CI: string; MIKKA_RESOURCE_TEST_ORIGIN: string; MIKKA_DATABASE_URL: string; DATABASE_URL: string; }' is not assignable to parameter of type 'ProcessEnv | undefined'.
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:17.0457080Z   Property 'NODE_ENV' is missing in type '{ CI: string; MIKKA_RESOURCE_TEST_ORIGIN: string; MIKKA_DATABASE_URL: string; DATABASE_URL: string; }' but required in type 'ProcessEnv'.
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:17.0737991Z  ELIFECYCLE  Command failed with exit code 1.
+postgres-sdk	Run pnpm typecheck	2026-10-26T00:45:17.1055379Z ##[error]Process completed with exit code 1.

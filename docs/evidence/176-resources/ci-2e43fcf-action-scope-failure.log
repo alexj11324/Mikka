@@ -1,0 +1,87 @@
+postgres	Preserve approved action slots and uncertain Calendar results	﻿2026-10-26T00:45:14.0066247Z ##[group]Run psql postgresql://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE mikka_208_test'
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0067019Z [36;1mpsql postgresql://postgres@127.0.0.1:5432/postgres -c 'CREATE DATABASE mikka_208_test'[0m
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0067865Z [36;1mnode --conditions=react-server --import tsx --test lib/operations/calendar-integration.test.ts lib/operations/action-intents.test.ts[0m
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0131549Z shell: /usr/bin/bash -e {0}
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0131811Z env:
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0132133Z   MIKKA_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0132614Z   DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0133072Z   WAKE_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0133928Z   WAKE_REVIEW_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_ci_176
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0134406Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0134709Z   NODE_ENV: test
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0134962Z   OPERATION_DB_TESTS: 1
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0135322Z   OPERATION_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/mikka_208_test
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0135917Z ##[endgroup]
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:14.0960084Z CREATE DATABASE
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:18.9776847Z ▶ trusted submission -> durable batch -> new workflow -> run retry -> daemon read-only recovery
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:18.9779020Z   ✔ ten submission retries reuse source, changed request conflicts, intentional identical request differs (184.029745ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:19.2282397Z   ✔ actual tool wrapper persists entire batch before first proposal and distinct identical slots survive concurrency (256.958187ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:19.2413882Z   ✔ migration replay after SQL commit preserves persisted source slots and operation identity (15.36102ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:19.3110300Z   ✔ new workflow replays persisted calls before model; regenerated call cannot create another intent (68.734501ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:19.9032675Z   ✔ SIGKILL after batch commit before proposal: separate process and new holder recover original slots (592.405994ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:20.3794453Z   ✔ background events still ride with one foreground source; expired preflight cannot create a proposal (476.016128ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:20.5040678Z   ✔ real Factory dispatch snapshots references in its transaction; device-loss retry copies them (114.142186ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:20.5355792Z   ✖ actual HTTP worker route checks token, owner, bound reference and live lease without provider writes (34.849109ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:20.6469755Z   ✖ real daemon journal restart preserves references; local MCP tool reads actual HTTP endpoint (100.962208ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:20.6472960Z ✖ trusted submission -> durable batch -> new workflow -> run retry -> daemon read-only recovery (5239.746858ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.0778203Z ▶ actual proposal/decision entrypoints -> ledger -> local calendar HTTP provider
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.0779839Z   ✔ step retry and ten concurrent proposals reuse persisted identity; actual approval invokes once (424.02024ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.0781432Z   ✔ lost provider response with historical missing input reconciles without resending (217.316655ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.0782869Z   ✔ lost provider response with historical null input reconciles without resending (151.381246ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.0784538Z   ✔ revocation committed after invocation reservation fences the actual send (53.290423ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.0785820Z   ✔ provider succeeds then real SQL writeback fails; retry only reads back (78.34416ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.0787003Z   ✔ legacy unbound proposal cannot execute but can be safely declined (20.456323ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.0788326Z   ✔ session expiry during provider preflight prevents the actual HTTP write (1134.82259ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.1555609Z   ✔ decline, expiry, wrong owner and changed pinned account do not invoke provider (71.581258ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.1575533Z ✔ actual proposal/decision entrypoints -> ledger -> local calendar HTTP provider (6173.447003ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2315311Z ℹ tests 19
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2318693Z ℹ suites 0
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2319264Z ℹ pass 16
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2319660Z ℹ fail 3
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2320024Z ℹ cancelled 0
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2320403Z ℹ skipped 0
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2320747Z ℹ todo 0
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2321170Z ℹ duration_ms 7104.362595
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2332997Z 
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2333587Z ✖ failing tests:
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2333850Z 
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2334270Z test at lib/operations/action-intents.test.ts:1:14915
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2335442Z ✖ actual HTTP worker route checks token, owner, bound reference and live lease without provider writes (34.849109ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2336136Z   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2336517Z   
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2336693Z   401 !== 200
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2336885Z   
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2337392Z       at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/lib/operations/action-intents.test.ts:162:95)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2338138Z       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2339026Z       at async Test.run (node:internal/test_runner/test:1409:7)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2339855Z       at async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/lib/operations/action-intents.test.ts:160:3)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2341276Z       at async Test.run (node:internal/test_runner/test:1409:7)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2341896Z       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2342351Z     generatedMessage: true,
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2342605Z     code: 'ERR_ASSERTION',
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2342842Z     actual: 401,
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2343050Z     expected: 200,
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2343279Z     operator: 'strictEqual',
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2344506Z     diff: 'simple'
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2344830Z   }
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2344973Z 
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2345202Z test at lib/operations/action-intents.test.ts:1:15739
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2346038Z ✖ real daemon journal restart preserves references; local MCP tool reads actual HTTP endpoint (100.962208ms)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2346724Z   AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2347108Z   
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2347317Z     assert.ok(!result.isError)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2347547Z   
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2348011Z       at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/lib/operations/action-intents.test.ts:177:54)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2348707Z       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2349227Z       at async Test.run (node:internal/test_runner/test:1409:7)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2349874Z       at async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/lib/operations/action-intents.test.ts:169:3)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2350475Z       at async Test.run (node:internal/test_runner/test:1409:7)
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2351016Z       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2351492Z     generatedMessage: true,
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2351762Z     code: 'ERR_ASSERTION',
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2351998Z     actual: false,
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2352265Z     expected: true,
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2352517Z     operator: '==',
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2352728Z     diff: 'simple'
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2352939Z   }
+postgres	Preserve approved action slots and uncertain Calendar results	2026-10-26T00:45:21.2407652Z ##[error]Process completed with exit code 1.

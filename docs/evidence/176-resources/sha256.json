@@ -1,4 +1,8 @@
 {
+  "action-scope-after.log": "03384ac89b020317d16811ba084df0d3b4fbd38c1440901ba9f44ca4c7e44460",
+  "action-scope-before.log": "cf0e207d7f0ca5b5fd5e622eb7dbd4dcb7aa7c8a5a6b83dcb39179a2cdd71c53",
+  "ci-2e43fcf-action-scope-failure.log": "62bb979f0a1dcb416428f25d3e2664b49ee8b7ab0bdbe04b3da3e36d4aa74b10",
+  "ci-2e43fcf-resource-type-failure.log": "3262872dd36ced890a93a1aaddb956efd977052906042ff2a2c62b284cc2ee64",
   "diagnostic-empty-plan-failure.log": "31a28ea3f741294d4fdbb79b5457e7a76041137dc1718fd330246ee176735e47",
   "diagnostic-invalid-url-fixture.log": "f5930ea7cd7ac5593ba7b7f229aa9dc636b498e8bece8e6d0f3b4e285f260993",
   "fresh-split-migrations.log": "85bb745591327e5640b55f79d9f6292e5aa7d619e893bf4fb23c14a0df080f8f",

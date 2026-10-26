@@ -1,0 +1,19 @@
+▶ trusted submission -> durable batch -> new workflow -> run retry -> daemon read-only recovery
+  ✔ ten submission retries reuse source, changed request conflicts, intentional identical request differs (148.251222ms)
+  ✔ actual tool wrapper persists entire batch before first proposal and distinct identical slots survive concurrency (280.616036ms)
+  ✔ migration replay after SQL commit preserves persisted source slots and operation identity (16.488259ms)
+  ✔ new workflow replays persisted calls before model; regenerated call cannot create another intent (91.418784ms)
+  ✔ SIGKILL after batch commit before proposal: separate process and new holder recover original slots (648.52356ms)
+  ✔ background events still ride with one foreground source; expired preflight cannot create a proposal (483.773909ms)
+  ✔ real Factory dispatch snapshots references and trusted workspace in its transaction; device-loss retry copies them (197.426786ms)
+  ✔ actual HTTP worker route checks token, owner, bound reference and live lease without provider writes (189.323101ms)
+  ✔ real daemon journal restart preserves references; local MCP tool reads actual HTTP endpoint (165.993864ms)
+✔ trusted submission -> durable batch -> new workflow -> run retry -> daemon read-only recovery (6003.646404ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7534.46889

@@ -1,6 +1,6 @@
 /** Keyless acceptance transport only. Both persistent stores and every external
  * provider must be isolated before runtime may replace a logical destination. */
-export function resourceControlledOrigin(env:NodeJS.ProcessEnv=process.env){
+export function resourceControlledOrigin(env:Readonly<Record<string,string|undefined>>=process.env){
  const origin=env.MIKKA_RESOURCE_TEST_ORIGIN
  if(!origin)return null
  const target=new URL(origin)
