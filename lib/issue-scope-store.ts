@@ -1,4 +1,5 @@
 import 'server-only'
+import { createHash } from 'node:crypto'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { issues, issueVersions, linearIssueLinks, linearIssuePublications, linearSyncOutbox } from '@/lib/db/schema'
@@ -6,11 +7,30 @@ import { activityActor } from '@/lib/activity-actor'
 import { issueView } from '@/lib/task-identifier-server'
 import type { TaskScope } from '@/lib/task-identifier'
 
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+async function personalPreview(tx: Transaction, issue: typeof issues.$inferSelect) {
+  const links = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.issueId, issue.id)).orderBy(linearIssueLinks.id)
+  const publications = await tx.select().from(linearIssuePublications).where(eq(linearIssuePublications.issueId, issue.id)).orderBy(linearIssuePublications.id)
+  const jobs = await tx.select().from(linearSyncOutbox).where(eq(linearSyncOutbox.issueId, issue.id)).orderBy(linearSyncOutbox.id)
+  const externalCopyPossible = links.length > 0 || publications.length > 0 || jobs.some(job => ['queued','processing','failed'].includes(job.status))
+  const confirmation = createHash('sha256').update(JSON.stringify({ id: issue.id, owner: issue.userId, revision: issue.revision, scope: issue.scope, scopeVersion: issue.scopeVersion, links, publications, jobs })).digest('hex')
+  return { revision: issue.revision, scope: issue.scope, scopeVersion: issue.scopeVersion, hasLinearLink: links.length > 0, hasRetainedPublication: publications.length > 0, externalCopyPossible, confirmation }
+}
+
+export async function previewPersonalScope(userId: string, issueId: string) {
+  return db.transaction(async tx => {
+    const [issue] = await tx.select().from(issues).where(eq(issues.id, issueId)).for('update')
+    if (!issue || issue.userId !== userId) return { error: 'issueScopeOwnerOnly' as const }
+    return { preview: await personalPreview(tx, issue) }
+  })
+}
+
 /** Local half of the two-way transition. The linked path remains gated at the
  * action boundary until #184's archive/unlink decision is confirmed.
  * No provider request is made here. The DB trigger atomically detaches the link,
  * cancels outgoing work and revokes other people's runs before commit. */
-export async function changeIssueScopeLocally(userId: string, input: { id: string; revision: number; scope: TaskScope }, options: { allowLinkedPersonal: boolean }) {
+export async function changeIssueScopeLocally(userId: string, input: { id: string; revision: number; scope: TaskScope }, options: { allowLinkedPersonal: boolean; confirmation?: string }) {
   for (let attempt = 0; ; attempt++) {
     try { return await changeScopeTransaction(userId, input, options) }
     catch (error) {
@@ -23,7 +43,7 @@ export async function changeIssueScopeLocally(userId: string, input: { id: strin
   }
 }
 
-async function changeScopeTransaction(userId: string, input: { id: string; revision: number; scope: TaskScope }, options: { allowLinkedPersonal: boolean }) {
+async function changeScopeTransaction(userId: string, input: { id: string; revision: number; scope: TaskScope }, options: { allowLinkedPersonal: boolean; confirmation?: string }) {
   return db.transaction(async tx => {
     // Imports reserve the remote UUID before looking up or creating an issue.
     // Take that lock before the local row lock to avoid import/detach deadlocks.
@@ -32,6 +52,7 @@ async function changeScopeTransaction(userId: string, input: { id: string; revis
     const [latest] = await tx.select().from(issues).where(eq(issues.id, input.id)).for('update')
     if (!latest || latest.userId !== userId) return { error: 'issueScopeOwnerOnly' as const }
     if (latest.revision !== input.revision) return { error: 'issueStale' as const }
+    if (input.scope === 'personal' && options.confirmation && (await personalPreview(tx, latest)).confirmation !== options.confirmation) return { error: 'issueStale' as const }
     if (input.scope === 'personal' && !options.allowLinkedPersonal) {
       const [currentLink] = await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(eq(linearIssueLinks.issueId, input.id)).limit(1)
       const [outgoing] = await tx.select({ id: linearSyncOutbox.id }).from(linearSyncOutbox).where(and(eq(linearSyncOutbox.issueId, input.id), inArray(linearSyncOutbox.status, ['queued', 'processing', 'failed']))).limit(1)

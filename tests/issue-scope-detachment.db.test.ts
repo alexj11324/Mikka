@@ -42,7 +42,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const pool = new Pool({ connectionString: connection, max: 5 })
   const { changeIssueScopeLocally } = await import('../lib/issue-scope-store')
   const { actAs } = await import('../lib/acting-user')
-  const { setIssueScope } = await import('../app/actions/issues')
+  const { saveIssue, setIssueScope, previewIssuePersonalScope, confirmIssuePersonalScope } = await import('../app/actions/issues')
   const { retryLinearIssue } = await import('../app/actions/linear-sync')
   const { AfterContext } = await import('next/dist/server/after/after-context')
   const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
@@ -127,6 +127,41 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     try { await check(`http://127.0.0.1:${(server.address() as {port:number}).port}`) }
     finally { await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve())) }
   }
+  await t.test('context and stale classifier cannot publish a personal task without a user choice', async () => {
+    const id=randomUUID();fixtureIds.push(id)
+    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Ship team work urgently\',$3,\'todo\',\'normal\',\'personal\')',[id,owner,doc])
+    await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,owner])
+    const { judgeIssueScope }=await import('../lib/issue-scope-judge')
+    for (const context of ['Telegram','the Mikka app','ambiguous team conversation']) await judgeIssueScope(id,context)
+    await assert.rejects(pool.query('update issues set scope=\'workspace\',"scopeConfidence"=0.99 where id=$1 and "scopeSetBy"=\'agent\'',[id]),(error:unknown)=>(error as {code:string}).code==='23514')
+    assert.deepEqual((await pool.query('select scope,"scopeSetBy" from issues where id=$1',[id])).rows[0],{scope:'personal',scopeSetBy:'agent'})
+    assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
+    assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,0)
+    assert.ok('issue' in await changeIssueScopeLocally(owner,{id,revision:1,scope:'workspace'},{allowLinkedPersonal:false}))
+    assert.deepEqual((await pool.query('select scope,"scopeSetBy" from issues where id=$1',[id])).rows[0],{scope:'workspace',scopeSetBy:'user'})
+  })
+  await t.test('owner preview detects external state changes and confirmation remains fail closed',async()=>{
+    const id=randomUUID();await seed(id,id,false)
+    await pool.query('update linear_sync_outbox set status=\'done\' where "issueId"=$1',[id])
+    const first=await actAs(owner,()=>previewIssuePersonalScope(id))
+    assert.ok('preview' in first && first.preview);assert.equal(first.preview.externalCopyPossible,false)
+    assert.deepEqual(await actAs(member,()=>previewIssuePersonalScope(id)),{error:'issueScopeOwnerOnly'})
+    await pool.query('update linear_sync_outbox set status=\'failed\' where "issueId"=$1',[id])
+    assert.deepEqual(await actAs(owner,()=>confirmIssuePersonalScope({id,revision:first.preview.revision,confirmation:first.preview.confirmation})),{error:'issueStale'})
+    const next=await actAs(owner,()=>previewIssuePersonalScope(id))
+    assert.ok('preview' in next && next.preview);assert.equal(next.preview.externalCopyPossible,true);assert.equal(next.preview.hasLinearLink,false)
+    assert.deepEqual(await actAs(owner,()=>confirmIssuePersonalScope({id,revision:next.preview.revision,confirmation:next.preview.confirmation})),{error:'issueScopeInLinear'})
+    assert.equal((await pool.query('select scope from issues where id=$1',[id])).rows[0].scope,'workspace')
+    const linked=await actAs(owner,()=>previewIssuePersonalScope(issue))
+    assert.ok('preview' in linked && linked.preview);assert.equal(linked.preview.hasLinearLink,true);assert.equal(linked.preview.externalCopyPossible,true)
+    assert.deepEqual(await actAs(owner,()=>confirmIssuePersonalScope({id:issue,revision:linked.preview.revision,confirmation:linked.preview.confirmation})),{error:'issueScopeInLinear'})
+    const safe=randomUUID();await seed(safe,safe,false)
+    await pool.query('update linear_sync_outbox set status=\'done\' where "issueId"=$1',[safe])
+    const safePreview=await actAs(owner,()=>previewIssuePersonalScope(safe))
+    assert.ok('preview' in safePreview && safePreview.preview);assert.equal(safePreview.preview.externalCopyPossible,false)
+    const accepted=await actAs(owner,()=>confirmIssuePersonalScope({id:safe,revision:safePreview.preview.revision,confirmation:safePreview.preview.confirmation}))
+    assert.ok('issue' in accepted && accepted.issue);assert.equal(accepted.issue.scope,'personal')
+  })
   await t.test('pending disposition gate, owner check and stale revisions leave no partial state', async () => {
     assert.ok(await issueForUser(member,issue))
     assert.ok(await readRun(member,memberRun))
@@ -445,6 +480,20 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.ok(link)
     return link
   }
+  await t.test('public app and MCP task creation remain personal without Linear requests',async()=>{
+    const calls=provider.requests.length
+    const app=await action(()=>saveIssue({title:'Team context alone',content:JSON.parse(doc),status:'todo',priority:'normal'}))
+    assert.ok('issue' in app);fixtureIds.push(app.issue.id)
+    const {createIssue}=await import('../lib/mcp/actions')
+    const bot=await action(()=>createIssue(owner,{title:'Ambiguous work task',body:'Perhaps for the team'}))
+    assert.ok('id' in bot);fixtureIds.push(bot.id)
+    for(const id of [app.issue.id,bot.id]) {
+      assert.equal((await pool.query('select scope from issues where id=$1',[id])).rows[0].scope,'personal')
+      assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
+      assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,0)
+    }
+    assert.equal(provider.requests.length,calls)
+  })
   await t.test('an in-flight old update cannot write personal state or upload its captured comments',async()=>{
     const id=randomUUID();await seed(id)
     provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
@@ -616,7 +665,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       })
       await waitFor(async()=>Boolean((await pool.query("select 1 from pg_stat_activity where datname=current_database() and wait_event_type='Lock' and query like '%issues%for update%' and pid<>pg_backend_pid()")).rows[0]),'retry did not wait for the scope lock')
       await lock.query('update issues set scope=\'personal\',revision=revision+1 where id=$1',[id])
-      await lock.query('update issues set scope=\'workspace\',revision=revision+1 where id=$1',[id])
+      await lock.query('update issues set scope=\'workspace\',"scopeSetBy"=\'user\',revision=revision+1 where id=$1',[id])
       // Simulate the forward enqueue already consumed before the manual retry.
       await lock.query('update linear_sync_outbox set status=\'done\' where "issueId"=$1',[id])
       await lock.query('commit')

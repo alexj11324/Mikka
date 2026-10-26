@@ -25,7 +25,7 @@ import { issueDoneEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { after } from 'next/server'
 import { judgeIssueScope } from '@/lib/issue-scope-judge'
-import { changeIssueScopeLocally } from '@/lib/issue-scope-store'
+import { changeIssueScopeLocally, previewPersonalScope } from '@/lib/issue-scope-store'
 import { TASK_SCOPES } from '@/lib/task-identifier'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { activityActor } from '@/lib/activity-actor'
@@ -150,6 +150,22 @@ export async function changeIssuePriority(input: { id: string; priority: string;
     if (issue.priority === parsed.data.priority) return { issue }
     return saveIssue({ ...issue, priority: parsed.data.priority })
   })
+}
+
+/** Preview is owner-only and does not make a provider request. A positive
+ * externalCopyPossible means an old remote copy may still be team-visible. */
+export async function previewIssuePersonalScope(id: string) {
+  const userId = await getUserId()
+  if (!z.uuid().safeParse(id).success) return { error: 'issueScopeInvalid' as const }
+  return previewPersonalScope(userId, id)
+}
+
+/** The linked case remains closed until the archive/unlink policy is chosen. */
+export async function confirmIssuePersonalScope(input: { id: string; revision: number; confirmation: string }) {
+  const userId = await getUserId()
+  const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), confirmation: z.string().regex(/^[a-f0-9]{64}$/) }).safeParse(input)
+  if (!parsed.success) return { error: 'issueScopeInvalid' as const }
+  return changeIssueScopeLocally(userId, { id: parsed.data.id, revision: parsed.data.revision, scope: 'personal' }, { allowLinkedPersonal: false, confirmation: parsed.data.confirmation })
 }
 
 export async function listIssueVersions(id: string) {
