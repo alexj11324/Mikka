@@ -3,7 +3,16 @@ on: [push, pull_request, merge_group]
 permissions:
   contents: read
 jobs:
+  native-authorization:
+    runs-on: ubuntu-latest
+    steps:
+      # Prior approvals are not reusable. This gate has no service containers.
+      - name: Native authorization is pending for automatic events
+        run: |
+          echo '::error::BLOCKED: this automatic run has no run-specific native resource deletion authorization'
+          exit 1
   mailboxes:
+    needs: native-authorization
     if: github.ref != 'refs/heads/fix/169-metadata-integration' && github.ref != 'refs/heads/fix/178-daemon-revocation' && github.ref != 'refs/heads/fix/178-transaction-fence' && github.head_ref != 'fix/169-metadata-integration' && github.head_ref != 'fix/178-daemon-revocation' && github.head_ref != 'fix/178-transaction-fence'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -41,6 +50,7 @@ jobs:
         env:
           MIKKA_DISPOSABLE_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/mikka_review
           MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/mikka_workspace_review
+          MIKKA_TEST_NATIVE_GROUPS: '1'
       - name: Required native profile count and retained receipt
         run: pnpm test:group-native
         env:
