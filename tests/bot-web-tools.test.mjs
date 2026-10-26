@@ -43,3 +43,25 @@ test('Actual Bot tool factory → service → Firecrawl adapter protocol, with f
   assert.equal((await tools.web_search.execute({ query: 'IANA example domains' }, context)).ok, true)
   assert.equal((await tools.read_webpage.execute({ url }, context)).ok, true)
 })
+
+
+test('Fresh Bot tool registries retain the original provider timestamp across a 59-minute cache hit', async () => {
+  let clock = Date.parse('2026-10-25T20:00:00Z')
+  let calls = 0
+  const caller = { userId: 'synthetic-cached-bot', caller: 'coordinator' }
+  const service = createWebService({ now: () => clock, provider: { name: 'original-array-provider', search: async () => { calls++; return [{ url, title: 'IANA', snippet: 'public evidence' }] } } })
+  const turn = () => createBotWebTools({ search: input => service.search(input.query, caller), scrape: async () => ({ ok: true, page: { url, markdown: 'unused' } }) })
+  const first = await turn().web_search.execute({ query: 'IANA documentation' }, context)
+  clock += 59 * 60000
+  const second = await turn().web_search.execute({ query: 'IANA documentation' }, context)
+  assert.equal(calls, 1)
+  assert.equal(first.retrievedAt, '2026-10-25T20:00:00.000Z')
+  assert.equal(second.retrievedAt, first.retrievedAt)
+  assert.equal(second.cached, true)
+  assert.equal(second.cacheAgeMs, 3540000)
+  clock += 2 * 60000
+  const refreshed = await turn().web_search.execute({ query: 'IANA documentation' }, context)
+  assert.equal(calls, 2)
+  assert.equal(refreshed.cached, false)
+  assert.equal(refreshed.retrievedAt, '2026-10-25T21:01:00.000Z')
+})

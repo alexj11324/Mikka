@@ -4,6 +4,12 @@ import test from 'node:test'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { createHash } from 'node:crypto'
 const manifest=JSON.parse(readFileSync(new URL('../docs/factory/migration-manifest-7251bf2.json',import.meta.url)))
+// Resolve unpublished composition names while retaining the frozen manifest's SQL hashes.
+const renames=JSON.parse(readFileSync(new URL('../docs/backend/176-resource-migration-renames.json',import.meta.url))).renames
+for(const entry of [...manifest.shared,...manifest.downstream]){
+ if(entry.file)entry.file=renames[entry.file]??entry.file
+ if(entry.migration)entry.migration=renames[entry.migration]??entry.migration
+}
 const dir=new URL('../drizzle/',import.meta.url)
 const names=readdirSync(dir).filter(n=>n.endsWith('.sql'))
 test('one canonical Factory migration per component, after main and before consumers, with unchanged shared SQL',()=>{

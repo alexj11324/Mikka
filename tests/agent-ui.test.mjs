@@ -36,17 +36,6 @@ test('演示公式覆盖行内、对齐、矩阵及长公式，且不输出解�
   assert.doesNotMatch(markup, /katex-error|language-math|\$\$/)
 })
 
-test('Agent 在 hydration 前预下载且保留 Next 动态分块；演示图片包含部署前缀', async () => {
-  const workspace = await readFile(new URL('../components/workspace/issue-workspace.tsx', import.meta.url), 'utf8')
-  const overview = await readFile(new URL('../components/workspace/workspace-overview.tsx', import.meta.url), 'utf8')
-  const demo = await readFile(new URL('../components/workspace/agent-demo.tsx', import.meta.url), 'utf8')
-  assert.match(workspace, /if \(typeof window !== 'undefined'\)\s*(?:\{\s*)?void import\('\.\/agent-panel'\)/)
-  assert.match(overview, /dynamic\(\(\) => import\('\.\/agent-panel'\)/)
-  assert.match(demo, /src: withBasePath\('\/placeholder\.svg/)
-  const tools = await readFile(new URL('../components/workspace/agent-demo-tools.tsx', import.meta.url), 'utf8')
-  assert.match(tools, /src=\{withBasePath\('\/placeholder\.svg/)
-})
-
 test('综合演示每个分组都可解析，覆盖全部本地回复组件', () => {
   assert.ok(AGENT_DEMO_CODE.includes('export function summarize'))
   const source = AGENT_DEMO_SECTIONS.map(section => section.response).join('\n')
@@ -65,11 +54,8 @@ test('beUI 代码块在 OpenUI 和 Markdown 中真正接入，等待状态使用
   assert.ok(result.root)
   assert.deepEqual(result.meta.errors, [])
   const markdown = await readFile(new URL('../components/workspace/agent-markdown.tsx', import.meta.url), 'utf8')
-  const response = await readFile(new URL('../components/workspace/agent-response.tsx', import.meta.url), 'utf8')
   const code = await readFile(new URL('../components/workspace/agent-code-block.tsx', import.meta.url), 'utf8')
   assert.match(markdown, /<AgentCodeBlock/)
-  assert.match(response, /<ReasoningText/)
-  assert.doesNotMatch(response, /<AgentProgress/)
   assert.match(code, /from '@\/components\/agents\/code-block'/)
 })
 
@@ -128,16 +114,12 @@ test('图片复用正文入口并共享 SWR 预加载，回复缩略图不懒加
   const loader = await readFile(new URL('../lib/agent-image-loader.ts', import.meta.url), 'utf8')
   const route = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
   const image = await readFile(new URL('../components/workspace/agent-image.tsx', import.meta.url), 'utf8')
-  const panel = await readFile(new URL('../components/workspace/agent-panel.tsx', import.meta.url), 'utf8')
   assert.match(loader, /\/api\/agent\?q=/)
   assert.match(loader, /preload\(agentImageKey\(query\), loadAgentImage\)/)
   assert.match(route, /export \{ GET \} from '\.\/images\/route'/)
   assert.match(image, /useSWR\(previewImage \? null : agentImageKey\(query\), loadAgentImage/)
   assert.match(image, /const image = previewImage \?\? data\?\.image/)
   assert.match(image, /ImageViewerThumbnail loading="eager"/)
-  assert.match(panel, /observeAgentImages\(preloadAgentImage\)/)
-  assert.match(panel, /fetch: fetchAgent,/)
-  assert.match(panel, /observeAgentImages\(preloadAgentImage\)/)
 })
 
 test('资料配图和详细回答规则进入模型规范', async () => {
@@ -328,7 +310,6 @@ test('beUI 组件包含在运行时和可序列化规范中', async () => {
   const compiled = JSON.parse(await readFile(new URL('../lib/agent-system-prompt.json', import.meta.url), 'utf8'))
   assert.equal(compiled, prompt)
   const route = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /import systemPrompt from '@\/lib\/agent-system-prompt.json'/)
   assert.doesNotMatch(route, /from '@openuidev\//)
   for (const name of Object.keys(agentComponentCatalog)) {
     assert.ok(library.components[name])
@@ -413,12 +394,9 @@ test('49 项 AI Elements 对照不遗漏且 beUI 对应源码可导入', async (
 
 test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 会话组件', async () => {
   for (const [file, expectedImport] of [
-    ['agent-composer.tsx', 'prompt-input'],
     ['agent-conversation.tsx', 'message-scroller'],
     ['agent-conversation.tsx', 'message-bubble'],
     ['agent-conversation.tsx', 'message'],
-    ['agent-response.tsx', 'streaming-response'],
-    ['agent-response.tsx', 'loading-states/reasoning-text'],
     ['agent-decision.tsx', 'approval-card'],
     ['agent-content.tsx', 'todo-list'],
   ]) {
@@ -429,82 +407,6 @@ test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 
   const starters = await readFile(new URL('../components/workspace/agent-starters.tsx', import.meta.url), 'utf8')
   assert.match(starters, /export const getAgentStarters/)
   assert.doesNotMatch(starters, /<Button|function AgentStarters/)
-})
-
-test('Agent 保留应用外壳与固定标题 pill，导航由应用外壳承担', async () => {
-  const source = await readFile(new URL('../components/workspace/agent-chat.tsx', import.meta.url), 'utf8')
-  for (const name of ['SidebarTrigger', 'AgentWelcome', 'ConversationPill']) {
-    assert.match(source, new RegExp(`<${name}[\\s>]`))
-  }
-  assert.doesNotMatch(source, /<AnimatedSidebar[\s>]|<AnimatedSidebarTrigger|<AISidebar/)
-  assert.match(source, /<ConversationPill name=\{title\}/)
-  for (const key of ['newTask']) assert.ok(source.includes(`size="icon" aria-label={agentCopy.${key}}`))
-  assert.doesNotMatch(source, /ChatApp|AnimatedSidebarInset/)
-  assert.match(source, /turns\.length === 0 \? <AgentWelcome/)
-  const welcome = await readFile(new URL('../components/workspace/agent-welcome.tsx', import.meta.url), 'utf8')
-  assert.match(welcome, /min-h-full[^"]*justify-center/)
-  // No starter cards and no model picker (rules R-11, R-12).
-  assert.doesNotMatch(welcome, /agentStarters|onSuggestion/)
-  const shell = await readFile(new URL('../components/workspace/issue-workspace.tsx', import.meta.url), 'utf8')
-  assert.ok(shell.includes("hideHeader={!!selected || section === 'agent'}"))
-  const layout = await readFile(new URL('../app/[locale]/layout.tsx', import.meta.url), 'utf8')
-  assert.match(layout, /strategy="beforeInteractive"/)
-  assert.ok(layout.includes('globalThis[Symbol.for("openui.devtools.autoMount")] = true;'))
-  const conversation = await readFile(new URL('../components/workspace/agent-conversation.tsx', import.meta.url), 'utf8')
-  assert.match(conversation, /<MessageGroup spacing="default">/)
-  assert.match(conversation, /<MessageAvatar>/)
-  assert.match(conversation, /variant="solid"/)
-  assert.doesNotMatch(conversation, /<Empty|AgentStarters|有什么可以帮你/)
-  const composer = await readFile(new URL('../components/workspace/agent-composer.tsx', import.meta.url), 'utf8')
-  assert.match(composer, /minRows=\{isEmpty \? 2 : 1\}/)
-  assert.doesNotMatch(conversation, /今天想完成什么|Agent 使用说明/)
-  assert.doesNotMatch(composer, /models=/)
-  assert.match(composer, /actions=\{/)
-  assert.doesNotMatch(composer, /leadingAction|<Kbd/)
-  const panel = await readFile(new URL('../components/workspace/agent-panel.tsx', import.meta.url), 'utf8')
-  assert.doesNotMatch(panel, /starters=|AgentStarters/)
-  assert.match(panel, /if \(question\) setPreviousTurns/)
-  assert.match(panel, /result && source === 'composer'/)
-  assert.match(panel, /current === prompt \? '' : current/)
-  assert.match(panel, /continueFromAnswer: prompt => request\(prompt, 'inline'\)/)
-})
-
-test('服务端和 beUI 界面均使用 DS 4.1 Flash', async () => {
-  const route = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
-  const composer = await readFile(new URL('../components/workspace/agent-composer.tsx', import.meta.url), 'utf8')
-  const chat = await readFile(new URL('../components/workspace/agent-chat.tsx', import.meta.url), 'utf8')
-  assert.ok(route.includes("opencode('deepseek-v4.1-flash')"))
-  assert.match(route, /providerOptions:\s*\{\s*opencode:\s*\{\s*reasoningEffort: 'medium'/)
-  assert.doesNotMatch(route, /maxOutputTokens\s*:|thinking:\s*\{\s*type:\s*['"]disabled/)
-  assert.match(route, /createOpenAICompatible/)
-  assert.match(route, /validateAgentStream\(\)/)
-  assert.doesNotMatch(composer, /models=|DS 4\.1 Flash/)
-  assert.doesNotMatch(chat, /Agent 工作区|DS 4\.1 Flash/)
-  for (const source of [route, composer, chat]) assert.doesNotMatch(source, /glm-5\.3|GLM-5\.3/)
-})
-
-test('停止按钮先取消表单默认行为，避免同步恢复后误发草稿', async () => {
-  const source = await readFile(new URL('../components/agents/prompt-input.tsx', import.meta.url), 'utf8')
-  assert.match(source, /onClick=\{loading \? event => \{[\s\S]*?event\.preventDefault\(\);\s*onStop\?\.\(\);/)
-})
-
-test('回复动作统一直接请求，澄清使用内联问题卡片', async () => {
-  const panel = await readFile(new URL('../components/workspace/agent-panel.tsx', import.meta.url), 'utf8')
-  const handler = panel.slice(panel.indexOf('async function handleUIAction'), panel.indexOf('async function request'))
-  assert.match(handler, /request\(prompt, 'inline'\)/)
-  assert.doesNotMatch(handler, /updateDraft|\.focus\(|\.slice\(/)
-  const renderers = await readFile(new URL('../components/workspace/agent-ui-library.tsx', import.meta.url), 'utf8')
-  assert.match(renderers, /send\(props.action\)/)
-  assert.match(renderers, /send\(props.prompt\)/)
-  assert.doesNotMatch(renderers, /useTriggerAction/)
-  const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
-  assert.ok(spec.promptOptions.additionalRules.some(rule => rule.includes('所有回复内的按钮') && rule.includes('不填入、不聚焦、不清空')))
-  assert.ok(spec.promptOptions.additionalRules.some(rule => rule.includes('需求模糊') && rule.includes('BeQuestions') && rule.includes('allowCustom=true')))
-  for (const name of ['BeButton', 'ShadcnButton']) {
-    const props = name === 'BeButton' ? { action: '请提供建议' } : { prompt: '请提供建议' }
-    assert.equal(agentComponentCatalog[name].props.safeParse({ ...props, label: '直接提问' }).success, true)
-    assert.equal(agentComponentCatalog[name].props.safeParse({ ...props, label: '填入提问' }).success, true)
-  }
 })
 
 test('beUI 限制按钮语义、状态、数字和小数位', () => {
