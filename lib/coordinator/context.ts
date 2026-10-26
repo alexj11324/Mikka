@@ -15,6 +15,8 @@ const KEEP_TOOL_MESSAGES = 20
 export interface StoredMessage {
   position: number
   message: ModelMessage
+  /** coordinator_messages.id for persisted rows; absent for pending inbox items. */
+  id?: string
 }
 
 /**
@@ -214,6 +216,8 @@ export function instructionsWithMemory(
 
 /** One entry in the chat the person sees. */
 export interface ChatItem {
+  /** coordinator_messages.id of the row this item starts at; absent while the message is still pending in the inbox. */
+  id?: string
   position: number
   from: 'person' | 'coordinator' | 'event'
   text: string
@@ -230,7 +234,7 @@ export function chatItems(
   rows: readonly (StoredMessage & { createdAt: Date })[],
 ): ChatItem[] {
   const items: ChatItem[] = []
-  for (const { position, message, createdAt } of rows) {
+  for (const { id, position, message, createdAt } of rows) {
     if (message.role === 'user') {
       const text =
         typeof message.content === 'string'
@@ -241,6 +245,7 @@ export function chatItems(
       const event = text.startsWith('[Event]')
       // The triage line is for the Coordinator, not the person.
       items.push({
+        ...(id ? { id } : {}),
         position,
         from: event ? 'event' : 'person',
         text: event
@@ -271,6 +276,7 @@ export function chatItems(
         last.tools.push(...tools)
       } else if (text || tools.length) {
         items.push({
+        ...(id ? { id } : {}),
           position,
           from: 'coordinator',
           text,

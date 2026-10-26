@@ -97,6 +97,11 @@ before(async () => {
       return { issue, user: { id: actor } }
     },
   } })
+  // Connection-list visibility is a separate read path; this suite exercises writes.
+  // Fail if a relation write unexpectedly calls it rather than loading real DB pools.
+  mock.module(file('./issue-visibility.ts'), { namedExports: {
+    issueVisibility: async () => { throw new Error('Unexpected list visibility read in relation write') },
+  } })
   mock.module(file('./issue-numbering.ts'), { namedExports: { allocateIssueNumbers: async () => 1 } })
   // Identifier formatting reads account data in current main; relation guards do not.
   mock.module(file('./task-identifier-server.ts'), { namedExports: {

@@ -41,7 +41,7 @@ test('only chronology of exact imports is exempt; all other checks remain',()=>{
 test('fresh main failure never falls back to stale origin/main or null',()=>{
  const calls=[]
  assert.throws(()=>currentMainMigrations((...args)=>{calls.push(args);throw Error('network unavailable')}),/network unavailable/)
- assert.equal(calls[0][0],'fetch'); assert.match(calls[0][4],/^refs\/heads\/main:refs\/mikka-migration-check\//)
+ assert.equal(calls[0][0],'fetch'); assert.match(calls[0][3],/^refs\/heads\/main:refs\/mikka-migration-check\//)
  assert.equal(calls[1][0],'update-ref')
  assert.throws(()=>currentMainMigrations((command)=>Buffer.from(command==='rev-parse'?'a'.repeat(40):'')),/inventory unavailable/)
 })
@@ -50,7 +50,7 @@ test('unrelated fetch cannot replace the frozen current-main comparison',()=>{
  const sha='a'.repeat(40),calls=[];let ref
  const main=currentMainMigrations((...args)=>{
   calls.push(args)
-  if(args[0]==='fetch'){ref=args[4].split(':')[1];return Buffer.from('')}
+  if(args[0]==='fetch'){ref=args[3].split(':')[1];return Buffer.from('')}
   if(args[0]==='rev-parse'){assert.equal(args[1],ref);assert.notEqual(args[1],'FETCH_HEAD');return Buffer.from(sha)}
   if(args[0]==='ls-tree'){assert.equal(args[2],sha);return Buffer.from('drizzle/20261025232201_example.sql\n')}
   return Buffer.from('')

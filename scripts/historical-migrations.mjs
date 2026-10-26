@@ -41,7 +41,7 @@ export function currentMainMigrations(runGit = git) {
   const ref = `refs/mikka-migration-check/${randomUUID()}`
   let sha
   try {
-    runGit('fetch', '--no-tags', '--depth=1', 'origin', `refs/heads/main:${ref}`)
+    runGit('fetch', '--no-tags', 'origin', `refs/heads/main:${ref}`)
     sha = runGit('rev-parse', ref).toString().trim()
     if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Invalid current main commit')
   } finally {
