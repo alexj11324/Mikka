@@ -1,4 +1,8 @@
 import { randomUUID } from "node:crypto";
+import {
+  SKILL_ACTIVATION_TARGET,
+  withdrawSkillApproval,
+} from "../self-improvement/activation";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { FactoryError, type FactoryBinding } from "./contract";
@@ -176,6 +180,7 @@ export const publishGate: FactoryGate = async (tx, task, _attempt, change) => {
       a.target,
       a.request.targetEnvironment,
       p.id,
+      publicationBindingHash(providerInput(task, a, p.request, p.id)),
     );
     if (
       new Date(receipt.data.verifiedTarget.observedAt).getTime() <
@@ -198,11 +203,15 @@ export interface PublicationAdapter {
   action: z.infer<typeof publicationRequest>["action"];
   target: string;
   environment: string;
-  execute(input: PublicationInput): Promise<PublicationAdapterReceipt>;
+  execute(
+    input: PublicationInput,
+    tx?: PoolClient,
+  ): Promise<PublicationAdapterReceipt>;
   /** Read-only inspection. This method must never create/promote a deployment. */
   reconcile?(
     input: PublicationInput,
     checkpoint: unknown,
+    tx?: PoolClient,
   ): Promise<PublicationAdapterReceipt>;
 }
 
@@ -283,6 +292,7 @@ export function createFactoryApprovals(
       a.target,
       a.request.targetEnvironment,
       publicationId,
+      publicationBindingHash(providerInput(task, a, req, publicationId)),
     );
     providerBinding(receipt, providerInput(task, a, req, publicationId));
     await tx.query(
@@ -374,6 +384,12 @@ export function createFactoryApprovals(
       const parsed = approvalRequest.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
       const req = parsed.data;
+      if (
+        req.action === "activate_skill" &&
+        (req.target !== SKILL_ACTIVATION_TARGET ||
+          !["preview", "production"].includes(req.targetEnvironment))
+      )
+        fail("factoryInvalid");
       return transaction(async (tx) => {
         const task = await owned(tx, actor, req.binding.taskId);
         if (task.issueId !== req.binding.issueId) fail("factoryNotFound");
@@ -506,6 +522,7 @@ export function createFactoryApprovals(
           [req.approvalId, task.id, actor.userId],
         );
         if (!rowCount) fail("factoryApprovalInvalid");
+        await withdrawSkillApproval(tx, task, req.approvalId);
         const result = { approvalId: req.approvalId, revoked: true };
         await tx.query(
           'INSERT INTO factory_approval_controls ("taskId","eventId","userId","humanSessionId",request,result) VALUES ($1,$2,$3,$4,$5,$6)',
@@ -629,7 +646,7 @@ export function createFactoryApprovals(
             await validApproval(tx, task, req.approvalId, true);
           };
           const receipt = publicationAdapterReceipt.parse(
-            await adapter.execute(trustedInput),
+            await adapter.execute(trustedInput, tx),
           );
           return complete(tx, task, req, a, current, receipt, publicationId);
         });
@@ -694,6 +711,7 @@ export function createFactoryApprovals(
             await adapter.reconcile(
               providerInput(task, a, req, publicationId),
               p.receipt,
+              tx,
             ),
           );
           return complete(tx, task, req, a, current, receipt, publicationId);

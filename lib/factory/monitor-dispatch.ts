@@ -114,6 +114,10 @@ export async function configureFactoryMonitorDispatch(
   receipt: Publication,
   replayed: boolean,
 ) {
+  if (receipt.action === "activate_skill" && !replayed)
+    await (
+      await import("../self-improvement/server")
+    ).skillAssignments.selectActive(task.userId, runId, tx);
   const row = await monitorRun(tx, task, runId);
   if (replayed) {
     const metadata = row.output?.monitorDispatch;

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { lockSkillPublication } from "../self-improvement/activation";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { bindingSchema, FactoryError, type FactoryBinding } from "./contract";
@@ -261,6 +262,23 @@ export function createFactoryMonitor(
       }
       if (task.stage !== "monitor" || !task.candidateId)
         fail("factoryTransition");
+      const {
+        rows: [skillPublication],
+      } = await tx.query(
+        `SELECT action FROM factory_publications WHERE "taskId"=$1 AND "candidateId"=$2 AND status='succeeded' ORDER BY "finishedAt" DESC LIMIT 1`,
+        [task.id, task.candidateId],
+      );
+      if (skillPublication?.action === "activate_skill")
+        await lockSkillPublication(
+          tx,
+          {
+            taskId: task.id,
+            candidateId: task.candidateId,
+            issueId: task.issueId,
+            action: skillPublication.action,
+          },
+          userId,
+        );
       const {
         rows: [source],
       } = await tx.query(

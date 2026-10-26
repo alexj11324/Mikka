@@ -1,4 +1,8 @@
 import { randomUUID, createHash } from "node:crypto";
+import {
+  lockSkillPublication,
+  probeSkillActivation,
+} from "../self-improvement/activation";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { Pool, PoolClient } from "pg";
@@ -9,6 +13,7 @@ import { digest } from "./evidence";
 import {
   readFactoryPublicationReceiptV2,
   verifiedPublicationTarget,
+  skillActivationProof,
 } from "./publication-receipt";
 import { configuredVercelMonitorProbes } from "./vercel-monitor";
 import { configuredLocalPublicationAdapters } from "./local-publication";
@@ -28,15 +33,20 @@ export const monitorAuditSchema = z
     repository: z.string(),
     environment: z.string(),
     scope: z.string(),
-    action: z.enum(["deploy_preview", "deploy_production"]),
+    action: z.enum(["deploy_preview", "deploy_production", "activate_skill"]),
     target: z.string(),
     targetEnvironment: z.string(),
     kind: z.enum([
       "local-artifact",
       "preview-deployment",
       "production-deployment",
+      "skill-activation",
     ]),
     provider: verifiedPublicationTarget.shape.provider,
+    skill: skillActivationProof
+      .extend({ runId: z.uuid(), mountReceiptId: z.uuid().nullable() })
+      .strict()
+      .optional(),
     health: z
       .object({
         path: z.literal("/mikka/api/health"),
@@ -231,10 +241,15 @@ export function createMonitorProbeRecorder(
   authorize: FactoryAuthorize,
   adapters: MonitorProbeAdapter[],
 ) {
-  return async (userId: string, runId: string) => {
-    const tx = await pool.connect();
+  return async (
+    userId: string,
+    runId: string,
+    existing?: PoolClient,
+    completionReport?: unknown,
+  ) => {
+    const tx = existing ?? (await pool.connect());
     try {
-      await tx.query("BEGIN");
+      if (!existing) await tx.query("BEGIN");
       const {
         rows: [task],
       } = await tx.query<FactoryTask>(
@@ -242,7 +257,7 @@ export function createMonitorProbeRecorder(
         [runId, userId],
       );
       if (!task) {
-        await tx.query("COMMIT");
+        if (!existing) await tx.query("COMMIT");
         return;
       }
       if (
@@ -251,6 +266,13 @@ export function createMonitorProbeRecorder(
         !task.candidateId
       )
         throw new FactoryError("factoryMonitorProbeStopped");
+      const receipt = await readFactoryPublicationReceiptV2(
+        tx,
+        userId,
+        task.id,
+        task.candidateId,
+      );
+      await lockSkillPublication(tx, receipt, userId);
       const {
         rows: [run],
       } = await tx.query(
@@ -265,12 +287,6 @@ export function createMonitorProbeRecorder(
         run.stopRequestedAt
       )
         throw new FactoryError("factoryMonitorProbeRunRequired");
-      const receipt = await readFactoryPublicationReceiptV2(
-        tx,
-        userId,
-        task.id,
-        task.candidateId,
-      );
       if (!monitorPublicationSupported(receipt))
         throw new FactoryError("factoryMonitorProbeUnavailable");
       const {
@@ -289,7 +305,7 @@ export function createMonitorProbeRecorder(
           prior.audit.publicationId !== receipt.publicationId
         )
           throw new FactoryError("factoryReplayMismatch");
-        await tx.query("COMMIT");
+        if (!existing) await tx.query("COMMIT");
         return prior.audit;
       }
       const adapter = adapters.find(
@@ -299,9 +315,19 @@ export function createMonitorProbeRecorder(
           a.environment === receipt.targetEnvironment &&
           a.repository === receipt.candidate.repository,
       );
-      if (!adapter) throw new FactoryError("factoryMonitorProbeUnavailable");
+      if (!adapter && receipt.action !== "activate_skill")
+        throw new FactoryError("factoryMonitorProbeUnavailable");
       const startedAt = new Date().toISOString(),
-        result = await adapter.execute(receipt),
+        result =
+          receipt.action === "activate_skill"
+            ? await probeSkillActivation(
+                tx,
+                receipt,
+                runId,
+                userId,
+                completionReport,
+              )
+            : await adapter!.execute(receipt),
         finishedAt = new Date().toISOString();
       const artifactId = randomUUID(),
         artifact = `run-chunk:${artifactId}`;
@@ -332,6 +358,7 @@ export function createMonitorProbeRecorder(
         observedOperationId: result.observedOperationId,
         observedReference: result.observedReference,
         errorCode: result.errorCode,
+        ...("skill" in result ? { skill: result.skill } : {}),
         ...(result.provider ? { provider: result.provider } : {}),
         ...(result.health ? { health: result.health } : {}),
         logArtifacts: [artifact],
@@ -359,13 +386,13 @@ export function createMonitorProbeRecorder(
         "UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1",
         [task.attemptId, JSON.stringify({ monitorProof: proof })],
       );
-      await tx.query("COMMIT");
+      if (!existing) await tx.query("COMMIT");
       return audit;
     } catch (error) {
-      await tx.query("ROLLBACK");
+      if (!existing) await tx.query("ROLLBACK");
       throw error;
     } finally {
-      tx.release();
+      if (!existing) tx.release();
     }
   };
 }
@@ -417,6 +444,27 @@ export async function validatedMonitorProof(
   )
     return;
   if (!v.provider && (a.version !== 1 || a.provider || a.health)) return;
+  if (v.skill) {
+    if (
+      !a.skill ||
+      a.skill.runId !== run.id ||
+      !a.skill.mountReceiptId ||
+      digest({ ...a.skill, runId: undefined, mountReceiptId: undefined }) !==
+        digest({ ...v.skill, runId: undefined, mountReceiptId: undefined })
+    )
+      return;
+    const observed = await probeSkillActivation(
+      tx,
+      receipt,
+      run.id,
+      task.userId,
+    );
+    if (
+      digest(observed.skill) !== digest(a.skill) ||
+      observed.errorCode !== a.errorCode
+    )
+      return;
+  } else if (a.skill) return;
   const start = Date.parse(a.startedAt),
     end = Date.parse(a.finishedAt);
   if (
@@ -448,6 +496,12 @@ export async function validatedMonitorProof(
     return;
   return proof;
 }
+function skillAuditMatches(a: MonitorAudit, r: MonitorPublication) {
+  if (!a.skill || !a.skill.mountReceiptId || a.skill.runId !== a.runId)
+    return false;
+  const { runId: _runId, mountReceiptId: _receiptId, ...proof } = a.skill;
+  return digest(proof) === digest(r.verifiedTarget.skill);
+}
 export function monitorProbePassed(a: MonitorAudit, r: MonitorPublication) {
   return (
     monitorPublicationSupported(r) &&
@@ -466,6 +520,7 @@ export function monitorProbePassed(a: MonitorAudit, r: MonitorPublication) {
             a.health.aliasBefore === null &&
             a.health.aliasAfter === null &&
             a.health.aliasStatus === null))) &&
+    (!r.verifiedTarget.skill || skillAuditMatches(a, r)) &&
     a.exitCode === 0 &&
     !a.signal &&
     !a.timedOut &&
@@ -485,6 +540,8 @@ export function monitorProbeFailed(
   r: MonitorPublication,
 ): boolean {
   if (a.timedOut || a.signal || !monitorPublicationSupported(r)) return false;
+  if (r.verifiedTarget.kind === "skill-activation")
+    return skillAuditMatches(a, r) && a.errorCode === "skill-run-failed";
   if (r.verifiedTarget.kind === "local-artifact")
     return ["content-mismatch", "missing"].includes(a.errorCode ?? "");
   return Boolean(
@@ -510,6 +567,15 @@ export function monitorProbeFailed(
 /** Explicit V2 adoption; old preview/local receipts can never represent production. */
 export function monitorPublicationSupported(r: MonitorPublication): boolean {
   const v = r.verifiedTarget;
+  if (v.kind === "skill-activation")
+    return (
+      r.version === 2 &&
+      r.action === "activate_skill" &&
+      !!v.skill &&
+      !v.provider &&
+      r.target === "mikka-builtin:run-report" &&
+      ["preview", "production"].includes(r.targetEnvironment)
+    );
   if (v.kind === "local-artifact")
     return r.action === "deploy_preview" && !v.provider;
   if (!v.provider || r.version !== 2) return false;

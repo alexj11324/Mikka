@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readSkillApprovalEvidence } from "../self-improvement/activation";
 import type { PoolClient } from "pg";
 import { evidenceSchema, FactoryError, type FactoryEvidence } from "./contract";
 import type { FactoryCandidate, FactoryTask } from "./store";
@@ -120,6 +121,7 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
     [task.candidateId, task.id],
   );
   if (!candidate) throw new FactoryError("factoryEvidenceRequired");
+  const skill = await readSkillApprovalEvidence(tx, task);
   const { rows } = await tx.query(
     "SELECT * FROM factory_attempts WHERE \"taskId\"=$1 AND \"candidateId\"=$2 AND stage IN ('execute','review','verify') ORDER BY position",
     [task.id, candidate.id],
@@ -180,6 +182,7 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
     candidateId: candidate.id,
     candidate: candidateIdentity(candidate),
     artifacts,
+    ...(skill ? { skill } : {}),
   };
   return {
     manifest,

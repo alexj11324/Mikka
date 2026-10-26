@@ -1,4 +1,5 @@
 import "server-only";
+import { createSkillActivationAdapters } from "../self-improvement/activation";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pool } from "@/lib/db";
 import { issueForUser } from "@/lib/issue-access";
@@ -36,6 +37,16 @@ export const factoryApprovals = createFactoryApprovals(
   [
     ...configuredLocalPublicationAdapters(process.env),
     ...configuredVercelPublicationAdapters(process.env),
+    ...createSkillActivationAdapters({
+      readRegisteredCandidate: async (...args) =>
+        (
+          await import("../self-improvement/server")
+        ).skillRegistry.readRegisteredCandidate(...args),
+      passingEvaluation: async (...args) =>
+        (
+          await import("../self-improvement/server")
+        ).skillEvaluations.passingEvaluation(...args),
+    }),
   ],
 );
 export const claimFactoryCheckRun = createFactoryCheckClaim(pool, authorize);

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { bindingSchema, candidateSchema, FactoryError } from "./contract";
 import { digest } from "./evidence";
+import { publicationAction } from "./approval-contract";
 
 const authorization = z
   .object({
@@ -10,7 +11,7 @@ const authorization = z
     expiresAt: z.iso.datetime(),
     binding: bindingSchema,
     eventId: z.uuid(),
-    action: z.enum(["deploy_preview", "deploy_production", "merge"]),
+    action: publicationAction,
     target: z.string().min(1),
     targetEnvironment: z.string().min(1),
   })

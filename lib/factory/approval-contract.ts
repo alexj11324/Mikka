@@ -6,6 +6,7 @@ export const publicationAction = z.enum([
   "deploy_preview",
   "deploy_production",
   "merge",
+  "activate_skill",
 ]);
 export const approvalRequest = z
   .object({

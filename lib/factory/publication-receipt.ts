@@ -3,6 +3,7 @@ import type { PoolClient } from "pg";
 import { candidateSchema, FactoryError } from "./contract";
 import { digest } from "./evidence";
 import { publicationBindingHash } from "./publication-operation";
+import { publicationAction } from "./approval-contract";
 
 const provider = z
   .object({
@@ -17,6 +18,19 @@ const provider = z
   })
   .strict();
 
+export const skillActivationProof = z
+  .object({
+    version: z.literal(1),
+    publicationId: z.uuid(),
+    bindingHash: z.string().regex(/^[a-f0-9]{64}$/),
+    versionId: z.uuid(),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+    proposalId: z.uuid(),
+    evaluationId: z.uuid(),
+  })
+  .strict();
+export type SkillActivationProof = z.infer<typeof skillActivationProof>;
+
 export const verifiedPublicationTarget = z
   .object({
     kind: z.enum([
@@ -24,6 +38,7 @@ export const verifiedPublicationTarget = z
       "preview-deployment",
       "production-deployment",
       "merge",
+      "skill-activation",
     ]),
     operationId: z.string().min(1).max(2000),
     target: z.string().min(1).max(2000),
@@ -33,6 +48,7 @@ export const verifiedPublicationTarget = z
     reference: z.string().min(1).max(2000),
     observedAt: z.iso.datetime(),
     provider: provider.optional(),
+    skill: skillActivationProof.optional(),
   })
   .strict();
 export const publicationAdapterReceipt = z
@@ -52,8 +68,28 @@ export function assertPublicationTarget(
   target: string,
   targetEnvironment: string,
   publicationId?: string,
+  expectedBindingHash?: string,
 ) {
   const v = receipt.verifiedTarget;
+  if (
+    (action === "activate_skill") !== (v.kind === "skill-activation") ||
+    (action !== "activate_skill" && v.skill !== undefined)
+  )
+    throw new FactoryError("factoryPublicationReceiptMismatch");
+  if (action === "activate_skill") {
+    const proof = skillActivationProof.safeParse(v.skill);
+    if (
+      !proof.success ||
+      !publicationId ||
+      v.operationId !== publicationId ||
+      proof.data.publicationId !== publicationId ||
+      !expectedBindingHash ||
+      proof.data.bindingHash !== expectedBindingHash ||
+      target !== "mikka-builtin:run-report" ||
+      !["preview", "production"].includes(targetEnvironment)
+    )
+      throw new FactoryError("factoryPublicationReceiptMismatch");
+  }
   if (
     v.target !== target ||
     !targetEnvironment ||
@@ -162,6 +198,24 @@ export async function readFactoryPublicationReceiptV2(
     digest(candidate) !== digest(p.candidate)
   )
     throw new FactoryError("factoryPublicationReceiptRequired");
+  const bindingHash =
+    p.action === "activate_skill"
+      ? publicationBindingHash({
+          idempotencyKey: p.id,
+          candidate,
+          authorization: {
+            approvalId: p.approvalId,
+            ownerId: userId,
+            humanSessionId: p.humanSessionId,
+            expiresAt: p.approvalRequest.expiresAt,
+            binding: p.request.binding,
+            eventId: p.request.eventId,
+            action: p.action,
+            target: p.target,
+            targetEnvironment: p.request.targetEnvironment,
+          },
+        })
+      : undefined;
   assertPublicationTarget(
     receipt.data,
     candidate,
@@ -169,6 +223,7 @@ export async function readFactoryPublicationReceiptV2(
     p.target,
     p.request.targetEnvironment,
     p.id,
+    bindingHash,
   );
   if (
     receipt.data.verifiedTarget.provider?.bindingHash !== undefined &&
@@ -198,7 +253,7 @@ export async function readFactoryPublicationReceiptV2(
     issueId: p.issueId as string,
     candidateId,
     candidate,
-    action: p.action as "deploy_preview" | "deploy_production" | "merge",
+    action: p.action as z.infer<typeof publicationAction>,
     target: p.target as string,
     targetEnvironment: p.request.targetEnvironment as string,
     publishedAt: (p.publishFinishedAt as Date).toISOString(),
