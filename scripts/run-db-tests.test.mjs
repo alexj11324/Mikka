@@ -1,97 +1,127 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { BOOTSTRAP, REQUIRED_SUITES, SELF_MANAGED, checkSummary, inventory, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
+import { SELF_MANAGED, inventory, main, readTree, validateTarget } from './run-db-tests.mjs'
+import { coveragePlan, databaseIdentity, profileEnvironment, parseEvidence, executePhase, aggregate, resultError } from './db-test-plan.mjs'
+const sha = 'a'.repeat(40), file = 'tests/example.db.test.ts'
+const files = { [file]: "import { Pool } from 'pg'; test('actual DB exercise',()=>{})" }
+const scripts = { 'test:example': `node --test ${file}` }
+const target = 'postgresql://e2e:synthetic@127.0.0.1:5432/mikka_e2e'
+const env = { CI: 'true', GITHUB_ACTIONS: 'true', E2E_DATABASE_URL: target, MIKKA_DATABASE_URL: target, DATABASE_URL: target, PATH: '/bin', COMPOSIO_API_KEY: 'must-not-inherit', VERCEL: 'must-not-inherit' }
+const config = () => ({ version: 1, expected: ['example'], profiles: { isolated: { targets: [{ key: 'E2E_DATABASE_URL', database: 'mikka_e2e', host: '127.0.0.1', port: '5432' }], bindings: { MIKKA_DATABASE_URL: 'E2E_DATABASE_URL' }, env: {} } }, recipes: [{ id: 'example', files: [{ path: file, requiredNames: ['actual DB exercise'] }], command: ['pnpm', '-s', 'test:example'], packageScript: 'test:example', profile: 'isolated', phase: 'prebuild', status: 'ready', expectedTests: ['actual DB exercise'], expectedCount: 1 }] })
+const plan = (c = config(), f = files, s = scripts, extra = {}) => coveragePlan(f, s, c, extra)
+const output = 'ok 1 - actual DB exercise\n# tests 1\n# pass 1\n# fail 0\n# skipped 0\n# todo 0\n# cancelled 0\n'
+const success = () => ({ status: 0, stdout: output, stderr: '' })
 
-const target = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
-const env = { CI: 'true', GITHUB_ACTIONS: 'true', E2E_DATABASE_URL: target, MIKKA_DATABASE_URL: target, DATABASE_URL: target }
-const sample = REQUIRED_SUITES[0]
-const files = { [sample.marker]: '', [sample.file]: "import { Pool } from 'pg'" }
-const scripts = { [sample.script]: `node --test ${sample.file}` }
+test('complete expected set, unknown/deleted files and duplicate primary coverage fail closed', () => {
+ assert.deepEqual(plan().files, [file])
+ assert.throws(() => plan(config(), { ...files, 'tests/unknown.db.test.ts': '' }), /Unregistered/)
+ assert.throws(() => plan(config(), {}), /Missing\/overlapping/)
+ for (const expected of [[], ['example', 'unknown'], ['example', 'example']]) assert.throws(() => plan(config(), files, scripts, { expected }), /expected/)
+ const c = config(); c.recipes.push({ ...c.recipes[0], id: 'duplicate' }); c.expected.push('duplicate'); assert.throws(() => plan(c), /Duplicate primary/)
+ assert.throws(() => plan(config(), { ...files, 'lib/feature.ts': '' }, scripts, { required: [{ marker: 'lib/feature.ts', file: 'tests/lost.db.test.ts' }] }), /Required feature/)
+})
+test('every recipe needs profile, DB contract, named tests, count, phase and a live invocation', () => {
+ for (const change of [c=>delete c.profiles.isolated, c=>c.profiles.isolated.targets=[{}], c=>c.recipes[0].files[0].requiredNames=[], c=>c.recipes[0].expectedCount=0, c=>c.recipes[0].phase='any', c=>c.recipes[0].command=['echo','green']]) {
+  const c=config(); change(c); assert.throws(()=>plan(c))
+ }
+ assert.throws(()=>plan(config(),files,{'test:example':'node -e 0'}),/no longer invokes/)
+ const c=config();c.recipes[0].runner='scripts/special.mjs'
+ assert.throws(()=>plan(c,files,{'test:example':'node scripts/special.mjs'}),/Missing live runner/)
+ const f={...files,'scripts/special.mjs':`spawn('node',['--test','${file}'])`}
+ assert.doesNotThrow(()=>plan(c,f,{'test:example':'node scripts/special.mjs'}))
+ assert.throws(()=>plan(c,{...f,'scripts/special.mjs':'no invocation'}, {'test:example':'node scripts/special.mjs'}),/no longer invokes/)
+})
+test('native is an explicit named variant, not ambiguous duplicate or exclusion', () => {
+ const c=config(); c.recipes[0].aliases=['test:native'];c.expected.push('native');c.recipes.push({...c.recipes[0],id:'native',variantOf:'example',packageScript:'test:native',command:['pnpm','-s','test:native'],phase:'postbuild'})
+ assert.equal(plan(c,files,{...scripts,'test:native':`node --test ${file}`}).recipes.length,2)
+ delete c.recipes[0].aliases;assert.throws(()=>plan(c,files,{...scripts,'test:native':`node --test ${file}`}),/Invalid explicit variant/)
+})
+test('original auth-email SELF_MANAGED is unchanged and not a passing recipe', () => {
+ assert.deepEqual(SELF_MANAGED,[{file:'lib/auth-email.test.ts',runner:'scripts/test-auth-email.mjs',reason:'starts its own Docker Postgres and refuses any application database'}])
+ const f={...files,'lib/auth-email.test.ts':"import { Pool } from 'pg'",'scripts/test-auth-email.mjs':"run('lib/auth-email.test.ts')"}
+ const p=plan(config(),f,scripts,{selfManaged:SELF_MANAGED});assert.deepEqual(p.selfManaged,['lib/auth-email.test.ts']);assert.deepEqual(p.expected,['example'])
+ assert.throws(()=>plan(config(),{...f,'scripts/test-auth-email.mjs':''},scripts,{selfManaged:SELF_MANAGED}),/self-managed/)
+})
+test('isolated profiles reject remote/options/DB mismatches and omit provider credentials', () => {
+ const p=config().profiles.isolated
+ const child=profileEnvironment(p,env,'prebuild');assert.equal(child.MIKKA_DATABASE_URL,target);assert.equal(child.RETAIN_SYNTHETIC_RECORDS,'1');assert.equal(child.COMPOSIO_API_KEY,undefined);assert.equal(child.VERCEL,undefined)
+ assert.equal(databaseIdentity('postgres://a:one@localhost/same_e2e'),databaseIdentity('postgres://b:two@127.0.0.1:5432/same_e2e'))
+ assert.equal(databaseIdentity('postgres://a@127.0.0.1/same%5Fe2e'),databaseIdentity('postgres://b@127.0.0.1/same_e2e'))
+ for(const bad of ['postgres://remote/mikka_e2e',target+'?host=remote',target+'#fragment','postgres://e2e@localhost:6543/mikka_e2e','postgres://e2e@localhost/business','https://localhost/mikka_e2e'])assert.throws(()=>profileEnvironment(p,{...env,E2E_DATABASE_URL:bad},'prebuild'),/target/)
+ assert.throws(()=>profileEnvironment(p,{...env,CI:''},'prebuild'),/isolated/)
+ assert.throws(()=>profileEnvironment({...p,bindings:{X:'MISSING'}},env,'prebuild'),/binding/)
+ assert.throws(()=>profileEnvironment({...p,env:{RETAIN_SYNTHETIC_RECORDS:'0'}},env,'prebuild'),/Cleanup/)
+ assert.throws(()=>profileEnvironment({...p,distinct:['E2E_DATABASE_URL','DATABASE_URL']},env,'prebuild'),/Separate/)
+ const http={...p,http:'ORIGIN'};assert.throws(()=>profileEnvironment(http,{...env,ORIGIN:'http://localhost:3100'},'prebuild'),/postbuild/)
+ assert.doesNotThrow(()=>profileEnvironment(http,{...env,ORIGIN:'http://localhost:3100'},'postbuild'))
+ assert.throws(()=>profileEnvironment(http,{...env,ORIGIN:'https://remote.example'},'postbuild'))
+ assert.doesNotThrow(()=>validateTarget(env));assert.throws(()=>validateTarget({...env,DATABASE_URL:'postgres://remote/business'}))
+})
+test('test names and all counts are required; zero/skip/todo/fail/cancelled never pass', () => {
+ const recipe=config().recipes[0], data={state:'passed',exitCode:0,...parseEvidence(output)}
+ assert.equal(resultError(recipe,data),null)
+ assert.deepEqual(parseEvidence('✔ actual DB exercise (1.23ms)\nℹ tests 1\nℹ pass 1\n').names,['actual DB exercise'])
+ for(const key of ['tests','pass','fail','skipped','todo','cancelled']){const x=structuredClone(data);delete x.counts[key];assert.ok(resultError(recipe,x))}
+ for(const key of ['fail','skipped','todo','cancelled']){const x=structuredClone(data);x.counts[key]=1;assert.ok(resultError(recipe,x))}
+ for(const patch of [{names:[]},{counts:{...data.counts,tests:0,pass:0}},{names:['wrong']},{exitCode:1},{state:'blocked'}])assert.ok(resultError(recipe,{...data,...patch}))
+})
+test('pending, missing-profile and wrong-phase recipes never start a subprocess', () => {
+ let calls=0;const run=()=>{calls++;return success()};const c=config();c.recipes[0].status='pending';c.recipes[0].pendingReason='retained harness not accepted'
+ const blocked=executePhase(plan(c),'prebuild',sha,env,run);assert.equal(calls,0);assert.equal(blocked.results[0].state,'blocked')
+ const failed=executePhase(plan(),'prebuild',sha,{...env,E2E_DATABASE_URL:undefined},run);assert.equal(calls,0);assert.equal(failed.results[0].state,'failed')
+ assert.equal(executePhase(plan(),'postbuild',sha,env,run).results.length,0);assert.equal(calls,0)
+ const post=config();post.recipes[0].phase='postbuild';assert.equal(executePhase(plan(post),'postbuild',sha,env,run).results[0].state,'blocked');assert.equal(calls,0)
+ const passed=executePhase(plan(),'prebuild',sha,env,(cmd,args,opts)=>{assert.equal(opts.shell,false);assert.equal(opts.env.COMPOSIO_API_KEY,undefined);return success()});assert.equal(passed.results[0].state,'passed')
+})
+test('aggregation binds exact SHA/plan/profile/command/phase and every result once', () => {
+ const p=plan(), report=executePhase(p,'prebuild',sha,env,success)
+ assert.equal(aggregate(p,sha,[report]).passed,true)
+ assert.equal(aggregate(p,sha,[]).passed,false)
+ assert.equal(aggregate(p,sha,[null,{unreadable:'missing.json'}]).passed,false)
+ assert.equal(aggregate(p,sha,[report,report]).passed,false)
+ for(const patch of [{sha:'b'.repeat(40)},{digest:'wrong'},{phase:'external'}])assert.equal(aggregate(p,sha,[{...report,...patch}]).passed,false)
+ for(const patch of [{profile:'wrong'},{command:['echo','pass']},{names:[]},{counts:null},{sha:'b'.repeat(40)}]){const x=structuredClone(report);Object.assign(x.results[0],patch);assert.equal(aggregate(p,sha,[x]).passed,false)}
+ const c=config();c.recipes[0].status='pending';c.recipes[0].pendingReason='not verified';const pending=plan(c);const forged={...report,digest:pending.digest,results:report.results.map(r=>({...r,digest:pending.digest}))};assert.equal(aggregate(pending,sha,[forged]).passed,false)
+ assert.notEqual(plan(config(),{...files,[file]:files[file]+'\n'}).digest,p.digest)
+})
+test('actual tree has exact complete R0 inventory, all previously missing suites and no new exclusions', () => {
+ const pkg=JSON.parse(readFileSync('package.json','utf8')).scripts,c=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8')),p=inventory(readTree(),pkg)
+ assert.equal(p.files.length,41);assert.equal(p.recipes.length,23);assert.deepEqual(p.expected,c.expected)
+ for(const id of ['credentials','groups','group-native','operations','migration-session','improvement','byos-claim','byos-worker','factory-question-http'])assert.ok(p.expected.includes(id))
+ assert.ok(p.contractErrors.length>0,'unverified result contracts remain failed, not excluded');
+ assert.deepEqual(p.selfManaged,['lib/auth-email.test.ts']);assert.ok(p.recipes.filter(r=>r.phase==='postbuild').every(r=>r.status==='pending'))
+ let calls=0;assert.equal(main({env:{},run(){calls++}}),1);assert.equal(calls,0)
+})
 
-test('parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or failed executions', () => {
-  assert.deepEqual(parseSummary('# tests 4\n# pass 4\n# fail 0\n# skipped 0\n'), { tests: 4, pass: 4, fail: 0, skipped: 0 })
-  assert.deepEqual(parseSummary('ℹ tests 2\nℹ pass 1\nℹ skipped 1\n'), { tests: 2, pass: 1, skipped: 1 })
-  assert.equal(checkSummary('s', 0, { tests: 3, pass: 3 }), null)
-  for (const key of ['skipped', 'todo', 'fail', 'cancelled']) assert.match(checkSummary('s', 0, { tests: 3, pass: 2, [key]: 1 }), new RegExp(key))
-  assert.match(checkSummary('s', 0, {}), /no node:test summary/)
-  assert.match(checkSummary('s', 0, { tests: 0, pass: 0 }), /ran no tests/)
-  assert.match(checkSummary('s', 0, { tests: 3, pass: 2 }), /count/)
-  assert.match(checkSummary('s', 1, { tests: 3, pass: 3 }), /exited/)
-  assert.match(checkSummary('s', null, { tests: 3, pass: 3 }), /exited/)
+test('workflow invokes each DB recipe through one phase and enforces final complete result', () => {
+ const workflow=readFileSync('.github/workflows/ui-policy.yml','utf8'), config=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8'))
+ const pin=workflow.match(/DB_TEST_EXPECTED: ([^\n]+)/)?.[1].split(',');assert.deepEqual(pin,config.expected)
+ for(const phase of ['prebuild','postbuild','external'])assert.equal(workflow.split(`pnpm test:db --phase ${phase} `).length-1,1)
+ for(const script of ['test:visibility-db','test:issue-search-db','test:credentials','test:historical-upgrade-db'])assert.ok(!workflow.includes(`pnpm ${script}`))
+ const dbJob=workflow.slice(workflow.indexOf('  browser-tests:'));assert.ok(!dbJob.includes('pnpm test:factory'));assert.ok(!dbJob.includes('pnpm test:groups'))
+ assert.ok(workflow.includes('pnpm test:db --aggregate test-results/r0/prebuild.json test-results/r0/postbuild.json test-results/r0/external.json'))
+ const aggregateStep=workflow.slice(workflow.indexOf('      - name: R0 complete same-SHA'),workflow.indexOf('      - uses: actions/upload-artifact@v4',workflow.indexOf('      - name: R0 complete same-SHA')))
+ assert.ok(!aggregateStep.includes('continue-on-error'));assert.ok(aggregateStep.includes('if: always()'))
+ assert.ok(dbJob.indexOf('tests/migrate-empty-db.test.mjs')<dbJob.indexOf('scripts/setup-e2e-db.mjs'))
+ assert.ok(dbJob.indexOf('--phase prebuild')<dbJob.indexOf('- run: pnpm build'));assert.ok(dbJob.indexOf('- run: pnpm build')<dbJob.indexOf('--phase postbuild'))
+ for(const pure of ['test:agent','test:issues','test:db-runner'])assert.ok(workflow.includes(`pnpm ${pure}`))
 })
-test('only matching ephemeral Actions URLs are permitted; missing DB fails before subprocess', () => {
-  assert.doesNotThrow(() => validateTarget(env))
-  for (const changes of [{ CI: '' }, { GITHUB_ACTIONS: '' }, { E2E_DATABASE_URL: '' }, { E2E_DATABASE_URL: 'postgres://business/db' }, { DATABASE_URL: 'postgres://business/db' }, { ORVILO_DATABASE_URL: 'postgres://business/db' }, { E2E_DATABASE_URL: target + '?options=x' }]) assert.throws(() => validateTarget({ ...env, ...changes }))
-  let called = false
-  assert.equal(main({ env: {}, run() { called = true } }), 1)
-  assert.equal(called, false)
+
+test('full case contracts reject omitted tests and duplicate-name substitutions', () => {
+ const c=config();c.recipes[0].expectedTests=['actual DB exercise','second assertion'];c.recipes[0].expectedCount=2
+ const r=c.recipes[0]
+ assert.ok(resultError(r,{state:'passed',exitCode:0,...parseEvidence(output)}))
+ const counts={tests:2,pass:2,fail:0,skipped:0,todo:0,cancelled:0}
+ assert.ok(resultError(r,{state:'passed',exitCode:0,counts,names:['actual DB exercise','actual DB exercise']}))
+ assert.equal(resultError(r,{state:'passed',exitCode:0,counts,names:['second assertion','actual DB exercise']}),null)
+ const actual=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8')).recipes.find(x=>x.id==='conversation-reads')
+ assert.equal(actual.expectedCount,11)
+ assert.ok(resultError(actual,{state:'passed',exitCode:0,counts,names:actual.files.map(x=>x.requiredNames[0])}))
+ const pending=config();pending.recipes[0].status='pending';pending.recipes[0].pendingReason='owner must provide full case contract';pending.recipes[0].expectedTests=null;pending.recipes[0].expectedCount=null
+ const p=plan(pending);assert.equal(p.contractErrors.length,1);assert.equal(aggregate(p,sha,[]).passed,false)
 })
-test('feature inventory fails on deleted suite, removed script or zero enrollment', () => {
-  assert.deepEqual(inventory(files, scripts).scripts, [sample.script])
-  assert.throws(() => inventory({ [sample.marker]: '' }, scripts), /Expected DB suite missing/)
-  assert.throws(() => inventory(files, {}), /Required script/)
-  assert.throws(() => inventory(files, { [sample.script]: 'node -e 0' }), /no longer runs/)
-  assert.throws(() => inventory({}, {}), /No database suites/)
-  assert.throws(() => inventory(files, scripts, ['test:active-agents']), /Expected DB suite missing/)
-})
-test('discovers every present pg/DB suite and rejects unregistered or ambiguous files', () => {
-  const extra = 'scripts/suggestions.db.test.ts'
-  const tree = { ...files, [extra]: '', 'lib/another.test.ts': "const pg = await import('pg')" }
-  assert.throws(() => inventory(tree, scripts), /needs one explicit/)
-  const full = { ...scripts, 'test:suggestions-db': `node --test ${extra}`, 'test:another-db': 'node --test lib/another.test.ts' }
-  assert.deepEqual(inventory(tree, full).scripts, ['test:another-db', sample.script, 'test:suggestions-db'].sort())
-  assert.deepEqual(inventory(tree, full, ['test:another-db', sample.script, 'test:suggestions-db']).scripts, ['test:another-db', sample.script, 'test:suggestions-db'].sort(), 'pinned discovered suites are validated after enrollment')
-  assert.throws(() => inventory(tree, full, ['test:not-present']), /Expected DB script not enrolled/)
-  assert.throws(() => inventory(tree, { ...full, 'test:duplicate': `node --test ${extra}` }), /found 2/)
-})
-test('self-managed suites are excluded only with a reason and a live dedicated runner', () => {
-  const own = { file: 'lib/own-db.test.ts', runner: 'scripts/test-own-db.mjs', reason: 'starts its own Postgres' }
-  const tree = { ...files, [own.file]: "import { Pool } from 'pg'", [own.runner]: `spawn('node', ['--test', '${own.file}'])` }
-  assert.throws(() => inventory(tree, scripts), /needs one explicit/, 'without the exclusion it must be enrolled')
-  const plan = inventory(tree, scripts, [], REQUIRED_SUITES, [own])
-  assert.deepEqual(plan.scripts, [sample.script])
-  assert.deepEqual(plan.selfManaged, [own.file])
-  assert.throws(() => inventory({ ...tree, [own.runner]: '' }, scripts, [], REQUIRED_SUITES, [own]), /no longer runs/)
-  assert.throws(() => inventory(tree, scripts, [], REQUIRED_SUITES, [{ ...own, runner: 'scripts/gone.mjs' }]), /missing/)
-  assert.throws(() => inventory(tree, scripts, [], REQUIRED_SUITES, [{ ...own, reason: '' }]), /needs a reason/)
-  assert.throws(() => inventory({ ...tree, [own.runner]: sample.file }, scripts, [], REQUIRED_SUITES, [{ ...own, file: sample.file }]), /both required and self-managed/)
-  for (const entry of SELF_MANAGED) assert.ok(entry.reason && entry.runner)
-})
-test('this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates', () => {
-  const pkg = JSON.parse(readFileSync('package.json', 'utf8')).scripts
-  const tree = readTree()
-  assert.ok(Object.hasOwn(tree, 'scripts/run-db-tests.test.mjs'), 'script-hosted suites are discovered too')
-  const plan = inventory(tree, pkg)
-  assert.ok(plan.scripts.includes('test:groups'))
-  assert.ok(plan.scripts.includes('test:workspace-migration-db'))
-  assert.ok(plan.scripts.includes('test:relation-cycle'))
-  assert.ok(plan.selfManaged.includes('lib/auth-email.test.ts'))
-  const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
-  const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
-  for (const script of plan.scripts) {
-    if (script !== 'test:groups') assert.ok(!workflow.includes(`pnpm ${script}`), `${script} runs once, through pnpm test:db`)
-  }
-  assert.ok(!/node --test tests\/workspace-migration\.test\.mjs/.test(workflow), 'workspace migration runs once, through pnpm test:db')
-  const pinned = workflow.match(/DB_TEST_EXPECTED: ([^\n]+)/)?.[1].split(',').sort()
-  assert.deepEqual(pinned, plan.scripts, 'workflow explicitly pins every suite expected on this tree')
-  for (const script of ['test:active-agents', 'test:group-turns', 'test:issue-search']) {
-    if (pkg[script]) {
-      assert.ok(workflow.includes(`pnpm ${script}`), `${script} strict pure gate retained`)
-      assert.ok(pkg.check.includes(`pnpm ${script}`), `${script} pure gate in check`)
-    }
-  }
-  assert.ok(workflow.includes(BOOTSTRAP))
-  assert.ok(workflow.indexOf(BOOTSTRAP) < workflow.indexOf('- run: pnpm test:e2e:setup'))
-  assert.ok(workflow.indexOf('- run: pnpm test:e2e:setup') < workflow.indexOf('run: pnpm test:db\n'))
-  assert.match(workflow, /MIGRATION_BOOTSTRAP_CI: '1'/)
-  assert.match(workflow, /REQUIRE_DB: '1'/)
-  assert.match(browser, /pnpm test:performance --output=performance-results/)
-  assert.match(browser, /pnpm test:e2e --grep-invert @performance/)
-  assert.match(workflow, /image: postgres:17/)
-  for (const name of ['test:agent', 'test:suggestions', 'test:integrations', 'test:issues', 'test:db-runner']) {
-    assert.ok(workflow.includes(`pnpm ${name}`), `${name} strict gate retained`)
-    assert.ok(pkg.check.includes(`pnpm ${name}`), `${name} in check`)
-  }
-  assert.ok(pkg['test:integrations'].includes('lib/issue-owner-scope.test.ts'))
+test('different credentials cannot make one database satisfy the two-database profile', () => {
+ const p={targets:[{key:'APP',database:'shared_e2e',host:'127.0.0.1',port:'5432'},{key:'WS',database:'shared_e2e',host:'127.0.0.1',port:'5432'}],distinct:['APP','WS'],bindings:{APP:'APP',WS:'WS'},env:{}}
+ assert.throws(()=>profileEnvironment(p,{...env,APP:'postgres://one:first@127.0.0.1:5432/shared_e2e',WS:'postgres://two:second@127.0.0.1/shared_e2e'},'prebuild'),/Separate databases/)
 })

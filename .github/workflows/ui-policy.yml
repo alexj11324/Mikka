@@ -155,6 +155,7 @@ jobs:
     env:
       CI: 'true'
       REQUIRE_DB: '1'
+      DB_TEST_EXPECTED: activity-actor-db,audit,byos-claim,byos-worker,conversation-reads,credentials,e2e:setup,factory,factory-monitor-http,factory-query-http,factory-question-http,group-native,groups,historical-upgrade-db,improvement,issue-search-db,mailboxes,migration-session,operations,relation-cycle,run-dispatch,visibility-db,workspace-migration-db
       MIKKA_TEST_DB_PORT: '5432'
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
@@ -173,10 +174,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Generate ephemeral test-only auth secret
         run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
-      - name: Historical imports fresh install and current-main dual DB upgrade
-        run: pnpm test:historical-upgrade-db
-        env:
-          HISTORY_PG_CONTAINER: ${{ job.services.postgres.id }}
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
@@ -185,22 +182,32 @@ jobs:
         run: node scripts/migrate.mjs
         env:
           MIGRATE: '1'
-      - name: Factory state and API isolation (temporary Postgres 17 only)
-        run: pnpm test:factory
+      - name: Populate disposable application fixture
+        run: node --experimental-strip-types scripts/setup-e2e-db.mjs
+      - name: R0 prebuild DB recipes (pending contracts remain failures)
+        id: r0-prebuild
+        continue-on-error: true
+        run: pnpm test:db --phase prebuild --output test-results/r0/prebuild.json
         env:
-          FACTORY_MONITOR_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
-      - run: pnpm test:e2e:setup
-      - name: Credential broker integration (isolated temporary Postgres databases)
-        run: pnpm test:credentials
-        env:
-          CREDENTIAL_TEST_ADMIN_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/postgres
-      - name: Team task and run visibility (temporary Postgres 17 only)
-        run: REQUIRE_DB=1 pnpm test:visibility-db
-      - name: Issue search and indexed pagination (temporary Postgres 17 only)
-        run: REQUIRE_DB=1 pnpm test:issue-search-db
-      - name: Required DB suites (temporary Postgres 17, no skips)
-        run: pnpm test:db
-        env:
-          REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:activity-actor-db,test:conversation-reads,test:groups,test:relation-cycle,test:workspace-migration-db
+          HISTORY_PG_CONTAINER: ${{ job.services.postgres.id }}
       - run: pnpm build
+        id: r0-build
+      - name: R0 postbuild contracts
+        if: always()
+        continue-on-error: true
+        run: pnpm test:db --phase postbuild --output test-results/r0/postbuild.json
+        env:
+          R0_BUILD_SUCCEEDED: ${{ steps.r0-build.outcome }}
+      - name: R0 independent harness contracts
+        if: always()
+        continue-on-error: true
+        run: pnpm test:db --phase external --output test-results/r0/external.json
+      - name: R0 complete same-SHA result (required; no skips or missing recipes)
+        if: always()
+        run: pnpm test:db --aggregate test-results/r0/prebuild.json test-results/r0/postbuild.json test-results/r0/external.json --output test-results/r0/aggregate.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r0-db-recipe-results
+          path: test-results/r0/*.json
+          if-no-files-found: error

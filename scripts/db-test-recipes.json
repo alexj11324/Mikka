@@ -1,0 +1,1051 @@
+{
+  "version": 1,
+  "expected": [
+    "activity-actor-db",
+    "audit",
+    "byos-claim",
+    "byos-worker",
+    "conversation-reads",
+    "credentials",
+    "e2e:setup",
+    "factory",
+    "factory-monitor-http",
+    "factory-query-http",
+    "factory-question-http",
+    "group-native",
+    "groups",
+    "historical-upgrade-db",
+    "improvement",
+    "issue-search-db",
+    "mailboxes",
+    "migration-session",
+    "operations",
+    "relation-cycle",
+    "run-dispatch",
+    "visibility-db",
+    "workspace-migration-db"
+  ],
+  "profiles": {
+    "shared": {
+      "targets": [
+        {
+          "key": "E2E_DATABASE_URL",
+          "database": "mikka_e2e",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "bindings": {
+        "E2E_DATABASE_URL": "E2E_DATABASE_URL",
+        "MIKKA_DATABASE_URL": "E2E_DATABASE_URL",
+        "DATABASE_URL": "E2E_DATABASE_URL",
+        "BETTER_AUTH_SECRET": "BETTER_AUTH_SECRET"
+      },
+      "env": {
+        "REQUIRE_DB": "1",
+        "CONVERSATION_READS_REQUIRE_DB": "1",
+        "MIKKA_TEST_DB_PORT": "5432",
+        "RETAIN_SYNTHETIC_RECORDS": "1",
+        "KEEP_GROUP_TEST_FIXTURES": "1"
+      }
+    },
+    "operations": {
+      "targets": [
+        {
+          "key": "OPERATION_TEST_DATABASE_URL",
+          "database": "mikka_208_test",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "bindings": {
+        "OPERATION_TEST_DATABASE_URL": "OPERATION_TEST_DATABASE_URL",
+        "MIGRATION_TEST_DATABASE_URL": "OPERATION_TEST_DATABASE_URL"
+      },
+      "env": {
+        "OPERATION_DB_TESTS": "1",
+        "NODE_ENV": "test"
+      }
+    },
+    "improvement": {
+      "targets": [
+        {
+          "key": "IMPROVEMENT_TEST_URL",
+          "database": "mikka_improvement",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "bindings": {
+        "IMPROVEMENT_TEST_URL": "IMPROVEMENT_TEST_URL"
+      },
+      "env": {}
+    },
+    "audit": {
+      "targets": [
+        {
+          "key": "AUDIT_APP_TEST_URL",
+          "suffix": "_e2e",
+          "host": "127.0.0.1",
+          "port": "5432"
+        },
+        {
+          "key": "AUDIT_WORKSPACE_TEST_URL",
+          "suffix": "_e2e",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "distinct": [
+        "AUDIT_APP_TEST_URL",
+        "AUDIT_WORKSPACE_TEST_URL"
+      ],
+      "bindings": {
+        "AUDIT_APP_TEST_URL": "AUDIT_APP_TEST_URL",
+        "AUDIT_WORKSPACE_TEST_URL": "AUDIT_WORKSPACE_TEST_URL"
+      },
+      "env": {
+        "REQUIRE_AUDIT_DB": "1"
+      }
+    },
+    "credentials": {
+      "targets": [
+        {
+          "key": "CREDENTIAL_TEST_ADMIN_DATABASE_URL",
+          "database": "postgres",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "bindings": {
+        "CREDENTIAL_TEST_ADMIN_DATABASE_URL": "CREDENTIAL_TEST_ADMIN_DATABASE_URL"
+      },
+      "env": {
+        "RETAIN_SYNTHETIC_RECORDS": "1"
+      }
+    },
+    "byos-claim": {
+      "targets": [],
+      "provisioner": "scripts/test-byos-claim.mjs",
+      "bindings": {},
+      "env": {
+        "RETAIN_SYNTHETIC_RECORDS": "1"
+      },
+      "provisionedTarget": {
+        "host": "127.0.0.1",
+        "database": "byos_claim_fixture",
+        "port": "ephemeral",
+        "retention": "pending"
+      }
+    },
+    "byos-worker": {
+      "targets": [],
+      "provisioner": "scripts/test-subscription-worker.mjs",
+      "bindings": {},
+      "env": {
+        "RETAIN_SYNTHETIC_RECORDS": "1"
+      },
+      "provisionedTarget": {
+        "host": "127.0.0.1",
+        "database": "mikka_cpa_e2e",
+        "port": "ephemeral",
+        "retention": "pending"
+      }
+    },
+    "factory-question-http": {
+      "targets": [
+        {
+          "key": "FACTORY_QUESTION_DATABASE_URL",
+          "database": "mikka_e2e",
+          "user": "factoryquestions192",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "http": "FACTORY_QUESTION_HTTP_ORIGIN",
+      "bindings": {
+        "FACTORY_QUESTION_DATABASE_URL": "FACTORY_QUESTION_DATABASE_URL",
+        "FACTORY_QUESTION_HTTP_ORIGIN": "FACTORY_QUESTION_HTTP_ORIGIN"
+      },
+      "env": {
+        "FACTORY_QUESTION_LOCAL_HTTP": "1",
+        "RETAIN_SYNTHETIC_RECORDS": "1"
+      }
+    },
+    "factory-query-http": {
+      "targets": [
+        {
+          "key": "FACTORY_QUERY_DATABASE_URL",
+          "database": "mikka_e2e",
+          "user": "factory192",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "http": "FACTORY_QUERY_HTTP_ORIGIN",
+      "bindings": {
+        "FACTORY_QUERY_DATABASE_URL": "FACTORY_QUERY_DATABASE_URL",
+        "FACTORY_QUERY_HTTP_ORIGIN": "FACTORY_QUERY_HTTP_ORIGIN"
+      },
+      "env": {
+        "FACTORY_QUERY_LOCAL_HTTP": "1",
+        "RETAIN_SYNTHETIC_RECORDS": "1"
+      }
+    },
+    "factory-monitor-http": {
+      "targets": [
+        {
+          "key": "FACTORY_CYCLE_TEST_URL",
+          "database": "mikka_e2e",
+          "user": "factorycycle192",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "http": "FACTORY_CYCLE_HTTP_ORIGIN",
+      "bindings": {
+        "FACTORY_CYCLE_TEST_URL": "FACTORY_CYCLE_TEST_URL",
+        "FACTORY_CYCLE_HTTP_ORIGIN": "FACTORY_CYCLE_HTTP_ORIGIN"
+      },
+      "env": {
+        "FACTORY_CYCLE_LOCAL_HTTP": "1",
+        "RETAIN_SYNTHETIC_RECORDS": "1"
+      }
+    },
+    "history": {
+      "targets": [
+        {
+          "key": "E2E_DATABASE_URL",
+          "database": "mikka_e2e",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "bindings": {
+        "E2E_DATABASE_URL": "E2E_DATABASE_URL",
+        "MIKKA_DATABASE_URL": "E2E_DATABASE_URL",
+        "DATABASE_URL": "E2E_DATABASE_URL",
+        "BETTER_AUTH_SECRET": "BETTER_AUTH_SECRET",
+        "HISTORY_PG_CONTAINER": "HISTORY_PG_CONTAINER"
+      },
+      "env": {
+        "REQUIRE_DB": "1",
+        "CONVERSATION_READS_REQUIRE_DB": "1",
+        "MIKKA_TEST_DB_PORT": "5432",
+        "RETAIN_SYNTHETIC_RECORDS": "1",
+        "KEEP_GROUP_TEST_FIXTURES": "1"
+      }
+    },
+    "groups": {
+      "targets": [
+        {
+          "key": "E2E_DATABASE_URL",
+          "database": "mikka_e2e",
+          "host": "127.0.0.1",
+          "port": "5432"
+        },
+        {
+          "key": "R0_WORKSPACE_DATABASE_URL",
+          "suffix": "_e2e",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "bindings": {
+        "E2E_DATABASE_URL": "E2E_DATABASE_URL",
+        "MIKKA_DATABASE_URL": "E2E_DATABASE_URL",
+        "DATABASE_URL": "E2E_DATABASE_URL",
+        "BETTER_AUTH_SECRET": "BETTER_AUTH_SECRET",
+        "MIKKA_DISPOSABLE_POSTGRES_URL": "E2E_DATABASE_URL",
+        "MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL": "R0_WORKSPACE_DATABASE_URL"
+      },
+      "env": {
+        "REQUIRE_DB": "1",
+        "CONVERSATION_READS_REQUIRE_DB": "1",
+        "MIKKA_TEST_DB_PORT": "5432",
+        "RETAIN_SYNTHETIC_RECORDS": "1",
+        "KEEP_GROUP_TEST_FIXTURES": "1"
+      },
+      "distinct": [
+        "E2E_DATABASE_URL",
+        "R0_WORKSPACE_DATABASE_URL"
+      ]
+    },
+    "factory": {
+      "targets": [
+        {
+          "key": "E2E_DATABASE_URL",
+          "database": "mikka_e2e",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "bindings": {
+        "E2E_DATABASE_URL": "E2E_DATABASE_URL",
+        "MIKKA_DATABASE_URL": "E2E_DATABASE_URL",
+        "DATABASE_URL": "E2E_DATABASE_URL",
+        "BETTER_AUTH_SECRET": "BETTER_AUTH_SECRET",
+        "FACTORY_TEST_DATABASE_URL": "E2E_DATABASE_URL",
+        "FACTORY_MONITOR_TEST_URL": "E2E_DATABASE_URL",
+        "FACTORY_QUESTION_TEST_URL": "E2E_DATABASE_URL",
+        "FACTORY_CYCLE_TEST_URL": "E2E_DATABASE_URL",
+        "FACTORY_MONITOR_DISPATCH_TEST_URL": "E2E_DATABASE_URL"
+      },
+      "env": {
+        "REQUIRE_DB": "1",
+        "CONVERSATION_READS_REQUIRE_DB": "1",
+        "MIKKA_TEST_DB_PORT": "5432",
+        "RETAIN_SYNTHETIC_RECORDS": "1",
+        "KEEP_GROUP_TEST_FIXTURES": "1",
+        "FACTORY_LOCAL_DB_TESTS": "1"
+      }
+    },
+    "run-dispatch": {
+      "targets": [
+        {
+          "key": "E2E_DATABASE_URL",
+          "database": "mikka_e2e",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "bindings": {
+        "E2E_DATABASE_URL": "E2E_DATABASE_URL",
+        "MIKKA_DATABASE_URL": "E2E_DATABASE_URL",
+        "DATABASE_URL": "E2E_DATABASE_URL",
+        "BETTER_AUTH_SECRET": "BETTER_AUTH_SECRET"
+      },
+      "env": {
+        "REQUIRE_DB": "1",
+        "CONVERSATION_READS_REQUIRE_DB": "1",
+        "MIKKA_TEST_DB_PORT": "5432",
+        "RETAIN_SYNTHETIC_RECORDS": "1",
+        "KEEP_GROUP_TEST_FIXTURES": "1",
+        "RUN_DISPATCH_DB_TESTS": "1"
+      }
+    },
+    "mailboxes": {
+      "targets": [
+        {
+          "key": "E2E_DATABASE_URL",
+          "database": "mikka_e2e",
+          "host": "127.0.0.1",
+          "port": "5432"
+        }
+      ],
+      "bindings": {
+        "E2E_DATABASE_URL": "E2E_DATABASE_URL",
+        "MIKKA_DATABASE_URL": "E2E_DATABASE_URL",
+        "DATABASE_URL": "E2E_DATABASE_URL",
+        "BETTER_AUTH_SECRET": "BETTER_AUTH_SECRET",
+        "MAILBOX_TEST_DATABASE_URL": "E2E_DATABASE_URL"
+      },
+      "env": {
+        "REQUIRE_DB": "1",
+        "CONVERSATION_READS_REQUIRE_DB": "1",
+        "MIKKA_TEST_DB_PORT": "5432",
+        "RETAIN_SYNTHETIC_RECORDS": "1",
+        "KEEP_GROUP_TEST_FIXTURES": "1"
+      }
+    }
+  },
+  "recipes": [
+    {
+      "id": "activity-actor-db",
+      "files": [
+        {
+          "path": "tests/activity-actor-db.test.ts",
+          "requiredNames": [
+            "actual action writer matrix records acting member/agent/system, ignores forged input, gates history"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:activity-actor-db"
+      ],
+      "profile": "shared",
+      "phase": "prebuild",
+      "status": "ready",
+      "packageScript": "test:activity-actor-db",
+      "expectedTests": [
+        "actor migration: legacy rows stay NULL, reruns preserve identity, new rows enforce type",
+        "actual action writer matrix records acting member/agent/system, ignores forged input, gates history"
+      ],
+      "expectedCount": 2
+    },
+    {
+      "id": "audit",
+      "files": [
+        {
+          "path": "lib/audit/mailbox-locks.test.ts",
+          "requiredNames": [
+            "real PG: coordinated stop versus complete preserves audit and mailbox lock order"
+          ]
+        },
+        {
+          "path": "lib/audit/postgres.test.ts",
+          "requiredNames": [
+            "PostgreSQL audit: tenant isolation, role matrix, retries, immutable export, failure and retention"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:audit"
+      ],
+      "profile": "audit",
+      "phase": "external",
+      "status": "pending",
+      "packageScript": "test:audit",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "byos-claim",
+      "files": [
+        {
+          "path": "lib/subscription-claim.test.ts",
+          "requiredNames": [
+            "real PG claim atomically publishes binding; concurrency, failure and cancellation preserve fences"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:byos-claim"
+      ],
+      "profile": "byos-claim",
+      "phase": "external",
+      "status": "pending",
+      "packageScript": "test:byos-claim",
+      "runner": "scripts/test-byos-claim.mjs",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "byos-worker",
+      "files": [
+        {
+          "path": "tests/byos-application.test.mjs",
+          "requiredNames": [
+            "new OAuth consent, owner-bound streaming/tool use and native launches reuse one durable connection"
+          ]
+        },
+        {
+          "path": "tests/byos-enrollment-binding.test.mjs",
+          "requiredNames": [
+            "source cleanup migration backfills legacy published transfers and replays without erasing history"
+          ]
+        },
+        {
+          "path": "tests/byos-environment-transfer.test.mjs",
+          "requiredNames": [
+            "authenticated transfer route carries separate leases through production worker and preserves source"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:byos-worker"
+      ],
+      "profile": "byos-worker",
+      "phase": "external",
+      "status": "pending",
+      "packageScript": "test:byos-worker",
+      "runner": "scripts/test-subscription-worker.mjs",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "prerequisites": [
+        "Go worker build",
+        "local synthetic TLS fixture",
+        "retained container lifecycle"
+      ],
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "conversation-reads",
+      "files": [
+        {
+          "path": "lib/conversation-reads-route.test.ts",
+          "requiredNames": [
+            "route: same-origin via x-forwarded-host → 200; missing Origin → 200"
+          ]
+        },
+        {
+          "path": "lib/conversation-reads-store.test.ts",
+          "requiredNames": [
+            "concurrent writes never move backward"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:conversation-reads"
+      ],
+      "profile": "shared",
+      "phase": "prebuild",
+      "status": "ready",
+      "packageScript": "test:conversation-reads",
+      "expectedTests": [
+        "route: no session → 401",
+        "route: cross-site Origin against x-forwarded-host → 403",
+        "route: same-origin via x-forwarded-host → 200; missing Origin → 200",
+        "request host: first x-forwarded-host value wins, Host is the fallback",
+        "origin: missing allowed, same host allowed, cross host and garbage rejected",
+        "positions outside PostgreSQL integer bounds are rejected before a query",
+        "auth, membership and origin status codes",
+        "GET before any read: nothing read, every reply unread",
+        "422: missing, malformed, unknown and cross-conversation ids",
+        "position string and uuid both accepted; older position ignored",
+        "concurrent writes never move backward"
+      ],
+      "expectedCount": 11
+    },
+    {
+      "id": "credentials",
+      "files": [
+        {
+          "path": "lib/credentials/acceptance.test.ts",
+          "requiredNames": [
+            "credential broker: real HTTP + Better Auth + isolated Postgres, synthetic vault and upstream"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:credentials"
+      ],
+      "profile": "credentials",
+      "phase": "external",
+      "status": "pending",
+      "packageScript": "test:credentials",
+      "runner": "scripts/test-credential-backend.mjs",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "e2e:setup",
+      "files": [
+        {
+          "path": "scripts/setup-e2e-db.test.mjs",
+          "requiredNames": [
+            "disposable setup rejects pg routing overrides before opening a connection"
+          ]
+        }
+      ],
+      "command": [
+        "node",
+        "--test",
+        "scripts/setup-e2e-db.test.mjs"
+      ],
+      "profile": "shared",
+      "phase": "prebuild",
+      "status": "ready",
+      "expectedTests": [
+        "disposable setup rejects pg routing overrides before opening a connection"
+      ],
+      "expectedCount": 1
+    },
+    {
+      "id": "factory",
+      "files": [
+        {
+          "path": "lib/factory/approval.test.ts",
+          "requiredNames": [
+            "PG17 approval/publish contract: real SQL, HTTP handler, isolated filesystem effect; upstream identities/results are fixtures"
+          ]
+        },
+        {
+          "path": "lib/factory/check-independence.test.ts",
+          "requiredNames": [
+            "PG17 check question ancestry (synthetic provider reports, real store/dispatch/gates)"
+          ]
+        },
+        {
+          "path": "lib/factory/checks.test.ts",
+          "requiredNames": [
+            "PG17 check integration: atomic dispatch, frozen commands, independent provenance, repair/new SHA, restart and closed downstream gates (fixture run reports)"
+          ]
+        },
+        {
+          "path": "lib/factory/monitor-cycle.test.ts",
+          "requiredNames": [
+            "PG17 monitor cycles: immutable history, CAS/replay, rollback, owner/candidate/stop fences"
+          ]
+        },
+        {
+          "path": "lib/factory/monitor-dispatch.test.ts",
+          "requiredNames": [
+            "PG17 normal monitor dispatch: actual local publication receipt, readonly claim, queue replay/rollback and closed boundaries"
+          ]
+        },
+        {
+          "path": "lib/factory/monitor.test.ts",
+          "requiredNames": [
+            "PG17 monitor: real transactions, concurrent dedupe, original issue, restart/rollback, fences, repair and recovery"
+          ]
+        },
+        {
+          "path": "lib/factory/postgres.test.ts",
+          "requiredNames": [
+            "PG17: routing, 10-way replay/CAS, actual SQL rollback/reconnect, attempts, candidate fences and API isolation"
+          ]
+        },
+        {
+          "path": "lib/factory/questions/postgres.test.ts",
+          "requiredNames": [
+            "PG17 execution questions: durable waiting, exact facts/human source, one continuation, rollback and stop fences"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:factory"
+      ],
+      "profile": "factory",
+      "phase": "prebuild",
+      "status": "pending",
+      "packageScript": "test:factory",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "factory-monitor-http",
+      "files": [
+        {
+          "path": "tests/factory-monitor-cycle-http.test.ts",
+          "requiredNames": [
+            "real isolated HTTP: passed monitor retry, replay, owner/candidate/stop/access boundaries"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:factory-monitor-http"
+      ],
+      "profile": "factory-monitor-http",
+      "phase": "postbuild",
+      "status": "pending",
+      "packageScript": "test:factory-monitor-http",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "prerequisites": [
+        "completed Next production build",
+        "running synthetic loopback Next server",
+        "owner-provided restricted fixture identity"
+      ],
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "factory-query-http",
+      "files": [
+        {
+          "path": "tests/factory-query-http.test.ts",
+          "requiredNames": [
+            "real local HTTP: issue discovery survives lost task ids and enforces owner, absence and revocation boundaries"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:factory-query-http"
+      ],
+      "profile": "factory-query-http",
+      "phase": "postbuild",
+      "status": "pending",
+      "packageScript": "test:factory-query-http",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "prerequisites": [
+        "completed Next production build",
+        "running synthetic loopback Next server",
+        "owner-provided restricted fixture identity"
+      ],
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "factory-question-http",
+      "files": [
+        {
+          "path": "tests/factory-question-http.test.ts",
+          "requiredNames": [
+            "real local question HTTP: owner, origin, replay, cancellation and isolation"
+          ]
+        }
+      ],
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "tests/factory-question-http.test.ts"
+      ],
+      "profile": "factory-question-http",
+      "phase": "postbuild",
+      "status": "pending",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "prerequisites": [
+        "completed Next production build",
+        "running synthetic loopback Next server",
+        "owner-provided restricted fixture identity"
+      ],
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "group-native",
+      "files": [
+        {
+          "path": "lib/group-mailbox-runtime.test.ts",
+          "requiredNames": [
+            "actual daemon startup routes BOTH CC/Codex CLI adapters with isolated fake binaries"
+          ]
+        }
+      ],
+      "variantOf": "groups",
+      "command": [
+        "pnpm",
+        "-s",
+        "test:group-native"
+      ],
+      "packageScript": "test:group-native",
+      "profile": "groups",
+      "phase": "postbuild",
+      "status": "pending",
+      "pendingReason": "Group owner will provide retained native harness and runtime preparation.",
+      "prerequisites": [
+        "group owner retained CLI harness",
+        "pinned native runtime image"
+      ],
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "groups",
+      "files": [
+        {
+          "path": "lib/group-artifact-review.test.ts",
+          "requiredNames": [
+            "disposable Postgres: mixed groups → durable isolated runtime → Artifact revision → human acceptance"
+          ]
+        },
+        {
+          "path": "lib/group-conversations.test.ts",
+          "requiredNames": [
+            "Postgres17 migration, atomic history, pagination, unread counts, membership and privacy"
+          ]
+        },
+        {
+          "path": "lib/group-mailbox-runtime.test.ts",
+          "requiredNames": [
+            "actual HTTP dispatch → group mailbox → isolated fake worker → trusted revision"
+          ]
+        },
+        {
+          "path": "lib/group-mailbox-turns.test.ts",
+          "requiredNames": [
+            "group message HTTP never imports the retired direct-provider dispatcher"
+          ]
+        },
+        {
+          "path": "lib/group-worker-authority.test.ts",
+          "requiredNames": [
+            "trusted issue-less group HTTP assignment and commit-time workspace authority"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:groups"
+      ],
+      "profile": "groups",
+      "phase": "prebuild",
+      "status": "pending",
+      "packageScript": "test:groups",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "aliases": [
+        "test:group-native"
+      ],
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "historical-upgrade-db",
+      "files": [
+        {
+          "path": "tests/historical-upgrade.db.test.mjs",
+          "requiredNames": [
+            "retained dual DB: fresh candidate equals current-main ledger upgrade; replay preserves history/data"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:historical-upgrade-db"
+      ],
+      "profile": "history",
+      "phase": "prebuild",
+      "status": "ready",
+      "packageScript": "test:historical-upgrade-db",
+      "expectedTests": [
+        "retained dual DB: fresh candidate equals current-main ledger upgrade; replay preserves history/data"
+      ],
+      "expectedCount": 1
+    },
+    {
+      "id": "improvement",
+      "files": [
+        {
+          "path": "lib/self-improvement/postgres.test.ts",
+          "requiredNames": [
+            "actual PG17 and HTTP: immutable feedback → scores → aggregate → candidate → fixed synthetic comparison"
+          ]
+        },
+        {
+          "path": "lib/self-improvement/wiring-postgres.test.ts",
+          "requiredNames": [
+            "PG17/HTTP assignment provenance and existing Factory gates"
+          ]
+        }
+      ],
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/self-improvement/postgres.test.ts",
+        "lib/self-improvement/wiring-postgres.test.ts"
+      ],
+      "profile": "improvement",
+      "phase": "external",
+      "status": "pending",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "issue-search-db",
+      "files": [
+        {
+          "path": "tests/issue-search.db.test.ts",
+          "requiredNames": [
+            "indexed, owner-safe relation search beyond 101 tasks, paging and graph visibility"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:issue-search-db"
+      ],
+      "profile": "shared",
+      "phase": "prebuild",
+      "status": "ready",
+      "packageScript": "test:issue-search-db",
+      "expectedTests": [
+        "indexed, owner-safe relation search beyond 101 tasks, paging and graph visibility"
+      ],
+      "expectedCount": 1
+    },
+    {
+      "id": "mailboxes",
+      "files": [
+        {
+          "path": "tests/session-mailbox.test.ts",
+          "requiredNames": [
+            "isolated PostgreSQL mailbox vertical slice"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:mailboxes"
+      ],
+      "profile": "mailboxes",
+      "phase": "external",
+      "status": "pending",
+      "packageScript": "test:mailboxes",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "migration-session",
+      "files": [
+        {
+          "path": "scripts/migration-session.test.mjs",
+          "requiredNames": [
+            "migration connection has bounded lock/statement waits and leaves other sessions unchanged"
+          ]
+        }
+      ],
+      "command": [
+        "node",
+        "--test",
+        "scripts/migration-session.test.mjs"
+      ],
+      "profile": "operations",
+      "phase": "external",
+      "status": "pending",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "operations",
+      "files": [
+        {
+          "path": "lib/operations/action-intents.test.ts",
+          "requiredNames": [
+            "trusted submission -> durable batch -> new workflow -> run retry -> daemon read-only recovery"
+          ]
+        },
+        {
+          "path": "lib/operations/calendar-integration.test.ts",
+          "requiredNames": [
+            "actual create_calendar_event proposal/decision entrypoints -> ledger -> local HTTP provider"
+          ]
+        },
+        {
+          "path": "lib/operations/ledger.test.ts",
+          "requiredNames": [
+            "operation ledger: real PG concurrency, reconnect and HTTP fault windows"
+          ]
+        },
+        {
+          "path": "lib/operations/session-authorization.test.ts",
+          "requiredNames": [
+            "real Better Auth HTTP + PG session and pending approval fences (isolated synthetic account)"
+          ]
+        }
+      ],
+      "command": [
+        "node",
+        "--conditions=react-server",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/operations/action-intents.test.ts",
+        "lib/operations/calendar-integration.test.ts",
+        "lib/operations/ledger.test.ts",
+        "lib/operations/session-authorization.test.ts"
+      ],
+      "profile": "operations",
+      "phase": "external",
+      "status": "pending",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "relation-cycle",
+      "files": [
+        {
+          "path": "lib/issue-relation-cycle.db.test.ts",
+          "requiredNames": [
+            "updateIssueRelation rejects a parent cycle on the server"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:relation-cycle"
+      ],
+      "profile": "shared",
+      "phase": "prebuild",
+      "status": "pending",
+      "packageScript": "test:relation-cycle",
+      "pendingReason": "Retained fixture acceptance required: existing cleanup deletes rows or rolls back the synthetic fixture.",
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "run-dispatch",
+      "files": [
+        {
+          "path": "tests/run-dispatch.test.ts",
+          "requiredNames": [
+            "real Postgres dispatch transactions and recovery"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:run-dispatch"
+      ],
+      "profile": "run-dispatch",
+      "phase": "external",
+      "status": "pending",
+      "packageScript": "test:run-dispatch",
+      "pendingReason": "Pending retained-fixture harness/profile acceptance; do not execute legacy cleanup paths.",
+      "expectedTests": null,
+      "expectedCount": null
+    },
+    {
+      "id": "visibility-db",
+      "files": [
+        {
+          "path": "tests/team-visibility.db.test.ts",
+          "requiredNames": [
+            "real API/core visibility: owner, teammate, outsider, scope flip and suspension"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:visibility-db"
+      ],
+      "profile": "shared",
+      "phase": "prebuild",
+      "status": "ready",
+      "packageScript": "test:visibility-db",
+      "expectedTests": [
+        "real API/core visibility: owner, teammate, outsider, scope flip and suspension"
+      ],
+      "expectedCount": 1
+    },
+    {
+      "id": "workspace-migration-db",
+      "files": [
+        {
+          "path": "tests/workspace-migration.test.mjs",
+          "requiredNames": [
+            "legacy workspaces upgrade twice without losing data or team constraints"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:workspace-migration-db"
+      ],
+      "profile": "shared",
+      "phase": "prebuild",
+      "status": "pending",
+      "packageScript": "test:workspace-migration-db",
+      "pendingReason": "Retained fixture acceptance required: existing cleanup deletes rows or rolls back the synthetic fixture.",
+      "expectedTests": null,
+      "expectedCount": null
+    }
+  ]
+}

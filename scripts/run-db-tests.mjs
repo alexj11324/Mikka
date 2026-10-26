@@ -2,11 +2,12 @@
 // MIK-19: required DB gates; only the Actions job's ephemeral PG17 is allowed.
 // Inventory is tree-aware, never "missing script => skip". A feature marker requires
 // its suite even if the test or package script was accidentally removed. All other
-// present pg/DB test files must map to a package script or inventory fails closed.
-import { spawnSync } from 'node:child_process'
-import { readFileSync, readdirSync, existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+// present pg/DB files must map to an explicit recipe. Pending phases fail closed.
+import { spawnSync, execFileSync } from 'node:child_process'
+import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { coveragePlan, executePhase, aggregate } from './db-test-plan.mjs'
 
 export const REQUIRED_SUITES = [
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-conversations.test.ts', script: 'test:groups' },
@@ -50,39 +51,8 @@ export function validateTarget(env) {
   if (env.ORVILO_DATABASE_URL && env.ORVILO_DATABASE_URL !== env.E2E_DATABASE_URL) throw new Error('Legacy database fallback must not point outside ephemeral service')
 }
 
-export function inventory(files, scripts, expected = [], required = REQUIRED_SUITES, selfManaged = SELF_MANAGED) {
-  const has = path => Object.hasOwn(files, path)
-  const selected = new Set()
-  const covered = new Set()
-  const commandHas = (command, file) => command?.split(/\s+/).includes(file)
-  const excluded = new Set()
-  for (const { file, runner, reason } of selfManaged) {
-    if (!has(file)) continue
-    if (!reason) throw new Error(`Self-managed DB suite ${file} needs a reason`)
-    if (!files[runner]?.includes(file)) throw new Error(`Self-managed DB suite ${file}: runner ${runner} missing or no longer runs it`)
-    if (required.some(suite => suite.file === file)) throw new Error(`DB suite ${file} cannot be both required and self-managed`)
-    excluded.add(file)
-  }
-  for (const { marker, file, script } of required) {
-    if (!has(marker) && !has(file) && !expected.includes(script)) continue
-    if (!has(file)) throw new Error(`Expected DB suite missing: ${file} (${marker})`)
-    if (!commandHas(scripts[script], file)) throw new Error(`Required script ${script} missing or no longer runs ${file}`)
-    selected.add(script); covered.add(file)
-  }
-  for (const [file, source] of Object.entries(files)) {
-    // Playwright DB fixtures run in the preserved server-backed browser/performance gates.
-    if (!/\.(test|spec)\.(ts|mjs|js)$/.test(file) || file === BOOTSTRAP || file === 'scripts/run-db-tests.test.mjs' || file.startsWith('tests/e2e/')) continue
-    const databaseBacked = /(?:\.db\.test\.|-db\.test\.)/.test(file) || /(?:from\s*['"]pg['"]|import\(['"]pg['"]\)|REQUIRE_DB|CONVERSATION_READS_REQUIRE_DB)/.test(source)
-    if (!databaseBacked || covered.has(file) || excluded.has(file)) continue
-    const matches = Object.entries(scripts).filter(([name, command]) => name.startsWith('test:') && commandHas(command, file))
-    if (matches.length !== 1) throw new Error(`DB test ${file} needs one explicit package test script (found ${matches.length})`)
-    selected.add(matches[0][0]); covered.add(file)
-  }
-  for (const name of expected) {
-    if (!selected.has(name)) throw new Error(`Expected DB script not enrolled: ${name}`)
-  }
-  if (!selected.size) throw new Error('No database suites enrolled')
-  return { scripts: [...selected].sort(), files: [...covered].sort(), selfManaged: [...excluded].sort() }
+export function inventory(files, scripts, expected, required = REQUIRED_SUITES, selfManaged = SELF_MANAGED, config = JSON.parse(readFileSync(new URL('./db-test-recipes.json', import.meta.url), 'utf8'))) {
+  return coveragePlan(files, scripts, config, { required, selfManaged, expected: expected ?? config.expected })
 }
 
 export function readTree(root = '.') {
@@ -99,23 +69,34 @@ export function readTree(root = '.') {
   return files
 }
 
-export function main({ root = '.', env = process.env, run = spawnSync } = {}) {
+export function main({ root = '.', env = process.env, run = spawnSync, args = [], commit = () => {
+  execFileSync('git', ['diff', '--exit-code', 'HEAD'], { cwd: root, stdio: 'pipe' })
+  execFileSync('git', ['ls-files', '--error-unmatch', 'scripts/db-test-plan.mjs', 'scripts/db-test-recipes.json'], { cwd: root, stdio: 'pipe' })
+  return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+} } = {}) {
   try {
-    validateTarget(env)
     const scripts = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).scripts ?? {}
-    const plan = inventory(readTree(root), scripts, (env.DB_TEST_EXPECTED ?? '').split(',').filter(Boolean))
-    console.log(`Required DB inventory: ${JSON.stringify(plan)}`)
-    let failed = false
-    for (const script of plan.scripts) {
-      console.log(`::group::pnpm ${script}`)
-      const result = run('pnpm', ['-s', script], { cwd: root, encoding: 'utf8', env: { ...env, REQUIRE_DB: '1', CONVERSATION_READS_REQUIRE_DB: '1', MIKKA_TEST_DB_PORT: '5432' }, maxBuffer: 64 << 20 })
-      process.stdout.write(result.stdout ?? ''); process.stderr.write(result.stderr ?? '')
-      console.log('::endgroup::')
-      const error = checkSummary(script, result.status, parseSummary(`${result.stdout}\n${result.stderr}`))
-      if (error) { console.error(`::error::${error}`); failed = true }
-      else console.log(`${script}: OK`)
-    }
+    const config = JSON.parse(readFileSync(resolve(root, 'scripts/db-test-recipes.json'), 'utf8'))
+    const planning = args.length === 1 && args[0] === '--inventory'
+    if (!planning && !env.DB_TEST_EXPECTED) throw Error('Complete DB_TEST_EXPECTED required for execution/aggregation')
+    const plan = inventory(readTree(root), scripts, planning ? config.expected : env.DB_TEST_EXPECTED.split(','), REQUIRED_SUITES, SELF_MANAGED, config)
+    if (planning) { console.log(JSON.stringify(plan, null, 2)); return plan.contractErrors.length ? 1 : 0 }
+    const sha = commit()
+    if (!/^[a-f0-9]{40}$/.test(sha) || (env.GITHUB_SHA && env.GITHUB_SHA !== sha)) throw Error('Current checkout must match exact evidence SHA')
+    const outputIndex = args.indexOf('--output')
+    if (outputIndex < 0 || outputIndex !== args.length - 2 || !args.at(-1)) throw Error('Explicit result --output required')
+    const command = args.slice(0, outputIndex)
+    let report, failed
+    if (command.length === 2 && command[0] === '--phase') {
+      report = executePhase(plan, command[1], sha, env, (file, argv, options) => run(file, argv, { ...options, cwd: root }))
+      failed = report.results.some(r => r.state !== 'passed')
+    } else if (command[0] === '--aggregate' && command.length > 1) {
+      report = aggregate(plan, sha, command.slice(1).map(path => { try { return JSON.parse(readFileSync(resolve(root, path), 'utf8')) } catch { return { unreadable: path } } }))
+      failed = !report.passed
+    } else throw Error('Use --inventory, --phase PHASE, or --aggregate REPORTS; no implicit execution')
+    const output = resolve(root, args.at(-1)); mkdirSync(dirname(output), { recursive: true }); writeFileSync(output, JSON.stringify(report, null, 2) + '\n')
+    console.log(JSON.stringify(report))
     return failed ? 1 : 0
   } catch (error) { console.error(`::error::${error.message}`); return 1 }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) process.exit(main())
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) process.exit(main({ args: process.argv.slice(2) }))
