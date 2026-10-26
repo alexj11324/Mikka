@@ -1,0 +1,133 @@
+
+Running 13 tests using 1 worker
+
+[WebServer] 2026-10-26T02:22:38.001Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+[WebServer] Yjs was already imported. This breaks constructor checks and will lead to issues! - https://github.com/yjs/yjs/issues/438
+  ✓   1 [chromium] › tests/e2e/unread.spec.ts:73:1 › 未读：首次进入没有已读记录时不显示分隔线 (5.9s)
+[WebServer] 2026-10-26T02:22:43.764Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+  ✓   2 [chromium] › tests/e2e/unread.spec.ts:83:1 › 未读：全部已读时不显示分隔线 (5.3s)
+[WebServer] 2026-10-26T02:22:49.082Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+  ✓   3 [chromium] › tests/e2e/unread.spec.ts:93:1 › 未读：自己发的消息不产生分隔线 (5.3s)
+[WebServer] 2026-10-26T02:22:54.324Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+  ✓   4 [chromium] › tests/e2e/unread.spec.ts:102:1 › 未读：有未读时显示「新」分隔线，停在视口上部约三分之一 (5.6s)
+[WebServer] 2026-10-26T02:22:59.934Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+  ✓   5 [chromium] › tests/e2e/unread.spec.ts:113:1 › 未读：分隔线在可视区域上方时出现顶部按钮，点一下回到分隔线 (5.7s)
+[WebServer] 2026-10-26T02:23:05.575Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+  ✓   6 [chromium] › tests/e2e/unread.spec.ts:128:1 › 未读：顶部按钮点 × 只关掉 (5.6s)
+[WebServer] 2026-10-26T02:23:11.225Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+  ✓   7 [chromium] › tests/e2e/unread.spec.ts:140:1 › 未读：不在底部时有新消息进来出现底部按钮，点击滚到最新一条并清零 (16.0s)
+[WebServer] 2026-10-26T02:23:27.231Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+  ✓   8 [chromium] › tests/e2e/unread.spec.ts:155:1 › 未读：手动滚到底部时底部按钮自动消失，计数归零 (27.1s)
+[WebServer] 2026-10-26T02:23:54.340Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+  ✓   9 [chromium] › tests/e2e/unread.spec.ts:171:1 › 未读：已读位置按可视区域最后一条上报（节流 2s），页面隐藏时立即 flush (5.7s)
+[WebServer] 2026-10-26T02:23:59.990Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+  ✓  10 [chromium] › tests/e2e/unread.spec.ts:190:1 › 未读：两个页面同步且已读位置不回退 (10.9s)
+[WebServer] 2026-10-26T02:24:10.924Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+  ✘  11 [chromium] › tests/e2e/unread.spec.ts:208:1 › 未读：可视区域最后一条是未落库的合成消息时，上报它前面最后一条已持久化消息 (10.5s)
+[WebServer] 2026-10-26T02:24:21.971Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+  ✓  12 [chromium] › tests/e2e/unread.spec.ts:225:5 › POST 422 › 未读：POST /read 返回 422 时静默降级，界面无报错且不重试 (10.7s)
+[WebServer] 2026-10-26T02:24:32.614Z ERROR [Better Auth]: Failed to run background task: [Error [APIError]: Email service unavailable] {
+[WebServer]   status: 'SERVICE_UNAVAILABLE',
+[WebServer]   body: [Object],
+[WebServer]   headers: {},
+[WebServer]   statusCode: 503
+[WebServer] }
+  ✓  13 [chromium] › tests/e2e/unread.spec.ts:225:5 › POST 403 › 未读：POST /read 返回 403 时静默降级，界面无报错且不重试 (10.6s)
+
+
+  1) [chromium] › tests/e2e/unread.spec.ts:208:1 › 未读：可视区域最后一条是未落库的合成消息时，上报它前面最后一条已持久化消息 ───────────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 30
+    Received: 12
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      214 |   await viewport(page).evaluate(element => element.scrollTo({ top: element.scrollHeight }))
+      215 |   await expect(conversation(page).getByText('消息 31', { exact: false })).toBeInViewport()
+    > 216 |   await expect.poll(() => storedPosition(page), { timeout: 5000 }).toBe(30)
+          |                                                                    ^
+      217 |   await page.waitForTimeout(2500)
+      218 |   expect(await storedPosition(page)).toBe(30)
+      219 | })
+        at /workspace/scratch/ssr-hotfix-main/tests/e2e/unread.spec.ts:216:68
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../ssr-hotfix-main-unread-results/unread-未读：可视区域最后一条是未落库的合成消息时，上报它前面最后一条已持久化消息-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../ssr-hotfix-main-unread-results/unread-未读：可视区域最后一条是未落库的合成消息时，上报它前面最后一条已持久化消息-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../ssr-hotfix-main-unread-results/unread-未读：可视区域最后一条是未落库的合成消息时，上报它前面最后一条已持久化消息-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../ssr-hotfix-main-unread-results/unread-未读：可视区域最后一条是未落库的合成消息时，上报它前面最后一条已持久化消息-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests/e2e/unread.spec.ts:208:1 › 未读：可视区域最后一条是未落库的合成消息时，上报它前面最后一条已持久化消息 ────────────
+  12 passed (2.1m)

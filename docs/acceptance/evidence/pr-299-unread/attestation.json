@@ -1,0 +1,22 @@
+{
+  "beforeCommit": "568390f7d293ec9b3878d436f6983987881320b4",
+  "afterCommit": "33a8bbb7291706e153a1612fe7a0da81fb731a72",
+  "browser": "Chrome Headless Shell 156.0.8078.4 (Playwright1248), Playwright1.64.1",
+  "environment": "Cloud Linux; isolated Docker PostgreSQL17 on loopback; production Next build/start. Read endpoint uses unchanged BrowserContext-memory fixture. No production database or real provider.",
+  "command": "python /workspace/scratch/pr299-repro.py <checkout> test; underlying playwright test tests/e2e/unread.spec.ts --config playwright.repro.config.ts",
+  "overlay": "Config changes output directory and starts Next directly. Final Chromium156 config inherits default browser; no assertion or fixture changes. Earlier event diagnostics were removed before these two runs.",
+  "beforeResult": "12 passed, 1 failed: expected30 received12",
+  "afterResult": "13 passed",
+  "buildAttestationLimit": "After-build started while hook change was uncommitted on568390; identical hook bytes committed as33a8bbb7 during that build. Local result is same-source evidence, not process-start gitHEAD attestation. Exact-head CI separately records checkout33a8bbb7.",
+  "exactCI": {
+    "main": "40259943534",
+    "SSR": "40259948964",
+    "browser": "40259948967 (pending at evidence creation)"
+  },
+  "files": {
+    "before-raw.log": "b1e938016d146c2e3318b2c022355791baf6fb6b6c6b4692da2e31b5b6b37697",
+    "after-raw.log": "bf7d39ee9510e433d54bd9d0afd630367c19a0d5d009b08e9631ee09939a6824"
+  },
+  "originalLocalTraceSHA256": "2bf4065c3810d1521acf6dc45fae1afbee83ae556b52d21c174238eb77b0b87f",
+  "tracePublication": "Not published because traces can contain synthetic session material; original preserved locally."
+}
