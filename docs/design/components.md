@@ -17,7 +17,8 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Task, run and source chips in chat | OpenUI `TaskChip`, `RunChip`, `SourceChip` (`components/workspace/agent-ui-library.tsx`, data from `agent-citations.tsx`) | R-15 |
 | Thread card under a Coordinator reply | `components/coordinator/thread-card.tsx`; opens `IssueThreadPanel` in the centre | R-66 |
 | New task | `components/coordinator/new-task-dialog.tsx` | R-22, R-23 |
-| Search | reUI `CommandDialog` (⌘K), centred | |
+| Search | reUI `CommandDialog` (⌘K), centred | Local rows first, then `GET /api/search` hits per source (`hooks/use-site-search.ts`) |
+| Group chat (opened from search) | `components/workspace/group-chat-view.tsx` | Read-only until group sending opens: no composer (R-10). Runs per R-13; bot colour not available yet |
 | Board | reUI `Kanban` (`components/reui/kanban.tsx`) | R-25 |
 | Status | StatusBadge set; `components/nav/status-dot.tsx` for devices | R-24, R-34 |
 | People avatars | `components/nav/letter-avatar.tsx`, `components/user-avatar.tsx` | |
