@@ -195,8 +195,7 @@ const definition = {
   evaluatorVersion: "exact-semantic-fields-v1",
   cases,
   contract,
-  verifyCommand:
-    "node --import tsx --test lib/self-improvement/report-benchmark.test.ts",
+  verifyCommand: "git diff --exit-code HEAD --",
   instanceDerivation: "sha256-seed-case-field-v1",
   rules: {
     maxOutputBytes: 8192,

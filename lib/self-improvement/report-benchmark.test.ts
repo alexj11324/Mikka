@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   REPORT_BENCHMARK,
   buildTask,
@@ -63,11 +67,11 @@ test("definition is deeply frozen, versioned and reproducible before generation"
   assert.equal(REPORT_BENCHMARK.version, "run-report-behavior-v1");
   assert.equal(
     REPORT_BENCHMARK.digest,
-    "4135993ad2cb1f017574b74d6fc900018337d8083d13dc0087388d3853c2a498",
+    "0e4ac1786df6d3565c63715a8919b5cdc7bfba899e42f7dcafce2ab4b9b0c92b",
   );
   assert.equal(
     instance.digest,
-    "07192984a603a4426301d1bc82bde3afbae9b739c7f3092794fd9ec8203b0d32",
+    "19737d352cd35cf921038766b0163ba59451a98d90c3f6cf2b04546fe2cfed9e",
   );
   assert.ok(Object.isFrozen(REPORT_BENCHMARK.cases[0].expected));
   for (const item of REPORT_BENCHMARK.cases) {
@@ -351,5 +355,44 @@ test("one instance supplies 25 distinct varied training tasks without changing h
       task(item.id).input.records,
       buildTask(item.id, other).input.records,
     );
+  }
+});
+
+test("frozen verification works in a fresh dependency-free fixture and rejects tracked changes", () => {
+  assert.equal(REPORT_BENCHMARK.verifyCommand, "git diff --exit-code HEAD --");
+  const fixture = mkdtempSync(join(tmpdir(), "mikka-report-verification-"));
+  try {
+    const git = (...args: string[]) =>
+      execFileSync("git", args, { cwd: fixture, stdio: "pipe" });
+    git("init", "--quiet");
+    writeFileSync(join(fixture, "record.txt"), "original fixture\n");
+    git("add", "record.txt");
+    git(
+      "-c",
+      "core.hooksPath=/dev/null",
+      "-c",
+      "user.name=Benchmark fixture",
+      "-c",
+      "user.email=fixture@example.invalid",
+      "-c",
+      "commit.gpgsign=false",
+      "commit",
+      "--quiet",
+      "-m",
+      "Frozen fixture",
+    );
+    const verify = () =>
+      spawnSync(REPORT_BENCHMARK.verifyCommand, {
+        cwd: fixture,
+        shell: true,
+        encoding: "utf8",
+      });
+    assert.equal(verify().status, 0);
+    writeFileSync(join(fixture, "record.txt"), "unsupported fixture change\n");
+    assert.equal(verify().status, 1);
+    git("add", "record.txt");
+    assert.equal(verify().status, 1);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
   }
 });

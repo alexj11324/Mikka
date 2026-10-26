@@ -12,7 +12,7 @@ a deployment succeeded. Real daemon sessions must produce the reports.
 `run-report-behavior-v1`, evaluator `exact-semantic-fields-v1`. Its SHA-256 digest
 covers the ordered case templates, expected facts, schema, evaluator version,
 instance derivation version, fixed verification command and thresholds. Definition
-digest: `4135993ad2cb1f017574b74d6fc900018337d8083d13dc0087388d3853c2a498`.
+digest: `0e4ac1786df6d3565c63715a8919b5cdc7bfba899e42f7dcafce2ab4b9b0c92b`.
 Changes to scoring code require a new evaluator/benchmark version and reviewed
 source; the digest is a definition identity, not a source signature.
 
@@ -142,19 +142,25 @@ validates identities and consistency; it does not query the database or authoriz
 activation. Keep the instance and evaluator outside the candidate's allowlisted
 Skill-file write scope.
 
-The fixed `verifyCommand` is
-`node --import tsx --test lib/self-improvement/report-benchmark.test.ts`.
-It verifies fixture/evaluator integrity. Actual report quality comes from server
-scoring of the actual submitted Harness output, never from this command's green
-unit-test status. Both execution assignments use the same command and settings;
-the server retains its trusted process result separately.
+The fixed `verifyCommand` is `git diff --exit-code HEAD --`. It verifies tracked
+fixture integrity against the current pinned HEAD, including staged and unstaged
+changes. It needs only Git, already required by the daemon, and works in a fresh
+read-only worktree with no installed dependencies or benchmark source files.
+The daemon validates the frozen source commit and supplies the remaining clean-tree
+checks through its trusted fixture snapshot and pre/post verification snapshot.
+This command alone does not inspect untracked files or authenticate HEAD.
+
+Actual report quality comes from server scoring of the actual submitted Harness
+output, never from this command's successful status. Both execution assignments
+use the same command and settings; the server retains its trusted process result
+separately. The candidate cannot change the command or the server evaluator.
 
 ## Verification and limits
 
-Run the fixed source-only command above. Tests cover correct/incorrect actual
+Run `node --import tsx --test lib/self-improvement/report-benchmark.test.ts` in the development checkout for source-only checks. This development command is not the daemon verification command. Tests cover correct/incorrect actual
 reports, unknown facts, untrusted notes, duplicate/escaped keys, invalid output,
 strict improvement, regression, all case identities, missing execution evidence,
-configuration equality and reproducible private instances.
+configuration equality, reproducible private instances, and the frozen Git verification command in a temporary dependency-free repository with clean, unstaged and staged fixtures.
 
 Four held-out cases give narrow evidence for structured operator reporting.
 They do not establish broad agent capability, production runtime acceptance or
