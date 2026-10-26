@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 // Only the dedicated cloud-Linux test DB or Actions' ephemeral service. Never
@@ -17,7 +20,25 @@ if (!url && process.env.REQUIRE_DB === '1') throw new Error('Scope DB tests cann
 
 test('workspace to personal local safety on real PostgreSQL and native HTTP claim route', { skip: !url }, async t => {
   const { Pool } = await import('pg')
-  const pool = new Pool({ connectionString: url, max: 5 })
+  // CI's shared E2E setup creates columns, not the production triggers/FKs.
+  // Bootstrap a fresh retained database from the real tracked migrations instead
+  // of relying on the state left by earlier suites or changing their fixtures.
+  const database = `scope184_${randomUUID().replaceAll('-', '')}_e2e`
+  const admin = new Pool({ connectionString: url, max: 1 })
+  try { await admin.query(`create database "${database}"`) } finally { await admin.end() }
+  const target = new URL(url!)
+  target.pathname = `/${database}`
+  const connection = target.toString()
+  const originalApplication = process.env.MIKKA_DATABASE_URL!
+  const originalWorkspace = process.env.DATABASE_URL!
+  process.env.MIKKA_DATABASE_URL = connection
+  process.env.DATABASE_URL = connection
+  t.after(() => { process.env.MIKKA_DATABASE_URL = originalApplication; process.env.DATABASE_URL = originalWorkspace })
+  const migrated = await promisify(execFile)(process.execPath, ['scripts/migrate.mjs'], {
+    env: { ...process.env, MIGRATE: '1', VERCEL_ENV: '' }, maxBuffer: 4 << 20,
+  })
+  assert.match(migrated.stdout, /applied 20261026025303_personal_scope_detachment.sql/)
+  const pool = new Pool({ connectionString: connection, max: 5 })
   const { changeIssueScopeLocally } = await import('../lib/issue-scope-store')
   const { actAs } = await import('../lib/acting-user')
   const { setIssueScope } = await import('../app/actions/issues')
@@ -62,7 +83,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   await pool.query('insert into device_tokens (id,"userId","tokenHash") values ($1,$2,$3)', [randomUUID(),member,hashDeviceToken(deviceToken)])
   async function seed(id: string, remote = id) {
     if (!fixtureIds.includes(id)) fixtureIds.push(id)
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Synthetic scope task\',$3,\'todo\',\'none\',\'workspace\')', [id,owner,doc])
+    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Synthetic scope task\',$3,\'todo\',\'normal\',\'workspace\')', [id,owner,doc])
     await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [id,team,workspace,owner])
     await pool.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") values ($1,$2,$3,$4,$5,\'MIK-184\')', [randomUUID(),id,owner,sync,remote])
   }
@@ -127,7 +148,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.deepEqual(await visibleRuns(member,{issueId:issue}),[])
     assert.ok(await issueForUser(owner,issue))
     assert.ok(await readRun(owner,ownerRun))
-    assert.equal(await verifyRunToken(new Request('http://127.0.0.1/'),memberToken),undefined)
+    assert.equal(Boolean(await verifyRunToken(new Request('http://127.0.0.1/'),memberToken)),false)
     assert.ok(await verifyRunToken(new Request('http://127.0.0.1/'),ownerToken))
     const renewal = await renewRunLeases(device,[memberRun])
     assert.deepEqual(renewal.revoked,[memberRun])
@@ -234,5 +255,8 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     } finally { await writer.query('rollback');writer.release();if(transition) await Promise.allSettled([transition]) }
   })
   assert.equal(rejectedExternalRequests,0,'no real provider request is permitted or required')
-  t.diagnostic(`Synthetic fixtures retained: ${JSON.stringify({owner,member,workspace,team,fixtureIds,memberRun,ownerRun})}`)
+  await pool.query(await readFile(new URL('../drizzle/20261026025303_personal_scope_detachment.sql', import.meta.url), 'utf8'))
+  assert.equal((await pool.query('select scope from issues where id=$1',[issue])).rows[0].scope,'personal')
+  assert.equal((await pool.query('select count(*)::int n from linear_issue_detachments where "issueId"=$1',[issue])).rows[0].n,1)
+  t.diagnostic(`Synthetic fixtures retained: ${JSON.stringify({database,owner,member,workspace,team,fixtureIds,memberRun,ownerRun})}`)
 })

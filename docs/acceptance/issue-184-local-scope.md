@@ -14,7 +14,7 @@ No real Linear API was called. No real account, user, session, application data,
 
 ## Evidence from cloud Linux
 
-Dedicated Docker Postgres 17: `mikka-issue184-pg`, loopback port 55484, database `issue184_e2e`. It was initialized from the tracked schema and migrations. The new migration also passed reapplication with the synthetic records retained.
+Dedicated Docker Postgres 17: `mikka-issue184-pg`, loopback port 55484, provisioning database `issue184_e2e`. Each test run creates and retains a fresh `scope184_<uuid>_e2e` database and initializes it from all tracked migrations, including the production foreign keys and triggers. This avoids depending on the shared CI setup, which only creates columns. The new migration also passes reapplication with synthetic records retained.
 
 Run the database suite with all three DB URL variables pointing to this isolated target, `ISSUE184_LOCAL_TEST=1`, `NODE_ENV=development`, and a loopback `BETTER_AUTH_URL`:
 
