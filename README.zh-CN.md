@@ -99,9 +99,9 @@ claude mcp add --transport http mikka https://app.aspectlylabs.com/mikka/api/mcp
 
 Claude Code 会打开浏览器完成登录。登录后，agent 可以读取和修改任务、派发运行，以及更新 Coordinator 的记忆。其他客户端的接入方式和完整工具列表参见 [MCP 文档](https://aspectlylabs.com/mikka/docs/mcp)。
 
-### 在自有设备上运行 agent
+### 在自有设备上运行编码 harness
 
-[`packages/daemon`](packages/daemon) 中的 daemon 会检测设备上已安装的 agent CLI，并通过它们运行线程：
+[`packages/daemon`](packages/daemon) 中的 daemon 会检测设备上已安装的编码 CLI harness，并通过选定的适配器执行工作线程：
 
 | 执行 harness | 检测的 CLI |
 | --- | --- |
