@@ -88,7 +88,7 @@ test('aggregation binds exact SHA/plan/profile/command/phase and every result on
 })
 test('actual tree has exact complete R0 inventory, all previously missing suites and no new exclusions', () => {
  const pkg=JSON.parse(readFileSync('package.json','utf8')).scripts,c=JSON.parse(readFileSync('scripts/db-test-recipes.json','utf8')),p=inventory(readTree(),pkg)
- assert.equal(p.files.length,49);assert.equal(p.recipes.length,29);assert.deepEqual(p.expected,c.expected)
+ assert.equal(p.files.length,51);assert.equal(p.recipes.length,31);assert.deepEqual(p.expected,c.expected)
  for(const id of ['credentials','groups','group-native','operations','migration-session','improvement','byos-claim','byos-worker','factory-question-http'])assert.ok(p.expected.includes(id))
  assert.equal(p.contractErrors.length,0,'every retained and pending contract has explicit names/counts');
  assert.deepEqual(p.selfManaged,['lib/auth-email.test.ts']);assert.equal(p.recipes.find(r=>r.id==='group-native').status,'pending');assert.equal(p.recipes.find(r=>r.id==='factory-question-http').phase,'postbuild')

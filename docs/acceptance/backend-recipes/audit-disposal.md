@@ -11,3 +11,9 @@ The default R0 recipe stays pending. `AUDIT_DELETION_ACCEPTANCE_AUTHORIZED=1` no
 The resumed test retains its original deletion-refusal/corruption rollback, legal-hold/export-lease, prune and tombstone assertions. It deletes at most one aged event persistently. All remaining rows, database, container and evidence remain retained. Shared or concurrent privileged use of this dedicated database is outside the contract and must not occur.
 
 Source-only checks: `node --import tsx --test lib/audit/disposal-contract.test.ts`; R0 inventory: `node --test scripts/run-db-tests.test.mjs`. Neither command connects to a database or performs deletion. A missing-approval invocation must reject before entering the test body. Do not run the positive disposal path to test the gate.
+
+## Retained session verification
+
+`test:audit-session` is a separate R0 recipe. It creates fresh run-bound databases and private manifests, never approval files, and does not import the deletion entrypoint. It exercises the lower-level receipt validator/consumer only: environment and owner/source drift, snapshot drift, concurrent one-winner admission, durable replay refusal, connection loss before UPDATE and after UPDATE/before COMMIT, and fixed-client failure without reconnect. Its budget regression updates a synthetic marker and injects an over-budget/wrong-ID result; the real transaction must roll that marker back. It does not execute SQL DELETE or claim deletion acceptance.
+
+All databases, manifests and surviving records remain retained. The successful test-only receipt consumers update only their own newly created receipt rows; they do not consume a separate prepared fixture awaiting user approval. Changes to source dependencies invalidate earlier prepared manifests as intended.

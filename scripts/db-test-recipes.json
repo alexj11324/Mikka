@@ -5,12 +5,14 @@
     "activity-actor-db",
     "audit",
     "audit-deletion",
+    "audit-session",
     "byos-claim",
     "byos-retained",
     "byos-worker",
     "conversation-reads",
     "credentials",
     "credentials-disposal",
+    "disposal-catalog",
     "e2e:setup",
     "factory",
     "factory-monitor-http",
@@ -1047,7 +1049,11 @@
         "actual HTTP dispatch \u2192 group mailbox \u2192 isolated fake worker \u2192 trusted revision"
       ],
       "expectedCount": 10,
-      "runner": "scripts/test-group-native-required.mjs"
+      "runner": "scripts/test-group-native-required.mjs",
+      "supportFiles": [
+        "packages/daemon/test/group-native-acceptance.ts",
+        "packages/daemon/test/native-resource-registry.ts"
+      ]
     },
     {
       "id": "groups",
@@ -1798,6 +1804,74 @@
         "lib/factory/postgres.test.ts",
         "lib/factory/questions/postgres.test.ts",
         "lib/factory/retained-test-support.ts"
+      ]
+    },
+    {
+      "id": "audit-session",
+      "files": [
+        {
+          "path": "lib/audit/disposal-session.db.test.ts",
+          "requiredNames": [
+            "retained PG audit session: environment, ownership, snapshot, one-use receipt and connection failure"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:audit-session"
+      ],
+      "profile": "audit",
+      "phase": "external",
+      "status": "ready",
+      "expectedTests": [
+        "retained PG audit session: environment, ownership, snapshot, one-use receipt and connection failure",
+        "environment mismatch and forged receipt owner/source are refused without consumption",
+        "new retained event invalidates the frozen snapshot",
+        "concurrent receipt admission has one winner and replay remains refused",
+        "connection loss before receipt update rolls back and pinned session cannot reconnect",
+        "connection loss after receipt update before commit rolls back and releases its lock",
+        "over-budget or wrong-ID result rolls back a real transaction without deleting rows"
+      ],
+      "expectedCount": 7,
+      "supportFiles": [
+        "lib/audit/disposal-session.ts",
+        "lib/audit/disposal-contract.ts",
+        "lib/audit/store.ts",
+        "scripts/prepare-audit-disposal.ts"
+      ],
+      "packageScript": "test:audit-session"
+    },
+    {
+      "id": "disposal-catalog",
+      "files": [
+        {
+          "path": "scripts/disposal/catalog-fixture.db.test.mjs",
+          "requiredNames": [
+            "retained PG inventory: actual catalog arrays, composite cascade, SET NULL and exact BYOS attempts"
+          ]
+        }
+      ],
+      "command": [
+        "pnpm",
+        "-s",
+        "test:disposal-catalog-db"
+      ],
+      "packageScript": "test:disposal-catalog-db",
+      "profile": "audit",
+      "phase": "external",
+      "status": "ready",
+      "expectedTests": [
+        "retained PG inventory: actual catalog arrays, composite cascade, SET NULL and exact BYOS attempts",
+        "real factory_192 catalog inventories only registered fixture effects",
+        "real monitor_195 catalog inventories only registered fixture effects",
+        "real questions catalog inventories only registered fixture effects",
+        "real BYOS join freezes the attempt PK and rejects a cross-scope alias"
+      ],
+      "expectedCount": 5,
+      "supportFiles": [
+        "scripts/disposal/factory-effects.mjs",
+        "scripts/disposal/byos-inventory.mjs"
       ]
     }
   ]

@@ -74,6 +74,9 @@ export function readTree(root = '.') {
       files[file] = readFileSync(resolve(root, file), 'utf8')
     }
   }
+  for (const file of ['packages/daemon/test/group-native-acceptance.ts','packages/daemon/test/native-resource-registry.ts']) {
+    if (existsSync(resolve(root,file))) files[file]=readFileSync(resolve(root,file),'utf8')
+  }
   return files
 }
 

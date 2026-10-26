@@ -67,6 +67,19 @@ export async function claimAuditDisposal(manifestPath: string, approvalPath: str
   validateApproval(JSON.parse(await readPrivate(approvalPath)) as Approval,text,source,m.plan.runId);
   const pool=await pinnedPool(raw);
   try {
+    await consumeAuditFixtureReceipt(pool,m,source);
+    return {pool,plan:m.plan as DisposalPlan};
+  } catch(e) {await pool.end();throw e;}
+}
+
+export type PreparedAuditFixture = {version:number;plan:DisposalPlan;target:ReturnType<typeof validateTarget>;environment:Record<string,string>;sourceHash:string;snapshot:unknown;maxPersistentDeletedEvents:number};
+// Lower-level fixture receipt validation/consumption only. This never authorizes
+// or performs deletion; claimAuditDisposal remains the approval-file boundary.
+export async function openAuditFixtureSession(raw: string, plan: DisposalPlan) {
+  validateTarget(raw,plan); return pinnedPool(raw);
+}
+export async function consumeAuditFixtureReceipt(pool: Pool, m: PreparedAuditFixture, source: string) {
+  validatePlan(m.plan);assert.equal(m.target.host,'127.0.0.1');assert.equal(m.target.database,`mikka_audit_disposal_${m.plan.runId.slice(12).replaceAll('-','')}_e2e`);assert.equal(m.environment.database,m.target.database);assert.equal(m.version,1);assert.equal(m.maxPersistentDeletedEvents,1);assert.equal(m.sourceHash,source);
     assert.deepEqual(await identity(pool),m.environment);
     // Session lock stays held by the sole pool connection for the entire test.
     assert.equal((await pool.query("SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked",[m.plan.runId])).rows[0].locked,true);
@@ -78,6 +91,4 @@ export async function claimAuditDisposal(manifestPath: string, approvalPath: str
       await pool.query('UPDATE audit_disposal_owner SET consumed=true WHERE run_id=$1',[m.plan.runId]);
       await pool.query('COMMIT');
     } catch(e) { await pool.query('ROLLBACK'); throw e; }
-    return {pool,plan:m.plan as DisposalPlan};
-  } catch(e) {await pool.end();throw e;}
 }

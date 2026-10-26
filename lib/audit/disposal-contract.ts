@@ -38,3 +38,9 @@ export function validatePruneRows(rows: unknown, p: DisposalPlan) {
     {id:p.exportId,seq:'2',floor:'0',retention:90,expired:false,event:{actorId:p.owner,actorType:'human',resourceId:p.exportId,action:'audit.export',outcome:'success',reason:'snapshot'}}
   ],'exact prepared event plus approved export record required; only aged event may expire');
 }
+
+export function validateDeletedEvents(removed: unknown, before: {tenant:string;id:string}[], after: {tenant:string;id:string}[], tenant: string, id: string) {
+  assert.equal(removed,'1','disposal budget must pass before commit');
+  const missing=before.filter(row=>!after.some(other=>other.tenant===row.tenant&&other.id===row.id));
+  assert.deepEqual(missing,[{tenant,id}],'only exact approved event may disappear before commit');
+}

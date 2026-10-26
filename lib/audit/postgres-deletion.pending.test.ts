@@ -3,7 +3,7 @@
 // authorization; fixture-retention flags alone never enable this entry.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rollbackProbe, validatePruneRows } from "./disposal-contract";
+import { rollbackProbe, validatePruneRows, validateDeletedEvents } from "./disposal-contract";
 import { claimAuditDisposal } from "./disposal-session";
 import { appendAudit, createExport, transaction, verifyAudit, pruneAudit } from "./store";
 
@@ -115,10 +115,8 @@ test("pending PostgreSQL audit: immutable deletion refusal, privileged deletion 
                 validatePruneRows(targets,plan);
                 const before=(await tx.query("SELECT tenant,id::text FROM security_audit_events ORDER BY tenant,id")).rows;
                 const result=await pruneAudit(tx, aged, "system");
-                assert.equal(result.removed,"1","disposal budget must pass before commit");
                 const after=(await tx.query("SELECT tenant,id::text FROM security_audit_events ORDER BY tenant,id")).rows;
-                const removed=before.filter(row=>!after.some(other=>other.tenant===row.tenant&&other.id===row.id));
-                assert.deepEqual(removed,[{tenant:aged,id}],"only exact approved event may disappear before commit");
+                validateDeletedEvents(result.removed,before,after,aged,id);
                 return result;
               }))
               .removed,

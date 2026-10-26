@@ -106,6 +106,7 @@ jobs:
       - run: pnpm test:suggestions
       - run: pnpm test:db-runner
       - run: pnpm test:audit-contract
+      - run: pnpm test:disposal-inventory
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:issues
@@ -161,7 +162,7 @@ jobs:
     env:
       CI: 'true'
       REQUIRE_DB: '1'
-      DB_TEST_EXPECTED: active-agents,activity-actor-db,audit,audit-deletion,byos-claim,byos-retained,byos-worker,conversation-reads,credentials,credentials-disposal,e2e:setup,factory,factory-monitor-http,factory-physical-absence,factory-query-http,factory-question-http,group-native,groups,historical-upgrade-db,improvement,issue-search-db,issue-threads-db,mailboxes,migration-session,operations,relation-cycle,run-dispatch,visibility-db,workspace-migration-db
+      DB_TEST_EXPECTED: active-agents,activity-actor-db,audit,audit-deletion,audit-session,byos-claim,byos-retained,byos-worker,conversation-reads,credentials,credentials-disposal,disposal-catalog,e2e:setup,factory,factory-monitor-http,factory-physical-absence,factory-query-http,factory-question-http,group-native,groups,historical-upgrade-db,improvement,issue-search-db,issue-threads-db,mailboxes,migration-session,operations,relation-cycle,run-dispatch,visibility-db,workspace-migration-db
       MIKKA_TEST_DB_PORT: '5432'
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       CREDENTIAL_TEST_ADMIN_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/postgres
