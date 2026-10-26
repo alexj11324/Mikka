@@ -8,8 +8,8 @@ assert.equal(process.argv[2],profile.file,'Required native test file must remain
 assert.equal(process.env.MIKKA_NATIVE_DISPOSAL_AUTHORIZED,'1','Native profile requires explicit authorization for its task-owned runtime container/process disposal; KEEP_GROUP_TEST_FIXTURES is insufficient')
 assert.ok(process.env.MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL,'Native integration requires an explicit separate workspace database URL')
 assert.equal(new URL(process.env.MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL).pathname,'/mikka_workspace_review','Workspace database must be exactly mikka_workspace_review')
-assert.ok(['/mikka_review','/mikka_e2e'].includes(new URL(process.env.MIKKA_DISPOSABLE_POSTGRES_URL).pathname),'App database must be mikka_review or mikka_e2e, distinct from workspace')
-for(const value of [process.env.MIKKA_DISPOSABLE_POSTGRES_URL,process.env.MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL]){const url=new URL(value);assert.ok(['postgres:','postgresql:'].includes(url.protocol));assert.equal(url.hostname,'127.0.0.1');assert.ok(['/mikka_review','/mikka_e2e','/mikka_workspace_review'].includes(url.pathname));assert.equal(url.search,'');assert.equal(url.hash,'')}
+assert.equal(new URL(process.env.MIKKA_DISPOSABLE_POSTGRES_URL).pathname,'/mikka_review','App database must be exactly mikka_review, distinct from workspace')
+for(const value of [process.env.MIKKA_DISPOSABLE_POSTGRES_URL,process.env.MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL]){const url=new URL(value);assert.ok(['postgres:','postgresql:'].includes(url.protocol));assert.equal(url.hostname,'127.0.0.1');assert.ok(['/mikka_review','/mikka_workspace_review'].includes(url.pathname));assert.equal(url.search,'');assert.equal(url.hash,'')}
 const result=spawnSync(process.execPath,['--import','tsx','--test','--test-reporter=tap',profile.file],{encoding:'utf8',maxBuffer:32*1024*1024,env:{...process.env,MIKKA_TEST_NATIVE_GROUPS:'1',KEEP_GROUP_TEST_FIXTURES:'1',KEEP_NATIVE_TEST_FIXTURES:'1'}})
 process.stdout.write(result.stdout??'');process.stderr.write(result.stderr??'')
 assert.equal(result.status,0,'Required native profile failed')

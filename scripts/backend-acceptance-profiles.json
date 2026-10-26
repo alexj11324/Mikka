@@ -3,7 +3,8 @@
     {
       "name": "group-native-required",
       "phase": "database",
-      "appDatabases": ["mikka_review", "mikka_e2e"],
+      "appDatabases": ["mikka_review"],
+      "appBinding": "R0_GROUP_APP_DATABASE_URL",
       "workspaceDatabase": "mikka_workspace_review",
       "requireDistinctWorkspaceDatabase": true,
       "script": "test:group-native",

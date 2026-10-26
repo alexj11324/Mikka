@@ -21,10 +21,17 @@ test('Factory HTTP profile requires explicit flag and rejects foreign database b
 })
 test('native integration rejects shared or suffix-only workspace databases before fixtures',()=>{
  for(const database of ['mikka_e2e','arbitrary_e2e']){
-  const r=spawnSync(process.execPath,['scripts/test-group-native-required.mjs','lib/group-mailbox-runtime.test.ts'],{encoding:'utf8',env:{...env,MIKKA_NATIVE_DISPOSAL_AUTHORIZED:'1',MIKKA_DISPOSABLE_POSTGRES_URL:'postgres://synthetic@127.0.0.1/mikka_e2e',MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL:`postgres://synthetic@127.0.0.1/${database}`}})
+  const r=spawnSync(process.execPath,['scripts/test-group-native-required.mjs','lib/group-mailbox-runtime.test.ts'],{encoding:'utf8',env:{...env,MIKKA_NATIVE_DISPOSAL_AUTHORIZED:'1',MIKKA_DISPOSABLE_POSTGRES_URL:'postgres://synthetic@127.0.0.1/mikka_review',MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL:`postgres://synthetic@127.0.0.1/${database}`}})
   assert.notEqual(r.status,0);assert.match(r.stderr,/Workspace database must be exactly/);assert.doesNotMatch(r.stdout,/# Subtest:/)
  }
  const profiles=JSON.parse(readFileSync('scripts/backend-acceptance-profiles.json','utf8')).profiles
  const native=profiles.find(p=>p.name==='group-native-required')
  assert.equal(native.workspaceDatabase,'mikka_workspace_review');assert.equal(native.requireDistinctWorkspaceDatabase,true)
+})
+
+test('native group app rejects the separate Factory database before fixtures',()=>{
+ const r=spawnSync(process.execPath,['scripts/test-group-native-required.mjs','lib/group-mailbox-runtime.test.ts'],{encoding:'utf8',env:{...env,MIKKA_NATIVE_DISPOSAL_AUTHORIZED:'1',MIKKA_DISPOSABLE_POSTGRES_URL:'postgres://synthetic@127.0.0.1/mikka_e2e',MIKKA_DISPOSABLE_WORKSPACE_POSTGRES_URL:'postgres://synthetic@127.0.0.1/mikka_workspace_review'}})
+ assert.notEqual(r.status,0);assert.match(r.stderr,/App database must be exactly mikka_review/);assert.doesNotMatch(r.stdout,/# Subtest:/)
+ const native=JSON.parse(readFileSync('scripts/backend-acceptance-profiles.json','utf8')).profiles.find(p=>p.name==='group-native-required')
+ assert.deepEqual(native.appDatabases,['mikka_review']);assert.equal(native.appBinding,'R0_GROUP_APP_DATABASE_URL')
 })
