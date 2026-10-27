@@ -32,6 +32,14 @@ test('a thread reads as one conversation: agent text, folded steps and people in
     { chunk: { type: 'text-delta', id: 'c', delta: '  ' }, at: t(21) },
     { chunk: { type: 'error', errorText: 'Interrupted' }, at: t(30) },
   ], [{ id: 'm', text: 'Check the fallback', author: 'Lin', mine: false, at: t(10) }])
-  assert.deepEqual(items.map(item => item.kind === 'steps' ? `steps:${item.count}` : item.kind === 'person' ? `person:${item.author}` : `${item.kind}:${item.text}`),
+  assert.deepEqual(items.map(item => item.kind === 'steps' ? `steps:${item.count}` : item.kind === 'person' ? `person:${item.author}` : item.kind === 'computer' ? `computer:${item.botId}` : `${item.kind}:${item.text}`),
     ['agent:Reproduced it.', 'steps:2', 'person:Lin', 'agent:Fixed.', 'error:Interrupted'])
+})
+
+test('a thread shows one computer card only for its own run', () => {
+  const at = new Date()
+  const card = { type: 'data-computer', data: { botId: 'bot-a', runId: 'run-a', task: 'Open the page', state: 'working' } }
+  const chunks = [{ chunk: card, at }, { chunk: card, at }, { chunk: { ...card, data: { ...card.data, runId: 'run-b' } }, at }]
+  assert.deepEqual(threadItems(chunks, [], 'run-a').map(item => item.kind), ['computer'])
+  assert.deepEqual(threadItems(chunks, [], 'run-c'), [])
 })

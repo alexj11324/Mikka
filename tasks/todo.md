@@ -547,9 +547,10 @@ MCP servers, and hooks run outside it*）。无人值守下 `permissionMode` 也
 
 - dev server 没起时 daemon 是**静默**的：`ServerUnreachableError` 被 syncPass 有意跳过，
   日志只留 `daemon started`。排查时容易误判成「daemon 没注册」，实际是服务端不可达。
-- 完整链路只能在库层面触发：`startRun` server action 已存在，但 issue 详情没有入口；
-  仓库也还没有配置 UI（`device_repos` 需要手写）。
-- 未覆盖的分支：`stopRun` 取消、`sendRunMessage` 中途插话、verify 失败 → run failed。
+- 当时完整链路只能在库层面触发，issue 详情和仓库配置都还没有 UI（`device_repos` 需要手写）。
+  现在线程由 Bot 派发；旧的手动启动、列表、详情和发消息 server actions 已移除（#334）。
+- 当时未覆盖的分支：`stopRun` 取消、线程中途插话、verify 失败 → run failed。
+  现在线程插话使用 `sendIssueThreadMessage`；保留 `stopRun` 供线程停止按钮使用。
 
 ## 三条分支补齐（同日）
 

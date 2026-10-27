@@ -22,7 +22,7 @@ The database test that exercises approval uses explicitly synthetic report recor
 
 This is not a claim of authenticated frozen-Preview acceptance, a real Claude Code/Codex device run, a real model-quality comparison or real-account tool execution. Those require the matching Preview database migration, an authenticated test session/device and explicit live-evaluation configuration. Production configuration and data were not changed.
 
-Apply `20261027040500_agent_kit.sql` before enabling `MIKKA_AGENT_KIT=1` in the target isolated Preview. Keep `MIKKA_AGENT_KIT_LIVE_EVAL` off until model-usage consent and the test budget are established. Keep the PR unmerged until the required CI and remaining acceptance checks have been reviewed.
+Apply `20261027181000_agent_kit.sql` before enabling `MIKKA_AGENT_KIT=1` in the target isolated Preview. Keep `MIKKA_AGENT_KIT_LIVE_EVAL` off until model-usage consent and the test budget are established. Keep the PR unmerged until the required CI and remaining acceptance checks have been reviewed.
 
 ## Independent review follow-up (2026-10-27)
 

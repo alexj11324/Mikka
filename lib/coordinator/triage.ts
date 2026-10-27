@@ -14,6 +14,8 @@ interface TriageEvent { kind: CoordinatorEventKind; payload: Record<string, unkn
 export function ruleTier(event: TriageEvent): CoordinatorEventTier | null {
   switch (event.kind) {
     case 'user_message':
+    // Hidden evidence the Coordinator must decide on (lib/attention); it was rated before it was handed over.
+    case 'matter_handoff':
       return 'attention'
     case 'issue_done':
     // A retry after the device went offline is the system handling it.
@@ -30,6 +32,9 @@ export function ruleTier(event: TriageEvent): CoordinatorEventTier | null {
     // An agent that asks or is stuck waits on the person.
     case 'run_question':
     case 'run_blocked':
+      return 'attention'
+    // The morning briefing is the Coordinator's to deliver (R-21).
+    case 'daily_briefing':
       return 'attention'
     // A handed-over document or page is a result: the card shows under the next reply.
     case 'artifact_submitted':

@@ -11,7 +11,7 @@ Alex requested the full Agent-as-Code engineering layer on 2026-10-26: declarati
 
 ## Rollout
 
-Apply the additive `20261027040500_agent_kit.sql` migration to the matching isolated Preview database before enabling `MIKKA_AGENT_KIT=1` on that Preview. The flag is off by default; no production configuration is changed by this PR. With the flag off, Coordinator tools and prompts follow the old path. Enabling does not change the user's selected harness.
+Apply the additive `20261027181000_agent_kit.sql` migration to the matching isolated Preview database before enabling `MIKKA_AGENT_KIT=1` on that Preview. The flag is off by default; no production configuration is changed by this PR. With the flag off, Coordinator tools and prompts follow the old path. Enabling does not change the user's selected harness.
 
 A new execution records an immutable definition revision, content digest, exact host instructions and their digest, effective tools, and the selected runtime/model where known. An execution replay reuses that record even if the user edits the Bot. Memory is loaded separately under the current owner/Bot scope. The host prompt snapshot is not a model's hidden internal system prompt and does not claim to capture provider-internal state.
 

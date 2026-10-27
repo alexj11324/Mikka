@@ -22,7 +22,7 @@ if(!loopback || (!dedicated && !actions)) throw new Error('Refusing non-isolated
 const pool=new Pool({connectionString,max:12})
 const store=new AgentKitStore(pool)
 const defaults=DEFAULT_AGENT_DEFINITION
-const migration=readFileSync(new URL('../../drizzle/20261027040500_agent_kit.sql',import.meta.url),'utf8')
+const migration=readFileSync(new URL('../../drizzle/20261027181000_agent_kit.sql',import.meta.url),'utf8')
 
 before(async()=>{
   // Dedicated tests can start with only the real migration's parent contracts.

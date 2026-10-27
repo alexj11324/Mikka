@@ -19,6 +19,8 @@ export type MikkaDataTypes = {
   publish: RunPublish
   /** Run state transitions written by the daemon. */
   "run-state": { state: RunState; error?: string; stopReason?: StopReason }
+  /** A real task is attached to this Bot's desktop, not to an agent identity. */
+  computer: { botId: string; runId: string; task: string; state: 'working' }
   /**
    * The spec a `plan` run wrote (ADR ORV-205). `specId` is the row the server
    * stores, so the card reads the spec's live status from there.

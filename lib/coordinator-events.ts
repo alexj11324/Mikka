@@ -125,6 +125,26 @@ export function runBlockedEvent(run: WorkerRun, reason: string): CoordinatorEven
   return workerEvent('run_blocked', run, { reason })
 }
 
+/**
+ * One item a briefing names, as the Coordinator reads it. `suggestionId`
+ * links the item to its suggestion so a client can show it as a chip.
+ * `title` is the source's own text until suggestions carry a verb-first
+ * action title (R-45, `suggestions.actionTitle`); then that title goes here, with the raw one as fallback.
+ */
+export interface BriefingEventItem { suggestionId: string; source: string; action: string; title: string; actor: string | null; url: string | null; required: boolean }
+
+/**
+ * The person's briefing is ready: the daily one at 08:00 their time, or the
+ * first one after they connect an app. One event per briefing kind and local
+ * date, so a rerun of the cron does not push it twice.
+ */
+export function briefingEvent(briefing: { userId: string; localDate: string; kind: 'first' | 'daily'; total: number; counts: Record<string, number> }, items: readonly BriefingEventItem[], personName: string | null = null): CoordinatorEventInput {
+  return {
+    userId: briefing.userId, kind: 'daily_briefing', dedupeKey: `daily_briefing:${briefing.userId}:${briefing.localDate}:${briefing.kind}`, issueId: null, runId: null,
+    payload: { localDate: briefing.localDate, briefingKind: briefing.kind, total: briefing.total, counts: briefing.counts, items, ...(personName ? { personName } : {}) },
+  }
+}
+
 /** An agent handed over a document or web page (MCP `submit_artifact`). One event per version. */
 export function artifactSubmittedEvent(
   submitter: { userId: string; botId?: string | null; runId: string | null; issueId: string | null; authorName: string },

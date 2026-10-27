@@ -38,7 +38,8 @@ computer. The computer is keyed by `bots.id`, never `agents.id`:
 ```
 workspace ──1:1── cloud machine (E2B sandbox, Linux)
                     ├─ mikka daemon (registered as a device, kind = "cloud")
-                    ├─ shared:  /workspace (repos, files)   $HOME (CLI logins)
+                    ├─ shared:  /workspace (repos, files)
+                    ├─ owner-scoped authentication (never shared across users)
                     ├─ bot A:   Xvfb :1 + WM + x11vnc + websockify  → noVNC
                     │           Chrome profile ~/.mikka/profiles/<botId>
                     ├─ bot B:   Xvfb :2 + …
@@ -47,17 +48,17 @@ workspace ──1:1── cloud machine (E2B sandbox, Linux)
 
 - **One machine per workspace**, not one per bot. The cost is one sandbox's
   running time plus one disk.
-- **Shared files**: all bots work in the same `/workspace` and the same
-  `$HOME`. Claude Code / Codex CLI logins (stored under `$HOME`) are therefore
-  done once and work for every bot.
+- **Shared files**: project files may be shared in `/workspace`. Subscription
+  credentials and browser sessions stay bound to their authorized account owner.
+  A shared `$HOME` is not an authentication or security boundary. The confirmed
+  requirements in #172 supersede the original shared-login explanation.
 - **Isolated desktops**: each bot gets its own X display (`Xvfb :N`), window
   manager, apps and windows, and its own VNC stream. Displays are allocated
   lazily on a bot's first computer use and kept across sleep.
-- **Browser logins are shared**: Chrome locks a profile directory to one
-  process, so each bot gets its own profile. A background job syncs cookies
-  between profiles, for example with CDP `Network.getAllCookies` and
-  `Network.setCookies`. Logging in on one bot's desktop then logs every bot in.
-  Sites that pin a session to one device may still ask again; that is accepted.
+- **Browser logins**: Chrome profiles are separate. Reuse requires explicit
+  same-owner authorization; no automatic cross-user authentication-cookie sync.
+  The initial runtime rejects a second account owner on the workspace machine
+  until a stronger process/sandbox isolation boundary is implemented.
 - **Sleep**: use E2B pause/resume. Pause when no bot has a running computer
   task and no viewer is open for N minutes (default 15). Resume on a computer
   tool call, a 唤醒 press or a viewer open.
@@ -111,8 +112,8 @@ New on top of #161:
 3. **Viewer auth.** The noVNC endpoint is reachable through the sandbox's public
    host. It must require a short-lived signed token, with separate view and
    control grants, and must never be open by URL alone.
-4. **Cookie sync.** Check that the CDP sync is reliable while two Chromes run.
-   Measure how long a change takes to propagate.
+4. **Session reuse.** Check authorized same-owner reuse while two Chromes run,
+   and prove that sessions cannot cross account-owner boundaries.
 
 Report findings in the issue before building on an assumption that failed.
 
