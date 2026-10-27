@@ -183,6 +183,7 @@
     "tsx": "4.23.15",
     "tw-animate-css": "^1.3.4",
     "typescript": "^5.9.3",
-    "wrangler": "^4.151.3"
+    "wrangler": "^4.151.3",
+    "esbuild": "0.28.2"
   }
 }

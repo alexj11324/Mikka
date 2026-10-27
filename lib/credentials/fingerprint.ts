@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import { CredentialError } from './contracts.js'
+import { CredentialError } from './contracts'
 
 export type SecretFingerprint = { digest: string; length: number }
 export function fingerprint(userId: string, value: string, authSecret = process.env.BETTER_AUTH_SECRET): SecretFingerprint {

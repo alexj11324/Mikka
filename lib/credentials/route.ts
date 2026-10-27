@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { canonicalOrigin, CredentialError, secretText, submitSchema, otpSchema } from './contracts.js'
-import { checkCredentialRequest, credentialBody, credentialFailure, privateHeaders } from './http.js'
-import { credentialActor, credentialStore, login, executeCredentialLease, resolveCredentialBrowser } from './runtime.js'
+import { canonicalOrigin, CredentialError, secretText, submitSchema, otpSchema } from './contracts'
+import { checkCredentialRequest, credentialBody, credentialFailure, privateHeaders } from './http'
+import { credentialActor, credentialStore, login, executeCredentialLease, resolveCredentialBrowser } from './runtime'
 import { pool } from '@/lib/db'
 
 export async function subagentCredentialRoute(request: Request, botId: string, subagentId: string, action: 'challenge' | 'submit' | 'login') {
