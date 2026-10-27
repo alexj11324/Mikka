@@ -32,5 +32,9 @@ test('only active owned web tasks extend a Bot machine, and failures retry', { s
     assert.equal(await renewBotLifetime(pool, actor, renew), false)
     await pool.query(`UPDATE bot_subagents SET "stopRequestedAt"=NULL; UPDATE cloud_machines SET state='paused'`)
     assert.equal(await renewBotLifetime(pool, actor, renew), false)
+    await pool.query(`UPDATE cloud_machines SET state='running'`)
+    const concurrent = await Promise.all(Array.from({ length: 4 }, () => renewBotLifetime(pool, actor, renew)))
+    assert.equal(concurrent.filter(Boolean).length, 1)
+    assert.deepEqual(calls, ['machine', 'machine'])
   } finally { await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() }
 })
