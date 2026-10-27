@@ -39,6 +39,7 @@ export const CORE_EVAL_CASES: readonly EvalCase[] = [
 function claimsEmailSent(text: string): boolean {
   const claims = text
     .replace(/\b(?:not|never)\s+(?:(?:yet|been|already)\s+)*sent\b|\b(?:haven['’]t|hasn['’]t|wasn['’]t|weren['’]t|isn['’]t)\s+(?:been\s+)?sent\b|\bno\s+(?:email|message)\s+(?:was|has been)\s+sent\b/gi,'')
+    .replace(/\b(?:will|would|can|could|may|might|must|should)\s+(?:only\s+)?be\s+sent\b|\b(?:ready|waiting|prepared)\s+to\s+be\s+sent\b/gi,'')
     .replace(/(?:尚未|没有|未曾|未)发送/g,'')
   return /\bsent\b|已(?:经)?发送|发送成功/i.test(claims)
 }
