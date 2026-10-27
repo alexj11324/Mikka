@@ -5,12 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ListChecks } from 'lucide-react-native'
 import { useDrawer } from '@/components/Drawer'
 import { BotAvatar, MenuIcon, Spinner, threadStatus } from '@/components/icons'
-import { BotBubble, DateLabel, EventLine, MyBubble, ThreadCard, TimedRow, useTimeReveal } from '@/components/chat'
+import { BotBubble, EventLine, MyBubble, ThreadCard, TimedRow, useTimeReveal } from '@/components/chat'
 import { Markdown } from '@/components/Markdown'
 import { Text } from '@/components/Text'
 import { Composer, Header, RoundButton } from '@/components/ui'
 import { api } from '@/lib/api'
-import { clockTime, dayLabel } from '@/lib/clock'
+import { clockTime } from '@/lib/clock'
 import { API_URL } from '@/lib/config'
 import { runTitle, type Chat, type CitationSource } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
@@ -70,7 +70,6 @@ export function ChatScreen({ botId, name, color, shape, draft }: { botId: string
 
   const items = data?.items ?? []
   const sources = data?.sources ?? {}
-  let lastDay = ''
 
   return (
     <View style={styles.screen}>
@@ -88,13 +87,9 @@ export function ChatScreen({ botId, name, color, shape, draft }: { botId: string
       <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
         <ScrollView ref={scroll} contentContainerStyle={[styles.list, { paddingTop: insets.top + 76 }]} onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
           {items.map(item => {
-            const day = dayLabel(item.createdAt)
-            const showDay = day !== lastDay
-            lastDay = day
             const time = clockTime(item.createdAt)
             return (
               <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
-                {showDay ? <DateLabel text={day} /> : null}
                 {item.from === 'event' ? <EventLine text={eventText(item.text, sources)} /> : null}
                 {item.from === 'person' && item.text ? <TimedRow time={time} offset={offset} align="right"><MyBubble text={item.text} /></TimedRow> : null}
                 {item.from === 'coordinator' && item.text ? (

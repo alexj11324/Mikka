@@ -71,8 +71,8 @@ thread card is a status icon and the thread name, with outputs as chips
 
 Message times are hidden. Swiping the chat from right to left reveals each
 message's time on the right, as in iMessage and ChatGPT (Figma 01b); no time
-labels above messages or inside cards. The briefing keeps its centred
-「今日简报 · <date>」 label (Hark).
+labels above messages or inside cards, and no date label above the briefing:
+it is one bubble (decisions 2026-10-27).
 
 Colour is restrained: grey spinners; blue only for unread dots and send;
 red only for failure; green for a finished thread and an online machine; PR

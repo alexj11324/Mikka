@@ -34,11 +34,6 @@ export function EventLine({ text }: { text: string }) {
   return <Text style={styles.event} numberOfLines={2}>{text}</Text>
 }
 
-/** Briefing date label, centred (Hark). The only time shown without a swipe. */
-export function DateLabel({ text }: { text: string }) {
-  return <Text style={styles.dateLabel}>{text}</Text>
-}
-
 const REVEAL = 56
 
 /**
@@ -72,6 +67,5 @@ const styles = StyleSheet.create({
   threadCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.bubble, borderRadius: 18, paddingHorizontal: 16, height: 52 },
   threadTitle: { flex: 1, fontSize: 16, fontWeight: '500' },
   event: { alignSelf: 'center', textAlign: 'center', fontSize: 12, lineHeight: 17, color: colors.secondary, marginHorizontal: 24 },
-  dateLabel: { alignSelf: 'center', fontSize: 12, color: colors.secondary, marginVertical: 4 },
   time: { position: 'absolute', right: -REVEAL + 6, bottom: 4, fontSize: 11, color: colors.tertiary },
 })
