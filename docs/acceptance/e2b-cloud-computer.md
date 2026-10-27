@@ -37,6 +37,17 @@ projections. The account's machine-identity limit prevents creating the two
 separate identities needed to configure them, so no broad existing identity
 was repurposed for the execution worker. The production feature remains off.
 
+The owner subsequently required reuse of existing identities. Preview now reuses
+the existing `team-secret-management-broker` identity for custody. The trusted
+control plane authorizes a binding and reads only its current access projection;
+execution children receive that one immutable projection over private stdin,
+never the identity or a vault token. They cannot read another projection or
+mutate the store. The existing identity also has admin access to the main Mikka
+project, so this preserves the execution boundary but does not provide
+project-level least privilege for the trusted custody process. The preview's
+additional client credential expires after 30 days. Real provider consent,
+inference and signed-in product acceptance remain outstanding.
+
 ## Implemented
 
 - Real E2B SDK control plane, plain Linux template with 2 CPUs / 2048 MB,

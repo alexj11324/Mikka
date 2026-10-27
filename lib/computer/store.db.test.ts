@@ -11,6 +11,7 @@ import { provisionCloudDevice, renewCloudDeviceToken } from './cloud-device'
 import { claimWorkerLease, renewWorkerLease, releaseWorkerLease } from './worker-lease'
 import { startCloudWorker } from './cloud-worker'
 import { queueCloudRun } from './queue-run'
+import { authorizedAccessName } from '../subscription-access-snapshot'
 import { ensureBotRuntime } from './bot-runtime'
 import { bindBotSubscription } from './bot-subscription'
 import { ComputerBroker } from '../../packages/daemon/src/computer/broker.mjs'
@@ -54,6 +55,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const runApprovalMigration = await readFile(new URL('../../drizzle/20261027040512_computer_run_approvals.sql', import.meta.url), 'utf8')
     await pool.query(runApprovalMigration); await pool.query(runApprovalMigration)
     await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint, provider text); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "modelId" text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
+    await pool.query('ALTER TABLE byos_connections ADD COLUMN "accessSecretName" text')
     const botRuntimeMigration = await readFile(new URL('../../drizzle/20261027040513_bot_cloud_runtimes.sql', import.meta.url), 'utf8')
     await pool.query(botRuntimeMigration); await pool.query(botRuntimeMigration)
     const policyMigration = await readFile(new URL('../../drizzle/20261027040514_workspace_computer_policy.sql', import.meta.url), 'utf8')
@@ -141,6 +143,23 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const connectionId = randomUUID()
     await pool.query('INSERT INTO byos_connections (id,"ownerId","workspaceId",state,epoch,provider) VALUES ($1,$2,$3,$4,$5,$6)', [connectionId, actor.userId, actor.workspaceId, 'connected', 1, 'codex'])
     await pool.query('UPDATE byos_bindings SET route=$2,"connectionId"=$3,"connectionRevision"=1 WHERE id=$1', [cloudSubscription, 'codex_cli', connectionId])
+    const projectionName = `mikka-byos-${randomUUID()}`
+    await pool.query('UPDATE byos_connections SET "accessSecretName"=$2 WHERE id=$1', [connectionId, projectionName])
+    const credentialScope = { ownerId: actor.userId, workspaceId: actor.workspaceId, connectionId, provider: 'codex' as const }
+    const credentialUse = { bindingId: cloudSubscription, consumerId: consumer }
+    assert.equal(await authorizedAccessName(pool, credentialScope, credentialUse, 1), projectionName)
+    await assert.rejects(authorizedAccessName(pool, { ...credentialScope, ownerId: bob.userId }, credentialUse, 1))
+    await assert.rejects(authorizedAccessName(pool, credentialScope, { ...credentialUse, consumerId: randomUUID() }, 1))
+    await assert.rejects(authorizedAccessName(pool, credentialScope, credentialUse, 2))
+    await assert.rejects(authorizedAccessName(pool, credentialScope, { ...credentialUse, runId: cloudRun }, 1), 'queued or unbound runs cannot read a projection')
+    const snapshotRun = randomUUID()
+    await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"leaseExpiresAt") VALUES ($1,$2,$3,\'running\',now()+interval \'1 minute\')', [snapshotRun, actor.userId, consumer])
+    await pool.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)', [snapshotRun, cloudSubscription])
+    assert.equal(await authorizedAccessName(pool, credentialScope, { ...credentialUse, runId: snapshotRun }, 1), projectionName)
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [snapshotRun])
+    await assert.rejects(authorizedAccessName(pool, credentialScope, { ...credentialUse, runId: snapshotRun }, 1), 'stopped runs cannot read a projection')
+    await pool.query('DELETE FROM byos_native_runs WHERE "runId"=$1', [snapshotRun])
+    await pool.query('DELETE FROM agent_runs WHERE id=$1', [snapshotRun])
     const botBinding = { botId: bot.id, connectionId, revision: 1, harness: 'codex' as const, modelId: 'fixture-model', idempotencyKey: 'bind-once' }
     await assert.rejects(bindBotSubscription(pool, bob, botBinding), /unavailable/)
     await assert.rejects(bindBotSubscription(pool, otherWorkspace, botBinding), /unavailable/)

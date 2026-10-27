@@ -20,6 +20,7 @@ export interface WorkerConfiguration {
   accessPath?: string
   accessProject?: string
   accessToken?: string
+  accessSnapshot?: { name: string; value: string }
   enrollmentAttemptPath?: string
   enrollmentClaimPath?: string
   enrollmentGrantPath?: string
@@ -42,7 +43,7 @@ export class WorkerRefusal extends Error {
 const safeCode = (value: unknown) => typeof value === "string" && /^[a-z_]{1,64}$/.test(value) ? value : "subscription_worker_unavailable"
 
 export class SubscriptionWorkerClient {
-  constructor(private readonly launch: { binary: string; args?: string[]; env?: Record<string, string> }, private readonly config: WorkerConfiguration, private readonly resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal) => Promise<{ workloadToken?: string; accessToken?: string }>) {}
+  constructor(private readonly launch: { binary: string; args?: string[]; env?: Record<string, string> }, private readonly config: WorkerConfiguration, private readonly resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal, use?: WorkerConfiguration['use'], revision?: unknown) => Promise<{ workloadToken?: string; accessToken?: string; accessSnapshot?: WorkerConfiguration['accessSnapshot'] }>) {}
   forUse(use: { bindingId: string; consumerId: string; runId?: string }): SubscriptionWorkerClient {
     return new SubscriptionWorkerClient(this.launch, { ...this.config, use: { bindingId: use.bindingId, consumerId: use.consumerId, ...(use.runId ? {runId:use.runId} : {}) } }, this.resolveIdentity)
   }
@@ -108,7 +109,7 @@ export class SubscriptionWorkerClient {
       // Execution children receive the access-store identity only. Refresh and
       // OAuth stay in custody children, with no token material in their results.
       void (async () => {
-        const identity = this.resolveIdentity ? await this.resolveIdentity(executionOnly, signal) : {}
+        const identity = this.resolveIdentity ? await this.resolveIdentity(executionOnly, signal, this.config.use, request.revision) : {}
         if (settled) return
         const resolved = { ...this.config, ...identity }
         const config = executionOnly ? { ...resolved, executionOnly: true, path: '', workloadToken: '', enrollmentAttemptPath: '', enrollmentClaimPath: '', enrollmentGrantPath: '', enableCodexOAuth: false, enableClaudeOAuth: false } : resolved

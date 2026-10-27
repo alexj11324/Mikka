@@ -42,26 +42,27 @@ func run() error {
 		return worker.ErrUnsupported
 	}
 	var config struct {
-		Scope                   worker.Scope       `json:"scope"`
-		Use                     *worker.RuntimeUse `json:"use"`
-		ExecutionOnly           bool               `json:"executionOnly"`
-		AccessPath              string             `json:"accessPath"`
-		AccessProject           string             `json:"accessProject"`
-		AccessToken             string             `json:"accessToken"`
-		DatabaseURL             string             `json:"databaseUrl"`
-		Origin                  string             `json:"infisicalOrigin"`
-		Project                 string             `json:"project"`
-		Environment             string             `json:"environment"`
-		Path                    string             `json:"path"`
-		Token                   string             `json:"workloadToken"`
-		EnableCodexOAuth        bool               `json:"enableCodexOAuth"`
-		EnableRuntime           bool               `json:"enableRuntime"`
-		EnablePlainModels       bool               `json:"enablePlainModels"`
-		EnableClaudeOAuth       bool               `json:"enableClaudeOAuth"`
-		EnrollmentAttemptPath   string             `json:"enrollmentAttemptPath"`
-		EnrollmentClaimPath     string             `json:"enrollmentClaimPath"`
-		EnrollmentGrantPath     string             `json:"enrollmentGrantPath"`
-		RetainEnrollmentSources bool               `json:"retainEnrollmentSources"`
+		Scope                   worker.Scope           `json:"scope"`
+		Use                     *worker.RuntimeUse     `json:"use"`
+		ExecutionOnly           bool                   `json:"executionOnly"`
+		AccessPath              string                 `json:"accessPath"`
+		AccessProject           string                 `json:"accessProject"`
+		AccessToken             string                 `json:"accessToken"`
+		AccessSnapshot          *worker.AccessSnapshot `json:"accessSnapshot"`
+		DatabaseURL             string                 `json:"databaseUrl"`
+		Origin                  string                 `json:"infisicalOrigin"`
+		Project                 string                 `json:"project"`
+		Environment             string                 `json:"environment"`
+		Path                    string                 `json:"path"`
+		Token                   string                 `json:"workloadToken"`
+		EnableCodexOAuth        bool                   `json:"enableCodexOAuth"`
+		EnableRuntime           bool                   `json:"enableRuntime"`
+		EnablePlainModels       bool                   `json:"enablePlainModels"`
+		EnableClaudeOAuth       bool                   `json:"enableClaudeOAuth"`
+		EnrollmentAttemptPath   string                 `json:"enrollmentAttemptPath"`
+		EnrollmentClaimPath     string                 `json:"enrollmentClaimPath"`
+		EnrollmentGrantPath     string                 `json:"enrollmentGrantPath"`
+		RetainEnrollmentSources bool                   `json:"retainEnrollmentSources"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(frame))
 	decoder.DisallowUnknownFields()
@@ -88,6 +89,9 @@ func run() error {
 			return worker.ErrUnsupported
 		}
 	} else {
+		if config.AccessSnapshot != nil {
+			return worker.ErrUnsupported
+		}
 		secrets, err := worker.NewInfisical(worker.InfisicalConfig{Origin: config.Origin, ProjectID: config.Project, Environment: config.Environment, Path: config.Path, Token: func(context.Context) (string, error) { return config.Token, nil }})
 		if err != nil {
 			return err
@@ -96,22 +100,29 @@ func run() error {
 	}
 	var access worker.SecretStore
 	if config.AccessPath != "" || config.EnableRuntime || config.EnableCodexOAuth || config.EnableClaudeOAuth {
-		if config.AccessPath == "" || (config.ExecutionOnly && config.AccessToken == "") || (!config.ExecutionOnly && (config.AccessPath == config.Path || (config.AccessToken != "" && config.AccessToken == config.Token))) {
+		if config.AccessPath == "" || (config.ExecutionOnly && (config.AccessToken == "") == (config.AccessSnapshot == nil)) || (!config.ExecutionOnly && (config.AccessPath == config.Path || (config.AccessToken != "" && config.AccessToken == config.Token))) {
 			return worker.ErrUnsupported
 		}
-		credential := config.AccessToken
-		if !config.ExecutionOnly {
-			credential = config.Token
-		} // Custody writes both paths; execution receives only the read identity.
-		accessProject := config.AccessProject
-		if accessProject == "" {
-			accessProject = config.Project
+		if config.ExecutionOnly && config.AccessSnapshot != nil {
+			access, err = worker.NewAccessSnapshot(*config.AccessSnapshot)
+			if err != nil {
+				return err
+			}
+		} else {
+			credential := config.AccessToken
+			if !config.ExecutionOnly {
+				credential = config.Token
+			} // Custody writes both paths; execution receives only the read identity.
+			accessProject := config.AccessProject
+			if accessProject == "" {
+				accessProject = config.Project
+			}
+			secrets, err := worker.NewInfisical(worker.InfisicalConfig{Origin: config.Origin, ProjectID: accessProject, Environment: config.Environment, Path: config.AccessPath, Token: func(context.Context) (string, error) { return credential, nil }})
+			if err != nil {
+				return err
+			}
+			access = secrets
 		}
-		secrets, err := worker.NewInfisical(worker.InfisicalConfig{Origin: config.Origin, ProjectID: accessProject, Environment: config.Environment, Path: config.AccessPath, Token: func(context.Context) (string, error) { return credential, nil }})
-		if err != nil {
-			return err
-		}
-		access = secrets
 	}
 	// No production native credential export until a verified runner/broker path
 	// avoids exposing tokens to untrusted tools. Config flags cannot attest that.

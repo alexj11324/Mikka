@@ -28,6 +28,28 @@ type Infisical struct {
 	client *http.Client
 }
 
+// A single immutable access projection supplied by the trusted parent. The
+// execution process has no vault identity and cannot request other secrets.
+type AccessSnapshot struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+func NewAccessSnapshot(snapshot AccessSnapshot) (SecretStore, error) {
+	if !validSecretName(snapshot.Name) || len(snapshot.Value) == 0 || len(snapshot.Value) > 32768 {
+		return nil, ErrStore
+	}
+	return snapshot, nil
+}
+func (s AccessSnapshot) Read(_ context.Context, name string) ([]byte, error) {
+	if name != s.Name {
+		return nil, ErrMissing
+	}
+	return []byte(s.Value), nil
+}
+func (AccessSnapshot) Create(context.Context, string, []byte) error { return ErrUnsupported }
+func (AccessSnapshot) Delete(context.Context, string) error         { return ErrUnsupported }
+
 func NewInfisical(config InfisicalConfig) (*Infisical, error) {
 	origin, err := url.Parse(config.Origin)
 	if err != nil || origin.Scheme != "https" || origin.Host == "" || origin.User != nil || (origin.Path != "" && origin.Path != "/") || origin.RawQuery != "" || origin.Fragment != "" || config.Token == nil || config.ProjectID == "" || config.Environment == "" || !strings.HasPrefix(config.Path, "/") {

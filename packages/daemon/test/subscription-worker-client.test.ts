@@ -5,7 +5,7 @@ import { SubscriptionWorkerClient } from '../src/subscription-worker-client'
 import { cleanupTempDirs, tempDir } from './helpers'
 
 afterEach(cleanupTempDirs)
-function fixture(hold = false, resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal) => Promise<{ workloadToken?: string; accessToken?: string }>, accessProject?: string) {
+function fixture(hold = false, resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal) => Promise<{ workloadToken?: string; accessToken?: string; accessSnapshot?: {name: string; value: string} }>, accessProject?: string, snapshotMode = false) {
   const directory = tempDir('mikka-worker-boundary-')
   const journal = join(directory, 'calls')
   const binary = join(directory, 'worker.mjs')
@@ -13,7 +13,7 @@ function fixture(hold = false, resolveIdentity?: (executionOnly: boolean, signal
   writeFileSync(binary, `#!/usr/bin/env node
 import {createInterface} from 'node:readline';import{appendFileSync}from'node:fs';
 let config;const lines=createInterface({input:process.stdin});lines.on('line',line=>{const value=JSON.parse(line);if(!config){config=value;return};const request=value;appendFileSync(${JSON.stringify(journal)},request.method+'\\n');
-const result={fullAuthority:Boolean(config.workloadToken||config.path),sourceAuthority:Boolean(config.enrollmentAttemptPath||config.enrollmentClaimPath||config.enrollmentGrantPath),accessAuthority:config.accessToken==='fixture-access-reader',binding:config.use?.bindingId,consumer:config.use?.consumerId,accessProject:config.accessProject};
+const result={fullAuthority:Boolean(config.workloadToken||config.path),sourceAuthority:Boolean(config.enrollmentAttemptPath||config.enrollmentClaimPath||config.enrollmentGrantPath),accessAuthority:config.accessToken==='fixture-access-reader',snapshot:config.accessSnapshot?.name,binding:config.use?.bindingId,consumer:config.use?.consumerId,accessProject:config.accessProject};
 if(request.method==='prepare'){setTimeout(()=>{console.log(JSON.stringify({id:request.id,result:{ready:true}}));lines.close()},${hold ? 500 : 0});return}
 if(request.method==='nativeStream'){console.log(JSON.stringify({id:request.id,head:{contentType:'application/json'}}));for(const byte of Buffer.from(JSON.stringify({...result,text:'汉字🙂'})))console.log(JSON.stringify({id:request.id,binaryChunk:Buffer.from([byte]).toString('base64')}));console.log(JSON.stringify({id:request.id,result:{done:true}}));lines.close();return}
 if(request.method==='executeStream'){console.log(JSON.stringify({id:request.id,chunk:JSON.stringify(result)}));console.log(JSON.stringify({id:request.id,result:{done:true}}))}else console.log(JSON.stringify({id:request.id,result}));lines.close()})
@@ -21,7 +21,7 @@ if(request.method==='executeStream'){console.log(JSON.stringify({id:request.id,c
   chmodSync(binary, 0o700)
   const client = new SubscriptionWorkerClient({ binary }, {
     scope: { ownerId: 'fixture-owner', workspaceId: 'fixture-workspace', connectionId: '20000000-0000-4000-8000-000000000001', provider: 'codex' },
-    databaseUrl: 'synthetic', infisicalOrigin: 'https://fixture.invalid', project: 'fixture', environment: 'test', path: '/grants', workloadToken: 'fixture-custody-identity', accessPath: '/access', accessProject, accessToken: 'fixture-access-reader', enableRuntime: true, enrollmentAttemptPath: '/attempts', enrollmentClaimPath: '/claims', enrollmentGrantPath: '/pending'
+    databaseUrl: 'synthetic', infisicalOrigin: 'https://fixture.invalid', project: 'fixture', environment: 'test', path: '/grants', workloadToken: 'fixture-custody-identity', accessPath: '/access', accessProject, accessToken: snapshotMode ? undefined : 'fixture-access-reader', enableRuntime: true, enrollmentAttemptPath: '/attempts', enrollmentClaimPath: '/claims', enrollmentGrantPath: '/pending'
   }, resolveIdentity).forUse({ bindingId: '20000000-0000-4000-8000-000000000002', consumerId: 'fixture-task' })
   return { client, journal }
 }
@@ -68,6 +68,12 @@ it('passes the dedicated access project to custody and restricted execution work
   const { client } = fixture(false, undefined, 'isolated-access-project')
   expect(await client.call('status')).toMatchObject({ fullAuthority: true, accessProject: 'isolated-access-project' })
   expect(await client.call('quota')).toMatchObject({ fullAuthority: false, accessProject: 'isolated-access-project' })
+})
+
+it('passes only the selected access snapshot to an execution child when an identity is shared', async () => {
+  const name = 'mikka-byos-00000000-0000-4000-8000-000000000001'
+  const { client } = fixture(false, async executionOnly => executionOnly ? { accessSnapshot: { name, value: 'projection' } } : { workloadToken: 'fixture-custody-identity' }, undefined, true)
+  expect(await client.call('quota', { revision: 2 })).toMatchObject({ fullAuthority: false, sourceAuthority: false, accessAuthority: false, snapshot: name })
 })
 
 it('does not start a worker request if identity resolution fails or is cancelled', async () => {
