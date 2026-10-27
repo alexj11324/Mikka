@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { SubagentStore } from './subagents'
 import { startSuggestion } from './suggestions'
+import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { claimCloudRun } from '@/lib/computer/claim'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
@@ -26,7 +27,8 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
       CREATE TABLE device_repos(id uuid PRIMARY KEY);
       CREATE TABLE suggestions(id uuid PRIMARY KEY);
       CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text,version integer);
-      CREATE TABLE byos_bindings(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text);
+      CREATE TABLE byos_connections(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,provider text,state text,epoch bigint);
+      CREATE TABLE byos_bindings(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,route text,"modelId" text,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE byos_native_runs("runId" uuid PRIMARY KEY,"bindingId" uuid);
     `)
     for (const name of ['20261027164501_cloud_computers.sql', '20261027164502_computer_run_bindings.sql']) await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
@@ -80,6 +82,18 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
       await pool.query('INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,\'alice\',$3,$4,\'snapshot-owner-alice\',$5,\'running\',$6)', [runId, alice.workspaceId, botA, `sandbox-${runId}`, randomUUID(), deviceId])
     }
     await pool.query('INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId") VALUES ($1,\'alice\',$2,$3)', [bindingId, alice.workspaceId, agentId])
+    const connectionId = randomUUID()
+    await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch) VALUES ($1,'alice',$2,'codex','connected',1)`, [connectionId, alice.workspaceId])
+    await pool.query(`UPDATE byos_bindings SET "connectionId"=$2,"connectionRevision"=1,route='codex_cli',"modelId"='fixture-model' WHERE id=$1`, [bindingId, connectionId])
+    assert.equal((await nativeRunBinding(pool, 'alice', agentId, 'codex', alice.workspaceId))?.id, bindingId)
+    assert.equal(await nativeRunBinding(pool, 'bob', agentId, 'codex', alice.workspaceId), null)
+    assert.equal(await nativeRunBinding(pool, 'alice', agentId, 'codex', stranger.workspaceId), null)
+    assert.equal(await nativeRunBinding(pool, 'alice', agentId, 'claude_code', alice.workspaceId), null)
+    await pool.query('UPDATE byos_connections SET epoch=2 WHERE id=$1', [connectionId])
+    assert.equal(await nativeRunBinding(pool, 'alice', agentId, 'codex', alice.workspaceId), null)
+    await pool.query("UPDATE byos_connections SET epoch=1,state='disconnected' WHERE id=$1", [connectionId])
+    assert.equal(await nativeRunBinding(pool, 'alice', agentId, 'codex', alice.workspaceId), null)
+    await pool.query("UPDATE byos_connections SET state='connected' WHERE id=$1", [connectionId])
     const expires = new Date(Date.now() + 90_000)
     assert.equal(await claimCloudRun(pool, alice, runA, botDevice, expires, bindingId), null, 'Bot worker cannot claim a thread')
     assert.equal(await claimCloudRun(pool, alice, runA, deviceB, expires, bindingId), null, 'another thread cannot claim it')

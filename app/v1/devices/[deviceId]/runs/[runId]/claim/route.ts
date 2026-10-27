@@ -10,7 +10,7 @@ import { issueRunToken } from '@/lib/mcp/worker'
 import { latestCheckpoint } from '@/lib/run-leases'
 import { retryNote } from '@/lib/run-retry'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
-import { subscriptionRuntime } from '@/lib/subscription-runtime'
+import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +43,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
   const subscription = process.env.MIKKA_BYOS_ENABLED === '1'
-    ? await subscriptionRuntime().repository.nativeBinding(caller.userId, agent.id, agent.harness) : null
+    ? await nativeRunBinding(pool, caller.userId, agent.id, agent.harness, caller.scopeWorkspaceId) : null
   if (subscription && (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId)) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
   if (subscription && !device.harnesses.some(harness => harness.harness === agent.harness && harness.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()

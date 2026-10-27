@@ -102,8 +102,9 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
 }
 export async function threadMachineAction(pool: Pool, actor: Actor, runId: string, action: 'pause' | 'resume' | 'end' | 'desktop') {
   const machine = (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [runId, actor.userId, actor.workspaceId])).rows[0]
-  if (!machine?.sandboxId || machine.state === 'ended') throw new ComputerError(404, 'Thread unavailable')
+  if (!machine || machine.state === 'ended') throw new ComputerError(404, 'Thread unavailable')
   if (action === 'resume') return ensureThreadMachine(pool, actor, runId)
+  if (!machine.sandboxId) throw new ComputerError(409, 'Thread machine has not started')
   const sandbox = await connectComputer(machine.sandboxId)
   if (action === 'pause') {
     const client = await pool.connect()
