@@ -233,7 +233,7 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   row or a run. Built-in role names stay English (Coordinator).
 - **R-44** The home greeting stays 「早上好，Alex」 (time of day + name).
 
-- **R-41** A 建议 item, briefing item or follow-up item is written as an
+- **R-45** A 建议 item, briefing item or follow-up item is written as an
   action: it starts with a verb and names who or what it is about
   (「回复 Jason：发布前要不要冻结 main」「核对 Stripe 10 月账单」), as Comma
   ("Reply to Agenda", "Forward INV-2041") and ChatGPT do. Never a vague
