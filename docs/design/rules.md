@@ -201,9 +201,10 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   one card per web task with its live screen and a step line (进行中, 需要你操作,
   完成), and the bot itself reports what it did, in its own voice. The user
   never drives a sub-agent's screen. When a site needs a login, the card shows
-  需要你操作, the bot says it in one message, and a login card appears inline
-  in the chat (logo, 登录 <site>, ✕; 邮箱, 密码; Google, Apple, 登录; 🔒
-  Secured by Mikka), no sheet and no sentence in the card. The login is saved
+  需要你操作, the bot says it in one message, and a 登录 <site> pill appears
+  under it. Tapping the pill expands it in place into the login card (logo,
+  登录 <site>, ✕; 邮箱, 密码; Google, Apple, 登录; 🔒 Secured by Mikka); ✕
+  shrinks it back. No sheet and no sentence in the card. The login is saved
   to the workspace's encrypted vault and typed into the site; the model never
   sees it. Once saved, the card collapses to 已登录 <site>.
 

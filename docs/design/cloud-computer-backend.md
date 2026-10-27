@@ -73,9 +73,9 @@ cloud thread ──1:1── thread machine (E2B sandbox from the workspace snap
     a sub-agent's screen.
   - **Login (Hark Secured Login precedent):** when a page needs credentials
     the sub-agent stops at `needs_you` with `needs: { kind: "login", site }`.
-    The bot says so in a chat message and posts a login card inline in the
-    chat (site logo, 登录 <site>, ✕; 邮箱, 密码; Google and Apple buttons and
-    登录; 🔒 Secured by Mikka). The person can ask the bot to send the card
+    The bot says so in a chat message and posts a 登录 <site> pill, which
+    expands in place into the login card (site logo, 登录 <site>, ✕; 邮箱,
+    密码; Google and Apple buttons and 登录; 🔒 Secured by Mikka). The person can ask the bot to send the card
     again.
     - 登录 submits to `POST /api/bots/:botId/subagents/:id/credentials`,
       which saves the email and password to the workspace's credential vault
