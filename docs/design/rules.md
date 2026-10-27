@@ -218,7 +218,10 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   cards are capped at 5 a day and written as R-21 cards with their source;
   interest cards are normal and stay in 建议; routine and location triggers
   go through the Coordinator under R-20's cap. Dismissals lower the fact's
-  confidence. Profiles are per person, never shared in a workspace.
+  confidence. Profiles are per person, never shared in a workspace. Both the
+  profile and the background research sit behind deployment flags (off by
+  default when self-hosted), a per-person entitlement, the person's own
+  toggles and a daily budget.
 
 ## Look
 
