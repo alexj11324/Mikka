@@ -4,6 +4,8 @@ import type { CoordinatorEventKind, RunStatus } from '@/lib/db/schema'
 /** One row for `coordinator_events`, before it gets an id. */
 export interface CoordinatorEventInput {
   userId: string
+  /** The bot whose chat it goes to; null or absent for the Coordinator's. */
+  botId?: string | null
   kind: CoordinatorEventKind
   dedupeKey: string
   issueId: string | null
@@ -20,16 +22,17 @@ export interface TelegramMessageSource extends TelegramReplyTarget {
   messageId: number
 }
 
-/** A message the person wrote to their Coordinator. */
+/** A message the person wrote to their Coordinator, or to one of their bots (`botId`). */
 export function userMessageEvent(
   userId: string,
   text: string,
-  options: { issueId?: string | null; telegram?: TelegramMessageSource } = {},
+  options: { issueId?: string | null; telegram?: TelegramMessageSource; botId?: string | null } = {},
 ): CoordinatorEventInput {
   const id = crypto.randomUUID()
   const telegram = options.telegram
   return {
     userId,
+    ...(options.botId ? { botId: options.botId } : {}),
     kind: 'user_message',
     dedupeKey: telegram ? 'telegram:' + telegram.threadId + ':' + telegram.messageId : 'user_message:' + id,
     issueId: options.issueId ?? null,
@@ -54,9 +57,10 @@ export function telegramReplyTargets(events: ReadonlyArray<Pick<CoordinatorEvent
 }
 
 /** A run ended. One event per run, however often the daemon reports it. */
-export function runFinishedEvent(run: { id: string; userId: string; issueId: string | null; kind: string; status: RunStatus; stopReason: string; report?: RunReport | null }): CoordinatorEventInput {
+export function runFinishedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null; kind: string; status: RunStatus; stopReason: string; report?: RunReport | null }): CoordinatorEventInput {
   return {
     userId: run.userId,
+    ...(run.botId ? { botId: run.botId } : {}),
     kind: 'run_finished',
     dedupeKey: `run_finished:${run.id}`,
     issueId: run.issueId,
@@ -66,9 +70,10 @@ export function runFinishedEvent(run: { id: string; userId: string; issueId: str
 }
 
 /** A run lost its device and was queued again as `retryRunId`. Background: nobody needs to act. */
-export function runRetriedEvent(run: { id: string; userId: string; issueId: string | null }, retry: { runId: string; attempt: number; maxAttempts: number; movedToDeviceId?: string | null }): CoordinatorEventInput {
+export function runRetriedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null }, retry: { runId: string; attempt: number; maxAttempts: number; movedToDeviceId?: string | null }): CoordinatorEventInput {
   return {
     userId: run.userId,
+    ...(run.botId ? { botId: run.botId } : {}),
     kind: 'run_retried',
     dedupeKey: `run_retried:${run.id}`,
     issueId: run.issueId,
@@ -95,10 +100,10 @@ export function issueDoneEvent(before: { status: string }, after: { id: string; 
 }
 
 /** The run an agent's worker tool call came from. */
-interface WorkerRun { id: string; userId: string; issueId: string | null }
+interface WorkerRun { id: string; userId: string; botId?: string | null; issueId: string | null }
 
 function workerEvent(kind: 'run_report' | 'run_question' | 'run_blocked', run: WorkerRun, payload: Record<string, unknown>): CoordinatorEventInput {
-  return { userId: run.userId, kind, dedupeKey: `${kind}:${run.id}:${crypto.randomUUID()}`, issueId: run.issueId, runId: run.id, payload }
+  return { userId: run.userId, ...(run.botId ? { botId: run.botId } : {}), kind, dedupeKey: `${kind}:${run.id}:${crypto.randomUUID()}`, issueId: run.issueId, runId: run.id, payload }
 }
 
 /** The agent inside a run reached a milestone and says so (MCP `report`). */
@@ -118,6 +123,22 @@ export function runQuestionEvent(run: WorkerRun, question: { question: string; o
 /** The agent inside a run cannot go on (MCP `blocked`). */
 export function runBlockedEvent(run: WorkerRun, reason: string): CoordinatorEventInput {
   return workerEvent('run_blocked', run, { reason })
+}
+
+/** An agent handed over a document or web page (MCP `submit_artifact`). One event per version. */
+export function artifactSubmittedEvent(
+  submitter: { userId: string; botId?: string | null; runId: string | null; issueId: string | null; authorName: string },
+  artifact: { artifactId: string; version: number; title: string; kind: string },
+): CoordinatorEventInput {
+  return {
+    userId: submitter.userId,
+    ...(submitter.botId ? { botId: submitter.botId } : {}),
+    kind: 'artifact_submitted',
+    dedupeKey: `artifact_submitted:${artifact.artifactId}:${artifact.version}`,
+    issueId: submitter.issueId,
+    runId: submitter.runId,
+    payload: { artifactId: artifact.artifactId, version: artifact.version, title: artifact.title, artifactKind: artifact.kind, authorName: submitter.authorName },
+  }
 }
 
 /** The person approved or declined something an agent proposed in their accounts (lib/pending-actions.ts). */

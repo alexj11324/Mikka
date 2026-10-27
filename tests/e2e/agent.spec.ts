@@ -58,7 +58,7 @@ test('历史仅可读取，原始数据保留，新对话动作进入当前 Bot'
   const stored = await page.request.get(app(`/api/agent/sessions?sessionId=${saved.id}`))
   expect(stored.status()).toBe(200)
   expect((await stored.json()).turns[0].completion).toBe(saved.completion)
-  await page.getByRole('button', { name: '打开 Bot 对话', exact: true }).click()
+  await page.getByRole('list', { name: 'Bot', exact: true }).getByRole('button', { name: 'Coordinator', exact: true }).click()
   await expect(archive).toHaveCount(0)
   await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
   await expect(page).toHaveURL(/section=coordinator/)
