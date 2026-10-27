@@ -217,8 +217,9 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check:ci` is the full CI gate: `check`, plus the production build,
-performance tests and Playwright tests.
+`pnpm check:ci` reproduces the CI gate (`check`, production build,
+performance and Playwright tests); CI runs these steps in the CI and Browser
+tests workflows.
 
 Start with these documents:
 

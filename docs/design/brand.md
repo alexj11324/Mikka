@@ -2,9 +2,9 @@
 
 Mikka has one mark: an M drawn on a 5×5 dot grid. The 13 dots that form the M
 are solid. The other 12 are ghosts at low opacity. This page says where the
-mark goes, how big it is, and what color it takes. Sizes follow the shadcn
-sidebar blocks the app is built on. Their header row is 48px (`h-12`), with
-the logo in a 32px tile (`size-8`) and a 16px glyph inside.
+mark goes, how big it is, and what color it takes. Sizes are listed per
+placement below; the bot list header uses a 28px inline mark (`size-7`), the
+same height as its icon buttons.
 
 ## Assets
 

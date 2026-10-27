@@ -11,7 +11,9 @@ source wins in a conflict is in [`README.md`](README.md).
 ## Bots, chats and threads
 
 - **R-01** The left column is the bot list (bots and group chats). The right
-  column is the thread list. There is no "conversation list".
+  column is the thread list. There is no "conversation list". A bot row shows
+  its state as a dot on the avatar (green working, orange needs you), never
+  as status text, and has no 「置顶 ·」 prefix.
 - **R-02** The right panel's 详情 header shows the bot selected on the left:
   the same bloub avatar and the same name as its left row, then 「<Bot 名>
   的屏幕」. A thread's name appears only as a row in the thread list, never as

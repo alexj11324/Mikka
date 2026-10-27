@@ -38,9 +38,6 @@ bot's avatar. The computer a thread uses is its bot's computer.
 
 - "会话" / "session" / "conversation list" for the left column. The left
   column is the **bot list** and the right column is the **thread list**.
-  `agent_sessions` and
-  `components/nav/conversation-list.tsx` are today's implementation, which
-  still lists sessions; that is a known gap, not the model.
 - "会话" for a run (e.g. "打开会话" on a task's run). Say **线程**.
 - "Agent" when you mean the thing on the left. Say **bot**. "Agent" is fine
   for the coding agents that run threads (`agents` table, Claude Code, Codex).

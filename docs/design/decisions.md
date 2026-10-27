@@ -14,7 +14,8 @@ Newest first.
 | --- | --- | --- | --- |
 | 2026-10-27 | The native Claude Code / Codex Coordinator runtime (#312, [`native-coordinator.md`](../architecture/native-coordinator.md)) is a deprecated design. The Coordinator and every bot run their chats only on Mikka's own harness; Claude Code and Codex only execute threads. The code stays, switched off (`MIKKA_NATIVE_COORDINATOR` unset); no runtime picker is built (「先关着放着…文档里面写清楚，这个是被废弃的方案」). Precedent: Comma retired running its chat agents on Codex / Claude Code on 2026-10-10 and kept them only for executing tasks on a station, a device or the Group's Cloud VM (AFK-surf/Comma `docs/architecture/DOMAIN_CONCEPTS.md`, Retired Sessions; migration `20261010150001_retire_external_runtime_config`) | R-05 | Opt-in native Claude Code / Codex Coordinator runtime (#312, PR #314) |
 | 2026-10-27 | The daily briefing leaves 建议: at 08:00 the person's time the Coordinator pushes it into its chat, and asks before acting on any item; 建议 keeps only the routine items by app (「briefings就不应该放在建议那一栏，应该有Coordinator要直接推送才对」「现在每天早上8点你推送一份，就是从coordinate里面推出去」). A briefing written on connecting an app is pushed the same way | R-21 | "建议 keeps the briefing and 例行事项" (same day, on branch `claude/mikka-mobile-tech-choice-jrtbd3`) |
-| 2026-10-25 | Keep the shell layout as it is: 72px icon rail with labels, conversation list, centre, full-height right panel, top search bar, white card on grey. Narrower rail, search in the list header, grouped list, floating right card and dropping the outer card were all proposed (after a look at ChatGPT's two-layer layout) and declined (「不用，我就要现在这个样子」). Conversation rows carry a status dot on the avatar (green working, orange needs you) instead of status text, and no 「置顶 ·」 prefix | R-13 | |
+| 2026-10-25 23:40 | The standalone Agent chat runtime is retired: the chat entity is a Bot. New-generation entry points and input are removed; owner-scoped history stays readable (`legacy-chat-archive.tsx`), shared Bot rendering and images stay, and Claude Code / Codex / Cursor stay as thread execution harnesses, not user-facing bots | `components.md` § Historical chat compatibility | Standalone Agent chat |
+| 2026-10-25 | Keep the shell layout as it is: 72px icon rail with labels, bot list, centre, full-height right panel, top search bar, white card on grey. Narrower rail, search in the list header, grouped list, floating right card and dropping the outer card were all proposed (after a look at ChatGPT's two-layer layout) and declined (「不用，我就要现在这个样子」). Bot rows carry a status dot on the avatar (green working, orange needs you) instead of status text, and no 「置顶 ·」 prefix | R-35, R-01 | |
 | 2026-10-25 | Layout pass (「10条可以全修」, pending Alex's review of the artifact): board cards lose chip borders, no 「看板」 pill, 已完成 collapses beside the open sidebar; issue content centred up to 680px; same-minute events join; group 详情 lists members, recent threads and files, with no cloud computer (Alex: 「群聊用人不看电脑…没有加电脑之前的那种做法」); the avatar stays beside the bubbles at the bottom of a run (「icon 应该是跟我们的这些泡泡放在左边」) | R-13, R-25, R-61, R-63 | Bordered chips; left-aligned 560px issue column; a near-empty group 详情 |
 | 2026-10-25 | One-to-one chats keep the grey bubble for a bot's text; an artifact, interactive chart or other rich card has no bubble (「一对一的聊天里，BOT回复应该是会说气泡…可以显示交互式图表的，是不需要气泡的」). The board's Coordinator sidebar was drawn without bubbles and with a different composer; fixed to match | R-14, R-10 | Board sidebar with bare text and a boxed composer |
 | 2026-10-25 | A running thread is the same green badge with a dot everywhere (board card, thread list, thread card) | R-14, R-25, R-66 | Blue 「运行中」 on board cards |
@@ -41,7 +42,7 @@ Newest first.
 | 2026-10-24 19:20 | Machine picker: Mikka Cloud first and default, then 本机, then Remote control; Settings › 设备 uses the same groups | R-23 | |
 | 2026-10-24 19:17 | Device online state = StatusDot on the icon, never a text badge | R-24 | |
 | 2026-10-24 18:56 | Left = bot list, right = thread list, no "conversation list" (`glossary.md`, PR #175) | R-01 | "会话" in the nav v3 handoff (#88) |
-| 2026-10-24 | ~~Right panel never has an input box~~ (narrowed 2026-10-25); one centre composer; no model picker; one-to-one chats without avatars; bubble rules | R-10, R-11, R-13, R-14 | |
+| 2026-10-24 | ~~Right panel never has an input box~~ (narrowed 2026-10-25); one centre composer; no model picker; one-to-one chats without avatars; ~~bubble rules (bot and user share one bubble)~~ → see 2026-10-25 (blue user bubbles) | R-10, R-11, R-13, R-14 | |
 | 2026-10-24 00:38 | Every bot has its own computer; no 新建云端电脑 entry | R-04 | |
 | 2026-10-24 | Bot avatars are bloub animated blobs | R-36 | HeroUI gradient spheres (2026-10-22) |
 | 2026-10-23 23:13 | "No Coordinator" applies only to action entry points; conversation headers keep the Coordinator pill | R-07 | An over-broad removal |
@@ -75,12 +76,3 @@ Questions waiting on Alex. Move a row to "Decided" when he answers.
 | 2026-10-24 | Remove white hairlines app-wide (dialog and popover rings, column borders), not only inputs? | Inputs only |
 | 2026-10-24 | Token drift between Figma and code (`rules.md` § Tokens): which side moves? | Code value ships, Figma follows |
 
-
-## 2026-10-25: Retire standalone Agent generation
-
-Alex clarified that the product chat entity is a Bot; the earlier standalone
-Agent chat runtime is retired. Remove its new-generation entrypoints and input
-behaviour. Preserve owner-scoped historical reads, shared Bot rendering/images,
-and Claude Code/Codex/Cursor task execution harnesses. Harness names describe
-execution layers, not extra user-facing Bots. This is a behavioural retirement,
-not a shell/layout redesign; source correction: Alex 2026-10-25 23:40 UTC.

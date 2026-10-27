@@ -71,7 +71,8 @@ more than once.
 2. Alex accepted the review page.
 3. Then e2e tests are written or updated and pass in CI (not before
    acceptance).
-4. CI is green (`pnpm check:ci` runs in CI; do not run builds on the Mac).
+4. CI is green: the CI and Browser tests workflows (`CONTRIBUTING.md` § How
+   changes are tested); do not run builds on the Mac.
 5. Docs updated in the same PR: `rules.md`, `components.md`, `decisions.md`,
    `glossary.md` or the feature spec, whichever the change touches.
 6. Merged to main. Green PRs may be merged without asking.
@@ -81,6 +82,5 @@ more than once.
 - One topic per PR. Title in the repo's commit style (`feat(scope): …`,
   `fix(scope): …`, `docs(design): …`) with the `MIK-xx` ids.
 - The PR body follows `.github/pull_request_template.md`.
-- Migrations: idempotent, tested on a real Postgres, since they run on Neon
-  on deploy.
+- Migrations: idempotent and tested on a real Postgres. Migrations run only through `pnpm migrate` (`scripts/migrate.mjs`): in Vercel Production when the Build Command is `pnpm migrate && pnpm build`, or with `MIGRATE=1`; plain `pnpm build` never runs them.
 - Small problems a reviewer finds are fixed by the reviewer directly.

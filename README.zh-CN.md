@@ -166,7 +166,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check:ci` 为完整的 CI 检查，在 `check` 的基础上还包括生产构建、性能测试和 Playwright 测试。
+`pnpm check:ci` 可复现 CI 检查（`check`、生产构建、性能测试和 Playwright 测试）；CI 在 CI 与 Browser tests 两个 workflow 中分步运行这些检查。
 
 建议首先阅读以下文档：
 
