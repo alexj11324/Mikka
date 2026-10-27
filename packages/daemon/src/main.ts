@@ -171,6 +171,8 @@ export class Daemon {
   private tick: Promise<void> = Promise.resolve()
   private draining = false
   private stopped = false
+  private stopPromise: Promise<void> | null = null
+  private starting: Promise<Daemon> | null = null
   private adapters = new Map<Harness, AgentAdapter>()
   /** Registered (or re-registered) with the server since this start. */
   private nativeCoordinator: Promise<void> | null = null
@@ -200,6 +202,18 @@ export class Daemon {
   }
 
   async start() {
+    this.starting = this.startInternal()
+    try {
+      return await this.starting
+    } catch (error) {
+      await this.stop().catch((err: unknown) => {
+        this.log.warn({ err }, "daemon startup cleanup failed")
+      })
+      throw error
+    }
+  }
+
+  private async startInternal() {
     const { paths } = this
     mkdirSync(paths.dataDir, { recursive: true, mode: 0o700 })
     // `mode` only applies on creation; tighten a dir that already existed.
@@ -210,6 +224,7 @@ export class Daemon {
       (error) => this.onLockCompromised(error),
       { socketPath: paths.socket }
     )
+    if (this.stopped) throw new Error("daemon stopped during startup")
     const secret = this.ensureSecret()
     this.device = loadDeviceFile(readJson(paths.device))
     if (this.options.credential)
@@ -224,6 +239,8 @@ export class Daemon {
       (runId, _item, error) => this.supervisor.markUndeliverable(runId, error)
     )
     this.worktrees = new WorktreeManager(paths.worktrees)
+    this.sandbox = await this.createAgentSandbox()
+    if (this.stopped) throw new Error("daemon stopped during startup")
     const adapters = (this.adapters = new Map<Harness, AgentAdapter>([
       [
         "mock",
@@ -283,11 +300,13 @@ export class Daemon {
       log: this.log,
     })
     await this.rpc.listen()
+    if (this.stopped) throw new Error("daemon stopped during startup")
 
     // Only harnesses this daemon can drive are advertised: the server must
     // never pin a run here that no adapter would take. (A detected CLI
     // without an adapter yet is left out; the schema has no "unsupported".)
     const detected = this.options.harnesses ?? (await detectHarnesses())
+    if (this.stopped) throw new Error("daemon stopped during startup")
     this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({ ...info, coordinator: coordinatorCapable(info) }))
     // Runs survive restarts: pick up what the journal says was active.
     this.supervisor.resumeAll()
@@ -473,21 +492,35 @@ export class Daemon {
     return acted
   }
 
-  private sandbox: AgentSandbox | null | undefined
+  private sandbox: AgentSandbox | null = null
+  private ownedSandbox: SandboxRuntime | null = null
 
   /** The agent sandbox (one per daemon), or null where there is none. */
   private agentSandbox(): AgentSandbox | null {
-    this.sandbox ??=
-      this.options.agentSandbox === undefined
-        ? SandboxRuntime.supported()
-          ? new SandboxRuntime(async ({ host }) => {
-              // Approval cards come later; an unlisted host is denied.
-              this.log.warn({ host }, "agent network request denied")
-              return false
-            })
-          : null
-        : this.options.agentSandbox
     return this.sandbox
+  }
+
+  private async createAgentSandbox(): Promise<AgentSandbox | null> {
+    if (this.options.agentSandbox !== undefined) return this.options.agentSandbox
+    if (!SandboxRuntime.supported()) {
+      this.log.warn("agent sandbox unavailable: platform or dependencies unsupported")
+      return null
+    }
+    const sandbox = new SandboxRuntime(async ({ host }) => {
+      this.log.warn({ host }, "agent network request denied")
+      return false
+    })
+    try {
+      await sandbox.probe()
+      this.ownedSandbox = sandbox
+      return sandbox
+    } catch (err) {
+      this.log.warn({ err }, "agent sandbox unavailable")
+      await sandbox.reset().catch((resetError: unknown) => {
+        this.log.warn({ err: resetError }, "agent sandbox cleanup failed")
+      })
+      return null
+    }
   }
 
   /** Verify inside the agent's sandbox; without one, only mock runs exist. */
@@ -898,9 +931,13 @@ export class Daemon {
     }).finally(() => { this.nativeCoordinator = null; this.nativeAbort = null })
   }
 
-  async stop() {
-    if (this.stopped) return
+  stop(): Promise<void> {
+    return (this.stopPromise ??= this.stopInternal())
+  }
+
+  private async stopInternal() {
     this.stopped = true
+    await this.starting?.catch(() => undefined)
     this.nativeAbort?.abort()
     await this.nativeCoordinator
     if (this.timer) clearTimeout(this.timer)
@@ -910,7 +947,15 @@ export class Daemon {
     await this.fsLoop.catch(() => undefined)
     await this.tick
     await this.rpc?.close()
-    await this.supervisor?.stop()
+    try {
+      await this.supervisor?.stop()
+    } finally {
+      const sandbox = this.ownedSandbox
+      this.ownedSandbox = null
+      await sandbox?.reset().catch((err: unknown) => {
+        this.log.warn({ err }, "agent sandbox cleanup failed")
+      })
+    }
     await this.outbox?.close()
     const release = this.releaseLock
     this.releaseLock = null
