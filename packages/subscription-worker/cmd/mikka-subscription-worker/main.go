@@ -46,6 +46,7 @@ func run() error {
 		Use                     *worker.RuntimeUse `json:"use"`
 		ExecutionOnly           bool               `json:"executionOnly"`
 		AccessPath              string             `json:"accessPath"`
+		AccessProject           string             `json:"accessProject"`
 		AccessToken             string             `json:"accessToken"`
 		DatabaseURL             string             `json:"databaseUrl"`
 		Origin                  string             `json:"infisicalOrigin"`
@@ -102,7 +103,11 @@ func run() error {
 		if !config.ExecutionOnly {
 			credential = config.Token
 		} // Custody writes both paths; execution receives only the read identity.
-		secrets, err := worker.NewInfisical(worker.InfisicalConfig{Origin: config.Origin, ProjectID: config.Project, Environment: config.Environment, Path: config.AccessPath, Token: func(context.Context) (string, error) { return credential, nil }})
+		accessProject := config.AccessProject
+		if accessProject == "" {
+			accessProject = config.Project
+		}
+		secrets, err := worker.NewInfisical(worker.InfisicalConfig{Origin: config.Origin, ProjectID: accessProject, Environment: config.Environment, Path: config.AccessPath, Token: func(context.Context) (string, error) { return credential, nil }})
 		if err != nil {
 			return err
 		}

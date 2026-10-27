@@ -18,6 +18,7 @@ export interface WorkerConfiguration {
   path: string
   workloadToken: string
   accessPath?: string
+  accessProject?: string
   accessToken?: string
   enrollmentAttemptPath?: string
   enrollmentClaimPath?: string

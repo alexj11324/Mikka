@@ -2,6 +2,24 @@
 
 Date: 2026-10-26. Tracks #172. Branch: `codex/e2b-cloud-computer-172`.
 
+## Current status (2026-10-27)
+
+The dated sections below are a chronological record; earlier statements that
+dispatch, run-wide approval and computer events are not wired describe their
+state at that time. The current branch has Bot-owned hosted task dispatch,
+Bot-scoped executor and subscription binding, run-wide approval, computer
+events, and subscription settings. A real E2B sandbox ran this integrated
+path with a simulated provider, including live desktop actions and worker
+credential renewal. This is not a real provider OAuth or inference test.
+
+The required additive database migrations have been applied to the isolated
+development database and the existing production database. The application
+changes remain on the development branch and the production feature flags
+remain off. Current preview work builds the actual CPA worker and sets up
+private connectivity for the E2B worker; isolated preview vault identities,
+real provider consent, real inference, the complete Bot chat experience and
+workspace computer-use policy enforcement still require validation or work.
+
 ## Implemented
 
 - Real E2B SDK control plane, plain Linux template with 2 CPUs / 2048 MB,
@@ -24,7 +42,7 @@ Date: 2026-10-26. Tracks #172. Branch: `codex/e2b-cloud-computer-172`.
 - Default 15-minute provider pause lifecycle; viewing/waking refreshes activity.
   Control state survives app restart in PostgreSQL. Provider pause is checked
   when reading computer state.
-- Run-to-Bot binding storage enforces matching owner/workspace through foreign keys and only admits queued runs; the bind operation serializes with run claiming. The local daemon claim path rejects bound runs rather than running them without the Bot desktop. Binding is not yet wired to dispatch or a cloud worker.
+- Run-to-Bot binding storage enforces matching owner/workspace through foreign keys and only admits queued runs; the bind operation serializes with run claiming. The local daemon claim path rejects bound runs rather than running them without the Bot desktop.
 - Reused #161's exact-operation broker/driver/proxy and regression tests; cloud display is bound to the trusted grant and included in the approval digest.
   Driver display selection is per child process, avoiding global DISPLAY races.
 

@@ -38,6 +38,7 @@ func run() error {
 		DatabaseURL        string `json:"databaseUrl"`
 		CanonicalGrantPath string `json:"canonicalGrantPath"`
 		AccessPath         string `json:"accessPath"`
+		AccessProject      string `json:"accessProject"`
 		RetainSources      bool   `json:"retainSources"`
 	}
 	if !input.Scan() || json.Unmarshal(input.Bytes(), &config) != nil || config.Token == "" || config.AttemptPath == config.ClaimPath || config.AttemptPath == config.GrantPath || config.ClaimPath == config.GrantPath {
@@ -105,7 +106,11 @@ func run() error {
 		if storeErr != nil {
 			return storeErr
 		}
-		access, storeErr := store(config.AccessPath)
+		accessProject := config.AccessProject
+		if accessProject == "" {
+			accessProject = config.Project
+		}
+		access, storeErr := worker.NewInfisical(worker.InfisicalConfig{Origin: config.Origin, ProjectID: accessProject, Environment: config.Environment, Path: config.AccessPath, Token: func(context.Context) (string, error) { return config.Token, nil }})
 		if storeErr != nil {
 			return storeErr
 		}

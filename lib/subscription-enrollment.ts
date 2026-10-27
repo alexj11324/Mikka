@@ -22,6 +22,7 @@ export interface EnrollmentConfiguration {
   databaseUrl?: string
   canonicalGrantPath?: string
   accessPath?: string
+  accessProject?: string
   retainSources?: boolean
 }
 export function enrollmentOperator(request: Request, token: string | undefined): string | null {

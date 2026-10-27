@@ -30,6 +30,6 @@ export const POST = enrollmentBindHTTP({
     const canonicalGrantPath = process.env.MIKKA_BYOS_INFISICAL_PATH
     const accessPath = process.env.MIKKA_BYOS_ACCESS_INFISICAL_PATH
     if (!databaseUrl || !canonicalGrantPath || !accessPath) throw new Error('subscription_binding_unavailable')
-    return new EnrollmentClient({ ...enrollmentConfiguration(), databaseUrl, canonicalGrantPath, accessPath })
+    return new EnrollmentClient({ ...enrollmentConfiguration(), databaseUrl, canonicalGrantPath, accessPath, accessProject: process.env.MIKKA_BYOS_ACCESS_INFISICAL_PROJECT })
   },
 })
