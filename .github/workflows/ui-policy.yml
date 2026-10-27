@@ -103,6 +103,8 @@ jobs:
           # Database regressions run against ephemeral Postgres in browser-tests below.
           MIKKA_DATABASE_URL: ""
       - run: pnpm test:auth-composio
+      - name: Test environment binding and fail-closed guards
+        run: pnpm test:test-accounts
       - name: Authentication email integration tests (isolated Postgres)
         run: node scripts/test-auth-email.mjs
       - run: pnpm test:groups
@@ -174,6 +176,8 @@ jobs:
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3100
+      MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
@@ -192,11 +196,13 @@ jobs:
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
       - run: pnpm test:e2e:setup
+      - name: Bind the disposable test environment to the exact checkout
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
       - name: Verify thread sharing, membership and privacy against isolated database
         run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-threads.integration.ts
       - name: Required DB suites (temporary Postgres 17, no skips)
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-native,test:groups,test:issue-search-db,test:relation-cycle,test:visibility-db,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-native,test:groups,test:issue-search-db,test:relation-cycle,test:test-accounts-db,test:visibility-db,test:workspace-migration-db
       - run: pnpm build

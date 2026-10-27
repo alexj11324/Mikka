@@ -52,6 +52,8 @@ jobs:
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3100
+      MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
       # Isolated Slack callback fixtures; these tests make no Slack API calls.
       SLACK_BOT_TOKEN: ci-only-slack-bot-token
       SLACK_SIGNING_SECRET: ci-only-slack-signing-secret
@@ -80,8 +82,14 @@ jobs:
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
       - run: pnpm test:e2e:setup
+      - name: Bind the disposable test environment to the exact checkout
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Test account allocation across independent PostgreSQL clients
+        run: pnpm test:test-accounts-db
       - run: pnpm build
         id: build
+      - name: Real HTTP authentication, account reuse and isolation
+        run: node scripts/test-accounts/run-http.mjs
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
         run: pnpm test:performance --output=performance-results
         env:
@@ -89,8 +97,12 @@ jobs:
       - name: Browser functionality regression
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: pnpm test:e2e --grep-invert @performance
+      - name: Scan account evidence before artifact upload
+        id: account-evidence-audit
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: node scripts/test-accounts/evidence.mjs
       - name: Upload browser failure evidence
-        if: always()
+        if: ${{ !cancelled() && steps.account-evidence-audit.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: browser-test-report
@@ -99,5 +111,7 @@ jobs:
             test-results/
             playwright-performance-report/
             performance-results/
+            .cache/e2e/http-acceptance-summary.json
+            .cache/e2e/account-http-evidence.json
           if-no-files-found: ignore
           retention-days: 7
