@@ -1991,6 +1991,7 @@
   "Coordinator": {
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
+    "briefingLabel": "今日简报 · {date}",
     "usedTools": "调用了 {tools}",
     "pendingActions": {
       "label": "等你确认",
