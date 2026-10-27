@@ -10,7 +10,11 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
   if (!/^[A-Za-z0-9_-]{43}$/.test(lease)) throw new CredentialError('credential_denied', 404)
   const kms = options.kms ?? awsKms('broker'), guard = options.guard ?? gatewayGuard
   // Consume durably before external effects. A crash cannot replay insertion.
-  const claimed = (await pool.query(`UPDATE credential_fill_leases SET consumed_at=now() WHERE nonce_hash=$1 AND consumed_at IS NULL AND expires_at>now() RETURNING *`, [hashNonce(lease)])).rows[0]
+  const claimed = (await pool.query(`WITH candidate AS MATERIALIZED (
+    SELECT * FROM credential_fill_leases WHERE nonce_hash=$1 AND consumed_at IS NULL AND expires_at>now() FOR UPDATE
+  ), consumed AS (
+    UPDATE credential_fill_leases l SET consumed_at=now(),input_envelope=NULL FROM candidate c WHERE l.nonce_hash=c.nonce_hash RETURNING l.nonce_hash
+  ) SELECT c.* FROM candidate c JOIN consumed USING(nonce_hash)`, [hashNonce(lease)])).rows[0]
   if (!claimed) throw new CredentialError('credential_denied', 404)
   const caller = { userId: claimed.user_id, workspaceId: claimed.workspace_id, botId: claimed.bot_id, subagentId: claimed.subagent_id, runId: claimed.run_id }
   const context = { userId: caller.userId, credentialId: claimed.credential_id, origin: claimed.origin }
@@ -40,6 +44,13 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
         plaintext.fill(0); plaintext = undefined
         await cdp.origin(context.origin)
         await cdp.call('Network.setCookies', { cookies: state.cookies })
+        if (Array.isArray(state.localStorage)) {
+          const root = await cdp.call('Runtime.evaluate', { expression: 'globalThis', returnByValue: false })
+          if (!root.result?.objectId) throw new CredentialError()
+          await cdp.call('Runtime.callFunctionOn', { objectId: root.result.objectId,
+            functionDeclaration: 'function(entries){localStorage.clear();for(const [k,v] of entries)localStorage.setItem(k,v)}',
+            arguments: [{ value: state.localStorage }], returnByValue: true })
+        }
         // HttpOnly cookies only. Login restoration is verified after reload;
         // if the login form remains, fall back to the saved password.
         await cdp.call('Page.reload')
@@ -74,7 +85,8 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     if (!safe) throw new CredentialError('credential_login_pending', 409)
     await cdp.origin(context.origin)
     const cookies = (await cdp.call('Network.getCookies', { urls: [context.origin] })).cookies
-    const sessionEnvelope = await sealSession(kms, context, credential.wrapped_dek, Buffer.from(JSON.stringify({ cookies })))
+    const localStorage = await cdp.evaluate('Object.entries(localStorage)')
+    const sessionEnvelope = await sealSession(kms, context, credential.wrapped_dek, Buffer.from(JSON.stringify({ cookies, localStorage })))
     await client.query(`INSERT INTO browser_sessions(credential_id,wrapped_dek,nonce,ciphertext,expires_at) VALUES($1,$2,$3,$4,now()+interval '7 days') ON CONFLICT(credential_id) DO UPDATE SET wrapped_dek=$2,nonce=$3,ciphertext=$4,expires_at=excluded.expires_at`, [context.credentialId, sessionEnvelope.wrappedDek, sessionEnvelope.nonce, sessionEnvelope.ciphertext])
     await client.query('UPDATE credentials SET last_used_at=now() WHERE id=$1', [context.credentialId])
     await client.query(`INSERT INTO credential_access_events(credential_id,user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,$6,$7)`, [context.credentialId, context.userId, caller.botId, caller.runId, caller.subagentId, context.origin, restored ? 'session_restored' : 'password_filled'])

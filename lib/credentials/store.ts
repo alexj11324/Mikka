@@ -52,11 +52,11 @@ export class CredentialStore {
       return { status: 'saved' as const, origin }
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   }
-  async lease(caller: BrowserCaller, origin: string, target: BrowserTarget) {
+  async lease(caller: BrowserCaller, origin: string, target: BrowserTarget, username?: string) {
     await this.authorize(caller)
     origin = canonicalOrigin(origin)
     if (canonicalOrigin(target.origin) !== origin || target.expiresAt < Date.now() + 5000) throw denied()
-    const rows = (await this.pool.query(`SELECT id FROM credentials WHERE user_id=$1 AND origin=$2 AND revoked_at IS NULL AND unattended_allowed=true ORDER BY last_used_at DESC NULLS LAST,created_at DESC LIMIT 2`, [caller.userId, origin])).rows
+    const rows = (await this.pool.query(`SELECT id FROM credentials WHERE user_id=$1 AND origin=$2 AND ($3::text IS NULL OR username=$3) AND revoked_at IS NULL AND unattended_allowed=true ORDER BY last_used_at DESC NULLS LAST,created_at DESC LIMIT 2`, [caller.userId, origin, username ?? null])).rows
     // Never choose a different account silently when several logins exist.
     if (rows.length !== 1) return { status: 'needs_login' as const, origin }
     const value = nonce()
@@ -66,7 +66,7 @@ export class CredentialStore {
   async list(actor: Actor) {
     return (await this.pool.query('SELECT origin,username,auth_kind AS "authKind",last_used_at AS "lastUsedAt",created_at AS "createdAt" FROM credentials WHERE user_id=$1 AND revoked_at IS NULL ORDER BY origin,username', [actor.userId])).rows
   }
-  async otpLease(caller: BrowserCaller, input: { nonce: string; origin: string; code: string }, target: BrowserTarget) {
+  async otpLease(caller: BrowserCaller, input: { nonce: string; origin: string; code: string; username?: string }, target: BrowserTarget) {
     await this.authorize(caller)
     const origin = canonicalOrigin(input.origin), client = await this.pool.connect()
     if (canonicalOrigin(target.origin) !== origin || target.expiresAt < Date.now() + 5000) throw denied()
@@ -74,7 +74,7 @@ export class CredentialStore {
       await client.query('BEGIN')
       const challenge = await client.query(`UPDATE credential_challenges SET consumed_at=now() WHERE nonce_hash=$1 AND user_id=$2 AND workspace_id=$3 AND bot_id=$4 AND subagent_id IS NOT DISTINCT FROM $5::uuid AND run_id IS NOT DISTINCT FROM $6::uuid AND origin=$7 AND consumed_at IS NULL AND expires_at>now() RETURNING nonce_hash`, [hashNonce(input.nonce), ...callerValues(caller), origin])
       if (!challenge.rowCount) throw denied()
-      const rows = (await client.query('SELECT id FROM credentials WHERE user_id=$1 AND origin=$2 AND revoked_at IS NULL LIMIT 2', [caller.userId, origin])).rows
+      const rows = (await client.query('SELECT id FROM credentials WHERE user_id=$1 AND origin=$2 AND ($3::text IS NULL OR username=$3) AND revoked_at IS NULL LIMIT 2', [caller.userId, origin, input.username ?? null])).rows
       if (rows.length !== 1) throw denied()
       const envelope = await seal(this.kms, { userId: caller.userId, credentialId: rows[0].id, origin }, Buffer.from(input.code), 'otp')
       const value = nonce()

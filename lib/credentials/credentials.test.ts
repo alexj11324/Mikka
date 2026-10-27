@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { randomBytes } from 'node:crypto'
-import { canonicalOrigin, assertSameOrigin, submitSchema, CredentialError, type EncryptionContext } from './contracts'
+import { canonicalOrigin, assertSameOrigin, submitSchema, otpSchema, CredentialError, type EncryptionContext } from './contracts'
 import { seal, open, sealSession, type Kms } from './kms'
 import { checkCredentialRequest, credentialBody, credentialFailure } from './http'
 import { Cdp } from './browser'
@@ -85,4 +85,12 @@ test('HMAC scanner rejects nested chat/tool secret copies without retaining valu
   assert.throws(() => assertNoSecret('a', { content: [{ text: 'prefix test-password suffix' }] }, [entry], key), CredentialError)
   assertNoSecret('a', { text: 'safe status' }, [entry], key)
   assertNoSecret('b', { text: 'test-password' }, [entry], key)
+})
+
+test('verification codes use a separate authenticated envelope purpose', async () => {
+  const kms = fixtureKms(), code = await seal(kms, owner, Buffer.from('123456'), 'otp')
+  assert.equal((await open(kms, owner, code, 'otp')).toString(), '123456')
+  await assert.rejects(open(kms, owner, code))
+  assert(otpSchema.safeParse({ nonce: 'a'.repeat(43), origin: owner.origin, code: '123456' }).success)
+  assert(!otpSchema.safeParse({ nonce: 'a'.repeat(43), origin: owner.origin, code: '123456', credentialId: 'forged' }).success)
 })

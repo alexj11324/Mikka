@@ -17,17 +17,22 @@ export async function credentialActor(request: Request) {
   return { userId: session.user.id, workspaceId: context.workspace.id }
 }
 
-export async function login(caller: BrowserCaller, site: string) {
+export async function login(caller: BrowserCaller, site: string, submittedUsername?: string) {
   if (process.env.CREDENTIAL_VAULT_ENABLED !== '1') throw new CredentialError()
   const origin = canonicalOrigin(site)
   await credentialStore.authorize(caller)
+  const target = await resolveCredentialBrowser(caller)
+  const lease = await credentialStore.lease(caller, origin, target, submittedUsername)
+  if (lease.status === 'needs_login') return lease
+  return executeCredentialLease(lease.lease, origin)
+}
+
+export async function resolveCredentialBrowser(caller: BrowserCaller) {
   const target = caller.subagentId
     ? await resolveSubagentBrowserTarget({ ...caller, subagentId: caller.subagentId })
     : caller.runId ? await resolveThreadBrowserTarget({ ...caller, runId: caller.runId }) : null
   if (!target) throw new CredentialError('credential_denied', 404)
-  const lease = await credentialStore.lease(caller, origin, target)
-  if (lease.status === 'needs_login') return lease
-  return executeCredentialLease(lease.lease, origin)
+  return target
 }
 
 export async function executeCredentialLease(lease: string, origin: string) {

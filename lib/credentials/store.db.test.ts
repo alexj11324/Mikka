@@ -52,6 +52,11 @@ test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation
     const guard = { begin: async () => { throw new CredentialError() }, end: async () => {} }
     await assert.rejects(fillCredential(pool, lease.lease, { kms, guard }), CredentialError)
     await assert.rejects(fillCredential(pool, lease.lease, { kms, guard }), CredentialError)
+    const codeChallenge = await store.challenge(a, origin)
+    const codeLease = await store.otpLease(a, { nonce: codeChallenge.nonce, origin, code: '123456' }, browserTarget)
+    await assert.rejects(fillCredential(pool, codeLease, { kms, guard }), CredentialError)
+    assert.equal((await pool.query(`SELECT count(*)::int AS count FROM credential_fill_leases WHERE input_kind='otp' AND input_envelope IS NOT NULL`)).rows[0].count, 0)
+    await assert.rejects(fillCredential(pool, codeLease, { kms, guard }), CredentialError)
     const expired = await store.lease(a, origin, browserTarget)
     await pool.query('UPDATE credential_fill_leases SET expires_at=now()-interval \'1 second\'')
     if (expired.status !== 'ready') throw new Error()
