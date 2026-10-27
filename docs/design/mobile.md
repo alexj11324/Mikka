@@ -95,6 +95,10 @@ What reaches the person and when is R-20. On mobile:
   Telegram or Slack.
 - The 08:00 briefing: a short message and push only when an item needs the
   person today; otherwise it sits in 建议.
+- Follow-up: when a thread finishes an item, the Coordinator says what was
+  done in one bubble, then lists what is left from today's briefing as
+  mention chips and asks whether to go on, with one button per item and
+  「不用了」 (Figma frame 08).
 
 ## Settings
 
