@@ -1,10 +1,11 @@
 import { after, NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { deviceHeartbeatSchema } from '@mikka/protocol/device'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { devices } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 import { reclaimLostRuns, renewRunLeases } from '@/lib/run-leases'
+import { renewCloudDeviceToken } from '@/lib/computer/cloud-device'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
   await db.update(devices).set({ harnesses: parsed.data.harnesses, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
   const result = await renewRunLeases(deviceId, parsed.data.runs.map(run => run.runId))
+  const cloudCredential = caller.scopeDeviceId === deviceId && caller.scopeWorkspaceId
+    ? await renewCloudDeviceToken(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId, deviceId, tokenId: caller.tokenId }).catch(() => null)
+    : null
   after(() => reclaimLostRuns(caller.userId).catch((error: unknown) => console.error('Could not reclaim lost runs', error instanceof Error ? error.message : error)))
-  return NextResponse.json(result)
+  return NextResponse.json({ ...result, ...(cloudCredential ? { cloudCredential } : {}) }, { headers: { 'Cache-Control': 'private, no-store' } })
 }

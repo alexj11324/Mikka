@@ -731,7 +731,7 @@ export class Daemon {
       const deviceId = this.device.deviceId as string
       // Heartbeat first: lease renewal must not wait on anything else.
       const quotas = this.quota?.snapshot().quotas
-      const { leases, revoked } = await link.heartbeat(deviceId, {
+      const { leases, revoked, cloudCredential } = await link.heartbeat(deviceId, {
         harnesses: this.harnesses,
         runs: this.supervisor.heartbeatRuns(),
         worktreeDiskBytes: await this.worktrees.diskUsage(),
@@ -739,6 +739,12 @@ export class Daemon {
       })
       this.supervisor.renewLeases(leases)
       if (revoked) this.supervisor.revokeLeases(revoked)
+      if (this.options.cloudComputer && cloudCredential && this.device.credential === credential) {
+        // Persist before switching transport. Keep the current token valid
+        // through this pass; the next pass registers with the replacement.
+        this.saveDevice({ credential: cloudCredential })
+        this.registered = false
+      }
       // Work in progress leaves the machine, so another can take over.
       const checkpointRun = link.checkpointRun?.bind(link)
       if (checkpointRun) await this.supervisor.saveCheckpoints(checkpointRun)

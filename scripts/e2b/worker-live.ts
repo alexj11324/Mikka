@@ -1,7 +1,7 @@
 /** Disposable synthetic app + isolated loopback Postgres + real E2B worker.
  * This verifies startup and credential delivery, not product/provider login. */
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { Sandbox } from 'e2b'
@@ -49,6 +49,9 @@ async function main() {
     await sandbox.commands.run('for i in $(seq 1 30); do curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8765/ | grep -q 401 && exit 0; sleep .2; done; exit 1', { user: 'user', timeoutMs: 10_000 })
     let done = false
     let observedDevice: string | undefined
+    let renewed = false
+    const replacement = `orv_${randomBytes(32).toString('base64url')}`
+    const expectedHash = createHash('sha256').update(replacement).digest('hex')
     const approved = new Set<string>(), operations: string[] = []
     const active = sandbox
     const observe = (async () => {
@@ -63,7 +66,19 @@ async function main() {
           const review = await active.files.read('/tmp/mikka-worker-review.json', { user: 'root' }).catch(() => null)
           if (review) {
             const snapshots = computerSyncBody.parse({ requests: JSON.parse(review) }).requests
-            const existing = await syncComputerReviews(pool, observedDevice, actor.userId, snapshots)
+            let existing = await syncComputerReviews(pool, observedDevice, actor.userId, snapshots)
+            if (snapshots.length && !renewed) {
+              // Switch credentials while a real task is waiting for approval.
+              await active.files.write('/tmp/mikka-worker-renewal.json', JSON.stringify({ credential: replacement }), { user: 'user' })
+              const deadline = Date.now() + 50_000
+              while (Date.now() < deadline && !renewed) {
+                const current = await active.files.read('/tmp/mikka-worker-registration.json', { user: 'root' }).catch(() => null)
+                renewed = Boolean(current && JSON.parse(current).hash === expectedHash)
+                if (!renewed) await new Promise(resolve => setTimeout(resolve, 500))
+              }
+              assert.ok(renewed, 'worker re-registers with the replacement while the task is active')
+              existing = await syncComputerReviews(pool, observedDevice, actor.userId, snapshots)
+            }
             for (const request of snapshots) if (!approved.has(request.id)) {
               if (approved.size === 0) assert.equal(await decideComputerReview(pool, actor, request.id, request.digest, true, 'run'), true)
               else assert.ok(existing.some(decision => decision.id === request.id && decision.digest === request.digest && decision.approve), 'later operation receives this run’s approval')
@@ -139,8 +154,9 @@ async function main() {
         else await new Promise(resolve => setTimeout(resolve, 500))
       }
       assert.equal(completion?.stopReason, 'submitted')
+      assert.ok(renewed)
       assert.deepEqual(operations, ['get_desktop_state', 'click'])
-      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, pinnedSource: true, otherBotDenied: true, taskLeasePrivate: true, takeoverDeniesAgent: true, handbackAllowsAgent: true, takeoverWaitsForOperation: true, syntheticBotTaskSubmitted: true, screenshotAndClickApproved: true }))
+      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, credentialRenewed: true, pinnedSource: true, otherBotDenied: true, taskLeasePrivate: true, takeoverDeniesAgent: true, handbackAllowsAgent: true, takeoverWaitsForOperation: true, syntheticBotTaskSubmitted: true, screenshotAndClickApproved: true }))
     } finally { done = true; await observe }
   } catch (error) {
     if (sandbox && stage === 'check mock service') {

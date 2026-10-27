@@ -12,6 +12,7 @@ claimed_file = '/tmp/mikka-worker-claimed'
 review_file = '/tmp/mikka-worker-review.json'
 decision_file = '/tmp/mikka-worker-decisions.json'
 completion_file = '/tmp/mikka-worker-completion.json'
+renewal_file = '/tmp/mikka-worker-renewal.json'
 
 def run_config():
     try:
@@ -38,7 +39,14 @@ async def request_handler(request):
         return web.json_response({'deviceId': body['deviceId'], 'workspaceId': workspace})
     config = run_config()
     if path.endswith('/heartbeat'):
-        return web.json_response({'leases': {config['runId']: config['leaseExpiresAt']} if config else {}})
+        response = {'leases': {config['runId']: config['leaseExpiresAt']} if config else {}}
+        try:
+            with open(renewal_file, encoding='utf8') as source:
+                response['cloudCredential'] = json.load(source)['credential']
+            os.unlink(renewal_file)
+        except FileNotFoundError:
+            pass
+        return web.json_response(response)
     if path.endswith('/computer'):
         body = await request.json()
         if body.get('requests'):

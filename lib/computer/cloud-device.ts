@@ -33,3 +33,29 @@ export async function provisionCloudDevice(pool: Pool, actor: { userId: string; 
     throw error
   } finally { client.release() }
 }
+
+/** Replace a near-expiry worker token over its authenticated heartbeat. The
+ * previous token remains valid until its own expiry so a lost response can
+ * be retried without disconnecting a live task. */
+export async function renewCloudDeviceToken(pool: Pool, actor: { userId: string; workspaceId: string; deviceId: string; tokenId: string }) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const current = await client.query(`SELECT t.id FROM cloud_machines m
+      JOIN devices d ON d.id=m."deviceId" AND d."ownerId"=m."ownerId" AND d.kind='cloud' AND d.enabled=true
+      JOIN device_tokens t ON t.id=$4 AND t."userId"=m."ownerId" AND t."boundDeviceId"=d.id AND t."boundWorkspaceId"=m."workspaceId"
+      WHERE m."workspaceId"=$1 AND m."ownerId"=$2 AND m."deviceId"=$3 AND t."revokedAt" IS NULL
+        AND t."expiresAt">now() AND t."expiresAt"<=now()+interval '1 hour' FOR UPDATE OF m,t`,
+    [actor.workspaceId, actor.userId, actor.deviceId, actor.tokenId])
+    if (!current.rowCount) { await client.query('COMMIT'); return null }
+    // A lost response can be retried, but cannot mint unbounded tokens.
+    const recent = await client.query(`SELECT 1 FROM device_tokens WHERE "boundDeviceId"=$1 AND "boundWorkspaceId"=$2
+      AND "revokedAt" IS NULL AND "expiresAt">now()+interval '23 hours' AND "createdAt">now()-interval '30 seconds' LIMIT 1`, [actor.deviceId, actor.workspaceId])
+    if (recent.rowCount) { await client.query('COMMIT'); return null }
+    const credential = `orv_${randomBytes(32).toString('base64url')}`
+    await client.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt")
+      VALUES ($1,$2,$3,$4,$5,$6,now()+interval '24 hours')`, [randomUUID(), actor.userId, 'Cloud computer worker', createHash('sha256').update(credential).digest('hex'), actor.deviceId, actor.workspaceId])
+    await client.query('COMMIT')
+    return credential
+  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+}

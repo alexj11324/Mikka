@@ -162,6 +162,8 @@ export const heartbeatResultSchema = z.object({
    * stops them now instead of when their lease runs out.
    */
   revoked: z.array(id).max(500).optional(),
+  /** Short-lived cloud device token, returned only over its authenticated link. */
+  cloudCredential: z.string().regex(/^orv_[A-Za-z0-9_-]{43}$/).optional(),
 })
 export type HeartbeatResult = z.input<typeof heartbeatResultSchema>
 

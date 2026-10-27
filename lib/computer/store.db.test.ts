@@ -7,7 +7,7 @@ import { ComputerStore } from './store'
 import { bindComputerRun } from './run-binding'
 import { claimCloudRun, claimLocalRun } from './claim'
 import { syncComputerReviews, decideComputerReview } from './reviews'
-import { provisionCloudDevice } from './cloud-device'
+import { provisionCloudDevice, renewCloudDeviceToken } from './cloud-device'
 import { claimWorkerLease, renewWorkerLease, releaseWorkerLease } from './worker-lease'
 import { startCloudWorker } from './cloud-worker'
 import { queueCloudRun } from './queue-run'
@@ -42,7 +42,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
     const bindingMigration = await readFile(new URL('../../drizzle/20261027000000_computer_run_bindings.sql', import.meta.url), 'utf8')
     await pool.query(bindingMigration); await pool.query(bindingMigration)
-    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', enabled boolean NOT NULL DEFAULT true, "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz)')
+    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', enabled boolean NOT NULL DEFAULT true, "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz, "createdAt" timestamptz NOT NULL DEFAULT now())')
     const scopeMigration = await readFile(new URL('../../drizzle/20261027000300_cloud_device_scope.sql', import.meta.url), 'utf8')
     await pool.query(scopeMigration); await pool.query(scopeMigration)
     const workerLeaseMigration = await readFile(new URL('../../drizzle/20261027000400_cloud_worker_leases.sql', import.meta.url), 'utf8')
@@ -107,6 +107,17 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(credentials.rows[0].tokenHash, createHash('sha256').update(firstCredential.token).digest('hex'))
     assert.ok(credentials.rows[0].revokedAt)
     assert.equal(credentials.rows[1].revokedAt, null)
+    const tokenId = (await pool.query('SELECT id FROM device_tokens WHERE "tokenHash"=$1', [createHash('sha256').update(rotatedCredential.token).digest('hex')])).rows[0].id as string
+    const renewalActor = { ...actor, deviceId: rotatedCredential.deviceId, tokenId }
+    assert.equal(await renewCloudDeviceToken(pool, { ...renewalActor, workspaceId: otherWorkspace.workspaceId }), null)
+    assert.equal(await renewCloudDeviceToken(pool, { ...renewalActor, userId: bob.userId }), null)
+    const renewals = await Promise.all([renewCloudDeviceToken(pool, renewalActor), renewCloudDeviceToken(pool, renewalActor)])
+    assert.equal(renewals.filter(Boolean).length, 1, 'concurrent retries mint at most one replacement in the cooldown')
+    const renewed = renewals.find(Boolean)!
+    const tokenState = await pool.query('SELECT "revokedAt","expiresAt" FROM device_tokens WHERE "tokenHash"=$1', [createHash('sha256').update(renewed).digest('hex')])
+    assert.equal(tokenState.rows[0].revokedAt, null)
+    assert.ok(new Date(tokenState.rows[0].expiresAt).getTime() > Date.now() + 23 * 60 * 60_000)
+    assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [tokenId])).rows[0].revokedAt, null, 'lost renewal responses leave the old token usable until expiry')
     const bobBot = await store.createBot(bob, 'Other owner')
     const cloudRun = randomUUID(), consumer = randomUUID(), cloudSubscription = randomUUID(), wrongSubscription = randomUUID()
     await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"deviceId") VALUES ($1,$2,$3,$4,$5)', [cloudRun, actor.userId, consumer, 'queued', worker.deviceId])
