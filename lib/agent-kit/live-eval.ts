@@ -1,37 +1,17 @@
 import 'server-only'
-import { generateText, isStepCount, type ToolSet } from 'ai'
+import { generateText, isStepCount } from 'ai'
 import { z } from 'zod'
 import { createCoordinatorRegistry } from '@/workflows/coordinator/tools'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { personalCoordinatorInstructions } from '@/lib/coordinator/native-prompt'
-import { definitionInstructions, type AgentDefinition } from './definition'
+import { definitionInstructions } from './definition'
 import { CORE_EVAL_CASES, runEvalSuite, compareReports, type EvalCase, type EvalTrace, type ToolObservation } from './evals'
+import { evaluationTools } from './eval-fixtures'
 import { caseFromFailure } from './improvement'
 import { selectRegisteredTools } from './registry'
 import { AgentKitError, type AgentKitStore, type AgentScope } from './store'
 
 const finalReply = z.strictObject({ text:z.string().max(16_000),outcome:z.enum(['answered','blocked','approval_required']) })
-
-/** Every tool is replaced before execution. This runner never dispatches a run, writes memory or contacts an account provider. */
-export function evaluationTools(registry: ToolSet, testCase: EvalCase, observations: ToolObservation[], agent?: AgentDefinition): ToolSet {
-  return Object.fromEntries(Object.entries(registry).map(([name,definition]) => [name,{
-    ...definition,
-    execute:async (input: unknown) => {
-      if (name === 'load_skill') {
-        const skillId = input && typeof input === 'object' && 'skillId' in input ? input.skillId : null
-        const skill = agent?.skills.find(item => item.id === skillId)
-        observations.push({ name,outcome:skill ? 'ok' : 'error',authorized:false,effectPerformed:false })
-        return skill ? { id:skill.id,body:skill.body } : { error:'skillNotAssigned' }
-      }
-      const pending = ['send_email','create_calendar_event','update_calendar_event'].includes(name)
-      const failed = testCase.id === 'search-failure' || (!pending && name !== 'web_search')
-      observations.push({ name,outcome:pending ? 'approval_pending' : failed ? 'error' : 'ok',authorized:false,effectPerformed:false })
-      if (pending) return { status:'pending_approval',actionId:'eval-action',executed:false }
-      if (failed) return { error:'searchUnavailable',verified:false }
-      return { results:[{ title:'Acme Example 1.0 release',url:'https://example.com/release',snippet:'Acme Example 1.0 was released on 2026-01-15.' }],source:'synthetic evaluation fixture' }
-    },
-  }])) as ToolSet
-}
 
 /** Live means real inference with synthetic, inert tools, not real-account or native-CLI acceptance. */
 export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, proposalId: string, requestId: string, mode: 'fixture' | 'live') {
@@ -44,7 +24,7 @@ export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, 
     const run = async (testCase: EvalCase, definition: typeof job.baseline.definition, signal: AbortSignal): Promise<EvalTrace> => {
       if (mode === 'fixture') {
         // Plumbing smoke test only; the activation gate always rejects fixture reports.
-        return { text:testCase.expectedOutcome === 'answered' ? 'Fixture response: 2026-01-15' : testCase.expectedOutcome === 'blocked' ? 'Search unavailable.' : 'Awaiting approval.',outcome:testCase.expectedOutcome,tools:testCase.requiredTools.map(name => ({ name,outcome:testCase.expectedOutcome === 'blocked' ? 'error' : testCase.expectedOutcome === 'approval_required' ? 'approval_pending' : 'ok',authorized:false,effectPerformed:false })) }
+        return { text:testCase.expectedOutcome === 'answered' ? `Fixture response: ${testCase.mustMention.join(' ')}` : testCase.expectedOutcome === 'blocked' ? 'Cannot complete this task without the missing prerequisite.' : 'Awaiting approval.',outcome:testCase.expectedOutcome,tools:testCase.requiredTools.map(name => ({ name,outcome:testCase.expectedOutcome === 'blocked' ? 'error' : testCase.expectedOutcome === 'approval_required' ? 'approval_pending' : 'ok',authorized:false,effectPerformed:false })) }
       }
       const observations: ToolObservation[] = []
       const registry = selectRegisteredTools(createCoordinatorRegistry(scope.ownerId,scope.botId),definition.tools)

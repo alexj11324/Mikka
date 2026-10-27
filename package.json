@@ -65,7 +65,7 @@
     "test:coordinator-native-scope": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/native-coordinator-tool-scope.test.ts",
     "test:coordinator-native-relay": "pnpm --filter @mikka/daemon exec vitest run --root ../.. tests/native-coordinator-relay.test.mjs",
     "test:slack": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/slack/webhook.test.ts lib/slack/owner.test.ts tests/slack-bot.test.mjs",
-    "test:agent-kit": "node --import tsx --test lib/agent-kit/agent-kit.test.ts lib/agent-kit/http.test.ts",
+    "test:agent-kit": "node --import tsx --test lib/agent-kit/agent-kit.test.ts lib/agent-kit/evals.test.ts lib/agent-kit/http.test.ts",
     "test:agent-kit-db": "node --import tsx --test lib/agent-kit/store.db.test.ts",
     "check:agent-definitions": "tsx scripts/agent-kit.mts validate agents/default && tsx scripts/agent-kit.mts validate agents/research-example"
   },

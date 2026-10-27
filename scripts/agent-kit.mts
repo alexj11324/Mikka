@@ -10,7 +10,7 @@ try {
   if(command==='export') console.log(exportDefinition(definition))
   else if(command==='validate') console.log(JSON.stringify({ valid:true,id:definition.id,digest:digest(definition),tools:definition.tools.length,skills:definition.skills.length }))
   else {
-    const report=await runEvalSuite({definition,cases:CORE_EVAL_CASES,mode:'fixture',run:async testCase=>({text:testCase.expectedOutcome==='answered'?'Synthetic fixture: 2026-01-15':testCase.expectedOutcome==='blocked'?'Search unavailable.':'Awaiting approval.',outcome:testCase.expectedOutcome,tools:testCase.requiredTools.map(name=>({name,outcome:testCase.expectedOutcome==='blocked'?'error':testCase.expectedOutcome==='approval_required'?'approval_pending':'ok',authorized:false,effectPerformed:false}))})})
+    const report=await runEvalSuite({definition,cases:CORE_EVAL_CASES,mode:'fixture',run:async testCase=>({text:testCase.expectedOutcome==='answered'?`Synthetic fixture: ${testCase.mustMention.join(' ')}`:testCase.expectedOutcome==='blocked'?'Cannot complete this task without the missing prerequisite.':'Awaiting approval.',outcome:testCase.expectedOutcome,tools:testCase.requiredTools.map(name=>({name,outcome:testCase.expectedOutcome==='blocked'?'error':testCase.expectedOutcome==='approval_required'?'approval_pending':'ok',authorized:false,effectPerformed:false}))})})
     console.log(JSON.stringify({label:'Framework smoke test only; not model capability evidence or activation approval.',report},null,2))
     if(report.errors || report.passed!==report.total) process.exitCode=1
   }

@@ -65,7 +65,8 @@ test('directory loader materializes the bundled Markdown example without executi
 })
 test('directory loader rejects traversal, symlinks and ambiguous asset fields', async t => {
   const root=await mkdtemp(join(tmpdir(),'mikka-agent-kit-'))
-  t.after(() => rm(root,{ recursive:true,force:true }))
+  if (process.env.MIKKA_PRESERVE_TEST_FIXTURES === '1') t.diagnostic(`Preserved synthetic loader fixtures: ${root}`)
+  else t.after(() => rm(root,{ recursive:true,force:true }))
   await mkdir(join(root,'bundle'));await writeFile(join(root,'outside.md'),'private')
   const manifest={ ...base(),instructionsFile:'../outside.md' } as Record<string,unknown>;delete manifest.instructions
   const write=() => writeFile(join(root,'bundle','agent.json'),JSON.stringify(manifest))
