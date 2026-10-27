@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | Every setting must have a precedent in a comparable product, cited in the spec; settings are a hierarchy, never one flat page; no rows that tell the person what they already know (「每一项设置，都必须找到同类型产品已有的设置作为参考…如果同类产品没有这样做，那你这样做就是违规」「分级菜单，你不能拉通拍」「账户登录方式写个Google，你是有毛病吗」) | R-70 | |
 | 2026-10-27 | Mobile Settings: profile, 工作区, 通知 (主动消息, 电脑在用时不推送到手机), 已连接的 App, 账户, 通用, 退出登录. What the Coordinator knows about the person is managed in the chat, not in Settings; no push-device list (「什么叫他妈“正在推送，不归我管”」「重新写设置页」) | | 「关于你」 and 推送设备 in Settings (same day) |
 | 2026-10-27 | 建议 shows its items as one long list (icon, title, source and time per row), not cards per app (「卡片统一用最下面那种长方形形式」) | R-21 | Horizontal per-app cards (same day) |
 | 2026-10-27 | Mobile cards have no outline: a card in the chat (proactive card, thread card) is a filled grey surface like the bubble, the way 建议's cards are filled; secondary buttons inside are white. Source icons are the apps' own coloured marks, never a glyph on a tinted square (「描边的话不好看」「直接用那个带颜色的图标不行吗」) | | Outlined cards; tinted-square source icons |

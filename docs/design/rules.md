@@ -170,6 +170,17 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   with 「‹ Coordinator」 to go back, on a phone it pushes in full screen.
   Figma: page 「线程卡片 · 聊天里派出线程」.
 
+## Settings
+
+- **R-70** Every setting needs a precedent. A row on any Settings screen
+  (web or mobile) ships only if a comparable product (ChatGPT, Claude,
+  Comma, Hark, Wabi, Linear, GitHub, Slack and the like) has the same setting;
+  the spec cites the product and source for each row. No precedent, no row.
+  Settings are a hierarchy: the top screen holds a few categories, and each
+  opens its own page; rows are never laid out flat on one page. A row never
+  states what the person already knows (for example which provider they
+  signed in with).
+
 ## Look
 
 - **R-30** Greys are pure neutral: `rgba(0,0,0,a)` and `#737373 / #A3A3A3 /
