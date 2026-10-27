@@ -19,7 +19,8 @@ export async function runSchedule(cron, env, fetcher = fetch) {
   try {
     response = await fetcher(`${env.MIKKA_URL.replace(/\/+$/, '')}${endpoint}`, {
       headers: { authorization: `Bearer ${env.CRON_SECRET}` },
-      redirect: 'error',
+      // Workers supports manual redirects; non-2xx responses are rejected below.
+      redirect: 'manual',
       signal: AbortSignal.timeout(90_000),
     })
   } catch {

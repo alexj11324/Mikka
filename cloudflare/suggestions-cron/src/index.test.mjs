@@ -28,7 +28,7 @@ test('each schedule calls only its endpoint and logs only whitelisted numeric co
     const call = calls.at(-1)
     assert.equal(call.url, `https://mikka.example.test/mikka${endpoint}`)
     assert.deepEqual(call.headers, { authorization: `Bearer ${env.CRON_SECRET}` })
-    assert.equal(call.redirect, 'error')
+    assert.equal(call.redirect, 'manual')
     assert.ok(call.signal instanceof AbortSignal)
   }
   assert.equal(calls.length, 2)
@@ -68,7 +68,7 @@ test('unknown schedules and missing configuration fail without a request', async
 
 test('HTTP and network failures reject without exposing a body or underlying error', async () => {
   for (const [schedule, endpoint] of Object.entries(SCHEDULES)) {
-    for (const status of [401, 503]) {
+    for (const status of [301, 302, 303, 307, 308, 401, 503]) {
       const { fetcher } = recorder(status)
       await assert.rejects(runSchedule(schedule, env, fetcher), { message: `${endpoint} answered ${status}` })
     }
