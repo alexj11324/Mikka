@@ -49,7 +49,11 @@
 
 ## 3. 推荐方案
 
-### 加密与存储：第一版用 Infisical（Alex 2026-10-27 定）
+### 加密与存储
+
+> **更新（Alex 2026-10-27）：第一版直接用 AWS KMS**（信封加密，Vercel OIDC 免密钥，主应用只能加密、broker 只能解密），不经过下面的 Infisical 过渡方案；下面的 Infisical 方案保留作记录。AWS 侧搭建步骤见 `docs/operations/aws-kms-credential-setup.md`。用户之间的隔离六条照旧适用，第 3 条的「加密绑定主人」由 KMS encryption context `{userId, credentialId, origin}` 实现。
+
+#### （已被取代）第一版用 Infisical
 
 不需要新开 AWS。第一版沿用 #313 的 Infisical 存储，外面再加一层由 Mikka 自己做的加密：
 
