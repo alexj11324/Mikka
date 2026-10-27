@@ -2,7 +2,7 @@ import 'server-only'
 import { and, asc, desc, eq, ne, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { db } from '@/lib/db'
-import { memorySettings, proactiveEntitlements, proactiveUsage, userFacts, userTimeZones } from '@/lib/db/schema'
+import { memorySettings, proactiveUsage, userFacts, userTimeZones } from '@/lib/db/schema'
 import { personLocale } from '@/lib/suggestions/action-title-server'
 import { localClock, safeTimeZone } from '@/lib/suggestions/briefing'
 import type { UserFactKind } from './kinds'
@@ -22,24 +22,14 @@ export async function setMemoryEnabled(userId: string, enabled: boolean): Promis
   await db.insert(memorySettings).values({ userId, enabled }).onConflictDoUpdate({ target: memorySettings.userId, set: { enabled, updatedAt: new Date() } })
 }
 
-/**
- * The person's daily cap on profile model calls when they may build a
- * profile: entitled (proactive_entitlements.profile) and 记忆 on. Null
- * otherwise; no entitlement row means not entitled. The deployment switch is
- * checked by the caller (lib/profile/flags.ts).
- */
-export async function profileAllowance(userId: string): Promise<{ dailyCalls: number } | null> {
-  const [row] = await db.select({ profile: proactiveEntitlements.profile, dailyCalls: proactiveEntitlements.dailyCalls, memory: memorySettings.enabled })
-    .from(proactiveEntitlements).leftJoin(memorySettings, eq(memorySettings.userId, proactiveEntitlements.userId))
-    .where(eq(proactiveEntitlements.userId, userId)).limit(1)
-  return row?.profile && row.memory !== false ? { dailyCalls: row.dailyCalls } : null
-}
+/** Profile model calls one person may make per UTC day (proactive.md § 3). */
+export const PROFILE_DAILY_CALLS = 200
 
 /** The UTC day usage is counted on. */
 export const usageDay = (now: Date) => now.toISOString().slice(0, 10)
 
 /** Takes one extraction call from the person's budget for `day`; false when it is spent. Counted before the call, so a failed call still counts. */
-export async function claimExtractionCall(userId: string, dailyCalls: number, day: string): Promise<boolean> {
+export async function claimExtractionCall(userId: string, day: string, dailyCalls = PROFILE_DAILY_CALLS): Promise<boolean> {
   if (dailyCalls <= 0) return false
   const [row] = await db.insert(proactiveUsage).values({ userId, day, kind: 'extraction', calls: 1 }).onConflictDoUpdate({
     target: [proactiveUsage.userId, proactiveUsage.day, proactiveUsage.kind],
@@ -160,15 +150,15 @@ export const CONSOLIDATION_HOUR = 4
 const CONSOLIDATION_CONCURRENCY = 8
 
 /**
- * Merges the facts of everyone entitled to a profile, with 记忆 on, whose local time is past 04:00
- * and who has not been merged on their local date yet. Run hourly; a person
- * without a stored time zone is merged on UTC dates. Claiming the date first
- * keeps overlapping runs to one merge per person and day.
+ * Merges the facts of everyone with 记忆 on whose local time is past 04:00,
+ * who has not been merged on their local date yet, and whom `entitled`
+ * allows (the PostHog flag; lib/profile/entitlement.ts). Run hourly; a
+ * person without a stored time zone is merged on UTC dates. Claiming the date
+ * first keeps overlapping runs to one merge per person and day.
  */
-export async function consolidateDueFacts({ now = new Date(), limit = 500, deadline = Infinity }: { now?: Date; limit?: number; deadline?: number } = {}) {
+export async function consolidateDueFacts({ entitled, now = new Date(), limit = 500, deadline = Infinity }: { entitled: (userId: string) => Promise<boolean>; now?: Date; limit?: number; deadline?: number }) {
   const people = await db.selectDistinct({ userId: userFacts.userId, timeZone: userTimeZones.timeZone, enabled: memorySettings.enabled, consolidatedOn: memorySettings.consolidatedOn })
     .from(userFacts)
-    .innerJoin(proactiveEntitlements, and(eq(proactiveEntitlements.userId, userFacts.userId), eq(proactiveEntitlements.profile, true)))
     .leftJoin(userTimeZones, eq(userTimeZones.userId, userFacts.userId))
     .leftJoin(memorySettings, eq(memorySettings.userId, userFacts.userId))
     .where(eq(userFacts.state, 'active'))
@@ -184,6 +174,7 @@ export async function consolidateDueFacts({ now = new Date(), limit = 500, deadl
     if (Date.now() > deadline) { result.deferred += batch.length - index; break }
     await Promise.all(batch.slice(index, index + CONSOLIDATION_CONCURRENCY).map(async person => {
       try {
+        if (!await entitled(person.userId)) { result.skipped++; return }
         const [claimed] = await db.insert(memorySettings).values({ userId: person.userId, consolidatedOn: person.date })
           .onConflictDoUpdate({ target: memorySettings.userId, set: { consolidatedOn: person.date, updatedAt: now }, setWhere: and(eq(memorySettings.enabled, true), sql`${memorySettings.consolidatedOn} is distinct from ${person.date}`) })
           .returning({ userId: memorySettings.userId })

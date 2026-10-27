@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
-import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
+import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, proactiveFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
 
 test('pageviews strip query strings, hashes, document identifiers and unapproved properties', () => {
   const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: {
@@ -56,6 +56,7 @@ test('all upcoming features fail closed, even if the remote switch is accidental
 
 test('gated features are on only when the remote flag is exactly true', () => {
   assert.equal(gatedFeatures.cloudComputer, 'mikka-cloud-computer')
+  assert.deepEqual(proactiveFeatures, { profile: 'mikka-proactive-profile', research: 'mikka-proactive-research' })
   for (const remote of [undefined, false, 'control', 'true']) assert.equal(gatedFeatureEnabled(remote), false)
   assert.equal(gatedFeatureEnabled(true), true)
   assert.equal(computerAcceptancePreview('preview', '1'), true)

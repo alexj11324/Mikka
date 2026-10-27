@@ -6,9 +6,10 @@ const originalFlag = process.env.PROACTIVE_PROFILE_ENABLED
 const secret = 'source-only-cron-test-secret'
 const verifyBearer = mock.fn(async (_value: string | null, _secret: string) => false)
 const result = () => ({ people: 3, due: 2, written: 2, skipped: 0, failed: 0, deferred: 0 })
-const consolidate = mock.fn(async (_options: { deadline: number }) => result())
+const consolidate = mock.fn(async (_options: { deadline: number; entitled: (userId: string) => Promise<boolean> }) => result())
 mock.module(new URL('../../../../lib/linear-sync/webhook.ts', import.meta.url).href, { namedExports: { verifyBearer } })
 mock.module(new URL('../../../../lib/profile/store.ts', import.meta.url).href, { namedExports: { consolidateDueFacts: consolidate } })
+mock.module(new URL('../../../../lib/profile/entitlement.ts', import.meta.url).href, { namedExports: { profileEntitled: async () => true } })
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
 beforeEach(() => {
@@ -52,6 +53,7 @@ test('an authorized call returns only counts and gives the merge a 40-second bud
   assert.deepEqual(await response.json(), result())
   const deadline = consolidate.mock.calls[0].arguments[0].deadline
   assert.ok(deadline >= started + 40_000 && deadline <= Date.now() + 40_000)
+  assert.equal(typeof consolidate.mock.calls[0].arguments[0].entitled, 'function', 'the merge checks each person\'s entitlement')
 })
 
 test('with PROACTIVE_PROFILE_ENABLED off an authorized call answers 200 and merges nothing', async () => {

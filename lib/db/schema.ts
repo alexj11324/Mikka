@@ -457,22 +457,9 @@ export const memorySettings = pgTable('memory_settings', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
-/**
- * Who may use proactive work (docs/design/proactive.md § 3); no row means no.
- * `research` is reserved for the nightly research run (phase 2). `dailyCalls`
- * caps the person's profile model calls per UTC day.
- */
-export const proactiveEntitlements = pgTable('proactive_entitlements', {
-  userId: text('userId').primaryKey(),
-  profile: boolean('profile').notNull().default(false),
-  research: boolean('research').notNull().default(false),
-  dailyCalls: integer('dailyCalls').notNull().default(200),
-  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-})
-
 export type ProactiveUsageKind = 'extraction'
 
-/** Proactive model calls and tokens per person, UTC day and kind, for the daily cap and cost per person. */
+/** Proactive model calls and tokens per person, UTC day and kind, for the daily cap (lib/profile/store.ts) and cost per person. */
 export const proactiveUsage = pgTable('proactive_usage', {
   userId: text('userId').notNull(),
   day: date('day').notNull(),

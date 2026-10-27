@@ -1,6 +1,7 @@
 import { withRequestLog } from '@/lib/request-log'
 import { verifyBearer } from '@/lib/linear-sync/webhook'
 import { profileEnabled } from '@/lib/profile/flags'
+import { profileEntitled } from '@/lib/profile/entitlement'
 import { consolidateDueFacts } from '@/lib/profile/store'
 
 export const runtime = 'nodejs'
@@ -17,7 +18,7 @@ async function handleGET(request: Request) {
   if (!await verifyBearer(request.headers.get('authorization'), secret)) return new Response(null, { status: 401 })
   // PROACTIVE_PROFILE_ENABLED off: nothing to merge, and the Worker's run still succeeds.
   if (!profileEnabled()) return Response.json({ skipped: 'disabled' }, { headers: { 'Cache-Control': 'no-store' } })
-  const result = await consolidateDueFacts({ deadline: Date.now() + BUDGET_MS })
+  const result = await consolidateDueFacts({ entitled: profileEntitled, deadline: Date.now() + BUDGET_MS })
   return Response.json(result, { headers: { 'Cache-Control': 'no-store' } })
 }
 

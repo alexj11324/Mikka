@@ -31,10 +31,12 @@ Each stored notification is read once for facts about the person after it is rat
 
 Proactive work is behind four switches (`docs/design/proactive.md` § 3), and any one of them off stops it:
 
-1. `PROACTIVE_PROFILE_ENABLED` (deployment, off unless `1` or `true`) gates extraction and this merge. Off, the endpoint answers 200 with `{"skipped":"disabled"}`. `PROACTIVE_RESEARCH_ENABLED` is reserved for the phase 2 research run and nothing reads it yet. Set both in Infisical, never in source.
-2. `proactive_entitlements.profile` must be true for the person; no row means not entitled.
+1. `PROACTIVE_PROFILE_ENABLED` (deployment, off unless `1` or `true`) gates extraction and this merge. Off, the endpoint answers 200 with `{"skipped":"disabled"}`. `PROACTIVE_RESEARCH_ENABLED` is reserved for the phase 2 research run and nothing reads it yet. Self-hosters without PostHog leave both off.
+2. The PostHog flag `mikka-proactive-profile` must be exactly `true` for the person (distinct id = Mikka user id, as in the browser). It is checked on the server with `posthog-node` (`lib/posthog-server.ts`), cached 5 minutes per person, and fails closed: no `NEXT_PUBLIC_POSTHOG_KEY`, an error, a 2-second timeout or any other value reads off. With `POSTHOG_SECRET_KEY` (a project secret or personal API key) flags are evaluated locally from polled definitions; without it each uncached check asks PostHog. `mikka-proactive-research` is reserved for phase 2.
 3. The person's 记忆 switch (`memory_settings.enabled`).
-4. `proactive_entitlements.dailyCalls` (default 200) caps extraction calls per UTC day. Each call is counted before it is made, and its tokens are added after, in `proactive_usage` (person, UTC day, kind), so cost per person can be computed.
+4. A daily cap of 200 extraction calls per person and UTC day (`PROFILE_DAILY_CALLS`). Each call is counted before it is made, and its tokens are added after, in `proactive_usage` (person, UTC day, kind). Each call is also sent to PostHog as an `$ai_generation` event (model, input and output tokens, latency; never the prompt or answer), best effort, so cost per person shows in PostHog.
+
+Set the environment values in Infisical, never in source.
 
 Facts the person corrected in 记忆 are never faded or overwritten. A person is due from 04:00 their time (the zone in `user_time_zones`, UTC without one); `memory_settings.consolidatedOn` holds the local date of the last merge and is claimed before merging, so overlapping runs merge a person once a day. A person with 记忆 off is not merged and nothing is extracted for them. The run starts no new people after about 40 seconds; the next hourly run picks up whoever is left.
 
