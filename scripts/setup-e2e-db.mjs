@@ -1,4 +1,5 @@
 import { Pool } from 'pg'
+import { readFile } from 'node:fs/promises'
 import { getMigrations } from 'better-auth/db/migration'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { postgresSchemaStatements } from '@chat-adapter/state-pg'
@@ -57,6 +58,11 @@ try {
       ...config.uniqueConstraints.map(key => `UNIQUE (${key.columns.map(column => identifier(column.name)).join(', ')})`),
     ]
     await pool.query(`CREATE TABLE IF NOT EXISTS ${identifier(config.name)} (${[...columns, ...constraints].join(', ')})`)
+  }
+  // Computer infrastructure uses reviewed SQL migrations rather than Drizzle
+  // table definitions. Apply the same additive DDL in the isolated E2E DB.
+  for (const name of ['20261026235901_cloud_computers.sql', '20261027000000_computer_run_bindings.sql', '20261027000200_local_computer_reviews.sql', '20261027000300_cloud_device_scope.sql', '20261027000400_cloud_worker_leases.sql', '20261027000500_computer_run_approvals.sql', '20261027000600_bot_cloud_runtimes.sql']) {
+    await pool.query(await readFile(new URL(`../drizzle/${name}`, import.meta.url), 'utf8'))
   }
   for (const statement of postgresSchemaStatements) await pool.query(statement)
   console.log('独立 E2E 数据库已就绪；认证表使用 Better Auth 迁移，业务表来自现有 Drizzle schema。')
