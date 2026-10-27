@@ -25,6 +25,12 @@ export const botViewSchema = z.object({ id: z.uuid(), name: z.string().min(1).ma
 export const approvalDecisionSchema = z.object({ digest: z.string(), decision: z.enum(['approve', 'deny']), scope: z.enum(['once', 'run']) }).strict()
 export const computerTaskStateSchema = z.enum(['working', 'approval', 'done', 'failed'])
 export const computerTaskSchema = z.object({ botId: z.string(), runId: z.string(), task: z.string(), state: computerTaskStateSchema, approvalId: z.string().optional() })
+export const subagentStateSchema = z.enum(['queued', 'running', 'needs_you', 'done', 'failed', 'stopped'])
+export const subagentEventSchema = z.object({
+  type: z.literal('data-subagent'),
+  data: z.object({ botId: z.uuid(), subagentId: z.uuid(), task: z.string().trim().min(1).max(200),
+    state: subagentStateSchema, needs: z.string().trim().min(1).max(1000).optional() }).strict(),
+}).strict()
 export const computerEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('computer.machine'), state: machineStateSchema }),
   z.object({ type: z.literal('computer.control'), botId: z.string(), control: controlStateSchema, controlledBy: z.object({ userId: z.string() }).optional() }),
@@ -44,6 +50,8 @@ export type ViewerGrant = z.infer<typeof viewerGrantSchema>
 export type ApprovalDecision = z.infer<typeof approvalDecisionSchema>
 export type ComputerTaskState = z.infer<typeof computerTaskStateSchema>
 export type ComputerTask = z.infer<typeof computerTaskSchema>
+export type SubagentState = z.infer<typeof subagentStateSchema>
+export type SubagentEvent = z.infer<typeof subagentEventSchema>
 export type ComputerEvent = z.infer<typeof computerEventSchema>
 
 // Daemon review snapshots contain no screenshot or model credentials. Display

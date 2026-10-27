@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createBotSchema, viewerGrantSchema, viewerRequestSchema, computerEventSchema } from './computer'
+import { createBotSchema, viewerGrantSchema, viewerRequestSchema, computerEventSchema, subagentEventSchema } from './computer'
 
 describe('computer wire contract', () => {
   it('rejects ownership injection when creating a Bot or requesting a viewer', () => {
@@ -16,5 +16,13 @@ describe('computer wire contract', () => {
   it('does not accept a desktop control push without a Bot identity', () => {
     expect(computerEventSchema.safeParse({ type: 'computer.control', control: 'user' }).success).toBe(false)
     expect(computerEventSchema.safeParse({ type: 'computer.control', botId: 'bot', control: 'user', controlledBy: { userId: 'owner' } }).success).toBe(true)
+  })
+  it('validates a web subagent card without treating it as a thread', () => {
+    const botId = '81c2421f-49a5-42bb-91dc-b0ec256caab2'
+    const subagentId = 'baef6bdb-f2ce-4a24-aedd-6ca2e82635da'
+    const event = { type: 'data-subagent', data: { botId, subagentId, task: 'Open the page', state: 'needs_you', needs: 'Sign in' } }
+    expect(subagentEventSchema.safeParse(event).success).toBe(true)
+    expect(subagentEventSchema.safeParse({ ...event, data: { ...event.data, runId: subagentId } }).success).toBe(false)
+    expect(subagentEventSchema.safeParse({ ...event, data: { ...event.data, state: 'invented' } }).success).toBe(false)
   })
 })

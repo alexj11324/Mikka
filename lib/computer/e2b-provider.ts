@@ -31,6 +31,21 @@ export async function createComputer(workspaceId: string, operationId: string) {
   })
 }
 
+/** Thread sandboxes are created from an owner-scoped workspace snapshot.
+ * They never inherit the Bot machine's running desktop or processes. */
+export const threadMachineProvider = {
+  async create(snapshotId: string, runId: string, operationId: string) {
+    const sandbox = await Sandbox.create(snapshotId, { ...options(), idempotencyKey: operationId,
+      metadata: { application: 'mikka-thread', runId },
+      lifecycle: { onTimeout: 'pause', autoResume: false },
+    })
+    return { sandboxId: sandbox.sandboxId }
+  },
+  async resume(sandboxId: string) { await Sandbox.connect(sandboxId, options()) },
+  async pause(sandboxId: string) { await Sandbox.pause(sandboxId, options()) },
+  async kill(sandboxId: string) { await Sandbox.kill(sandboxId, options()) },
+}
+
 export async function installComputerRuntime(sandbox: Sandbox) {
   // Created per instance, never baked into a shared template.
   await sandbox.commands.run("if getent group mikka-runner >/dev/null; then install -d -m 710 -o root -g mikka-runner /run/mikka-viewer; else install -d -m 700 /run/mikka-viewer; fi; umask 077; head -c 32 /dev/urandom > /run/mikka-viewer/key", { user: 'root' })
