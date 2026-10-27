@@ -7,7 +7,11 @@ import { ComputerError } from '@/lib/computer/store'
 import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, ensureHostedRunnerImage } from '@/lib/computer/e2b-provider'
 import { installSubagentRuntime, runtimeRequest } from './runtime'
 import type { Actor } from './subagents'
-const options = () => ({ apiKey: process.env.E2B_API_KEY!, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy })
+function options() {
+  const key = process.env.E2B_API_KEY
+  if (!key) throw new Error('Cloud runtime unavailable')
+  return { apiKey: key, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
+}
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 /** Capture filesystem only. A cloned memory image would duplicate live daemon
  * credentials/connections. Cache is always bound to one owner and workspace. */
@@ -42,11 +46,11 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (machine?.state === 'ended') throw new ComputerError(409, 'Thread ended')
     if (machine?.state === 'running') { await client.query('COMMIT'); return { runId, state: 'running' } }
     if (machine?.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now() && machine.state !== 'paused') throw new ComputerError(409, 'Thread provisioning in progress')
-    if (!machine) {
+    if (!machine || machine.snapshotId === 'pending') {
       const source = await connectComputer(run.botSandboxId)
       const snapshotId = await workspaceSnapshot(client as unknown as Pool, actor, source, run.repoPath)
       machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state)
-        VALUES ($1,$2,$3,$4,$5,$6,'starting') RETURNING *`, [runId, actor.workspaceId, actor.userId, run.botId, snapshotId, randomUUID()])).rows[0]
+        VALUES ($1,$2,$3,$4,$5,$6,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.botId, snapshotId, randomUUID()])).rows[0]
     }
     // Persist snapshot and operation ID before provider requests.
     await client.query('UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval \'15 minutes\' WHERE "runId"=$1', [runId, leaseId])

@@ -23,7 +23,7 @@ export async function installSubagentRuntime(sandbox: Sandbox, ownerId: string) 
   await sandbox.commands.run('for i in $(seq 1 30); do test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6082/agents/x/state)" = 401 && exit 0; sleep .2; done; exit 1', { user: 'root', timeoutMs: 10_000 })
 }
 export async function grant(sandbox: Sandbox, row: BrowserBinding, role: 'runtime' | 'view' | 'broker') {
-  const expiresAt = Date.now() + (role === 'broker' ? 30_000 : 120_000)
+  const expiresAt = Date.now() + (role === 'broker' ? 90_000 : 120_000)
   const payload = Buffer.from(JSON.stringify({ ownerId: row.ownerId, workspaceId: row.workspaceId, botId: row.botId, subagentId: row.id, epoch: row.epoch, role, exp: Math.floor(expiresAt / 1000) })).toString('base64url')
   const key = await sandbox.files.read('/run/mikka-subagents/key', { user: 'root', format: 'bytes' })
   const token = `${payload}.${createHmac('sha256', key).update(payload).digest('base64url')}`

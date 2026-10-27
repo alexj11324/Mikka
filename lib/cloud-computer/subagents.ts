@@ -14,7 +14,7 @@ export class SubagentStore {
     if (!row) throw new ComputerError(404, 'Subagent unavailable')
     return row
   }
-  async create(actor: Actor, botId: string, task: string, id = randomUUID()) {
+  async create(actor: Actor, botId: string, task: string, id: string = randomUUID()) {
     const bot = (await this.pool.query('SELECT id FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [botId, actor.userId, actor.workspaceId])).rows[0]
     if (!bot) throw new ComputerError(404, 'Bot unavailable')
     await this.pool.query(`INSERT INTO bot_subagents (id,"ownerId","workspaceId","botId",task) VALUES ($1,$2,$3,$4,$5) ON CONFLICT(id) DO NOTHING`, [id, actor.userId, actor.workspaceId, botId, task])

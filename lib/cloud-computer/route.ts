@@ -29,7 +29,8 @@ export async function subagentRoute(request: Request, botId: string, id?: string
     if (action === 'viewer') return response(await store.viewer(actor, botId, id))
     if (action === 'stop') { const row = await store.stop(actor, botId, id); return response({ subagentId: row.id, state: row.status }) }
     const row = await store.get(actor, botId, id)
-    return response({ subagentId: row.id, botId: row.botId, task: row.task, state: row.status, step: row.step, needs: row.needs })
+    const approval = (await pool.query(`SELECT id,input->>'summary' AS summary,created_at FROM (SELECT id,input,"createdAt" AS created_at FROM pending_actions WHERE "userId"=$2 AND action='browser_operation' AND status='pending' AND input->>'subagentId'=$1 AND "createdAt">now()-interval '5 minutes') p ORDER BY created_at DESC LIMIT 1`, [id, actor.userId])).rows[0] ?? null
+    return response({ subagentId: row.id, botId: row.botId, task: row.task, state: row.status, step: row.step, needs: row.needs, approval })
   } catch (error) {
     if (error instanceof ComputerError) return response({ error: error.message }, error.status)
     if (error instanceof z.ZodError || error instanceof SyntaxError) return response({ error: 'Invalid request' }, 400)

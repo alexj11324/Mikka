@@ -180,6 +180,18 @@ async def action(request):
     async with b.lock:
         if b.guard:raise web.HTTPConflict()
         name=data.get('action')
+        if data.get('expectedLoaderId'):
+            from urllib.parse import urlsplit
+            tree=await b.rpc('Page.getFrameTree',session=b.session)
+            frame=tree['frameTree']['frame'];u=urlsplit(frame['url'])
+            if frame['loaderId']!=data['expectedLoaderId'] or f'{u.scheme}://{u.netloc}'!=data.get('expectedOrigin'):raise web.HTTPConflict()
+        if name=='inspectMutation':
+            from urllib.parse import urlsplit
+            mutation=data.get('mutation',{});selector=json.dumps(str(mutation.get('selector',''))[:500])
+            expression=f"(() => {{ const e={('document.activeElement' if mutation.get('action')=='key' else 'document.querySelector('+selector+')')}; if (!e) return {{requiresApproval:true}}; const text=(e.innerText||e.getAttribute('aria-label')||'').slice(0,500); const risk=/pay|purchase|buy|delete|remove|cancel|unsubscribe|transfer|send|publish|submit|confirm|付款|支付|购买|删除|取消|转账|发送|发布|确认/i.test(text); return {{requiresApproval:risk || (e.type==='submit' && e.form?.method.toLowerCase()!=='get') || ({json.dumps(mutation.get('action')=='key' and mutation.get('key')=='Enter')} && e.form?.method.toLowerCase()!=='get')}}; }})()"
+            check=await b.rpc('Runtime.evaluate',{'expression':expression,'returnByValue':True},b.session)
+            tree=await b.rpc('Page.getFrameTree',session=b.session);frame=tree['frameTree']['frame'];u=urlsplit(frame['url'])
+            return web.json_response({**check['result']['value'],'loaderId':frame['loaderId'],'origin':f'{u.scheme}://{u.netloc}'})
         if name=='navigate':
             from urllib.parse import urlparse
             u=urlparse(data.get('url',''))
@@ -187,8 +199,19 @@ async def action(request):
             await b.rpc('Page.navigate',{'url':data['url']},b.session)
         elif name=='observe':
             # Exclude all form values, cookies, storage and raw HTML.
-            text=await b.rpc('Runtime.evaluate',{'expression':"JSON.stringify({url:location.href,title:document.title,links:Array.from(document.querySelectorAll('a')).slice(0,80).map(e=>({text:e.innerText.slice(0,160),href:e.href})),buttons:Array.from(document.querySelectorAll('button')).slice(0,80).map(e=>e.innerText.slice(0,160)),needsLogin:!!document.querySelector('input[type=password]')})",'returnByValue':True},b.session)
+            text=await b.rpc('Runtime.evaluate',{'expression':"JSON.stringify({url:location.href,title:document.title,links:Array.from(document.querySelectorAll('a')).slice(0,80).map(e=>({text:e.innerText.slice(0,160),href:e.href})),buttons:Array.from(document.querySelectorAll('button')).slice(0,80).map(e=>e.innerText.slice(0,160)),needsLogin:Array.from(document.querySelectorAll('input[type=password]')).some(e=>e.getClientRects().length>0)})",'returnByValue':True},b.session)
             return web.json_response({'observation':json.loads(text['result']['value'])})
+        elif name=='type':
+            selector=json.dumps(str(data.get('selector',''))[:500])
+            expression=f"(() => {{ const e=document.querySelector({selector}); if (!e || e.type==='password' || e.autocomplete==='one-time-code' || !['INPUT','TEXTAREA'].includes(e.tagName)) return false; e.focus(); return true; }})()"
+            focused=await b.rpc('Runtime.evaluate',{'expression':expression,'returnByValue':True},b.session)
+            if focused.get('result',{}).get('value') is not True:raise web.HTTPForbidden()
+            await b.rpc('Input.insertText',{'text':str(data.get('text',''))[:2000]},b.session)
+        elif name=='key':
+            key=data.get('key')
+            if key not in ('Enter','Tab','Escape','ArrowDown','ArrowUp'):raise web.HTTPBadRequest()
+            await b.rpc('Input.dispatchKeyEvent',{'type':'keyDown','key':key},b.session)
+            await b.rpc('Input.dispatchKeyEvent',{'type':'keyUp','key':key},b.session)
         elif name=='click':
             # Selector comes from the bot; irreversible actions still require approval in its harness.
             selector=json.dumps(str(data.get('selector',''))[:500])

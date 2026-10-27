@@ -268,7 +268,7 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
   if (!issue) return { error: 'issueNotFound' }
   try {
     const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, idempotencyKey: `coordinator:${toolCallId}` })
-    await (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, { userId, workspaceId: target.workspaceId }, result.runId)
+    if (process.env.MIKKA_CLOUD_THREAD_MACHINES === '1') await (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, { userId, workspaceId: target.workspaceId }, result.runId)
     return { ...result, botId: input.botId, task: issue.title, status: 'queued' as const }
   } catch { return { error: 'cloudComputerUnavailable' } }
 }

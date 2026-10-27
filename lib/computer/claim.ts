@@ -33,10 +33,14 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     if (policy?.permission === 'deny') { await client.query('COMMIT'); return null }
     const run = (await client.query('SELECT id,"agentId" FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND "userId"=$3 AND status=$4 AND "stopRequestedAt" IS NULL FOR UPDATE', [runId, deviceId, actor.userId, 'queued'])).rows[0]
     if (!run) { await client.query('COMMIT'); return null }
-    const binding = (await client.query(`SELECT b."botId",1 AS display FROM computer_run_bindings b
+    const binding = process.env.MIKKA_CLOUD_THREAD_MACHINES === '1' ? (await client.query(`SELECT b."botId",1 AS display FROM computer_run_bindings b
       JOIN thread_machines m ON m."runId"=b."runId" AND m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId" AND m."deviceId"=$2
       JOIN devices dev ON dev.id=m."deviceId" AND dev."ownerId"=b."ownerId" AND dev.kind='cloud' AND dev.enabled=true
-      WHERE b."runId"=$1 AND b."workspaceId"=$3 AND b."ownerId"=$4 AND m.state IN ('starting','running')`, [runId, deviceId, actor.workspaceId, actor.userId])).rows[0]
+      WHERE b."runId"=$1 AND b."workspaceId"=$3 AND b."ownerId"=$4 AND m.state IN ('starting','running')`, [runId, deviceId, actor.workspaceId, actor.userId])).rows[0] : (await client.query(`SELECT b."botId",d.display FROM computer_run_bindings b
+      JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId" AND m."deviceId"=$2
+      JOIN devices dev ON dev.id=m."deviceId" AND dev."ownerId"=b."ownerId" AND dev.kind='cloud' AND dev.enabled=true
+      JOIN bot_desktops d ON d."botId"=b."botId" AND d."workspaceId"=b."workspaceId" AND d."ownerId"=b."ownerId"
+      WHERE b."runId"=$1 AND b."workspaceId"=$3 AND b."ownerId"=$4`, [runId, deviceId, actor.workspaceId, actor.userId])).rows[0]
     if (!binding) { await client.query('COMMIT'); return null }
     const subscription = await client.query('SELECT 1 FROM byos_bindings WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "consumerId"=$4', [subscriptionBindingId, actor.userId, actor.workspaceId, run.agentId])
     if (!subscription.rowCount) { await client.query('COMMIT'); return null }
