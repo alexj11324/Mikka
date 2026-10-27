@@ -443,6 +443,10 @@ export class RunSupervisor {
       error: null,
       updatedAt: new Date().toISOString(),
     })
+    if (assignment.computer) {
+      const task = assignment.prompt.split('\n')[0].replace(/^#\s*/, '').trim().slice(0, 200) || 'Task'
+      this.emit(assignment.runId, { type: 'data-computer', data: { botId: assignment.computer.botId, runId: assignment.runId, task, state: 'working' } })
+    }
     if (assignment.leaseExpiresAt)
       this.leases.set(assignment.runId, Date.parse(assignment.leaseExpiresAt))
     this.launch(assignment.runId, repo)

@@ -13,6 +13,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } fro
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { AgentMarkdown } from './agent-markdown'
+import { ComputerCard } from '@/components/computer/computer-card'
 import { ThreadStatus, harnessLabel } from './issue-threads'
 import { cn } from '@/lib/utils'
 
@@ -34,7 +35,7 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
   const [sendFailed, setSendFailed] = useState(false)
   const detail = data?.thread.detail
   const active = !!data && runIsActive(data.thread.status)
-  const items = data ? threadItems(data.chunks, data.messages) : []
+  const items = data ? threadItems(data.chunks, data.messages, runId) : []
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
@@ -72,6 +73,7 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
               {item.kind === 'agent' && <div className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>}
               {item.kind === 'steps' && <span className="flex items-center gap-1 text-xs text-muted-foreground"><ChevronRight className="size-3.5" aria-hidden="true" />{t('steps', { harness: harnessLabel(detail?.harness ?? ''), count: item.count })}</span>}
               {item.kind === 'error' && <p role="alert" className="text-xs text-destructive">{item.text}</p>}
+              {item.kind === 'computer' && <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : data.thread.status === 'succeeded' ? 'done' : 'failed'} />}
               {item.kind === 'person' && (item.mine
                 // R-14: your own words are the blue bubble on the right.
                 ? <p className={cn(BUBBLE, 'self-end bg-sidebar-primary text-sidebar-primary-foreground')}>{item.text}</p>

@@ -247,6 +247,12 @@ The test was repeated with a run-wide grant: the first screenshot was approved
 for that run, and its later click was automatically approved on the same Bot
 desktop. A different run on the same desktop still needs its own decision.
 
+The scoped task endpoint now queues a run and its Bot binding in one database
+transaction. A trusted cloud worker emits a `data-computer` event, and the
+server checks it against the scoped device and stored Bot binding before the
+thread can render its computer card. PostgreSQL and source tests cover these
+bindings; the signed-in UI and deployed request path still need acceptance.
+
 Development and production databases also have the additive cloud-device-scope
 migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
 expiry validation, rotation and the Bot's pending-review state. The worker
