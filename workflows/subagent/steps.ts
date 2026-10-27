@@ -12,15 +12,16 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
   }
   if (row.status === 'queued' || row.status === 'needs_you') return 'waiting'
   try {
-    let observation = await store.action(actor, botId, id, { action: 'observe' })
+    const observation = await store.action(actor, botId, id, { action: 'observe' })
     // A task's explicit starting URL needs no model round on an empty page.
-    if ((observation.observation as { url?: string })?.url === 'about:blank') {
+    if (['about:blank', 'nullblank'].includes((observation.observation as { url?: string })?.url ?? '')) {
       const initial = row.task.match(/https?:\/\/[^\s<>"')]+/)?.[0]
       if (initial) {
         const url = new URL(initial)
         if (url.username || url.password) throw new Error('Invalid starting URL')
         await store.action(actor, botId, id, { action: 'navigate', url: url.toString() })
-        observation = await store.action(actor, botId, id, { action: 'observe' })
+        // Observe on the next durable turn after the navigation has loaded.
+        return 'running'
       }
     }
     const page = observation.observation as { needsLogin?: boolean; url?: string }
