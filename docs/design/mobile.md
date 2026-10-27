@@ -44,14 +44,28 @@ Drawer, top to bottom:
 The Coordinator is the first ordinary row in the drawer and the default
 screen; it gets no other special UI (R-06).
 
-**线程 screen** (like ChatGPT's Codex screen):
+**线程 screen** (like the Claude app's Code screen):
 
-- Filter chips: 全部 · Mikka Cloud · 本机 · Remote (R-23 order); an online
-  machine has a green dot (R-24).
-- Sections 置顶 and 今天, then older. A running thread shows a spinner; one
-  waiting on the person shows the orange dot (R-13) and sorts first.
-- A floating composer at the bottom dispatches work through the Coordinator
-  (R-10: one composer).
+- A thread row is a status icon, the thread name, and one grey line (状态 ·
+  bot · machine or PR). Never the bot's bloub avatar (glossary). Icons: grey
+  spinner 进行中, hollow circle 等你回复, PR icon 待审阅, red alert 失败, grey
+  check 完成. Rows waiting on the person carry a blue unread dot on the right.
+- 设备 chips at the top (Mikka Cloud, Mac, …); an online machine has a green
+  dot (R-24). Tapping one filters the list.
+- The filter button (top right) opens a menu: 全部 · 等你回复 · 待审阅 ·
+  进行中 · 已完成 · 已归档.
+- Bottom: a search button and a 「新线程」 pill, which opens the composer to
+  dispatch work through the Coordinator.
+
+**Chat** (like the Claude app): the header is the bot's name in a pill; the
+right button opens that bot's threads and carries a blue dot when one waits
+on the person. The bot's replies are plain text without a bubble (this
+differs from the web's grey bubble, R-14; Alex to confirm for mobile). The
+thread card is a status icon and the thread name, with outputs as chips
+(R-66); no step line.
+
+Colour is restrained: grey spinners and checks; blue only for unread dots
+and send; red only for failure; green only for an online machine.
 
 Things waiting on the person have no screen of their own: proactive cards sit
 in the Coordinator chat (unread dot on its drawer row), and waiting threads
