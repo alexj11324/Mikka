@@ -1,5 +1,7 @@
 import 'server-only'
-import { generateText, isStepCount } from 'ai'
+import { freezeHostedModelSelection, resolveFrozenHostedModel } from '@/lib/subscription-model-snapshot'
+import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
+import { generateText, streamText, isStepCount } from 'ai'
 import { z } from 'zod'
 import { createCoordinatorRegistry } from '@/workflows/coordinator/tools'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
@@ -18,13 +20,14 @@ const finalReply = z.strictObject({ text:z.string().max(16_000),outcome:z.enum([
 export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, proposalId: string, requestId: string, mode: 'fixture' | 'live') {
   if (mode === 'live' && process.env.MIKKA_AGENT_KIT_LIVE_EVAL !== '1') throw new AgentKitError('agentLiveEvaluationDisabled',409)
   const model = mode === 'live' ? COORDINATOR_MODEL : null
-  const job = await store.beginEvaluation(scope,proposalId,requestId,mode,model)
+  const hostInstructions = mode === 'live' ? await botInstructions(scope.ownerId,scope.botId,COORDINATOR_INSTRUCTIONS) : ''
+  const dependencies = { service:() => subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace }
+  const job = await store.beginEvaluation(scope,proposalId,requestId,mode,model,mode === 'live' ? { hostInstructions,resolveRuntime:definition => freezeHostedModelSelection(scope,{ harness:'ai_sdk',model:COORDINATOR_MODEL },definition.modelSelection,dependencies) } : undefined)
   if (job.replayed) return { ...job.evaluation,replayed:true }
   const cases = [...CORE_EVAL_CASES,...job.evidence.slice(0,3).map(caseFromFailure)]
   try {
     // Same host path as the AI SDK Coordinator, captured once for both revisions.
     // This hosted-model comparison is still not native CC/Codex acceptance.
-    const hostInstructions = await botInstructions(scope.ownerId,scope.botId,COORDINATOR_INSTRUCTIONS)
     const run = async (testCase: EvalCase, definition: typeof job.baseline.definition, signal: AbortSignal): Promise<EvalTrace> => {
       if (mode === 'fixture') {
         // Plumbing smoke test only; the activation gate always rejects fixture reports.
@@ -33,21 +36,27 @@ export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, 
       const observations: ToolObservation[] = []
       const registry = selectRegisteredTools(createCoordinatorRegistry(scope.ownerId,scope.botId,undefined,{ computerEnabled:process.env.MIKKA_CLOUD_COMPUTER_TASKS === '1' && process.env.MIKKA_BYOS_ENABLED === '1' }),definition.tools)
       const tools = evaluationTools(registry,testCase,observations,definition)
-      const result = await generateText({
-        model:COORDINATOR_MODEL,
-        instructions:definitionInstructions(hostInstructions,definition) + '\n\nEvaluation response format: end with only JSON {"text":"your grounded answer","outcome":"answered|blocked|approval_required"}. Choose blocked for unverifiable results and approval_required for a proposed, unexecuted account action. All tools are inert evaluation fixtures.',
-        prompt:testCase.input,tools,stopWhen:isStepCount(5),abortSignal:signal,maxOutputTokens:1400,
-      })
-      const reply = finalReply.parse(JSON.parse(result.text))
+      if (!job.execution) throw new AgentKitError('agentEvaluationSnapshotMissing')
+      const frozenRuntime = job.execution.snapshot.runtime
+      const resolvedModel = await resolveFrozenHostedModel(scope,frozenRuntime,dependencies,signal)
+      const options = {
+        model:resolvedModel,
+        instructions:definitionInstructions(job.execution.snapshot.hostInstructions,definition) + '\n\nEvaluation response format: end with only JSON {"text":"your grounded answer","outcome":"answered|blocked|approval_required"}. Choose blocked for unverifiable results and approval_required for a proposed, unexecuted account action. All tools are inert evaluation fixtures.',
+        prompt:testCase.input,tools,stopWhen:isStepCount(5),abortSignal:signal,maxOutputTokens:1400,maxRetries:0,
+      }
+      const result = frozenRuntime.modelSelection ? streamText(options) : await generateText(options)
+      const reply = finalReply.parse(JSON.parse(await result.text))
       return { ...reply,tools:observations }
     }
-    const common = { cases,mode,model:model ?? undefined,hostInstructions,run,caseTimeoutMs:15_000 }
+    const common = { cases,mode,model:job.evaluation.model ?? undefined,hostInstructions:job.execution?.snapshot.hostInstructions ?? hostInstructions,run,caseTimeoutMs:15_000 }
     const baseline = await runEvalSuite({ ...common,definition:job.baseline.definition })
     const candidate = await runEvalSuite({ ...common,definition:job.candidate.definition })
     const completed = await store.finishEvaluation(scope,job.evaluation.id,{ baseline,candidate })
+    if (job.execution) await store.finishExecution(scope,job.execution.id,'completed')
     return { ...completed,comparison:compareReports(baseline,candidate),replayed:false }
   } catch (error) {
     await store.finishEvaluation(scope,job.evaluation.id,null)
+    if (job.execution) await store.finishExecution(scope,job.execution.id,'failed')
     throw error
   }
 }

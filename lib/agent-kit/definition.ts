@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
+import { agentModelSourceSchema } from '../agent-model'
+import type { HostedRuntimeSnapshot } from '../subscription-model-snapshot'
 import { AGENT_HOOK_IDS, AGENT_TOOL_IDS } from './registry'
 
 export const MAX_DEFINITION_BYTES = 256_000
@@ -20,6 +22,7 @@ export const agentDefinitionSchema = z.strictObject({
   hooks: z.array(z.enum(AGENT_HOOK_IDS)).max(2),
   memory: z.strictObject({ scope: z.literal('owner-bot') }),
   evalSuite: z.literal('mikka.core.v1'),
+  modelSelection: agentModelSourceSchema.optional(),
 }).superRefine((value, ctx) => {
   for (const key of ['tools', 'hooks'] as const) {
     if (new Set(value[key]).size !== value[key].length) ctx.addIssue({ code: 'custom', path: [key], message: 'Duplicate capability' })
@@ -78,7 +81,7 @@ export interface DefinitionSnapshot {
   hostInstructions: string
   hostInstructionsDigest: string
   effectiveTools: string[]
-  runtime: { harness: string; model: string | null }
+  runtime: HostedRuntimeSnapshot
 }
 export function makeSnapshot(revisionId: string, revision: number, input: unknown, hostInstructions: string, runtime: DefinitionSnapshot['runtime']): DefinitionSnapshot {
   const definition = parseDefinition(input)

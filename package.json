@@ -72,7 +72,8 @@
     "test:byos": "node --import ./scripts/server-test.mjs --import tsx --test lib/infisical-workload.test.ts lib/subscription-access-snapshot.test.ts lib/subscription-model.test.ts lib/subscription-enrollment.test.ts lib/subscription-enrollment-bind.test.ts lib/subscription-enrollment-binding-proof.test.ts lib/subscription-enrollment-handoff.test.ts lib/subscription-enrollment-policy.test.ts lib/subscription-ui.test.ts",
     "test:byos-worker": "node scripts/test-subscription-worker.mjs",
     "test:slack": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/slack/webhook.test.ts lib/slack/owner.test.ts tests/slack-bot.test.mjs",
-    "test:agent-kit-compat": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-kit/main-compat.test.ts lib/agent-kit/registry-compat.test.ts"
+    "test:agent-kit-compat": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-kit/main-compat.test.ts lib/agent-kit/registry-compat.test.ts && pnpm test:agent-kit-model",
+    "test:agent-kit-model": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-execution-model.test.ts lib/subscription-model-snapshot.test.ts lib/subscription-workflow-model.test.ts lib/subscription-workflow-turn.test.ts lib/agent-kit/hosted-replay.test.ts lib/agent-kit/live-eval-disabled.test.ts lib/agent-kit/core-entry.test.ts lib/agent-kit/disabled-entry.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",
@@ -117,6 +118,7 @@
     "@tiptap/y-tiptap": "^3.0.10",
     "@vercel/analytics": "1.3.1",
     "@vercel/oidc": "^4.0.2",
+    "@workflow/serde": "5.0.0",
     "ai": "7.0.148",
     "aws4fetch": "1.0.20",
     "beautiful-mermaid": "^1.1.3",

@@ -111,13 +111,14 @@ export class AgentKitStore {
       return target
     })
   }
-  async beginExecution(scope: AgentScope, executionKey: string, hostInstructions: string, runtime: DefinitionSnapshot['runtime'], defaults: AgentDefinition): Promise<AgentExecution> {
+  async beginExecution(scope: AgentScope, executionKey: string, hostInstructions: string, runtime: DefinitionSnapshot['runtime'] | ((definition: AgentDefinition) => Promise<DefinitionSnapshot['runtime']>), defaults: AgentDefinition): Promise<AgentExecution> {
     z.string().min(1).max(240).parse(executionKey)
     return this.transaction(async client => {
       const current = await this.head(client,scope,defaults)
       const existing = await client.query<AgentExecution>('select id,snapshot,status from agent_kit_executions where owner_id=$1 and bot_key=$2 and execution_key=$3',[...params(scope),executionKey])
       if (existing.rows[0]) return existing.rows[0]
-      const id = randomUUID(); const snapshot = makeSnapshot(current.id,current.version,current.definition,hostInstructions,runtime)
+      const resolvedRuntime = typeof runtime === 'function' ? await runtime(current.definition) : runtime
+      const id = randomUUID(); const snapshot = makeSnapshot(current.id,current.version,current.definition,hostInstructions,resolvedRuntime)
       await client.query('insert into agent_kit_executions(id,owner_id,bot_key,execution_key,version_id,snapshot) values($1,$2,$3,$4,$5,$6)',[id,...params(scope),executionKey,current.id,JSON.stringify(snapshot)])
       return { id,snapshot,status:'running' }
     })
@@ -200,7 +201,7 @@ export class AgentKitStore {
   async proposals(scope: AgentScope) {
     return this.transaction(async client => { await this.authority(client,scope); return (await client.query<ImprovementProposal>('select * from agent_kit_proposals where owner_id=$1 and bot_key=$2 order by created_at desc limit 100',params(scope))).rows })
   }
-  async beginEvaluation(scope: AgentScope, proposalId: string, requestId: string, mode: 'fixture' | 'live', model: string | null) {
+  async beginEvaluation(scope: AgentScope, proposalId: string, requestId: string, mode: 'fixture' | 'live', model: string | null, hosted?: { hostInstructions: string; resolveRuntime(definition: AgentDefinition): Promise<DefinitionSnapshot['runtime']> }) {
     uuid(proposalId);uuid(requestId)
     return this.transaction(async client => {
       await this.authority(client,scope)
@@ -209,13 +210,25 @@ export class AgentKitStore {
       if (!proposal) throw new AgentKitError('agentProposalNotFound',404)
       const prior = await client.query<EvaluationRecord>('select * from agent_kit_evaluations where owner_id=$1 and bot_key=$2 and request_key=$3',[...params(scope),requestId])
       if (prior.rows[0]) {
-        if (prior.rows[0].proposal_id !== proposalId || prior.rows[0].mode !== mode || prior.rows[0].model !== model) throw new AgentKitError('agentRequestConflict')
+        if (prior.rows[0].proposal_id !== proposalId || prior.rows[0].mode !== mode || (!hosted && prior.rows[0].model !== model)) throw new AgentKitError('agentRequestConflict')
         return { replayed:true as const, evaluation:prior.rows[0] }
       }
       if (proposal.status !== 'proposed') throw new AgentKitError('agentProposalClosed')
+      const baseline = await this.version(client,scope,proposal.baseline_id)
+      const candidate = await this.version(client,scope,proposal.candidate_id)
+      let execution: AgentExecution | undefined
+      if (hosted) {
+        if (mode !== 'live' || canonicalJSON(baseline.definition.modelSelection ?? null) !== canonicalJSON(candidate.definition.modelSelection ?? null)) throw new AgentKitError('agentEvaluationMismatch')
+        const runtime = await hosted.resolveRuntime(baseline.definition)
+        const snapshot = makeSnapshot(baseline.id,baseline.version,baseline.definition,hosted.hostInstructions,runtime)
+        const executionId = randomUUID()
+        await client.query('insert into agent_kit_executions(id,owner_id,bot_key,execution_key,version_id,snapshot) values($1,$2,$3,$4,$5,$6)',[executionId,...params(scope),`evaluation:${requestId}`,baseline.id,JSON.stringify(snapshot)])
+        execution = { id:executionId,snapshot,status:'running' }
+        model = runtime.model
+      }
       const id=randomUUID()
       await client.query('insert into agent_kit_evaluations(id,owner_id,bot_key,proposal_id,request_key,mode,model) values($1,$2,$3,$4,$5,$6,$7)',[id,...params(scope),proposalId,requestId,mode,model])
-      return { replayed:false as const, evaluation:{ id,proposal_id:proposalId,mode,model,status:'running' as const,reports:null }, baseline:await this.version(client,scope,proposal.baseline_id),candidate:await this.version(client,scope,proposal.candidate_id),evidence:proposal.evidence }
+      return { replayed:false as const, evaluation:{ id,proposal_id:proposalId,mode,model,status:'running' as const,reports:null }, baseline,candidate,evidence:proposal.evidence,execution }
     })
   }
   async finishEvaluation(scope: AgentScope, id: string, reports: EvaluationRecord['reports']) {

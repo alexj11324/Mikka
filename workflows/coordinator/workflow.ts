@@ -1,4 +1,4 @@
-import { WorkflowAgent } from '@ai-sdk/workflow'
+import { runHostedWorkflowTurn } from '@/lib/subscription-workflow-turn'
 import { isStepCount } from 'ai'
 import { getWorkflowMetadata } from 'workflow'
 import { COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
@@ -32,8 +32,9 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
     try {
       const selected = await native.runtime(userId)
       execution = await kit.beginAgentExecution(userId,botId,holder,round,selected)
+      if (execution && execution.snapshot.runtime.harness !== selected.harness) throw new Error('agent_runtime_changed')
       const result = selected.harness === 'ai_sdk'
-        ? await new WorkflowAgent({ model:COORDINATOR_MODEL,tools:coordinatorTools(userId,botId,undefined,{ execution,computerEnabled }) }).generate({ ...(await steps.preparePrompt(userId,botId,execution?.snapshot)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep })
+        ? await runHostedWorkflowTurn(execution?.snapshot.runtime ?? { harness:'ai_sdk',model:COORDINATOR_MODEL },coordinatorTools(userId,botId,undefined,{ execution,computerEnabled }),{ ...(await steps.preparePrompt(userId,botId,execution?.snapshot)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep })
         : await nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scope,{ execution,computerEnabled }),botId,execution?.snapshot)
       const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
       await steps.appendMessages(userId,holder,result.responseMessages,quiet ? null : turnWarning(result.finishReason,result.text),botId)

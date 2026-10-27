@@ -1,3 +1,5 @@
+import { freezeHostedModelSelection } from '@/lib/subscription-model-snapshot'
+import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
 import type { CoordinatorRuntime } from '@mikka/protocol/coordinator'
 import { agentKitEnabled, agentKitStore, agentScope } from '@/lib/agent-kit/service'
 import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
@@ -15,7 +17,8 @@ export async function beginAgentExecution(userId: string, botId: string | null, 
   if (!agentKitEnabled()) return null
   const scope = await agentScope(userId,botId)
   const instructions = await botInstructions(userId,botId,runtime.harness === 'ai_sdk' ? COORDINATOR_INSTRUCTIONS : personalCoordinatorInstructions())
-  return agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,{ harness:runtime.harness,model:runtime.harness === 'ai_sdk' ? COORDINATOR_MODEL : ('model' in runtime ? runtime.model ?? null : null) },DEFAULT_AGENT_DEFINITION)
+  const configured = { harness:runtime.harness,model:runtime.harness === 'ai_sdk' ? COORDINATOR_MODEL : ('model' in runtime ? runtime.model ?? null : null) }
+  return agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,definition => freezeHostedModelSelection(scope,configured,definition.modelSelection,{ service:() => subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace }),DEFAULT_AGENT_DEFINITION)
 }
 export async function beforeAgentTool(userId: string, botId: string | null, executionId: string, callId: string, name: string, nativeScope?: NativeToolScope) {
   'use step'
