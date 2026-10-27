@@ -23,7 +23,7 @@ export async function computerState(id: string) {
 
 /** Keep a machine with an active daemon alive; inactivity still expires it. */
 export async function renewComputerLifetime(id: string) {
-  await Sandbox.setTimeout(id, lifetime, options())
+  await Sandbox.setTimeout(id, lifetime, { ...options(), requestTimeoutMs: 10_000 })
 }
 
 /** Template is built from scripts/e2b/bootstrap.sh, never a third-party CUA image. */

@@ -45,9 +45,8 @@ export async function reconcileSubagents(pool: Pool) {
     JOIN bot_subagents s ON s."workspaceId"=m."workspaceId" AND s."ownerId"=m."ownerId"
     WHERE m.state='running' AND m."sandboxId" IS NOT NULL AND s.state IN ('running','needs_you') AND s."stopRequestedAt" IS NULL
     ORDER BY m."lastActiveAt" LIMIT 50`)
-  for (const row of activeMachines.rows) {
-    try { await renewBotLifetime(pool, { userId: row.ownerId, workspaceId: row.workspaceId }) } catch { failed++ }
-  }
+  const renewals = await Promise.allSettled(activeMachines.rows.map(row => renewBotLifetime(pool, { userId: row.ownerId, workspaceId: row.workspaceId })))
+  failed += renewals.filter(result => result.status === 'rejected').length
   const pending = await pool.query(`SELECT s.id,s."botId",s."ownerId",s."workspaceId" FROM bot_subagents s
     WHERE s.state IN ('running','needs_you') AND s."stopRequestedAt" IS NOT NULL ORDER BY s."stopRequestedAt" LIMIT 1`)
   for (const row of pending.rows) {
