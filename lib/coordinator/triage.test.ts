@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { chatItems, eventPrompt } from './context'
 import { ATTENTION_THRESHOLD, eventsForInbox, ruleTier, tierFromDecision, triageQuestions, triageState } from './triage'
+import { briefingEvent } from '@/lib/coordinator-events'
 
 const run = (payload: Record<string, unknown>) => ({ kind: 'run_finished' as const, payload: { stopReason: 'submitted', ...payload } })
 
@@ -61,4 +62,24 @@ test('worker events: questions and blocks need the person, reports go to the mod
 test('a worker question tells the Coordinator to relay the answer', () => {
   const text = eventPrompt({ kind: 'run_question', issueId: null, runId: 'r2', payload: { question: 'Keep v1?', options: ['Yes', 'No'] }, tier: 'attention' })
   assert.match(text, /asks the person: Keep v1\?\nOptions: Yes \/ No\n.*send_to_run/)
+})
+
+test('the morning briefing is pushed to the person once a day', () => {
+  const event = briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'daily', total: 4, counts: { gmail: 3, linear: 1 } }, [
+    { source: 'linear', action: 'handle', title: 'Fix login', actor: 'Dana', url: 'https://linear.app/x/issue/MIK-9', required: true },
+    { source: 'gmail', action: 'reply', title: 'Thursday agenda', actor: null, url: null, required: false },
+  ])
+  assert.equal(event.dedupeKey, 'daily_briefing:u1:2026-10-27:daily')
+  assert.notEqual(briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'first', total: 1, counts: {} }, []).dedupeKey, event.dedupeKey)
+  const tier = ruleTier(event)
+  assert.equal(tier, 'attention')
+  const prompt = eventPrompt({ ...event, tier })
+  assert.match(prompt, /^\[Event\] It is 08:00 for the person: their morning briefing for 2026-10-27\. 4 item\(s\)/)
+  assert.match(prompt, /gmail 3, linear 1/)
+  assert.match(prompt, /- linear · handle · assigned to them: "Fix login" from Dana \(https:\/\/linear\.app\/x\/issue\/MIK-9\)/)
+  assert.match(prompt, /do not act until they say so/)
+  // The person sees it as an event, without the triage line.
+  const [item] = chatItems([{ position: 1, createdAt: new Date(0), message: { role: 'user', content: prompt } }])
+  assert.equal(item.from, 'event')
+  assert.doesNotMatch(item.text, /Triage:/)
 })

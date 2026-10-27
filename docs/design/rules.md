@@ -76,7 +76,9 @@ source wins in a conflict is in [`README.md`](README.md).
   It is not a flat list of the board's issues. The suggestion flow: the
   decision model picks an item → it appears in 建议 → clicking it fills the
   centre composer → the bot dispatches a thread → the item leaves 建议 and
-  shows up below as a 任务.
+  shows up below as a 任务. The daily briefing is not in 建议: the
+  Coordinator pushes it into its chat at 08:00 the person's time, and right
+  after they connect an app.
 - **R-22** Tasks are never created on the board itself: no column `+`, no
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog

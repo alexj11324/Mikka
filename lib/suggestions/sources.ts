@@ -107,7 +107,7 @@ async function currentLinear(userId: string): Promise<ExternalNotification[]> {
 /**
  * Runs right after the person connects an app: subscribes its triggers, reads
  * what is there now, judges it like any webhook, and writes the first
- * briefing. Never throws; a source that fails just adds nothing.
+ * briefing, which the Coordinator then delivers in its chat. Never throws; a source that fails just adds nothing.
  */
 export async function bootstrapSuggestions(userId: string, app: 'composio' | 'linear', timeZone: string | null) {
   const read = async <T,>(label: string, load: () => Promise<T[]>): Promise<T[]> => {
@@ -123,7 +123,8 @@ export async function bootstrapSuggestions(userId: string, app: 'composio' | 'li
       ? await read('Linear', () => currentLinear(userId))
       : (await read('Composio', () => ensureComposioTriggers(userId, { force: true }))).includes('gmail') ? await read('Gmail', () => currentGmail(userId)) : []
     await ingestNotifications(notifications)
-    await writeFirstBriefing(userId, timeZone)
+    // Loaded here so the webhook routes that import this module do not pull in the Coordinator workflow.
+    if (await writeFirstBriefing(userId, timeZone)) await (await import('@/lib/coordinator/wake')).wakeCoordinator(userId)
   } catch (error) {
     console.error('First briefing failed', error instanceof Error ? error.message : error)
   }

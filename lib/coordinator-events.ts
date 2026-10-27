@@ -120,6 +120,21 @@ export function runBlockedEvent(run: WorkerRun, reason: string): CoordinatorEven
   return workerEvent('run_blocked', run, { reason })
 }
 
+/** One item a briefing names, as the Coordinator reads it. */
+export interface BriefingEventItem { source: string; action: string; title: string; actor: string | null; url: string | null; required: boolean }
+
+/**
+ * The person's briefing is ready: the daily one at 08:00 their time, or the
+ * first one after they connect an app. One event per briefing kind and local
+ * date, so a rerun of the cron does not push it twice.
+ */
+export function briefingEvent(briefing: { userId: string; localDate: string; kind: 'first' | 'daily'; total: number; counts: Record<string, number> }, items: readonly BriefingEventItem[]): CoordinatorEventInput {
+  return {
+    userId: briefing.userId, kind: 'daily_briefing', dedupeKey: `daily_briefing:${briefing.userId}:${briefing.localDate}:${briefing.kind}`, issueId: null, runId: null,
+    payload: { localDate: briefing.localDate, briefingKind: briefing.kind, total: briefing.total, counts: briefing.counts, items },
+  }
+}
+
 /** The person approved or declined something an agent proposed in their accounts (lib/pending-actions.ts). */
 export function actionDecidedEvent(
   action: { id: string; userId: string; action: string; input: Record<string, unknown> },

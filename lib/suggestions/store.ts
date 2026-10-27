@@ -3,6 +3,8 @@ import { and, desc, eq, gte, inArray, isNull, lt, ne, or } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { decide } from '@/lib/coordinator/decide'
 import { decisionInput } from '@/lib/coordinator/decision'
+import { briefingEvent } from '@/lib/coordinator-events'
+import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { db } from '@/lib/db'
 import { briefings, suggestions, userTimeZones } from '@/lib/db/schema'
 import { BRIEFING_HOUR, BRIEFING_WINDOW_MS, briefingContent, dueBriefingZones, localClock, localDate, localInstant, safeTimeZone } from './briefing'
@@ -64,9 +66,23 @@ const shown = (row: Briefing | undefined) => row && !(row.kind === 'daily' && !r
 const pending = (row: Briefing | undefined, dueAt: Date) => !row || (row.kind === 'first' && row.createdAt < dueAt)
 
 /**
+ * Hands a briefing with something in it to the Coordinator, which writes it to
+ * the person in its chat (R-21). The event's dedupe key keeps it to one push
+ * per briefing kind and local date. True when there was something to push;
+ * the caller then wakes the Coordinator.
+ */
+async function pushBriefing(row: Briefing): Promise<boolean> {
+  if (!row.total) return false
+  const items = (await briefingHighlights(row.userId, row.highlights)).map(item => ({ source: item.source, action: item.action, title: item.title, actor: item.actor, url: item.url, required: item.required }))
+  await recordCoordinatorEvent(db, briefingEvent({ ...row, counts: row.counts as Record<string, number> }, items))
+  return true
+}
+
+/**
  * Writes the daily briefing from the last 24 hours, also when it is empty, so
- * each local date gets at most one. It replaces only a `first` briefing
- * written before `dueAt`. Null when another writer got there first.
+ * each local date gets at most one, and pushes it. It replaces only a `first`
+ * briefing written before `dueAt`. `saved` is null when another writer got
+ * there first.
  */
 async function writeDailyBriefing(userId: string, timeZone: string, dueAt: Date, now: Date) {
   const row = await briefingRow(userId, timeZone, 'daily', now)
@@ -75,16 +91,18 @@ async function writeDailyBriefing(userId: string, timeZone: string, dueAt: Date,
     set: { kind: row.kind, timeZone: row.timeZone, highlights: row.highlights, counts: row.counts, total: row.total, createdAt: now },
     setWhere: and(eq(briefings.kind, 'first'), lt(briefings.createdAt, dueAt)),
   }).returning()
-  return saved ?? null
+  return { saved: saved ?? null, pushed: saved ? await pushBriefing(saved) : false }
 }
 
 /**
  * The person's current briefing. The briefings cron writes the daily one at
  * 08:00 their time; this is the fallback when it has not run yet. Before
  * 08:00 it is the latest briefing from the last day (yesterday's, or one
- * written on connecting an app), so nothing is written early.
+ * written on connecting an app), so nothing is written early. `onPushed`
+ * runs when this read wrote the day's briefing and queued it for the
+ * Coordinator, so the caller can wake it.
  */
-export async function todaysBriefing(userId: string, timeZoneName: string | null) {
+export async function todaysBriefing(userId: string, timeZoneName: string | null, { onPushed }: { onPushed?: () => void } = {}) {
   const timeZone = safeTimeZone(timeZoneName)
   const now = new Date()
   const { date: today, hour } = localClock(timeZone, now)
@@ -96,7 +114,9 @@ export async function todaysBriefing(userId: string, timeZoneName: string | null
   const existing = await todays()
   const dueAt = localInstant(timeZone, today, BRIEFING_HOUR)
   if (!pending(existing, dueAt)) return shown(existing)
-  return shown(await writeDailyBriefing(userId, timeZone, dueAt, now) ?? await todays())
+  const { saved, pushed } = await writeDailyBriefing(userId, timeZone, dueAt, now)
+  if (pushed) onPushed?.()
+  return shown(saved ?? await todays())
 }
 
 /**
@@ -121,7 +141,8 @@ const BRIEFING_CONCURRENCY = 8
  * who has none for today yet. Running every 15 minutes, a person's briefing
  * lands within 15 minutes of 08:00; a missed or cut-short run is caught up by
  * the next one the same local day. Safe to run concurrently: the
- * (userId, localDate) key keeps it to one per day.
+ * (userId, localDate) key keeps it to one per day. `pushed` lists the people
+ * whose briefing was queued for the Coordinator; the caller wakes them.
  */
 export async function writeDueBriefings({ now = new Date(), limit = 500, deadline = Infinity }: { now?: Date; limit?: number; deadline?: number } = {}) {
   const zones = (await db.selectDistinct({ timeZone: userTimeZones.timeZone }).from(userTimeZones)).map(row => row.timeZone)
@@ -135,12 +156,14 @@ export async function writeDueBriefings({ now = new Date(), limit = 500, deadlin
     people.push(...rows.map(row => ({ userId: row.userId, timeZone: zone.timeZone, dueAt: zone.dueAt })))
   }
   const result = { zones: zones.length, due: Math.min(people.length, limit), written: 0, empty: 0, skipped: 0, failed: 0, deferred: Math.max(0, people.length - limit) }
+  const pushed: string[] = []
   const batch = people.slice(0, limit)
   for (let index = 0; index < batch.length; index += BRIEFING_CONCURRENCY) {
     if (Date.now() > deadline) { result.deferred += batch.length - index; break }
     await Promise.all(batch.slice(index, index + BRIEFING_CONCURRENCY).map(async person => {
       try {
-        const saved = await writeDailyBriefing(person.userId, person.timeZone, person.dueAt, now)
+        const { saved, pushed: queued } = await writeDailyBriefing(person.userId, person.timeZone, person.dueAt, now)
+        if (queued) pushed.push(person.userId)
         if (!saved) result.skipped++
         else if (saved.total) result.written++
         else result.empty++
@@ -150,13 +173,17 @@ export async function writeDueBriefings({ now = new Date(), limit = 500, deadlin
       }
     }))
   }
-  return result
+  return { result, pushed }
 }
 
-/** Writes the briefing right after the person connects an app, replacing today's. */
+/**
+ * Writes the briefing right after the person connects an app, replacing
+ * today's, and queues it for the Coordinator. True when it was queued.
+ */
 export async function writeFirstBriefing(userId: string, timeZoneName: string | null) {
   const row = await briefingRow(userId, safeTimeZone(timeZoneName), 'first', new Date())
-  await db.insert(briefings).values(row).onConflictDoUpdate({ target: [briefings.userId, briefings.localDate], set: { kind: row.kind, timeZone: row.timeZone, highlights: row.highlights, counts: row.counts, total: row.total, createdAt: new Date() } })
+  const [saved] = await db.insert(briefings).values(row).onConflictDoUpdate({ target: [briefings.userId, briefings.localDate], set: { kind: row.kind, timeZone: row.timeZone, highlights: row.highlights, counts: row.counts, total: row.total, createdAt: new Date() } }).returning()
+  return saved ? pushBriefing(saved) : false
 }
 
 /** The suggestions a briefing names, in its order, skipping any since dismissed. */

@@ -2390,8 +2390,6 @@
       "morning": "Good morning, {name}.",
       "afternoon": "Good afternoon, {name}.",
       "evening": "Good evening, {name}.",
-      "briefing": "{count, plural, one {# new message is} other {# new messages are}} worth a look, starting with",
-      "noneToday": "No new suggestions today.",
       "routine": "Routine",
       "empty": "Nothing to read right now",
       "connect": "Connect apps",

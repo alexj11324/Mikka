@@ -31,6 +31,9 @@ export function ruleTier(event: TriageEvent): CoordinatorEventTier | null {
     case 'run_question':
     case 'run_blocked':
       return 'attention'
+    // The morning briefing is the Coordinator's to deliver (R-21).
+    case 'daily_briefing':
+      return 'attention'
     // A progress note is background unless the decision model sees something in it.
     case 'run_report':
       return typeof event.payload.text === 'string' && event.payload.text.trim() ? null : 'background'
