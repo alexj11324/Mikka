@@ -29,12 +29,13 @@ test('新建 Bot 进入左侧列表，打开它自己的对话，消息不进 Co
   const composer = page.getByLabel('给 写作助手 发消息', { exact: true })
   await composer.fill('帮我起草一份周报')
   await composer.press('Enter')
-  await expect(page.getByText('帮我起草一份周报', { exact: true })).toBeVisible()
+  const botChat = page.getByRole('region', { name: '与 写作助手 的对话', exact: true })
+  await expect(botChat.getByText('帮我起草一份周报', { exact: true })).toBeVisible()
   await page.screenshot({ path: test.info().outputPath('bot-chat.png'), fullPage: false })
 
   await page.reload()
   await expect(conversationPill(page)).toHaveText('写作助手')
-  await expect(page.getByText('帮我起草一份周报', { exact: true })).toBeVisible()
+  await expect(botChat.getByText('帮我起草一份周报', { exact: true })).toBeVisible()
 
   await bots.getByRole('button', { name: 'Coordinator', exact: true }).click()
   await expect(conversationPill(page)).toHaveText('Coordinator')

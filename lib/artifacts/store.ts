@@ -92,7 +92,7 @@ async function detail(where: ReturnType<typeof and>): Promise<ArtifactDetail | n
   // Authors are bots: shown with their own bloub, found by name, else by the run that handed the artifact over.
   const names = [...new Set(versions.map(version => version.authorName.toLowerCase()))]
   const named = names.length ? await db.select({ name: bots.name, color: bots.color, shape: bots.shape }).from(bots)
-    .where(and(eq(bots.userId, row.userId), inArray(sql`lower(${bots.name})`, names))) : []
+    .where(and(eq(bots.ownerId, row.userId), inArray(sql`lower(${bots.name})`, names))) : []
   const [runBot] = row.runId ? await db.select({ color: bots.color, shape: bots.shape }).from(agentRuns)
     .innerJoin(bots, eq(bots.id, agentRuns.botId)).where(eq(agentRuns.id, row.runId)).limit(1) : []
   const look = (name: string) => named.find(bot => bot.name.toLowerCase() === name.toLowerCase()) ?? runBot ?? null

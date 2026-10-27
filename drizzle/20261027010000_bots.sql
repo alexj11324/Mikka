@@ -1,24 +1,30 @@
--- Bots: what a person chats with in the left column. A bot runs only on Mikka's
--- own harness (AI SDK), never on a coding agent, so it is its own table and not
--- a row in agents (Claude Code / Codex on a device). Each thread (agent_runs
--- row) records the bot that started it.
--- Additive and safe to re-run: new table, nullable columns with no default
--- (catalog-only), FKs added NOT VALID because every existing row is null.
+-- Bots: what a person chats with in the left column; the Coordinator is the
+-- built-in one and has no row. A bot is an identity, never a worker agent or
+-- a run: it chats on the Coordinator harness and its threads (agent_runs)
+-- record it in "botId".
+-- The identity ("ownerId", "workspaceId", unique (id, "workspaceId",
+-- "ownerId")) is the one the cloud computer (#317, bot_desktops) keys on.
+-- Either migration may run first: the table is created with the shared
+-- identity and every column the other side adds is added if missing.
+-- Additive and safe to re-run; FKs on existing tables are NOT VALID because
+-- every existing row is null.
 begin;
 set local lock_timeout = '5s';
 
 create table if not exists bots (
   id uuid primary key,
-  "userId" text not null,
+  "workspaceId" uuid not null,
+  "ownerId" text not null references "user"(id) on delete cascade,
   name text not null,
-  -- A bloub colour id (components/nav/bot-avatar.tsx).
-  color text not null default 'encre',
-  -- A bloub shape id (components/nav/bot-avatar.tsx).
-  shape text not null default 'cercle',
   "createdAt" timestamptz not null default now(),
-  "updatedAt" timestamptz not null default now()
+  unique (id, "workspaceId", "ownerId")
 );
-create unique index if not exists bots_user_name_key on bots ("userId", lower(name));
+-- A bloub colour and shape id (components/nav/bot-avatar.tsx).
+alter table bots add column if not exists color text not null default 'encre';
+alter table bots add column if not exists shape text not null default 'cercle';
+alter table bots add column if not exists "updatedAt" timestamptz not null default now();
+create index if not exists bots_owner_workspace_idx on bots ("ownerId", "workspaceId");
+create unique index if not exists bots_owner_workspace_name_key on bots ("ownerId", "workspaceId", lower(name));
 
 alter table agent_runs add column if not exists "botId" uuid;
 do $$

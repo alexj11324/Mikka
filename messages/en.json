@@ -1999,6 +1999,7 @@
     "stop": "Stop",
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
+    "conversationWith": "Conversation with {name}",
     "usedTools": "Used {tools}",
     "pendingActions": {
       "label": "Waiting for your approval",

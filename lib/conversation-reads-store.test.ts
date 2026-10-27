@@ -83,7 +83,9 @@ before(async () => {
     ids[key] = randomUUID()
     await pool.query('insert into coordinator_messages (id, "userId", position, message) values ($1, $2, $3, $4)', [ids[key], userId, position, message])
   }
-  await pool.query('insert into bots (id, "userId", name) values ($1, $2, $3), ($4, $5, $6)', [aliceBot, alice, 'Writer', bobBot, bob, 'Helper'])
+  // A bot belongs to a real user in a workspace.
+  await pool.query('insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values ($1, $1, $1 || \'@example.com\', false, now(), now()), ($2, $2, $2 || \'@example.com\', false, now(), now()) on conflict do nothing', [alice, bob])
+  await pool.query('insert into bots (id, "ownerId", "workspaceId", name) values ($1, $2, $3, $4), ($5, $6, $3, $7)', [aliceBot, alice, randomUUID(), 'Writer', bobBot, bob, 'Helper'])
   for (const [key, position, message] of [['w1', 1, { role: 'user', content: 'hi Writer' }], ['w2', 2, { role: 'assistant', content: 'Writer here' }]] as const) {
     ids[key] = randomUUID()
     await pool.query('insert into coordinator_messages (id, "userId", "botId", position, message) values ($1, $2, $3, $4, $5)', [ids[key], alice, aliceBot, position, message])
@@ -95,6 +97,7 @@ after(async () => {
   await pool.query('delete from conversation_reads where "userId" = any($1)', [[alice, bob]])
   await pool.query('delete from coordinator_messages where "userId" = any($1)', [[alice, bob]])
   await pool.query('delete from bots where id = any($1)', [[aliceBot, bobBot]])
+  await pool.query('delete from "user" where id = any($1)', [[alice, bob]])
   await pool.end()
 })
 

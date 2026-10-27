@@ -31,7 +31,7 @@ async function ownBot(userId: string, botId: string | null | undefined): Promise
   const parsed = botIdSchema.safeParse(botId ?? null)
   if (!parsed.success) throw new ActionFailureError('validationGeneric')
   if (!parsed.data) return null
-  const [bot] = await db.select({ id: bots.id, name: bots.name }).from(bots).where(and(eq(bots.id, parsed.data), eq(bots.userId, userId))).limit(1)
+  const [bot] = await db.select({ id: bots.id, name: bots.name }).from(bots).where(and(eq(bots.id, parsed.data), eq(bots.ownerId, userId))).limit(1)
   if (!bot) throw new ActionFailureError('validationGeneric')
   return bot
 }

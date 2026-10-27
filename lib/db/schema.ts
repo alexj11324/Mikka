@@ -40,13 +40,17 @@ export const issuePrefixes = pgTable('issue_prefixes', {
  * own harness (AI SDK), never on a coding agent, so it is not a row in `agents`.
  */
 export const bots = pgTable('bots', {
-  id: uuid('id').primaryKey(), userId: text('userId').notNull(), name: text('name').notNull(),
+  id: uuid('id').primaryKey(),
+  /** Who made it, in which workspace: the identity the cloud computer (bot_desktops, #317) keys on too. */
+  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspaceId').notNull(),
+  name: text('name').notNull(),
   /** A bloub colour id, see components/nav/bot-avatar.tsx. */
   color: text('color').notNull().default('encre'),
   shape: text('shape').notNull().default('cercle'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [uniqueIndex('bots_user_name_key').on(table.userId, sql`lower(${table.name})`)])
+}, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`)])
 
 export const agentSessions = pgTable('agent_sessions', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(), title: varchar('title', { length: 200 }).notNull(),

@@ -18,7 +18,7 @@ if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=
 const dbTest = databaseUrl ? test : test.skip
 
 dbTest('a bot and the Coordinator keep their own conversation, inbox and memory', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { eq, inArray }] = await Promise.all([
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { eq, inArray, sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
@@ -30,11 +30,13 @@ dbTest('a bot and the Coordinator keep their own conversation, inbox and memory'
       await db.delete(schema.coordinatorMessages).where(eq(schema.coordinatorMessages.userId, userId))
       await db.delete(schema.coordinatorSessions).where(eq(schema.coordinatorSessions.userId, userId))
       await db.delete(schema.bots).where(inArray(schema.bots.id, [botId]))
+      await db.delete(schema.users).where(eq(schema.users.id, userId))
     })
     await scope.close()
   })
   await scope.run(async () => {
-    await db.insert(schema.bots).values({ id: botId, userId, name: 'Writer' })
+    await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${userId}, 'Bot owner', ${`${userId}@example.com`}, false, now(), now())`)
+    await db.insert(schema.bots).values({ id: botId, ownerId: userId, workspaceId: randomUUID(), name: 'Writer' })
     await recordCoordinatorEvent(db, userMessageEvent(userId, 'to the Coordinator'))
     await recordCoordinatorEvent(db, userMessageEvent(userId, 'to Writer', { botId }))
     assert.deepEqual((await store.wakingChats(userId)).sort(), [botId, null].sort(), 'one wake per chat with waiting messages')

@@ -136,7 +136,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   <section ref={rootRef} aria-label={name} className="mikka-agent flex min-h-0 flex-1 flex-col">
     <MessageScrollerProvider defaultScrollPosition="end">
       <MessageScroller className="min-h-0 flex-1">
-        <MessageScrollerViewport aria-label={t('conversation')}>
+        <MessageScrollerViewport aria-label={bot ? t('conversationWith', { name: bot.name }) : t('conversation')}>
           <MessageScrollerContent className={cn('mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 pb-6', compact ? 'pt-4' : 'pt-18')}>
             {data && !items.length && (data.enabled
               ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">{avatar('pill', 'thinking')}{tNav('writingWelcome')}</p>

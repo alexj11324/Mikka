@@ -1999,6 +1999,7 @@
     "stop": "停止",
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
+    "conversationWith": "与 {name} 的对话",
     "usedTools": "调用了 {tools}",
     "pendingActions": {
       "label": "等你确认",

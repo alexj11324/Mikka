@@ -127,7 +127,7 @@ export async function handleRead(q: Queryable, request: ReadRequest): Promise<Re
   const ownerId = conversationOwner(request.conversationId, request.userId)
   if (!ownerId) return { status: 404, body: { error: 'conversationNotFound' } }
   const botId = conversationBot(request.conversationId)
-  if (botId && !(await q.query('select 1 from bots where id = $1::uuid and "userId" = $2', [botId, ownerId])).rows.length) return { status: 404, body: { error: 'conversationNotFound' } }
+  if (botId && !(await q.query('select 1 from bots where id = $1::uuid and "ownerId" = $2', [botId, ownerId])).rows.length) return { status: 404, body: { error: 'conversationNotFound' } }
   if (request.method === 'GET') return { status: 200, body: await current(q, request.userId, request.conversationId, ownerId) }
   let messageId: unknown
   try {
