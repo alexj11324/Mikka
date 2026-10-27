@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { ThreadMachines, type ThreadMachineProvider } from './thread-machine'
 import { SubagentQueue } from './subagent-queue'
+import { SubagentStore } from './subagent-store'
 import { startSuggestion, attachSuggestionRun, attachSuggestionSubagent, failUnattachedSuggestions } from '@/lib/suggestions/execution'
 import { claimThreadWorkerLease, provisionThreadDevice, releaseThreadWorkerLease } from './thread-device'
 import { renewCloudDeviceToken } from './cloud-device'
@@ -43,7 +44,7 @@ test('thread lifecycle serializes creation and respects owner, idle and terminal
       CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id),"botId" uuid NOT NULL,"workspaceId" uuid NOT NULL,"ownerId" text NOT NULL);
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,name text,kind text,enabled boolean NOT NULL DEFAULT true,"lastSeenAt" timestamptz);
       CREATE TABLE device_tokens (id uuid PRIMARY KEY,"userId" text,name text,"tokenHash" text,"boundDeviceId" uuid,"boundWorkspaceId" uuid,"expiresAt" timestamptz,"revokedAt" timestamptz,"lastUsedAt" timestamptz,"createdAt" timestamptz NOT NULL DEFAULT now());
-      CREATE TABLE cloud_machines ("workspaceId" uuid,"ownerId" text,"deviceId" uuid);
+      CREATE TABLE cloud_machines ("workspaceId" uuid,"ownerId" text,"deviceId" uuid,"sandboxId" text);
       CREATE TABLE workspace_computer_policies ("workspaceId" uuid,permission text,version integer);
       CREATE TABLE local_computer_reviews (id uuid,"userId" text,"runId" uuid,"deviceId" uuid,digest text,call jsonb,decision boolean,"expiresAt" timestamptz,"seenAt" timestamptz);
       CREATE TABLE suggestions (id uuid PRIMARY KEY,"userId" text NOT NULL,source text,action text,title text,"actionTitle" text,url text,actor text,shown boolean,"dismissedAt" timestamptz);
@@ -165,6 +166,26 @@ test('thread lifecycle serializes creation and respects owner, idle and terminal
     assert.ok(queued && remaining)
     assert.equal(await queue.stop(actor, botId, remaining.id), true)
     assert.equal((await pool.query('SELECT state FROM bot_subagents WHERE id=$1', [remaining.id])).rows[0].state, 'stopped')
+    const browser = claims.filter(Boolean).find(task => task!.id !== running.id)!
+    await pool.query('INSERT INTO cloud_machines ("workspaceId","ownerId","sandboxId") VALUES ($1,$2,$3)', [actor.workspaceId, actor.userId, 'browser-fixture'])
+    const browserLeases: { controlledBy: string | null; stopRequested: boolean }[] = []
+    let browserClosed = 0
+    const browserRuntime = {
+      async connectComputer() { return {} },
+      async syncSubagentLease(_box: unknown, lease: { controlledBy: string | null; stopRequested: boolean }) { browserLeases.push(lease) },
+      async subagentViewerGrant(_box: unknown, _lease: unknown, _userId: string, mode: string) { return { url: `wss://fixture.invalid/${mode}` } },
+      async stopSubagentBrowser() { browserClosed++ },
+    } as unknown as typeof e2bProvider
+    const browserStore = new SubagentStore(pool, browserRuntime)
+    await assert.rejects(browserStore.operate({ ...actor, userId: 'bob' }, botId, browser.id, 'viewer'), { status: 404 })
+    await assert.rejects(browserStore.operate(actor, botId, browser.id, 'viewer', 'control'), { status: 403 })
+    assert.deepEqual(await browserStore.operate(actor, botId, browser.id, 'viewer'), { url: 'wss://fixture.invalid/view' })
+    assert.deepEqual(await browserStore.operate(actor, botId, browser.id, 'takeover'), { url: 'wss://fixture.invalid/control' })
+    await browserStore.operate(actor, botId, browser.id, 'handback')
+    assert.deepEqual(await browserStore.operate(actor, botId, browser.id, 'stop'), { stopped: true })
+    assert.equal(browserClosed, 1)
+    assert.deepEqual(browserLeases.map(lease => [lease.controlledBy, lease.stopRequested]), [[null, false], ['alice', false], [null, false], [null, true]])
+    assert.equal((await pool.query('SELECT state FROM bot_subagents WHERE id=$1', [browser.id])).rows[0].state, 'stopped')
     await assert.rejects(pool.query('DELETE FROM bots WHERE id=$1', [botId]), { code: '23503' }, 'browser records cannot disappear through a Bot cascade')
 
     const suggestionId = randomUUID()

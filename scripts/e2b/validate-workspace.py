@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-repo = Path('/workspace')
+repo = Path(sys.argv[1]) if len(sys.argv) == 2 else Path('/workspace')
 gitdir = repo / '.git'
 if gitdir.is_symlink() or not gitdir.is_dir():
     sys.exit('Unsupported repository metadata')
