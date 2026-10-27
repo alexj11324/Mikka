@@ -219,7 +219,16 @@ acceptance('prepare/acquire/real owner-peer HTTP/clean release safely reuses the
       assert.equal((await database.query('select count(*)::int as n from public."user"')).rows[0].n, before)
       assert.equal((await next.owner.request('/api/conversations/coordinator/read')).status, 200)
       const previousPlan = await pool.cleanupPlan({ runId: first.lease.runId })
-      assert.ok(previousPlan.resources.some(item => item.type === 'user' && item.id === next.owner.userId && item.reason === 'ACTIVE_LEASE_PROTECTED'))
+      // A reused identity keeps its original provisioning provenance. The
+      // preceding attached-executor case may already have created this user.
+      const provenance = await database.query(`select l.run_id as "runId"
+        from mikka_test_accounts.accounts a join mikka_test_accounts.leases l on l.id=a.provision_lease_id
+        where a.slot_id=$1 and a.user_id=$2 and l.environment_id=$3`, [next.owner.slotId, next.owner.userId, environment.id])
+      assert.equal(provenance.rowCount, 1)
+      const provisioningRunId = provenance.rows[0].runId
+      assert.equal(previousPlan.resources.some(item => item.type === 'user' && item.id === next.owner.userId), provisioningRunId === first.lease.runId)
+      const provisioningPlan = await pool.cleanupPlan({ runId: provisioningRunId })
+      assert.ok(provisioningPlan.resources.some(item => item.type === 'user' && item.id === next.owner.userId && item.reason === 'ACTIVE_LEASE_PROTECTED'))
       await assert.rejects(first.owner.request('/api/conversations/coordinator/read'))
       await assert.rejects(pool.revokeSessions(first.lease))
       assert.equal((await next.owner.request('/api/auth/get-session')).status, 200)
