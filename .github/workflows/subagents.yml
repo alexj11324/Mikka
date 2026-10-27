@@ -1,0 +1,23 @@
+name: Subagents and thread backend
+on:
+  push:
+    branches: ['codex/342-runtime']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm typecheck
+      - run: pnpm exec oxlint --deny-warnings lib/cloud-computer workflows/subagent app/api/computer/events scripts/e2b/subagent-cdp.mjs
+      - run: python3 -m py_compile scripts/e2b/subagent-gateway.py scripts/e2b/subagent-live-acceptance.py
+      - run: node scripts/check-migrations.mjs

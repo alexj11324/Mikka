@@ -268,6 +268,7 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
   if (!issue) return { error: 'issueNotFound' }
   try {
     const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, idempotencyKey: `coordinator:${toolCallId}` })
+    await (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, { userId, workspaceId: target.workspaceId }, result.runId)
     return { ...result, botId: input.botId, task: issue.title, status: 'queued' as const }
   } catch { return { error: 'cloudComputerUnavailable' } }
 }
@@ -353,4 +354,28 @@ export async function webSearchStep(userId: string, input: { query: string; limi
   'use step'
   await assertNativeToolScope(userId,scope)
   return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
+}
+
+/** Web work stays in the Bot chat; it never creates an agent_runs row. */
+export async function startWebSubagent(userId: string, input: { botId: string; task: string; suggestionId?: string }, toolCallId: string, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (!toolCallId || toolCallId.length > 200) return { error: 'browserUnavailable' }
+  const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
+  if (!bot) return { error: 'botUnavailable' }
+  await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, bot.workspaceId)
+  const { SubagentStore } = await import('@/lib/cloud-computer/subagents')
+  const { start } = await import('workflow/api')
+  const { webSubagentWorkflow } = await import('@/workflows/subagent/workflow')
+  const digest = createHash('sha256').update(JSON.stringify(['web-subagent', userId, input.botId, toolCallId])).digest('hex')
+  const id = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-8${digest.slice(17, 20)}-${digest.slice(20, 32)}`
+  const actor = { userId, workspaceId: bot.workspaceId as string }
+  if (input.suggestionId) {
+    const suggestion = await pool.query('SELECT 1 FROM suggestion_executions WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4', [input.suggestionId, userId, actor.workspaceId, input.botId])
+    if (!suggestion.rowCount) return { error: 'suggestionUnavailable' }
+  }
+  const row = await new SubagentStore(pool).create(actor, input.botId, input.task, id)
+  if (input.suggestionId) await pool.query(`UPDATE suggestion_executions SET status='running',"subagentId"=$5 WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 AND ("subagentId" IS NULL OR "subagentId"=$5)`, [input.suggestionId, userId, actor.workspaceId, input.botId, id])
+  await start(webSubagentWorkflow, [actor, input.botId, row.id])
+  return { subagentId: row.id, state: row.status, botId: input.botId }
 }
