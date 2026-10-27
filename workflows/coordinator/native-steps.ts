@@ -3,16 +3,17 @@ import { nativeCoordinatorEnabled, nativeCoordinatorStore } from '@/lib/coordina
 import { loadConversation } from '@/lib/coordinator/store'
 import { instructionsWithMemory, promptMessages } from '@/lib/coordinator/context'
 import { nativeCoordinatorContext, personalCoordinatorInstructions } from '@/lib/coordinator/native-prompt'
+import { botInstructions } from '@/lib/coordinator/bot-instructions'
 
 export async function runtime(userId: string): Promise<CoordinatorRuntime> {
   'use step'
   return nativeCoordinatorEnabled() ? nativeCoordinatorStore.runtime(userId) : { harness: 'ai_sdk' }
 }
-export async function enqueue(userId: string, holder: string, round: number, selected: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, tools: NativeCoordinatorJob['tools']) {
+export async function enqueue(userId: string, holder: string, round: number, selected: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, tools: NativeCoordinatorJob['tools'], botId: string | null = null) {
   'use step'
-  const { summary, memory, messages } = await loadConversation(userId)
+  const { summary, memory, messages } = await loadConversation(userId, botId)
   return nativeCoordinatorStore.enqueue(userId,holder,round,selected,{
-    instructions: instructionsWithMemory(personalCoordinatorInstructions(), memory),
+    instructions: instructionsWithMemory(await botInstructions(userId, botId, personalCoordinatorInstructions()), memory),
     context: nativeCoordinatorContext(promptMessages(summary,messages)), tools,
   })
 }

@@ -20,7 +20,7 @@ describe("durable Coordinator transport relay", () => {
     const result = await nativeCoordinatorTurn("owner-from-closure","holder",0,runtime,createTools)
     expect(createTools.mock.calls).toEqual([[],[{holder:"holder",turnId:"turn",callId:"call"}]])
     expect(execute).toHaveBeenCalledTimes(1)
-    expect(native.enqueue).toHaveBeenCalledWith("owner-from-closure","holder",0,runtime,[expect.objectContaining({name:"propose_reply",inputSchema:expect.objectContaining({type:"object"})})])
+    expect(native.enqueue).toHaveBeenCalledWith("owner-from-closure","holder",0,runtime,[expect.objectContaining({name:"propose_reply",inputSchema:expect.objectContaining({type:"object"})})],null)
     expect(native.finishTool).toHaveBeenCalledWith("owner-from-closure","holder","turn","call",{owner:"owner-from-closure",text:"draft",approval:"required"})
     expect(result.text).toBe(reply)
     expect(result.responseMessages.map(message=>message.role)).toEqual(["assistant","tool","assistant"])

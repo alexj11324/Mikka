@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Sidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 
-export type RailDestination = 'conversations' | 'board' | 'plugins'
+export type RailDestination = 'chats' | 'board' | 'plugins'
 
 // 主页 (the agent conversations), the board, plugins.
 export const RAIL_ITEMS: { id: RailDestination; icon: LucideIcon; label: 'Nav.home' | 'Nav.board' | 'Nav.plugins' }[] = [
-  { id: 'conversations', icon: House, label: 'Nav.home' },
+  { id: 'chats', icon: House, label: 'Nav.home' },
   { id: 'board', icon: Columns3, label: 'Nav.board' },
   { id: 'plugins', icon: Copy, label: 'Nav.plugins' },
 ]
