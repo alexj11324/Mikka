@@ -161,7 +161,6 @@
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.33",
     "zod": "^4.6.7",
-    "@better-auth/core": "1.7.12",
     "@chat-adapter/slack": "4.43.0"
   },
   "devDependencies": {
