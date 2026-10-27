@@ -6,6 +6,7 @@ import { subagentNotice } from './subagent-notice'
 import * as provider from './e2b-provider'
 import { finishSuggestionSubagent } from '@/lib/suggestions/execution'
 import { botWebWorker } from '@/workflows/subagents/workflow'
+import { renewBotLifetime } from './bot-heartbeat'
 
 type Orphan = { id: string; ownerId: string; workspaceId: string; workerKey: string }
 
@@ -40,6 +41,13 @@ export async function failOrphanedSubagent(pool: Pool, orphan: Orphan, runtime =
  * repair terminal chat/suggestion updates. Never free a slot before close. */
 export async function reconcileSubagents(pool: Pool) {
   let stopped = 0, reported = 0, failed = 0
+  const activeMachines = await pool.query(`SELECT DISTINCT m."workspaceId",m."ownerId",m."lastActiveAt" FROM cloud_machines m
+    JOIN bot_subagents s ON s."workspaceId"=m."workspaceId" AND s."ownerId"=m."ownerId"
+    WHERE m.state='running' AND m."sandboxId" IS NOT NULL AND s.state IN ('running','needs_you') AND s."stopRequestedAt" IS NULL
+    ORDER BY m."lastActiveAt" LIMIT 50`)
+  for (const row of activeMachines.rows) {
+    try { await renewBotLifetime(pool, { userId: row.ownerId, workspaceId: row.workspaceId }) } catch { failed++ }
+  }
   const pending = await pool.query(`SELECT s.id,s."botId",s."ownerId",s."workspaceId" FROM bot_subagents s
     WHERE s.state IN ('running','needs_you') AND s."stopRequestedAt" IS NOT NULL ORDER BY s."stopRequestedAt" LIMIT 1`)
   for (const row of pending.rows) {

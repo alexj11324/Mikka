@@ -6,7 +6,7 @@
   "type": "module",
   "packageManager": "pnpm@10.34.3",
   "scripts": {
-    "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts lib/computer/thread-machine.db.test.ts lib/computer/thread-result.db.test.ts lib/computer/snapshot-policy.test.ts lib/computer/workspace-snapshot.db.test.ts",
+    "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts lib/computer/bot-heartbeat.db.test.ts lib/computer/thread-machine.db.test.ts lib/computer/thread-result.db.test.ts lib/computer/snapshot-policy.test.ts lib/computer/workspace-snapshot.db.test.ts",
     "generate:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs",
     "check:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
     "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && pnpm lint && next build",

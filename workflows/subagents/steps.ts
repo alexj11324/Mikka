@@ -5,6 +5,7 @@ import { SubagentApprovals, type BrowserAction } from '@/lib/computer/subagent-a
 import { subagentNotice } from '@/lib/computer/subagent-notice'
 import * as provider from '@/lib/computer/e2b-provider'
 import { ensureBotMachine } from '@/lib/computer/bot-machine'
+import { renewBotLifetime } from '@/lib/computer/bot-heartbeat'
 import { botWebWorker } from './workflow'
 
 type Actor = { userId: string; workspaceId: string }
@@ -45,6 +46,7 @@ export async function requestApproval(actor: Actor, task: Subagent, operationKey
 
 export async function approvalStatus(actor: Actor, task: Subagent, id: string, digest: string) {
   'use step'
+  await renewBotLifetime(pool, actor).catch(() => console.error('Could not renew active Bot machine'))
   return await new SubagentApprovals(pool).status(actor, task.botId, task.id, id, digest) ?? { state: 'denied', result: null }
 }
 
