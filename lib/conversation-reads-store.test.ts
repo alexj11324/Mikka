@@ -53,6 +53,9 @@ const needDb = (t: TestContext) => { if (!pool) t.skip(skipReason); return Boole
 const alice = `test-reads-${randomUUID()}`
 const bob = `test-reads-${randomUUID()}`
 const ids: Record<string, string> = {}
+// alice's bot chats on the same harness, numbering its own messages from 1.
+const aliceBot = randomUUID()
+const bobBot = randomUUID()
 const host = 'localhost:3000'
 const req = (over: Partial<ReadRequest>): ReadRequest => ({ method: 'GET', userId: alice, conversationId: 'coordinator', origin: null, host, ...over })
 const post = (messageId: unknown, over: Partial<ReadRequest> = {}) => handleRead(pool!, req({ method: 'POST', body: JSON.stringify({ messageId }), ...over }))
@@ -80,12 +83,21 @@ before(async () => {
     ids[key] = randomUUID()
     await pool.query('insert into coordinator_messages (id, "userId", position, message) values ($1, $2, $3, $4)', [ids[key], userId, position, message])
   }
+  // A bot belongs to a real user in a workspace.
+  await pool.query('insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values ($1, $1, $1 || \'@example.com\', false, now(), now()), ($2, $2, $2 || \'@example.com\', false, now(), now()) on conflict do nothing', [alice, bob])
+  await pool.query('insert into bots (id, "ownerId", "workspaceId", name) values ($1, $2, $3, $4), ($5, $6, $3, $7)', [aliceBot, alice, randomUUID(), 'Writer', bobBot, bob, 'Helper'])
+  for (const [key, position, message] of [['w1', 1, { role: 'user', content: 'hi Writer' }], ['w2', 2, { role: 'assistant', content: 'Writer here' }]] as const) {
+    ids[key] = randomUUID()
+    await pool.query('insert into coordinator_messages (id, "userId", "botId", position, message) values ($1, $2, $3, $4, $5)', [ids[key], alice, aliceBot, position, message])
+  }
 })
 
 after(async () => {
   if (!pool) return
   await pool.query('delete from conversation_reads where "userId" = any($1)', [[alice, bob]])
   await pool.query('delete from coordinator_messages where "userId" = any($1)', [[alice, bob]])
+  await pool.query('delete from bots where id = any($1)', [[aliceBot, bobBot]])
+  await pool.query('delete from "user" where id = any($1)', [[alice, bob]])
   await pool.end()
 })
 
@@ -144,4 +156,16 @@ test('concurrent writes never move backward', async t => {
   assert.equal((final.body as { lastReadMessageId: string }).lastReadMessageId, ids.a5)
   // Every response reflects a monotonic state: no response is below the position it asked for.
   all.forEach((r, i) => assert.ok((r.body as { lastReadPosition: number }).lastReadPosition >= positions[i]))
+})
+
+test("a bot's chat keeps its own read position and unread count", async t => {
+  if (!needDb(t)) return
+  const writer = `bot:${aliceBot}`
+  assert.equal((await handleRead(pool!, req({ conversationId: `bot:${bobBot}` }))).status, 404, "another person's bot")
+  assert.equal((await handleRead(pool!, req({ conversationId: `bot:${randomUUID()}` }))).status, 404, 'no such bot')
+  assert.deepEqual(await handleRead(pool!, req({ conversationId: writer })), { status: 200, body: { lastReadMessageId: null, lastReadPosition: null, unreadCount: 1 } })
+  assert.equal((await post(ids.a3, { conversationId: writer })).status, 422, "a Coordinator message id in the bot's chat")
+  assert.deepEqual(await post('2', { conversationId: writer }), { status: 200, body: { lastReadMessageId: ids.w2, lastReadPosition: 2, unreadCount: 0 } }, "position 2 is the bot's own message 2")
+  const coordinator = await handleRead(pool!, req({}))
+  assert.notEqual((coordinator.body as { lastReadMessageId: string | null }).lastReadMessageId, ids.w2, "reading the bot's chat leaves the Coordinator's alone")
 })

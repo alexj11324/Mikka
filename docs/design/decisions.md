@@ -24,6 +24,7 @@ Newest first.
 | 2026-10-25 | Input boxes go only where there is a conversation. The ban was about the thread list and the computer screen, which are not chats; an open thread is a conversation with its agent and ends in the standard composer (「那个地方根本不是聊天界面，但他写上去了…结果就变成了所有地方的右边都不能加输入框了」) | R-10 | "Right panel never has an input box" (2026-10-24) |
 | 2026-10-25 | Any thread may edit the Figma file and the design docs; no single design thread owns them. New Figma work goes on its own page (「readme 相关的只由设计线程维护，你可以把它删掉」) | `README.md` | Figma owned by the design thread only |
 | 2026-10-25 | Sign-in: Google button uses Google's official "G" mark; no scope or callback-URL notes under the OAuth buttons; divider reads "or" / 「或」 (「这个是假的」「删一下口水话」) | R-40 | "Or use email" divider |
+| 2026-10-25 00:39 | Artifact viewer design accepted (「设计稿我批了」); files in R2, versions in Neon, HTML in an opaque-origin sandbox iframe with no separate usercontent domain, 选择元素 through an injected script and `postMessage` | R-31, `docs/mcp.md` § Artifacts | Codex's drafts (2026-10-24) |
 | 2026-10-24 21:57 | Clef is fully replaced by the OpenAI Decisions API, including the first auto-approval screen (「10月22日那个东西已经过时了，已经完全换成了 OpenAI 的 decisions API」) | R-20 | Clef (2026-10-22) |
 | 2026-10-24 21:57 | Right panel = 建议 + 任务; 任务 = threads started by the orchestrator or a bot, all kept, not the board's issues; a clicked suggestion fills the composer, the bot dispatches a thread, and the item moves from 建议 down to 任务 | R-21 | 建议 / bot threads / 我的任务 (20:46); 任务 tab = flat board list (2026-10-23) |
 | 2026-10-24 21:57 | bloub keeps all 16 shapes | R-36 | |
@@ -60,7 +61,7 @@ Only these frames count as a source (file `zPe5LKycb2XuT1ivCLRw07`).
 | Style guide | `98:2` | 2026-10-24 |
 | 新建 Bot dialog | `195:3225` | in review |
 | Group chat | `224:5023` (blue user bubbles; `205:4488` archived) | 2026-10-25 |
-| Artifact viewer | `178:11626` | in review |
+| Artifact viewer | `178:11626` | 2026-10-25 00:39 |
 | Issue detail, threads and comments | page `220:5022`, frames `220:5023`, `220:5199` | 2026-10-25 |
 
 ## Open

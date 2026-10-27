@@ -5,6 +5,8 @@ import { useRef, useState } from 'react'
 import { useIsStreaming } from '@openuidev/react-lang'
 import { ApprovalCard, type ApprovalCardStatus } from '@/components/agents/approval-card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useAgentInteraction } from './agent-interaction'
 import { type AgentComponentRenderers } from '@/lib/agent-ui-catalog'
 
@@ -75,6 +77,8 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
   const questions = (props.questions ?? []).map(question => ({ ...question, autoAdvance: false, customPlaceholder: agentCopy.addAnotherAnswer }))
 
   if (questions.length === 0) return null
+  const [only] = questions
+  if (questions.length === 1 && !only.multiple && only.options?.length) return <ChoiceCard title={only.title} options={only.options} />
 
   return <div className="flex min-w-0 flex-col gap-2">
     <p className="text-xs text-muted-foreground">{agentCopy.answerHereAgentWillContinueBasedOn}</p>
@@ -93,6 +97,24 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
         void send((agentCopy.taskContext + (props.context) + agentCopy.myAnswers + (response) + agentCopy.continueAdvisingBasedOnThisInformationWithout))
       }}
     />
+    {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+  </div>
+}
+
+/**
+ * One question with a few answers (Figma 208:4780, Grok style): a bordered
+ * card, options lettered A, B, C…; a click is the reply. Anything else the
+ * person wants to say goes through the composer.
+ */
+function ChoiceCard({ title, options }: { title: string; options: { value: string; label: string }[] }) {
+  const { send, error, status } = useAgentDecision()
+  const [picked, setPicked] = useState<string | null>(null)
+  return <div className="flex w-full max-w-xl min-w-0 flex-col gap-2 rounded-2xl border p-4">
+    <p className="px-2 pb-1 font-medium">{title}</p>
+    {options.map((option, index) => <Button key={option.value} type="button" variant="ghost" className={cn('h-auto justify-start gap-3 px-2 py-2 text-left font-normal whitespace-normal', picked === option.value && 'bg-muted')}
+      disabled={status !== 'pending'} onClick={() => { setPicked(option.value); void send(option.label) }}>
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-md border text-xs text-muted-foreground">{String.fromCharCode(65 + index)}</span>{option.label}
+    </Button>)}
     {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
   </div>
 }
