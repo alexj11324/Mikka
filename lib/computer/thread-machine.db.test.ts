@@ -6,6 +6,8 @@ import { Pool } from 'pg'
 import { ThreadMachines, type ThreadMachineProvider } from './thread-machine'
 import { SubagentQueue } from './subagent-queue'
 import { SubagentStore } from './subagent-store'
+import { coordinatorWebBot } from './coordinator-bot'
+import { SubagentApprovals } from './subagent-approval'
 import { startSuggestion, attachSuggestionRun, attachSuggestionSubagent, failUnattachedSuggestions } from '@/lib/suggestions/execution'
 import { claimThreadWorkerLease, provisionThreadDevice, releaseThreadWorkerLease } from './thread-device'
 import { renewCloudDeviceToken } from './cloud-device'
@@ -39,7 +41,7 @@ test('thread lifecycle serializes creation and respects owner, idle and terminal
   }
   try {
     await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'), ('bob');
-      CREATE TABLE bots (id uuid, "workspaceId" uuid, "ownerId" text, UNIQUE(id,"workspaceId","ownerId"));
+      CREATE TABLE bots (id uuid, "workspaceId" uuid, "ownerId" text, name text, UNIQUE(id,"workspaceId","ownerId"));
       CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"deviceId" uuid,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz);
       CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id),"botId" uuid NOT NULL,"workspaceId" uuid NOT NULL,"ownerId" text NOT NULL);
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,name text,kind text,enabled boolean NOT NULL DEFAULT true,"lastSeenAt" timestamptz);
@@ -48,16 +50,24 @@ test('thread lifecycle serializes creation and respects owner, idle and terminal
       CREATE TABLE workspace_computer_policies ("workspaceId" uuid,permission text,version integer);
       CREATE TABLE local_computer_reviews (id uuid,"userId" text,"runId" uuid,"deviceId" uuid,digest text,call jsonb,decision boolean,"expiresAt" timestamptz,"seenAt" timestamptz);
       CREATE TABLE suggestions (id uuid PRIMARY KEY,"userId" text NOT NULL,source text,action text,title text,"actionTitle" text,url text,actor text,shown boolean,"dismissedAt" timestamptz);
-      CREATE TABLE coordinator_events (id uuid PRIMARY KEY,"userId" text,kind text,"dedupeKey" text UNIQUE,payload jsonb,tier text)`)
+      CREATE TABLE coordinator_events (id uuid PRIMARY KEY,"userId" text,"botId" uuid,kind text,"dedupeKey" text UNIQUE,payload jsonb,tier text)`)
     const sql = await readFile(new URL('../../drizzle/20261027180000_thread_machines_and_bot_subagents.sql', import.meta.url), 'utf8')
     await pool.query(sql); await pool.query(sql)
     await pool.query(await readFile(new URL('../../drizzle/20261027180002_thread_worker_leases.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027180004_thread_results.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027180005_thread_desktops.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027180006_subagent_runtime.sql', import.meta.url), 'utf8'))
+    const coordinatorBotSql = await readFile(new URL('../../drizzle/20261027180007_coordinator_web_bots.sql', import.meta.url), 'utf8')
+    await pool.query(coordinatorBotSql); await pool.query(coordinatorBotSql)
+    const approvalSql = await readFile(new URL('../../drizzle/20261027180008_subagent_approvals.sql', import.meta.url), 'utf8')
+    await pool.query(approvalSql); await pool.query(approvalSql)
+    await pool.query(await readFile(new URL('../../drizzle/20261027180009_subagent_worker.sql', import.meta.url), 'utf8'))
     const suggestionSql = await readFile(new URL('../../drizzle/20261027180001_suggestion_execution.sql', import.meta.url), 'utf8')
     await pool.query(suggestionSql); await pool.query(suggestionSql)
-    await pool.query('INSERT INTO bots VALUES ($1,$2,$3)', [botId, actor.workspaceId, actor.userId])
+    await pool.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)', [botId, actor.workspaceId, actor.userId, 'Test Bot'])
+    const identities = await Promise.all(Array.from({ length: 4 }, () => coordinatorWebBot(pool, actor)))
+    assert.equal(new Set(identities).size, 1)
+    assert.notEqual(identities[0], await coordinatorWebBot(pool, { ...actor, userId: 'bob' }))
     await pool.query('INSERT INTO agent_runs (id,"userId",status) VALUES ($1,$2,$3)', [runId, actor.userId, 'queued'])
     await pool.query('INSERT INTO computer_run_bindings VALUES ($1,$2,$3,$4)', [runId, botId, actor.workspaceId, actor.userId])
     await pool.query('INSERT INTO workspace_snapshots ("workspaceId","ownerId","snapshotId","dependencyFingerprint","sourceRevision") VALUES ($1,$2,$3,$4,$5)', [actor.workspaceId, actor.userId, 'snapshot-fixture', 'fingerprint', 'revision'])
@@ -152,8 +162,10 @@ test('thread lifecycle serializes creation and respects owner, idle and terminal
     await assert.rejects(queue.enqueue(actor, botId, 'Different task', retryKey), /unavailable/)
     await queue.stop(actor, botId, retried[0].id)
     const tasks = await Promise.all(Array.from({ length: 8 }, (_, i) => queue.enqueue(actor, botId, `Task ${i + 1}`)))
-    const claims = await Promise.all(Array.from({ length: 8 }, () => queue.claimNext(actor)))
+    const claims = await Promise.all(Array.from({ length: 8 }, (_, i) => queue.claimNext(actor, `worker-${i}`)))
     assert.equal(claims.filter(Boolean).length, 6)
+    const claimedIndex = claims.findIndex(Boolean)
+    assert.equal((await queue.claimNext(actor, `worker-${claimedIndex}`))?.id, claims[claimedIndex]?.id, 'a retried workflow reclaims its own task')
     const running = claims.find(Boolean)!
     assert.equal(await queue.stop({ ...actor, userId: 'bob' }, botId, running.id), false)
     assert.equal(await queue.stop(actor, botId, running.id), true)
@@ -167,6 +179,19 @@ test('thread lifecycle serializes creation and respects owner, idle and terminal
     assert.equal(await queue.stop(actor, botId, remaining.id), true)
     assert.equal((await pool.query('SELECT state FROM bot_subagents WHERE id=$1', [remaining.id])).rows[0].state, 'stopped')
     const browser = claims.filter(Boolean).find(task => task!.id !== running.id)!
+    const approvals = new SubagentApprovals(pool)
+    const action = { action: 'navigate', url: 'https://example.com/' } as const
+    const requested = await approvals.request(actor, botId, browser.id, 'fixture-tool-call', action)
+    assert.equal((await approvals.request(actor, botId, browser.id, 'fixture-tool-call', action)).id, requested.id)
+    await assert.rejects(approvals.request(actor, botId, browser.id, 'fixture-tool-call', { ...action, url: 'https://other.example/' }), /changed/)
+    assert.equal(await approvals.pending({ ...actor, userId: 'bob' }, botId, browser.id), null)
+    assert.equal(await approvals.decide(actor, botId, browser.id, requested.id, 'wrong-digest', true), false)
+    assert.equal(await approvals.decide(actor, botId, browser.id, requested.id, requested.digest, true), true)
+    assert.equal(await approvals.decide(actor, botId, browser.id, requested.id, requested.digest, true), false)
+    const consumed = await Promise.all([approvals.consume(actor, botId, browser.id, requested.id, requested.digest), approvals.consume(actor, botId, browser.id, requested.id, requested.digest)])
+    assert.deepEqual(consumed.filter(Boolean), [action], 'an approved browser action executes at most once')
+    assert.equal(await approvals.complete(actor, botId, browser.id, requested.id, requested.digest, { ok: true }), true)
+    assert.equal(await approvals.consume(actor, botId, browser.id, requested.id, requested.digest), undefined)
     await pool.query('INSERT INTO cloud_machines ("workspaceId","ownerId","sandboxId") VALUES ($1,$2,$3)', [actor.workspaceId, actor.userId, 'browser-fixture'])
     const browserLeases: { controlledBy: string | null; stopRequested: boolean }[] = []
     let browserClosed = 0
@@ -193,7 +218,7 @@ test('thread lifecycle serializes creation and respects owner, idle and terminal
     assert.equal(await startSuggestion(pool, 'bob', suggestionId), null)
     const starts = await Promise.all([startSuggestion(pool, actor.userId, suggestionId), startSuggestion(pool, actor.userId, suggestionId)])
     assert.equal(starts.filter(start => start?.created).length, 1)
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM coordinator_events')).rows[0].n, 1)
+    assert.equal((await pool.query("SELECT count(*)::int AS n FROM coordinator_events WHERE kind='suggestion_start'")).rows[0].n, 1)
     assert.equal(await attachSuggestionRun(pool, 'bob', suggestionId, runId), false)
     assert.equal(await attachSuggestionRun(pool, actor.userId, suggestionId, runId), true)
     const finished = (await pool.query('SELECT "executionState","dismissedAt" FROM suggestions WHERE id=$1', [suggestionId])).rows[0]

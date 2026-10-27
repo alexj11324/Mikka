@@ -21,7 +21,7 @@ export class ComputerStore {
     return rows[0]
   }
   async listBots(actor: Actor) {
-    return (await this.pool.query<Bot>('SELECT id,name,"workspaceId","ownerId" FROM bots WHERE "workspaceId"=$1 AND "ownerId"=$2 ORDER BY "createdAt"', [actor.workspaceId, actor.userId])).rows
+    return (await this.pool.query<Bot>('SELECT id,name,"workspaceId","ownerId" FROM bots WHERE "workspaceId"=$1 AND "ownerId"=$2 AND NOT EXISTS (SELECT 1 FROM coordinator_web_bots c WHERE c."botId"=bots.id) ORDER BY "createdAt"', [actor.workspaceId, actor.userId])).rows
   }
   async policy(workspaceId: string): Promise<'ask' | 'deny'> {
     const row = (await this.pool.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]
@@ -64,6 +64,8 @@ export class ComputerStore {
           state=CASE WHEN state='queued' THEN 'stopped' ELSE state END,
           "endedAt"=CASE WHEN state='queued' THEN now() ELSE "endedAt" END
           WHERE "workspaceId"=$1 AND state IN ('queued','running','needs_you')`, [workspaceId])
+        await client.query(`UPDATE bot_subagent_approvals SET state='denied',"decidedAt"=now()
+          WHERE "workspaceId"=$1 AND state IN ('pending','approved')`, [workspaceId])
       }
       const sync = async () => {
         if (machine?.sandboxId && machine.runtimeReady && desktops.length) {

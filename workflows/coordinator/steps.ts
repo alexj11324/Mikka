@@ -38,6 +38,40 @@ export async function computerToolsEnabled() {
   return process.env.MIKKA_CLOUD_COMPUTER_TASKS === '1' && process.env.MIKKA_BYOS_ENABLED === '1'
 }
 
+export async function webSubagentsEnabled() {
+  'use step'
+  return process.env.MIKKA_BOT_SUBAGENTS === '1' && process.env.MIKKA_CLOUD_COMPUTER_TASKS === '1'
+}
+
+/** Queue a web task under its chat's identity. A durable tool-call id makes
+ * workflow retries reuse the task rather than spawning a second browser. */
+export async function dispatchWebTask(userId: string, conversationBotId: string | null, input: { task: string; suggestionId?: string }, toolCallId: string, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (process.env.MIKKA_BOT_SUBAGENTS !== '1' || process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'webTaskUnavailable' }
+  let workspaceId: string | undefined
+  if (conversationBotId) workspaceId = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [conversationBotId, userId])).rows[0]?.workspaceId
+  else {
+    const [{ workspaceDb }, { workspaces, workspaceMembers }] = await Promise.all([import('@/lib/workspace-db'), import('@/lib/db/workspace-schema')])
+    const rows = await workspaceDb.select({ id: workspaces.id }).from(workspaces).innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
+      .where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).orderBy(asc(workspaces.createdAt)).limit(1)
+    workspaceId = rows[0]?.id
+  }
+  if (!workspaceId) return { error: 'workspaceUnavailable' }
+  try { await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, workspaceId) } catch { return { error: 'workspaceUnavailable' } }
+  const actor = { userId, workspaceId }
+  const botId = conversationBotId ?? await (await import('@/lib/computer/coordinator-bot')).coordinatorWebBot(pool, actor)
+  const queue = new (await import('@/lib/computer/subagent-queue')).SubagentQueue(pool)
+  const task = await queue.enqueue(actor, botId, input.task, `coordinator:${toolCallId}`)
+  if (input.suggestionId && !await (await import('@/lib/suggestions/execution')).attachSuggestionSubagent(pool, userId, input.suggestionId, task.id)) {
+    await queue.stop(actor, botId, task.id)
+    return { error: 'suggestionUnavailable' }
+  }
+  const [{ start }, { botWebWorker }] = await Promise.all([import('workflow/api'), import('@/workflows/subagents/workflow')])
+  await start(botWebWorker, [actor])
+  return { botId, subagentId: task.id, task: task.task, state: task.state }
+}
+
 async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
     return await fn()
@@ -256,7 +290,7 @@ export async function listComputerBots(userId: string, scope?: NativeToolScope) 
   const { authorizeSubscriptionWorkspace } = await import('@/lib/subscription-runtime')
   const { rows } = await pool.query(`SELECT b.id,b.name,b."workspaceId",coalesce(array_agg(r.harness) FILTER (WHERE r.harness IS NOT NULL),'{}') AS harnesses
     FROM bots b LEFT JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
-    WHERE b."ownerId"=$1 GROUP BY b.id ORDER BY b."createdAt",b.id LIMIT 50`, [userId])
+    WHERE b."ownerId"=$1 AND NOT EXISTS (SELECT 1 FROM coordinator_web_bots c WHERE c."botId"=b.id) GROUP BY b.id ORDER BY b."createdAt",b.id LIMIT 50`, [userId])
   const visible = await Promise.all(rows.map(async row => {
     try { await authorizeSubscriptionWorkspace(userId, row.workspaceId); return { id: row.id, name: row.name, harnesses: row.harnesses } }
     catch { return null }

@@ -26,6 +26,7 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
   'use workflow'
   const holder = getWorkflowMetadata().workflowRunId
   const computerEnabled = await steps.computerToolsEnabled()
+  const webEnabled = await steps.webSubagentsEnabled()
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const inbox = await steps.takeInbox(userId, holder, botId)
     if (!inbox.held) return
@@ -34,11 +35,11 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
       return
     }
     try {
-      const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, tools: coordinatorTools(userId, botId, undefined, computerEnabled, inbox.suggestionIds) })
+      const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, tools: coordinatorTools(userId, botId, undefined, computerEnabled, inbox.suggestionIds, webEnabled) })
       const selected = await native.runtime(userId)
       const result = selected.harness === 'ai_sdk'
         ? await agent.generate({ ...(await steps.preparePrompt(userId, botId)), stopWhen: isStepCount(AGENT_MAX_ROUNDS), prepareStep: coordinatorStep })
-        : await nativeCoordinatorTurn(userId, holder, round, selected, scope => coordinatorTools(userId, botId, scope, computerEnabled, inbox.suggestionIds), botId)
+        : await nativeCoordinatorTurn(userId, holder, round, selected, scope => coordinatorTools(userId, botId, scope, computerEnabled, inbox.suggestionIds, webEnabled), botId)
       // After a quiet decision on hidden evidence there is nothing to say, so a quiet or empty reply is not a warning.
       const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
       await steps.appendMessages(userId, holder, result.responseMessages, quiet ? null : turnWarning(result.finishReason, result.text), botId)
@@ -68,7 +69,7 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
 }
 
 /** Every bot's tools. Each one runs as a step scoped to the person; memory and dispatched runs belong to the bot (null: the Coordinator). */
-export function coordinatorTools(userId: string, botId: string | null, scope?: NativeToolScope, computerEnabled = false, activeSuggestionIds: readonly string[] = []) {
+export function coordinatorTools(userId: string, botId: string | null, scope?: NativeToolScope, computerEnabled = false, activeSuggestionIds: readonly string[] = [], webEnabled = false) {
   const id = z.uuid()
   // A named Bot always controls its own computer. The built-in Coordinator
   // may select any authorized Bot on the person's explicit instruction.
@@ -83,6 +84,13 @@ export function coordinatorTools(userId: string, botId: string | null, scope?: N
       inputSchema: z.object({ query: z.string().trim().min(2).max(300), limit: z.number().int().min(1).max(10).optional() }),
       execute: input => steps.webSearchStep(userId, input, scope),
     }),
+    ...(webEnabled ? {
+      dispatch_web_task: tool({
+        description: 'Start a web task for yourself as a separate browser subagent. Use for browsing and website work, not coding. Returns immediately; the task reports in this chat. For a clicked suggestion, pass its suggestionId. Browser actions require the person’s approval.',
+        inputSchema: z.object({ task: z.string().trim().min(1).max(200), suggestionId: id.optional() }),
+        execute: (input, options) => suggestionAllowed(input.suggestionId) ? steps.dispatchWebTask(userId, botId, input, options.toolCallId, scope) : { error: 'suggestionMismatch' },
+      }),
+    } : {}),
     list_issues: tool({
       description: 'List the person\'s issues, most recently updated first. Optionally only one status (todo, doing, review, done and so on).',
       inputSchema: z.object({ status: z.string().optional() }),

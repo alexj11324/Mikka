@@ -53,6 +53,8 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query(await readFile(new URL('../../drizzle/20261027180000_thread_machines_and_bot_subagents.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027180002_thread_worker_leases.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027180005_thread_desktops.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261027180007_coordinator_web_bots.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261027180008_subagent_approvals.sql', import.meta.url), 'utf8'))
     const workerLeaseMigration = await readFile(new URL('../../drizzle/20261027164512_cloud_worker_leases.sql', import.meta.url), 'utf8')
     await pool.query(workerLeaseMigration); await pool.query(workerLeaseMigration)
     const reviewMigration = await readFile(new URL('../../drizzle/20261027164510_local_computer_reviews.sql', import.meta.url), 'utf8')

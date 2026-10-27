@@ -266,9 +266,11 @@ export async function chatView(userId: string, limit = 200, botId: string | null
   }))
   const leased = coordinatorLeaseActive(session)
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
-  const subagents = botId ? (await pool.query<{ id: string; task: string; state: string; needs: string | null }>(`SELECT id,task,state,needs FROM bot_subagents
-    WHERE "botId"=$1 AND "ownerId"=$2 ORDER BY "createdAt" DESC,id DESC LIMIT $3`, [botId, userId, limit])).rows.map(row =>
-    subagentEventSchema.parse({ type: 'data-subagent', data: { botId, subagentId: row.id, task: row.task, state: row.state, ...(row.needs ? { needs: row.needs } : {}) } })) : []
+  const subagents = (await pool.query<{ id: string; botId: string; task: string; state: string; needs: string | null }>(`SELECT id,"botId",task,state,needs FROM bot_subagents s
+    WHERE s."ownerId"=$2 AND (($1::uuid IS NOT NULL AND s."botId"=$1) OR ($1::uuid IS NULL AND EXISTS
+      (SELECT 1 FROM coordinator_web_bots c WHERE c."botId"=s."botId" AND c."ownerId"=s."ownerId" AND c."workspaceId"=s."workspaceId")))
+    ORDER BY s."createdAt" DESC,s.id DESC LIMIT $3`, [botId, userId, limit])).rows.map(row =>
+    subagentEventSchema.parse({ type: 'data-subagent', data: { botId: row.botId, subagentId: row.id, task: row.task, state: row.state, ...(row.needs ? { needs: row.needs } : {}) } }))
   return {
     items, subagents,
     // A handoff waiting in the inbox is not shown as a reply coming: the Coordinator may decide to stay quiet.

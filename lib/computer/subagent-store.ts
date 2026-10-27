@@ -26,6 +26,7 @@ export class SubagentStore {
         await client.query(`UPDATE bot_subagents SET state='stopped',control='idle',"stopRequestedAt"=now(),"endedAt"=now() WHERE id=$1`, [id])
         await client.query('COMMIT')
         await (await import('@/lib/suggestions/execution')).finishSuggestionSubagent(this.pool, actor.userId, id, 'stopped')
+        await (await import('./subagent-notice')).subagentNotice(this.pool, actor, botId, id, 'finished', { state: 'stopped' })
         return { stopped: true }
       }
       if (!['running', 'needs_you'].includes(row.state) || !row.sandboxId || row.permission === 'deny') throw new ComputerError(409, 'Web task is unavailable')
@@ -42,11 +43,13 @@ export class SubagentStore {
       const sandbox = await this.runtime.connectComputer(row.sandboxId)
       await this.runtime.syncSubagentLease(sandbox, lease)
       await client.query(`UPDATE bot_subagents SET "controlledBy"=$2,"controlUntil"=$3,epoch=$4,control=$5,"stopRequestedAt"=$6 WHERE id=$1`, [id, row.controlledBy, row.controlUntil, row.epoch, row.controlledBy ? 'user' : 'agent', row.stopRequestedAt])
+      if (action === 'stop') await client.query(`UPDATE bot_subagent_approvals SET state='denied',"decidedAt"=now() WHERE "subagentId"=$1 AND "ownerId"=$2 AND state IN ('pending','approved')`, [id, actor.userId])
       const grant = action === 'viewer' || action === 'takeover' ? await this.runtime.subagentViewerGrant(sandbox, lease, actor.userId, action === 'takeover' ? 'control' : mode) : null
       await client.query('COMMIT')
       if (action === 'stop') {
         await this.runtime.stopSubagentBrowser(sandbox, id)
         await new SubagentQueue(this.pool).finish(actor, botId, id, 'failed')
+        await (await import('./subagent-notice')).subagentNotice(this.pool, actor, botId, id, 'finished', { state: 'stopped' })
         return { stopped: true }
       }
       return grant ?? { control: 'agent' }

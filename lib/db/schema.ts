@@ -267,7 +267,7 @@ export const runTokens = pgTable('run_tokens', {
  * (lib/attention): the person has not seen it, and the Coordinator alone
  * decides whether to tell them.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'suggestion_start', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'suggestion_start', 'subagent_update', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth

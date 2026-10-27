@@ -1,7 +1,7 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/auth'
@@ -30,7 +30,7 @@ async function getOwner() {
 export async function listBots(): Promise<BotView[]> {
   const { ownerId, workspaceId } = await getOwner()
   return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots)
-    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId))).orderBy(asc(bots.createdAt))
+    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId), sql`NOT EXISTS (SELECT 1 FROM coordinator_web_bots c WHERE c."botId"=${bots.id})`)).orderBy(asc(bots.createdAt))
 }
 
 /** 新建 Bot: a name, a colour and a shape. Bots run on Mikka's own harness, so there is no machine to pick. */

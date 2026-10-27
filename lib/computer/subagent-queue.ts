@@ -35,16 +35,22 @@ export class SubagentQueue {
     return result.rows[0]
   }
 
-  async claimNext(actor: Actor): Promise<Subagent | null> {
+  async claimNext(actor: Actor, workerKey?: string): Promise<Subagent | null> {
+    if (workerKey !== undefined && (!workerKey || workerKey.length > 256)) throw new Error('Invalid worker')
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`bot-subagent-capacity:${actor.workspaceId}`])
+      if (workerKey) {
+        const prior = await client.query<Subagent>(`SELECT id,"botId",task,state FROM bot_subagents
+          WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "workerKey"=$3 AND state IN ('running','needs_you')`, [actor.workspaceId, actor.userId, workerKey])
+        if (prior.rowCount) { await client.query('COMMIT'); return prior.rows[0] }
+      }
       const occupied = (await client.query<{ count: string }>(`SELECT count(*) AS count FROM bot_subagents WHERE "workspaceId"=$1 AND state IN ('running','needs_you')`, [actor.workspaceId])).rows[0]
       if (Number(occupied.count) >= BOT_SUBAGENT_LIMIT) { await client.query('COMMIT'); return null }
-      const result = await client.query<Subagent>(`UPDATE bot_subagents SET state='running',control='agent',"startedAt"=now() WHERE id=(
+      const result = await client.query<Subagent>(`UPDATE bot_subagents SET state='running',control='agent',"startedAt"=now(),"workerKey"=$3 WHERE id=(
         SELECT id FROM bot_subagents WHERE "workspaceId"=$1 AND "ownerId"=$2 AND state='queued'
-        ORDER BY "createdAt",id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id,"botId",task,state`, [actor.workspaceId, actor.userId])
+        ORDER BY "createdAt",id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id,"botId",task,state`, [actor.workspaceId, actor.userId, workerKey ?? null])
       await client.query('COMMIT')
       return result.rows[0] ?? null
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
