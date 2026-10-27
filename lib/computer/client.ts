@@ -1,4 +1,5 @@
-import { computerStateSchema, viewerGrantSchema, computerEventSchema } from '@mikka/protocol/computer'
+import { z } from 'zod'
+import { botViewSchema, computerStateSchema, viewerGrantSchema, computerEventSchema } from '@mikka/protocol/computer'
 import { withBasePath } from '@/lib/base-path'
 import { MOCK_HOSTS, mockComputer, mockSetup } from './mock'
 import type { ApprovalDecision, ApprovalView, ComputerEvent, ComputerState, KnownHost, SetupStep, SetupStepState, ViewerGrant, ViewerMode } from './types'
@@ -27,6 +28,7 @@ async function call<T>(path: string, init?: RequestInit & { json?: unknown }): P
 const botPath = (botId: string, rest = '') => `/api/bots/${encodeURIComponent(botId)}/computer${rest}`
 
 export const computerApi = {
+  bots: () => call<unknown>('/api/bots').then(value => z.array(botViewSchema).parse(value)),
   state: (botId: string) => isMockedComputer(botId) ? mockComputer.state(botId) : call<ComputerState>(botPath(botId)).then(value => computerStateSchema.parse(value)),
   wake: (botId: string) => isMockedComputer(botId) ? mockComputer.wake(botId) : call<null>(botPath(botId, '/wake'), { method: 'POST' }),
   viewer: (botId: string, mode: ViewerMode) => isMockedComputer(botId) ? mockComputer.viewer(botId, mode) : call<ViewerGrant>(botPath(botId, '/viewer'), { method: 'POST', json: { mode } }).then(value => viewerGrantSchema.parse(value)),

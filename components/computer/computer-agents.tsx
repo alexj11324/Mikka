@@ -2,8 +2,8 @@
 
 import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
-import { getThreadName, listAgents } from '@/app/actions/agents'
-import { isMockedComputer } from '@/lib/computer/client'
+import { getThreadName } from '@/app/actions/agents'
+import { computerApi, isMockedComputer } from '@/lib/computer/client'
 
 /** A thread that uses a bot's computer: the run, its name, and the bot that owns both. */
 export type ComputerThread = { botId: string; botName: string; runId: string; name: string }
@@ -47,8 +47,8 @@ export function useConversationThread(conversation: string | null | undefined): 
 
 /** A bot's display name: the one the card was given, else the bot list. */
 export function useComputerBotName(botId: string, given?: string) {
-  const { data } = useSWR(given ? null : 'agents', listAgents, { revalidateOnFocus: false })
-  return given ?? data?.find(agent => agent.id === botId)?.name ?? 'Agent'
+  const { data } = useSWR(given || isMockedComputer(botId) ? null : 'computer-bots', computerApi.bots, { revalidateOnFocus: false })
+  return given ?? data?.find(bot => bot.id === botId)?.name ?? 'Bot'
 }
 
 /** A thread's name from its task; the card's own name, then its task sentence, until that is known. */
