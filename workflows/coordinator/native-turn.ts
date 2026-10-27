@@ -5,14 +5,14 @@ import * as native from './native-steps'
 import type { NativeToolScope } from './tool-scope'
 
 /** A durable transport relay, not an additional LLM/agent loop. Native harness chooses tools. */
-export async function nativeCoordinatorTurn(userId: string, holder: string, round: number, runtime: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, createTools: (scope?: NativeToolScope) => ToolSet) {
+export async function nativeCoordinatorTurn(userId: string, holder: string, round: number, runtime: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, createTools: (scope?: NativeToolScope) => ToolSet, botId: string | null = null) {
   const tools = createTools()
   const definitions: NativeCoordinatorJob['tools'] = []
   for (const [name, definition] of Object.entries(tools)) {
     if (definition.type === 'provider' || !definition.execute) continue
     definitions.push({ name, description: typeof definition.description === 'string' ? definition.description : name, inputSchema: await asSchema(definition.inputSchema).jsonSchema as Record<string, unknown> })
   }
-  const turnId = await native.enqueue(userId,holder,round,runtime,definitions)
+  const turnId = await native.enqueue(userId,holder,round,runtime,definitions,botId)
   const responseMessages: ModelMessage[] = []
   const completed = new Map<string, unknown>()
   try {

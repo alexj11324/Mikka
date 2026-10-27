@@ -1,0 +1,38 @@
+name: E2B subscription custody
+on:
+  push:
+    branches: [main, 'codex/e2b-cloud-computer-172']
+  pull_request:
+    paths:
+      - 'lib/subscription*'
+      - 'lib/infisical-workload*'
+      - 'packages/subscription-worker/**'
+      - 'packages/daemon/**'
+      - 'packages/protocol/**'
+      - 'scripts/test-subscription*'
+      - 'tests/byos-*'
+      - '.github/workflows/e2b-byos.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:byos
+      - run: pnpm --filter @mikka/protocol exec vitest run src/subscription.test.ts
+      - run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
+      - run: pnpm --filter @mikka/daemon exec vitest run test/subscription-hosted-runner.test.ts
+      - run: pnpm test:byos-worker
+        env:
+          MIKKA_BYOS_BACKEND_ONLY: '1'

@@ -15,10 +15,12 @@ test('Retired chat route exposes only the shared image GET, with no generation o
   assert.doesNotMatch(archive, /<div inert>|AgentGenerativeUI/)
   assert.match(archive, /<LegacyReplyContent/)
   assert.match(archive, /fetchAgentHistory/)
-  const nav = await source('components/nav/conversation-list.tsx')
-  assert.match(nav, /Nav\.openBotChat/)
-  assert.doesNotMatch(nav, /choose\(\{ kind: 'agent', sessionId: null/)
+  // The left column lists bots only; an older chat opens from ⌘K, read-only.
+  const nav = await source('components/nav/bot-list.tsx')
+  assert.match(nav, /Nav\.newBot/)
+  assert.doesNotMatch(nav, /choose\(\{ kind: 'agent'/)
   assert.doesNotMatch(nav, /sessions.map|recent.map/)
+  assert.match(await source('components/nav/global-search.tsx'), /Nav\.openBotChat|tNav\('openBotChat'\)/)
   assert.match(await source('components/nav/global-search.tsx'), /archivedConversation/)
 })
 

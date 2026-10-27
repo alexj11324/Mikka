@@ -40,7 +40,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const migrated = await promisify(execFile)(process.execPath, ['scripts/migrate.mjs'], {
     env: { ...process.env, MIGRATE: '1', VERCEL_ENV: '' }, maxBuffer: 4 << 20,
   })
-  assert.match(migrated.stdout, /applied 20261026220000_personal_scope_detachment.sql/)
+  assert.match(migrated.stdout, /applied 20261027183117_personal_scope_detachment.sql/)
   const pool = new Pool({ connectionString: connection, max: 5 })
   const { changeIssueScopeLocally } = await import('../lib/issue-scope-store')
   const { promoteExistingIssueForUser } = await import('../lib/team-issue-promotion')
@@ -64,6 +64,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const { issueRunToken, verifyRunToken } = await import('../lib/mcp/worker')
   const { renewRunLeases } = await import('../lib/run-leases')
   const { completeRunForDevice, dispatchCompletedIssue } = await import('../lib/run-completion')
+  const { authorizedClaimResponse } = await import('../lib/run-claim-response')
   const { createAppIssueFromLinear, applyLinearIssueToApp, syncAppIssueToLinear } = await import('../lib/linear-sync/issue-sync')
   const { processLinearIssueOutbox, processLinearInboxDelivery } = await import('../lib/linear-sync/worker')
   const { hashDeviceToken } = await import('../lib/device-link')
@@ -97,7 +98,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   // Recreate the pre-verification migration state in this fresh synthetic DB
   // so an unlinked terminal job can exist exactly as it could before 2242.
   // Later replays restore 2242 and 2243 before any application assertions.
-  await pool.query(await readFile(new URL('../drizzle/20261026224000_team_issue_creation_gate.sql',import.meta.url),'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261027183121_team_issue_creation_gate.sql',import.meta.url),'utf8'))
   const legacyFailed=randomUUID()
   await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Legacy failed-only task\',$3,\'todo\',\'normal\',\'workspace\')',[legacyFailed,owner,doc])
   await pool.query('update linear_sync_outbox set status=\'failed\',attempts=8 where "issueId"=$1',[legacyFailed])
@@ -114,10 +115,10 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   assert.equal((await pool.query('select "externalTargetVerified" from linear_issue_links where id=$1',[legacyLink])).rows[0].externalTargetVerified,false)
   // Replay the tracked migration's legacy backfill while the isolated DB has
   // only this synthetic legacy fixture. It includes its normal trigger DDL.
-  await pool.query(await readFile(new URL('../drizzle/20261026224200_require_verified_team_promotion.sql',import.meta.url),'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261027183123_require_verified_team_promotion.sql',import.meta.url),'utf8'))
   // Restore the subsequent tracked scope gate; the older migration replaces
   // its function body. This leaves the suite on the exact final policy.
-  await pool.query(await readFile(new URL('../drizzle/20261026224300_team_issue_promotions.sql',import.meta.url),'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261027183124_team_issue_promotions.sql',import.meta.url),'utf8'))
   assert.equal((await pool.query('select "externalTargetVerified" from linear_issue_links where id=$1',[legacyLink])).rows[0].externalTargetVerified,true)
   fixtureIds.push(legacyImported)
   await pool.query('insert into devices (id,"ownerId",name) values ($1,$2,\'Synthetic\')', [device,member])
@@ -151,11 +152,11 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   await pool.query('update agent_runs set status=\'running\' where id=$1',[ownerRun])
   const memberToken = (await issueRunToken({id:memberRun,userId:member})).token
   const ownerToken = (await issueRunToken({id:ownerRun,userId:owner})).token
-  async function withClaimServer(check: (origin: string)=>Promise<void>) {
+  async function withClaimServer(check: (origin: string)=>Promise<void>, runId = memberRun) {
     const server = createServer(async (incoming,outgoing) => {
       const request = new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{authorization:incoming.headers.authorization??''}})
       try {
-        const response = await claim.POST(request,{params:Promise.resolve({deviceId:device,runId:memberRun})})
+        const response = await claim.POST(request,{params:Promise.resolve({deviceId:device,runId})})
         outgoing.writeHead(response.status,Object.fromEntries(response.headers));outgoing.end(await response.text())
       } catch { outgoing.writeHead(500);outgoing.end('Handler failed') }
     })
@@ -214,6 +215,66 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal(claimed.runId,memberRun)
       assert.ok(await verifyRunToken(new Request(`${origin}/`),claimed.mcp.token))
     })
+  })
+  await t.test('claim paused after commit returns no prompt when retirement wins before token issuance', async () => {
+    const id=randomUUID(),run=randomUUID(),barrier=18430127
+    await seed(id,id,false)
+    await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt) values ($1,$2,$3,$4,$5,$6,\'queued\',\'private claim race instructions\')',[run,member,id,agent,device,repo])
+    // This retained, fixture-specific trigger pauses before the scope token
+    // fence. Its advisory lock never touches the issue/run retirement locks.
+    await pool.query(`create function scope184_claim_response_barrier() returns trigger language plpgsql as $$ begin
+      if new."runId"='${run}'::uuid then perform pg_advisory_xact_lock(${barrier}); end if;return new;end $$;
+      create trigger aaa_scope184_claim_response_barrier before insert on run_tokens for each row execute function scope184_claim_response_barrier()`)
+    const blocker=await pool.connect()
+    let responsePromise:Promise<Response>|undefined
+    let held=false
+    try {
+      await blocker.query('select pg_advisory_lock($1)',[barrier]);held=true
+      const pid=(await blocker.query('select pg_backend_pid() pid')).rows[0].pid
+      await withClaimServer(async origin=>{
+        try {
+          responsePromise=fetch(`${origin}/claim`,{method:'POST',headers:{authorization:`Bearer ${deviceToken}`}})
+          await waitFor(async()=>Boolean((await pool.query("select 1 from pg_stat_activity a where a.wait_event_type='Lock' and $1=any(pg_blocking_pids(a.pid))",[pid])).rowCount),'claim did not pause before token issuance')
+          assert.equal((await pool.query('select status from agent_runs where id=$1',[run])).rows[0].status,'preparing')
+          const preview=await actAs(owner,()=>previewIssuePersonalScope(id))
+          assert.ok('preview' in preview && preview.preview)
+          const changed=await actAs(owner,()=>confirmIssuePersonalScope({id,revision:1,confirmation:preview.preview.confirmation}))
+          assert.ok('issue' in changed)
+          await blocker.query('select pg_advisory_unlock($1)',[barrier]);held=false
+          const response=await responsePromise
+          assert.equal(response.status,409)
+          const body=await response.text()
+          for(const field of ['private claim race instructions','prompt','mcp','subscriptionBinding'])assert.equal(body.includes(field),false)
+          assert.equal((await pool.query('select status from agent_runs where id=$1',[run])).rows[0].status,'cancelled')
+          assert.equal((await pool.query('select count(*)::int n from run_tokens where "runId"=$1 and "revokedAt" is null',[run])).rows[0].n,0)
+          assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
+        } finally {
+          if(held){await blocker.query('select pg_advisory_unlock($1)',[barrier]);held=false}
+          if(responsePromise)await Promise.allSettled([responsePromise])
+        }
+      },run)
+    } finally {
+      if(held)await blocker.query('select pg_advisory_unlock($1)',[barrier]);blocker.release()
+      if(responsePromise)await Promise.allSettled([responsePromise])
+    }
+  })
+  await t.test('claim response tolerates a heartbeat holding its run before the issue fence',async()=>{
+    const id=randomUUID(),run=randomUUID(),lease=new Date(Date.now()+600_000).toISOString()
+    await seed(id,id,false)
+    await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,$6,\'preparing\',$7)',[run,member,id,agent,device,repo,lease])
+    const writer=await pool.connect()
+    let responding:ReturnType<typeof authorizedClaimResponse>|undefined
+    try {
+      await writer.query('begin')
+      await writer.query('select id from agent_runs where id=$1 for update',[run])
+      const pid=(await writer.query('select pg_backend_pid() pid')).rows[0].pid
+      responding=authorizedClaimResponse(member,{id:run,issueId:id,agentId:agent,deviceId:device,deviceRepoId:repo},lease,()=>new Response('authorized',{status:200}))
+      await waitFor(async()=>Boolean((await pool.query("select 1 from pg_stat_activity a where a.wait_event_type='Lock' and $1=any(pg_blocking_pids(a.pid))",[pid])).rowCount),'response did not wait on the held heartbeat run')
+      try {await writer.query('update agent_runs set "updatedAt"=now() where id=$1',[run]);await writer.query('commit')}
+      catch(error){assert.equal((error as {code:string}).code,'40P01');await writer.query('rollback')}
+      assert.equal((await responding)?.status,200)
+      assert.equal((await pool.query('select status from agent_runs where id=$1',[run])).rows[0].status,'preparing')
+    } finally {await writer.query('rollback');writer.release();if(responding)await Promise.allSettled([responding])}
   })
   await t.test('concurrent clicks commit one revision, one tombstone, and cancel old outbox work', async () => {
     const results = await Promise.all([localFlip(issue),localFlip(issue)])

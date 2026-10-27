@@ -67,7 +67,7 @@ export async function listActiveAgents(database: Database, userId: string, now =
         or(gt(agentRuns.leaseExpiresAt, now), and(isNull(agentRuns.leaseExpiresAt), gt(devices.lastSeenAt, onlineSince))),
       )),
     database.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, updatedAt: coordinatorSessions.updatedAt })
-      .from(coordinatorSessions).where(eq(coordinatorSessions.userId, userId)).limit(1),
+      .from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNull(coordinatorSessions.botId))).limit(1),
   ])
   const list = mergeAgentRuns(rows)
   if (coordinatorLeaseActive(session, now)) {

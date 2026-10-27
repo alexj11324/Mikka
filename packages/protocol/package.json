@@ -40,7 +40,10 @@
     "./label-colors": "./src/label-colors.ts",
     "./members": "./src/members.ts",
     "./collab": "./src/collab.ts",
-    "./coordinator": "./src/coordinator.ts"
+    "./artifact-frame": "./src/artifact-frame.ts",
+    "./coordinator": "./src/coordinator.ts",
+    "./computer": "./src/computer.ts",
+    "./subscription": "./src/subscription.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",

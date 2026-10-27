@@ -1,6 +1,6 @@
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
-import { and, asc, desc, eq, gt, inArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { actAs } from '@/lib/acting-user'
 import type { ActivityActor } from '@/lib/activity-actor'
@@ -191,7 +191,7 @@ export async function listLabels(userId: string) {
 }
 
 export async function readMemory(userId: string) {
-  const [session] = await db.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions).where(eq(coordinatorSessions.userId, userId)).limit(1)
+  const [session] = await db.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNull(coordinatorSessions.botId))).limit(1)
   return { memory: session?.memory ?? '' }
 }
 

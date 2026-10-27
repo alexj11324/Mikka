@@ -7,12 +7,13 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowUp, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { getIssueThread, sendIssueThreadMessage } from '@/app/actions/agents'
 import { runIsActive, threadItems } from '@/lib/issue-run-conversation'
-import { LetterAvatar } from '@/components/nav/letter-avatar'
+import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { Button } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { AgentMarkdown } from './agent-markdown'
+import { ComputerCard } from '@/components/computer/computer-card'
 import { ThreadStatus, harnessLabel } from './issue-threads'
 import { cn } from '@/lib/utils'
 
@@ -34,7 +35,7 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
   const [sendFailed, setSendFailed] = useState(false)
   const detail = data?.thread.detail
   const active = !!data && runIsActive(data.thread.status)
-  const items = data ? threadItems(data.chunks, data.messages) : []
+  const items = data ? threadItems(data.chunks, data.messages, runId) : []
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
@@ -54,7 +55,7 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
         <Button variant="ghost" size="sm" className="shrink-0" aria-label={t('back', { name: back })} onClick={onClose}><ChevronLeft data-icon="inline-start" />{back}</Button>
         <span aria-hidden="true" className="text-muted-foreground">/</span>
       </>}
-      {detail && <LetterAvatar name={detail.agentName} size="pill" />}
+      {detail && <BotAvatar color={colorFor(detail.agentName)} size="pill" still />}
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{detail?.name ?? t('title')}</h2>
       {!back && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
     </header>
@@ -72,6 +73,7 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
               {item.kind === 'agent' && <div className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>}
               {item.kind === 'steps' && <span className="flex items-center gap-1 text-xs text-muted-foreground"><ChevronRight className="size-3.5" aria-hidden="true" />{t('steps', { harness: harnessLabel(detail?.harness ?? ''), count: item.count })}</span>}
               {item.kind === 'error' && <p role="alert" className="text-xs text-destructive">{item.text}</p>}
+              {item.kind === 'computer' && <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : data.thread.status === 'succeeded' ? 'done' : 'failed'} />}
               {item.kind === 'person' && (item.mine
                 // R-14: your own words are the blue bubble on the right.
                 ? <p className={cn(BUBBLE, 'self-end bg-sidebar-primary text-sidebar-primary-foreground')}>{item.text}</p>

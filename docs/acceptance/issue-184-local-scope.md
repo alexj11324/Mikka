@@ -29,6 +29,16 @@ The reported `/complete` race was reproduced on a task with **no Linear link or 
 
 Legitimate owner-personal and null-task completions, member completion while workspace, plan behavior, `not_run`, failed verify, and terminal replay remain covered. Coordinator and worker-auth helper logic was not changed.
 
+## Current-main claim response compatibility candidate
+
+The local compatibility candidate combines the retained `c48748e` backend with main `c43ee781442af8d4f530e29f731effd4e2ed181f`. Both scope and Bot/computer/artifact test inventories remain enrolled. It has 70 tracked SQL sources (61 from main and nine scope additions); the old 49-source acceptance manifest does not apply. No current-main database execution is claimed here.
+
+Independent source review found another revocation window: claim committed before retirement, token issuance failed after retirement, but its best-effort catch still returned the old prompt. `authorizedClaimResponse` now locks issue then run after asynchronous preparation, rechecks ownership, current workspace access, deletion, run/device state and the exact claim lease, and builds the response synchronously from the locked run. Retirement winning first returns 409 without prompt, token or execution parameters. A response authorized before retirement cannot be recalled after it reaches the transport.
+
+Five pure route tests cover retirement during token issuance, ordinary token provisioning failure while access remains valid, membership/lease changes, the fresh locked prompt, and bounded retries of rolled-back deadlock/serialization failures. A new retained PG/HTTP test pauses token issuance with a fixture-specific advisory-lock trigger after the claim commit, retires the task through public preview/confirm, then requires 409, a cancelled run and zero live tokens/outbox. A second prepared PG case exercises a heartbeat's reverse lock order; only rolled-back local response transactions retry, at most twice. These tests are prepared source only, pending the separate single-run approval. The barrier trigger/function and fixtures remain in the new scope test database; they add no DROP or DELETE operations. Workspace membership is rechecked through the existing separate workspace database; the app row locks serialize scope retirement, not cross-database membership changes.
+
+The nine unshipped scope migration files are renamed to `20261027183117` through `20261027183125`, keeping their SQL bytes and relative order unchanged while following current main's timestamp policy. Fresh test databases are required; no alias or migration-runner change is introduced, and no permission to replay the renamed migrations on any existing database is implied.
+
 ## Real PG / loopback HTTP evidence
 
 On Mikka cloud Linux, Docker Postgres 17 `mikka-issue184-pg` listens only on loopback port 55484. The provisioning DB is `issue184_e2e`; the scope suite creates and retains a fresh database (its local name is frozen in the candidate manifest) initialized from **all tracked migrations**, including actual production constraints, foreign keys and triggers. It does not depend on the shared CI column-only setup or modify another suite's records.
