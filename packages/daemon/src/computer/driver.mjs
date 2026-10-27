@@ -220,11 +220,24 @@ export async function executeDriver(driver, input, display, leaseGuard) {
         JSON.stringify({ jsonrpc: "2.0", id: n, method, params }) + "\n",
       );
     });
-  let timer;
+  let timer, waitCancellation;
   try {
     // Waiting for a person or another agent is not a driver timeout. No RPC
     // is sent until the lock is held and the run is still permitted.
+    if (leaseGuard?.permitted) {
+      waitCancellation = setInterval(() => {
+        let allowed = false;
+        try { allowed = leaseGuard.permitted(); } catch { /* fail closed */ }
+        if (!allowed && readyReject) {
+          const reject = readyReject;
+          readyResolve = undefined; readyReject = undefined;
+          reject(new Error("Computer run is no longer active"));
+          child.kill();
+        }
+      }, 250);
+    }
     await ready;
+    clearInterval(waitCancellation);
     if (leaseGuard?.permitted && !leaseGuard.permitted()) throw new Error("Computer run is no longer active");
     timer = setTimeout(() => {
       fail(new Error("Driver timed out; outcome unknown, do not retry automatically"));
@@ -241,6 +254,7 @@ export async function executeDriver(driver, input, display, leaseGuard) {
     );
     return await request("tools/call", { name: call.name, arguments: args });
   } finally {
+    clearInterval(waitCancellation);
     clearTimeout(timer);
     lines.close();
     child.stdin.end();

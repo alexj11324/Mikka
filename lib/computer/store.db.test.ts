@@ -12,6 +12,7 @@ import { claimWorkerLease, renewWorkerLease, releaseWorkerLease } from './worker
 import { startCloudWorker } from './cloud-worker'
 import { queueCloudRun } from './queue-run'
 import { authorizedAccessName } from '../subscription-access-snapshot'
+import { findNativeRun } from '../subscription-native-run'
 import { ensureBotRuntime } from './bot-runtime'
 import { bindBotSubscription } from './bot-subscription'
 import { ComputerBroker } from '../../packages/daemon/src/computer/broker.mjs'
@@ -222,6 +223,28 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
       VALUES ($1,$2,$3,$4,$5,$6,$7,'running')`, [threadRun, actor.workspaceId, actor.userId, 'fixture-snapshot', randomUUID(), 'thread-fixture', threadDevice])
     assert.equal(await claimCloudRun(pool, actor, threadRun, worker.deviceId, deadline, cloudSubscription), null, 'the shared Bot device cannot claim a thread machine run')
     assert.deepEqual(await claimCloudRun(pool, actor, threadRun, threadDevice, deadline, cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0, machine: 'thread' })
+    assert.equal((await findNativeRun(pool, actor.userId, worker.deviceId, cloudRun))?.id, cloudSubscription, 'the original device remains authorized')
+    const dedicatedRun = randomUUID(), dedicatedDevice = randomUUID()
+    await pool.query('INSERT INTO devices (id,"ownerId",kind) VALUES ($1,$2,$3)', [dedicatedDevice, actor.userId, 'cloud'])
+    await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"deviceId") VALUES ($1,$2,$3,$4,$5)', [dedicatedRun, actor.userId, managedCodex.agentId, 'queued', dedicatedDevice])
+    await bindComputerRun(pool, actor, dedicatedRun, bot.id)
+    await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","snapshotId","operationId","sandboxId","deviceId",state)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'running')`, [dedicatedRun, actor.workspaceId, actor.userId, 'fixture-snapshot', randomUUID(), 'native-thread-fixture', dedicatedDevice])
+    assert.ok(await claimCloudRun(pool, actor, dedicatedRun, dedicatedDevice, deadline, linked[0].bindingId))
+    assert.equal((await findNativeRun(pool, actor.userId, dedicatedDevice, dedicatedRun))?.id, linked[0].bindingId)
+    assert.equal(await findNativeRun(pool, bob.userId, dedicatedDevice, dedicatedRun), undefined)
+    assert.equal(await findNativeRun(pool, actor.userId, worker.deviceId, dedicatedRun), undefined)
+    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [dedicatedDevice])
+    assert.equal(await findNativeRun(pool, actor.userId, dedicatedDevice, dedicatedRun), undefined)
+    await pool.query('UPDATE devices SET enabled=true WHERE id=$1', [dedicatedDevice])
+    await pool.query('UPDATE thread_machines SET state=$2 WHERE "runId"=$1', [dedicatedRun, 'paused'])
+    assert.equal(await findNativeRun(pool, actor.userId, dedicatedDevice, dedicatedRun), undefined)
+    await pool.query('UPDATE thread_machines SET state=$2 WHERE "runId"=$1', [dedicatedRun, 'running'])
+    await pool.query('UPDATE byos_bindings SET "workspaceId"=$2 WHERE id=$1', [linked[0].bindingId, otherWorkspace.workspaceId])
+    assert.equal(await findNativeRun(pool, actor.userId, dedicatedDevice, dedicatedRun), undefined)
+    await pool.query('UPDATE byos_bindings SET "workspaceId"=$2 WHERE id=$1', [linked[0].bindingId, actor.workspaceId])
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [dedicatedRun])
+    assert.equal(await findNativeRun(pool, actor.userId, dedicatedDevice, dedicatedRun), undefined)
     // A thread display is :1 on its own machine even when its Bot's shared
     // desktop uses a different display number.
     await pool.query('UPDATE bot_desktops SET display=9 WHERE "botId"=$1', [bot.id])

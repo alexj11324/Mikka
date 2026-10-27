@@ -59,9 +59,9 @@ catch(error) { await writeFile('/tmp/mikka-wait-'+mode,mode==='cancel'&&String(e
   await syncDesktopLease(sandbox, { ...held, epoch: 3 })
   const second = await sandbox.commands.run(`node /tmp/mikka-driver-wait-test.mjs ${botId} ${ownerId} cancel`, { user: 'mikka-runner', background: true, timeoutMs: 0 })
   await new Promise(resolve => setTimeout(resolve, 2000))
-  await syncDesktopLease(sandbox, { ...held, epoch: 4, controlledBy: null, controlUntil: 0 })
   await bounded(second.wait())
   assert.equal(await sandbox.files.read('/tmp/mikka-wait-cancel', { user: 'mikka-runner' }), 'cancelled')
+  await syncDesktopLease(sandbox, { ...held, epoch: 4, controlledBy: null, controlUntil: 0 })
   console.log('live thread control: wait, handback and cancellation passed')
 } finally { await sandbox.kill() }
 
