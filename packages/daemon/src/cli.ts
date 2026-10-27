@@ -39,7 +39,8 @@ const defaultIO: CliIO = {
 /** Returns an exit code, or `null` while the daemon keeps running. */
 export async function runCli(
   argv: string[],
-  io: CliIO = defaultIO
+  io: CliIO = defaultIO,
+  privateConfig?: { protectionBypass?: string }
 ): Promise<number | null> {
   const { values, positionals } = parseArgs({
     args: argv,
@@ -151,7 +152,7 @@ export async function runCli(
     link = memoryServer.link()
     credential = "dev"
   } else {
-    link = new HttpServerLink(serverArg)
+    link = new HttpServerLink(serverArg, fetch, DAEMON_VERSION, privateConfig?.protectionBypass)
   }
 
   const log = createLogger({

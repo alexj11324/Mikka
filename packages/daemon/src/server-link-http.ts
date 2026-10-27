@@ -118,8 +118,14 @@ export class HttpServerLink implements ServerLink {
   constructor(
     private readonly baseUrl: string,
     private readonly fetchImpl: typeof fetch = fetch,
-    private readonly clientVersion: string = DAEMON_VERSION
-  ) {}
+    private readonly clientVersion: string = DAEMON_VERSION,
+    private readonly protectionBypass?: string
+  ) {
+    if (protectionBypass) {
+      const url = new URL(baseUrl)
+      if (url.protocol !== 'https:' || !url.hostname.endsWith('.vercel.app') || url.username || url.password || url.search || url.hash || !/^[A-Za-z0-9_-]{20,256}$/.test(protectionBypass)) throw new Error('Invalid preview transport')
+    }
+  }
 
   private async send(
     method: string,
@@ -138,7 +144,9 @@ export class HttpServerLink implements ServerLink {
           "content-type": "application/json",
           [CLIENT_VERSION_HEADER]: this.clientVersion,
           ...(token ? { authorization: `Bearer ${token}` } : {}),
+          ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),
         },
+        ...(this.protectionBypass ? { redirect: 'error' as const } : {}),
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: signal
           ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])

@@ -69,6 +69,18 @@ const assignment = (runId: string) => ({
 })
 
 describe("HttpServerLink", () => {
+  it('sends a private preview bypass only to the fixed HTTPS preview origin and refuses redirects', async () => {
+    const previewSecret = 'fixture-preview-secret-1234567890'
+    const fetcher: typeof fetch = async (url, init) => {
+      expect(String(url)).toBe('https://fixture.vercel.app/mikka/v1/devices/register')
+      expect(new Headers(init?.headers).get('x-vercel-protection-bypass')).toBe(previewSecret)
+      expect(init?.redirect).toBe('error')
+      return json({ deviceId: 'dev-1', workspaceId: crypto.randomUUID() }, 201)
+    }
+    await new HttpServerLink('https://fixture.vercel.app/mikka', fetcher, '1', previewSecret).registerDevice('session-1', INFO)
+    expect(() => new HttpServerLink('https://attacker.example/mikka', fetcher, '1', previewSecret)).toThrow('Invalid preview transport')
+    expect(() => new HttpServerLink('http://fixture.vercel.app/mikka', fetcher, '1', previewSecret)).toThrow('Invalid preview transport')
+  })
   it("sends exact computer reviews over the authenticated device channel", async () => {
     const id = crypto.randomUUID(), runId = crypto.randomUUID(), digest = 'a'.repeat(64)
     const { fetch, calls } = scripted(call => call.path.endsWith('/register')

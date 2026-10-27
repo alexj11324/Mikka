@@ -13,6 +13,8 @@ type Actor = { userId: string; workspaceId: string }
 export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbox, server: string, sourceSha: string, runtime = provider) {
   const url = new URL(server)
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || !/^[a-f0-9]{40}$/.test(sourceSha)) throw new Error('Invalid cloud worker configuration')
+  const protectionBypass = process.env.VERCEL_ENV === 'preview' ? process.env.MIKKA_CLOUD_PREVIEW_BYPASS : undefined
+  if (protectionBypass && (!url.hostname.endsWith('.vercel.app') || !/^[A-Za-z0-9_-]{20,256}$/.test(protectionBypass))) throw new Error('Invalid cloud worker configuration')
   const leaseId = randomUUID()
   if (!await claimWorkerLease(pool, actor, sandbox.sandboxId, leaseId)) throw new Error('Cloud worker provisioning is busy or unavailable')
   const temporary = `/run/mikka-viewer/worker-${leaseId}.next`
@@ -32,7 +34,7 @@ export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbo
     const hash = createHash('sha256').update(credential.token).digest('hex')
     // The staging directory is root-only; the runner's handoff is private and
     // no credential appears in a shell command, argument or environment.
-    await sandbox.files.write(temporary, JSON.stringify({ deviceId: credential.deviceId, workspaceId: actor.workspaceId, credential: credential.token, server: url.toString() }), { user: 'root' })
+    await sandbox.files.write(temporary, JSON.stringify({ deviceId: credential.deviceId, workspaceId: actor.workspaceId, credential: credential.token, server: url.toString(), ...(protectionBypass ? { protectionBypass } : {}) }), { user: 'root' })
     if (!await renewWorkerLease(pool, actor, leaseId)) throw new Error('Cloud worker lease expired')
     await sandbox.commands.run(`install -d -o mikka-runner -g mikka-runner -m 0700 /home/mikka-runner/.mikka && install -o mikka-runner -g mikka-runner -m 0600 ${temporary} /home/mikka-runner/.mikka/bootstrap.next && mv /home/mikka-runner/.mikka/bootstrap.next /home/mikka-runner/.mikka/bootstrap.json && unlink ${temporary}`, { user: 'root', timeoutMs: 10_000 })
     await sandbox.commands.run('cd /opt/mikka/worker/packages/daemon && HOME=/home/mikka-runner ./node_modules/.bin/tsx bin/cloud-worker.ts > /home/mikka-runner/.mikka/worker-bootstrap.log 2>&1', { user: 'mikka-runner', background: true, timeoutMs: 0 })

@@ -8,6 +8,7 @@ const configSchema = z.object({
   deviceId: z.uuid(), workspaceId: z.uuid(),
   credential: z.string().regex(/^orv_[A-Za-z0-9_-]{43}$/),
   server: z.url({ protocol: /^https$/ }),
+  protectionBypass: z.string().regex(/^[A-Za-z0-9_-]{20,256}$/).optional(),
 }).strict()
 
 /** Read a one-use control-plane handoff. Never accept a symlink, a file
@@ -19,7 +20,7 @@ export function consumeCloudBootstrap(path: string) {
     if (!stat.isFile() || stat.uid !== process.getuid?.() || (stat.mode & 0o077) !== 0 || stat.size > 4096) throw new Error('Invalid cloud worker handoff')
     const config = configSchema.parse(JSON.parse(readFileSync(fd, 'utf8')))
     const url = new URL(config.server)
-    if (url.username || url.password || url.search || url.hash) throw new Error('Invalid cloud worker server')
+    if (url.username || url.password || url.search || url.hash || (config.protectionBypass && !url.hostname.endsWith('.vercel.app'))) throw new Error('Invalid cloud worker server')
     unlinkSync(path)
     return config
   } finally { closeSync(fd) }
