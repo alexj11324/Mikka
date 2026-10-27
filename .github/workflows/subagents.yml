@@ -9,6 +9,16 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: isolated-ci
+          POSTGRES_DB: subagent_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -21,3 +31,7 @@ jobs:
       - run: pnpm exec oxlint --deny-warnings lib/cloud-computer workflows/subagent app/api/computer/events scripts/e2b/subagent-cdp.mjs
       - run: python3 -m py_compile scripts/e2b/subagent-gateway.py scripts/e2b/subagent-live-acceptance.py
       - run: node scripts/check-migrations.mjs
+      - run: node --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/backend.db.test.ts
+        env:
+          REQUIRE_DB: '1'
+          COMPUTER_TEST_DATABASE_URL: postgresql://postgres:isolated-ci@localhost:5432/subagent_test
