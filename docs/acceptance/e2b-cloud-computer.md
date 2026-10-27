@@ -260,6 +260,13 @@ and submission. This does not exercise the deployed heartbeat endpoint or a
 real provider credential. PostgreSQL tests separately cover renewal isolation,
 concurrent requests and retry after a lost response. The sandbox was deleted.
 
+Template `hrtv52tbqrefferq6m27` (worker source `8c46e2d`) completed the same
+synthetic task with the Bot-bound computer event, run approval and credential
+renewal. Approved screenshot, click, Tab and scroll operations ran through the
+guarded driver; an X11 event listener confirmed that Tab and the scroll reached
+the desktop window. This remains a synthetic service/model test, not signed-in
+product or provider acceptance. The sandbox was deleted.
+
 Development and production databases also have the additive cloud-device-scope
 migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
 expiry validation, rotation and the Bot's pending-review state. The worker

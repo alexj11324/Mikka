@@ -5,6 +5,7 @@ import { ComputerStore } from './store'
 import { createComputerHandler } from './handler'
 import { startCloudWorker } from './cloud-worker'
 import { connectComputer } from './e2b-provider'
+import { ensureBotRuntime } from './bot-runtime'
 
 export const computerRoute = createComputerHandler(new ComputerStore(pool), async request => {
   const session = await auth.api.getSession({ headers: request.headers })
@@ -22,5 +23,6 @@ export const computerRoute = createComputerHandler(new ComputerStore(pool), asyn
   [actor.workspaceId, actor.userId, botId])).rows[0]
   if (!machine?.sandboxId) throw new Error('Cloud computer unavailable')
   const sandbox = await connectComputer(machine.sandboxId)
-  await startCloudWorker(pool, actor, sandbox, origin, sha)
+  const worker = await startCloudWorker(pool, actor, sandbox, origin, sha)
+  await ensureBotRuntime(pool, actor, botId, sandbox, worker.deviceId)
 })

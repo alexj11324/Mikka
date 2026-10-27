@@ -7,7 +7,7 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { ComputerError } from '@/lib/computer/store'
 import { queueCloudRun } from '@/lib/computer/queue-run'
 
-const inputSchema = z.object({ issueId: z.uuid(), agentId: z.uuid(), deviceRepoId: z.uuid(), note: z.string().trim().max(10_000).optional() }).strict()
+const inputSchema = z.object({ issueId: z.uuid(), harness: z.enum(['codex', 'claude_code']), note: z.string().trim().max(10_000).optional() }).strict()
 const headers = { 'Cache-Control': 'private, no-store' }
 
 export async function POST(request: Request, { params }: { params: Promise<{ botId: string }> }) {
@@ -23,7 +23,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
   try {
     const [issue, context] = await Promise.all([issueForUser(session.user.id, parsed.data.issueId), loadWorkspaceContext(undefined, session.user)])
     if (!issue) return Response.json({ error: 'Task unavailable' }, { status: 404, headers })
-    const result = await queueCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { ...parsed.data, botId, title: issue.title, body: tiptapToText(issue.content) })
+    const runtime = (await pool.query('SELECT "agentId","repoId" FROM bot_cloud_runtimes WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND harness=$4', [botId, session.user.id, context.workspace.id, parsed.data.harness])).rows[0]
+    if (!runtime) return Response.json({ error: 'Bot computer task is unavailable' }, { status: 409, headers })
+    const result = await queueCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { issueId: parsed.data.issueId, note: parsed.data.note, botId, agentId: runtime.agentId, deviceRepoId: runtime.repoId, title: issue.title, body: tiptapToText(issue.content) })
     return Response.json(result, { status: 202, headers })
   } catch (error) {
     if (error instanceof ComputerError) return Response.json({ error: error.message }, { status: error.status, headers })

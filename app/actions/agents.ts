@@ -3,7 +3,7 @@
 import { visibleRuns } from '@/lib/agent-runs'
 
 import { headers } from 'next/headers'
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
@@ -155,7 +155,7 @@ export async function listAgents(): Promise<AgentView[]> {
     id: agents.id, name: agents.name, description: agents.description, instructions: agents.instructions,
     harness: agents.harness, deviceId: agents.deviceId, deviceName: devices.name,
   }).from(agents).leftJoin(devices, eq(devices.id, agents.deviceId))
-    .where(eq(agents.userId, userId)).orderBy(asc(agents.name))
+    .where(and(eq(agents.userId, userId), sql`not exists (select 1 from bot_cloud_runtimes bcr where bcr."agentId" = ${agents.id})`)).orderBy(asc(agents.name))
   return rows
 }
 
@@ -257,7 +257,7 @@ async function issueThreadAccess(issueId: string) {
 const threadColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt,
   report: agentRuns.report, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
-  agentName: agents.name, harness: agents.harness, ownerName: users.name,
+  agentName: sql<string>`coalesce((select b.name from computer_run_bindings crb join bots b on b.id=crb."botId" and b."ownerId"=crb."ownerId" where crb."runId"=${agentRuns.id}), ${agents.name})`, harness: agents.harness, ownerName: users.name,
 }
 
 /** The issue's threads, as much of each as this viewer may see (R-62). */

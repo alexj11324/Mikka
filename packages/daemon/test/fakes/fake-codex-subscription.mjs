@@ -89,7 +89,9 @@ lines.on("line", async (line) => {
       if (answer.result?.isError) process.exit(2)
       }
       if (fullComputer) await call('mikka_computer', 'get_desktop_state', {})
-      await call('mikka_computer', 'click', { x: 3, y: 4 })
+      await call('mikka_computer', 'click', fullComputer ? { x: 150, y: 150 } : { x: 3, y: 4 })
+      if (fullComputer) await call('mikka_computer', 'press_key', { key: 'tab' })
+      if (fullComputer) await call('mikka_computer', 'scroll', { direction: 'down', amount: 2, x: 150, y: 150 })
       if (fullComputer) await call('mikka', 'submit', { summary: 'Synthetic computer task completed' })
     }
     if(prompt==='PROBE_GIT') {

@@ -36,7 +36,7 @@ async def request_handler(request):
         body = await request.json()
         if body.get('workspaceId') != workspace or not body.get('deviceId'):
             return web.json_response({'error': 'invalid device'}, status=400)
-        publish(marker, {'deviceId': body['deviceId'], 'hash': hashlib.sha256(auth[7:].encode()).hexdigest()})
+        publish(marker, {'deviceId': body['deviceId'], 'hash': hashlib.sha256(auth[7:].encode()).hexdigest(), 'harnesses': body.get('harnesses', [])})
         return web.json_response({'deviceId': body['deviceId'], 'workspaceId': workspace})
     config = run_config()
     if path.endswith('/heartbeat'):

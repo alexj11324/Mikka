@@ -8,6 +8,7 @@ import { Sandbox } from 'e2b'
 import { ComputerStore } from '../../lib/computer/store'
 import { startCloudWorker } from '../../lib/computer/cloud-worker'
 import { queueCloudRun } from '../../lib/computer/queue-run'
+import { ensureBotRuntime } from '../../lib/computer/bot-runtime'
 import { claimCloudRun } from '../../lib/computer/claim'
 import { decideComputerReview, syncComputerReviews } from '../../lib/computer/reviews'
 import { computerSyncBody } from '@mikka/protocol/computer'
@@ -27,13 +28,14 @@ async function main() {
     await pool.query('CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES (\'synthetic-owner\')')
     await pool.query(await readFile(new URL('../../drizzle/20261026235901_cloud_computers.sql', import.meta.url), 'utf8'))
     await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
-    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL, enabled boolean NOT NULL DEFAULT true, "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz)')
-    await pool.query('CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, route text); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, instructions text); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "baseBranch" text)')
+    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL, enabled boolean NOT NULL DEFAULT true, harnesses jsonb NOT NULL DEFAULT \'[]\', "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz)')
+    await pool.query('CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, route text); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
     await pool.query(await readFile(new URL('../../drizzle/20261027000000_computer_run_bindings.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000200_local_computer_reviews.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000300_cloud_device_scope.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000400_cloud_worker_leases.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000500_computer_run_approvals.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261027000600_bot_cloud_runtimes.sql', import.meta.url), 'utf8'))
     const actor = { userId: 'synthetic-owner', workspaceId: randomUUID() }
     const store = new ComputerStore(pool)
     const bot = await store.createBot(actor, 'Synthetic Bot')
@@ -58,9 +60,9 @@ async function main() {
       while (!done) {
         const marker = await active.files.read('/tmp/mikka-worker-registration.json', { user: 'root' }).catch(() => null)
         if (marker) {
-          const item = JSON.parse(marker) as { deviceId: string; hash: string }
+          const item = JSON.parse(marker) as { deviceId: string; hash: string; harnesses: unknown[] }
           const verified = await pool.query('UPDATE device_tokens SET "lastUsedAt"=now() WHERE "tokenHash"=$1 AND "userId"=$2 AND "boundDeviceId"=$3 AND "boundWorkspaceId"=$4 AND "revokedAt" IS NULL RETURNING id', [item.hash, actor.userId, item.deviceId, actor.workspaceId])
-          if (verified.rowCount) await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1 AND "ownerId"=$2', [item.deviceId, actor.userId])
+          if (verified.rowCount) await pool.query('UPDATE devices SET "lastSeenAt"=now(),harnesses=$3 WHERE id=$1 AND "ownerId"=$2', [item.deviceId, actor.userId, JSON.stringify(item.harnesses)])
         }
         if (observedDevice) {
           const review = await active.files.read('/tmp/mikka-worker-review.json', { user: 'root' }).catch(() => null)
@@ -103,6 +105,11 @@ async function main() {
       assert.equal(again.deviceId, worker.deviceId)
       assert.equal(Number((await pool.query('SELECT count(*) FROM device_tokens WHERE "boundDeviceId"=$1', [worker.deviceId])).rows[0].count), 1)
       await sandbox.commands.run('if test -r /home/mikka-runner/.mikka/worker/device.json; then exit 1; fi', { user: 'user' })
+      stage = 'provision Bot working tree'
+      const runtimes = await ensureBotRuntime(pool, actor, bot.id, sandbox, worker.deviceId)
+      const codex = runtimes.find(item => item.harness === 'codex')
+      assert.ok(codex)
+      assert.deepEqual(await ensureBotRuntime(pool, actor, bot.id, sandbox, worker.deviceId), runtimes)
       stage = 'install guarded driver probe'
       await sandbox.files.write('/home/mikka-runner/.mikka/driver-probe.mjs', await readFile(new URL('../../packages/daemon/src/computer/driver.mjs', import.meta.url), 'utf8'), { user: 'mikka-runner' })
       await sandbox.files.write('/home/mikka-runner/.mikka/guard-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(bot.id)},ownerId:${JSON.stringify(actor.userId)}});\n`, { user: 'mikka-runner' })
@@ -128,9 +135,7 @@ async function main() {
       assert.ok(Date.now() - began >= 800, 'takeover waits for the operation lock')
       await store.operate(actor, bot.id, 'handback')
       stage = 'prepare synthetic Bot task'
-      const agentId = randomUUID(), bindingId = randomUUID(), repoId = randomUUID(), issueId = randomUUID()
-      await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,instructions) VALUES ($1,$2,$3,$4,$5)', [agentId, actor.userId, worker.deviceId, 'codex', ''])
-      await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch") VALUES ($1,$2,$3,$4)', [repoId, actor.userId, worker.deviceId, 'main'])
+      const agentId = codex.agentId, repoId = codex.repoId, bindingId = randomUUID(), issueId = randomUUID()
       await pool.query('INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId",route) VALUES ($1,$2,$3,$4,$5)', [bindingId, actor.userId, actor.workspaceId, agentId, 'codex_cli'])
       const { runId } = await queueCloudRun(pool, actor, { botId: bot.id, issueId, agentId, deviceRepoId: repoId, title: 'FULL_COMPUTER', body: '' })
       const prompt = (await pool.query('SELECT prompt FROM agent_runs WHERE id=$1', [runId])).rows[0].prompt as string
@@ -139,8 +144,9 @@ async function main() {
       assert.ok(computer)
       await sandbox.files.write('/tmp/mikka-fake-codex.mjs', await readFile(new URL('../../packages/daemon/test/fakes/fake-codex-subscription.mjs', import.meta.url), 'utf8'), { user: 'root' })
       await sandbox.commands.run('install -m 0755 /tmp/mikka-fake-codex.mjs /usr/local/bin/codex', { user: 'root' })
-      const repoPath = '/home/mikka-runner/.mikka/synthetic-repo'
-      await sandbox.commands.run(`mkdir -p ${repoPath} && git -C ${repoPath} init -q -b main && git -C ${repoPath} -c user.name=Fixture -c user.email=fixture@example.invalid commit --allow-empty -qm init`, { user: 'mikka-runner', timeoutMs: 20_000 })
+      await sandbox.commands.run('DISPLAY=:1 stdbuf -oL xev -name MikkaComputerProbe -geometry 640x480+40+40 -event keyboard -event mouse > /tmp/mikka-xev.log 2>&1', { user: 'user', background: true, timeoutMs: 0 })
+      await sandbox.commands.run('for i in $(seq 1 50); do id=$(DISPLAY=:1 xdotool search --onlyvisible --name MikkaComputerProbe 2>/dev/null | head -1); if test -n "$id"; then DISPLAY=:1 xdotool windowmove "$id" 40 40 windowsize "$id" 640 480 windowactivate --sync "$id"; exit 0; fi; sleep .1; done; exit 1', { user: 'user', timeoutMs: 10_000 })
+      const repoPath = `/home/mikka-runner/.mikka/bot-workspaces/${bot.id}`
       const assignment = { runId, issueId, deviceId: worker.deviceId, repoId, baseBranch: 'main', harness: 'codex', prompt, model: 'fixture-model', verifyCommand: 'true', leaseExpiresAt, computer,
         subscriptionBinding: { bindingId, ownerId: actor.userId, workspaceId: actor.workspaceId, consumerId: agentId, route: 'codex_cli' } }
       const context = { route: 'codex_cli', modelId: 'fixture-model', revision: 2, accountId: 'fixture-account', expiresAt: new Date(Date.now() + 180_000).toISOString() }
@@ -156,10 +162,13 @@ async function main() {
       }
       assert.equal(completion?.stopReason, 'submitted')
       assert.ok(renewed)
-      assert.deepEqual(operations, ['get_desktop_state', 'click'])
+      assert.deepEqual(operations, ['get_desktop_state', 'click', 'press_key', 'scroll'])
+      const desktopEvents = await sandbox.files.read('/tmp/mikka-xev.log', { user: 'root' })
+      assert.match(desktopEvents, /keysym[^\n]*Tab/, 'the approved key reached the desktop window')
+      assert.match(desktopEvents, /button 5/, 'the approved scroll reached the desktop window')
       const event = JSON.parse(await sandbox.files.read('/tmp/mikka-worker-computer-event.json', { user: 'root' }))
       assert.deepEqual(event, { type: 'data-computer', data: { botId: bot.id, runId, task: 'FULL_COMPUTER', state: 'working' } })
-      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, credentialRenewed: true, pinnedSource: true, otherBotDenied: true, taskLeasePrivate: true, takeoverDeniesAgent: true, handbackAllowsAgent: true, takeoverWaitsForOperation: true, syntheticBotTaskSubmitted: true, screenshotAndClickApproved: true, computerEventMatchesBot: true }))
+      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, credentialRenewed: true, pinnedSource: true, otherBotDenied: true, taskLeasePrivate: true, takeoverDeniesAgent: true, handbackAllowsAgent: true, takeoverWaitsForOperation: true, syntheticBotTaskSubmitted: true, screenshotClickKeyScrollApproved: true, keyboardAndScrollReachedWindow: true, computerEventMatchesBot: true }))
     } finally { done = true; await observe }
   } catch (error) {
     if (sandbox && stage === 'check mock service') {
