@@ -16,7 +16,7 @@ const SUGGESTION_EVENTS = new Set(['pull_request', 'issues', 'issue_comment', 'p
 const MAX_PAGES = 10
 
 /** One row of GET /app/hook/deliveries. */
-export interface GitHubDelivery { id: number; guid: string; delivered_at: string; redelivery: boolean; status_code: number; event: string }
+export interface GitHubDelivery { id: string; guid: string; delivered_at: string; redelivery: boolean; status_code: number; event: string }
 
 function base64url(value: string | Buffer) {
   return Buffer.from(value).toString('base64url')
@@ -84,7 +84,10 @@ export async function redeliverFailedGitHubWebhooks({ now = new Date(), fetcher 
     if (cursor) url.searchParams.set('cursor', cursor)
     const response = await fetcher(url, { headers })
     if (!response.ok) throw new Error(`GitHub delivery log answered ${response.status}`)
-    const rows = await response.json() as GitHubDelivery[]
+    // GitHub delivery IDs exceed Number.MAX_SAFE_INTEGER; keep the original JSON digits.
+    const rows = JSON.parse(await response.text(), (key, value, context?: { source: string }) =>
+      key === 'id' && typeof value === 'number' ? context!.source : value,
+    ) as GitHubDelivery[]
     deliveries.push(...rows)
     cursor = nextCursor(response.headers.get('link'))
     if (!cursor || !rows.length || rows.some(row => new Date(row.delivered_at) < since)) break

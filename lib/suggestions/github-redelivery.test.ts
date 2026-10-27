@@ -20,7 +20,7 @@ test('the App JWT is RS256, issued by the App, and expires within 10 minutes', (
 })
 
 const at = (minutesAgo: number) => new Date(Date.parse('2026-10-27T08:00:00Z') - minutesAgo * 60_000).toISOString()
-const delivery = (id: number, guid: string, minutesAgo: number, status: number, event = 'pull_request'): GitHubDelivery => ({ id, guid, delivered_at: at(minutesAgo), redelivery: id > 100, status_code: status, event })
+const delivery = (id: number, guid: string, minutesAgo: number, status: number, event = 'pull_request'): GitHubDelivery => ({ id: String(id), guid, delivered_at: at(minutesAgo), redelivery: id > 100, status_code: status, event })
 
 test('only failed suggestion deliveries in the window are redelivered, once per guid', () => {
   const since = new Date(at(180))
@@ -32,7 +32,7 @@ test('only failed suggestion deliveries in the window are redelivered, once per 
     delivery(5, 'e', 240, 503), // outside the window
     delivery(6, 'f', 30, 503, 'push'), // not an event that feeds suggestions
   ], since)
-  assert.deepEqual(picked.map(item => item.id), [1, 103])
+  assert.deepEqual(picked.map(item => item.id), ['1', '103'])
   assert.equal(failedDeliveries([delivery(1, 'a', 30, 503), delivery(2, 'b', 31, 503)], since, 1).length, 1)
 })
 
@@ -59,4 +59,17 @@ test('redelivers each failed delivery through the attempts endpoint', async () =
   const result = await redeliverFailedGitHubWebhooks({ now, env: { GITHUB_APP_ID: '4840908', GITHUB_APP_PRIVATE_KEY: privateKey }, fetcher })
   assert.deepEqual(posted, ['https://api.github.com/app/hook/deliveries/7/attempts'])
   assert.deepEqual(result, { configured: true, scanned: 2, failed: 1, redelivered: 1, errors: 0 })
+})
+
+test('preserves a raw 19-digit delivery ID in the redelivery URL', async () => {
+  const now = new Date('2026-10-27T08:00:00Z')
+  const posted: string[] = []
+  const raw = '[{"id":3850587977317089288,"guid":"large-id","delivered_at":"2026-10-27T07:30:00Z","redelivery":false,"status_code":503,"event":"pull_request"}]'
+  const fetcher = (async (url: string | URL, init?: RequestInit) => {
+    if (init?.method === 'POST') { posted.push(String(url)); return new Response(null, { status: 202 }) }
+    return new Response(raw, { headers: { 'Content-Type': 'application/json' } })
+  }) as typeof fetch
+  const result = await redeliverFailedGitHubWebhooks({ now, env: { GITHUB_APP_ID: '4840908', GITHUB_APP_PRIVATE_KEY: privateKey }, fetcher })
+  assert.deepEqual(posted, ['https://api.github.com/app/hook/deliveries/3850587977317089288/attempts'])
+  assert.deepEqual(result, { configured: true, scanned: 1, failed: 1, redelivered: 1, errors: 0 })
 })
