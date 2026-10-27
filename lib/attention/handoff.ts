@@ -10,7 +10,6 @@ import { levelRank, type Assessment, type AttentionLevel } from './judgment'
 export interface Notice { source: string; title: string; actor: string | null; occurredAt: string; url: string | null; excerpt: string }
 
 export interface ItemEvidence { latest: Notice; earlier: Notice[]; keys: string[] }
-export interface BriefingEvidence { localDate: string; items: { title: string; source: string; level: AttentionLevel | null; url: string | null; actor: string | null }[]; total: number }
 
 /** Earlier notices kept on a matter, newest first. */
 const EARLIER_LIMIT = 5
@@ -43,17 +42,16 @@ export function stateAfterNotice(matter: { state: AttentionMatterState; level: A
 
 export interface BudgetView { open: boolean; remaining?: number; nextAt?: string }
 
-/** The `matter_handoff` / `briefing_handoff` event payload. */
+/** The `matter_handoff` event payload. */
 export interface HandoffPayload {
   matterId: string
-  kind: 'item' | 'briefing'
   level: AttentionLevel
   title: string
   url: string | null
   assessment: Assessment | null
-  evidence: ItemEvidence | BriefingEvidence
+  evidence: ItemEvidence
   /** Minutes between the latest notice and the handoff. */
-  minutesAgo: number | null
+  minutesAgo: number
   recheck: boolean
   personAsked: boolean
   /** The Coordinator's last decision on this matter, if any. Earlier notices, including ones the judgment linked from another thread, are in the evidence. */
@@ -86,16 +84,7 @@ function budgetLine(budget: BudgetView): string {
 /** The text the Coordinator reads for a handoff. Deterministic: everything time-dependent is in the payload. */
 export function handoffPrompt(payload: HandoffPayload): string {
   const decide = `Record your decision with record_attention (matterId ${payload.matterId}) before you reply. After quiet or snooze, reply with exactly ${QUIET_REPLY} and nothing else.`
-  if (payload.kind === 'briefing') {
-    const evidence = payload.evidence as BriefingEvidence
-    return [
-      `${HANDOFF_PREFIX} Today's 08:00 briefing (${evidence.localDate}) is ready in 建议 with ${evidence.total} item(s). The person has not heard about it. Speak up only if an item needs them today, in two or three short lines, closing with a sentence saying the full briefing is in 建议; otherwise quiet. While the notification budget is closed, quiet.`,
-      ...evidence.items.map((item, index) => `${index + 1}. [${item.level ?? 'normal'}] ${item.source}: ${item.title}${item.actor ? ` (from ${item.actor})` : ''}${item.url ? ` ${item.url}` : ''}`),
-      budgetLine(payload.notifyBudget),
-      decide,
-    ].join('\n')
-  }
-  const evidence = payload.evidence as ItemEvidence
+  const evidence = payload.evidence
   const assessment = payload.assessment
   return [
     `${HANDOFF_PREFIX} A matter from the person's connected apps, rated ${payload.level}. Hidden evidence: the person has not seen this message and has not been told.${payload.recheck ? ' It comes back to you now because you snoozed it.' : ''}${payload.personAsked ? ' The person asked to be reminded: tell them unless fresh evidence shows it is resolved.' : ''}`,

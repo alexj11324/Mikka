@@ -239,11 +239,11 @@ export const runTokens = pgTable('run_tokens', {
  * run, through the worker tools of the MCP server (lib/mcp/worker.ts).
  */
 /**
- * `matter_handoff` and `briefing_handoff` carry hidden evidence from connected
- * apps (lib/attention): the person has not seen it, and the Coordinator alone
+ * `matter_handoff` carries hidden evidence from connected apps
+ * (lib/attention): the person has not seen it, and the Coordinator alone
  * decides whether to tell them.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'matter_handoff', 'briefing_handoff'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'matter_handoff'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth
@@ -345,7 +345,7 @@ export const briefings = pgTable('briefings', {
 
 /**
  * A matter from the person's connected apps that reached a routed level
- * (critical, high or ask), or the day's briefing, and what the Coordinator
+ * (critical, high or ask), and what the Coordinator
  * decided about it (lib/attention/store.ts). Repeated notices about one
  * matter share the row. `state`: `waiting` for a budget or for the matter in
  * hand, `handed` to the Coordinator, then `notified`, `quiet`, `snoozed`
@@ -356,9 +356,8 @@ export type AttentionMatterState = (typeof ATTENTION_MATTER_STATES)[number]
 
 export const attentionMatters = pgTable('attention_matters', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
-  kind: text('kind').$type<'item' | 'briefing'>().notNull(),
   matterKey: text('matterKey').notNull(),
-  source: text('source').$type<SuggestionSource>(),
+  source: text('source').$type<SuggestionSource>().notNull(),
   /** The latest notice's suggestion row. */
   suggestionId: uuid('suggestionId').references(() => suggestions.id, { onDelete: 'set null' }),
   title: text('title').notNull(), url: text('url'),
@@ -372,7 +371,7 @@ export const attentionMatters = pgTable('attention_matters', {
   reason: text('reason'),
   /** When a snoozed matter is handed over again. */
   runAt: timestamp('runAt', { withTimezone: true }),
-  /** The next handoff is a recheck (a snooze or the briefing): it spends no handoff budget. */
+  /** The next handoff is a recheck of a snooze: it spends no handoff budget. */
   recheck: boolean('recheck').notNull().default(false),
   /** The person asked for the reminder: telling them spends no budget. */
   personAsked: boolean('personAsked').notNull().default(false),

@@ -15,9 +15,8 @@ alter table coordinator_sessions add column if not exists locale text;
 create table if not exists attention_matters (
   id uuid primary key,
   "userId" text not null,
-  kind text not null check (kind in ('item', 'briefing')),
   "matterKey" text not null,
-  source text,
+  source text not null,
   "suggestionId" uuid references suggestions(id) on delete set null,
   title text not null,
   url text,

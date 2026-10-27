@@ -98,7 +98,7 @@ export async function takeInbox(userId: string, holder: string): Promise<InboxTa
 }
 
 function isHandoff(kind: string): boolean {
-  return kind === 'matter_handoff' || kind === 'briefing_handoff'
+  return kind === 'matter_handoff'
 }
 
 function carriesCode(event: { payload: Record<string, unknown> }): boolean {

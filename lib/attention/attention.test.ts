@@ -140,7 +140,7 @@ test('repeated notices join their matter; only a raised level hands it over agai
 })
 
 const payload = (fields: Partial<HandoffPayload> = {}): HandoffPayload => ({
-  matterId: 'mat-1', kind: 'item', level: 'critical', title: 'Domain expires tomorrow', url: 'https://mail.google.com/x',
+  matterId: 'mat-1', level: 'critical', title: 'Domain expires tomorrow', url: 'https://mail.google.com/x',
   assessment: cost({ due: 'within48h', reversible: false }),
   evidence: { latest: { source: 'gmail', title: 'Domain expires tomorrow', actor: 'registrar', occurredAt: '2026-10-27T08:00:00.000Z', url: 'https://mail.google.com/x', excerpt: 'Renew now or lose it.' }, earlier: [], keys: ['gmail:t'] },
   minutesAgo: 2, recheck: false, personAsked: false, previous: null, notifyBudget: { open: true, remaining: 5 }, ...fields,
@@ -155,9 +155,6 @@ test('the handoff prompt is hidden evidence with the assessment and the budget',
   assert.match(text, /Notification budget: open, 5 left/)
   assert.match(handoffPrompt(payload({ notifyBudget: { open: false, nextAt: '2026-10-27T13:00:00.000Z' } })), /snooze .* runAt 2026-10-27T13:00:00.000Z/)
   assert.match(handoffPrompt(payload({ assessment: { ...none, verificationCode: true } })), /verification code, 2 minute/)
-  const briefing = handoffPrompt(payload({ kind: 'briefing', evidence: { localDate: '2026-10-27', total: 4, items: [{ title: 'Review PR', source: 'github', level: 'high', url: null, actor: 'dana' }] } }))
-  assert.match(briefing, /08:00 briefing \(2026-10-27\)/)
-  assert.match(briefing, /1\. \[high\] github: Review PR \(from dana\)/)
 })
 
 test('the chat hides handoffs, quiet replies and the decision tool', () => {

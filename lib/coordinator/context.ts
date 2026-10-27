@@ -131,7 +131,6 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         note,
       ].filter(Boolean).join('\n')
     case 'matter_handoff':
-    case 'briefing_handoff':
       return handoffPrompt(payload as unknown as HandoffPayload)
   }
 }

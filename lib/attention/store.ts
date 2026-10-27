@@ -5,8 +5,8 @@ import { db } from '@/lib/db'
 import { attentionLog, attentionMatters, coordinatorEvents, coordinatorSessions, type AttentionMatterState } from '@/lib/db/schema'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import { BUDGET_WINDOW_MS, budgetState, type BudgetKind } from './budget'
-import { mergeEvidence, notice, stateAfterNotice, type BriefingEvidence, type BudgetView, type HandoffPayload, type ItemEvidence } from './handoff'
-import { higherLevel, isRouted, levelRank, type AttentionLevel, type MatterContext } from './judgment'
+import { mergeEvidence, notice, stateAfterNotice, type BudgetView, type HandoffPayload, type ItemEvidence } from './handoff'
+import { higherLevel, isRouted, levelRank, type MatterContext } from './judgment'
 import { onPersonTold } from './push'
 import type { Score } from './score'
 
@@ -53,7 +53,7 @@ function context(matter: Matter, id = matter.id): MatterContext {
   return { id, title: matter.title, level: matter.level, state: matter.state, reason: matter.reason }
 }
 
-const byKey = (userId: string, key: string) => and(eq(attentionMatters.userId, userId), eq(attentionMatters.kind, 'item'),
+const byKey = (userId: string, key: string) => and(eq(attentionMatters.userId, userId),
   or(eq(attentionMatters.matterKey, key), sql`${attentionMatters.evidence}->'keys' @> ${JSON.stringify([key])}::jsonb`))
 
 /**
@@ -64,7 +64,7 @@ const byKey = (userId: string, key: string) => and(eq(attentionMatters.userId, u
 export async function judgmentContext(userId: string, key: string, now = new Date()): Promise<{ same: MatterContext | null; matters: MatterContext[]; ids: Map<string, string> }> {
   const [same] = await db.select().from(attentionMatters).where(byKey(userId, key)).limit(1)
   const recent = await db.select().from(attentionMatters)
-    .where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.kind, 'item'), gte(attentionMatters.updatedAt, new Date(now.getTime() - MATTERS_DAYS * 86_400_000)), ...(same ? [ne(attentionMatters.id, same.id)] : [])))
+    .where(and(eq(attentionMatters.userId, userId), gte(attentionMatters.updatedAt, new Date(now.getTime() - MATTERS_DAYS * 86_400_000)), ...(same ? [ne(attentionMatters.id, same.id)] : [])))
     .orderBy(desc(attentionMatters.updatedAt)).limit(MATTERS_FOR_JUDGMENT)
   const ids = new Map(recent.map((matter, index) => [`m${index + 1}`, matter.id]))
   return { same: same ? context(same) : null, matters: recent.map((matter, index) => context(matter, `m${index + 1}`)), ids }
@@ -94,7 +94,7 @@ export async function recordNotice(notification: ExternalNotification, suggestio
     if (!target) {
       if (!routed) return false
       await tx.insert(attentionMatters).values({
-        id: randomUUID(), userId, kind: 'item', matterKey, source: notification.source, suggestionId, title: notification.title, url: notification.url,
+        id: randomUUID(), userId, matterKey, source: notification.source, suggestionId, title: notification.title, url: notification.url,
         level: score.level, assessment: { ...score.assessment }, evidence: { ...mergeEvidence(null, notice(notification), matterKey) }, state: 'waiting',
       }).onConflictDoNothing()
       return true
@@ -171,18 +171,18 @@ export async function releaseAttention(userId: string, now = new Date()): Promis
       .sort((a, b) => Number(b.recheck) - Number(a.recheck) || levelRank(b.level) - levelRank(a.level) || a.updatedAt.getTime() - b.updatedAt.getTime())
       .find(candidate => candidate.recheck || handoffOpen)
     if (!matter) return false
-    const latest = matter.kind === 'item' ? (matter.evidence as unknown as ItemEvidence).latest : null
+    const evidence = matter.evidence as unknown as ItemEvidence
     const payload: HandoffPayload = {
-      matterId: matter.id, kind: matter.kind, level: matter.level, title: matter.title, url: matter.url,
-      assessment: matter.kind === 'item' && 'cost' in matter.assessment ? matter.assessment as unknown as HandoffPayload['assessment'] : null,
-      evidence: matter.evidence as unknown as ItemEvidence | BriefingEvidence,
-      minutesAgo: latest ? Math.max(0, Math.round((now.getTime() - new Date(latest.occurredAt).getTime()) / 60_000)) : null,
+      matterId: matter.id, level: matter.level, title: matter.title, url: matter.url,
+      assessment: 'cost' in matter.assessment ? matter.assessment as unknown as HandoffPayload['assessment'] : null,
+      evidence,
+      minutesAgo: Math.max(0, Math.round((now.getTime() - new Date(evidence.latest.occurredAt).getTime()) / 60_000)),
       recheck: matter.recheck, personAsked: matter.personAsked,
       previous: matter.handoffs ? await lastDecision(tx, matter.id) : null,
       notifyBudget: view(budgetState('notify', await spends(tx, userId, 'notify', now), now, matter.level)),
     }
     await tx.insert(coordinatorEvents).values({
-      id: randomUUID(), userId, kind: matter.kind === 'briefing' ? 'briefing_handoff' : 'matter_handoff',
+      id: randomUUID(), userId, kind: 'matter_handoff',
       dedupeKey: `matter_handoff:${matter.id}:${matter.handoffs + 1}`, issueId: null, runId: null,
       payload: { ...payload }, tier: 'attention',
     }).onConflictDoNothing()
@@ -263,7 +263,7 @@ export async function settleTurn(userId: string, matterIds: readonly string[], t
         await tx.update(attentionMatters).set({ state: 'notified', reason: 'told without recording', personAsked: false, updatedAt: now }).where(eq(attentionMatters.id, matter.id))
         await log(tx, matter, 'notify', !matter.personAsked, { reason: 'told without recording' })
         told.push(matter)
-      } else if (!budget.open && matter.kind === 'item' && (matter.level === 'critical' || matter.level === 'high')) {
+      } else if (!budget.open && (matter.level === 'critical' || matter.level === 'high')) {
         await tx.update(attentionMatters).set({ state: 'snoozed', reason: 'notification budget closed', runAt: budget.nextAt, updatedAt: now }).where(eq(attentionMatters.id, matter.id))
         await log(tx, matter, 'snooze', false, { reason: 'notification budget closed', runAt: budget.nextAt })
       } else {
@@ -274,18 +274,4 @@ export async function settleTurn(userId: string, matterIds: readonly string[], t
   })
   for (const matter of told) await onPersonTold(matter)
   await releaseAttention(userId, now)
-}
-
-/** Queues today's briefing as a matter for the Coordinator. It spends no handoff budget. Null when it was already queued or matters are off. */
-export async function queueBriefing(userId: string, evidence: BriefingEvidence, level: AttentionLevel): Promise<string | null> {
-  return db.transaction(async tx => {
-    await lock(tx, userId)
-    if (!await attentionEnabled(userId, tx)) return null
-    const id = randomUUID()
-    const rows = await tx.insert(attentionMatters).values({
-      id, userId, kind: 'briefing', matterKey: `briefing:${evidence.localDate}`, source: null, suggestionId: null,
-      title: `Briefing ${evidence.localDate}`, url: null, level, assessment: {}, evidence: { ...evidence }, state: 'waiting', recheck: true,
-    }).onConflictDoNothing().returning({ id: attentionMatters.id })
-    return rows[0]?.id ?? null
-  })
 }
