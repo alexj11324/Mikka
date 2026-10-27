@@ -252,7 +252,7 @@ export class Daemon {
           const entry = this.journal.get(runId)
           const computer = entry?.assignment.computer
           if (!computer || computer.display !== display || computer.ownerId !== entry?.assignment.subscriptionBinding?.ownerId || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
-          return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId })
+          return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId, policyVersion: computer.policyVersion })
         },
       })
     }

@@ -149,11 +149,11 @@ export async function executeDriver(driver, input, display, leaseGuard) {
       process.env[k] === undefined ? [] : [[k, process.env[k]]],
     ),
   );
-  if (leaseGuard && (driver.path !== "/opt/mikka/computer/cua-driver" || display === undefined || typeof leaseGuard.botId !== "string" || typeof leaseGuard.ownerId !== "string" || !leaseGuard.botId || !leaseGuard.ownerId || [leaseGuard.botId, leaseGuard.ownerId].some(value => value.length > 128 || value.includes("\0"))))
+  if (leaseGuard && (driver.path !== "/opt/mikka/computer/cua-driver" || display === undefined || typeof leaseGuard.botId !== "string" || typeof leaseGuard.ownerId !== "string" || !leaseGuard.botId || !leaseGuard.ownerId || !Number.isSafeInteger(leaseGuard.policyVersion) || leaseGuard.policyVersion < 0 || leaseGuard.policyVersion > 2147483647 || [leaseGuard.botId, leaseGuard.ownerId].some(value => value.length > 128 || value.includes("\0"))))
     throw new Error("Invalid desktop lease");
   const command = leaseGuard ? "flock" : driver.path;
   const argsForProcess = leaseGuard
-    ? ["-F", "-s", `/run/mikka-viewer/${display.slice(1)}.lock`, "/usr/bin/python3", "/opt/mikka/computer/lease-driver.py", display, leaseGuard.botId, leaseGuard.ownerId]
+    ? ["-F", "-s", `/run/mikka-viewer/${display.slice(1)}.lock`, "/usr/bin/python3", "/opt/mikka/computer/lease-driver.py", display, leaseGuard.botId, leaseGuard.ownerId, String(leaseGuard.policyVersion)]
     : ["mcp", "--direct"];
   const child = spawn(command, argsForProcess, {
     env: { ...env, ...(display === undefined ? {} : { DISPLAY: display }) },

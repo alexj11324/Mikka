@@ -14,6 +14,7 @@ import { MembersPanel } from '@/components/settings/members-panel'
 import { LinearSettings } from '@/components/settings/linear-settings'
 import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings'
 import { IntegrationsSettings } from '@/components/settings/integrations-settings'
+import { ComputerPolicySettings } from '@/components/settings/computer-policy-settings'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { TelegramSettings } from '@/components/settings/telegram-settings'
@@ -41,7 +42,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onBack, onS
         {section === 'profile' && <div className="flex flex-col gap-3"><SettingsSectionComponent id="profile-heading" title={t('profile.heading')}><SettingRow title={t('profile.avatar')} description={t('profile.avatarDescription')}><Avatar className="size-10"><AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></SettingRow><SettingRow title={t('profile.name')}><span>{user.name || t('profile.notSet')}</span></SettingRow><SettingRow title={t('profile.email')}><span className="break-all">{user.email}</span></SettingRow></SettingsSectionComponent></div>}
         {section === 'account' && <GoogleSignInSettings googleEnabled={googleEnabled} />}
         {section === 'integrations' && <><IntegrationsSettings />{workspaceId && !preview && <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} />}<LinearSettings notice={linearNotice} /><IssuePrefixSettings /><TelegramSettings preview={preview} /></>}
-        {section === 'workspace' && <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />}
+        {section === 'workspace' && <><WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />{workspaceId && !preview && <ComputerPolicySettings key={workspaceId} workspaceId={workspaceId} />}</>}
       </SettingsContent>}
     </AppShellContent>
   </>

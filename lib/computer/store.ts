@@ -23,6 +23,54 @@ export class ComputerStore {
   async listBots(actor: Actor) {
     return (await this.pool.query<Bot>('SELECT id,name,"workspaceId","ownerId" FROM bots WHERE "workspaceId"=$1 AND "ownerId"=$2 ORDER BY "createdAt"', [actor.workspaceId, actor.userId])).rows
   }
+  async policy(workspaceId: string): Promise<'ask' | 'deny'> {
+    const row = (await this.pool.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]
+    return row?.permission === 'deny' ? 'deny' : 'ask'
+  }
+  /** Caller must authorize an active workspace admin. Serializes policy
+   * transitions with display wake/control and each actual driver call. */
+  async setPolicy(workspaceId: string, permission: 'ask' | 'deny') {
+    const client = await this.pool.connect()
+    const key = `computer-policy:${workspaceId}`
+    try {
+      await client.query('BEGIN')
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [key])
+      const machine = (await client.query<Machine>('SELECT * FROM cloud_machines WHERE "workspaceId"=$1 FOR UPDATE', [workspaceId])).rows[0]
+      const desktops = (await client.query<Desktop>('SELECT * FROM bot_desktops WHERE "workspaceId"=$1 ORDER BY display FOR UPDATE', [workspaceId])).rows
+      const policy = (await client.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version)
+        VALUES ($1,$2,CASE WHEN $2='deny' THEN 1 ELSE 0 END)
+        ON CONFLICT ("workspaceId") DO UPDATE SET permission=$2,"updatedAt"=now(),
+          version=CASE WHEN workspace_computer_policies.permission=$2 THEN workspace_computer_policies.version ELSE workspace_computer_policies.version+1 END
+        RETURNING version`, [workspaceId, permission])).rows[0]
+      if (permission === 'deny') {
+        await client.query('UPDATE computer_run_bindings SET "approvedForRun"=false WHERE "workspaceId"=$1', [workspaceId])
+        await client.query(`UPDATE local_computer_reviews v SET decision=false FROM computer_run_bindings b
+          WHERE v."runId"=b."runId" AND b."workspaceId"=$1 AND v.decision IS NULL`, [workspaceId])
+        // Previously delivered approvals cannot be rebound to a later policy
+        // generation. Stop these threads so they cannot appear to resume with
+        // stale authority after an administrator re-enables computer use.
+        await client.query(`UPDATE agent_runs r SET "stopRequestedAt"=coalesce(r."stopRequestedAt",now()),"updatedAt"=now(),
+          status=CASE WHEN r.status='queued' THEN 'stopped' ELSE r.status END
+          FROM computer_run_bindings b WHERE b."runId"=r.id AND b."workspaceId"=$1
+            AND r.status=ANY($2::text[])`, [workspaceId, ['queued', 'preparing', 'running', 'waiting_input', 'finishing']])
+      }
+      const sync = async () => {
+        if (!machine?.sandboxId || !machine.runtimeReady || !desktops.length) return
+        const sandbox = await this.runtime.connectComputer(machine.sandboxId)
+        for (const desktop of desktops) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
+      }
+      // Every transition increments the policy version. The display lock
+      // fences old approvals even if the subsequent database commit fails.
+      await sync()
+      await client.query('COMMIT')
+      return { permission }
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
+  }
   private async bot(actor: Actor, botId: string, client: Pool | PoolClient = this.pool) {
     const { rows } = await client.query<Bot>('SELECT id,name,"workspaceId","ownerId" FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "ownerId"=$3', [botId, actor.workspaceId, actor.userId])
     if (!rows[0]) throw new ComputerError(404, 'Computer not found')
@@ -39,6 +87,7 @@ export class ComputerStore {
       FROM local_computer_reviews v JOIN agent_runs r ON r.id=v."runId" AND r."userId"=v."userId" AND r."deviceId"=v."deviceId"
       JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
       WHERE b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3 AND v.decision IS NULL
+        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')
         AND v."expiresAt">now() AND v."seenAt">now()-interval '10 seconds' AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now()
         AND r.status=ANY($4::text[]) ORDER BY v."seenAt",v.id LIMIT 1`, [botId, actor.workspaceId, actor.userId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows[0]
     const call = review?.call
@@ -53,8 +102,8 @@ export class ComputerStore {
     return { machine: row.machine, control: held ? 'user' : row.control === 'user' ? 'agent' : row.control,
       ...(held ? { controlledBy: { userId: row.controlledBy } } : {}), ...(row.lastAction ? { lastAction: row.lastAction } : {}), ...(pendingApproval ? { pendingApproval } : {}) }
   }
-  private lease(d: Desktop): provider.DesktopLease {
-    return { botId: d.botId, ownerId: d.ownerId, display: d.display, epoch: d.epoch, controlledBy: d.controlledBy, controlUntil: d.controlUntil ? new Date(d.controlUntil).getTime() / 1000 : 0 }
+  private lease(d: Desktop, computerAllowed = true, policyVersion = 0): provider.DesktopLease {
+    return { botId: d.botId, ownerId: d.ownerId, display: d.display, epoch: d.epoch, controlledBy: d.controlledBy, controlUntil: d.controlUntil ? new Date(d.controlUntil).getTime() / 1000 : 0, computerAllowed, policyVersion }
   }
   async operate(actor: Actor, botId: string, action: 'wake' | 'viewer' | 'takeover' | 'handback', mode: 'view' | 'control' = 'view') {
     await this.bot(actor, botId)
@@ -65,6 +114,7 @@ export class ComputerStore {
     let persistProgress = false
     try {
       await client.query('BEGIN')
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
       const machine = (await client.query<Machine>('SELECT * FROM cloud_machines WHERE "workspaceId"=$1 FOR UPDATE', [actor.workspaceId])).rows[0]
       // A shared Unix account is not a multi-owner isolation boundary. Until
       // separate OS/sandbox isolation ships, one workspace machine has one owner.
@@ -104,7 +154,8 @@ export class ComputerStore {
         if (!held || desktop.controlledBy !== actor.userId) throw new ComputerError(403, 'Take control first')
         desktop.controlUntil = new Date(Date.now() + 5 * 60_000)
       }
-      const lease = this.lease(desktop)
+      const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
+      const lease = this.lease(desktop, policy?.permission !== 'deny', policy?.version ?? 0)
       await client.query('UPDATE bot_desktops SET control=$2,"controlledBy"=$3,"controlUntil"=$4,epoch=$5 WHERE "botId"=$1', [botId, desktop.control, desktop.controlledBy, desktop.controlUntil, desktop.epoch])
       persistProgress = true
       await this.runtime.syncDesktopLease(sandbox, lease)

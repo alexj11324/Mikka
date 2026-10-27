@@ -1530,6 +1530,16 @@
       "previewNote": "Form preview: workspace storage is not connected, so changes are not saved.",
       "previewLabel": "Workspace form preview"
     },
+    "computerPolicy": {
+      "heading": "Cloud computers",
+      "description": "Control whether Bots may operate computers in this workspace.",
+      "label": "Bot computer use",
+      "help": "Denying stops computer tasks and revokes their approvals. People can still take control.",
+      "adminOnly": "Only workspace admins can change this setting.",
+      "ask": "Ask for approval",
+      "deny": "Deny",
+      "error": "Could not update or load the computer setting."
+    },
     "issuePrefix": {
       "title": "Personal task ids",
       "description": "Personal tasks stay in Mikka and never go to Linear; they use your own four-letter prefix. Workspace tasks use their Linear id.",

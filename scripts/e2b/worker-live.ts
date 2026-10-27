@@ -37,6 +37,7 @@ async function main() {
     await pool.query(await readFile(new URL('../../drizzle/20261027000400_cloud_worker_leases.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000500_computer_run_approvals.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000600_bot_cloud_runtimes.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261027000700_workspace_computer_policy.sql', import.meta.url), 'utf8'))
     const actor = { userId: 'synthetic-owner', workspaceId: randomUUID() }
     const store = new ComputerStore(pool)
     const bot = await store.createBot(actor, 'Synthetic Bot')
@@ -113,8 +114,8 @@ async function main() {
       assert.deepEqual(await ensureBotRuntime(pool, actor, bot.id, sandbox, worker.deviceId), runtimes)
       stage = 'install guarded driver probe'
       await sandbox.files.write('/home/mikka-runner/.mikka/driver-probe.mjs', await readFile(new URL('../../packages/daemon/src/computer/driver.mjs', import.meta.url), 'utf8'), { user: 'mikka-runner' })
-      await sandbox.files.write('/home/mikka-runner/.mikka/guard-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(bot.id)},ownerId:${JSON.stringify(actor.userId)}});\n`, { user: 'mikka-runner' })
-      const probe = () => sandbox!.commands.run('node /home/mikka-runner/.mikka/guard-probe.mjs', { user: 'mikka-runner', timeoutMs: 30_000 })
+      await sandbox.files.write('/home/mikka-runner/.mikka/guard-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(bot.id)},ownerId:${JSON.stringify(actor.userId)},policyVersion:Number(process.argv[2])});\n`, { user: 'mikka-runner' })
+      const probe = (version = 0) => sandbox!.commands.run(`node /home/mikka-runner/.mikka/guard-probe.mjs ${version}`, { user: 'mikka-runner', timeoutMs: 30_000 })
       stage = 'deny agent while person controls'
       await store.operate(actor, bot.id, 'takeover')
       const before = await sandbox.commands.run('DISPLAY=:1 xdotool getmouselocation --shell', { user: 'mikka-runner' })
@@ -123,11 +124,23 @@ async function main() {
       assert.equal(after.stdout, before.stdout)
       await store.operate(actor, bot.id, 'handback')
       stage = 'deny another Bot and task user'
-      await sandbox.files.write('/home/mikka-runner/.mikka/wrong-bot-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(randomUUID())},ownerId:${JSON.stringify(actor.userId)}});\n`, { user: 'mikka-runner' })
+      await sandbox.files.write('/home/mikka-runner/.mikka/wrong-bot-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(randomUUID())},ownerId:${JSON.stringify(actor.userId)},policyVersion:0});\n`, { user: 'mikka-runner' })
       await assert.rejects(sandbox.commands.run('node /home/mikka-runner/.mikka/wrong-bot-probe.mjs', { user: 'mikka-runner', timeoutMs: 30_000 }))
       await sandbox.commands.run('if test -r /run/mikka-viewer/1.json || test -w /run/mikka-viewer/1.lock; then exit 1; fi', { user: 'user' })
       stage = 'allow agent after handback'
       await probe()
+      stage = 'workspace denial is enforced at the real driver'
+      await sandbox.commands.run("flock -F -s /run/mikka-viewer/1.lock sh -c 'touch /home/mikka-runner/.mikka/policy-lock-held; exec sleep 2'", { user: 'mikka-runner', background: true, timeoutMs: 0 })
+      await sandbox.commands.run('for i in $(seq 1 50); do test -f /home/mikka-runner/.mikka/policy-lock-held && exit 0; sleep .1; done; exit 1', { user: 'mikka-runner', timeoutMs: 7_000 })
+      const policyBegan = Date.now()
+      await store.setPolicy(actor.workspaceId, 'deny')
+      assert.ok(Date.now() - policyBegan >= 800, 'workspace denial waits for an operation already in progress')
+      await assert.rejects(probe())
+      await store.operate(actor, bot.id, 'wake')
+      await assert.rejects(probe(), 'waking must not bypass the workspace denial')
+      await store.setPolicy(actor.workspaceId, 'ask')
+      await assert.rejects(probe(), 'a stale run stays blocked after re-enablement')
+      await probe(2)
       stage = 'serialize takeover with an active operation'
       await sandbox.commands.run("flock -F -s /run/mikka-viewer/1.lock sh -c 'touch /home/mikka-runner/.mikka/lock-held; exec sleep 2'", { user: 'mikka-runner', background: true, timeoutMs: 0 })
       await sandbox.commands.run('for i in $(seq 1 50); do test -f /home/mikka-runner/.mikka/lock-held && exit 0; sleep .1; done; exit 1', { user: 'mikka-runner', timeoutMs: 7_000 })
@@ -172,7 +185,7 @@ async function main() {
       assert.match(desktopEvents, /button 5/, 'the approved scroll reached the desktop window')
       const event = JSON.parse(await sandbox.files.read('/tmp/mikka-worker-computer-event.json', { user: 'root' }))
       assert.deepEqual(event, { type: 'data-computer', data: { botId: bot.id, runId, task: 'FULL_COMPUTER', state: 'working' } })
-      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, credentialRenewed: true, pinnedSource: true, otherBotDenied: true, taskLeasePrivate: true, takeoverDeniesAgent: true, handbackAllowsAgent: true, takeoverWaitsForOperation: true, syntheticBotTaskSubmitted: true, screenshotClickKeyScrollApproved: true, keyboardAndScrollReachedWindow: true, computerEventMatchesBot: true }))
+      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, credentialRenewed: true, pinnedSource: true, otherBotDenied: true, taskLeasePrivate: true, workspacePolicyDeniesDriver: true, workspacePolicyWaitsForOperation: true, takeoverDeniesAgent: true, handbackAllowsAgent: true, takeoverWaitsForOperation: true, syntheticBotTaskSubmitted: true, screenshotClickKeyScrollApproved: true, keyboardAndScrollReachedWindow: true, computerEventMatchesBot: true }))
     } finally { done = true; await observe }
   } catch (error) {
     if (sandbox && stage === 'check mock service') {

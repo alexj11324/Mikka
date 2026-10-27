@@ -265,6 +265,7 @@ export const runAssignmentSchema = z.object({
   computer: z.object({
     botId: z.uuid(), ownerId: z.string().min(1).max(128),
     display: z.string().regex(/^:[1-9][0-9]{0,2}$/),
+    policyVersion: z.number().int().nonnegative().max(2147483647),
   }).strict().optional(),
   /** Mock harness only: fixture name under `packages/daemon/fixtures`. */
   fixture: z.string().max(200).optional(),

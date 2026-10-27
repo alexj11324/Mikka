@@ -16,5 +16,5 @@ export function executeDriver(
   driver: ComputerDriver,
   input: unknown,
   display?: string,
-  leaseGuard?: { botId: string; ownerId: string },
+  leaseGuard?: { botId: string; ownerId: string; policyVersion: number },
 ): Promise<unknown>;

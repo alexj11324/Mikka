@@ -15,6 +15,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     if (digest) await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-task:${digest}`])
     const target = (await client.query(`SELECT m."deviceId",a.instructions,repo."baseBranch" FROM bots b
       JOIN bot_desktops d ON d."botId"=b.id AND d."ownerId"=b."ownerId" AND d."workspaceId"=b."workspaceId"
@@ -23,6 +24,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       JOIN agents a ON a.id=$4 AND a."userId"=b."ownerId" AND a."deviceId"=dev.id
       JOIN device_repos repo ON repo.id=$5 AND repo."deviceId"=dev.id AND repo."userId"=b."ownerId"
       WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3
+        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')
         AND EXISTS (SELECT 1 FROM byos_bindings s JOIN byos_connections c ON c.id=s."connectionId" AND c."ownerId"=s."ownerId"
           AND c."workspaceId"=s."workspaceId" AND c.state='connected' AND c.epoch=s."connectionRevision"
           WHERE s.id=(SELECT latest.id FROM byos_bindings latest WHERE latest."ownerId"=b."ownerId" AND latest."consumerId"=a.id::text

@@ -13,6 +13,7 @@ export async function bindComputerRun(pool: Pool, actor: Actor, runId: string, b
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     const run = (await client.query('SELECT status FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
     if (!run) throw new ComputerError(404, 'Run not found')
     const bot = (await client.query('SELECT id FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "ownerId"=$3', [botId, actor.workspaceId, actor.userId])).rows[0]

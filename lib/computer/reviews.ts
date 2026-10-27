@@ -13,6 +13,8 @@ export async function syncComputerReviews(pool: Pool, deviceId: string, userId: 
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    const workspaces = await client.query('SELECT DISTINCT "workspaceId" FROM computer_run_bindings WHERE "runId"=ANY($1::uuid[]) ORDER BY "workspaceId"', [rows.map(row => row.runId)])
+    for (const workspace of workspaces.rows) await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${workspace.workspaceId}`])
     const device = (await client.query('SELECT id FROM devices WHERE id=$1 AND "ownerId"=$2 AND enabled=true FOR UPDATE', [deviceId, userId])).rows[0]
     if (!device) throw new Error('Device unavailable')
     for (const row of rows) {
@@ -20,6 +22,7 @@ export async function syncComputerReviews(pool: Pool, deviceId: string, userId: 
         LEFT JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
         LEFT JOIN bot_desktops d ON d."botId"=b."botId" AND d."ownerId"=b."ownerId" AND d."workspaceId"=b."workspaceId"
         WHERE r.id=$1 AND r."userId"=$2 AND r."deviceId"=$3 AND r."stopRequestedAt" IS NULL
+          AND (b."workspaceId" IS NULL OR NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny'))
           AND r.status=ANY($4::text[]) AND (b."runId" IS NULL OR r."leaseExpiresAt">now()) FOR UPDATE OF r`, [row.runId, userId, deviceId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows[0]
       if (!run || (run.botId ? row.display !== `:${run.display}` : row.display !== undefined)) throw new Error('Run or desktop unavailable')
       const inserted = await client.query(`INSERT INTO local_computer_reviews (id,"deviceId","runId","userId",target,display,call,digest,"expiresAt","seenAt")
@@ -44,6 +47,7 @@ export async function decideComputerReview(pool: Pool, actor: { userId: string; 
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     // Serialize against sync and cancellation using the same run row lock.
     const run = (await client.query(`SELECT r.id FROM agent_runs r
       JOIN local_computer_reviews v ON v."runId"=r.id
@@ -51,6 +55,7 @@ export async function decideComputerReview(pool: Pool, actor: { userId: string; 
       JOIN bot_desktops d ON d."botId"=b."botId" AND d."workspaceId"=b."workspaceId" AND d."ownerId"=b."ownerId"
       JOIN devices dev ON dev.id=v."deviceId" AND dev."ownerId"=$3 AND dev.enabled=true
       WHERE v.id=$1 AND v.digest=$2 AND v."userId"=$3 AND v.decision IS NULL AND v."expiresAt">now()
+        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')
         AND v."seenAt">now()-interval '10 seconds' AND v.display=':' || d.display::text
         AND r."userId"=$3 AND r."deviceId"=v."deviceId" AND r."stopRequestedAt" IS NULL
         AND r."leaseExpiresAt">now() AND r.status=ANY($5::text[]) FOR UPDATE OF r`,

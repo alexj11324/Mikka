@@ -6,7 +6,7 @@ import { Sandbox } from 'e2b'
 import { HOSTED_NATIVE_IMAGE } from '@mikka/protocol/subscription'
 
 const lifetime = 15 * 60_000
-export type DesktopLease = { botId: string; ownerId: string; display: number; epoch: number; controlledBy: string | null; controlUntil: number }
+export type DesktopLease = { botId: string; ownerId: string; display: number; epoch: number; controlledBy: string | null; controlUntil: number; computerAllowed: boolean; policyVersion: number }
 const options = () => {
   if (!process.env.E2B_API_KEY) throw new Error('Cloud computer is not configured')
   return { apiKey: process.env.E2B_API_KEY, timeoutMs: lifetime, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
@@ -68,6 +68,11 @@ export async function startDesktop(sandbox: Sandbox, display: number) {
 export async function syncDesktopLease(sandbox: Sandbox, lease: DesktopLease) {
   // Atomic rename: readers never observe a truncated revocation/control state.
   if (!Number.isInteger(lease.display) || lease.display < 1 || lease.display > 999) throw new Error('Invalid display')
+  // Existing sandboxes may have been provisioned by an older deployment.
+  // Install the current guard before publishing a policy-bearing lease.
+  const guard = await readFile(join(process.cwd(), 'scripts/e2b/lease-driver.py'), 'utf8')
+  await sandbox.files.write('/opt/mikka/computer/lease-driver.py', guard, { user: 'root' })
+  await sandbox.commands.run('chmod 0755 /opt/mikka/computer/lease-driver.py', { user: 'root', timeoutMs: 10_000 })
   const path = `/run/mikka-viewer/${lease.display}`
   await sandbox.files.write(`${path}.next`, JSON.stringify(lease), { user: 'root' })
   // A shared lock is held for the whole CUA driver process. Takeover waits

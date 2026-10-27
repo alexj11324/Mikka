@@ -25,13 +25,13 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
   const admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
-  let created = 0, failSync = false, failStart = false, epoch = 0
+  let created = 0, failSync = false, failStart = false, epoch = 0, computerAllowed = true
   const runtime = {
     async createComputer() { created++; return { sandboxId: 'sandbox-test' } },
     async connectComputer() { return { sandboxId: 'sandbox-test' } },
     async computerState() { return 'sleeping' },
     async installComputerRuntime() {}, async startDesktop() { if (failStart) throw new Error('start response lost') },
-    async syncDesktopLease(_sandbox: unknown, lease: { epoch: number }) { epoch = lease.epoch; if (failSync) throw new Error('transport failed') },
+    async syncDesktopLease(_sandbox: unknown, lease: { epoch: number; computerAllowed?: boolean }) { epoch = lease.epoch; computerAllowed = lease.computerAllowed === true; if (failSync) throw new Error('transport failed') },
     async viewerGrant() { return { url: 'wss://test.invalid', expiresAt: new Date().toISOString() } },
   } as unknown as typeof provider
   const actor = { userId: 'alice', workspaceId: randomUUID() }
@@ -56,6 +56,8 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint, provider text); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "modelId" text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
     const botRuntimeMigration = await readFile(new URL('../../drizzle/20261027000600_bot_cloud_runtimes.sql', import.meta.url), 'utf8')
     await pool.query(botRuntimeMigration); await pool.query(botRuntimeMigration)
+    const policyMigration = await readFile(new URL('../../drizzle/20261027000700_workspace_computer_policy.sql', import.meta.url), 'utf8')
+    await pool.query(policyMigration); await pool.query(policyMigration)
     const store = new ComputerStore(pool, runtime)
     const bot = await store.createBot(actor, 'Desktop')
     assert.deepEqual(await store.state(actor, bot.id), { machine: 'sleeping', control: 'idle' })
@@ -170,7 +172,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(queuedBinding.status, 'queued')
     assert.match(queuedBinding.prompt, /Use the desktop/)
     assert.equal(await claimLocalRun(pool, queued.runId, worker.deviceId, new Date(Date.now() + 30000)), 'cloud-required')
-    assert.deepEqual(await claimCloudRun(pool, actor, queued.runId, worker.deviceId, new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1' })
+    assert.deepEqual(await claimCloudRun(pool, actor, queued.runId, worker.deviceId, new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0 })
     const idempotent = { ...cloudInput, idempotencyKey: 'durable-tool-call-1' }
     const [first, retry] = await Promise.all([queueCloudRun(pool, actor, idempotent), queueCloudRun(pool, actor, idempotent)])
     assert.equal(first.runId, retry.runId, 'a retried tool call queues exactly one task')
@@ -184,7 +186,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('UPDATE devices SET enabled=true WHERE id=$1', [worker.deviceId])
     const cloudClaims = await Promise.all([claimCloudRun(pool, actor, cloudRun, worker.deviceId, deadline, cloudSubscription), claimCloudRun(pool, actor, cloudRun, worker.deviceId, deadline, cloudSubscription)])
     assert.equal(cloudClaims.filter(Boolean).length, 1)
-    assert.deepEqual(cloudClaims.find(Boolean), { botId: bot.id, ownerId: actor.userId, display: ':1' })
+    assert.deepEqual(cloudClaims.find(Boolean), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0 })
     const runId = randomUUID()
     await pool.query('INSERT INTO agent_runs (id,"userId",status) VALUES ($1,$2,$3)', [runId, actor.userId, 'queued'])
     await assert.rejects(bindComputerRun(pool, bob, runId, bobBot.id), { status: 404 })
@@ -263,6 +265,23 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(await decideComputerReview(pool, actor, grantReview.id, grantReview.digest, true, 'run'), true)
     const laterReview = makeReview(runId, 11)
     assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [laterReview]), [{ id: laterReview.id, digest: laterReview.digest, approve: true }])
+    await store.setPolicy(actor.workspaceId, 'deny')
+    assert.equal(await store.policy(actor.workspaceId), 'deny')
+    assert.equal(computerAllowed, false, 'workspace denial reaches the actual display guard')
+    assert.equal((await pool.query('SELECT "approvedForRun" FROM computer_run_bindings WHERE "runId"=$1', [runId])).rows[0].approvedForRun, false)
+    assert.ok((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [runId])).rows[0].stopRequestedAt, 'active cloud threads are stopped')
+    assert.equal(await decideComputerReview(pool, actor, laterReview.id, laterReview.digest, true), false)
+    await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [makeReview(runId, 20)]), /Run or desktop unavailable/)
+    await assert.rejects(queueCloudRun(pool, actor, cloudInput), { status: 409 })
+    await store.operate(actor, bot.id, 'wake')
+    assert.equal(computerAllowed, false, 'waking a denied desktop cannot re-enable the driver')
+    await store.setPolicy(actor.workspaceId, 'ask')
+    assert.equal(computerAllowed, true)
+    assert.equal((await pool.query('SELECT version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0].version, 2)
+    await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [makeReview(runId, 21)]), /Run or desktop unavailable/, 're-enabling cannot revive a stopped run')
+    // Continue the remaining independent review cases with fresh simulated runs.
+    await pool.query('UPDATE agent_runs SET status=$2,"stopRequestedAt"=NULL WHERE id=ANY($1::uuid[])', [[runId, secondRunId], 'running'])
+    await pool.query('UPDATE computer_run_bindings SET "approvedForRun"=true WHERE "runId"=$1', [runId])
     const keyValue = { id: randomUUID(), runId, target: 'f'.repeat(64), display: ':1', call: { name: 'press_key' as const, arguments: { key: 'tab', modifiers: ['shift' as const] } }, expiresAt: Date.now() + 120000 }
     const keyReview = { ...keyValue, digest: createHash('sha256').update(JSON.stringify(keyValue)).digest('hex') }
     assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [keyReview]), [{ id: keyReview.id, digest: keyReview.digest, approve: true }])

@@ -136,7 +136,7 @@ it.each(['codex', 'claude_code'] as const)('holds a hosted %s computer call unti
     const runner = await createHostedBotRunner({ stateDir, link, binaries: { [harness]: binary }, computerBroker: broker,
       ...(process.env.MIKKA_E2B_TEST_DOCKER === '1' ? { dockerSocket: 'unix:///run/mikka-container/docker.sock' as const } : {}) })
     const assignment = { runId, deviceId, issueId: randomUUID(), repoId: randomUUID(), baseBranch: 'main', harness, prompt: 'COMPUTER', model: 'fixture-model',
-      computer: { botId, ownerId: 'fixture-owner', display: ':2' },
+      computer: { botId, ownerId: 'fixture-owner', display: ':2', policyVersion: 0 },
       subscriptionBinding: { bindingId: randomUUID(), ownerId: 'fixture-owner', workspaceId, consumerId: randomUUID(), route: harness === 'codex' ? 'codex_cli' : 'claude_code_cli' },
     } as RunAssignment
     const session = await runner.start(assignment, { runId, cwd: await makeRepo(), prompt: 'COMPUTER', model: 'fixture-model', env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }), log: createLogger({ level: 'silent' }) })
