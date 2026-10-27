@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { build } from 'esbuild'
 import { fileURLToPath } from 'node:url'
 
@@ -15,3 +15,4 @@ await build({
 
 // Vercel expects the static output directory even for this API-only service.
 mkdirSync(path('public'), { recursive: true })
+writeFileSync(path('public/health.json'), JSON.stringify({ ok: true }))
