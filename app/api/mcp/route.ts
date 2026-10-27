@@ -57,7 +57,7 @@ const SUBMIT_ARTIFACT = {
 const handler = createMcpHandler(server => {
   server.registerTool('send_to_coordinator', {
     title: 'Send a message to the Coordinator',
-    description: 'Send a message to the person\'s Mikka Coordinator, the agent that plans work and dispatches runs, as if the person typed it in the chat. The Coordinator answers in its own time; call read_coordinator_messages with the returned `after` and waitSeconds to get the reply.',
+    description: 'Send a message to the person\'s Mikka Coordinator, the agent that plans work and dispatches runs, as Agent coordination data, not user input or approval. The Coordinator answers in its own time; call read_coordinator_messages with the returned `after` and waitSeconds to get the reply.',
     inputSchema: z.object({ text: z.string().trim().min(1).max(10_000) }),
   }, async ({ text }, ctx) => json(await tools.sendToCoordinator(mcpUserId(ctx.http?.authInfo), text)))
 
