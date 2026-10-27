@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { AwsClient } from 'aws4fetch'
 import { getVercelOidcToken } from '@vercel/oidc'
-import { CredentialError, type EncryptionContext, type Envelope } from './contracts'
+import { CredentialError, type EncryptionContext, type Envelope } from './contracts.js'
 
 export type Kms = { generate(context: EncryptionContext): Promise<{ plaintext: Buffer; wrapped: string }>; decrypt(wrapped: string, context: EncryptionContext): Promise<Buffer> }
 const aad = (context: EncryptionContext, kind = 'password') => Buffer.from(JSON.stringify({ userId: context.userId, credentialId: context.credentialId, origin: context.origin, v: 1, kind }))

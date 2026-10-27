@@ -4,9 +4,9 @@ import { auth } from '@/lib/auth'
 import { pool } from '@/lib/db'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { resolveSubagentBrowserTarget, resolveThreadBrowserTarget } from '@/lib/cloud-computer/subagent-browser'
-import { canonicalOrigin, CredentialError, type BrowserCaller } from './contracts'
-import { awsKms } from './kms'
-import { CredentialStore } from './store'
+import { canonicalOrigin, CredentialError, type BrowserCaller } from './contracts.js'
+import { awsKms } from './kms.js'
+import { CredentialStore } from './store.js'
 
 export const credentialStore = new CredentialStore(pool, awsKms('app'))
 export async function credentialActor(request: Request) {

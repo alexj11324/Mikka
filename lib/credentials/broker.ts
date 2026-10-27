@@ -1,8 +1,8 @@
 import type { Pool } from 'pg'
-import { CredentialError } from './contracts'
-import { awsKms, open, sealSession, type Kms } from './kms'
-import { CredentialStore, hashNonce, rowEnvelope, type BrowserTarget } from './store'
-import { Cdp, gatewayGuard, type BrowserGuard } from './browser'
+import { CredentialError } from './contracts.js'
+import { awsKms, open, sealSession, type Kms } from './kms.js'
+import { CredentialStore, hashNonce, rowEnvelope, type BrowserTarget } from './store.js'
+import { Cdp, gatewayGuard, type BrowserGuard } from './browser.js'
 
 /** Imported only by services/credential-broker, which runs under the broker
  * project identity. No endpoint returns plaintext or arbitrary browser output. */

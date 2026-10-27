@@ -1,5 +1,5 @@
-import { assertSameOrigin, CredentialError } from './contracts'
-import type { BrowserTarget } from './store'
+import { assertSameOrigin, CredentialError } from './contracts.js'
+import type { BrowserTarget } from './store.js'
 
 export interface BrowserGuard {
   begin(target: BrowserTarget): Promise<{ cdpUrl: string; targetId: string; guardToken: string }>

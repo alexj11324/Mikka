@@ -1,5 +1,5 @@
 import 'server-only'
-import { assertNoSecret } from './fingerprint'
+import { assertNoSecret } from './fingerprint.js'
 
 /** A pre-migration deployment has no saved secrets yet. Once the vault table
  * exists, database failures fail closed rather than silently disabling scans. */

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { randomBytes } from 'node:crypto'
-import { canonicalOrigin, assertSameOrigin, submitSchema, otpSchema, CredentialError, type EncryptionContext } from './contracts'
-import { seal, open, sealSession, type Kms } from './kms'
-import { checkCredentialRequest, credentialBody, credentialFailure } from './http'
-import { Cdp } from './browser'
-import { assertNoSecret, fingerprint } from './fingerprint'
+import { canonicalOrigin, assertSameOrigin, submitSchema, otpSchema, CredentialError, type EncryptionContext } from './contracts.js'
+import { seal, open, sealSession, type Kms } from './kms.js'
+import { checkCredentialRequest, credentialBody, credentialFailure } from './http.js'
+import { Cdp } from './browser.js'
+import { assertNoSecret, fingerprint } from './fingerprint.js'
 
 function fixtureKms(): Kms {
   const keys = new Map<string, { key: Buffer; context: string }>()
