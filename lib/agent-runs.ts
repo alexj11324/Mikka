@@ -101,10 +101,10 @@ export async function readRun(userId: string, runId: string): Promise<RunDetail 
 }
 
 /** A message to the running agent; the daemon delivers it. */
-export async function addRunMessage(userId: string, input: { runId: string; text: string }): Promise<void> {
+export async function addRunMessage(userId: string, input: { runId: string; text: string }, origin: 'user' | 'peer' = 'user'): Promise<void> {
   const parsed = z.object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('messageRequired')
-  await sendOwnedRunMessage(db, userId, parsed.data)
+  await sendOwnedRunMessage(db, userId, parsed.data, origin)
 }
 
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
