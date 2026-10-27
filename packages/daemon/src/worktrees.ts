@@ -36,6 +36,10 @@ const FETCH_GIT = [
   "protocol.ext.allow=never",
 ]
 
+/** Repository configuration is user-controlled. Worktree checkout must not
+ * execute its hooks or fsmonitor as the trusted daemon account. */
+const safeGit = (baseDir: string) => simpleGit({ baseDir, config: ['core.hooksPath=/dev/null', 'core.fsmonitor=false', 'protocol.ext.allow=never'], unsafe: { allowUnsafeHooksPath: true, allowUnsafeFsMonitor: true, allowUnsafeProtocolOverride: true } })
+
 export function runBranch(runId: string) {
   return `mikka/run-${assertSafeId("run id", runId)}`
 }
@@ -75,7 +79,7 @@ export class WorktreeManager {
     const path = this.pathFor(runId)
     if (existsSync(join(path, ".git"))) return path
     mkdirSync(this.root, { recursive: true })
-    await simpleGit(repoPath).raw([
+    await safeGit(repoPath).raw([
       "worktree",
       "add",
       "-B",
@@ -158,7 +162,7 @@ export class WorktreeManager {
       return null
     }
     const git = (args: string[]) =>
-      execa("git", ["-c", "core.hooksPath=/dev/null", ...args], {
+      execa("git", [...FETCH_GIT, ...args], {
         cwd: realpathSync(path),
         env: { GIT_DIR: gitDir, GIT_WORK_TREE: realpathSync(path) },
         stdin: "ignore",
@@ -172,7 +176,7 @@ export class WorktreeManager {
 
   /** Paths changed in the worktree (tracked and untracked), for the report. */
   async changedFiles(worktree: string): Promise<string[]> {
-    const status = await simpleGit(worktree).status()
+    const status = await safeGit(worktree).status()
     return status.files.map((file) => file.path)
   }
 
@@ -235,10 +239,10 @@ export class WorktreeManager {
 
   private async removePath(path: string, repoPath: string) {
     try {
-      await simpleGit(repoPath).raw(["worktree", "remove", "--force", path])
+      await safeGit(repoPath).raw(["worktree", "remove", "--force", path])
     } catch {
       rmSync(path, { recursive: true, force: true })
-      await simpleGit(repoPath)
+      await safeGit(repoPath)
         .raw(["worktree", "prune"])
         .catch(() => undefined)
     }
@@ -260,7 +264,7 @@ export class WorktreeManager {
     const root = resolve(this.root)
     const path = worktree ? resolve(worktree) : null
     if (path && dirname(path) !== root) return false
-    const git = simpleGit(repoPath)
+    const git = safeGit(repoPath)
     if (path && existsSync(join(path, ".git"))) {
       if ((await this.changedFiles(path)).length > 0) return false
     }
@@ -300,7 +304,7 @@ export class WorktreeManager {
   async runBranches(
     repoPath: string
   ): Promise<{ runId: string; worktree: string | null }[]> {
-    const out = await simpleGit(repoPath).raw([
+    const out = await safeGit(repoPath).raw([
       "branch",
       "--list",
       "mikka/run-*",

@@ -271,7 +271,12 @@ export class Daemon {
           const entry = this.journal.get(runId)
           const computer = entry?.assignment.computer
           if (!computer || computer.display !== display || computer.ownerId !== entry?.assignment.subscriptionBinding?.ownerId || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
-          return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId, policyVersion: computer.policyVersion })
+          if (computer.machine === 'thread') {
+            const deviceId = this.device.deviceId
+            if (!deviceId || !this.options.link.wakeThreadComputer) throw new Error('Thread computer unavailable')
+            await this.options.link.wakeThreadComputer(deviceId, runId)
+          }
+          return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId, policyVersion: computer.policyVersion, permitted: () => this.supervisor.computerRunAllowed(runId) })
         },
       })
     }

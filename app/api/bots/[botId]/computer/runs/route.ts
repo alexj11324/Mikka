@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { after } from 'next/server'
 import { auth } from '@/lib/auth'
 import { pool } from '@/lib/db'
 import { issueForUser } from '@/lib/issue-access'
@@ -26,6 +27,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
     const runtime = (await pool.query('SELECT "agentId","repoId" FROM bot_cloud_runtimes WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND harness=$4', [botId, session.user.id, context.workspace.id, parsed.data.harness])).rows[0]
     if (!runtime) return Response.json({ error: 'Bot computer task is unavailable' }, { status: 409, headers })
     const result = await queueCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { issueId: parsed.data.issueId, note: parsed.data.note, botId, agentId: runtime.agentId, deviceRepoId: runtime.repoId, title: issue.title, body: tiptapToText(issue.content) })
+    if (process.env.MIKKA_CLOUD_THREAD_MACHINES === '1') {
+      const actor = { userId: session.user.id, workspaceId: context.workspace.id }
+      after(async () => {
+        try { await (await import('@/lib/computer/provision-thread')).provisionCloudThread(pool, actor, result.runId, botId) }
+        catch { await (await import('@/lib/computer/thread-failure')).failThreadProvision(pool, actor, result.runId) }
+      })
+    }
     return Response.json(result, { status: 202, headers })
   } catch (error) {
     if (error instanceof ComputerError) return Response.json({ error: error.message }, { status: error.status, headers })

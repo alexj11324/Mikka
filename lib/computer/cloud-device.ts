@@ -47,7 +47,17 @@ export async function renewCloudDeviceToken(pool: Pool, actor: { userId: string;
       WHERE m."workspaceId"=$1 AND m."ownerId"=$2 AND m."deviceId"=$3 AND t."revokedAt" IS NULL
         AND t."expiresAt">now() AND t."expiresAt"<=now()+interval '1 hour' FOR UPDATE OF m,t`,
     [actor.workspaceId, actor.userId, actor.deviceId, actor.tokenId])
-    if (!current.rowCount) { await client.query('COMMIT'); return null }
+    if (!current.rowCount) {
+      const thread = await client.query(`SELECT t.id FROM thread_machines m
+        JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
+        JOIN devices d ON d.id=m."deviceId" AND d."ownerId"=m."ownerId" AND d.kind='cloud' AND d.enabled=true
+        JOIN device_tokens t ON t.id=$4 AND t."userId"=m."ownerId" AND t."boundDeviceId"=d.id AND t."boundWorkspaceId"=m."workspaceId"
+        WHERE m."workspaceId"=$1 AND m."ownerId"=$2 AND m."deviceId"=$3 AND m.state='running'
+          AND r.status IN ('queued','preparing','running','waiting_input','finishing') AND t."revokedAt" IS NULL
+          AND t."expiresAt">now() AND t."expiresAt"<=now()+interval '1 hour' FOR UPDATE OF m,t`,
+      [actor.workspaceId, actor.userId, actor.deviceId, actor.tokenId])
+      if (!thread.rowCount) { await client.query('COMMIT'); return null }
+    }
     // A lost response can be retried, but cannot mint unbounded tokens.
     const recent = await client.query(`SELECT 1 FROM device_tokens WHERE "boundDeviceId"=$1 AND "boundWorkspaceId"=$2
       AND "revokedAt" IS NULL AND "expiresAt">now()+interval '23 hours' AND "createdAt">now()-interval '30 seconds' LIMIT 1`, [actor.deviceId, actor.workspaceId])

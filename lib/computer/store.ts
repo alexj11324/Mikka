@@ -37,6 +37,12 @@ export class ComputerStore {
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [key])
       const machine = (await client.query<Machine>('SELECT * FROM cloud_machines WHERE "workspaceId"=$1 FOR UPDATE', [workspaceId])).rows[0]
       const desktops = (await client.query<Desktop>('SELECT * FROM bot_desktops WHERE "workspaceId"=$1 ORDER BY display FOR UPDATE', [workspaceId])).rows
+      const subagents = (await client.query<{ id: string; botId: string; ownerId: string; epoch: number; controlledBy: string | null; controlUntil: Date | null; stopRequestedAt: Date | null }>(`SELECT * FROM bot_subagents WHERE "workspaceId"=$1
+        AND state IN ('running','needs_you') AND "browserContextId" IS NOT NULL ORDER BY id FOR UPDATE`, [workspaceId])).rows
+      const threadDesktops = (await client.query<Desktop & { sandboxId: string; machineState: string }>(`SELECT d.*,1 AS display,t."sandboxId",t.state AS "machineState" FROM thread_desktops d
+        JOIN thread_machines t ON t."runId"=d."runId" AND t."ownerId"=d."ownerId" AND t."workspaceId"=d."workspaceId"
+        WHERE d."workspaceId"=$1 AND t."runtimeReady"=true AND t."sandboxId" IS NOT NULL AND t.state IN ('running','paused')
+        ORDER BY d."runId" FOR UPDATE OF d`, [workspaceId])).rows
       const policy = (await client.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version)
         VALUES ($1,$2,CASE WHEN $2='deny' THEN 1 ELSE 0 END)
         ON CONFLICT ("workspaceId") DO UPDATE SET permission=$2,"updatedAt"=now(),
@@ -54,11 +60,31 @@ export class ComputerStore {
           status=CASE WHEN r.status='queued' THEN 'stopped' ELSE r.status END
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."workspaceId"=$1
             AND r.status=ANY($2::text[])`, [workspaceId, ['queued', 'preparing', 'running', 'waiting_input', 'finishing']])
+        await client.query(`UPDATE bot_subagents SET "stopRequestedAt"=coalesce("stopRequestedAt",now()),
+          state=CASE WHEN state='queued' THEN 'stopped' ELSE state END,
+          "endedAt"=CASE WHEN state='queued' THEN now() ELSE "endedAt" END
+          WHERE "workspaceId"=$1 AND state IN ('queued','running','needs_you')`, [workspaceId])
       }
       const sync = async () => {
-        if (!machine?.sandboxId || !machine.runtimeReady || !desktops.length) return
-        const sandbox = await this.runtime.connectComputer(machine.sandboxId)
-        for (const desktop of desktops) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
+        if (machine?.sandboxId && machine.runtimeReady && desktops.length) {
+          const sandbox = await this.runtime.connectComputer(machine.sandboxId)
+          for (const desktop of desktops) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
+        }
+        if (machine?.sandboxId && machine.runtimeReady && subagents.length) {
+          const sandbox = await this.runtime.connectComputer(machine.sandboxId)
+          for (const subagent of subagents) await this.runtime.syncSubagentLease(sandbox, {
+            subagentId: subagent.id, botId: subagent.botId, ownerId: subagent.ownerId, workspaceId,
+            epoch: subagent.epoch, controlledBy: subagent.controlledBy,
+            controlUntil: subagent.controlUntil ? new Date(subagent.controlUntil).getTime() / 1000 : 0,
+            computerAllowed: permission !== 'deny', policyVersion: policy.version,
+            stopRequested: permission === 'deny' || !!subagent.stopRequestedAt,
+          })
+        }
+        for (const desktop of threadDesktops) {
+          const sandbox = await this.runtime.connectComputer(desktop.sandboxId)
+          await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
+          if (desktop.machineState === 'paused') await this.runtime.threadMachineProvider.pause(desktop.sandboxId)
+        }
       }
       // Every transition increments the policy version. The display lock
       // fences old approvals even if the subsequent database commit fails.
@@ -88,6 +114,7 @@ export class ComputerStore {
       FROM local_computer_reviews v JOIN agent_runs r ON r.id=v."runId" AND r."userId"=v."userId" AND r."deviceId"=v."deviceId"
       JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
       WHERE b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3 AND v.decision IS NULL
+        AND NOT EXISTS (SELECT 1 FROM thread_machines t WHERE t."runId"=r.id)
         AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')
         AND v."expiresAt">now() AND v."seenAt">now()-interval '10 seconds' AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now()
         AND r.status=ANY($4::text[]) ORDER BY v."seenAt",v.id LIMIT 1`, [botId, actor.workspaceId, actor.userId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows[0]

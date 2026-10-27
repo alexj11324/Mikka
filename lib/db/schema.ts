@@ -267,7 +267,7 @@ export const runTokens = pgTable('run_tokens', {
  * (lib/attention): the person has not seen it, and the Coordinator alone
  * decides whether to tell them.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'suggestion_start', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth
@@ -351,6 +351,11 @@ export const suggestions = pgTable('suggestions', {
   required: boolean('required').notNull().default(false),
   occurredAt: timestamp('occurredAt', { withTimezone: true }).notNull(),
   dismissedAt: timestamp('dismissedAt', { withTimezone: true }),
+  executionState: text('executionState').$type<'not_started' | 'running' | 'completed' | 'failed'>().notNull().default('not_started'),
+  executionStartedAt: timestamp('executionStartedAt', { withTimezone: true }),
+  executionFinishedAt: timestamp('executionFinishedAt', { withTimezone: true }),
+  executionRunId: uuid('executionRunId').references(() => agentRuns.id, { onDelete: 'set null' }),
+  executionSubagentId: uuid('executionSubagentId'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('suggestions_external_key').on(table.userId, table.source, table.externalId), index('suggestions_user_shown_idx').on(table.userId, table.shown, table.createdAt)])
 

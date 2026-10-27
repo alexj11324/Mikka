@@ -26,10 +26,6 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
   'use workflow'
   const holder = getWorkflowMetadata().workflowRunId
   const computerEnabled = await steps.computerToolsEnabled()
-  const agent = new WorkflowAgent({
-    model: COORDINATOR_MODEL,
-    tools: coordinatorTools(userId, botId, undefined, computerEnabled),
-  })
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const inbox = await steps.takeInbox(userId, holder, botId)
     if (!inbox.held) return
@@ -38,13 +34,15 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
       return
     }
     try {
+      const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, tools: coordinatorTools(userId, botId, undefined, computerEnabled, inbox.suggestionIds) })
       const selected = await native.runtime(userId)
       const result = selected.harness === 'ai_sdk'
         ? await agent.generate({ ...(await steps.preparePrompt(userId, botId)), stopWhen: isStepCount(AGENT_MAX_ROUNDS), prepareStep: coordinatorStep })
-        : await nativeCoordinatorTurn(userId, holder, round, selected, scope => coordinatorTools(userId, botId, scope, computerEnabled), botId)
+        : await nativeCoordinatorTurn(userId, holder, round, selected, scope => coordinatorTools(userId, botId, scope, computerEnabled, inbox.suggestionIds), botId)
       // After a quiet decision on hidden evidence there is nothing to say, so a quiet or empty reply is not a warning.
       const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
       await steps.appendMessages(userId, holder, result.responseMessages, quiet ? null : turnWarning(result.finishReason, result.text), botId)
+      await steps.failUnattachedSuggestions(userId, inbox.suggestionIds)
       if (inbox.handoffMatterIds.length) await steps.settleAttention(userId, inbox.handoffMatterIds, inbox.handoffOnly && !quiet)
       if (inbox.telegramTargets.length && result.text.trim()) {
         // The reply is saved and shows on the web; a Telegram failure (a
@@ -60,6 +58,7 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
         }
       }
     } catch (error) {
+      await steps.failUnattachedSuggestions(userId, inbox.suggestionIds)
       // The messages stay in the conversation; the next wake answers them.
       await steps.failTurn(userId, holder, error instanceof Error ? error.message : String(error), botId)
       throw error
@@ -69,12 +68,13 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
 }
 
 /** Every bot's tools. Each one runs as a step scoped to the person; memory and dispatched runs belong to the bot (null: the Coordinator). */
-export function coordinatorTools(userId: string, botId: string | null, scope?: NativeToolScope, computerEnabled = false) {
+export function coordinatorTools(userId: string, botId: string | null, scope?: NativeToolScope, computerEnabled = false, activeSuggestionIds: readonly string[] = []) {
   const id = z.uuid()
   // A named Bot always controls its own computer. The built-in Coordinator
   // may select any authorized Bot on the person's explicit instruction.
   const botInput = botId ? id.optional() : id
   const targetBot = (requested?: string) => botId ? (!requested || requested === botId ? botId : null) : requested ?? null
+  const suggestionAllowed = (id?: string) => !id || activeSuggestionIds.includes(id)
   return {
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input, scope)),
     ...createGoogleAITools((action, input) => steps.composioAction(userId, action, input, scope), (action, input) => steps.proposeAccountAction(userId, action, input, scope)),
@@ -131,8 +131,8 @@ export function coordinatorTools(userId: string, botId: string | null, scope?: N
       }),
       dispatch_bot_computer: tool({
         description: 'When asked to use a Bot computer, queue a thread for an existing issue on that Bot. The computer must be awake and the person must already have linked a subscription. Computer operations still require their approval.',
-        inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional() }),
-        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerTask(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
+        inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional(), suggestionId: id.optional() }),
+        execute: (input, options) => { const target = targetBot(input.botId); return !suggestionAllowed(input.suggestionId) ? { error: 'suggestionMismatch' } : target ? steps.dispatchComputerTask(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
       }),
     } : {}),
     dispatch_run: tool({
@@ -141,8 +141,9 @@ export function coordinatorTools(userId: string, botId: string | null, scope?: N
         issueId: id, agentId: id,
         deviceRepoId: id.describe('A repository id from list_agents, on the agent\'s own device.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
+        suggestionId: id.optional().describe('The suggestionId from the person’s clicked suggestion, if this run starts that suggestion.'),
       }),
-      execute: input => steps.dispatchRun(userId, input, scope, botId),
+      execute: input => suggestionAllowed(input.suggestionId) ? steps.dispatchRun(userId, input, scope, botId) : { error: 'suggestionMismatch' },
     }),
     list_runs: tool({
       description: 'List recent runs, newest first, optionally for one issue or only those still going.',

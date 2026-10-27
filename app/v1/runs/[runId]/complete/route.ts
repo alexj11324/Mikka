@@ -2,7 +2,7 @@ import { after, NextResponse } from 'next/server'
 import { and, eq, inArray } from 'drizzle-orm'
 import { runStateForStop } from '@mikka/protocol/daemon'
 import { runCompleteRequest, reachesReview } from '@mikka/protocol/run'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { agentRuns, devices, issues, type RunStatus } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
@@ -10,8 +10,17 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { revokeRunTokens } from '@/lib/mcp/worker'
+import { finishSuggestionRun } from '@/lib/suggestions/execution'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300
+
+async function finalizeThread(runId: string, userId: string) {
+  const row = (await pool.query('SELECT "workspaceId" FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND state<>\'ended\'', [runId, userId])).rows[0]
+  if (!row) return
+  try { await (await import('@/lib/computer/thread-result')).finalizeCloudThread(pool, { userId, workspaceId: row.workspaceId }, runId) }
+  catch { console.error('Cloud thread finalization will be retried') }
+}
 
 /** A run in one of these states may still be completed; the rest already ended. */
 const LIVE_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const
@@ -34,7 +43,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     .limit(1)
   if (!run) return NextResponse.json({ error: 'Unknown run.' }, { status: 404 })
   // A run ends once: a repeated completion is accepted and ignored.
-  if (!(LIVE_STATUSES as readonly string[]).includes(run.status)) return new NextResponse(null, { status: 204 })
+  if (!(LIVE_STATUSES as readonly string[]).includes(run.status)) {
+    await finishSuggestionRun(pool, run.userId, runId, run.status)
+    after(() => finalizeThread(runId, run.userId))
+    return new NextResponse(null, { status: 204 })
+  }
   const parsed = runCompleteRequest.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid completion.' }, { status: 400 })
   const { stopReason, report } = parsed.data
@@ -52,6 +65,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     .returning({ id: agentRuns.id })
   // Only the completion that ended the run tells the Coordinator.
   if (ended.length) {
+    await finishSuggestionRun(pool, run.userId, runId, status)
+    after(() => finalizeThread(runId, run.userId))
     await revokeRunTokens(runId)
     await recordCoordinatorEvent(db, runFinishedEvent({ ...run, status, stopReason, report }))
     after(() => wakeCoordinator(run.userId))

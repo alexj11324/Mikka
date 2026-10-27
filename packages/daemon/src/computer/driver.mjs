@@ -151,9 +151,9 @@ export async function executeDriver(driver, input, display, leaseGuard) {
   );
   if (leaseGuard && (driver.path !== "/opt/mikka/computer/cua-driver" || display === undefined || typeof leaseGuard.botId !== "string" || typeof leaseGuard.ownerId !== "string" || !leaseGuard.botId || !leaseGuard.ownerId || !Number.isSafeInteger(leaseGuard.policyVersion) || leaseGuard.policyVersion < 0 || leaseGuard.policyVersion > 2147483647 || [leaseGuard.botId, leaseGuard.ownerId].some(value => value.length > 128 || value.includes("\0"))))
     throw new Error("Invalid desktop lease");
-  const command = leaseGuard ? "flock" : driver.path;
+  const command = leaseGuard ? "/usr/bin/python3" : driver.path;
   const argsForProcess = leaseGuard
-    ? ["-F", "-s", `/run/mikka-viewer/${display.slice(1)}.lock`, "/usr/bin/python3", "/opt/mikka/computer/lease-driver.py", display, leaseGuard.botId, leaseGuard.ownerId, String(leaseGuard.policyVersion)]
+    ? ["/opt/mikka/computer/lease-driver.py", display, leaseGuard.botId, leaseGuard.ownerId, String(leaseGuard.policyVersion)]
     : ["mcp", "--direct"];
   const child = spawn(command, argsForProcess, {
     env: { ...env, ...(display === undefined ? {} : { DISPLAY: display }) },
@@ -187,15 +187,31 @@ export async function executeDriver(driver, input, display, leaseGuard) {
       fail(new Error("Invalid driver response"));
     }
   });
-  child.stderr.resume(); // Never forward desktop/process content to daemon logs.
-  child.on("error", fail);
-  child.on("exit", () =>
-    fail(
-      new Error(
-        "Driver exited before confirming operation; no automatic retry",
-      ),
-    ),
-  );
+  let readyResolve, readyReject;
+  const ready = leaseGuard ? new Promise((resolve, reject) => { readyResolve = resolve; readyReject = reject; }) : Promise.resolve();
+  if (leaseGuard) {
+    let prefix = "";
+    child.stderr.on("data", (chunk) => {
+      if (!readyResolve) return;
+      prefix += chunk.toString();
+      const newline = prefix.indexOf("\n");
+      if (newline >= 0) {
+        if (prefix.slice(0, newline) === "MIKKA_LEASE_READY") readyResolve();
+        else readyReject(new Error("Desktop control unavailable"));
+        readyResolve = undefined; readyReject = undefined;
+      } else if (prefix.length > 1024) {
+        readyReject(new Error("Desktop control unavailable"));
+        readyResolve = undefined; readyReject = undefined;
+      }
+    });
+  } else child.stderr.resume(); // Never forward desktop/process content to daemon logs.
+  const exited = () => {
+    const error = new Error("Driver exited before confirming operation; no automatic retry");
+    if (readyReject) { readyReject(error); readyResolve = undefined; readyReject = undefined; }
+    fail(error);
+  };
+  child.on("error", (error) => { if (readyReject) { readyReject(error); readyResolve = undefined; readyReject = undefined; } fail(error); });
+  child.on("exit", exited);
   const request = (method, params) =>
     new Promise((resolve, reject) => {
       const n = ++id;
@@ -204,15 +220,16 @@ export async function executeDriver(driver, input, display, leaseGuard) {
         JSON.stringify({ jsonrpc: "2.0", id: n, method, params }) + "\n",
       );
     });
-  const timer = setTimeout(() => {
-    fail(
-      new Error(
-        "Driver timed out; outcome unknown, do not retry automatically",
-      ),
-    );
-    child.kill();
-  }, 30000);
+  let timer;
   try {
+    // Waiting for a person or another agent is not a driver timeout. No RPC
+    // is sent until the lock is held and the run is still permitted.
+    await ready;
+    if (leaseGuard?.permitted && !leaseGuard.permitted()) throw new Error("Computer run is no longer active");
+    timer = setTimeout(() => {
+      fail(new Error("Driver timed out; outcome unknown, do not retry automatically"));
+      child.kill();
+    }, 30000);
     await request("initialize", {
       protocolVersion: "2024-11-05",
       capabilities: {},

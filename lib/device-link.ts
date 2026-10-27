@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { cloudDeviceScopeAllows } from '@/lib/device-token-scope'
+import { cloudDeviceIsActive } from '@/lib/computer/device-scope'
 import { z } from 'zod'
 import { agentRuns, deviceTokens, devices, runMessages } from '@/lib/db/schema'
 import type { RunCommand } from '@mikka/protocol/device'
@@ -53,8 +54,7 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
   if (row.expiresAt && row.expiresAt.getTime() <= Date.now()) return null
   if (row.boundDeviceId || row.boundWorkspaceId) {
     if (!row.boundDeviceId || !row.boundWorkspaceId || !row.expiresAt) return null
-    const machine = await pool.query('SELECT 1 FROM cloud_machines m JOIN devices d ON d.id=m."deviceId" WHERE m."deviceId"=$1 AND m."workspaceId"=$2 AND m."ownerId"=$3 AND d."ownerId"=$3 AND d.kind=$4', [row.boundDeviceId, row.boundWorkspaceId, row.userId, 'cloud'])
-    if (!machine.rowCount) return null
+    if (!await cloudDeviceIsActive(pool, row.boundDeviceId, row.boundWorkspaceId, row.userId)) return null
     const allowed = await cloudDeviceScopeAllows(request, row.boundDeviceId, async (runId, deviceId) => {
       if (!z.uuid().safeParse(runId).success) return false
       const [run] = await db.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, row.userId), eq(agentRuns.deviceId, deviceId))).limit(1)

@@ -6,6 +6,15 @@ import { briefingEvent } from '@/lib/coordinator-events'
 
 const run = (payload: Record<string, unknown>) => ({ kind: 'run_finished' as const, payload: { stopReason: 'submitted', ...payload } })
 
+test('a clicked suggestion wakes the Coordinator with source content marked as untrusted', () => {
+  const payload = { suggestionId: 's1', source: 'github', action: 'review', title: 'Review the change', url: 'https://example.test/change', actor: 'Ada' }
+  assert.equal(ruleTier({ kind: 'suggestion_start', payload }), 'attention')
+  const prompt = eventPrompt({ kind: 'suggestion_start', issueId: null, runId: null, payload })
+  assert.match(prompt, /clicked this suggestion/)
+  assert.match(prompt, /untrusted data/)
+  assert.match(prompt, /"suggestionId":"s1"/)
+})
+
 test('clear cases follow the rules', () => {
   assert.equal(ruleTier({ kind: 'user_message', payload: { text: 'hi' } }), 'attention')
   assert.equal(ruleTier({ kind: 'issue_done', payload: { title: 'x' } }), 'background')

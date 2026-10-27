@@ -18,9 +18,10 @@ export async function syncComputerReviews(pool: Pool, deviceId: string, userId: 
     const device = (await client.query('SELECT id FROM devices WHERE id=$1 AND "ownerId"=$2 AND enabled=true FOR UPDATE', [deviceId, userId])).rows[0]
     if (!device) throw new Error('Device unavailable')
     for (const row of rows) {
-      const run = (await client.query(`SELECT r.id,b."botId",b."approvedForRun",d.display FROM agent_runs r
+      const run = (await client.query(`SELECT r.id,b."botId",b."approvedForRun",CASE WHEN t."runId" IS NOT NULL THEN 1 ELSE d.display END AS display FROM agent_runs r
         LEFT JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
         LEFT JOIN bot_desktops d ON d."botId"=b."botId" AND d."ownerId"=b."ownerId" AND d."workspaceId"=b."workspaceId"
+        LEFT JOIN thread_machines t ON t."runId"=b."runId" AND t."workspaceId"=b."workspaceId" AND t."ownerId"=b."ownerId" AND t."deviceId"=r."deviceId"
         WHERE r.id=$1 AND r."userId"=$2 AND r."deviceId"=$3 AND r."stopRequestedAt" IS NULL
           AND (b."workspaceId" IS NULL OR NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny'))
           AND r.status=ANY($4::text[]) AND (b."runId" IS NULL OR r."leaseExpiresAt">now()) FOR UPDATE OF r`, [row.runId, userId, deviceId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows[0]
@@ -53,10 +54,11 @@ export async function decideComputerReview(pool: Pool, actor: { userId: string; 
       JOIN local_computer_reviews v ON v."runId"=r.id
       JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=$3 AND b."workspaceId"=$4
       JOIN bot_desktops d ON d."botId"=b."botId" AND d."workspaceId"=b."workspaceId" AND d."ownerId"=b."ownerId"
+      LEFT JOIN thread_machines t ON t."runId"=b."runId" AND t."workspaceId"=b."workspaceId" AND t."ownerId"=b."ownerId" AND t."deviceId"=r."deviceId"
       JOIN devices dev ON dev.id=v."deviceId" AND dev."ownerId"=$3 AND dev.enabled=true
       WHERE v.id=$1 AND v.digest=$2 AND v."userId"=$3 AND v.decision IS NULL AND v."expiresAt">now()
         AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')
-        AND v."seenAt">now()-interval '10 seconds' AND v.display=':' || d.display::text
+        AND v."seenAt">now()-interval '10 seconds' AND v.display=':' || (CASE WHEN t."runId" IS NOT NULL THEN 1 ELSE d.display END)::text
         AND r."userId"=$3 AND r."deviceId"=v."deviceId" AND r."stopRequestedAt" IS NULL
         AND r."leaseExpiresAt">now() AND r.status=ANY($5::text[]) FOR UPDATE OF r`,
     [id, digest, actor.userId, actor.workspaceId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows[0]

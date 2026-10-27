@@ -1,5 +1,5 @@
 import 'server-only'
-import { createHmac } from 'node:crypto'
+import { createHmac, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Sandbox } from 'e2b'
@@ -44,6 +44,81 @@ export const threadMachineProvider = {
   async resume(sandboxId: string) { await Sandbox.connect(sandboxId, options()) },
   async pause(sandboxId: string) { await Sandbox.pause(sandboxId, options()) },
   async kill(sandboxId: string) { await Sandbox.kill(sandboxId, options()) },
+}
+
+/** A clean staging sandbox contains the pinned worker image, but no Bot
+ * desktop, browser profile, worker credential or E2B control-plane key. */
+export async function createWorkspaceSnapshotStage() {
+  const template = process.env.E2B_COMPUTER_TEMPLATE
+  if (!template) throw new Error('Cloud desktop template is not configured')
+  return Sandbox.create(template, { ...options(), lifecycle: { onTimeout: 'kill' } })
+}
+
+export async function createWorkspaceSnapshot(stage: Sandbox) {
+  return stage.createSnapshot({ mode: 'filesystem' })
+}
+
+export async function deleteWorkspaceSnapshot(snapshotId: string) {
+  await Sandbox.deleteSnapshot(snapshotId, options())
+}
+
+export type SubagentLease = { subagentId: string; botId: string; workspaceId: string; ownerId: string; epoch: number; controlledBy: string | null; controlUntil: number; computerAllowed: boolean; policyVersion: number; stopRequested: boolean }
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const validSubagent = (id: string) => { if (!uuid.test(id)) throw new Error('Invalid subagent') }
+
+export async function installSubagentRuntime(sandbox: Sandbox) {
+  for (const name of ['subagent-browser.mjs', 'subagent-rpc.mjs', 'subagent-viewer.py', 'subagent-command.py', 'start-subagent.sh']) {
+    await sandbox.files.write(`/opt/mikka/computer/${name}`, await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8'), { user: 'root' })
+  }
+  await sandbox.commands.run('install -d -o root -g root -m 0711 /run/mikka-subagent; flock -n /run/mikka-subagent/gateway.lock /usr/bin/python3 /opt/mikka/computer/subagent-viewer.py', { user: 'root', background: true, timeoutMs: 0 })
+  await sandbox.commands.run(`for i in $(seq 1 50); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6081/subagents/00000000-0000-4000-8000-000000000000)" = 401 ] && exit 0; sleep .2; done; exit 1`, { user: 'root', timeoutMs: 15_000 })
+}
+
+export async function startSubagentBrowser(sandbox: Sandbox, id: string) {
+  validSubagent(id)
+  await sandbox.commands.run(`bash /opt/mikka/computer/start-subagent.sh ${id} > /tmp/mikka-subagent-${id}.log 2>&1`, { user: 'user', background: true, timeoutMs: 0 })
+  await sandbox.commands.run(`for i in $(seq 1 100); do python3 -c 'import socket,sys; s=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); s.close()' /home/user/.mikka/subagents/${id}/browser.sock 2>/dev/null && exit 0; sleep .2; done; exit 1`, { user: 'user', timeoutMs: 25_000 })
+}
+
+/** The state file is root-written and user-readable; its lock serializes
+ * approved agent actions, viewer input, takeover, stop and policy revocation. */
+export async function syncSubagentLease(sandbox: Sandbox, lease: SubagentLease) {
+  validSubagent(lease.subagentId); validSubagent(lease.botId); validSubagent(lease.workspaceId)
+  const path = `/run/mikka-subagent/${lease.subagentId}`
+  await sandbox.commands.run(`touch ${path}.lock; chown root:$(id -gn user) ${path}.lock; chmod 660 ${path}.lock`, { user: 'root', timeoutMs: 10_000 })
+  await sandbox.files.write(`${path}.next`, JSON.stringify(lease), { user: 'root' })
+  await sandbox.commands.run(`chown root:$(id -gn user) ${path}.next; chmod 640 ${path}.next; flock -x ${path}.lock mv ${path}.next ${path}.json`, { user: 'root', timeoutMs: 45_000 })
+}
+
+export async function subagentViewerGrant(sandbox: Sandbox, lease: SubagentLease, userId: string, mode: 'view' | 'control') {
+  if (mode === 'control' && (lease.controlledBy !== userId || lease.controlUntil <= Date.now() / 1000)) throw new Error('Control is not held')
+  const exp = Math.floor(Date.now() / 1000) + 120
+  const payload = Buffer.from(JSON.stringify({ kind: 'subagent', ...lease, userId, mode, exp })).toString('base64url')
+  const key = await sandbox.files.read('/run/mikka-viewer/key', { user: 'root', format: 'bytes' })
+  const signature = createHmac('sha256', key).update(payload).digest('base64url')
+  return { url: `wss://${sandbox.getHost(6081)}/subagents/${lease.subagentId}?token=${payload}.${signature}`, expiresAt: new Date(exp * 1000).toISOString() }
+}
+
+/** Only reviewed, fixed actions reach the private browser RPC. No request
+ * content enters argv, shell source, access logs or the model's environment. */
+export async function subagentBrowserAction(sandbox: Sandbox, lease: SubagentLease, request: { action: 'navigate' | 'snapshot' | 'click' | 'type'; url?: string; ref?: number; text?: string }) {
+  validSubagent(lease.subagentId); validSubagent(lease.botId); validSubagent(lease.workspaceId)
+  if (!/^[A-Za-z0-9._:@-]{1,128}$/.test(lease.ownerId) || !Number.isSafeInteger(lease.policyVersion) || lease.policyVersion < 0) throw new Error('Invalid browser lease')
+  const requestId = randomUUID(), dir = `/home/user/.mikka/subagents/${lease.subagentId}`
+  await sandbox.files.write(`${dir}/request-${requestId}.json`, JSON.stringify(request), { user: 'user' })
+  try {
+    const result = await sandbox.commands.run(`/usr/bin/python3 /opt/mikka/computer/subagent-command.py ${lease.subagentId} ${requestId} ${lease.botId} ${lease.ownerId} ${lease.workspaceId} ${lease.policyVersion}`, { user: 'user', timeoutMs: 0 })
+    return JSON.parse(result.stdout)
+  } finally { await sandbox.commands.run(`rm -f ${dir}/request-${requestId}.json`, { user: 'user', timeoutMs: 10_000 }).catch(() => undefined) }
+}
+
+export async function stopSubagentBrowser(sandbox: Sandbox, id: string) {
+  validSubagent(id)
+  const requestId = randomUUID(), dir = `/home/user/.mikka/subagents/${id}`
+  await sandbox.files.write(`${dir}/request-${requestId}.json`, JSON.stringify({ action: 'close' }), { user: 'user' })
+  try {
+    await sandbox.commands.run(`if [ -S ${dir}/browser.sock ]; then flock -x /run/mikka-subagent/${id}.lock /usr/local/bin/node /opt/mikka/computer/subagent-rpc.mjs ${id} ${requestId} || flock -n ${dir}/launch.lock true; fi; flock -w 30 ${dir}/launch.lock true`, { user: 'user', timeoutMs: 45_000 })
+  } finally { await sandbox.commands.run(`rm -f ${dir}/request-${requestId}.json`, { user: 'user', timeoutMs: 10_000 }).catch(() => undefined) }
 }
 
 export async function installComputerRuntime(sandbox: Sandbox) {

@@ -48,7 +48,7 @@ export async function GET(request: Request) {
   const [, items] = await Promise.all([todaysBriefing(user.id, timeZone, { onPushed: () => after(() => wakeCoordinator(user.id)) }), listSuggestions(user.id)])
   const groups = new Map<SuggestionSource, typeof items>()
   for (const item of items) groups.set(item.source, [...groups.get(item.source) ?? [], item])
-  const view = (item: (typeof items)[number]) => ({ id: item.id, source: item.source, action: item.action, title: item.title, actionTitle: item.actionTitle, url: item.url, actor: item.actor, required: item.required, occurredAt: item.occurredAt })
+  const view = (item: (typeof items)[number]) => ({ id: item.id, source: item.source, action: item.action, title: item.title, actionTitle: item.actionTitle, url: item.url, actor: item.actor, required: item.required, occurredAt: item.occurredAt, executionState: item.executionState })
   return NextResponse.json({
     groups: [...groups].map(([source, list]) => ({ source, items: list.map(view) })),
   }, { headers })

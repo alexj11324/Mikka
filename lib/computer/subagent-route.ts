@@ -1,0 +1,12 @@
+import { auth } from '@/lib/auth'
+import { pool } from '@/lib/db'
+import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { SubagentStore } from './subagent-store'
+import { createSubagentHandler } from './subagent-handler'
+
+export const subagentRoute = createSubagentHandler(new SubagentStore(pool), async request => {
+  const session = await auth.api.getSession({ headers: request.headers })
+  if (!session?.user) return null
+  const context = await loadWorkspaceContext(undefined, session.user)
+  return { userId: session.user.id, workspaceId: context.workspace.id }
+})

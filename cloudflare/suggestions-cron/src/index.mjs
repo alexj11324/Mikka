@@ -1,6 +1,7 @@
 // Scheduling only: each endpoint handles its own work in Mikka.
 export const SCHEDULES = {
   '*/15 * * * *': '/api/cron/briefings',
+  '*/10 * * * *': '/api/cron/thread-cleanup',
   '0 * * * *': '/api/cron/suggestions-reconcile',
 }
 
@@ -21,7 +22,7 @@ export async function runSchedule(cron, env, fetcher = fetch) {
       headers: { authorization: `Bearer ${env.CRON_SECRET}` },
       // Workers supports manual redirects; non-2xx responses are rejected below.
       redirect: 'manual',
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(endpoint === '/api/cron/thread-cleanup' ? 290_000 : 90_000),
     })
   } catch {
     throw new Error(`${endpoint} request failed`)

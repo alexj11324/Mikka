@@ -31,7 +31,7 @@ test('each schedule calls only its endpoint and logs only whitelisted numeric co
     assert.equal(call.redirect, 'manual')
     assert.ok(call.signal instanceof AbortSignal)
   }
-  assert.equal(calls.length, 2)
+  assert.equal(calls.length, Object.keys(SCHEDULES).length)
   assert.deepEqual(logs, Object.values(SCHEDULES).map(endpoint => `${endpoint} 200 {"zones":2,"due":1,"written":1,"empty":0,"skipped":0,"failed":0,"deferred":3,"pushed":1,"people":4}`))
 })
 
@@ -47,7 +47,7 @@ test('invalid count values and malformed responses never leak content to logs or
   assert.equal(logs.length, 1)
 })
 
-test('wrangler uploads the native module with both production schedules', () => {
+test('wrangler uploads the native module with all production schedules', () => {
   const source = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
   const config = JSON.parse(source.replace(/^\s*\/\/.*$/gm, ''))
   assert.equal(config.main, 'src/index.mjs')

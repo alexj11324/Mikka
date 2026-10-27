@@ -9,7 +9,7 @@ const belongs = async (id: string, device: string) => id === run && device === o
 const req = (path: string, init?: RequestInit) => new Request(`https://mikka.example${path}`, init)
 
 test('cloud device token admits only its own explicit daemon routes', async () => {
-  for (const path of [`/v1/devices/${own}/heartbeat`, `/mikka/v1/devices/${own}/runs`, `/v1/devices/${own}/runs/${run}/claim`, `/v1/runs/${run}/events`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), true)
+  for (const path of [`/v1/devices/${own}/heartbeat`, `/mikka/v1/devices/${own}/runs`, `/v1/devices/${own}/runs/${run}/claim`, `/v1/devices/${own}/runs/${run}/computer/wake`, `/v1/runs/${run}/events`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), true)
   for (const path of [`/v1/devices/${other}/heartbeat`, `/v1/devices/${own}/runs/${other}/claim`, `/v1/runs/${other}/events`, `/v1/devices/${own}/coordinator`, `/v1/devices/${own}/runs/${run}/future`, '/api/subscriptions', '/v1/devices/other']) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), false)
 })
 test('registration must explicitly name the bound device', async () => {

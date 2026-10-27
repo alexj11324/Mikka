@@ -1,7 +1,8 @@
 import 'server-only'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import type { SubagentState } from '@mikka/protocol/computer'
+import { finishSuggestionSubagent } from '@/lib/suggestions/execution'
 
 type Actor = { userId: string; workspaceId: string }
 export const BOT_SUBAGENT_LIMIT = 6
@@ -12,9 +13,20 @@ export type Subagent = { id: string; botId: string; task: string; state: Subagen
 export class SubagentQueue {
   constructor(private readonly pool: Pool) {}
 
-  async enqueue(actor: Actor, botId: string, task: string): Promise<Subagent> {
+  async enqueue(actor: Actor, botId: string, task: string, idempotencyKey?: string): Promise<Subagent> {
     const sentence = task.trim()
-    if (!sentence || sentence.length > 200) throw new Error('Invalid web task')
+    if (!sentence || sentence.length > 200 || (idempotencyKey !== undefined && (!idempotencyKey.length || idempotencyKey.length > 256))) throw new Error('Invalid web task')
+    const key = idempotencyKey === undefined ? null : createHash('sha256').update(JSON.stringify([actor.userId, actor.workspaceId, idempotencyKey])).digest('hex')
+    if (key) {
+      const keyed = await this.pool.query<Subagent>(`INSERT INTO bot_subagents (id,"workspaceId","ownerId","botId",task,"idempotencyKey")
+        SELECT $4,b."workspaceId",b."ownerId",b.id,$5,$6 FROM bots b WHERE b.id=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3
+        ON CONFLICT ("ownerId","workspaceId","idempotencyKey") WHERE "idempotencyKey" IS NOT NULL
+        DO UPDATE SET "idempotencyKey"=EXCLUDED."idempotencyKey"
+        WHERE bot_subagents."botId"=EXCLUDED."botId" AND bot_subagents.task=EXCLUDED.task RETURNING id,"botId",task,state`,
+      [botId, actor.workspaceId, actor.userId, randomUUID(), sentence, key])
+      if (!keyed.rowCount) throw new Error('Bot or web task unavailable')
+      return keyed.rows[0]
+    }
     const result = await this.pool.query<Subagent>(`INSERT INTO bot_subagents (id,"workspaceId","ownerId","botId",task)
       SELECT $4,b."workspaceId",b."ownerId",b.id,$5 FROM bots b
       WHERE b.id=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3 RETURNING id,"botId",task,state`,
@@ -30,7 +42,7 @@ export class SubagentQueue {
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`bot-subagent-capacity:${actor.workspaceId}`])
       const occupied = (await client.query<{ count: string }>(`SELECT count(*) AS count FROM bot_subagents WHERE "workspaceId"=$1 AND state IN ('running','needs_you')`, [actor.workspaceId])).rows[0]
       if (Number(occupied.count) >= BOT_SUBAGENT_LIMIT) { await client.query('COMMIT'); return null }
-      const result = await client.query<Subagent>(`UPDATE bot_subagents SET state='running',control='agent' WHERE id=(
+      const result = await client.query<Subagent>(`UPDATE bot_subagents SET state='running',control='agent',"startedAt"=now() WHERE id=(
         SELECT id FROM bot_subagents WHERE "workspaceId"=$1 AND "ownerId"=$2 AND state='queued'
         ORDER BY "createdAt",id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id,"botId",task,state`, [actor.workspaceId, actor.userId])
       await client.query('COMMIT')
@@ -41,13 +53,14 @@ export class SubagentQueue {
   /** A running browser retains its slot until a worker actually closes it.
    * Queued tasks need no cleanup and can become terminal immediately. */
   async stop(actor: Actor, botId: string, id: string): Promise<boolean> {
-    const result = await this.pool.query(`UPDATE bot_subagents SET
+    const result = await this.pool.query<{ state: SubagentState }>(`UPDATE bot_subagents SET
         state=CASE WHEN state='queued' THEN 'stopped' ELSE state END,
         control=CASE WHEN state='queued' THEN 'idle' ELSE control END,
         "endedAt"=CASE WHEN state='queued' THEN now() ELSE "endedAt" END,
         "stopRequestedAt"=COALESCE("stopRequestedAt",now())
-      WHERE id=$1 AND "botId"=$2 AND "workspaceId"=$3 AND "ownerId"=$4 AND state IN ('queued','running','needs_you') RETURNING id`,
+      WHERE id=$1 AND "botId"=$2 AND "workspaceId"=$3 AND "ownerId"=$4 AND state IN ('queued','running','needs_you') RETURNING state`,
     [id, botId, actor.workspaceId, actor.userId])
+    if (result.rows[0]?.state === 'stopped') await finishSuggestionSubagent(this.pool, actor.userId, id, 'stopped')
     return result.rowCount === 1
   }
 
@@ -59,6 +72,7 @@ export class SubagentQueue {
         control='idle',"endedAt"=now(),"browserContextId"=NULL
       WHERE id=$1 AND "botId"=$2 AND "workspaceId"=$3 AND "ownerId"=$4 AND state IN ('running','needs_you')
       RETURNING id,"botId",task,state`, [id, botId, actor.workspaceId, actor.userId, outcome])
+    if (result.rows[0]) await finishSuggestionSubagent(this.pool, actor.userId, id, result.rows[0].state)
     return result.rows[0] ?? null
   }
 }

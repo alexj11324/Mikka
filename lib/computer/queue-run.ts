@@ -33,17 +33,18 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     [input.botId, actor.userId, actor.workspaceId, input.agentId, input.deviceRepoId])).rows[0]
     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
     const prompt = runPrompt(input.title, input.body, target.instructions, input.note)
+    const dedicated = process.env.MIKKA_CLOUD_THREAD_MACHINES === '1'
     if (digest) {
       const existing = (await client.query(`SELECT r."userId",r."issueId",r."agentId",r."deviceId",r."deviceRepoId",r.prompt,r."botId" AS "runBotId",b."botId",b."workspaceId"
         FROM agent_runs r LEFT JOIN computer_run_bindings b ON b."runId"=r.id WHERE r.id=$1`, [runId])).rows[0]
       if (existing) {
-        if (existing.userId !== actor.userId || existing.issueId !== input.issueId || existing.agentId !== input.agentId || existing.deviceId !== target.deviceId || existing.deviceRepoId !== input.deviceRepoId || existing.runBotId !== input.botId || existing.botId !== input.botId || existing.workspaceId !== actor.workspaceId || existing.prompt !== prompt) throw new ComputerError(409, 'Task request changed')
+        if (existing.userId !== actor.userId || existing.issueId !== input.issueId || existing.agentId !== input.agentId || (!dedicated && (existing.deviceId !== target.deviceId || existing.deviceRepoId !== input.deviceRepoId)) || existing.runBotId !== input.botId || existing.botId !== input.botId || existing.workspaceId !== actor.workspaceId || existing.prompt !== prompt) throw new ComputerError(409, 'Task request changed')
         await client.query('COMMIT')
         return { runId }
       }
     }
     await client.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt,"botId")
-      VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9)`, [runId, actor.userId, input.issueId, input.agentId, target.deviceId, input.deviceRepoId, target.baseBranch, prompt, input.botId])
+      VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9)`, [runId, actor.userId, input.issueId, input.agentId, dedicated ? null : target.deviceId, input.deviceRepoId, target.baseBranch, prompt, input.botId])
     await client.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId, input.botId, actor.workspaceId, actor.userId])
     await client.query('COMMIT')
     return { runId }

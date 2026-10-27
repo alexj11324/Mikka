@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process"
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { afterEach, describe, expect, it } from "vitest"
@@ -13,6 +13,15 @@ const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8" }).trim()
 
 describe("starting on the issue branch", () => {
+  it('does not run repository checkout hooks as the daemon', async () => {
+    const repo = await makeRepo()
+    const marker = join(tempDir(), 'hook-ran')
+    const hook = join(repo, '.git', 'hooks', 'post-checkout')
+    writeFileSync(hook, `#!/bin/sh\ntouch '${marker}'\n`)
+    chmodSync(hook, 0o755)
+    await new WorktreeManager(tempDir()).create('hook-fixture', repo, 'main')
+    expect(existsSync(marker)).toBe(false)
+  })
   /** A repo with an `origin` that has `main` and a person's commit on `mikka/orv-1`. */
   async function repoWithIssueBranch() {
     const repo = await makeRepo()

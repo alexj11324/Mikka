@@ -253,6 +253,9 @@ export class HttpServerLink implements ServerLink {
     const result = await this.call("POST", computerSyncPath(checkId(deviceId)), { body: { requests }, schema: computerSyncResponse, signal })
     return result.decisions
   }
+  async wakeThreadComputer(deviceId: string, runId: string) {
+    await this.call('POST', `/v1/devices/${seg(deviceId)}/runs/${seg(runId)}/computer/wake`, { timeoutMs: 120_000 })
+  }
   async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
     return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})
   }

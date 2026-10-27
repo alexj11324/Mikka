@@ -75,9 +75,11 @@ export interface InboxTake {
   handoffMatterIds: string[]
   /** Every event in the take is a handoff: a reply can only be telling the person about one. */
   handoffOnly: boolean
+  /** Suggestions explicitly started by the person in this inbox batch. */
+  suggestionIds: string[]
 }
 
-const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false }
+const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, suggestionIds: [] }
 
 export async function takeInbox(userId: string, holder: string, botId: string | null = null): Promise<InboxTake> {
   return db.transaction(async tx => {
@@ -110,6 +112,7 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
       telegramTargets: handoffs.some(carriesCode) ? [] : telegramReplyTargets(events),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
       handoffOnly: handoffs.length === events.length,
+      suggestionIds: events.flatMap(event => event.kind === 'suggestion_start' && typeof event.payload.suggestionId === 'string' ? [event.payload.suggestionId] : []),
     }
   })
 }

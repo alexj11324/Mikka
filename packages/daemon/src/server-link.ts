@@ -84,6 +84,8 @@ export interface ServerLink {
   claimRun(deviceId: string, runId: string): Promise<RunAssignment>
   /** Owner-reviewed computer requests; responses carry decisions only. */
   syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]>
+  /** Lazily starts a thread machine's own desktop before an approved call. */
+  wakeThreadComputer?(deviceId: string, runId: string): Promise<void>
   /** Private hosted-run channel; these methods never return provider tokens. */
   nativeContext?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeBrokerContext>
   nativeRequest?(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal):Promise<{contentType:string;body:ReadableStream<Uint8Array>}>

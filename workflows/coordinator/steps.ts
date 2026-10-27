@@ -81,6 +81,11 @@ export async function releaseLease(userId: string, holder: string, botId: string
   return store.releaseLease(userId, holder, botId)
 }
 
+export async function failUnattachedSuggestions(userId: string, suggestionIds: string[]) {
+  'use step'
+  await (await import('@/lib/suggestions/execution')).failUnattachedSuggestions(pool, userId, suggestionIds)
+}
+
 export async function failTurn(userId: string, holder: string, error: string, botId: string | null = null) {
   'use step'
   await store.failTurn(userId, holder, error, botId)
@@ -207,10 +212,15 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
 }
 
 /** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope, botId: string | null = null) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string; suggestionId?: string }, scope?: NativeToolScope, botId: string | null = null) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId)), status: 'queued' }))
+  return asToolResult(async () => {
+    const { suggestionId, ...runInput } = input
+    const result = await queueRun(userId, runInput, botId)
+    if (suggestionId) await (await import('@/lib/suggestions/execution')).attachSuggestionRun(pool, userId, suggestionId, result.runId)
+    return { ...result, status: 'queued' }
+  })
 }
 
 /** Only the person's own Bots in workspaces they still belong to are listed. */
@@ -255,7 +265,7 @@ export async function listComputerBots(userId: string, scope?: NativeToolScope) 
 }
 
 /** Queue and bind atomically, with a stable tool-call id for workflow retries. */
-export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string }, toolCallId: string, scope?: NativeToolScope) {
+export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; suggestionId?: string }, toolCallId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
@@ -268,6 +278,15 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
   if (!issue) return { error: 'issueNotFound' }
   try {
     const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, idempotencyKey: `coordinator:${toolCallId}` })
+    if (input.suggestionId) await (await import('@/lib/suggestions/execution')).attachSuggestionRun(pool, userId, input.suggestionId, result.runId)
+    if (process.env.MIKKA_CLOUD_THREAD_MACHINES === '1') {
+      const actor = { userId, workspaceId: target.workspaceId as string }
+      try { await (await import('@/lib/computer/provision-thread')).provisionCloudThread(pool, actor, result.runId, input.botId) }
+      catch {
+        await (await import('@/lib/computer/thread-failure')).failThreadProvision(pool, actor, result.runId)
+        return { error: 'cloudThreadUnavailable', runId: result.runId }
+      }
+    }
     return { ...result, botId: input.botId, task: issue.title, status: 'queued' as const }
   } catch { return { error: 'cloudComputerUnavailable' } }
 }
