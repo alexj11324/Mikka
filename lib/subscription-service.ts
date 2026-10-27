@@ -1,3 +1,4 @@
+import { workerSubscriptionMatches } from './agent-kit/worker'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { quotaSnapshotSchema, type QuotaSnapshot } from '@mikka/protocol'
 import { authorizeSubscriptionUse, SubscriptionRefusal, type SubscriptionAccess, type SubscriptionRoute, type SubscriptionUse } from '@mikka/protocol/subscription'
@@ -92,9 +93,10 @@ export class SubscriptionService {
   }
   async check(use: SubscriptionUse, signal?: AbortSignal) { return authorizeSubscriptionUse(use, await this.access(use, signal)) }
   async nativeRun(ownerId: string, deviceId: string, runId: string) {
-    const { rows } = await this.repository.pool.query(`select b.id,b."workspaceId",b."consumerId",b.route from byos_native_runs n join agent_runs r on r.id=n."runId" join agents a on a.id=r."agentId" join byos_bindings b on b.id=n."bindingId" where r.id=$1 and r."userId"=$2 and r."deviceId"=$3 and a."userId"=$2 and a."deviceId"=$3 and b."ownerId"=$2 and b."consumerId"=a.id::text and b.route=case a.harness when 'codex' then 'codex_cli' when 'claude_code' then 'claude_code_cli' else '' end and r.status in ('preparing','running','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, [runId,ownerId,deviceId])
+    const { rows } = await this.repository.pool.query(`select b.id,b."workspaceId",b."consumerId",b.route,b."modelId",r."agentDefinition",a.harness from byos_native_runs n join agent_runs r on r.id=n."runId" join agents a on a.id=r."agentId" join devices d on d.id=r."deviceId" and d."ownerId"=r."userId" and d.enabled=true join byos_bindings b on b.id=n."bindingId" where r.id=$1 and r."userId"=$2 and r."deviceId"=$3 and a."userId"=$2 and b."ownerId"=$2 and b."consumerId"=a.id::text and d.harnesses @> jsonb_build_array(jsonb_build_object('harness',coalesce(r."agentDefinition"->>'harness',a.harness),'installed',true,'subscriptionBroker',true)) and r.status in ('preparing','running','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, [runId,ownerId,deviceId])
     if (!rows[0]) throw new SubscriptionRefusal('account_unavailable')
     const row=rows[0]
+    if (!workerSubscriptionMatches(row.agentDefinition,row.harness,row)) throw new SubscriptionRefusal('binding_mismatch')
     return {ownerId,workspaceId:row.workspaceId,consumerId:row.consumerId,bindingId:row.id,execution:'native',runId} as const
   }
   async nativeContext(use: SubscriptionUse, signal?: AbortSignal) {

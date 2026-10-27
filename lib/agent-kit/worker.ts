@@ -32,3 +32,13 @@ export function freezeWorkerDefinition(input: { harness: Harness; instructions: 
 export function retryWorkerDefinition(snapshot: WorkerDefinitionSnapshot | null | undefined, prompt: string): WorkerDefinitionSnapshot | null {
   return snapshot ? { ...structuredClone(snapshot),promptDigest:digest(prompt) } : null
 }
+
+/** Match a claimed run's subscription without following a later Agent edit. */
+export function workerSubscriptionMatches(snapshot: WorkerDefinitionSnapshot | null | undefined, currentHarness: string, binding: { id:string; modelId:string; route:string }): boolean {
+  const harness=snapshot?.harness ?? currentHarness
+  const route=harness==='codex'?'codex_cli':harness==='claude_code'?'claude_code_cli':null
+  if (!route || binding.route!==route) return false
+  if (!snapshot) return true
+  const pinned=snapshot.subscription
+  return Boolean(pinned && pinned.bindingId===binding.id && pinned.modelId===binding.modelId && pinned.route===binding.route)
+}
