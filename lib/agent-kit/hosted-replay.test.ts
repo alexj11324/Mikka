@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import type { Pool } from 'pg'
 import { AgentKitStore } from './store'
 import { DEFAULT_AGENT_DEFINITION } from './builtin'
 
@@ -24,7 +23,7 @@ function fakeRepository() {
     if(sql.startsWith('insert into agent_kit_evaluations')) {evaluations.set(String(args[4]),{id:args[0],proposal_id:args[3],mode:args[5],model:args[6],status:'running',reports:null});return {rows:[]} }
     throw new Error(`Unexpected isolated query: ${sql}`)
   } }
-  return {store:new AgentKitStore({connect:async()=>client} as unknown as Pool),executions,version}
+  return {store:new AgentKitStore({connect:async()=>client} as unknown as ConstructorParameters<typeof AgentKitStore>[0]),executions,version}
 }
 const runtime = {harness:'ai_sdk',model:'saved-model',modelSelection:{type:'subscription' as const,bindingId:id(3),ownerId:'alice',consumerId:id(1),workspaceId:id(2),connectionId:id(4),connectionRevision:7,modelId:'saved-model',route:'claude_cpa' as const}}
 test('execution replay returns stored model selection before evaluating any new binding resolver',async()=>{
